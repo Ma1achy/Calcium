@@ -19,9 +19,15 @@ const CMD =
   "npx vitest run test/edge/view-model.test.ts test/unit/view-model.test.ts " +
   "test/contract/view-model.test.ts test/integration/blocks.test.ts " +
   "examples/docker/test/banner.test.ts";
+
+// **The example's rows import `@fmx/calcium` and run against `dist/`**, so a
+// mutation to `src/` cannot reach them — which the pass found by leaving one
+// alive. They stay in the command because they are the consumer's evidence, and
+// every mechanism they cover has a framework-side row that a mutation can touch.
 const MEASURE = "src/data/viewmodel/measure.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const BUILDERS = "src/shell/builders/index.ts";
+const CONTAINERS = "src/presentation/blocks/kinds/containers.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -139,6 +145,26 @@ const MUTATIONS = [
     from: "          ? !Number.isInteger(share.cells) || share.cells <= 0",
     to: "          ? false",
     expect: "T1.20",
+  },
+  {
+    // **The vertical axis dropped entirely.** It is the arm with a shipped
+    // consumer — the banner's blank first row — and the only axis that exists:
+    // horizontal was ruled by the walk and refused by the build, because every
+    // renderer fits its output to the width it is handed.
+    name: "the vertical axis is never applied",
+    file: CONTAINERS,
+    from: "            ...(align === undefined ? {} : { justifyContent: DOWN[align] }),",
+    to: "",
+    expect: "T3.22",
+  },
+  {
+    // **The vertical default moved to the bottom**, which would move every
+    // short child in every existing row group without anything asking.
+    name: "the vertical axis defaults to bottom",
+    file: CONTAINERS,
+    from: "        const align = block.align?.[index];",
+    to: "        const align = block.align?.[index] ?? \"bottom\";",
+    expect: "T3.22",
   },
 ];
 

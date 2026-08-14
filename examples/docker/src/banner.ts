@@ -38,7 +38,8 @@ const WHALE_CELLS = 40;
  * Stored **as written**, and normalised by `pad` below rather than by hand: a
  * constant that is already padded is a constant somebody will re-indent.
  */
-const WHALE = [
+/** The art, exported for the tests that assert the container reproduces it. */
+export const WHALE_ROWS = [
   "                    ##        .",
   "              ## ## ##       ==",
   "           ## ## ## ##      ===",
@@ -56,7 +57,7 @@ const WHALE = [
  * wordmark's baseline on the whale's hull rather than its spout. Eight entries,
  * seven of content.
  */
-const WORDMARK_BLOCKS = [
+export const WORDMARK_ROWS = [
   "",
   " ▄▄▄▄▄                         ▄▄",
   " ██▀▀▀██                       ██",
@@ -100,13 +101,13 @@ const alignBottom = (lines: readonly string[], rows: number): readonly string[] 
 ];
 
 const compose = (right: readonly string[]): readonly string[] => {
-  const rows = Math.max(WHALE.length, right.length);
+  const rows = Math.max(WHALE_ROWS.length, right.length);
   const rightRows = alignBottom(right, rows);
   return Array.from({ length: rows }, (_, i) =>
     // The left column is padded so the right one starts at the same column on
     // every row; the composed row is then right-trimmed, because trailing space
     // costs cells in a measured block and shows in nothing.
-    `${pad(WHALE[i] ?? "", WHALE_CELLS)}${" ".repeat(GAP)}${rightRows[i] ?? ""}`.replace(/\s+$/u, ""),
+    `${pad(WHALE_ROWS[i] ?? "", WHALE_CELLS)}${" ".repeat(GAP)}${rightRows[i] ?? ""}`.replace(/\s+$/u, ""),
   );
 };
 
@@ -127,9 +128,9 @@ const widthOf = (lines: readonly string[]): number =>
 type Variant = Readonly<{ name: string; lines: readonly string[]; blocks: boolean }>;
 
 const VARIANTS: readonly Variant[] = [
-  { name: "wide-blocks", lines: compose(WORDMARK_BLOCKS), blocks: true },
+  { name: "wide-blocks", lines: compose(WORDMARK_ROWS), blocks: true },
   { name: "wide-ascii", lines: compose(WORDMARK_ASCII), blocks: false },
-  { name: "whale", lines: WHALE.map((l) => pad(l, WHALE_CELLS).replace(/\s+$/u, "")), blocks: false },
+  { name: "whale", lines: WHALE_ROWS.map((l) => pad(l, WHALE_CELLS).replace(/\s+$/u, "")), blocks: false },
 ];
 
 /** Exported for the tests and the tier table — the four the document names. */
@@ -194,7 +195,7 @@ export function bannerRow(width: number, blocks: boolean): Block | null {
     id: "banner",
     direction: "row",
     children: [
-      { kind: "raw", id: "banner-whale", text: WHALE.join("\n") },
+      { kind: "raw", id: "banner-whale", text: WHALE_ROWS.join("\n") },
       { kind: "raw", id: "banner-wordmark", text: wordmark.join("\n") },
     ],
     flex: [{ cells: WHALE_CELLS + GAP - 1 }, 1],
@@ -206,7 +207,7 @@ function wordmarkFor(width: number, blocks: boolean): readonly string[] | null {
   for (const v of VARIANTS) {
     if (v.blocks && !blocks) continue;
     if (widthOf(v.lines) > width) continue;
-    if (v.name === "wide-blocks") return WORDMARK_BLOCKS;
+    if (v.name === "wide-blocks") return WORDMARK_ROWS;
     if (v.name === "wide-ascii") return WORDMARK_ASCII;
     return null;
   }

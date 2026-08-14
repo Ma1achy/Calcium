@@ -2901,7 +2901,35 @@ BUILT 38 horizontal composition   b.row — the banner already paid for its abse
                                    in the entry that added it. 11 mutations, 11 caught; five
                                    ANCHOR MISSES first, which the harness names distinctly
                                    from survivors — the earlier half's anchors moved when
-                                   this one landed
+                                   this one landed.
+                                   ALIGN BUILT 2026-08-14 AND RULED AS TWO AXES, BUILT AS
+                                   ONE. The vertical axis has the shipped consumer: the
+                                   wordmark's BLANK FIRST ROW is bottom alignment written
+                                   into the art, the same way the padded whale was a fixed
+                                   width written into it — and the container reproduces it,
+                                   asserted both framework-side (T3.22) and against the
+                                   banner's own golden (K6). THE HORIZONTAL AXIS DOES NOT
+                                   EXIST: every renderer fits its output to the width it is
+                                   handed, so a child allocated ten cells emits ten-cell rows
+                                   and aligning a ten-cell box inside a ten-cell one is a
+                                   no-op — measured. Placing it would need the content's own
+                                   width, which measure(block,width)→height does not answer.
+                                   R1 A THIRD TIME: heights are measurable and widths are not.
+                                   AND A FOURTH DEAD GUARD, the first I added myself: an
+                                   explicit height passed to the aligned child, justified by
+                                   a true sentence about justifyContent and diagnosed against
+                                   a STALE dist/ — the child already stretches, which the
+                                   file's own comment says twenty lines below. PADDING IS
+                                   RULED AND NOT BUILT: it would give a document two ways to
+                                   say "a blank row above", so if it lands `gapBefore` becomes
+                                   its top edge — and the note is on `gapBefore` rather than
+                                   in this entry, because a condition written beside the
+                                   deferral is the one nobody reads. HEIGHT:"fill" IS
+                                   UNBLOCKED AND UNBUILT, with a reason rather than a
+                                   deferral: its only consumer is S3's dashboard figure, and
+                                   a feature whose consumer is a drawing is F21's shape —
+                                   which is what this entry just spent two steps closing.
+                                   C04 I45, commitment 42, T3.22–T3.23, T6.25–T6.26
 BUILT 39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
                                    overrides with `/theme <theme> --no-bg` (a FlagDef, free in
                                    --help, per-invocation not sticky; warn and comply). Painting

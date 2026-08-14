@@ -273,6 +273,18 @@ export type MergeRow = Omit<TableRow, "expanded">;
  * The height rule lives at the *sequence*, never at the block — see
  * `sequenceHeight` in `measure.ts`. Nothing else in the vocabulary produces
  * vertical space, and every surface in the S-series draws it.
+ *
+ * **If a general `padding` is ever added, this becomes its top edge** (C04 §3
+ * R19, roadmap 38). Roadmap 38 asks for padding *as a general property rather
+ * than `gapBefore` being the only spacing that exists*, and a document with both
+ * would have two ways to say *a blank row above this block* — which every
+ * measurer, every container's child-width computation and every sequence would
+ * then have to agree about. So the change is a replacement, not an addition.
+ *
+ * **The note is here rather than in the roadmap entry**, because a condition
+ * written beside the deferral is the one nobody reads: three deferrals this
+ * project has recorded were satisfied elsewhere while their text stood
+ * unchanged. Whoever writes the second spacing field is reading this line.
  */
 export type Gap = Readonly<{ gapBefore?: boolean }>;
 
@@ -578,6 +590,17 @@ export type Group = Readonly<{
    * field is how a value comes to be silently unread.
    */
   flex?: readonly Share[];
+  /**
+   * Where each child sits inside what `flex` gave it (I45, §3).
+   *
+   * A second array beside `flex` rather than a field on it: one says how much
+   * space, the other says where in it, and merging them would make a size field
+   * carry a position. Two is the limit — a third parallel array is a record per
+   * child, and this one is not it.
+   *
+   * Ignored on a `column` group, on `flex`'s precedent and for its reason.
+   */
+  align?: readonly Valign[];
 }> & Gap;
 
 /**
@@ -597,6 +620,28 @@ export type Group = Readonly<{
  * declaration rather than on the order the author wrote.
  */
 export type Share = number | Readonly<{ cells: number }>;
+
+/**
+ * Where a `row` group's child sits in the row's height (I45).
+ *
+ * **One axis, and the other one is not expressible — which is R1 a third time.**
+ * The walk ruled two: horizontal within the child's own allocation, vertical
+ * within the row's height. Building it showed only the second can exist. Every
+ * renderer fits its output to the width it is handed, so a child allocated ten
+ * cells emits ten-cell rows and there is nothing left to place: aligning a
+ * ten-cell box inside a ten-cell box is a no-op, measured. Placing it would mean
+ * knowing how wide the content actually is, and `measure(block, width) → height`
+ * does not answer that — the same missing preferred width that made weights the
+ * only allocation and `{cells: n}` the child's own business.
+ *
+ * **Heights are measurable and widths are not**, and that asymmetry is the whole
+ * reason this field has one axis. The banner is its consumer: the wordmark
+ * carries a blank first row so its seven lines sit on the whale's hull, which is
+ * `bottom` written into the art by hand.
+ *
+ * Absent is `top`, which is what a row did before this existed.
+ */
+export type Valign = "top" | "middle" | "bottom";
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
 export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;

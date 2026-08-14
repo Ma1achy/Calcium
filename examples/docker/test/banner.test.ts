@@ -12,9 +12,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cells } from "@fmx/calcium";
 import type { Raw } from "@fmx/calcium";
-import { FLOOR, banner, bannerLines, bannerRow, variants } from "../src/banner.ts";
+import { FLOOR, WHALE_ROWS, WORDMARK_ROWS, banner, bannerLines, bannerRow, variants } from "../src/banner.ts";
 import { measurable } from "../../../test/support/render.ts";
-import type { Block } from "@fmx/calcium";
+import { b, type Block } from "@fmx/calcium";
 
 const DOC = readFileSync(new URL("../DOCKER_TUI_BANNER.md", import.meta.url), "utf8");
 const fenced = [...DOC.matchAll(/```[a-z]*\n([\s\S]*?)```/gu)].map((m) =>
@@ -61,6 +61,53 @@ describe("K5: the row container draws the banner the hand-composition drew", () 
 
     expect(drawn, "the container draws what the hand-composition drew").toEqual(
       COMPOSED_DOC.map((l) => l.replace(/\s+$/u, "")),
+    );
+  });
+});
+
+describe("K6: the blank first row is vertical alignment, hand-written into the art", () => {
+  it("a bottom-aligned seven-row wordmark draws what the eight-row one draws", () => {
+    // **The banner's second hand-written layout, and the container can express
+    // it** (C04 I45). `DOCKER_TUI_BANNER.md` says the top pad *is already in the
+    // document* — eight rows, the first blank — which puts the wordmark's
+    // baseline on the whale's hull rather than its spout. That is a vertical
+    // alignment, and a row already computes the height it would align within.
+    //
+    // **The art is not changed here**, and that is deliberate: K1–K4 assert the
+    // document's art against the doc's own fenced blocks, so editing it would
+    // fail those rows for a reason that has nothing to do with alignment. What
+    // this shows is that the *container* reproduces what the blank row does.
+    const kit = measurable({});
+    const whale = b.raw(WHALE_ROWS.join("\n"));
+    const padded = b.raw(WORDMARK_ROWS.join("\n"));
+    const unpadded = b.raw(WORDMARK_ROWS.slice(1).join("\n"));
+
+    const byHand = kit.renderToLines(
+      b.group("row", [whale, padded], { flex: [{ cells: 43 }, 1] }),
+      120,
+    );
+    const byContainer = kit.renderToLines(
+      b.group("row", [whale, unpadded], {
+        flex: [{ cells: 43 }, 1],
+        align: ["top", "bottom"],
+      }),
+      120,
+    );
+
+    expect(unpadded, "the fixture is genuinely a row shorter").not.toEqual(padded);
+    expect(byContainer.map((l) => l.replace(/\s+$/u, ""))).toEqual(
+      byHand.map((l) => l.replace(/\s+$/u, "")),
+    );
+
+    // **The control**: without the alignment the shorter art sits at the top,
+    // which is the rendering the blank row exists to prevent — so the row above
+    // is about the alignment rather than about the two arts happening to match.
+    const unaligned = kit.renderToLines(
+      b.group("row", [whale, unpadded], { flex: [{ cells: 43 }, 1] }),
+      120,
+    );
+    expect(unaligned.map((l) => l.replace(/\s+$/u, ""))).not.toEqual(
+      byHand.map((l) => l.replace(/\s+$/u, "")),
     );
   });
 });

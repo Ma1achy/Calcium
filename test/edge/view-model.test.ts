@@ -5,6 +5,7 @@
 // Those wait on C09 and say so. What is C04's own is the boundary behaviour of
 // validation and patching, and the width arithmetic the measurers will share.
 import { describe, expect, it } from "vitest";
+import { b } from "../../src/shell/builders/index.js";
 import {
   applyPatch,
   atLeastOne,
@@ -186,6 +187,62 @@ describe("C04 width arithmetic at the boundaries", () => {
     expect(widths, "the shares this rests on").toEqual([1, 1, 30]);
 
     expect(placeable(wide, 12), "the two weighted ones, and then the budget is gone").toBe(2);
+  });
+
+  it("T3.22 (I45): a bottom-aligned short child draws what a hand-padded one draws", () => {
+    // **The banner's blank first row, expressed by the container.** A seven-row
+    // art beside an eight-row one, aligned `bottom`, must render exactly as the
+    // same art with a blank row written into it — which is what
+    // `DOCKER_TUI_BANNER.md` calls *the top pad already in the document*.
+    //
+    // Framework-side as well as in the consumer, and the mutation pass is why:
+    // the example's rows import `@fmx/calcium` and run against `dist/`, so a
+    // mutation to `src/` cannot reach them. A row that a mutation cannot touch
+    // is a row that reports nothing about the code under it.
+    const kit = measurable({});
+    const tall = b.raw(["1", "2", "3"].join("\n"));
+    const short = b.raw(["X"].join("\n"));
+    const padded = b.raw(["", "", "X"].join("\n"));
+
+    const byHand = kit.renderToLines(
+      b.group("row", [tall, padded], { flex: [{ cells: 5 }, 1] }),
+      20,
+    );
+    const byContainer = kit.renderToLines(
+      b.group("row", [tall, short], { flex: [{ cells: 5 }, 1], align: ["top", "bottom"] }),
+      20,
+    );
+    expect(byContainer.map((l) => l.replace(/\s+$/u, ""))).toEqual(
+      byHand.map((l) => l.replace(/\s+$/u, "")),
+    );
+
+    // **The control, and the default.** Without the alignment the short child
+    // sits at the top, which is what a row did before this existed — so `top`
+    // is asserted rather than assumed, and the row above is about the alignment
+    // rather than about two arts that happen to match.
+    const plain = kit.renderToLines(b.group("row", [tall, short], { flex: [{ cells: 5 }, 1] }), 20);
+    expect(plain[0], "absent means top").toContain("X");
+    expect(
+      kit.renderToLines(
+        b.group("row", [tall, short], { flex: [{ cells: 5 }, 1], align: ["top", "top"] }),
+        20,
+      ),
+      "and `top` is what absent already did",
+    ).toEqual(plain);
+  });
+
+  it("T3.23 (I45): neither axis changes a measurement", () => {
+    // **Position is not size**, which is what makes both axes cheap: the row is
+    // still its tallest child and every cache keyed on `(block, width)` is
+    // untouched. Asserted over the corpus of widths rather than at one, because
+    // an alignment that leaked into a height would leak at some widths only.
+    const kit = measurable({});
+    const plain = rowOf(2, "row");
+    const aligned: Group = { ...plain, align: ["bottom", "middle"] };
+
+    for (const width of [7, 13, 40, 80, 120]) {
+      expect(kit.measure(aligned, width), `at ${String(width)}`).toBe(kit.measure(plain, width));
+    }
   });
 
   it("T3.6c (§3): a row group splits equally, and still measures when it cannot", () => {

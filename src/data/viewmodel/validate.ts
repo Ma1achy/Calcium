@@ -255,6 +255,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "direction" must be "row" or "column"`);
     }
     checkFlex(b, e, at);
+    checkAlign(b, e, at);
   },
   raw: (b, e, at) => requireString(b, "text", e, at),
 });
@@ -310,6 +311,37 @@ function checkFlex(b: Record<string, unknown>, e: string[], at: string): void {
         `${at}.flex[${String(i)}]: a share is a weight above zero or {cells: n}; ` +
           `omit the child to leave it unplaced, and 1 is one share`,
       );
+    }
+  }
+}
+
+/**
+ * A `row` group's per-child vertical alignment (C04 I45).
+ *
+ * Refused on the same terms as `flex`: a length that does not match the children
+ * has no reading, and a value outside the vocabulary would be silently ignored
+ * by the renderer — which is how a typo becomes a layout nobody asked for and
+ * nothing reports.
+ */
+function checkAlign(b: Record<string, unknown>, e: string[], at: string): void {
+  const align = b["align"];
+  if (align === undefined) return;
+
+  if (!Array.isArray(align)) {
+    e.push(`${at}: "align" must be an array, one entry per child`);
+    return;
+  }
+
+  const children = b["children"];
+  if (Array.isArray(children) && align.length !== children.length) {
+    e.push(
+      `${at}: "align" has ${String(align.length)} entries for ${String(children.length)} children`,
+    );
+  }
+
+  for (const [i, entry] of align.entries()) {
+    if (entry !== "top" && entry !== "middle" && entry !== "bottom") {
+      e.push(`${at}.align[${String(i)}]: one of top, middle, bottom`);
     }
   }
 }

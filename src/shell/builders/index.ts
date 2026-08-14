@@ -49,6 +49,7 @@ import type {
   Glyph,
   Group,
   Share,
+  Valign,
   Hunk,
   KeyValue,
   Logs,
@@ -527,7 +528,7 @@ function panel(
 function group(
   direction: "row" | "column",
   children: readonly Block[],
-  opts?: BlockOpts & { flex?: readonly Share[] },
+  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Valign[] },
 ): Group {
   const flex = opts?.flex;
   if (flex !== undefined) {
@@ -550,6 +551,13 @@ function group(
     }
   }
 
+  const align = opts?.align;
+  if (align !== undefined && align.length !== children.length) {
+    throw new TypeError(
+      `b.group: ${String(align.length)} alignments for ${String(children.length)} children`,
+    );
+  }
+
   return finish<Group>(
     {
       kind: "group",
@@ -557,6 +565,7 @@ function group(
       direction,
       children,
       ...(flex === undefined ? {} : { flex: [...flex] }),
+      ...(align === undefined ? {} : { align: [...align] }),
     } as Group,
     opts,
     false,

@@ -172,6 +172,20 @@ export const panelDefinition: BlockDefinition<Panel> = {
 
 // --- group -----------------------------------------------------------------
 
+/**
+ * C04's vocabulary to Ink's, **down the row's height only** (C04 I45).
+ *
+ * There is no horizontal table because there is no horizontal axis: every
+ * renderer fits its output to the width it is handed, so a child fills its
+ * allocation and has nothing to be placed within. Heights are measurable and
+ * widths are not.
+ */
+const DOWN = {
+  top: "flex-start",
+  middle: "center",
+  bottom: "flex-end",
+} as const;
+
 export const groupDefinition: BlockDefinition<Group> = {
   kind: "group",
 
@@ -205,12 +219,30 @@ export const groupDefinition: BlockDefinition<Group> = {
     const children = block.children
       .slice(0, placeable(block, width))
       .flatMap((child, index) => {
+        // **One axis, and it is not a measurement** (C04 I45). The child's Box
+        // is already the width the container computed and already stretches to
+        // the row's height, so `justifyContent` places its lines down inside a
+        // box that was sized before it was read. Absent is `top`, which is what
+        // a row did before this existed.
+        const align = block.align?.[index];
         const drawn = createElement(
           Box,
           {
             key: child.id === "" ? String(index) : child.id,
             width: widths[index] ?? 1,
             flexDirection: "column",
+            // **No height is stated, and a dead guard is why that is written
+            // down.** A first version passed the row's height here, reasoning
+            // that `justifyContent` places content along a box's main axis and
+            // a box with no height is as tall as its content. The reasoning is
+            // sound and the premise is false: the row leaves `alignItems` at
+            // its default stretch — for the reason given below — so every child
+            // is already the row's height and the arithmetic changed nothing.
+            // **It was added while diagnosing a consumer's failing frame that
+            // turned out to be a stale `dist/`**, which is how a guard comes to
+            // be justified by a sentence that is true and not about the
+            // decision it is attached to.
+            ...(align === undefined ? {} : { justifyContent: DOWN[align] }),
           },
           ctx.renderChild(child, widths[index] ?? 1),
         );
