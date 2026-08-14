@@ -349,7 +349,7 @@ preference to override.**
 ```
 background: "terminal"     inherit — today's behaviour. Preserves transparency, and is
                            correct for a theme designed to sit in a dark terminal
-background: "paint"        paint `surfaces.bg`. Required for any theme that cannot assume
+background: "surface"      paint `surfaces.bg`. Required for any theme that cannot assume
                            its host
 ```
 
