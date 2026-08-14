@@ -7936,3 +7936,52 @@ and more precisely. **What it would actually buy is a rendering of a theme nobod
 at**, which is worth having and is worth having *as a frame* — so it belongs to whoever builds
 the category above rather than to a theme. Recorded so the exemption is counted rather than
 excluded.
+
+---
+
+## F164 — `src/index.ts` names a type in its header as one a reader will not find, and exports it eighty lines down ★★
+
+| | |
+|---|---|
+| **Surface** | the public APIs
+
+---
+
+## F164 — `src/index.ts` names a type in its header as one a reader will not find, and exports it two hundred lines down ★★
+
+| | |
+|---|---|
+| **Surface** | the public API's own file, found while measuring roadmap 48's population |
+| **Reached for** | the list of published types, which is the input to the by-use signal |
+| **Verdict** | **a real Calcium finding** — one file, two statements about the same decision |
+| **Absorbed by** | nothing; the header is corrected here |
+
+The file header lists **two things a reader will look for and not find**, and the first is
+`ViewRefresh`:
+
+> Exporting the declaration type of a mechanism nothing runs is A03 §2's vacuity class
+> arriving as an export … It returns with `b.live` (§5) and **not before**.
+
+`b.live` is at `src/shell/builders/index.ts:649`. `ViewRefresh` is exported at
+`src/index.ts:245`, under a note of its own saying exactly that — *back on the list … the
+condition named was the driver, not a release, and C23 I32 to I35 met it.*
+
+**Both notes are correct and they are about the same decision.** The condition was met, the
+export returned, and the sentence excusing its absence stayed where it was — so the file's
+summary and the file's body disagree about what the file exports, and only the summary is
+read first.
+
+**This is the deferral class, and it is the fourth instance.** A deferral names a condition
+and nothing watches it, and the shape the first three shared is that **the condition is
+written where the deferral is and the thing that satisfies it is written somewhere else.**
+This one tightens that: the satisfier is **in the same file**, two hundred lines apart, and
+neither half is wrong. Proximity is not what makes a deferral expire — being looked at is,
+and a header is the part of a file nobody re-reads.
+
+**It was found by a population step rather than by reading.** Roadmap 48's signal derives its
+subject from the `export type` clauses, so `ViewRefresh` appeared in a list the header says
+does not contain it. Nothing about the discrepancy is visible to a reader of either note, and
+the file typechecks, publishes and passes `make enforce` either way.
+
+**Fixed** — the header names the one withheld thing it still withholds, and records that the
+other returned, so the note that would go stale next is the one a reader can check.

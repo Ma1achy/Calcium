@@ -879,6 +879,56 @@ the entry is what a reader consults instead of the source. The cheapest guard is
 the one that found it: keep the violation list short enough that someone opens
 the file it names.
 
+### The public surface by use — a residue, not a rule
+
+F105 and F160 closed MG24's name-matching as a class: four tightenings measured,
+four refused, because a coherent API reuses its vocabulary across types
+deliberately and narrowing to the public surface selects *for* that population.
+What F160 left is a residue rather than a bug, and it named the shape that could
+work — *a second consumer written from the public surface names every field it
+uses, and the residue is the candidates, by **use** rather than by name.* Both
+consumers exist now. This is that measurement, and it is **reported, never
+gated**, for C24 I11's reason.
+
+**Why the same name-matching is fatal to MG24 and harmless here.** The two use
+opposite directions of one match, and this is the whole argument for building it
+rather than tightening the rule.
+
+MG24's verdict is *unconsumed*, so it needs the **cleared** side to be exact —
+and it is not: a member is cleared the moment any unrelated type anywhere
+declares that name and something reads it. This signal's verdict is *candidate*,
+so it needs the **listed** side to be exact — and it is, because a collision can
+only ever *clear*. Measured on the day it landed: **141 of 217 clearings are
+ambiguous**, and not one of them can put a member into the residue. **The list
+under-reports and cannot over-report**, which is what a set of candidates for a
+read wants and what a gate cannot use.
+
+#### The walk — indexed by rule interaction, and a table because none of these is
+event-mediated
+
+Four rules: the **population** is members of the types `src/index.ts` exports;
+a **use** is a textual name in an example's source, tested per keyword as MG24
+tests it; the **two consumers** are different evidence, so a candidate is named
+by neither; the **output** is a residue for reading. Every interaction below
+holds at rest, so this is a classification table and not a trace.
+
+| # | the two rules that meet | the cell | ruling |
+|---|---|---|---|
+| 1 | *a use is a name* × *the output is a residue* | a name several published types carry | the direction above: clearing is ambiguous, listing cannot be. **141 of 217.** Stated as the founding claim rather than as a limitation, because it is why the instrument is sound where the rule is not |
+| 2 | *a use is a name* × *the population* | the keyword decides the test, and it was tuned for `src/` — where deps records are built inline and interfaces are called into | an app inverts that: it *builds* declarations and rarely calls in. Measured, the split still holds — **19 of 311 are interface-declared and every one is a thing an app calls** (`TuiInstance.stop`, `VerbTransport.invoke`, `WorldDriver.query`). It holds **by measurement here, not by inheritance**, and that is the difference worth recording |
+| 3 | *two consumers* × *a use is a name* | a member named only in an example's **test** | **13.** A test names a field in order to assert it, which is evidence about the surface and not about use. Neither cleared nor listed — a third bucket, printed |
+| 4 | *the population* × *the output* | a member no app can name without doing something neither app does — writing a custom block kind (`RenderContext`, `Style`, `TerminalCapabilities`), driving a fixture world (`WorldDriver`) | **a candidate is not an unused member.** The residue is read by *what an app would have to do to reach it*, so the read is over strata and not over names. This is the reason it reports and does not gate |
+| 5 | *the population* × *the freeze* | a type withheld from the list for A03 §2's vacuity class and later restored | `ViewRefresh`. Withheld through C22 and C23 because a consumer could declare a refreshing part and never be called; back at `src/index.ts:245` once C23 I32–I35 gave it a driver. **Neither app names any of its three members** — and the file's own header still lists it among the things *a reader will look for and not find*. F164 |
+
+**The blind spot, because an unrecorded limit reads as strength.** The residue is
+exact about the claim it makes — *neither example names this member* — and that
+claim is a **proxy** for use with one known gap: a builder can set a field the
+app never names. `b.live` is the measured instance. `examples/docker` uses the
+mechanism `ViewRefresh` declares and reaches it through `b.live`, whose own
+`LiveSpec` carries `staleAfter` where the published type carries `staleAfterMs`.
+So a member in the residue is a **candidate for a read**, and the first question
+the read asks is whether a builder covers it.
+
 ### MG26 — the dev-only entry points stay out of the bundle
 
 C24 I8 says `@fmx/calcium/testing` and `@fmx/calcium/fixtures` are absent from a

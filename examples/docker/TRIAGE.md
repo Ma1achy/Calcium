@@ -35,7 +35,7 @@ type change.
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 18 | **14** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader |
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 12 | **6** | — | **new at F80** · method — five findings disproved, and **F161 caught before it was filed** |
@@ -286,6 +286,7 @@ wrongness and the split is the finding: `DOCKER_TUI_SURFACES.md`'s corrections i
 | **F32** | itself, three passes — `ExposedPorts` is true of a service image and false of a base one |
 | **F44** · **F65** · **F57** | itself — four of eight extents wrong and `40+4+60 = 104`; a tally reading 5 over four rows; a comparison frame varying two axes in the document arguing for frames |
 | **F59** | itself — a README snippet shipped in every tarball that had never been type-checked |
+| **F164** | itself — `src/index.ts`'s header lists `ViewRefresh` among the things a reader *will not find*, and line 245 exports it. The deferral class's fourth instance and the one that tightens its shape: the satisfier is in the **same file**, so proximity is not what makes a deferral expire — being looked at is. Found by a population step, not by reading. **Fixed** |
 
 **A design document written with the specs open got the framework wrong seven times.** Reading
 a spec and checking against it are different acts and only the second is a test — A03 §2's

@@ -21,17 +21,20 @@
  * naming their owners: the ruling says they are not public, not that they are
  * finished.
  *
- * **Two things a reader will look for and not find.**
+ * **One thing a reader will look for and not find.**
  *
- *   - `ViewRefresh`, and with it `b.live`. It is the declaration type for C23
- *     §3b's part refresh, and §3b has drivers for two of its three mechanisms.
- *     Exporting the declaration type of a mechanism nothing runs is A03 §2's
- *     vacuity class arriving as an export: a consumer would declare a refreshing
- *     part, type-check, and never be called. It returns with `b.live` (§5) and
- *     not before.
  *   - `b.hunk`, and any diff parser. `Patch` is exported as a block shape and
  *     nothing here turns two texts into hunks — they arrive from a diff tool or
  *     already structured from the far side, and the framework renders them.
+ *
+ * **`ViewRefresh` was the second and is no longer** (F164). It was withheld
+ * through C22 and C23 because the mechanism beneath it had no driver, and the
+ * condition named was the driver rather than a release — C23 I32 to I35 met it,
+ * and it is exported below with the note that says so. This sentence stands
+ * where the excusing one did, because the excusing one outlived its condition by
+ * two components while sitting two hundred lines above the export that falsified
+ * it. **A header is the part of a file nobody re-reads**, so a claim here that
+ * names a symbol is a claim to check by grepping this file, not by reading on.
  *
  * Two sibling entry points carry what must never reach production (I8):
  * `@fmx/calcium/testing` and `@fmx/calcium/fixtures`.
