@@ -552,3 +552,31 @@ The general form, and the reason this sits beside the instruments rather than in
 `FINDINGS.md`: **an instrument that silently discards evidence is indistinguishable from
 evidence that was not there.** §0's pipe, §1's stripped capture and §8's short hold are the
 same sentence about three different tools; this one is about the reader.
+
+### A fourth shape: `head` in a command that produces a count
+
+The three above are about frames. This one is about a **number**, and it belongs here because
+it is the first class in what happens and the second class in how you find it.
+
+`grep -rn 'stage:' examples/docker/src | head -6` produced six sites. There are **twelve**.
+The six went into a finding, a triage row and a roadmap row, and were carried into an argument
+about whether the field was documentation a reader depends on — an argument whose answer turns
+on how many places write it.
+
+| | the cut frame | this |
+|---|---|---|
+| what happened | real output, truncated | real output, truncated |
+| what you are looking at | a frame with its edge cut off | **a number** |
+| the tell | re-read the whole thing and the rows are there | **there is none** — a truncated count and a real one are the same shape |
+
+**A frame has an edge and a count does not.** Re-reading is what catches a cut frame, and there
+is nothing to re-read in `6`. It reads as derived, it is the right kind of thing, and the only
+signal available is remembering that the command which produced it had a limit in it.
+
+So the rule is about the command rather than about the reading: **`head`, `tail` and `-m` belong
+in a command that is sampling and never in one that is counting.** If the output is going to
+become a quantity, `wc -l` it or print all of it — and if it is long enough to want narrowing,
+that length *is* the finding and truncating it removes the thing you were about to say.
+
+The same applies to a count taken from a tool that pages by default. §0's pipe swallowed an exit
+status; this swallows a magnitude. **One bit and one number, and neither leaves a mark.**

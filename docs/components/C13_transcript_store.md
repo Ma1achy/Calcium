@@ -210,8 +210,8 @@ document is JSON by construction (C04 I46, §5a).
 
 | # | the two rules that meet | the cell | disposition |
 |---|---|---|---|
-| 1 | *what reaches disk is redacted* (C20 I6) × *a document holds the far side's output* | C20's redactor is a **tokeniser over a command line** — positional rules on flag names, then entropy. A transcript document holds what the far side *printed*, and `examples/docker/src/inspect.ts:152` puts **every container environment variable** into a `keyValue` block | **RULING OWED.** The redactor does not generalise and cannot: scanning a rendered document would mean understanding every kind's semantics. This is the expensive half of C20's persistence and 44's row is silent about it |
-| 2 | *an entry has `rev`* × *append-only with an index-aligned sidecar* | **a history entry is immutable once appended; a transcript entry is not.** It is patched and settled after it would already have been written, and an index-aligned append-only file assumes a row never changes | **RULING OWED**, and this is the one that moves the design — see 5b.3 |
+| 1 | *what reaches disk is redacted* (C20 I6) × *a document holds the far side's output* | C20's redactor is a **tokeniser over a command line** — positional rules on flag names, then entropy. A transcript document holds what the far side *printed*, and `examples/docker/src/inspect.ts:152` puts **every container environment variable** into a `keyValue` block | **RULED: the framework never redacts, and persistence is declared per verb** — 5b.4 |
+| 2 | *an entry has `rev`* × *append-only with an index-aligned sidecar* | **a history entry is immutable once appended; a transcript entry is not.** It is patched and settled after it would already have been written, and an index-aligned append-only file assumes a row never changes | **RULED: settled entries only** — 5b.3 |
 | 3 | *an entry may be `live`* × *persistence* | a live entry's document is a snapshot of one poll, and its `fetch` does not survive the process. Restored, it is a panel frozen at a moment with nothing saying so | falls out of 5b.3's recommendation |
 | 4 | *an entry may be `streaming`* × *persistence* | an entry still accepting patches at exit: a half-built document, whose `status` may read `ok` before the verb finished | falls out of 5b.3 |
 | 5 | *the cap is 100,000 **blocks*** (§5) × *C20 compacts to a **row** count* | "keep the last N" is a different arithmetic on each side — C20 counts lines, C13 counts blocks across entries of wildly different size | compaction is by C13's own cap, applied to whole entries |
@@ -226,7 +226,7 @@ document is JSON by construction (C04 I46, §5a).
 | 4 | `append` → exit before the chain confirms | `drain` writes from `confirmed` | C20's policy, carried unchanged — the one row of this trace that needs nothing new |
 | 5 | `clear` → write in flight | `reset` empties both, and the queued write must not land after it | C20's chain already orders this |
 
-### 5b.3 What the trace recommends, stated as a recommendation and not a ruling
+### 5b.3 Settled entries only
 
 **Persist settled entries only.** Rows 1, 2 and 3 of the trace are all the same
 defect — a row written before it stopped changing — and settling is precisely the
@@ -238,13 +238,49 @@ confirmed write* keeps its meaning one level up.
 What it costs is stated rather than hidden: **a session killed mid-command loses
 that command's output**, and the entry the user most wants back after a crash is
 sometimes exactly that one. The alternative — a rewritable row — buys it at the
-price of the whole index-aligned shape.
+price of the whole index-aligned shape, and the two losses are not comparable:
+**a missing last entry is recovered by running the command again, and a file whose
+rows disagree with memory is not recovered at all.**
 
-**The redaction ruling is not ours to infer.** The available answers are opt-in
-persistence with the hazard documented, a per-app redactor the framework calls, or
-persisting `command` and `meta` alone — which is C20's file with extra steps and is
-not a transcript. Nothing is built here until that is decided, because the default
-in a security-shaped decision is not something a spec should acquire by omission.
+### 5b.4 The framework never redacts, and persistence is declared per verb
+
+**RULED.** Nothing is written unless an app declares a policy, and the declaration
+is per **verb**:
+
+```
+persistence is OFF unless the app declares a policy
+a policy is either  TuiConfig.persist: "all"  or per-verb  ToolDef.persist: true
+an entry is written iff  its verb opts in  AND  the entry has settled (5b.3)
+```
+
+**There is no framework redactor, and the argument for that is the argument
+against one.** C20's works because a command line has tokens; a rendered document
+has seventeen kinds and none, so being right about all of them is the requirement
+and being wrong about one is silent — **a redactor wrong about one kind is worse
+than none, because it is switched on.** A per-app redactor is the same trap with
+the blame moved: it is still a scanner over rendered output, and it still has to be
+right about every kind.
+
+**The verb is the unit because that is where the knowledge is.** `inspect.ts` knows
+`Env` carries secrets and the framework cannot; and this is the *second* instance
+of a principle C05 already states rather than a new one — `ToolDef.handoff` is
+declared on the grounds that *the app author is the only party who can know this*,
+and detection is not available. Same sentence, same field shape, one row down.
+
+**Off by default, because the failure modes are not symmetric.** A missing feature
+is visible the first time someone resumes. **A leaked secret is not visible at all**
+— not in a frame, not in a test, not in a review of the app that caused it.
+
+**And silence is safe but unexplained**, which is why declaring the policy is what
+switches the feature on rather than a flag that turns it off: an app that simply
+never thought about it gets no persistence and no mystery, and an app with nothing
+to hide writes `persist: "all"` on one line.
+
+**One cheap defence lands with it.** `stateDir` defaults to `.calcium` in the
+project directory (`src/shell/config.ts:80`), so a persisted transcript is a file
+that can be committed. The directory is created with a `.gitignore` containing `*`,
+so **it ignores itself regardless of the project's own ignore rules** — one line,
+and it does not depend on the app author having thought of it either.
 
 ---
 
@@ -329,6 +365,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost. The count recurses through nested blocks (`panel.children`, `group.children`, a row's `detail`) and never through rows.
 - **I18** — C13 imports nothing from `terminal/` or `presentation/`.
 - **I19** — Readers take `TranscriptView`, never `TranscriptStore`. The mutators and the §5a payload window are reachable only from L4, so no consumer above can append, clear, or see a debug buffer it was never given.
+- **I20** — **An entry reaches disk only if its verb declared persistence and the entry has settled** (§5b). Both halves are load-bearing and each answers a different failure. *Settled* makes the file append-only **in fact rather than by assumption**: a transcript entry is patched and settled after a history entry would already have been immutable, so a row written earlier is a row that disagrees with memory — and a missing last entry is recovered by running the command again where a divergent file is not recovered at all. *Declared* is because **the framework never redacts and cannot**: C20's redactor works on a tokenised command line, a rendered document has seventeen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. The verb is the unit because that is where the knowledge is — the same ground C05 I19 already gives `handoff`, *the app author is the only party who can know this*. Off by default, since a missing feature is visible on the first resume and **a leaked secret is not visible at all** (F168).
 
 ---
 
@@ -351,6 +388,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 15. Cap overshoot is exposed as `overCap` and acted on by L4, and it is true after every call rather than only after `append` (I15).
 16. An invalid document raises rather than returning; a failed patch returns rather than raising (I8, I10).
 17. Readers get `TranscriptView`; only L4 holds the store, so nothing above can mutate the transcript or read a retained payload (I19).
+18. **Persistence is declared per verb and writes settled entries only**, the framework redacts nothing, and an app that declares nothing persists nothing (I20, §5b).
 
 ---
 
