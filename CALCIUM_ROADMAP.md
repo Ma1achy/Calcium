@@ -349,11 +349,25 @@ preference to override.**
 ```
 background: "terminal"     inherit — today's behaviour. Preserves transparency, and is
                            correct for a theme designed to sit in a dark terminal
-background: <colour>       paint it. Required for any theme that cannot assume its host
+background: "paint"        paint `surfaces.bg`. Required for any theme that cannot assume
+                           its host
 ```
 
+**CORRECTED BY THE WALK — a choice, not a colour** (C10 §4c row 1, I25). This read
+`background: <colour>`, which is a second source of truth for the one surface every floor
+is already measured against: a theme could paint `#ffffff` and prove its floor against
+`#fafafa`, **which is this entry's own defect entered from the other side.** The precedent
+is one entry back — `AskOptions.placement` is a choice between placements rather than a
+`Placement`.
+
 **Which makes the contrast floor provable in both cases** — against the painted colour, or
-against the *declared assumption* when inheriting. That declaration is also what lets C10
+against the *declared assumption* when inheriting. **CORRECTED: provability is a rung of the
+ladder, not a branch of the declaration** (C10 I26). Provable at 24-bit; at 8-bit provable
+against the cube's defined RGB, which obliges computing the floor against the **quantised**
+value rather than the token; **best-effort at 4-bit**, where `surface.bg` is a curated index
+and 0–15 are whatever the emulator's palette says; and vacuous at 1-bit, where nothing is
+painted and nothing is coloured. So the override is one clause of four and
+the only optional one, where this entry named it as the whole statement. That declaration is also what lets C10
 warn on a mismatch where `COLORFGBG` is available (non-interactive, so C02's refusal of
 probes is untouched; OSC 11 stays out on the same grounds the image protocol's quiet mode was
 chosen).
@@ -407,6 +421,16 @@ is honest as long as it is stated.
 full region width**, or the wash ends ragged where the text does. That is the same mechanism
 as [selection's full-row background](#selection-wash), one scope up — **build them together rather than
 twice.**
+
+**DISCHARGED, AND BY NEITHER OF THEM** (C22 §6g.1, I65). `exact()` squares every row and
+predates both; `render-frame` already depends on it, and entry 23's wash *consumes* it —
+`washed` runs after `exact`, which is where its own full-row half comes from. So there is
+nothing to build together, and **the mechanism the two actually share is one layer below
+where this note points**: a wash is a span with a start and an end, a background is a
+default, and **every reset in the tree returns to the terminal's default rather than to
+ours.** Four reset sites, measured, one of them in L1. A shared-work note that is already
+discharged reads as coverage of the interaction it names while the real one sits at the
+reset.
 
 <a id="help-bucketing"></a>
 #### `/help` returned no verb summaries — narrow this before filing it
@@ -2739,6 +2763,43 @@ RULED 39 theme background ★      RULED: theme declares `background: "terminal"
                                    paints, because it cannot work otherwise. Shares row-padding
                                    with selection's wash. Plus: /help's verb list came
                                    back empty — both found by looking
+                                   WALKED 2026-08-14, BOTH ARTEFACTS — C10 §4c (structural:
+                                   a declaration, a surface, a depth and an override all
+                                   hold at rest) and C22 §6g (event-mediated: what the next
+                                   frame writes). FOUR CORRECTIONS TO THE RULING, none of
+                                   which changes what it decided. (1) THE DECLARATION IS A
+                                   CHOICE, NOT A COLOUR: `<colour>` is a second source of
+                                   truth for `surfaces.bg`, the one surface every floor is
+                                   already measured against, so a theme could paint one
+                                   value and prove its floor against another — this entry's
+                                   own defect from the other side. (2) PROVABILITY IS A RUNG
+                                   OF THE LADDER, NOT A BRANCH OF THE DECLARATION: provable
+                                   at 24, provable against the cube's defined RGB at 8 and
+                                   the floor must be recomputed against the QUANTISED value,
+                                   best-effort at 4 where the index is the emulator's, and
+                                   vacuous at 1 where nothing is painted AND nothing is
+                                   coloured. The override is one clause of four and the
+                                   only optional one. (3) THE SHARED PADDING IS ALREADY BUILT AND
+                                   OWED BY NEITHER ENTRY — `exact()` predates both and 23's
+                                   wash consumes it — and what the two actually share is one
+                                   layer down: a wash is a span, a background is a default,
+                                   and every reset returns to the TERMINAL's default. Four
+                                   reset sites, measured, one in L1. (4) READING `--no-bg`
+                                   IS A PUBLIC TYPE CHANGE: declaring it is free and free in
+                                   --help as claimed, but a local handler sees argv with
+                                   `shellOnly` flags stripped and its only other surface is
+                                   the line as typed — so `LocalContext` gains the validated
+                                   args, which is freeze-relevant and closes /theme's own
+                                   re-derivation of an argument validation had parsed.
+                                   AND ONE DEFECT THE TRACE FOUND: `/theme light --no-bg`
+                                   then `/theme light` commits NO FRAME, because setVariant
+                                   is a no-op when the variant is unchanged and the flag is
+                                   a SECOND AXIS on the same command — every assertion about
+                                   the state passes and the background does not come back.
+                                   Plus I57's four-bytes-a-row prefix, kept on asymmetry
+                                   against a failure never observed, stops being inert on
+                                   the day this lands and is what makes reset-then-base
+                                   expressible. C10 §4c I25 I26, C22 §6g I65 I66
 BUILT 40 as-you-type completion    the trigger, not the engine — and it makes the manifest
                                    claim visible. Largely subsumes the next line
 BUILT 41 typo detection            trivial, delightful — smaller once 40 lands. BOTH BUILT, and

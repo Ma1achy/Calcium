@@ -262,6 +262,78 @@ Shipped values, measured against `tone.default`'s 4.5 floor: dark `#264057` at *
 
 ---
 
+## 4c. The theme's own background, walked by hand — roadmap entry 39
+
+The entry is **RULED with no code**, so the walk is where the ruling meets the
+tree. It has state *and* structure, so it takes both artefacts: this section is
+the **structural** half — a declaration, a surface, a colour depth and an
+override all hold at rest, with no event between them — and C22 §6g is the
+**event-mediated** half.
+
+**The defect reproduces, and it is narrower than the entry says.** `surfaces.bg`
+has exactly two readers, `textSurfaces` and `validatePalette`, both in
+`contrast.ts`. Nothing paints it and nothing else reads it, in either variant. So
+the floor is not *assumed against a guess* in some loose sense — it is computed
+against a colour **that has no consumer at all**, which is the same claim with a
+mechanism behind it.
+
+### 4c.1 — the classification table: which rule owns a cell
+
+Indexed by rule interaction. Every row is a cell where two correct statements
+overlap; a row governed by one rule would be a restatement of it.
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | **`background: <colour>` beside `surfaces.bg`** | the theme declares what it paints | I19 measures every floor against `surfaces.bg` | **R1 — the declaration is a *choice*, not a colour.** `background: "terminal" \| "paint"`, and what `paint` paints is `surfaces.bg`. A colour here is a second source of truth for the one surface every floor is already measured against, so a theme could paint `#ffffff` and prove its floor against `#fafafa` — **this entry's own defect, entered from the other side.** Precedent one entry back: `AskOptions.placement` is a choice between placements rather than a `Placement`, for the same reason |
+| 2 | paints × depth 8 | painting makes the floor provable | an 8-bit surface is the nearest **cube** entry, not the token's hex | **R2a — provable against a defined table**, and the recomputation is owed. `resolve.ts` uses indices **16–255 only**, whose RGB the standard fixes, so the painted colour is knowable — but it is not the hex, and a floor computed against the hex is once again a colour nobody paints |
+| 3 | paints × depth 4 | as above | a 4-bit surface is a **curated index** (I5), and 0–15 are whatever the emulator's palette says | **R2b — not provable, and painting still fixes the bug.** `surface.bg` is index 15 on light and 0 on dark, so painting puts light's dark foregrounds on the emulator's white: right in every configuration anyone runs, provable in none. **The guarantee drops to best-effort here for a reason that is not the override** |
+| 4 | paints × depth 1 | the light theme paints because it cannot work otherwise | surfaces vanish at 1-bit (I8) — **and so do foregrounds** | **R2c — vacuous, and safe.** Nothing is painted and nothing is coloured, so the frame is the terminal's own pair and the bug cannot arise. Named because §4b puts `inverse` in the middle rung and a reader will look for the analogue: **a wash is a region and reverse video separates it from its surroundings; a background *is* the surroundings, and there is nothing for it to contrast against.** There is no rung to want |
+| 5 | `--no-bg` × a theme declaring `terminal` | the user overrides the theme | the theme already inherits | **R3 — a no-op, and no notice.** The warning names a consequence and a flag that changed nothing has none; a notice here is the framework talking about itself |
+| 6 | `--no-bg` × the floor claim | warn and comply, and state the cost | the floor is provable when painting | **R4 — the statement has four clauses and the override is one of them**, where the entry names it as the whole. Rows 2–4 are the other three, and they are properties of the terminal rather than of anybody's preference. So the honest statement is a **rung table**, not a paint/inherit split |
+| 7 | `--no-bg` × `Overrides` | an override is how a value is changed at runtime | `applyOverrides` merges into `tokens`, bumps the serial, re-validates and changes the theme's identity | **R5 — not an override.** Overrides are sticky by construction and this is per invocation. It is session state read at paint, patching no token — which also keeps it out of the theme identity, so **C22 I58's render cache needs no new axis**: the base is applied at row assembly and never enters a cached block's bytes (C22 §6g R9) |
+| 8 | painting `bg` × `bgElev` | the screen has one background | `bgElev` is the second text-bearing surface (I19) | **R6 — `bg` alone.** `bgElev` has no painter either; the day it gets one is the day a block draws a panel, and painting the distinction now would draw a depth nothing else expresses |
+| 9 | a painted base × **the selection wash** (entry 23) | the wash is a background over its own cells | the base is a background over **every** cell | **R7 — the wash wins for its span and the base resumes after it**, which is a fact about the **reset** and not about the padding (C22 §6g R9). This is the cell the entry's *build them together* note was reaching for, and **it is not where the note pointed** |
+| 10 | a painted base × a diff row's own background | §4a paints the whole row, gutter included | the frame squares every row to the region width | **Confirms.** C25 renders at the region width, so there is no pad after a diff row for the base to land in. One line, because this row was written expecting a defect and is worth keeping as the answer |
+
+**Row 1 is the one that would have shipped**, and nothing downstream could catch
+it: a theme declaring both a background and a `bg` is internally consistent, every
+floor passes, and the screen is painted a colour no floor was measured against.
+
+### 4c.2 — the rulings
+
+- **R1 — `background: "terminal" | "paint"`**, and `paint` paints `surfaces.bg`.
+  One colour for the background, and it is the one the floors already use.
+- **R2 — provability is a rung table, not a binary.** Provable at 24; provable
+  against the 256-cube's defined RGB at 8, which obliges recomputing the floor
+  against the quantised value; best-effort at 4, where the index is the
+  emulator's; vacuous at 1, where nothing is painted and nothing is coloured.
+- **R3 — a no-op override is silent.**
+- **R4 — the override is one clause of four, and the only optional one.** The
+  statement that ships names all four; the entry names this one as the whole.
+- **R5 — `--no-bg` is session state, not an `Overrides` entry**, so the theme's
+  identity and every cache keyed on it are untouched.
+- **R6 — `bg` alone is painted.** `bgElev` waits for a block that draws one.
+- **R7 — the wash composes with the base at the reset**, which is C22's.
+
+### 4c.3 — what the rulings leave behind
+
+- **The light theme's `paint` is a token change and the dark theme's is a
+  decision.** Dark keeps `terminal` and keeps your transparency; that is the
+  entry's ruling and it means **the shipped default paints nothing**, so every
+  test that has ever run has run against the inheriting arm. The painting arm
+  ships with one theme exercising it.
+- **A theme declaring `paint` with a `bg` that fails no floor can still be
+  wrong**, because floors constrain the *pair* and not the absolute. A theme
+  whose `bg` is `#000000` on a terminal the user configured white is legible and
+  jarring, and nothing here has an opinion about that. Named so it is not
+  mistaken for a gap.
+- **`COLORFGBG` is not read, and the entry's mismatch warning is not built.** The
+  entry offers it as something the declaration *enables*; it is a second feature
+  with its own reader, and folding it in would make this entry's scope the
+  variable one. Recorded as owed, not as done.
+
+---
+
 ## 5. Switching
 
 `/theme` switches variant. The change is **atomic**: the store swaps a resolved theme in one assignment, so no frame is ever half-themed.
@@ -308,6 +380,8 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I22** — The two diff surfaces are text-bearing, and every `syntax` slot and every gutter tone (`ok`, `error`, `muted`) clears its floor against both in both variants (§4a) — **those twelve slots and no others**, asserted on the pairing rather than on its results, because a widened pairing passes on the tokens as shipped and only costs something later. There is no third or fourth: §4a measured a stronger pair for word-level emphasis and found under ten units of one channel between it and the plain pair, so word-level emphasis is `underline`'s and not a background's. `bgDeep` remains excluded because it carries no text; the criterion is text, not the word "surface".
 - **I23** — A diff background is the third signal and never the only one. At 1-bit it is absent, and the marker and the toned gutter carry the distinction alone (→ C25 I13, → A01 D29).
 - **I24** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
+- **I25** — **A theme's background declaration is a choice and never a colour.** `background: "terminal" | "paint"`, and what `paint` paints is `surfaces.bg` — the one surface every floor is already measured against (I19). A colour in this field would be a second source of truth for the same thing, so a theme could paint one value and prove its floor against another, which is roadmap 39's own defect arriving from the other side (§4c row 1). `--no-bg` overrides it for one invocation and is **session state, not an `Overrides` entry**: overrides merge into `tokens`, bump the serial and change the theme's identity, and a per-invocation switch that did any of that would be sticky by construction and would put a paint decision into every cache keyed on identity (I11, → C22 I58).
+- **I26** — **The contrast floor's provability is a rung of the degradation ladder, not a property of painting.** It is provable at 24-bit; provable at 8-bit against the 256-cube's defined RGB, which obliges computing it against the **quantised** value rather than the token, because the quantised value is what is painted; **best-effort at 4-bit**, where `surface.bg` is a curated index and 0–15 are whatever the emulator's palette says; and **vacuous at 1-bit**, where no background is painted and no foreground is coloured, so the terminal's own pair is what shows and the failure this addresses cannot occur (I8, §4c rows 2–4). `--no-bg` is the **fourth clause** of that statement and the only optional one; the other three are the terminal's. There is no reverse-video rung: §4b's middle rung distinguishes a region from its surroundings, and a background is the surroundings.
 
 ---
 
@@ -334,6 +408,8 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 19. `Style` has two colour channels and no more. `background` comes only from a `surface` ref through `resolveBackground`, because the floors are measured for surfaces and not for tones in that role (I21).
 20. The two diff surfaces are text-bearing, so the §4 floors extend to them — for the twelve slots that land on them and no others, the background covering the whole row (I22). A second, stronger level was specified, measured and withdrawn; the floors left no room for it, and `underline` is what word-level emphasis has instead (§4a). The `bgDeep` exclusion is the criterion doing its job in the other direction.
 21. A diff background is a third signal that vanishes at 1-bit, where the marker and the toned gutter carry the distinction alone (I23, → A01 D29).
+22. **A theme declares whether it paints, as a choice and not as a colour** — `"terminal" | "paint"`, painting `surfaces.bg` — and the user's `--no-bg` is a per-invocation session flag rather than an override, so no token changes and no cache keyed on theme identity is disturbed (I25, §4c).
+23. **What painting buys the contrast floor is stated per rung of the ladder, not per branch of the declaration**: provable at 24, provable against the cube's defined RGB at 8, best-effort at 4, vacuous at 1 — and the override is one clause of four rather than the whole statement (I26, §4c).
 
 ---
 
@@ -359,6 +435,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.14** (I21): `resolveBackground` on a `surface` ref returns a `Style` whose `background` is set and whose `colour` is absent; `resolve` on the same ref returns the mirror image. The two functions differ in which channel they fill and in nothing else.
 - **T1.15** (I21): `resolveBackground` on a palette ref — `tone.ok`, `syntax.keyword` — returns the empty `Style`. A tone cannot be painted as a background, because no floor was ever measured for it in that role.
 - **T1.16** (I2, I23): at depth 1, `resolveBackground` on both diff surfaces returns the empty `Style`. The degradation that makes I23 lossless.
+- **T1.17** (I25): a theme declaring `paint` resolves its base to `surface.bg` and to nothing else — asserted by changing `bg` and watching the base follow it. The row that fails the day the declaration carries a colour of its own, which is the only way the two can disagree.
+- **T1.18** (I26): the base over all four depths, in one row, because the claim is a ladder and not four claims: the token's hex at 24, a cube index in **16–255** at 8, the theme's own curated index at 4 — asserted against the declared table, not a computed nearest, which is T1.13's argument for this surface — and the empty `Style` at 1.
+- **T1.19** (I26): at 8-bit, the floor recomputed against the **quantised** base rather than the token, for every slot `textSurfaces` pairs with `bg`. Asserted as a recomputation and not as a result: against the shipped tokens both numbers clear, so a row comparing outcomes would agree with the wrong one.
 
 ### Tier 2 — contract / interface
 
@@ -434,6 +513,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.18** (I22): checking the diff surfaces against `syntax` alone → T2.14b fails, and the gutter is unchecked on the surface it is drawn on.
 - **T6.19** (I21): letting `resolveBackground` accept a palette ref → T1.15 fails, and a tone is painted as a background with no floor measured for it.
 - **T6.20** (I2, I23): emitting a diff background at depth 1 → T1.16 fails, and the one signal a monochrome terminal cannot show becomes the one carrying the meaning.
+- **T6.21** (I25): widening the declaration to `"terminal" | <colour>` and painting that colour → T1.17 fails. **The revert every reader will propose**, because a colour reads as more expressive than a choice; what it buys is a theme that paints one value and proves its floor against another.
+- **T6.22** (I26): computing the 8-bit floor against the token's hex rather than against the quantised base → T1.19 fails. **Nothing else does**: both numbers clear on the shipped tokens, so this is invisible in results and visible only in which value the check was handed — I22's shape, one surface along.
+- **T6.23** (I25): applying `--no-bg` through `applyOverrides` → T1.17's identity assertion fails, the theme's serial moves, and a per-invocation flag becomes sticky in every cache keyed on identity.
 
 ---
 
