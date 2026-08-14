@@ -2831,8 +2831,16 @@ RULED 35 progress feedback        the spinner is static by a ruling whose premis
                                    kills the wheel — another argument that terminal-native
                                    selection and inner scroll are in tension
       37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
-                                   bracketed with them. C10's no-background choice means a drawn
-                                   line is the only tool available
+                                   bracketed with them. THIS ROW WAS STALE AND ITS OWN PROSE
+                                   WAS NOT: it said "C10's no-background choice means a drawn
+                                   line is the only tool available", which entry 39 makes
+                                   false — a theme may declare `background: "surface"`. The
+                                   entry's body already carries the correction and reaches
+                                   the same conclusion by the surviving half: `"terminal"`
+                                   stays legitimate and a transparent terminal has no fill,
+                                   so a separator cannot depend on one. The summary kept the
+                                   claim and the body kept the condition, which is the
+                                   compression class in a row rather than in prose
 BUILT 38 horizontal composition   b.row — the banner already paid for its absence by hand
                                    (width fractions ship with it; height fill is separate and
                                     waits on phase 1.1's producer-context contract).

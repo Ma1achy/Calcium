@@ -328,6 +328,24 @@ following exactly*, and following it exactly produces a field that cannot expres
 banner — a boolean absorb-flag over a minimum nothing computes. It reads as a citation
 of a solved problem, and the two mechanisms share only a name.
 
+#### One fact answered three design questions, and it is worth stating as a rule
+
+**Heights are measurable and widths are not.** `measure(block, width) → height`
+takes a width and returns a height, so a container can always ask *how tall would
+you be here* and can never ask *how wide would you like to be*. Three independent
+questions in this entry were decided by that asymmetry and by nothing else:
+
+| the question | what the asymmetry decided |
+|---|---|
+| how a row divides its width (R1) | **weights**, not C11's boolean-over-a-minimum — there is no preferred width to absorb residual from |
+| how a child with an intrinsic size says so (R13) | **the child declares cells**, because the container cannot ask |
+| which way a row may align (R16, R17) | **vertically only** — the row knows its own height, and a child already fills the width it was handed |
+
+Three answers, one fact, and none of them was reached by looking at the other
+two. **Stated here because the next question about a container will have the same
+shape**, and because R1 read as a fact about C11 the first time — it is not: it is
+a fact about the measurement contract, and C11 is where its consequence showed.
+
 #### The rulings
 
 - **R1 — weights, not C11's boolean.** A group has no preferred width to absorb from.

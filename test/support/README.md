@@ -369,3 +369,30 @@ be 'light'*) rather than the cause.
 that is the argument for the producer rule above rather than against the cast:
 the field was absent, invisible to the compiler, and found in seconds only
 because one row went through the producer.
+
+## An example's rows run against `dist/`, so no mutation reaches them
+
+`examples/docker/test/*` and `examples/minimal/test/*` import `@fmx/calcium`,
+which resolves to the built package. A mutation applied to `src/` therefore
+changes nothing those rows can see: the mutation pass reports a **survivor**, and
+the survivor is an artefact of the module graph rather than a gap in the
+assertions.
+
+**Measured 2026-08-14, twice in one entry.** A vertical-alignment mutation
+survived against a banner row that asserts exactly that mechanism, and separately
+a consumer frame failed for twenty minutes against a `dist/` that predated the
+fix being diagnosed.
+
+**Both halves are wanted and they prove different things.** An app row proves the
+mechanism works *end to end, as shipped* — through the public surface, the built
+artefact, the real registry. A framework row proves it is *tested*: it is the one
+a mutation can reach. So a mechanism whose only coverage is app-side has no
+mutation reaching it, and its framework-side row is missing whatever the app
+asserts.
+
+Two rules follow, and both cost nothing:
+
+- **Rebuild before an isolated run** that crosses the boundary. A stale `dist/`
+  has produced a wrong diagnosis twice.
+- **Every mechanism an example asserts gets a framework-side row too.** The
+  example is the evidence; the framework row is the test.
