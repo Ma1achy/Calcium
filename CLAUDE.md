@@ -262,9 +262,19 @@ Each of these produces code that compiles, passes review, and is wrong.
   belief and not a ruling, and the cheapest moment to find that out is before something is
   built on it.
 
+  **And the answer can be *no file at all*, which is the strongest form and reads as the
+  weakest.** F161 is the measured case: a shared mark with four named consumers, one of them
+  said to ship, cited against a real finding — and the character it proposes is in no file in
+  the repository. **A count, a finding number and a shipped instance are what a ruling looks
+  like from outside**, and all three can be present with nothing behind them. Going to each
+  of the four consumers, none could take the mark: one already has the slot, one is text
+  inside a `code` block and would need a block-kind change first, one has no renderer at all,
+  and the fourth was a homonym — a log *level* named `trace`. **A count of consumers is an
+  argument only if the consumers share a shape.**
+
   **The instrument's running total, because a habit that costs twenty minutes deserves a
-  number**: it has now **disproved three findings and produced three** — F58b, F66's
-  replacement reason, and F92. It is the only one that checks the *record* rather than an
+  number**: it has now **disproved three claims and produced four** — F58b, F66's
+  replacement reason, F92 and F161. It is the only one that checks the *record* rather than an
   artefact; the frame-read checks output, the mutation pass checks tests, the audit checks
   code.
 

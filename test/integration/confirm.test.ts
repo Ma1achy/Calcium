@@ -45,6 +45,7 @@ import { measureSequence } from "../support/viewport.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { block } from "../../src/data/viewmodel/construct.js";
 import { createChoiceSelection, defaultStart } from "../../src/shell/choice-selection.js";
+import type { Choice } from "../../src/shell/local/registry.js";
 import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import type { OverlayManager } from "../../src/viewport/overlay/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
@@ -519,9 +520,26 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     // where the difference the entry expected — modular wrap against
     // stop-at-edge — turned out not to exist at all: the two copies of the
     // cycling agreed exactly, so the start is the whole of what is shared.
-    expect(defaultStart([{ key: "y" }, { key: "n", default: true as const }])).toBe(1);
-    expect(defaultStart([{ key: "y", default: true as const }, { key: "n" }])).toBe(0);
-    expect(defaultStart([{ key: "y" }, { key: "n" }]), "unmarked falls to the last").toBe(1);
+    // **Real `Choice` values, not the narrow shape `defaultStart` reads.** The
+    // signature takes `{ default?: true }` because that is all it looks at, and
+    // a bare literal of exactly that shape is a fixture that cannot be a
+    // choice — `tsc`'s excess-property check is what said so. A fixture must be
+    // the thing under test (`test/support/README.md`).
+    const marked: readonly Choice[] = [
+      { key: "y", label: "yes" },
+      { key: "n", label: "no", default: true },
+    ];
+    const markedFirst: readonly Choice[] = [
+      { key: "y", label: "yes", default: true },
+      { key: "n", label: "no" },
+    ];
+    const unmarked: readonly Choice[] = [
+      { key: "y", label: "yes" },
+      { key: "n", label: "no" },
+    ];
+    expect(defaultStart(marked)).toBe(1);
+    expect(defaultStart(markedFirst)).toBe(0);
+    expect(defaultStart(unmarked), "unmarked falls to the last").toBe(1);
 
     // The menu's start, in the same store: `null` is a display and does not
     // move, which was a guard written twice before it was one.

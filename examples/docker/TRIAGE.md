@@ -38,8 +38,8 @@ type change.
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 30 | **9** | — | 7 closed · **4 open, all four about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
+| **10** | [**A claim carried without a record**](#10) | 12 | **6** | — | **new at F80** · method — five findings disproved, and **F161 caught before it was filed** |
+| **11** | [A gate that passes without checking](#11) | 31 | **10** | — | 8 closed · **4 open, all four about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -429,11 +429,16 @@ says a demo of a plot should have a shape.
 | **F130** | the grant's own tests could not see it, because the double was narrower |
 
 
-## 10 · A claim carried without a record — **5, and all five disproved** · new at F80
+## 10 · A claim carried without a record — **6: five findings disproved, one claim caught before it was filed** · new at F80
 
-**This group is the disposition.** Every entry is a finding that was filed, believed, and then
-turned out to be wrong — and a log that quietly dropped them would read as *eighty-four found*
-rather than **seventy-nine found and five disproved.**
+**This group is the disposition.** The first five entries are findings that were filed,
+believed, and then turned out to be wrong — and a log that quietly dropped them would read as
+*eighty-four found* rather than **seventy-nine found and five disproved.**
+
+**F161 is the sixth and it is the group's first arriving from the other end**: the instrument
+was pointed at a claim *before* it became a finding, so what is filed is the disproof rather
+than the belief. That is the group succeeding rather than growing, and it is worth
+distinguishing in the count instead of folding into it.
 
 | | what was claimed | what measuring said |
 |---|---|---|
@@ -442,10 +447,15 @@ rather than **seventy-nine found and five disproved.**
 | **F58** | `?? 0` reports signal-death as clean success | `authoritativeMeta` overwrites `exitCode` on every route: `999` yields **0**, `SIGTERM` yields **143**. The five coercions never reached a document — **retracted, superseded by F58b** |
 | **F66** | docker refuses to remove an image a running container references, and it cannot be forced | `rmi` **untags** without `-f` while the container runs — **retracted**, then the retraction itself amended, because what decides it is whether the tag is the image's *last* reference |
 | **F68** | the completion menu paints no background and the transcript reads through it | every cell of the box is written — measured by diffing two captures row by row, columns 0–81 on all three rows — **withdrawn**, published in two READMEs first |
+| **F161** | a hanging-continuation mark has four consumers, one of which ships | the character is in **no file** in the repository, and none of the four could take it: one already has a `Glyph` slot, one is text inside a `code` block, one has no renderer, one was a homonym — a log *level* named `trace`. **Caught before it was filed** |
 
-**Three of the five were disproved by one instrument, and it is worth stating as a number.**
-*Going to find where the claim was written* has now **disproved three findings and produced
-two** — F58b, and F66's replacement reason. Five results from one habit that costs twenty
+**Four of the six were disproved by one instrument, and it is worth stating as a number.**
+*Going to find where the claim was written* has now **disproved three claims and produced
+four** — F58b, F66's replacement reason, F92 and F161. **This line and `CLAUDE.md`'s had
+already drifted apart by one before F161 was added** — F92 was counted there and not here,
+which is two records of one number doing what two records of one fact always do. Corrected in
+both, and the drift is left recorded rather than tidied away: it is the same class the group
+is about, arriving in the group's own summary. Seven results from one habit that costs twenty
 minutes makes it the highest-yield thing in the toolkit, and it is the only instrument that
 checks the *record* rather than an artefact. The frame-read checks output. The mutation pass
 checks tests. The audit checks code. Nothing else asks whether a belief has a source.
@@ -482,10 +492,11 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **11: 5 closed, 6 open**
+## 11 · A gate that passes without checking — **12: 6 closed, 6 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
+| **F162** | **`make test`, for a test file's own types** | vitest transpiles rather than typechecks, so a type error **inside** a test row is invisible to that row: T4.31 ran, asserted and went green in a file `tsc` refuses. `check` covers it and `afb88c4` published a clean `check` for a commit that does not typecheck — which makes the remedy an ordering one, **`check` last, not first**. **Fixed** |
 | **F2** | a CI job | Calcium was not a publishable package, and the job proved nothing |
 | **F56** | `package.json`'s `bin` | a claim about an executable, accepted by install, pack, `publish --dry-run` and `make proof`. Three consumers existed and **all three reached around the entry point** |
 | **F60** | `make proof` | red on `main` for two merged PRs, because it is the one target CI does not run |

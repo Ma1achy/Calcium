@@ -2919,6 +2919,53 @@ the sixth sweep changes is which instrument the number indicts**: nineteen of tw
 survived a read, so the *list* is sound and the *method* was not. On the criterion set before
 the sweep — *if it is most of them, the list is sound and entry 9 is next* — it is most of them.
 
+**SEVENTH PASS, 2026-08-14 — entry 16's cost table taken to the rows, and it asks a different
+question.** All six sweeps ask *is this row still true*. This asks **does this row describe the
+job the tree has** — and the two failures are independent, which is why a sweep cannot find
+this one: **a row can be exactly right about what does not exist and still be wrong about what
+building it means.** Entry 16 is the measured case, because every one of its four estimates was
+checked against the tree as it was built rather than after:
+
+| the row said | what it was |
+|---|---|
+| *merge* the selection — "the confirm reimplements it, which is the two-records-of-one-fact class" | a change of **block kind**. The two selections already agreed exactly — `% length` in both directions, in `confirm.ts` and in `keys.ts` alike — so nothing merged, and the two records did not disagree |
+| the flip is C19's and the confirm lacks it | **no code at all.** `prefer` is a field of C15's `anchored` arm and of nothing else, so the confirm inherited it the moment step 2 let it be anchored. The row attributed a mechanism to the wrong component |
+| `… N more` moves across with it | **not portable.** Only C19 holds a remainder, so the count stays C19's and the confirm drops its payload for a bare `…` |
+| *"two parameters are the whole difference"* | three — and `placement` had to be a **choice between** placements rather than a `Placement`, because `anchored` carries a row only the session can compute |
+
+**The shape is one thing said four ways.** A row names an **operation between two existing
+things** — merge, share, generalise, widen, move across — and the operation presumes a mechanism
+the tree does not have, or a difference that does not exist. It is written from the **surfaces**,
+where the two things look different, rather than from the tree, where they may already be the
+same code or may share no seam at all.
+
+**Run over the rows it is four entries, not one**, which is what makes it a pass rather than a
+note on 16:
+
+| entry | the operation the row named | what the tree had |
+|---|---|---|
+| **16** one popup | *merge* the selection, *move* the flip and the truncation | one identical implementation, one field of a third component, and one thing that does not travel |
+| **23** selection needs a background | a `carries: "meaning"` **palette** applied as a wash | `resolveBackground` refuses any ref that is not `surface.*` — the entry named a mechanism C10 does not have (C10 §4b) |
+| **31** completion is unranked | *widen* the filter, prefix → substring, **"one line"** | the verb source emits one word at a time, so the whole name never reaches the filter and widening it changes nothing (C19 I27) |
+| **6** flags that select a rendering (§2.2) | *select among* renderings with a flag | `--help` **replaces** the result, and `usageBlocks` lists every flag flat. 2.2 closes with no field |
+
+**Three of the four were found after the entry was picked, and that is the cost.** A stale row
+wastes a read; a kind-wrong row wastes the plan built on it. 35 is **not** on this list and the
+distinction is the point: its spinner premise is a claim about the tree that *expired*, which is
+the sweeps' class and which a sweep did catch. This one was never true.
+
+**The check is one question asked before sizing, and it is entry 48's residue again**: *what do
+these two share today* — measured, not read. Entry 16 step 4 is what running it looks like. The
+walk asked, found `% length` in both directions in both files, and the step became a store plus
+one supplied field rather than a merge of two mechanisms.
+
+**Not mechanised, and that is a ruling rather than a gap.** The operation verbs are greppable and
+a rule over them would report rows rather than errors — every row on a roadmap names an
+operation, so the population is the whole list and the signal says nothing about any member of
+it. That is A03 §2's vacuity class arriving in the instrument again, which is the shape the
+grep-reach signal was nearly built in. This is a **read**, like the sixth sweep's two arms, and
+nothing reaches it but running it.
+
 **Not checked, and named rather than left to look checked:** 2, 3, 4. Three of forty-five, and
 they are the three that **cannot** be checked from here: each names `prism-tui`, a consumer
 repository that does not exist in this tree. That is a different state from *not looked at* and

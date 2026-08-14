@@ -7771,3 +7771,92 @@ population of a gate and therefore a step of its own, exactly as F159's is.
 F159 came from fabricating a violation; this came from a rule firing on something that was
 not its subject. **A rule that reports the wrong instance is showing you its matching, and
 that is the only view of it you get from outside.**
+
+---
+
+## F161 — a shared mark with four consumers, and none of the four can take it ★★★
+
+**The claim, about to be built:** *there is now a hanging-continuation slot with four
+consumers — the fault notice, `--help`'s flags, the pending entry and a view's trace line —
+one of which ships; F122 is the finding for authoring a mark at five sites, so it is cheaper
+to add the slot once than to correct it four times.*
+
+**Where it is written down: nowhere.** The character is in no file in this repository — not a
+spec, not a design document, not a roadmap entry, not a note, not `src/`. That is a stronger
+answer than the instrument's usual one. F58's claim lived in four documents citing each other
+and F66's was carried through four steps of one plan; **this had no record at all**, and it
+still read as settled because it named a finding (F122), a count (four) and a shipped instance.
+Those three together are what a ruling looks like from outside.
+
+**The four, measured one at a time.** Taken on the charitable reading — *four places now want a
+hanging mark* — rather than the literal one:
+
+| named consumer | what is actually there |
+|---|---|
+| **F15's fault notice** | **already has the slot.** `noticeDoc` sets `glyph` from `GLYPH_OF[tone]` — `src/shell/documents.ts:151` — and `prefixCells` in `blocks/kinds/simple.ts:39` reserves its cells, capability-free, by C09 §4's 1:1 rule. What it carries is a **severity** and not a continuation, so a second leading mark on that row is a second severity |
+| **`--help`'s flags** | **cannot take a glyph at all.** `usageBlocks` — `src/data/adapters/mapping.ts:169` — emits **one `code` block** of pre-joined text, with the flags as lines inside `text` indented two spaces. A mark there is a non-ASCII character in a `src/` string literal, which SS47 refuses by name. The change this consumer wants is **structural** — `keyValue` or a table — and having made it, it wants a *column*, not a slot |
+| **the pending entry** | **has no renderer.** `blocks: []` at `src/shell/execution.ts:895`, and entry 35's residue already says so: *nothing composes the notice, and there is no elapsed-time part*. There is nothing to put a mark on until something composes one |
+| **a view's trace line** | **does not exist.** The only `trace` in `src/` is a **log level** — `case "trace":` in `levelTone`, `blocks/kinds/structured.ts:86`, folding to `dim`. A homonym, not a consumer |
+
+**One of the four ships, and it is the one that argues against the slot.** The fault notice is
+real, drawn, and the only one with a leading mark — because a leading mark on a notice is a
+`Glyph`, and that mechanism is built. Cited as *the consumer that ships*, it reads as the first
+of four; measured, it is the demonstration that the remaining three are not the same problem.
+
+**Wrong in both directions, which is the shape to watch for.** Not four — two at most, and
+neither of those two is buildable today. And the cheapness argument runs **backwards**: adding
+one slot does not save three corrections, because the three want three different changes —
+nothing (the slot exists), a block-kind change, and a composer. **A count of consumers is an
+argument only if the consumers share a shape**, and this one was assembled by listing places
+that draw a line under something.
+
+**What no reading reaches, and why this is the sixth blind spot's instrument rather than
+review.** Every sentence in the claim is individually plausible: F122 *is* the finding about
+authoring a mark at several sites; the fault notice *does* ship; the pending entry *is* blank.
+Review checks whether the parts are true and they are. What fails is the join — *therefore
+these are four instances of one slot* — and the only thing that asks it is going to each site.
+Twenty minutes.
+
+**Running total for the instrument, because a habit that costs twenty minutes deserves a
+number: it has now disproved three claims and produced four** — F58b, F66's replacement reason,
+F92 and this. It remains the only one that checks the **record**; the frame-read checks output,
+the mutation pass checks tests, the audit checks code.
+
+**If the slot is still wanted, this is what it would need**: a consumer that draws a mark today
+and wants a different one, plus a second that would draw the same mark for the same reason. On
+today's tree there is one candidate — the pending entry, once something composes it — and one
+candidate is not a shared slot. Recorded so that the next pass does not re-derive the four.
+
+---
+
+## F162 — a type error in a test file is invisible to the suite that runs it, and a green `check` was published for a commit that does not typecheck ★★
+
+**`afb88c4` does not typecheck**, and its report said `check` was clean. Found on the next
+session's first `make check`, with the working tree otherwise untouched:
+
+```
+test/integration/confirm.test.ts(522,28): error TS2353: Object literal may only specify
+  known properties, and 'key' does not exist in type 'Readonly<{ default?: true; }>'.
+```
+
+**The suite could not have caught it, and that is the durable half.** `make test` ran
+T4.31 — the row containing those lines — and passed it, along with 2808 others. Vitest
+transpiles rather than typechecks, so **a type error inside a test file is invisible to the
+test it is inside**: the row executes, asserts, and goes green. Nothing in a passing suite
+distinguishes a file that typechecks from one that does not.
+
+**Which of the two causes produced the false green cannot be reconstructed** — `check` run
+before T4.31 was written, or its counters misread — and it does not matter, because both have
+one remedy: **`check` is the last target run, not the first.** A gate run before the final edit
+is a gate not run, and it reports identically to one that was.
+
+**The defect it was hiding is small and the fixture rule already forbade it.** `defaultStart`
+takes `readonly Readonly<{ default?: true }>[]` because that is all it reads; the test handed it
+bare literals of exactly that shape, which is a fixture that **cannot be a choice**. `tsc`'s
+excess-property check is what said so. Fixed by giving the fixtures the real `Choice` type,
+labels and all — *a fixture must be the thing under test* (`test/support/README.md`), and here
+the type system was the thing enforcing it.
+
+**Related to F142's class from the other side.** F142 is a count with no mechanism; this is a
+mechanism whose result was reported without being re-run. Both publish a number that was true
+once.
