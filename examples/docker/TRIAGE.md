@@ -119,7 +119,7 @@ reach it. **Seven closes is the strongest evidence in this document that a shape
 | **F41** | `Patch.collapsedAfter`, `actions` | open |
 | **F21** | the action model, from a keystroke | open — the dispatch route |
 | **F23** | `view: true` on a local tool | open — accepted, does nothing |
-| **F165** | **`ErrorLike.code`, `.stage`, `.details` — set by three producers, the adapter mapping and the app's own six sites; rendered by nothing.** The first thing roadmap 48's residue was read for, and it listed one of the three: the other two were *cleared* by the app naming them, which is the instrument's direction working as described | open — the remedy is a ruling, not a patch |
+| **F165** | **`ErrorLike.code`, `.stage`, `.details` — set by three producers, the adapter mapping and the app's own twelve sites; rendered by nothing.** The first thing roadmap 48's residue was read for, and it listed one of the three: the other two were *cleared* by the app naming them, which is the instrument's direction working as described. **The twelve sites were then read, and they split the three**: `stage` is a per-file constant restating the kind of function it sits in, so the framework already knows it (F13's class, group 1); `code` and `details` come off the far side's own envelope and are the one place narrowing costs something | open — **two dispositions, not one**; the ruling is owed |
 
 **F78 is the sharpest instance yet and it is worse than the others by a specific mechanism.**
 `b.live` throws when neither `fetch` nor `stream` is given, and throws again when both are —

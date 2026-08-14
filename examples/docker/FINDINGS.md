@@ -8016,7 +8016,7 @@ expression anywhere in `src/`. They are produced on every route that can fail:
 | `data/adapters/mapping.ts:107–115` | `code`, `stage`, `details`, **off the far side's own error envelope** |
 | `data/viewmodel/patch.ts:32` | `stage` and `code: "patch"` on a rejected patch |
 | `data/manifest/validate.ts:97` · `interaction/parser/parse.ts:45` | `details` on a validation and a parse failure |
-| `examples/docker`, **six sites** | `stage: "adapter"` and `stage: "local"`, by hand |
+| `examples/docker`, **twelve sites** | `stage: "adapter"` and `stage: "local"`, by hand |
 
 **The app is the part that makes this a finding rather than an unused field.** Six call
 sites in `examples/docker` write `stage` into an `error`, which is a consumer supplying a
@@ -8027,7 +8027,7 @@ frozen and dropped.
 
 **Found by a residue, and the residue found one of the three.** Roadmap 48's signal lists
 `ErrorLike.details` because neither example names it. `code` and `stage` were **cleared** —
-`stage` by the app's own six sites, `code` by a name any type may carry — which is the
+`stage` by the app's own twelve sites, `code` by a name any type may carry — which is the
 instrument's stated direction working as described: it under-reports, and the read that
 starts from one member is what reaches the other two. **A candidate is where to look, not
 what is wrong**, and this is the first measured instance of that being the useful shape.
@@ -8045,6 +8045,55 @@ argument), or keep them as the structured half of a document an agent reads rath
 person. The last is the one that would explain `details` existing at all. What is not
 available is the current state, where a producer, an adapter and an app all fill fields on a
 promise nothing keeps.
+
+### The twelve sites read, and they split the three members rather than settling them together
+
+**The count was wrong first, and how it went wrong is the point of recording it.** F165 said
+*six sites*, from a `grep | head -6`. There are **twelve**. A number produced by a truncated
+command reads exactly like a number produced by a count, which is the instrument-manufactures-
+evidence class in its simplest shape — and it survived into three documents because nothing
+about it looked derived.
+
+**Not one of the twelve is a runtime discrimination.** Each writes a literal determined by the
+kind of function it sits in — a local handler writes `"local"`, an adapter writes `"adapter"` —
+and no site chooses between the two at runtime. All twelve pair it with
+`blocks: [b.notice.error(message)]` carrying the same message the `error` object does.
+
+| what a reader has | what `stage` adds |
+|---|---|
+| a reader of the **source** is reading the local handler, or the adapter | the name of the file they are in |
+| a reader of the **screen** sees the notice | nothing; it is rendered nowhere |
+
+So it is **not** documentation-in-place. It is ballast on a required field, and `ps.ts:161`'s
+own comment says how it got there: C04 I3 requires `error` when `status` is `"error"` and its
+absence is silent (F35), so the author wrote an `ErrorLike` — and `stage` came with the type
+rather than from a decision to signal anything.
+
+**That makes `stage` group 1's shape and not this group's.** The framework already knows the
+route: C23 is what ran the local handler or the adapter. A fact the framework holds and the app
+is asked to author twelve times is F13 exactly, and the disposition is neither *narrow* nor
+*wire* — it is **the app should not be writing it**.
+
+**`code` and `details` are the opposite case, and this is where narrowing removes something
+real.** Both arrive from the far side's own error envelope at `mapping.ts:107–115`. A
+JSON-emitting CLI saying `{"code":"NO_SUCH_CONTAINER","details":{"id":"abc","exit":137}}` is
+saying something no other part of the system has, and the framework parses it, types it,
+freezes it and drops it. Narrowing the type deletes the only channel the far side has for
+structured failure.
+
+**So: three members, two dispositions, and neither is the one the finding opened with.**
+
+| member | who authors it | disposition |
+|---|---|---|
+| `stage` | the app, twelve times, as a per-file constant | **the framework's fact** — supplied or dropped, not authored (F13) |
+| `code`, `details` | the far side, through the adapter mapping | **rendered or deliberately withheld** — a C09 question, and the one place a narrowing costs something |
+
+**This session's precedent does not decide it, and that is the finding about the precedent.**
+F58b narrowed because its seven fields were *computed and thrown away* by a producer that
+gained nothing from them. `stage` is authored deliberately and is still worth removing;
+`details` is not authored at all and is worth keeping. **Whether a field is written by hand
+turns out not to be the axis** — what decides it is whether anyone but the framework could
+know the value.
 
 ---
 

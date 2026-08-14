@@ -3114,7 +3114,7 @@ PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    in the residue, and reading it found `code` and
                                    `stage` beside it — three of five members set by
                                    three producers, the adapter mapping and the app's
-                                   own six sites, rendered by nothing. THE OTHER TWO
+                                   own twelve sites, rendered by nothing. THE OTHER TWO
                                    WERE CLEARED, which is the residue's stated direction
                                    paying out: a candidate is where to look and not what
                                    is wrong
