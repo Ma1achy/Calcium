@@ -2981,6 +2981,36 @@ this question.
 | **45** configurable cursor | a capability-gated `DECSCUSR` escape, and a blink state machine on the refresh driver's clock | **Survives.** Every mechanism it names exists and is in the right component: `escapes.ts` already holds `mode()` pairs and a `CURSOR` show/hide, so the shape is one more constant of a kind already there; `refresh.ts` owns intervals; `Placed.cursor` is per layer (C15 I19), which is what makes *per focus target* a seam rather than a preference |
 | **48** MG24 on the public surface | *tighten the rule* | **Refused by the entry itself**, four times measured, and a fifth in the other direction when entry 16 added `AskOptions.placement`. Its own conclusion is that the fix is a **second consumer** rather than a rule change — which is phase-1 work, so it is not pickable as an entry |
 
+**RUN AGAIN BEFORE THE NEXT PICK, 2026-08-14 — and 29 was the one it was owed.** The first
+run left 29 alone with *F161 is the question to ask it: a count of consumers is an argument
+only if the consumers share a shape.* Asked, and they do not. **None of the five exists in
+`src/`**, so this is about what each would need rather than about what is there:
+
+| the consumer | what it actually wants |
+|---|---|
+| mode indicator (`NAV`/`EDIT`) | a **label** in a chrome row |
+| queued count (`✳ 1 running task`) | a **label** in a chrome row |
+| elapsed time | **misfiled.** Entry 35 puts it on the **pending entry** — *nothing composes the notice, and there is no elapsed-time part* — which is a block in the transcript and not chrome at all |
+| region separators (**37**) | **whole rows**, three of them, and the entry prices them at 7.5% of a 40-row terminal. Not a label and not a slot |
+| where in this container am I (**46**) | a **column.** The scrollbar entry already rules it — *reserve the column always, never conditionally* — with the reason: a column that appears on overflow changes the width, which changes wrapping, which changes whether it overflows |
+
+**Two of five share a shape, one is in the wrong entry, and two are different geometry — one of
+those already ruled.** The count was assembled from *things that want screen space* rather than
+*things that want the same slot*, which is F161's mechanism arriving in a roadmap row instead of
+in a plan. *Rule once* is still the right instinct and its subject is **two** consumers.
+
+**And both of those two are themselves unbuilt** — the mode indicator waits on C26 §4's modes
+and the queued count on **33** — so 29 today is a slot with nothing to put in it, which is the
+vacuity an invariant has until its subject exists.
+
+**Where that leaves the four symbol-carrying OPEN entries: none is pickable as it stands.**
+24 waits on 39, 44 on 34, 48 is refused by its own conclusion, and 29's two real consumers are
+unbuilt. **That is a fact about the frontier rather than about the entries**, and the useful
+reading of it is that the next move is to unblock rather than to pick: **39** is already RULED,
+is the smaller of the two blockers, and closes a *shipped* defect — the light theme sets
+foregrounds and paints nothing behind them, and `surfaces.bg` is declared in both themes and
+read only by the contrast checker.
+
 **Two of five, and both would have passed a sweep**, which is the case for the pass being a
 question and not a rule. Neither is a stale citation: 44's sentence about C20 is true, and 24's
 sentence about the background ruling is true. **What is wrong is the job each implies.**
