@@ -268,7 +268,7 @@ function harness(script: Scripted = {}) {
     // `/theme` alike. This is the second harness in the tree with its own
     // `as unknown as PipelineDeps`, and the cast is why the compiler saw
     // neither.
-    confirm: createConfirmHost({ overlays, anchor: () => ({ row: 0, rows: 1 }), invalidate: () => undefined }),
+    confirm: createConfirmHost({ overlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined }),
     // C23 I46 — everything visible. This harness has no viewport, so answering
     // from one would pause every part in the file: a fake supplying the
     // behaviour under test rather than standing in for it. The pause has its own

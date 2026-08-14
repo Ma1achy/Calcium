@@ -64,6 +64,8 @@ export function menuBlocks(
   selected: number | null,
   remainder: number,
 ): readonly Block[] {
+  // The caller windows; this draws what it is given (`menuWindow`).
+
   const detailed = candidates.some((c) => c.detail !== undefined);
   const body: Block = detailed
     ? {
@@ -171,6 +173,45 @@ export function menuBlocks(
     { kind: "raw", id: `${MENU_ID}-more`, text: `+ ${String(remainder)} more` } satisfies Block,
     edge,
   ]);
+}
+
+/**
+ * The candidates that fit, and where the window starts (I23).
+ *
+ * **The compositor cuts from the end, so anything the owner puts last is what
+ * it loses.** `composite.ts` writes `lines[0 … height)` — C15 reports
+ * `truncated` and cutting is the frame's half of the split — and this file used
+ * to hand over every candidate and trust the clamp. Read from a frame, a
+ * truncated menu drew the top rule and four candidates: **the `+ N more`
+ * indicator and the bottom edge were both in the cut**, which is to say the
+ * indicator has never been visible on any occasion it fired, and the edge C19
+ * §6 argues stops the menu reading as continuous with the prompt is missing in
+ * exactly the case where the list runs into it.
+ *
+ * The remainder was wrong by the same amount: `menuRowsShown` subtracts three
+ * chrome rows *because it assumes all three are drawn*, so a menu showing four
+ * candidates reported twenty-eight missing where twenty-six were.
+ *
+ * **And the selection could leave the frame.** With every candidate in the
+ * content, arrowing past the last visible row moved a marker into a cut row —
+ * the menu looked frozen while the selection was moving. The window follows the
+ * selection for that reason rather than for scrolling's own sake.
+ */
+export function menuWindow(
+  total: number,
+  selected: number | null,
+  fits: number,
+): Readonly<{ start: number; shown: number }> {
+  if (fits <= 0 || total <= fits) return Object.freeze({ start: 0, shown: total });
+  const at = selected ?? 0;
+  // **One clamp, and the other two were dead.** The first draft wrote
+  // `min(at - fits + 1, total - fits)` and then `min(start, at)`, which read as
+  // careful and could not fire: `at` is at most `total - 1`, so `at - fits + 1`
+  // is at most `total - fits` and never exceeds it, and `start` is at most `at`
+  // by construction. Two lines with nothing to be wrong about, passing exactly
+  // like two that are satisfied — found by a mutation that changed them and
+  // failed nothing (A03 §2).
+  return Object.freeze({ start: Math.max(0, at - fits + 1), shown: fits });
 }
 
 /**

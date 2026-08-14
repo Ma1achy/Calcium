@@ -2572,8 +2572,25 @@ PART  16 ONE POPUP ★             confirm · completion · peek · question are
                                    list is a construction error exactly when the list is the
                                    only path to the answer, which `resolve(text)` shows is
                                    not a partition over onSelect's four values.
-                                   STILL OPEN: the flip and `…` for the confirm (step 3),
-                                   and the shared selection store
+                                   STEP 3 BUILT and it found TWO SHIPPED DEFECTS, both
+                                   invisible to every assertion and both read from a frame.
+                                   The compositor writes lines[0..height), so whatever an
+                                   owner puts last is what it loses: C19's `+ N more` and its
+                                   bottom edge were in the cut on EVERY occasion the
+                                   indicator fired — a mechanism observable exactly never —
+                                   and the remainder was wrong by the chrome it assumed was
+                                   drawn. The confirm lost its CHOICES: measured on a 24-row
+                                   terminal with a 20-row payload, the reader was asked a
+                                   question with no [y], no [n] and no bottom border, keys
+                                   still working. So C19 windows its own list (`menuWindow`)
+                                   and the confirm drops its payload for `…` rather than
+                                   appending an indicator that would be the first row lost.
+                                   The FLIP needed nothing: `prefer` is already a field of
+                                   the anchored arm alone, so the type said it without a
+                                   comment. And the filed resize defect is fixed —
+                                   `refreshAnchors` before the commit — read from the screen,
+                                   since the menu sat at row 21 with the prompt at 37.
+                                   STILL OPEN: the shared selection store
 PART  17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
                                    MAX_ROWS is the fallback adapter's alone. diffing → caching → window
                                    the block → cap with a marker. A CHAIN, in that order
@@ -2819,7 +2836,7 @@ what landed**.
 | 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:185` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
 | 41 | BUILT | **both populations, one suggester.** `suggestName` — `src/data/manifest/validate.ts:147` — is the single distance-2 cutoff (C05 I18), read for unknown flags at `src/data/manifest/validate.ts:284` and unknown verbs at `src/interaction/parser/parse.ts:183`, sharing the tie-break so a second implementation cannot diverge. `test/unit/parser.test.ts` asserts distance 3 outside and 2 inside | — |
 | 23 | BUILT | **a surface with its own pairing, and the ruling it corrected.** `surfaces.selection` — `src/presentation/theme/tokens-dark.ts:36`, `#264057` at 7.25 : 1 against `tone.default` — is checked by `selectionPairs`, `src/presentation/theme/contrast.ts:158`, a **sibling** of `diffPairs` rather than an entry in it. The cells come from `selectionSpans` — `src/interaction/editor/layout.ts:167` — off the same walk `layout` uses, and `washed` in `src/shell/paint.ts:291` applies them after `exact` squares the row, which is where full-row rather than text-width comes from. `inverse` is the 1-bit rung. T4.22–T4.26 and T1.37–T1.41 | a `carries: "meaning"` **palette** cannot be a wash — `resolveBackground` refuses any ref that is not `surface.*`, so the entry named a mechanism C10 does not have (C10 §4b) |
-| 16 | PART | **two steps of four, and both were resized by the walk.** Step 1: the choices are a table — `choiceBlock` at `src/shell/confirm.ts:101` — so the marker is a `bullet` slot L1 resolves and `ConfirmDeps` no longer takes a capability record at all. Step 2: `assertPlaceable` at `src/viewport/overlay/manager.ts:167` refuses a centred layer with no width at **both** entry points (C15 I20), which found the tree's second instance — `clearConfirmLayer` at `src/interaction/history/layers.ts:95` declared none — and `AskOptions.placement` at `src/shell/local/registry.ts:44` is a choice between placements, resolved by `placementOf` in `src/shell/confirm.ts`. T1.21, T1.22, T4.12–T4.18 | the flip and `…` for the confirm, and the shared selection store. `… N more` is not portable: only a layer holding its own list can count (design §6 R2) |
+| 16 | PART | **three steps of four, and step 3 found two shipped defects.** Step 1: the choices are a table — `choiceBlock` at `src/shell/confirm.ts:101` — so the marker is a `bullet` slot L1 resolves and `ConfirmDeps` no longer takes a capability record at all. Step 2: `assertPlaceable` at `src/viewport/overlay/manager.ts:167` refuses a centred layer with no width at **both** entry points (C15 I20), which found the tree's second instance — `clearConfirmLayer` at `src/interaction/history/layers.ts:95` declared none — and `AskOptions.placement` at `src/shell/local/registry.ts:44` is a choice between placements, resolved by `placementOf` in `src/shell/confirm.ts`. Step 3: `menuWindow` at `src/interaction/completion/menu.ts:186` windows the list to what the placement holds, and `refreshAnchors` in `src/shell/keys.ts` re-places the anchored layers on a resize. T1.21, T1.22, T4.12–T4.18, T4.28–T4.30, T4.33, T4.34 | the flip and `…` for the confirm, and the shared selection store. `… N more` is not portable: only a layer holding its own list can count (design §6 R2) |
 | 15 | BUILT | **four steps and a step 0, and the mode is a target throughout.** Copy mode: `#setCopyMode` holds the state at `src/shell/session.ts:586`, C03 gains `suspend`/`resume` at `src/terminal/frame-scheduler.ts:263` (§4a), C01 gains `setMouseTracking` at `src/terminal/lifecycle.ts:348` because nowhere else writes an escape. The prompt: an anchor plus the cursor, with `⌥a`/`⇧←`/`⇧Home` bound after `modifiersOf` — `src/interaction/router/decode.ts:113` — learned xterm's fourth bit. One clipboard: `copyText`, `src/interaction/editor/editor.ts:377`, written by `⌥w` and by the transcript's `copyElement`, `src/shell/keys.ts:778`, over a range held by `extendRow`, `src/interaction/router/focus.ts:246`, copying `rowCopyText`'s source text, `src/presentation/table/definition.ts:290`. The wash is entry 23 | OSC 52 is a separate axis and is not built: whether a copy **also** reaches the system clipboard is a capability question about the terminal, and it changes nothing about where the text lands in-process |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 

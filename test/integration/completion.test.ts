@@ -7,7 +7,10 @@ import {
   createEngine,
   flagNameSource,
   flagValueSource,
+  menuBlocks,
   menuLayer,
+  menuRowsShown,
+  menuWindow,
   MENU_ID,
   remainderOf,
   verbSource,
@@ -18,6 +21,7 @@ import { tokenise } from "../../src/interaction/parser/index.js";
 import { raw } from "../support/manifest.js";
 import { at, fakeClock } from "../support/completion.js";
 import { registry } from "../support/overlay.js";
+import { measurable, visible } from "../support/render.js";
 
 describe("C19 + C05 — the anti-drift test (I4)", () => {
   it("T4.1: a flag and an enum value added to the manifest complete, with no TypeScript change", async () => {
@@ -151,6 +155,65 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
     // how many were lost. That half is C19's.
     expect(menu.truncated).toBe(true);
     expect(remainderOf(menu, many.length, 10)).toBe(50);
+  });
+
+  it("T4.9 (I23): the indicator and the bottom edge are inside the drawn box", () => {
+    // **The row T4.5 reads as covering and does not.** T4.5 asserts the count
+    // and hands `menuRowsShown` its answer by hand; it never asks where the
+    // indicator lands. Read from a frame, it landed in the cut: `composite.ts`
+    // writes `lines[0 … height)`, so everything the menu puts last is what it
+    // loses — the `+ N more` row and the bottom edge both, on every occasion
+    // the indicator fired. A mechanism observable exactly never, which is
+    // A03 §2's vacuity class arriving in shipped code.
+    const r = measurable();
+    const manager = createOverlayManager({
+      registry: { measureSequence: (b, w) => r.registry.measureSequence(b, w) },
+    });
+    const many = Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}` }));
+    manager.push(menuLayer(many, 0, 0, { row: 2, rows: 1 }));
+
+    const region = { width: 80, height: 10 };
+    const first = manager.layout(region)[0];
+    if (first === undefined) throw new Error("unreachable");
+    const fits = menuRowsShown(first);
+    const remainder = remainderOf(first, many.length, fits);
+    const w = menuWindow(many.length, 0, fits);
+    manager.update(MENU_ID, {
+      content: menuBlocks(many.slice(w.start, w.start + w.shown), 0, remainder),
+    });
+
+    const placed = manager.layout(region)[0];
+    if (placed === undefined) throw new Error("unreachable");
+    const lines = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width));
+    const drawn = lines.slice(0, placed.height).map(visible);
+
+    expect(drawn.some((l) => l.includes(`+ ${String(remainder)} more`)), "the indicator is drawn").toBe(
+      true,
+    );
+    expect(lines.length, "and nothing is cut at all now").toBeLessThanOrEqual(placed.height);
+    expect(drawn[drawn.length - 1]?.trim().length, "the bottom edge is a rule").toBeGreaterThan(0);
+  });
+
+  it("T4.10 (I23, I20): the selection stays inside the window as it moves", () => {
+    // **The third consequence of handing over every candidate**, and the one a
+    // reader would report as *the menu is frozen*: with the list longer than
+    // the box, arrowing past the last visible row moved the marker into a cut
+    // row. Every assertion about `selected` agreed — the index was moving.
+    const fits = 4;
+    const far = menuWindow(60, 20, fits);
+    expect(far.shown).toBe(fits);
+    expect(20).toBeGreaterThanOrEqual(far.start);
+    expect(20).toBeLessThan(far.start + far.shown);
+
+    // Both ends, because a window that only ever chases downwards passes the
+    // first case and pins the last: at the top it must not start below zero,
+    // and at the bottom it must not run past the list.
+    expect(menuWindow(60, 0, fits)).toEqual({ start: 0, shown: fits });
+    // The last candidate, which is where a clamp against `total - fits` would
+    // have mattered if it could: `at` is at most `total − 1`, so the two
+    // expressions coincide there and the clamp was dead. It is gone.
+    expect(menuWindow(60, 59, fits)).toEqual({ start: 56, shown: fits });
+    expect(menuWindow(3, 2, fits), "a list that fits is not windowed").toEqual({ start: 0, shown: 3 });
   });
 
   it("the menu declares no width, so C15 gives it the whole region", () => {

@@ -58,6 +58,14 @@ export type ConfirmDeps = Readonly<{
    * frame moves.
    */
   anchor: () => Readonly<{ row: number; rows: number }>;
+  /**
+   * The region C15 places against, for the truncation pass (entry 16 R2).
+   *
+   * The same seam C19's menu takes. How much fits is a fact about the frame and
+   * C15 answers it only once the layer is on the stack, so this is a second
+   * pass rather than an argument to the first.
+   */
+  overlayRegion: () => Readonly<{ width: number; height: number }>;
   /** The frame is L4's to commit; C15 never paints (A02 Seam 4). */
   invalidate: () => void;
 }>;
@@ -139,13 +147,53 @@ function keyWidth(choices: readonly Choice[]): number {
   return widest;
 }
 
-function render(opts: AskOptions, selected: number): readonly Block[] {
+/**
+ * Whether the placement could not hold the question (C15 I8).
+ *
+ * `Placed.truncated` and nothing more, which is the whole of what is portable:
+ * the menu can say *how many* because it holds its own candidates, and this
+ * file holds a caller's block and no registry — `CONFIRM_WIDTH` is a request
+ * rather than a measurement for exactly that reason.
+ */
+function truncated(deps: ConfirmDeps): boolean {
+  const placed = deps.overlays
+    .layout(deps.overlayRegion())
+    .find((p) => p.layer.id === CONFIRM_LAYER_ID);
+  return placed?.truncated ?? false;
+}
+
+/**
+ * The question, its payload and its choices — or the question, `…` and its
+ * choices when the region cannot hold them all.
+ *
+ * **The payload is dropped rather than marked, and a frame is what decided
+ * it.** `composite.ts` writes `lines[0 … height)`, so a box that does not fit
+ * loses its *tail* — and this box's tail is the choices. Measured on an
+ * ordinary 24-row terminal with a twenty-row detail: the reader was shown the
+ * question and ten rows of payload, and **no `[y]`, no `[n]` and no bottom
+ * border.** A question with its answers cut off, with the keys still working
+ * and nothing on screen saying so.
+ *
+ * So an appended indicator was never the shape: an extra row at the end is the
+ * first thing lost. Replacing the payload is what fits, and it costs the reader
+ * only what they could not read anyway — the alternative, shrinking the detail,
+ * needs a measurement this file cannot make.
+ */
+function render(opts: AskOptions, selected: number, cut = false): readonly Block[] {
   const children: Block[] = [
     block({ kind: "notice", id: "confirm-question", tone: "warn", glyph: "warn", text: opts.question }),
   ];
   // Ruling C's payload — what the answer will affect, shown with the question
   // rather than in the entry that follows it.
-  if (opts.detail !== undefined) children.push(opts.detail);
+  if (opts.detail !== undefined) {
+    children.push(
+      cut
+        ? // ASCII, because this text is authored where the capability is not
+          // (C09 I22, F122) — the same reason C19 writes its indicator flat.
+          block({ kind: "raw", id: "confirm-elided", text: "..." })
+        : opts.detail,
+    );
+  }
 
   children.push(choiceBlock(opts.choices, selected));
 
@@ -215,9 +263,25 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         ...placementOf(opts, deps),
         content: render(opts, selected),
         dismissable: false,
+        // **A question is not an advisory overlay, so the default fraction is
+        // the wrong one** (C15 I18). Half the region is right for a peek, which
+        // a reader dismisses; a confirm that does not fit loses its *answers*,
+        // and the reader is asked something with no visible way to reply.
+        //
+        // It reduces the case and cannot remove it: a fraction caps a
+        // proportion where this wants a minimum, and below about nine rows even
+        // the collapsed form is taller than any fraction of the region. C15
+        // floors at one row and draws it truncated rather than absent (I18),
+        // which is the right end to fail at — see C23 T4.28's residue.
+        maxHeightFraction: 0.8,
       };
 
       const disposable = deps.overlays.push(layer);
+      // **The second pass, and it drops the payload rather than marking it**
+      // (entry 16 R2). See `collapsed`.
+      if (truncated(deps)) {
+        deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected, true) });
+      }
 
       return new Promise<string>((resolve) => {
         const settle = (key: string): boolean => {

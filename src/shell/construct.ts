@@ -704,6 +704,19 @@ export async function constructGraph(
   // **The anchor is captured before the cache is dropped** — C14's `resize`
   // does that internally (C14 I8), which is why this hands over one snapshot
   // and does not compute anything from it.
+  /**
+   * Step 11's anchor refresh, reachable from step 8's handler.
+   *
+   * **A forward reference made explicit rather than left implicit.** The resize
+   * subscription is registered at step 8 and the effect table is built at step
+   * 11, so naming `keys` inside the handler is a temporal-dead-zone read that
+   * is safe only because construction is synchronous and no signal can
+   * interleave. That is a true argument and a fragile one — it stops holding
+   * the day any step awaits — and the failure it would produce is a throw
+   * inside a signal handler.
+   */
+  let refreshAnchors: () => void = () => undefined;
+
   at("resize", () => {
     lifecycle.onResize((size) => {
       // **The width, and not the height** (C22 I34). Width is what invalidates
@@ -714,6 +727,13 @@ export async function constructGraph(
       // first. The height passed through is the one C14 already holds, so this
       // call carries no opinion about it.
       stores.viewport.resize({ width: size.columns, height: stores.viewport.scroll.viewportHeight });
+      // **The anchors, before the frame is asked for** (C15 I14, C19 I23). An
+      // anchored layer stores the row it was placed against, and every writer
+      // of that row was a keystroke path — so a resize left an open menu
+      // anchored to the previous region height until the next character. C15
+      // clamps, so nothing faults and no number disagrees; the menu is simply
+      // in the wrong place, which is a frame's finding and not an assertion's.
+      refreshAnchors();
       scheduler.commit("resize");
     });
     // `SIGCONT` re-acquires and says so through `onResume`; C01 sets no
@@ -744,6 +764,7 @@ export async function constructGraph(
     overlays: stores.overlays,
     // The same anchor C19's menu takes, read at `ask` time (C15 I17).
     anchor: deps.frame.promptAnchor,
+    overlayRegion: deps.frame.overlayRegion,
     invalidate: () => void scheduler.commit("input"),
   });
 
@@ -962,6 +983,8 @@ export async function constructGraph(
     // is the opposite of the case a coalescing window is for.
     redraw: () => void scheduler.commit("completion"),
   });
+  // Step 8's handler reaches the anchors through this, declared above it.
+  refreshAnchors = () => void keys.refreshAnchors();
 
   /**
    * Is the prompt still answering keys under whatever is on the stack (I51)?

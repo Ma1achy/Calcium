@@ -22,8 +22,10 @@
 import {
   accept,
   contextAt,
+  menuBlocks,
   menuLayer,
   menuRowsShown,
+  menuWindow,
   remainderOf,
   MENU_ID,
   SPINNER_MS,
@@ -208,6 +210,22 @@ export interface KeyEffects {
    * `searchEnd` takes its action for the same reason (C20 §7).
    */
   searchTyped(text: string | null): void;
+  /**
+   * The region changed — re-place whatever is anchored to the prompt.
+   *
+   * **Placement is live in C15's type and nothing was keeping it current.** The
+   * anchor is recomputed on every keystroke — `showMenu` passes `deps.anchor()`
+   * and `update` carries the placement with the content — and the resize path
+   * was not: it resized the viewport and committed a frame, and `redrawMenu`
+   * sends content alone. So a resize with the menu open left it anchored to the
+   * *previous* region height until the next keystroke. C15 clamps, so no number
+   * is inconsistent and nothing faults; the menu is simply in the wrong place,
+   * which is what a frame shows and an assertion about the anchor agrees with.
+   *
+   * Both layers, because both take the same anchor and only one of them would
+   * have been noticed.
+   */
+  refreshAnchors(): void;
   /** The line went away — close the menu and forget `Esc`'s suppression (C19 I19). */
   reset(): void;
 }
@@ -237,6 +255,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   /** The prefix the open menu was built for — "does this keystroke extend it". */
   let builtFor = "";
   let remainder = 0;
+  /**
+   * How many candidate rows the placement holds — 0 until it has been measured.
+   *
+   * **The window exists because the compositor cuts from the end** (C19 I23,
+   * `composite.ts:128`): everything the menu puts last is what it loses, and
+   * that is the indicator, the bottom edge and any candidate past the fold. A
+   * frame-read is what showed it; every assertion about the remainder agreed
+   * with the old behaviour, because the number was computed correctly and drawn
+   * nowhere.
+   */
+  let fits = 0;
   let seq = 0;
   /**
    * Where `Esc` dismissed a typed menu, as the token's start offset (C19 I19).
@@ -250,11 +279,36 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   const ctxNow = (): CompletionContext =>
     contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
 
+  /**
+   * The visible slice, so the menu draws exactly what its placement holds.
+   *
+   * `fits` is 0 until `countRemainder` has run, which means *not yet measured*
+   * rather than *nothing fits* — the first draw hands over the whole list and
+   * the second pass windows it, which is the same two-pass shape the remainder
+   * has always had and for the same reason (C15 answers only once the layer is
+   * on the stack).
+   */
+  function windowedBlocks(): ReturnType<typeof menuBlocks> {
+    // `fits` is 0 until the placement has been measured, and `menuWindow`
+    // answers *the whole list* for that — so there is no arm here. The first
+    // draft carried one, and it was dead: `menuWindow` already treats a
+    // non-positive fit as *everything*. Two expressions saying one thing, the
+    // second of which could not be violated (A03 §2).
+    // **Only a truncated placement windows anything**, and tier 5 is what
+    // insisted on the guard. `fits` is one measurement of one placement, and a
+    // dynamic source produces several in a row — a spinner, then the real set —
+    // so a `fits` from the wrong one silently dropped candidates that fitted
+    // perfectly well. `remainder` is the only thing that says *something was
+    // actually cut*, and where nothing was, there is nothing to window.
+    if (remainder <= 0) return menuBlocks(candidates, selected, 0);
+    const w = menuWindow(candidates.length, selected, fits);
+    const slice = candidates.slice(w.start, w.start + w.shown);
+    return menuBlocks(slice, selected === null ? null : selected - w.start, remainder);
+  }
+
   function redrawMenu(): void {
     if (candidates.length === 0) return;
-    deps.overlays.update(MENU_ID, {
-      content: menuLayer(candidates, selected, remainder, deps.anchor()).content,
-    });
+    deps.overlays.update(MENU_ID, { content: windowedBlocks() });
   }
 
   /**
@@ -273,6 +327,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     candidates = next;
     selected = sel;
     builtFor = prefix;
+    // **A new list is measured afresh, and tier 5 is what proved it.** The
+    // mutation pass reported this line dead — every `showMenu` is followed by
+    // `countRemainder` in the same tick, so a stale `fits` looked unreadable —
+    // and the unit rows agreed, because none of them drives a *dynamic* source.
+    // A real one shows a spinner first: one row, so `fits` becomes 1, and the
+    // candidates that arrive afterwards are windowed to it. `/ps --status=`
+    // drew `running` and nothing else.
+    //
+    // So the survivor was the third disposition — the tests could not construct
+    // the state, not the code could not reach it — and the two dead clamps
+    // beside it were the first disposition. They read identically in a report.
+    fits = 0;
     const layer = menuLayer(candidates, selected, remainder, deps.anchor());
     if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
       return;
@@ -307,7 +373,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // **Rows, not blocks** (C19 I23). `content.length` counts boxes, and the
     // table holding sixty candidates is one of them — so a menu clamped to ten
     // rows used to report fifty-nine missing where fifty are.
-    remainder = remainderOf(placed ?? null, candidates.length, menuRowsShown(placed ?? null));
+    fits = menuRowsShown(placed ?? null);
+    remainder = remainderOf(placed ?? null, candidates.length, fits);
     redrawMenu();
   }
 
@@ -866,6 +933,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       else deps.history.searchType(text);
       refreshSearchLayer();
     },
+    refreshAnchors: () => {
+      const at = deps.anchor();
+      // `update` answers *whether the layer is on the stack* and is a no-op
+      // when it is not (C15 I14), so neither call needs a second record of
+      // what is open — the question C19 I21 already settled for `showMenu`.
+      deps.overlays.update(MENU_ID, {
+        placement: menuLayer(candidates, selected, remainder, at).placement,
+      });
+      deps.overlays.update(SEARCH_ID, { placement: deps.history.searchLayer(at).placement });
+    },
+
     reset: () => {
       closeMenu();
       suppressedAt = null;

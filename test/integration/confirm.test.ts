@@ -42,8 +42,8 @@ import { createRouter, type RouterDeps } from "../../src/interaction/router/rout
 import { CONFIRM_WIDTH, createConfirmHost } from "../../src/shell/confirm.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { measureSequence } from "../support/viewport.js";
-import { registry } from "../support/overlay.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
+import { block } from "../../src/data/viewmodel/construct.js";
 import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import type { OverlayManager } from "../../src/viewport/overlay/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
@@ -78,16 +78,33 @@ const YES_NO = [
 ];
 
 /** Real C13, C14, C15, a real confirm host and a real router. */
-function world(over: Partial<RouterDeps> = {}) {
+function world(
+  over: Partial<RouterDeps> = {},
+  overlayRegion = { width: 80, height: 24 },
+  anchorAt = { row: 8, rows: 1 },
+) {
   const store = createTranscriptStore();
   const viewport = createViewport(store, { width: 80, height: 10, measureSequence });
-  const overlays = createOverlayManager({ registry });
+  // **The registry measures `table`, because the choices are one** (C09 §3).
+  // `support/overlay.ts`'s default does not register it, so an unregistered
+  // kind measures as `raw` — one row for a two-choice list — and the height
+  // C15 places is a row short of what the frame draws. The two numbers agreed
+  // everywhere until a row compared them.
+  const measured = measurable({ definitions: [tableDefinition] });
+  const overlays = createOverlayManager({
+    registry: { measureSequence: (b, w) => measured.registry.measureSequence(b, w) },
+  });
   const focus = createFocusStore();
   const invalidate = vi.fn();
   const globalSeen: InputEvent[] = [];
   let cancels = 0;
 
-  const confirm = createConfirmHost({ overlays, anchor: () => ({ row: 8, rows: 1 }), invalidate });
+  const confirm = createConfirmHost({
+    overlays,
+    anchor: () => anchorAt,
+    overlayRegion: () => overlayRegion,
+    invalidate,
+  });
 
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),
@@ -424,6 +441,74 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     w.router.dispatch(key("escape"));
     return expect(answer).resolves.toBe("n");
+  });
+
+  it("T4.28 (entry 16 R2, C15 I8): a question that does not fit keeps its choices", () => {
+    // **The defect a frame found and no assertion could.** `composite.ts` writes
+    // `lines[0 … height)`, so a box that does not fit loses its tail — and this
+    // box's tail is the answers. Measured on an ordinary 24-row terminal with a
+    // twenty-row payload: the question and ten rows of detail were drawn, and
+    // no `[y]`, no `[n]` and no bottom border. The keys still worked and
+    // nothing on screen said so.
+    //
+    // So the payload is dropped rather than marked: an appended indicator is
+    // the first row lost. `…` costs the reader what they could not read anyway.
+    const w = world({}, { width: 80, height: 12 });
+    void w.confirm.ask({
+      question: "Remove 6 stopped containers?",
+      detail: block({
+        kind: "raw",
+        id: "d",
+        text: Array.from({ length: 20 }, (_, i) => `row ${String(i)}`).join("\n"),
+      }),
+      choices: YES_NO,
+    });
+
+    const placed = w.overlays.layout({ width: 80, height: 12 })[0];
+    if (placed === undefined) throw new Error("unreachable");
+    const r = measurable({ definitions: [tableDefinition] });
+    const all = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width).map(visible));
+    const drawn = all.slice(0, placed.height);
+
+    expect(drawn.some((l) => l.includes("[n]")), "the answers are on the frame").toBe(true);
+    expect(drawn.some((l) => l.includes("...")), "and the payload says it was dropped").toBe(true);
+    expect(all.length, "nothing is cut at all").toBeLessThanOrEqual(placed.height);
+    expect(drawn.some((l) => l.includes("row 0")), "the payload itself is gone").toBe(false);
+  });
+
+  it("T4.29 (entry 16 R2): a question that fits keeps its payload", () => {
+    // T4.19's control, and it cannot be folded in: dropping the detail
+    // unconditionally satisfies every assertion above.
+    const w = world();
+    void w.confirm.ask({
+      question: "Remove 1 container?",
+      detail: block({ kind: "raw", id: "d", text: "dtui-quiet" }),
+      choices: YES_NO,
+    });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.some((l) => l.includes("dtui-quiet"))).toBe(true);
+    expect(drawn.some((l) => l.includes("..."))).toBe(false);
+  });
+
+  it("T4.30 (entry 16, C15 I7): the anchored question flips when there is no room above", () => {
+    // **The flip is a field of the anchored arm and always was**, which is what
+    // step 3's check came back with: `Placement` carries `prefer` inside
+    // `{kind: "anchored"}` and nowhere else, so a centred layer has no flip to
+    // express and the type already says so. Nothing to build — the confirm
+    // inherited it the moment it could be anchored, which is what this asserts
+    // rather than a mechanism of its own.
+    // **A prompt near the top, which is a fresh session and not a contrivance:**
+    // two rows above the anchor and twenty-one below. The first draft used the
+    // default anchor and a tall payload, and the box went *above* anyway —
+    // because the truncation collapse fires first and the short form fits. Two
+    // rules meeting, and the fixture agreed with the wrong one.
+    const w = world({}, { width: 80, height: 24 }, { row: 2, rows: 1 });
+    void w.confirm.ask({ question: "q?", choices: YES_NO, placement: "anchored" });
+
+    const placed = w.overlays.layout({ width: 80, height: 24 })[0];
+    if (placed === undefined) throw new Error("unreachable");
+    expect(placed.top, "below the anchor's own row").toBeGreaterThan(2);
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {
