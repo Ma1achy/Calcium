@@ -819,6 +819,25 @@ decides** what an untrusted value is; the **round trip** must preserve it; and
 | 4 | *the type says `number`* × *the round trip* | `-0`, which JSON writes as `0` | **not refused.** `-0` is a legal number and renders identically; refusing it would narrow the type to buy an equality nobody needs. The property is asserted with a comparison that treats the two as equal, and this row is why |
 | 5 | *the round trip* × *the corpus* | which fixtures the sweep runs over | `ONE_PER_KIND` and `ADVERSARIAL`, the same corpora T2.1 uses — so a kind added without a fixture fails T2.10 before it reaches here, and the sweep **asserts its own count** rather than reporting a completion it never observed |
 
+### The half that cannot fail, stated rather than discovered
+
+**I46 has two halves and only one of them can be violated by an input.** The
+mutation pass is what asked, and the answer is worth having in the spec rather
+than in a run's exemption list.
+
+The **validator** half is not vacuous: three fabricated inputs fail it, and two of
+them were accepted for the life of the component. The **equality** half is —
+every member of the block union is a string, a number, a boolean, an array or a
+record, so `JSON.parse(JSON.stringify(d))` equals `d` for every document that can
+be constructed, and deleting the assertion changes nothing.
+
+**What falsifies it is a type change, not an input.** The day a kind carries a
+`Date`, a `Map`, a `bigint` or a class instance, that assertion is the only thing
+in the suite that says so — which is why it is kept rather than reduced to a
+validity check, and why this paragraph exists instead of a row that reads as
+covering something it cannot reach. **An invariant is vacuous until its subject
+exists**, and the honest form is to say which half is which.
+
 **What this does not settle.** Whether `validateDocument` is *published* is C24's
 question and not this one: C24 I1 removes an export used by neither app, and the
 consumer this would have is roadmap 44 — which is framework work and imports it
@@ -976,8 +995,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.9** (I11): the module graph shows no import from `terminal/` or above.
 - **T2.11** (I34): `validateBlock` accepts a `patch` carrying a `view` action whose `target` is one of the document's own block ids, and the `Action` union's five kinds are exhaustive over the validator — a sixth added without validation fails the build, exactly as T2.10 does for `Block`. The pairing is what makes the union closed rather than open with four entries written down.
 - **T2.10**: every member of the `Block` union is exhaustively handled by the validator — adding a kind without validation fails the build. *(Registry completeness — that every kind has a registered measurer and renderer — is C09's test, since C09 owns the registry.)*
-- **T2.12** (I46, §5a): the round trip, over `ONE_PER_KIND` and `ADVERSARIAL` — `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal to `d` for every fixture, and the row **asserts how many it ran**, because a sweep over an empty corpus is the same green as a sweep that passed.
-- **T2.13** (I46, §5a): the fabricated failures, which is what makes T2.12 worth running — a plot series carrying `NaN`, one carrying `Infinity`, and a `Cell.spark` carrying a string are each **refused by the validator**, and the first two were accepted before *and after* a round trip that silently rewrote them to `null`.
+- **T2.18** (I46, §5a): the round trip, over `ONE_PER_KIND` and `ADVERSARIAL` — `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal to `d` for every fixture, and the row **asserts how many it ran**, because a sweep over an empty corpus is the same green as a sweep that passed.
+- **T2.19** (I46, §5a): the fabricated failures, which is what makes T2.18 worth running — a plot series carrying `NaN`, one carrying `Infinity`, and a `Cell.spark` carrying a string are each **refused by the validator**, and the first two were accepted before *and after* a round trip that silently rewrote them to `null`.
 
 ### Tier 3 — edge cases
 
@@ -1050,8 +1069,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.24** (I44): placing fixed children before the others → T3.21 fails, and the rendered set depends on a declaration rather than on the order the author wrote.
 - **T6.25** (I45): defaulting the vertical axis to `bottom` rather than `top` → T3.22's control fails, and every existing row group moves its short children without anything asking it to.
 - **T6.26** (I45): adding the alignment offset to the measured height → T3.23 fails, and a row's height stops being its tallest child.
-- **T6.27** (I46): dropping the finiteness check back to `typeof === "number"` → T2.13 fails, and `NaN` persists as `null` under a validator that agrees twice.
-- **T6.28** (I46): checking that a numeric array *is* an array without checking its elements — the state that shipped → T2.13 fails on `Cell.spark`.
+- **T6.27** (I46): dropping the finiteness check back to `typeof === "number"` → T2.19 fails, and `NaN` persists as `null` under a validator that agrees twice.
+- **T6.28** (I46): checking that a numeric array *is* an array without checking its elements — the state that shipped → T2.19 fails on `Cell.spark`.
 - **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
 
 ---

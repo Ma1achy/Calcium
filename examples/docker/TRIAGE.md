@@ -36,7 +36,7 @@ type change.
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 18 | **14** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader |
-| **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
+| **8** | [Absence indistinguishable from failure](#8) | 12 | **3 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 13 | **6** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry rather than correcting one** |
 | **11** | [A gate that passes without checking](#11) | 32 | **10** | — | 8 closed · **5 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F156 is the first found by a foreign runner rather than by us** |
@@ -328,6 +328,7 @@ Every instance is invisible by construction: a green suite, a plausible frame, n
 | **F15** | an invalid document — no entry, no error, no clue | open, and it is the mechanism |
 | **F64** | `b.logs` has no consumer in this app at all; the surfaces document says it demonstrates tone on log lines and it does not | open — a claim, not a feature |
 | **F67** | **below 16 rows the shell draws nothing, says nothing, and stays alive** | **closed** — the gate existed and neither half ran (C01 I12b, C22 T4.21) |
+| **F167** | **a document that persists and reloads as a *different valid document*** | `NaN` in a plot series validated, `JSON.stringify` wrote it as `null`, and the reloaded document validated too — the second agreement is the defect. Under it, `Series.values` and `Cell.spark` were never element-checked at all, so a string in a numeric array passed with or without a round trip. Four sibling numeric fields already used `isFiniteNumber`. **Fixed** — C04 I46, T2.19, T6.27, T6.28 |
 
 **F67 is the new instance and the first where the *framework* is the one saying nothing.**
 Measured with the size set on the PTY master before the child draws: 100×12, 100×15 and 30×16

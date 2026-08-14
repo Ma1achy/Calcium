@@ -138,6 +138,102 @@ describe("C04 contract", () => {
     }
   });
 
+  it("T2.18 (I46, §5a): every fixture survives a JSON round trip unchanged", () => {
+    // **The property persistence rests on** (F166, roadmap 44). The block union
+    // holds no function, `Map`, `Set` or `Date`, so `JSON.stringify` is the
+    // serialiser and `validateDocument` is the parser — and nothing asserted it
+    // until this row, which is why the two defects T2.19 covers were reachable.
+    //
+    // `toEqual` rather than `toStrictEqual` is §5a rows 3 and 4: it treats `-0`
+    // and `0` as equal and ignores a key whose value is `undefined`, which are
+    // exactly the two inequalities the spec tolerates and names. T3.24 asserts
+    // both directly rather than leaving them to a comparison's defaults.
+    let ran = 0;
+    for (const b of CORPUS) {
+      const d = doc({ blocks: [b] });
+      const round = validateDocument(JSON.parse(JSON.stringify(d)) as unknown);
+      expect(round.ok, `${b.kind} "${b.id}" must revalidate: ${round.ok ? "" : round.error.join("; ")}`).toBe(true);
+      if (round.ok) expect(round.value, `${b.kind} "${b.id}" round trip`).toEqual(d);
+      ran += 1;
+    }
+
+    // **An exit status is one bit and it is the same bit for clean and for
+    // did-not-run.** A sweep over an empty corpus is the same green as one that
+    // passed, and three instruments in this repository have reported a
+    // completion they never observed.
+    expect(ran, "the sweep ran over every fixture").toBe(CORPUS.length);
+    expect(ran).toBeGreaterThan(ALL_KINDS.length);
+  });
+
+  it("T2.19 (I46, §5a): what JSON cannot carry is refused, and it was accepted twice", () => {
+    // **The fabricated failures, and they did not need fabricating.** Without
+    // these the sweep above is vacuous — a property no input can violate passes
+    // exactly like one that is satisfied (A03 §2).
+    //
+    // The measured state before the fix, and the reason it is the bad kind of
+    // silent: `validateBlock` accepted `[1, NaN]`, `JSON.stringify` wrote it as
+    // `[1, null]`, and `validateBlock` accepted **that** too. A persisted plot
+    // reloaded as a different plot and the validator agreed both times.
+    const plotWith = (values: readonly unknown[]): unknown => ({
+      kind: "plot",
+      id: "p",
+      form: "line",
+      height: 8,
+      series: [{ values, label: "rps" }],
+    });
+
+    expect(validateBlock(plotWith([1, Number.NaN])).ok, "NaN is not a JSON number").toBe(false);
+    expect(validateBlock(plotWith([1, Number.POSITIVE_INFINITY])).ok, "nor is Infinity").toBe(false);
+
+    // **The wider half, and the one that has nothing to do with round trips**:
+    // the elements were never checked at all — `requireArray` established the
+    // array and stopped — so an untrusted document could put anything in a
+    // numeric array. `null` is what a round trip produces; a string is what a
+    // far side produces.
+    expect(validateBlock(plotWith([1, null])).ok, "null is what NaN becomes").toBe(false);
+    expect(validateBlock(plotWith(["12"])).ok, "a numeric string is not a number").toBe(false);
+
+    // The second numeric array, which no round trip would have surfaced: a
+    // sparkline inside a table cell.
+    const tableWithSpark = (spark: unknown): unknown => ({
+      kind: "table",
+      id: "t",
+      columns: [{ key: "a", label: "A" }],
+      rows: [{ id: "r1", cells: { a: { text: "x", spark } } }],
+    });
+    expect(validateBlock(tableWithSpark(["1", "2"])).ok, "Cell.spark holds numbers").toBe(false);
+    expect(validateBlock(tableWithSpark([1, 2])).ok, "and a real one is accepted").toBe(true);
+
+    // The control: the same shapes, well formed. Without it every assertion
+    // above passes for a validator that refuses any plot at all.
+    expect(validateBlock(plotWith([1, 2, 3])).ok, "a finite series is accepted").toBe(true);
+  });
+
+  it("T3.24 (I46, §5a): the two inequalities the property tolerates, asserted rather than assumed", () => {
+    // §5a rows 3 and 4. Both are real differences and neither is worth
+    // narrowing the type for — but a difference nobody wrote down is a defect
+    // waiting to be rediscovered, so the rows exist to say which two they are.
+    const minusZero = doc({
+      blocks: [{ kind: "progress", id: "g", label: "x", current: -0, total: 10 }],
+    });
+    const backAgain = validateDocument(JSON.parse(JSON.stringify(minusZero)) as unknown);
+    expect(backAgain.ok, "`-0` is a finite number and stays valid").toBe(true);
+    // `Object.is` is the comparison that can see it; `toEqual` cannot, which is
+    // why the sweep above is silent about this case and this row is not.
+    const roundedCurrent = JSON.parse(JSON.stringify(minusZero)).blocks[0].current as number;
+    expect(Object.is(roundedCurrent, -0), "and JSON writes it as `0`").toBe(false);
+    expect(roundedCurrent).toBe(0);
+
+    // An explicit `undefined` loses its key. Unreachable through the framework —
+    // `exactOptionalPropertyTypes` makes `{gapBefore: undefined}` a different
+    // type from `{}`, and every constructor spreads-if-present — so this is a
+    // hand-written document, which is exactly what a persisted one is.
+    const explicit = { kind: "raw", id: "r", text: "a", gapBefore: undefined };
+    const parsed = JSON.parse(JSON.stringify(explicit)) as Record<string, unknown>;
+    expect("gapBefore" in explicit, "the key is there before").toBe(true);
+    expect("gapBefore" in parsed, "and gone after").toBe(false);
+  });
+
   it("T2.10b: the validator rejects a malformed instance of every kind", () => {
     // Exhaustiveness is only worth something if each entry does work. A table
     // of no-op validators is exhaustive and checks nothing.

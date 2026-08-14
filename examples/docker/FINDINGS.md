@@ -8108,3 +8108,59 @@ exactly: the same words, two referents, and the summary picked the wrong one.
 **What 44 actually needs, now that the codec is not it**: a persistence *policy* for transcript
 entries — ids, revisions, ordering, the cap and eviction — which its own row already describes
 correctly and calls *C20's shape one level up*. That half is real. It is not blocked on 34.
+
+---
+
+## F167 — a numeric array was checked for being an array and never for holding numbers ★★★
+
+| | |
+|---|---|
+| **Surface** | `validateDocument`, on every route a document arrives by |
+| **Reached for** | the JSON round trip roadmap 44 rests on (F166) |
+| **Verdict** | **two real Calcium defects**, both shipped, neither reachable by any existing test |
+| **Absorbed by** | nothing; fixed here — C04 I46, T2.18, T2.19, T3.24, T6.27, T6.28 |
+
+**The first is silent in both directions, which is what makes it worth the star.** A plot
+series carrying `NaN` validated. `JSON.stringify` writes it as `null`. The reloaded document
+validated **too**. So a persisted document came back as a *different document that
+revalidated clean*, and nothing on the way through could say which of the two it was drawing.
+
+```
+validateBlock([1, NaN])        → ok
+JSON.stringify                 → [1, null]
+validateBlock([1, null])       → ok        ← the second agreement is the defect
+```
+
+**The second is wider than the round trip that found it.** `Series.values` and `Cell.spark`
+were never element-checked at all: `requireArray` established the array and stopped. A
+string, a `null` or an object in a numeric array validated with or without a round trip —
+which means an untrusted document from a far side could put anything there and C12 would do
+arithmetic on it. Nothing about persistence is involved; the property is simply what made
+anybody look.
+
+**Both were invisible to every instrument.** MG24 and MG27 walk declarations. The measurement
+sweep runs `measure` against rendered height and never asks what a value *is*. The validator's
+own suite has a row per kind, and a row indexed by *kind* tests each kind's rules against
+themselves — the defect lives where *the type says number* meets *JSON's number is not
+JavaScript's*, which is a cell no per-kind row occupies. Four other numeric fields in the same
+file — `height`, `current`, `total`, `flex` — already used `isFiniteNumber`. **The concept was
+present and the arrays were not covered by it.**
+
+### And the half that cannot fail, which the mutation pass is the only thing that asked
+
+The round-trip property has two halves and **only the validator half can be violated by an
+input**. Every member of the block union is a string, a number, a boolean, an array or a
+record — no `Date`, no `Map`, no `bigint` — so `JSON.parse(JSON.stringify(d))` equals `d` for
+every document that can be constructed, and deleting the equality assertion fails nothing.
+
+**That is the finding rather than a gap to patch.** What falsifies that half is a *type
+change*, not an input: the day a kind carries a value JSON drops, the assertion is the only
+thing in the suite that says so. It is kept, and C04 §5a says which half is which — because a
+row that reads as covering something it cannot reach is A03 §2's vacuity class wearing a test
+id, and the mutation pass is the only instrument that asks a passing assertion whether it
+could ever have failed.
+
+**Predicted, and worth recording as such.** The instruction that produced this was *fabricate
+one that fails; if nothing can be made to fail, the sweep is vacuous and that is the finding.*
+Both outcomes happened, in different halves of one property — three fabrications landed on the
+validator, and the equality half turned out to be the vacuous one.

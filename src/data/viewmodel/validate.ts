@@ -98,6 +98,42 @@ function requireArray(b: Record<string, unknown>, key: string, e: string[], at: 
 }
 
 /**
+ * A numeric array's **elements** (C04 I46, §5a).
+ *
+ * **`requireArray` established the array and stopped**, so `Series.values` and
+ * `Cell.spark` accepted a string, a `null` or an object — with or without a
+ * round trip, which is why this is wider than the property that found it.
+ *
+ * Finite, because JSON has no `NaN` and no `Infinity`: `JSON.stringify` writes
+ * both as `null`, and the validator accepted the value going out **and the
+ * different value coming back**. A document that persists and reloads as a
+ * different document which revalidates clean is worse than one that is refused,
+ * which is the whole of I46.
+ *
+ * Absent is legal — `spark` is optional and an absent array is not an empty one.
+ */
+function requireFiniteNumbers(
+  values: unknown,
+  e: string[],
+  at: string,
+  what: string,
+): void {
+  if (values === undefined) return;
+  if (!isArray(values)) {
+    e.push(`${at}: "${what}" must be an array of finite numbers`);
+    return;
+  }
+  for (const [i, v] of values.entries()) {
+    if (isFiniteNumber(v)) continue;
+    e.push(
+      `${at}: ${what}[${String(i)}] is ${v === null ? "null" : typeof v} — a numeric array holds ` +
+        `finite numbers (C04 I46). JSON writes NaN and Infinity as null, so a value that is ` +
+        `neither survives a round trip as a different one`,
+    );
+  }
+}
+
+/**
  * `actions`, where a block carries them. Absent is legal; present and malformed
  * is not.
  *
@@ -171,7 +207,11 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
         if (isString(id)) rowIds.set(id, (rowIds.get(id) ?? 0) + 1);
         if (!isRecord(row["cells"])) continue;
         for (const [key, cell] of Object.entries(row["cells"])) {
-          if (isRecord(cell)) requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+          if (!isRecord(cell)) continue;
+          requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+          // I46 — the second numeric array, and the one no round trip would
+          // have surfaced: a sparkline drawn from a cell's own numbers.
+          requireFiniteNumbers(cell["spark"], e, `${at} cell "${key}"`, "spark");
         }
       }
 
@@ -190,6 +230,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   events: (b, e, at) => requireArray(b, "events", e, at),
   plot: (b, e, at) => {
     requireArray(b, "series", e, at);
+    // I46 — the series' own numbers, which nothing checked.
+    if (isArray(b["series"])) {
+      for (const [i, s] of b["series"].entries()) {
+        if (isRecord(s)) requireFiniteNumbers(s["values"], e, at, `series[${String(i)}].values`);
+      }
+    }
     if (b["form"] !== "line" && b["form"] !== "sparkline") {
       e.push(`${at}: "form" must be "line" or "sparkline"`);
     }
