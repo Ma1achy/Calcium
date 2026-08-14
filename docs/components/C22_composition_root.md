@@ -1042,6 +1042,107 @@ coordinates.**
 
 ---
 
+## 6f. The cursor's shape, walked by hand — roadmap entry 45
+
+The entry rules **per focus target, not global**, and stops there. The row this
+walk exists for is the one the entry does not make: **`Placed.cursor` carries a
+position and no style, and the prompt is not a layer at all** — so per-target
+style has nowhere to live today, and building the blink half first would build it
+against a seam that does not exist.
+
+### 6f.1 — the two partitions are not the same partition, and that is row 1
+
+`FOCUS_ORDER` has **seven** members: `overlay`, `copyMode`, `pushedView`,
+`interaction`, `prompt`, `liveBlock`, `global`. **Two of them are layers** —
+`overlay` and `pushedView` are the two `kind`s of `overlayTop`. The other five
+have no `Placed` at all, and the prompt, which is the entry's own example of a
+target wanting its own shape, is one of them.
+
+So a `cursorStyle` on `Layer` covers two of seven while reading as covering all,
+and *per target* and *per layer* are different partitions with two members in
+common. **The style keys on the `FocusTarget`.** `activeTarget` returns one of
+the seven on every dispatch, so the key is always defined; a layer is not always
+there. Position stays exactly where it is — a layer's geometry is genuinely the
+layer's, and a style is a property of *what kind of interaction this is*, which
+is what a target names and a box does not.
+
+`Placed.cursor` is untouched, and that is the test of the ruling rather than a
+convenience: C15 goes on knowing nothing about cursor styles, and no public type
+of C15's widens.
+
+### 6f.2 — the classification table: which rule owns a cell
+
+Structural. Indexed by rule interaction: every row is a cell where two correct
+statements overlap.
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | **the prompt, which is not a layer** | style is per focus target | position is per layer, through `Placed.cursor` | §6f.1. Different partitions, two members in common. **Style keys on the target; position is untouched** — and a style on `Layer` would cover 2 of 7 while reading as total |
+| 2 | a target declaring no style, with a style already on the wire | absent means *the terminal's own* | **nothing can un-write a `DECSCUSR`** | The resolution is two flat levels — the target's, then the session's — and the end of it is `0`, which is the terminal's **configured** default and therefore the user's own setting. *Emit nothing* is only reachable **before the first emission**, so the rule is about a transition and not about a value. A chain with three links would need a parent, and `FOCUS_ORDER` is a priority list rather than a tree: there is no containing target to inherit from |
+| 3 | **a blink transition on a target with no declared shape** | steady on a keystroke, blinking after N ms | shape and blink are **one wire parameter**, not two | **The blink machine is inert wherever nothing is declared**, and this is the fabricated boundary case. `CSI Ps SP q` encodes both — 1/2 block, 3/4 underline, 5/6 bar, blinking/steady, `0` default — so there is no way to say *make the current shape steady*. Acting would choose a shape the app never asked for, on a terminal whose own cursor was already correct |
+| 4 | the same style emitted on every frame | the cursor sequence goes out with **every** frame — `hide` leads the write, position and show close it | the terminal owns the blink **phase** | **Emit on change only, and C01 holds the last emitted value.** A style re-asserted on every frame is 60 assertions a second against a spinner's 80 ms cadence; if a terminal restarts its blink phase on `DECSCUSR` — which this walk did **not** measure and does not need to — a blinking cursor would never blink. The ruling is right either way, which is why it does not rest on the unmeasured half: fewer bytes, and no dependence on a behaviour we cannot see |
+| 5 | a layer with no cursor of its own, prompt focused underneath | the top layer owns the cursor | `cursorFor` falls through to the prompt when `promptFocused` | **The fall-through answers *position* and not *target*.** `activeTarget` is still `overlay`, so the style is the overlay's. Two different questions inside one function, and resolving the style from `promptFocused` would put the prompt's shape under a menu's cursor |
+| 6 | `global` | every target may declare a style | `global` is the no-focus rung | It is a target and may declare one; the shipped map declares none, so it takes the session default. Named because a `Partial<Record<…>>` invites *which of these are real*, and the answer is all seven |
+| 7 | `release()`, and the setting is not in `held` | C01 I6 — release emits the inverse of `held` | **a setting has no inverse** | A **second restore path** beside `held`'s, emitting `0`. I8 permits releasing a key while emitting nothing, and that reasoning is about keys; a category with no key is outside it. This is what makes row 8's taxonomy load-bearing rather than tidy |
+| 8 | `DECSCUSR` in `escapes.ts` | *"Each mode is an enter/leave pair"* | SGR is *"not a mode … no inverse to emit at release, never enters `held`"* | **Neither, and the file has exactly these two categories.** A setting has **persistent state** (unlike SGR) and **no inverse** (unlike a mode): its undo is a third value, not the negation of the first. It lands as a third kind with a declared reset, because writing it as a `mode()` would make `held` and I6 false — release would emit a *leave* that is really *set to default*, and those are different claims about the same bytes |
+| 9 | a terminal that does not implement it | the entry says it *degrades by being ignored* | `TerminalCapabilities` has no axis for it | **No capability axis, and this is a refusal with a reason so it is not re-proposed.** Any terminal that parses CSI at all consumes `CSI Ps SP q` silently, and detecting it would need a query-and-response round trip C02 does not do for anything. The degradation is the terminal's own; adding an axis would widen a public type to record something nothing can measure |
+
+**Row 4 is the one that would have shipped**, and it is invisible from every
+direction that does not read bytes: the style would be correct on every frame,
+the resolution would be correct for every target, and the symptom is a cursor
+that does not blink when it was asked to.
+
+### 6f.3 — the sequence trace: what the next frame emits
+
+| # | Sequence | What is emitted | What the row is for |
+|---|---|---|---|
+| 1 | focus moves mid-blink | the new target's resolved style, on the next frame; the blink phase restarts because the value changed | **A style change is a frame effect and the blink timer is not coalesced with it.** The timer decides *which of two forms*; the target decides *which shape*. Keeping them separate is what stops a focus change from being swallowed by an unexpired timer |
+| 2 | a keystroke while the blink timer is armed | the steady form, and the timer re-arms | **The key path needs no timer.** Every keystroke already composes a frame — one commit per batch (I27) — so *steady on a keystroke* is free. Only the **idle edge** needs the driver |
+| 3 | the idle edge fires | the blinking form, committed | A driver tick, never a `setInterval` in `paint.ts` — the constraint survives the expiry of its premise. **And it commits**, because an effect outside a batch has no frame (I31); this is the same shape as the completion continuation and the spinner's wake |
+| 4 | copy mode entered | the `copyMode` style, on the frame that enters it | **The existing ordering is already right and the row records why.** `#setCopyMode` commits *and flushes* before `suspend()`, precisely so the indicator's frame is on the screen before frames are gated — which is the same window this needs. Nothing new is owed |
+| 5 | **a handoff** | on `resume()`, the next frame re-emits — and it does so **because the value differs from what C01 last emitted**, not because anything detects the child | **The precedent is exact and the mechanism turned out to be weaker than the precedent.** `contaminated` exists because a child writes over the screen, and the cursor style is exactly the state a child changes and does not restore — `vim` leaves a bar behind. But `cursorSequence` is emitted on **every** frame, so nothing here needs `contaminated` at all: the ordinary next frame repairs it. **Row 4's emit-on-change ruling is what puts that at risk**, since C01's record now says *already emitted* while the child has changed it underneath. So the record is cleared by `resume()` — the same shape as I56's *drop the record before the bytes go out*, one component over |
+| 6 | resize | nothing new; `contaminated` forces a repaint and the style rides the frame | Confirms rather than finds, and the confirmation is the point: the style is not a second thing to invalidate on resize |
+
+**Row 5 is where the walk changed its own ruling.** The trace was written
+expecting the handoff to need a restore hook; measuring what `composeFrame`
+actually emits showed the ordinary frame already covers it — and then row 4's
+optimisation reintroduced the problem in a different place. **A ruling that makes
+a state cheaper to hold creates a way for that state to be wrong**, which is the
+throw-leaves-state question asked of a cache instead of an exception.
+
+### 6f.4 — the rulings
+
+- **R1 — style keys on `FocusTarget`; position stays per layer.** `Placed.cursor`
+  is untouched and C15 learns nothing about styles.
+- **R2 — two flat levels and a transition rule.** Target's style, then the
+  session's; `0` is the end, and *emit nothing* is only reachable before the
+  first emission.
+- **R3 — shape and blink are one parameter.** The blink machine is inert where no
+  shape is declared, and every blink transition re-emits the whole style.
+- **R4 — emit on change; C01 holds the last emitted value**, and `resume()`
+  clears it.
+- **R5 — a `setting` is a third category in `escapes.ts`**, with a declared reset,
+  restored at `release()` on a path of its own beside `held`'s.
+- **R6 — no capability axis**, refused with its reason.
+
+### 6f.5 — what the rulings leave behind
+
+- **The blink interval is a number nobody has measured.** *N ms of no input* is
+  the entry's phrasing and this walk does not fix N; it belongs with the ruling
+  that owns the driver's cadence, and naming it here stops it being chosen by
+  whoever writes the first test.
+- **A style declared for `interaction` or `liveBlock` is expressible and
+  invisible.** Both are targets and neither places a cursor: `cursorFor` answers
+  from the top layer or the prompt, so those two resolve a style for a cursor
+  that is hidden. Legal, useless, and named — because the day block-level editing
+  places a cursor (C26 §11), it becomes meaningful with no change here.
+- **`copyMode`'s style is emitted and then frozen for the duration.** Frames are
+  gated, so nothing can change it until `resume()`. That is correct and it means
+  the copy-mode style cannot animate — which is a property worth stating, since a
+  blinking copy-mode cursor would simply stop blinking at an arbitrary phase.
+
+---
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -1260,6 +1361,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I60** — **`ctx.tick` is not in the key and no transcript render receives one.** `visibleRows` passes no tick, so every entry renders at 0; a `steps` block animating in the transcript would serve its first frame for the life of the session and nothing here would fail. The invariant is the *pair*: the axis is absent **and** the value is constant, so the day one is threaded the other is owed — either the key gains it or live entries stop being cached (§6c trace row 10, A03 §2).
 - **I61** — **A resolved capability record that cannot open the terminal refuses at gate 3b, and the refusal names the cause rather than the consequence.** `isUsable` is the test (C02 I7), read from the **resolved** record so that a valid `capabilities` override still opens (C02 I4) — which is what forces the gate after construction and makes it accept I36's cost knowingly. It throws rather than returning, because `start()` rejecting is the only channel this path has: §8 step 3 is reached from `stop()`, and a session that never ran never calls it, so a warning into C02's collection would be **unread by construction**. The message names `env` when the record is empty or carries no `TERM`, because the cause is a config field and C01 — which raised the only prior refusal — is entitled to the capability record alone and can only name the consequence (F8).
 - **I62** — **The prompt's window contains the cursor's row, and every range test against it is in editor coordinates.** The two halves are one invariant because either alone is a defect and the second is what the first was missing. A window anchored on the buffer's end is correct until a mid-buffer edit and then puts the cursor outside itself; testing membership on the *painted* index is what made that silent, because a marker row and a content row are the same kind of number there — `within = row − first + offset` is `0` both for the first content row of an unmarked window and for the row immediately above a marked one, so the cursor was drawn **on the elision marker** and a selection span **washed** it. Both were measured in a frame and neither is visible to an assertion: the arithmetic is self-consistent and every number agrees with every other (§6e table rows 1 and 2). So `promptWindow` returns its content range, membership is `first ≤ row < first + count`, and elision is marked at **both** ends — the bottom marker is not decoration but what makes dropping the rows outside the window honest, since a wash clipped at the edge is otherwise indistinguishable from one that ends there (§6e table rows 3, 4).
+- **I63** — **A cursor style is keyed on the focus target, resolved in two flat levels, and emitted only when it changes.** The key is `FocusTarget` and not `Layer`, because the two are different partitions with two members in common: `FOCUS_ORDER` has seven members and exactly two — `overlay` and `pushedView` — are layers, so a style on `Layer` covers two-sevenths of its subject while reading as total, and the prompt, which is the entry's own example, is not a layer at all. `activeTarget` answers on every dispatch and a layer does not, so the target is the key that is always defined. **Position is untouched**: a box's geometry is the box's, a style is a property of what kind of interaction is happening, and `Placed.cursor` stays exactly as C15 wrote it. Resolution is the target's style, then the session's, and it ends at `0` — the terminal's *configured* default, which is the user's own setting — because **nothing can un-write a `DECSCUSR`**: *emit nothing* is reachable only before the first emission, so the rule is about a transition rather than a value, and a third inheritance link would need a parent that a priority list does not have. **Emitted only on change**, because the cursor sequence goes out with every frame and a style re-asserted sixty times a second is at best wasted bytes and at worst a cursor that never blinks — which makes C01's record of the last emitted value load-bearing, and `resume()` clearing it the counterpart of a child that changed it underneath (§6f, C01 I20).
 ---
 
 ## 11. Commitments
@@ -1319,6 +1421,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 31. **This stage makes the second frame free and the first no cheaper**, so it is not the fix and the spec says so where someone would otherwise stop (I59, F90).
 32. No transcript render receives a `tick`, and the key has no axis for one; threading either obliges the other (I60).
 33. **The prompt's window follows the cursor and marks elision at both ends**, and membership is tested in editor coordinates rather than painted ones — which is what kept the cursor off the elision marker and the wash off it too (I62, §6e).
+34. **A cursor style is keyed on the focus target and never on the layer**, resolved target-then-session with `0` as the end, and emitted only when it changes — `Placed.cursor` is untouched and C15 learns nothing about styles (I63, §6f, C01 I20).
 ---
 
 ## 12. Tests
@@ -1331,6 +1434,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
 - **T1.19** (I40): `/theme light` writes the variant, and a session constructed against the same `stateDir` opens light. Driven through two real sessions over one fake filesystem rather than by reading the file — the file's contents are an implementation detail and the claim is that the choice survives.
+- **T1.22** (I63, §6f table row 1): a style declared for `prompt` and a different one for `pushedView` → each is emitted when its target is active. **The row that fails against a style on `Layer`**, because the prompt has no `Placed` — and it is the entry's own example, so a design that cannot express it is refused by the case that motivated it.
+- **T1.22b** (I63, §6f table row 3, **fabricated**): a target declaring **no** style, and the blink edge firing on it → **nothing is emitted at all**, before and after. The boundary the walk was asked to fabricate: shape and blink are one wire parameter, so *make the current shape steady* is unsayable, and acting would choose a shape the app never asked for on a terminal whose cursor was already right. Asserted on the bytes, because every other observation of *inert* looks like *unchanged*.
+- **T1.22c** (I63, §6f table row 3, **fabricated**): the same target with a style declared, a key arriving while the blink timer is armed → the **steady** form on that frame, and the timer re-armed. The pair with T1.22b: one asserts silence where nothing is declared and one asserts the steady form where something is, and either alone is satisfied by a machine that never emits.
+- **T1.22d** (I63, §6f table row 4): the same style across three consecutive frames → emitted **once**. The cursor sequence goes out with every frame, so a style folded into it is re-asserted at frame cadence; this is the row that says the record exists and is read.
+- **T1.22e** (I63, §6f table row 5, C01 I20): `resume()` then a frame → the style is emitted again although it has not changed. The record is cleared rather than trusted, because a suspended terminal belonged to a child and `vim` leaves a bar behind — **the case emit-on-change created**, which is why it is a row of its own and not a clause of T1.22d.
 - **T1.21** (I62, §6e table row 1): a windowed prompt with the cursor **one editor row above the window** → the terminal cursor is not on the elision marker. The state the shipped defect needed and the one no fixture built: `cap` 4 with six editor rows put the cursor on frame row 4, the `❯ ⋯` row, because `within` came out `0` and `0` is inside `[0, cap)`. Asserted against the **painted marker row** rather than against a number, since every number agreed with every other while it was wrong.
 - **T1.21b** (I62, §6e table row 2): the same window with a selection span on that row → the marker row carries no wash. T4.26's *"the marker row is untouched"* cannot construct this, because its span is inside the window, where the marker cannot be washed either way.
 - **T1.21c** (I62, §6e.5): **a marker wherever rows are elided and nowhere else** — a mid-buffer cursor draws one above and one below with `cap − 2` content rows, and a cursor at the head draws one below only. Both cases, because the middle one alone does not carry the claim: the mutation that removes the head's bottom marker leaves it untouched (T6.50). The bottom marker is what makes the clipped wash honest (table row 4), so its absence is a defect and not a missing nicety. **A both-ends window needs `n > 2·cap − 2`** — below that the head and tail branches meet with no gap — which is arithmetic the ruling implies and did not state, found by the fixture coming back with one marker.
@@ -1512,6 +1620,10 @@ PTY harness.
 - **T6.36** (I40): treating an unreadable `theme` file as fatal, or as silently absent → T1.19b fails on the notice or on the session opening at all. The two halves of C20's repair, arriving one component up.
 - **T6.34** (I39): removing the `cancel()` from the printable path → C19 T5.2 fails on its last assertion, and a menu opens for a prefix the user has typed past. The effect table's own `mine !== seq` guard does not cover it: a printable keystroke does not advance that sequence, which is why the guard looked like the mechanism and was not.
 - **T6.47** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.
+- **T6.52** (I63): keying the style on the layer rather than on the target → T1.22 fails, and the prompt has no style at all while `overlay` and `pushedView` keep theirs. **Two of seven, passing every assertion the two layers can make.**
+- **T6.53** (I63): emitting the resolved style on every frame instead of on change → T1.22d fails. Nothing is visibly wrong on any single frame, which is the whole reason the row is about a count rather than a value.
+- **T6.54** (I63, C01 I20): keeping the record across `resume()` → T1.22e fails, and the shape a child left behind survives the rest of the session. The mutation that shows emit-on-change created a state to get wrong.
+- **T6.55** (I63): making the blink machine act where no style is declared — picking a shape so that *steady* is expressible → T1.22b fails, and a terminal whose cursor was already correct is overwritten by a shape nobody asked for.
 - **T6.48** (I62): testing membership on the painted index — `0 ≤ within < cap` — instead of on the editor row, **in the wash** → T1.21b fails and a span washes the elision marker. The cursor's identical half is a **listed survivor with its reason**, and the reason is a finding rather than an excuse: once the window follows the cursor there is no row outside it for the cursor to be on, so that comparison is never reached. **The two consumers are not symmetric**, because a span is not the cursor and can lie outside a window the cursor is inside — one fault, one comparison, two different reachabilities.
 - **T6.49** (I62): anchoring the window on the buffer's end again → T1.21 and T1.21c fail and **T1.21d passes**, which is the point of T1.21d existing: the tail case is identical under both rules, so a revert is invisible to every frame drawn while the cursor is where it usually is. This is also the mutation that restores the *pair* the tree shipped, since the cursor's range test only misbehaves against an end-anchored window.
 - **T6.50** (I62): dropping the bottom marker at the head while keeping the cursor-following window → T1.21c fails. **Its first draft asserted the middle case only and this mutation was caught by something else**, which is the row's own argument for covering head, middle and tail: *a marker wherever rows are elided and nowhere else* is not carried by the case with two of them.
