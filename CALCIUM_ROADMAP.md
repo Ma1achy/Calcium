@@ -2967,6 +2967,23 @@ these two share today* — measured, not read. Entry 16 step 4 is what running i
 walk asked, found `% length` in both directions in both files, and the step became a store plus
 one supplied field rather than a merge of two mechanisms.
 
+**Run over the five symbol-carrying OPEN entries before picking one, 2026-08-14 — and it
+moved the pick.** Its first live use, on 24, 29, 44, 45 and 48. Every one of the five symbols
+resolves as the sixth sweep said, so a sweep would have passed all five; two do not survive
+this question.
+
+| entry | the operation the row names | what the tree has |
+|---|---|---|
+| **44** session resume | *"the transcript is already a store with a cap and eviction; **persisting it is C20's shape one level up**"* | **A kind error, and the blocker is unnamed.** C20's `persist.ts` writes two **line-oriented text files** through `commandLine`/`metaLine` codecs — `join("")` of rows, append-only, index-aligned sidecar. A transcript entry is a `ViewDocument`: a tree of blocks. The **policy** generalises beautifully — one chain, rewind rather than drop, drain from the last confirmed write — and the **codec does not**. What it actually needs is a document serialiser, and there is none in `src/`: the only `JSON.stringify` calls are diagnostics, validation messages and the fixture corpus. That is entry **34**'s structured export, which 34's own residue records as absent — so 44 is blocked on 34 and its row says nothing about it |
+| **24** more default themes | *`light` is dark-on-dark "**which the background ruling fixes**"* | **A deferral chain reading as availability.** The premise is exactly right and better than stated: `surfaces.bg` is declared in both themes and is read **only by the contrast checker** — `theme/contrast.ts` — so nothing paints it anywhere. But the fix it points at is entry **39**, which is RULED and **not built** (`--no-bg` matches nothing in `src/`). The row presents its blocker as done |
+| **29** chrome row budget | *rule once — "**FIVE features now want it**"* | Not falsified, and **F161 is the question to ask it**: a count of consumers is an argument only if the consumers share a shape, and two of these five are separate entries with one (46) blocked on 7. Worth checking before it is picked, not before it is read |
+| **45** configurable cursor | a capability-gated `DECSCUSR` escape, and a blink state machine on the refresh driver's clock | **Survives.** Every mechanism it names exists and is in the right component: `escapes.ts` already holds `mode()` pairs and a `CURSOR` show/hide, so the shape is one more constant of a kind already there; `refresh.ts` owns intervals; `Placed.cursor` is per layer (C15 I19), which is what makes *per focus target* a seam rather than a preference |
+| **48** MG24 on the public surface | *tighten the rule* | **Refused by the entry itself**, four times measured, and a fifth in the other direction when entry 16 added `AskOptions.placement`. Its own conclusion is that the fix is a **second consumer** rather than a rule change — which is phase-1 work, so it is not pickable as an entry |
+
+**Two of five, and both would have passed a sweep**, which is the case for the pass being a
+question and not a rule. Neither is a stale citation: 44's sentence about C20 is true, and 24's
+sentence about the background ruling is true. **What is wrong is the job each implies.**
+
 **Not mechanised, and that is a ruling rather than a gap.** The operation verbs are greppable and
 a rule over them would report rows rather than errors — every row on a roadmap names an
 operation, so the population is the whole list and the signal says nothing about any member of

@@ -7827,6 +7827,12 @@ and wants a different one, plus a second that would draw the same mark for the s
 today's tree there is one candidate — the pending entry, once something composes it — and one
 candidate is not a shared slot. Recorded so that the next pass does not re-derive the four.
 
+**Disposition, 2026-08-14: the drawings are a design and not a pending change.** `⏺` and `⎿`
+appear in no file in this repository, and the agent-tui surfaces that use them are a sketch of
+what a consumer might draw rather than a claim about the framework. Nothing here is owed, and
+saying so is the point — an undischarged finding and a finding whose subject was never a
+mechanism read identically once the argument for it has been retracted.
+
 ---
 
 ## F162 — a type error in a test file is invisible to the suite that runs it, and a green `check` was published for a commit that does not typecheck ★★
