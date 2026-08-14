@@ -12,7 +12,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cells } from "@fmx/calcium";
 import type { Raw } from "@fmx/calcium";
-import { FLOOR, banner, bannerLines, variants } from "../src/banner.ts";
+import { FLOOR, banner, bannerLines, bannerRow, variants } from "../src/banner.ts";
+import { measurable } from "../../../test/support/render.ts";
+import type { Block } from "@fmx/calcium";
 
 const DOC = readFileSync(new URL("../DOCKER_TUI_BANNER.md", import.meta.url), "utf8");
 const fenced = [...DOC.matchAll(/```[a-z]*\n([\s\S]*?)```/gu)].map((m) =>
@@ -38,6 +40,30 @@ const COMPOSED_DOC = at(3, "composed");
 
 const text = (bl: unknown): string => (bl as Raw).text;
 const rowsOf = (bl: unknown): readonly string[] => text(bl).split("\n");
+
+describe("K5: the row container draws the banner the hand-composition drew", () => {
+  it("the frame is identical, and it is roadmap 38's acceptance test", () => {
+    // **This is the whole argument for the entry, measured rather than
+    // asserted.** Everything the composition does by hand — padding the whale to
+    // a uniform width, holding two arts side by side, keeping the wordmark's
+    // start column constant — is what a row container does, and a *proportion*
+    // could not do it: `40 : 61` gives the whale 41 columns at 105 and 47 at
+    // 120, so the gap widens with the terminal. `{cells: 43}` is 40 plus this
+    // file's 4-column gap, less the container's one cell of gutter.
+    //
+    // Rendered through C09 rather than read off a `raw` block's text, because
+    // the container's output *is* the claim.
+    const row = bannerRow(120, true);
+    expect(row, "a group at a width the composed variant fits").not.toBeNull();
+
+    const kit = measurable({});
+    const drawn = kit.renderToLines(row as Block, 120).map((l) => l.replace(/\s+$/u, ""));
+
+    expect(drawn, "the container draws what the hand-composition drew").toEqual(
+      COMPOSED_DOC.map((l) => l.replace(/\s+$/u, "")),
+    );
+  });
+});
 
 describe("the three build-time claims", () => {
   it("K1: no tab characters anywhere — in the art, or in the document that holds it", () => {

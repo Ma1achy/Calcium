@@ -164,3 +164,51 @@ export function banner(width: number, blocks: boolean): Block | null {
   if (lines === null || width < FLOOR) return null;
   return { kind: "raw", id: "banner", text: lines.join("\n") } as Block;
 }
+
+/**
+ * The same banner as a **row group**, which is what roadmap 38 exists to make
+ * possible (C04 I44).
+ *
+ * **The whale declares its cells and the wordmark takes what is left.** A
+ * proportion cannot express this — `40 : 61` gives the whale 41 columns at 105
+ * and 47 at 120, so the gap between the two arts widens with the terminal — and
+ * `{cells: 43}` is the whale's 40 plus the 4-column gap this file chose, less
+ * the one cell of gutter the container puts between every pair.
+ *
+ * **What the framework now does that this file did by hand**: padding every
+ * whale row to a uniform width, which `pad` did and the renderer's `fit` does;
+ * and holding the two arts in one block without either of them knowing the
+ * other's width.
+ *
+ * What is still the app's: the **wordmark's leading blank row**, which is a
+ * vertical alignment a row group has no opinion about (a short child sits at the
+ * top), and the variant choice, which is this file's own tiering.
+ */
+export function bannerRow(width: number, blocks: boolean): Block | null {
+  if (width < FLOOR) return null;
+  const wordmark = wordmarkFor(width, blocks);
+  if (wordmark === null) return null;
+
+  return {
+    kind: "group",
+    id: "banner",
+    direction: "row",
+    children: [
+      { kind: "raw", id: "banner-whale", text: WHALE.join("\n") },
+      { kind: "raw", id: "banner-wordmark", text: wordmark.join("\n") },
+    ],
+    flex: [{ cells: WHALE_CELLS + GAP - 1 }, 1],
+  } as Block;
+}
+
+/** The wordmark the composed variant at this width would use, or `null`. */
+function wordmarkFor(width: number, blocks: boolean): readonly string[] | null {
+  for (const v of VARIANTS) {
+    if (v.blocks && !blocks) continue;
+    if (widthOf(v.lines) > width) continue;
+    if (v.name === "wide-blocks") return WORDMARK_BLOCKS;
+    if (v.name === "wide-ascii") return WORDMARK_ASCII;
+    return null;
+  }
+  return null;
+}

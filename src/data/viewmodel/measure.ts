@@ -15,7 +15,7 @@
  * whichever width a child happens to wrap. A shared function cannot drift.
  */
 
-import type { Block, Group, MeasureFn, Panel } from "./types.js";
+import type { Block, Group, MeasureFn, Panel, Share } from "./types.js";
 
 /**
  * Width 0 is treated as 1 (T3.2). No measurer divides by zero, and no caller
@@ -45,6 +45,11 @@ export const BORDER_INSET = 2;
 
 /** One cell of gutter between each adjacent pair in a `row` group. */
 export const ROW_GUTTER = 1;
+
+/** A share that names cells rather than a proportion (I44). */
+function isCells(share: Share): share is Readonly<{ cells: number }> {
+  return typeof share === "object";
+}
 
 /** `panel` children, and a table row's `detail` blocks (§3). */
 export function insetWidth(width: number): number {
@@ -82,13 +87,24 @@ export function groupChildWidths(block: Group, width: number): readonly number[]
   if (block.direction === "column" || n <= 1) return block.children.map(() => w);
 
   const gaps = (n - 1) * ROW_GUTTER;
-  const budget = w - gaps;
-  const weights = block.flex ?? block.children.map(() => 1);
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const shares = block.flex ?? block.children.map(() => 1);
 
-  return block.children.map((_child, i) =>
-    normaliseWidth(Math.floor((budget * (weights[i] ?? 1)) / total)),
-  );
+  // **Fixed first, and what remains is what the weights divide** (I44). Any
+  // other order makes a cell count a suggestion, which is the one thing a cell
+  // count is not — the banner's whale is 40 cells and `40 : 61` gives it 41 at
+  // 105 columns and 47 at 120.
+  const fixed = shares.reduce<number>((sum, share) => sum + (isCells(share) ? share.cells : 0), 0);
+  const budget = w - gaps - fixed;
+  const weights = shares.reduce<number>((sum, share) => sum + (isCells(share) ? 0 : share), 0);
+
+  return block.children.map((_child, i) => {
+    const share = shares[i] ?? 1;
+    if (isCells(share)) return normaliseWidth(share.cells);
+    // A row of fixed children alone divides nothing: `weights` is 0 and there is
+    // no share to compute, so the floor answers rather than an infinity.
+    if (weights === 0) return normaliseWidth(budget);
+    return normaliseWidth(Math.floor((budget * share) / weights));
+  });
 }
 
 /**

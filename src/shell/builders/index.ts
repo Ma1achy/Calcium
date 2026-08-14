@@ -48,6 +48,7 @@ import type {
   Events,
   Glyph,
   Group,
+  Share,
   Hunk,
   KeyValue,
   Logs,
@@ -526,7 +527,7 @@ function panel(
 function group(
   direction: "row" | "column",
   children: readonly Block[],
-  opts?: BlockOpts & { flex?: readonly number[] },
+  opts?: BlockOpts & { flex?: readonly Share[] },
 ): Group {
   const flex = opts?.flex;
   if (flex !== undefined) {
@@ -535,11 +536,15 @@ function group(
         `b.group: ${String(flex.length)} weights for ${String(children.length)} children`,
       );
     }
-    for (const weight of flex) {
-      if (!Number.isFinite(weight) || weight <= 0) {
+    for (const share of flex) {
+      const bad =
+        typeof share === "object"
+          ? !Number.isInteger(share.cells) || share.cells <= 0
+          : !Number.isFinite(share) || share <= 0;
+      if (bad) {
         throw new TypeError(
-          `b.group: a weight is a finite number above zero — got ${String(weight)}; ` +
-            `omit the child to leave it unplaced, and 1 is one share`,
+          `b.group: a share is a weight above zero or {cells: n} whole columns — got ` +
+            `${JSON.stringify(share)}; omit the child to leave it unplaced, and 1 is one share`,
         );
       }
     }

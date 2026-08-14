@@ -16,6 +16,7 @@ import {
   applyPatch,
   childWidths,
   groupChildWidths,
+  type Share,
   insetWidth,
   normaliseWidth,
   ACTION_KINDS,
@@ -67,7 +68,7 @@ void _exhaustive;
  * A `row`/`column` group of `n` trivial children — the shape `groupChildWidths`
  * takes, since the width rule now reads the block's own weights (C04 I42).
  */
-function rowOf(n: number, direction: "row" | "column", flex?: readonly number[]): Group {
+function rowOf(n: number, direction: "row" | "column", flex?: readonly Share[]): Group {
   return {
     kind: "group",
     id: "g",

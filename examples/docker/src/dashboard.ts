@@ -23,7 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import { banner } from "./banner.ts";
+import { bannerRow } from "./banner.ts";
 import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone, ViewDocument } from "@fmx/calcium";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
@@ -426,7 +426,12 @@ export function dashboard(
    * set the panel's minimum width and a narrow terminal would get a bordered
    * box sized for art it is not showing.
    */
-  const art = banner(width, unicode);
+  // **A row container, since the framework has one** (C04 I44, roadmap 38).
+  // `bannerRow` declares the whale's cells and lets the wordmark take what is
+  // left; `banner` is the hand-composition it replaces, kept in the module
+  // because the golden in `DOCKER_TUI_BANNER.md` is asserted against both — one
+  // as the source of the art, the other as the frame the container must draw.
+  const art = bannerRow(width, unicode);
 
   return [
     ...(art === null ? [] : [art]),

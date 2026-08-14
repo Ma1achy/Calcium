@@ -293,10 +293,21 @@ function checkFlex(b: Record<string, unknown>, e: string[], at: string): void {
     );
   }
 
-  for (const [i, weight] of flex.entries()) {
-    if (typeof weight !== "number" || !Number.isFinite(weight) || weight <= 0) {
+  for (const [i, share] of flex.entries()) {
+    // **A cell count is refused on the same argument as a weight of zero**
+    // (I44): `{cells: 0}` and a fraction of a cell both name something the grid
+    // has no reading for, and a share that means two things is what the zero
+    // rule exists to keep out.
+    if (typeof share === "object" && share !== null && "cells" in share) {
+      const cells = (share as { cells: unknown }).cells;
+      if (typeof cells !== "number" || !Number.isInteger(cells) || cells <= 0) {
+        e.push(`${at}.flex[${String(i)}]: "cells" is a whole number of columns above zero`);
+      }
+      continue;
+    }
+    if (typeof share !== "number" || !Number.isFinite(share) || share <= 0) {
       e.push(
-        `${at}.flex[${String(i)}]: a weight is a finite number above zero; ` +
+        `${at}.flex[${String(i)}]: a share is a weight above zero or {cells: n}; ` +
           `omit the child to leave it unplaced, and 1 is one share`,
       );
     }

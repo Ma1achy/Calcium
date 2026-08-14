@@ -216,7 +216,17 @@ describe("C04 validation", () => {
     // cell* is what `1` says, since the floor gives every placed child a column.
     const two = [b.raw("a"), b.raw("b")];
 
-    for (const flex of [[0, 1], [-1, 1], [Number.NaN, 1], [Number.POSITIVE_INFINITY, 1]]) {
+    for (const flex of [
+      [0, 1],
+      [-1, 1],
+      [Number.NaN, 1],
+      [Number.POSITIVE_INFINITY, 1],
+      // A cell count names columns, so a fraction and a zero are refused on the
+      // same argument: the grid has no reading for either (I44).
+      [{ cells: 0 }, 1],
+      [{ cells: 2.5 }, 1],
+      [{ cells: -3 }, 1],
+    ]) {
       expect(() => b.group("row", two, { flex }), JSON.stringify(flex)).toThrow(TypeError);
     }
 

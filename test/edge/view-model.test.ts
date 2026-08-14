@@ -12,6 +12,7 @@ import {
   childWidths,
   document,
   groupChildWidths,
+  type Share,
   placeable,
   insetWidth,
   normaliseWidth,
@@ -36,7 +37,7 @@ function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
  * A `row`/`column` group of `n` trivial children — the shape `groupChildWidths`
  * takes, since the width rule now reads the block's own weights (C04 I42).
  */
-function rowOf(n: number, direction: "row" | "column", flex?: readonly number[]): Group {
+function rowOf(n: number, direction: "row" | "column", flex?: readonly Share[]): Group {
   return {
     kind: "group",
     id: "g",
@@ -148,6 +149,43 @@ describe("C04 width arithmetic at the boundaries", () => {
 
     expect(placeable(flat, 4), "three flat children, dropped one at a time").toBeLessThan(3);
     expect(placeable(nested, 4), "two outer children, and the pair is one of them").toBe(2);
+  });
+
+  it("T3.20 (I44): a fixed share is the same number of cells at every width", () => {
+    // **Two widths in one row, because one cannot tell a cell count from a
+    // ratio.** `[40, 61]` gives 41 and 62 at 105 and 47 and 71 at 120 — right
+    // once and drifting after — which is the measurement that says the banner
+    // cannot be a proportion.
+    expect(groupChildWidths(rowOf(2, "row", [40, 61]), 105)).toEqual([41, 62]);
+    expect(groupChildWidths(rowOf(2, "row", [40, 61]), 120)).toEqual([47, 71]);
+
+    for (const width of [105, 120, 200]) {
+      const widths = groupChildWidths(rowOf(2, "row", [{ cells: 40 }, 1]), width);
+      expect(widths[0], `fixed at ${String(width)}`).toBe(40);
+      expect(widths[1], "and the weight takes what is left").toBe(width - 1 - 40);
+    }
+
+    // Fixed and weighted together: 40 cells off the top, one gutter, and the
+    // remaining 64 divided 3 : 1.
+    expect(groupChildWidths(rowOf(3, "row", [{ cells: 40 }, 3, 1]), 106)).toEqual([40, 48, 16]);
+
+    // A row of fixed children alone divides nothing, and the slack is unspent.
+    expect(groupChildWidths(rowOf(2, "row", [{ cells: 10 }, { cells: 20 }]), 80)).toEqual([10, 20]);
+  });
+
+  it("T3.21 (I44, §3): a fixed child is not privileged at placement", () => {
+    // **The fixed child is last**, which is where a fixed-first placement rule
+    // would keep it — so the two rules disagree here and nowhere a row that fits
+    // could show. Placement stays left to right, as it does for weights (I42).
+    const wide = rowOf(3, "row", [1, 1, { cells: 30 }]);
+    // Thirty cells demanded of a twelve-column row: the budget the weights
+    // divide is **negative**, so both fall to the 1-cell floor — the fixed child
+    // is satisfied in the arithmetic and then fails to be placed, which is the
+    // two questions coming apart exactly where I44 says they do.
+    const widths = groupChildWidths(wide, 12);
+    expect(widths, "the shares this rests on").toEqual([1, 1, 30]);
+
+    expect(placeable(wide, 12), "the two weighted ones, and then the budget is gone").toBe(2);
   });
 
   it("T3.6c (§3): a row group splits equally, and still measures when it cannot", () => {

@@ -2833,7 +2833,7 @@ RULED 35 progress feedback        the spinner is static by a ruling whose premis
       37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
                                    bracketed with them. C10's no-background choice means a drawn
                                    line is the only tool available
-PART  38 horizontal composition   b.row — the banner already paid for its absence by hand
+BUILT 38 horizontal composition   b.row — the banner already paid for its absence by hand
                                    (width fractions ship with it; height fill is separate and
                                     waits on phase 1.1's producer-context contract).
                                    WALKED 2026-08-14, C04 §3 — a classification table and a
@@ -2885,7 +2885,23 @@ PART  38 horizontal composition   b.row — the banner already paid for its abse
                                    gap, and a proportion cannot pin a cell count, so the gap
                                    widens with the terminal. The measured consumer needs a
                                    FIXED width and weights are a ratio — R1's finding
-                                   arriving as a consequence, and the next argument
+                                   arriving as a consequence, and the next argument.
+                                   INTRINSIC WIDTHS BUILT AND THE BANNER CONVERTED
+                                   2026-08-14 — `Share = number | {cells: n}`, fixed taken
+                                   off the budget before any weight, and PLACEMENT
+                                   UNCHANGED: a fixed child that does not fit is dropped
+                                   like any other, because privileging it would make the
+                                   rendered set depend on a declaration rather than on the
+                                   author's order. Allocation and placement answer different
+                                   questions, so the fork was not one. THE ACCEPTANCE TEST
+                                   IS THE BANNER'S OWN FRAME: `bannerRow` renders IDENTICAL
+                                   to the hand-composed golden in DOCKER_TUI_BANNER.md at
+                                   120 columns, and the dashboard now builds it — so
+                                   `direction: "row"` HAS A CALLER and F21's shape is closed
+                                   in the entry that added it. 11 mutations, 11 caught; five
+                                   ANCHOR MISSES first, which the harness names distinctly
+                                   from survivors — the earlier half's anchors moved when
+                                   this one landed
 BUILT 39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
                                    overrides with `/theme <theme> --no-bg` (a FlagDef, free in
                                    --help, per-invocation not sticky; warn and comply). Painting
@@ -3095,7 +3111,7 @@ what landed**.
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 31 | PART | **recency-first landed.** `rank` — `src/interaction/completion/engine.ts` — runs after `dedupe` at both call sites over an injected `recency`, and C22 supplies it from C20's history at `src/shell/construct.ts`. `null` sorts last and stably, so it refines source order rather than replacing it. C19 I26, §3a; five mutations in `tools/mutate/runs/c19-ranking.mjs` | **substring and subsequence.** Substring is **refused** and I27 says why: the verb source emits one word at a time, so the whole name never reaches the filter and widening it changes nothing. Subsequence wants a match-quality scorer, which is a separate ruling |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
-| 38 | PART | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` — and the weights C04 §3 deferred are built: `flex?: readonly number[]` at `src/data/viewmodel/types.ts:580`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` | **the banner still does not close**, and the frame-read says why: two multi-line `raw` blocks compose side by side correctly, but the whale is padded to a fixed 40 with a fixed 4-cell gap and a proportion cannot pin a cell count. A fixed-width child is the next argument. `align`, `padding` and `height: "fill"` are separate steps, and **`direction: "row"` still has no caller in the tree** |
+| 38 | BUILT | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` — and the weights C04 §3 deferred are built: `flex?: readonly number[]` at `src/data/viewmodel/types.ts:580`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` — and `Share` closes it: `examples/docker/src/banner.ts:187` builds a row group whose frame is identical to the composed golden, and `examples/docker/src/dashboard.ts:434` puts it in the document, so **`direction: "row"` has a caller**. C04 I44, commitment 41, T3.20, T3.21, T6.23, T6.24 | **`align`, `padding` and `height: "fill"` are separate steps**, each named in C04 §3 with its reason. The wordmark's leading blank row stays the app's, because vertical alignment inside a row is not built |
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
 | 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |

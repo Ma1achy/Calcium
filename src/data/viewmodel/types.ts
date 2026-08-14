@@ -559,7 +559,7 @@ export type Group = Readonly<{
   direction: "row" | "column";
   children: readonly Block[];
   /**
-   * How a `row` group's width is divided — one weight per child (I42, §3).
+   * How a `row` group's width is divided — one share per child (I42, I44, §3).
    *
    * **Absent is an equal split**, which is what every group did before this
    * field and what `[1, 1, …]` still means: the arithmetic is identical, and a
@@ -577,8 +577,26 @@ export type Group = Readonly<{
    * should not fail. Knowingly vacuous, and said out loud because an ignored
    * field is how a value comes to be silently unread.
    */
-  flex?: readonly number[];
+  flex?: readonly Share[];
 }> & Gap;
+
+/**
+ * One child's share of a `row` group's width (I44).
+ *
+ * A **number** is a weight — a proportion of what is left. `{ cells: n }` is an
+ * intrinsic width, in cells, and it is the answer to the question R1 left open:
+ * a group cannot ask a child how wide it wants to be, so a child that knows
+ * says. The banner is the measured case — a 40-cell whale beside a wordmark —
+ * and it cannot be written as `40 : 61`, which gives 41 and 62 at 105 columns
+ * and 47 and 71 at 120.
+ *
+ * **Fixed shares are taken off the budget first**, and the weights divide what
+ * remains; any other order makes a cell count a suggestion. **Placement is
+ * unchanged**: a fixed child that does not fit is dropped exactly as any other
+ * is, because privileging it would make the rendered set depend on a
+ * declaration rather than on the order the author wrote.
+ */
+export type Share = number | Readonly<{ cells: number }>;
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
 export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;

@@ -36,6 +36,7 @@ export type {
   MergeRow,
   Notice,
   Panel,
+  Share,
   Patch,
   PatchResult,
   Pills,

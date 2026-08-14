@@ -17,7 +17,8 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/edge/view-model.test.ts test/unit/view-model.test.ts " +
-  "test/contract/view-model.test.ts test/integration/blocks.test.ts";
+  "test/contract/view-model.test.ts test/integration/blocks.test.ts " +
+  "examples/docker/test/banner.test.ts";
 const MEASURE = "src/data/viewmodel/measure.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const BUILDERS = "src/shell/builders/index.ts";
@@ -39,8 +40,8 @@ const MUTATIONS = [
     // entry — and T3.16 is the only shape that separates them.
     name: "the gutter is taken proportionally, not off the top",
     file: MEASURE,
-    from: "  const budget = w - gaps;",
-    to: "  const budget = w;",
+    from: "  const budget = w - gaps - fixed;",
+    to: "  const budget = w - fixed;",
     expect: "T3.17",
   },
   {
@@ -61,8 +62,8 @@ const MUTATIONS = [
     // gutter.
     name: "the remainder goes to the leftmost child",
     file: MEASURE,
-    from: "  return block.children.map((_child, i) =>\n    normaliseWidth(Math.floor((budget * (weights[i] ?? 1)) / total)),\n  );",
-    to: "  const shares = block.children.map((_child, i) =>\n    normaliseWidth(Math.floor((budget * (weights[i] ?? 1)) / total)),\n  );\n  const spent = shares.reduce((sum, s) => sum + s, 0);\n  return shares.map((s, i) => (i === 0 ? s + (budget - spent) : s));",
+    from: "    return normaliseWidth(Math.floor((budget * share) / weights));",
+    to: "    const each = normaliseWidth(Math.floor((budget * share) / weights));\n    const spent = shares.reduce((sum, s) => sum + (isCells(s) ? 0 : Math.floor((budget * s) / weights)), 0);\n    return i === 0 ? each + (budget - spent) : each;",
     expect: "T3.16",
   },
   {
@@ -70,8 +71,8 @@ const MUTATIONS = [
     // existing `column` call site and is the regression half of T3.16.
     name: "absent weights are not an equal split",
     file: MEASURE,
-    from: "  const weights = block.flex ?? block.children.map(() => 1);",
-    to: "  const weights = block.flex ?? block.children.map((_c, i) => i + 1);",
+    from: "  const shares = block.flex ?? block.children.map(() => 1);",
+    to: "  const shares = block.flex ?? block.children.map((_c, i) => i + 1);",
     expect: "T3.16",
   },
   {
@@ -79,8 +80,8 @@ const MUTATIONS = [
     // and no use enters a published type.
     name: "a zero weight is constructible",
     file: BUILDERS,
-    from: "      if (!Number.isFinite(weight) || weight <= 0) {",
-    to: "      if (false) {",
+    from: "          : !Number.isFinite(share) || share <= 0;",
+    to: "          : false;",
     expect: "T1.20",
   },
   {
@@ -88,7 +89,7 @@ const MUTATIONS = [
     // from a fixture or a far side takes — no constructor in between.
     name: "the validator accepts a zero weight",
     file: VALIDATE,
-    from: "    if (typeof weight !== \"number\" || !Number.isFinite(weight) || weight <= 0) {",
+    from: "    if (typeof share !== \"number\" || !Number.isFinite(share) || share <= 0) {",
     to: "    if (false) {",
     expect: "T1.20",
   },
@@ -99,6 +100,44 @@ const MUTATIONS = [
     file: BUILDERS,
     from: "    if (flex.length !== children.length) {",
     to: "    if (false) {",
+    expect: "T1.20",
+  },
+  {
+    // **The weighted shares computed over the whole budget** rather than over
+    // what the fixed children left — which makes a cell count a suggestion, and
+    // is right at exactly one width per row.
+    name: "the weights divide the budget the fixed children already took",
+    file: MEASURE,
+    from: "  const budget = w - gaps - fixed;",
+    to: "  const budget = w - gaps;",
+    expect: "T3.20",
+  },
+  {
+    // **A fixed share treated as a weight**, which is the state before this
+    // half: the banner's whale drifts with the terminal.
+    name: "a cell count is read as a weight",
+    file: MEASURE,
+    from: "    if (isCells(share)) return normaliseWidth(share.cells);",
+    to: "",
+    expect: "T3.20",
+  },
+  {
+    // **Fixed children placed first.** The rendered set would depend on a
+    // declaration rather than on the order the author wrote — C04 I42's rule a
+    // second time (C04 I42), and the fixture puts the fixed child last for that reason.
+    name: "a fixed child is placed before the others",
+    file: MEASURE,
+    from: "  const widths = groupChildWidths(block, width);\n  let used = 0;",
+    to: "  const shares = block.flex ?? [];\n  const order = block.children\n    .map((_c, i) => i)\n    .sort((a, z) => (typeof shares[a] === \"object\" ? -1 : 0) - (typeof shares[z] === \"object\" ? -1 : 0));\n  const all = groupChildWidths(block, width);\n  const widths = order.map((i) => all[i] ?? 1);\n  let used = 0;",
+    expect: "T3.21",
+  },
+  {
+    // **`{cells: 0}` accepted**, on the same argument as a zero weight: a share
+    // that names something the grid has no reading for.
+    name: "a zero cell count is constructible",
+    file: BUILDERS,
+    from: "          ? !Number.isInteger(share.cells) || share.cells <= 0",
+    to: "          ? false",
     expect: "T1.20",
   },
 ];
