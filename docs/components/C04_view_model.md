@@ -790,6 +790,44 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 
 ---
 
+## 5a. The serialisation contract
+
+**A document is JSON, and nothing said so.** The block union declares no function,
+`Map`, `Set` or `Date` member — the only function types in the file are `MeasureFn`
+and the measurer's signature, neither of which is a document field — so
+`JSON.stringify` is the serialiser and `validateDocument` is the parser. That is
+why roadmap 44's persistence needs no codec (F166), and it is a property nothing
+asserted until it was written down here.
+
+**The property**: for every valid document `d`,
+`validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal
+to `d`. It is the same shape as C09's window sweep — a generic claim run over the
+whole corpus rather than a row per kind — and, like that one, what it is worth
+depends on whether anything can fail it.
+
+### The walk — a classification table, because none of this is event-mediated
+
+Four rules meet here: the **document is pure data** (I1); **`validateDocument`
+decides** what an untrusted value is; the **round trip** must preserve it; and
+**JSON's number is not JavaScript's**. The cells are where two of those overlap.
+
+| # | the two rules that meet | the cell | ruling |
+|---|---|---|---|
+| 1 | *the type says `number`* × *the round trip preserves* | `NaN` and `Infinity` — legal JavaScript numbers that JSON writes as `null` | **measured: accepted before and after, and the value changes.** A plot's `[1, NaN]` persists as `[1, null]` and revalidates clean, so the document that comes back is a *different, still-valid* document. The validator requires a **finite** number wherever the type says number |
+| 2 | *`validateDocument` decides* × *the type says `number`* | a numeric **array** — `Series.values` and `Cell.spark` | **the elements were never checked at all.** `requireArray` establishes the array and stops, so `["x"]`, `[null]` and `[{}]` validate today, round trip or no round trip. This is wider than the property that found it, and it is the half that matters for an untrusted document |
+| 3 | *pure data* × *the round trip* | a property whose value is an explicit `undefined` | `JSON.stringify` drops the key, so the parsed object lacks it. **Asserted modulo this**, and the reason is that it is unreachable through the framework: `exactOptionalPropertyTypes` makes `{gapBefore: undefined}` a different type from `{}`, and every constructor spreads-if-present rather than assigning `undefined` — the adapter mapping says so in its own comment |
+| 4 | *the type says `number`* × *the round trip* | `-0`, which JSON writes as `0` | **not refused.** `-0` is a legal number and renders identically; refusing it would narrow the type to buy an equality nobody needs. The property is asserted with a comparison that treats the two as equal, and this row is why |
+| 5 | *the round trip* × *the corpus* | which fixtures the sweep runs over | `ONE_PER_KIND` and `ADVERSARIAL`, the same corpora T2.1 uses — so a kind added without a fixture fails T2.10 before it reaches here, and the sweep **asserts its own count** rather than reporting a completion it never observed |
+
+**What this does not settle.** Whether `validateDocument` is *published* is C24's
+question and not this one: C24 I1 removes an export used by neither app, and the
+consumer this would have is roadmap 44 — which is framework work and imports it
+directly. C24's own precedent is `ViewRefresh`, withheld until it had a driver and
+better for the wait. The property below holds either way, and it is what a
+persisted document rests on.
+
+---
+
 ## 6. Invariants
 
 - **I1** — `ViewDocument` and every `Block` are deeply immutable. All mutation is `applyPatch` returning a new value.
@@ -838,6 +876,8 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I43** — **Weights and nested groups both express uneven allocation, and they differ where it matters.** §3 deferred weights on the grounds that *uneven allocation is expressible as nested groups*, and that equivalence holds **only while every child fits**: a nested group is one child of the outer row and is dropped whole, where flat children are dropped one at a time (§3, roadmap 38). Neither supersedes the other — nesting also expresses grouping, which a number cannot — and the 1-cell floor's boundary, measured as degenerate at `w ≤ 2n − 1`, becomes reachable at ordinary widths under weights: `[50, 1]` puts the second child at one cell in eighty columns (→ C09 §4b).
 - **I44** — **A share is a weight or a cell count, and fixed widths are satisfied before any weight is computed.** `flex` takes `number | { cells: n }`: R1 says a group cannot ask a child what width it wants, and this is the child saying so, which is the same fact from the side that holds it. **Allocation and placement answer different questions and both are stated**: fixed children take their cells off the budget first and the weighted ones divide what remains — any other order makes a cell count a suggestion — while **placement is unchanged**, left to right while the budget lasts, so a fixed child that does not fit is dropped exactly as any other is. Privileging it there would make the rendered set depend on a declaration rather than on the order the author wrote, which is I42's rule a second time. A `cells` that is not a positive integer is a construction error, on the same argument as a weight of zero (§3, roadmap 38).
 - **I45** — **A row aligns its children in its own height, and that is the only axis there is.** **Vertical placement is inside the row's height**, which a row already computes as its tallest child and otherwise discards. **A horizontal axis was ruled and refused by the build**: every renderer fits its output to the width it is handed, so a child fills its allocation and aligning a ten-cell box inside a ten-cell one is a no-op — placing it would mean knowing how wide the content *is*, and `measure(block, width) → height` does not answer that. Heights are measurable and widths are not, which is the same missing preferred width that made weights the only allocation (I44), arriving a third time. The axis that exists has a shipped consumer: the banner's wordmark carries a **blank first row** so its seven lines sit on the whale's hull, which is vertical alignment hand-written into the art exactly as the padded whale was a fixed width hand-written into it (§3, roadmap 38). It defaults to `top`, which is what a row does today, so an absent field renders byte for byte as before. **`measure` is untouched**: alignment moves rendered lines inside a box the container already sized, so the row is still the tallest child and every cache keyed on `(block, width)` is unaffected — the containment argument that made weights safe, applied to position instead of size. A child that is not placed is aligned by nobody.
+
+- **I46** — **A valid document survives a JSON round trip unchanged, and the validator refuses what JSON cannot carry.** The union holds no function, `Map`, `Set` or `Date`, so `JSON.stringify` is the serialiser and `validateDocument` is the parser — which is why persistence needs no codec (F166) and why this had to be stated before something rested on it. **Where the type says `number` the validator requires a finite one, elements of numeric arrays included.** Two defects were found by writing the property rather than by the property failing: `NaN` and `Infinity` were accepted, and JSON writes them as `null`, so a document persisted and reloaded was a *different document that revalidated clean*; and `Series.values` and `Cell.spark` were never element-checked at all, so a string, a `null` or an object in a numeric array validated with or without a round trip — the wider half, and the one an untrusted document turns on. **Two inequalities are knowingly tolerated and named rather than closed**: `-0` writes as `0`, which renders identically and is not worth narrowing the type for, and an explicit `undefined` property is dropped, which no constructor can produce because `exactOptionalPropertyTypes` makes it a distinct type and every one spreads-if-present (§5a).
 
 ---
 
@@ -889,6 +929,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 40. **Weights and nesting are both kept**, because the equivalence §3 deferred weights on holds only while every child fits, and the floor's degenerate boundary is reachable at ordinary widths once shares are uneven (I43, §3).
 41. **A share is a weight or a cell count**, fixed satisfied before weighted and placement unchanged — so a declared width is exact where it fits and is dropped like any other child where it does not (I44, §3).
 42. **A row aligns in its own height and measures the same either way** — and the vertical one is what the banner's blank first row was doing by hand (I45, §3).
+43. **A document is JSON, so persistence needs no codec** — and the validator refuses what JSON cannot carry, finite numbers included and numeric array elements with them, because a document that round-trips into a *different valid document* is worse than one that is refused (I46, §5a).
 
 ---
 
@@ -935,6 +976,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.9** (I11): the module graph shows no import from `terminal/` or above.
 - **T2.11** (I34): `validateBlock` accepts a `patch` carrying a `view` action whose `target` is one of the document's own block ids, and the `Action` union's five kinds are exhaustive over the validator — a sixth added without validation fails the build, exactly as T2.10 does for `Block`. The pairing is what makes the union closed rather than open with four entries written down.
 - **T2.10**: every member of the `Block` union is exhaustively handled by the validator — adding a kind without validation fails the build. *(Registry completeness — that every kind has a registered measurer and renderer — is C09's test, since C09 owns the registry.)*
+- **T2.12** (I46, §5a): the round trip, over `ONE_PER_KIND` and `ADVERSARIAL` — `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal to `d` for every fixture, and the row **asserts how many it ran**, because a sweep over an empty corpus is the same green as a sweep that passed.
+- **T2.13** (I46, §5a): the fabricated failures, which is what makes T2.12 worth running — a plot series carrying `NaN`, one carrying `Infinity`, and a `Cell.spark` carrying a string are each **refused by the validator**, and the first two were accepted before *and after* a round trip that silently rewrote them to `null`.
 
 ### Tier 3 — edge cases
 
@@ -960,6 +1003,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.21** (I44): declared cells wider than the budget — the fixed child is **not** privileged at placement, and the row places left to right as it does with weights. Asserted with the fixed child **last**, which is where a fixed-first placement rule would keep it and this one does not.
 - **T3.22** (I45): a seven-row child beside an eight-row one, aligned `bottom`, renders identically to the same child with a blank row written into it — **the banner's own hand-alignment, expressed by the container**. And `top` reproduces the unaligned rendering byte for byte, so the default is asserted rather than assumed.
 - **T3.23** (I45): alignment measures identically to none at all, over every width in the corpus. The row that says position is not size.
+- **T3.24** (I46, §5a): the two tolerated inequalities, asserted rather than assumed — a block carrying `-0` round-trips to `0` and stays valid, and a property whose value is an explicit `undefined` loses the key. Both are stated in §5a; a row is what stops them being rediscovered as defects.
 - **T3.13**: `applyPatch` with a `merge` carrying an empty row array → `{ok: true}`, document unchanged.
 - **T3.13b** (§4): a `merge` whose payload omits half the existing rows → every omitted row survives. Absence is not deletion.
 - **T3.14**: a document at the 10,000-block cap (D40) → validation flags `truncated`, and measurement of the whole set completes within budget.
@@ -1006,6 +1050,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.24** (I44): placing fixed children before the others → T3.21 fails, and the rendered set depends on a declaration rather than on the order the author wrote.
 - **T6.25** (I45): defaulting the vertical axis to `bottom` rather than `top` → T3.22's control fails, and every existing row group moves its short children without anything asking it to.
 - **T6.26** (I45): adding the alignment offset to the measured height → T3.23 fails, and a row's height stops being its tallest child.
+- **T6.27** (I46): dropping the finiteness check back to `typeof === "number"` → T2.13 fails, and `NaN` persists as `null` under a validator that agrees twice.
+- **T6.28** (I46): checking that a numeric array *is* an array without checking its elements — the state that shipped → T2.13 fails on `Cell.spark`.
 - **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
 
 ---
