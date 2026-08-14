@@ -130,6 +130,13 @@ const tui = createTui({
   binary: BINARY,
   manifest: buildManifest(engine),
   theme: defaultTheme,
+  // **The second consumer of the cursor field, and the reason it is not
+  // vacuous** (C22 I63, roadmap 45). A beam where the reader types and the
+  // terminal's own everywhere else — which is the entry's own example, and the
+  // case a style keyed on `Layer` could not express, since the prompt has no
+  // `Placed`. Declaring nothing here would leave the field published, resolved
+  // and never filled in by anyone.
+  cursor: { targets: { prompt: { shape: "beam", blink: false } } },
   // **Required in practice, though the type says optional** (FINDINGS F8).
   // C22 I20 has the app supply the environment and no file under `src/` reads
   // `process.env` — but omitted it defaults to `{}`, so `TERM` is absent,

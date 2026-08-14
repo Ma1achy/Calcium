@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import { compose, type Composed } from "../../src/shell/frame.js";
+import { composeFrame, type FrameResult } from "../../src/shell/render-frame.js";
 import { cursorFor, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager, type Placed } from "../../src/viewport/overlay/index.js";
@@ -94,6 +95,56 @@ function deps(
   ghost: () => null,
   };
 }
+
+describe("C22 §6f — the frame carries the cursor's shape (I63)", () => {
+  it("T1.22d (C22 I63, §6f table rows 4 and 5): the shape is in the write, from the target, once", () => {
+    // **The wiring, and it is a separate row because a seam-level test passes
+    // on the day nothing calls the seam.** Every other row about the shape
+    // calls `cursorShapeSequence` directly; the two mutations this one exists
+    // for are at the call site — dropping it from the frame's `write`, and
+    // resolving it from the prompt rather than from `router.target`.
+    const f = frameAt();
+    const emitted: string[] = [];
+    let target = "prompt";
+
+    const compose = (): FrameResult =>
+      composeFrame({
+        composed: () => f,
+        paintDeps: () => deps(() => []),
+        resizeViewport: () => undefined,
+        cursorSequence: () => "",
+        cursorShape: () => {
+          // A stand-in for C01's record: bytes on a change, nothing otherwise.
+          const style = target === "prompt" ? "[6 q" : "[2 q";
+          if (emitted[emitted.length - 1] === style) return "";
+          emitted.push(style);
+          return style;
+        },
+        previous: () => null,
+      });
+
+    const first = compose();
+    if (first.kind !== "frame") throw new Error("unreachable");
+    expect(first.write, "the shape is in the frame's one write").toContain("[6 q");
+
+    // **Once over three frames at the same target**, which is the property no
+    // reading of a single frame can see: every frame is correct and the stream
+    // is not.
+    const second = compose();
+    const third = compose();
+    if (second.kind !== "frame" || third.kind !== "frame") throw new Error("unreachable");
+    expect(second.write, "and not again").not.toContain(" q");
+    expect(third.write).not.toContain(" q");
+    expect(emitted, "one emission across three frames").toEqual(["[6 q"]);
+
+    // And it follows the **target**, not the prompt: a resolution wired to
+    // `promptFocused` answers the position's question, not this one.
+    target = "overlay";
+    const fourth = compose();
+    if (fourth.kind !== "frame") throw new Error("unreachable");
+    expect(fourth.write, "a different target, a different shape").toContain("[2 q");
+  });
+});
 
 describe("C22 §6a — compositing", () => {
   it("T1.12 (C22 I28): the layer region is the viewport region, and the drawer adds its top", () => {

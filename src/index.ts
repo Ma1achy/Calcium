@@ -50,6 +50,15 @@ export type {
 } from "./shell/types.js";
 
 /**
+ * The cursor's shape, for `TuiConfig.cursor` (C22 I63, C01 I20).
+ *
+ * Exported because a consumer that names the type — rather than writing an
+ * object literal at the call site — cannot otherwise, and a config field whose
+ * type is unreachable is a field only an inline literal can fill.
+ */
+export type { CursorShape, CursorStyle } from "./terminal/escapes.js";
+
+/**
  * The local-handler contract (C23 §2, I36).
  *
  * **`TuiConfig.localHandlers` has been public since C22 and its context type was

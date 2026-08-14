@@ -36,6 +36,7 @@ import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { resolveFocus } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER } from "./config.js";
+import { cursorStyleFor } from "./cursor-style.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
@@ -474,6 +475,15 @@ class Session implements TuiInstance {
       paintDeps: (frame) => this.#paintDeps(graph, frame),
       resizeViewport: (size) => void graph.viewport.resize(size),
       cursorSequence: (cursor) => graph.lifecycle.cursorSequence(cursor),
+      // **The target, not the layer** (C22 I63, §6f). `router.target` is what
+      // holds the keys, and it is defined on every frame — a layer is not, and
+      // five of the seven targets have no `Placed` at all. C01 answers with
+      // nothing when the shape has not changed, so this is a read per frame and
+      // bytes only on a transition.
+      cursorShape: () =>
+        graph.lifecycle.cursorShapeSequence(
+          cursorStyleFor(graph.router.target, this.config.cursor),
+        ),
       // **The record is the caller's, because the write is** (I55, §4a).
       // `composeFrame` returns bytes and never puts them on a terminal, so it
       // cannot know whether they landed; this does.

@@ -60,6 +60,118 @@ afterEach(() => {
   }
 });
 
+describe("C01 — the cursor's shape is a setting (I20)", () => {
+  const BEAM = { shape: "beam", blink: false } as const;
+  const BLOCK = { shape: "block", blink: true } as const;
+
+  it("T1.25 (I20): the same shape is emitted once, and a different one emits again", () => {
+    // **The defect this row exists for cannot be seen by looking at a cursor.**
+    // The shape rides the frame's write, and the frame's write happens sixty
+    // times a second — so a style emitted per frame is correct on every frame
+    // and wrong as a stream. The row counts rather than compares.
+    const { lifecycle } = harness();
+    lifecycle.acquire();
+
+    expect(lifecycle.cursorShapeSequence(BEAM), "the first is bytes").not.toBe("");
+    expect(lifecycle.cursorShapeSequence(BEAM), "the second is nothing").toBe("");
+    expect(lifecycle.cursorShapeSequence(BEAM), "and so is the third").toBe("");
+    expect(lifecycle.cursorShapeSequence(BLOCK), "a change emits again").not.toBe("");
+    expect(lifecycle.cursorShapeSequence(BLOCK)).toBe("");
+  });
+
+  it("T1.25b (I20): blink is part of the value, because it is part of the parameter", () => {
+    // Shape and blink are one wire parameter, so *the same shape, blinking* is
+    // a different value and not a modifier of the previous one.
+    const { lifecycle } = harness();
+    lifecycle.acquire();
+
+    expect(lifecycle.cursorShapeSequence({ shape: "beam", blink: false })).not.toBe("");
+    expect(
+      lifecycle.cursorShapeSequence({ shape: "beam", blink: true }),
+      "same shape, other blink — a different value",
+    ).not.toBe("");
+  });
+
+  it("T1.26 (I20): nothing emitted means nothing emitted, before and at release", () => {
+    // **The fabricated boundary case** (C22 §6f table row 3). A target that
+    // declares no style resolves to `null`, and asking for `null` before
+    // anything has been put on the wire must write nothing at all — otherwise
+    // an application that never asked to touch the cursor resets a terminal
+    // whose own setting was already what the user wanted.
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+
+    expect(lifecycle.cursorShapeSequence(null), "before anything, nothing").toBe("");
+    const before = stdout.output;
+    lifecycle.release();
+    expect(stdout.output.slice(before.length), "and nothing at release either").not.toContain(
+      " q",
+    );
+  });
+
+  it("T1.26b (I20): a shape that was set is reset at release", () => {
+    // The other arm, and both are needed: a reset written unconditionally
+    // satisfies this one and fails T1.26, and writing none satisfies T1.26 and
+    // leaves a bar behind on exit.
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+    lifecycle.cursorShapeSequence(BEAM);
+
+    const before = stdout.output;
+    lifecycle.release();
+    expect(stdout.output.slice(before.length), "the reset, and it is `0`").toContain("[0 q");
+  });
+
+  it("T1.27 (I20): after a handoff the next resolution is emitted, the reset included", () => {
+    // **The state emit-on-change created**, and it is reachable only through a
+    // handoff: the child owned the terminal and may have set a shape of its own
+    // — `vim` leaves a bar behind — so the record describes a screen that no
+    // longer exists.
+    //
+    // **The `null` arm is the one that matters and the first draft of this row
+    // could not construct it.** With a real style, `suspend()`'s reset already
+    // forces a re-emission, so the row passed with the resume handling removed
+    // entirely — the mutation pass is what said so. Asking for *the terminal's
+    // own* is the only request the two dispositions answer differently.
+    const { lifecycle } = harness();
+    lifecycle.acquire();
+    lifecycle.cursorShapeSequence(BEAM);
+    expect(lifecycle.cursorShapeSequence(BEAM), "held, before the handoff").toBe("");
+
+    lifecycle.suspend();
+    lifecycle.resume();
+
+    expect(
+      lifecycle.cursorShapeSequence(null),
+      "the reset, because the child's shape is on the screen and the record cannot say",
+    ).toBe("\u001b[0 q");
+    expect(lifecycle.cursorShapeSequence(null), "and then it holds again").toBe("");
+  });
+
+  it("T1.27c (I20): a real style after a handoff is emitted too", () => {
+    // The other arm, and it is the one that passes under both dispositions —
+    // kept because dropping it would leave the resume path asserted only by a
+    // request for `null`, which is the rarer resolution.
+    const { lifecycle } = harness();
+    lifecycle.acquire();
+    lifecycle.cursorShapeSequence(BEAM);
+    lifecycle.suspend();
+    lifecycle.resume();
+
+    expect(lifecycle.cursorShapeSequence(BEAM), "re-emitted, although unchanged").not.toBe("");
+  });
+
+  it("T1.27b (I20): suspend gives the shape back before the child takes the terminal", () => {
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+    lifecycle.cursorShapeSequence(BEAM);
+
+    const before = stdout.output;
+    lifecycle.suspend();
+    expect(stdout.output.slice(before.length), "reset on the way out").toContain("[0 q");
+  });
+});
+
 describe("C01 acquisition and release", () => {
   it("T1.1 (I6, C5): full acquisition emits the sequences in documented order", () => {
     const { lifecycle, stdout, stdin } = harness();
