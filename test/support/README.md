@@ -357,3 +357,15 @@ erases the *question of which seams exist at all*. `overlays`, `documentView` an
 `blocks` are real objects now for that reason; the remaining cast is a known
 weakness, and anything added to `PipelineDeps` will be silently absent here until
 a row calls it.
+
+**Measured 2026-08-14, and the prediction held exactly.** `setSuppressBackground`
+was added to `PipelineDeps` for roadmap 39's `--no-bg`; the harness compiled
+unchanged, and `/theme`'s handler threw at the first call into `undefined`. T4.4
+caught it — *a theme switch makes L4 call invalidate* — because it drives the
+verb rather than the seam, and it reported the consequence (*expected 'dark' to
+be 'light'*) rather than the cause.
+
+**So the weakness is bounded by which fields a row happens to exercise**, and
+that is the argument for the producer rule above rather than against the cast:
+the field was absent, invisible to the compiler, and found in seconds only
+because one row went through the producer.

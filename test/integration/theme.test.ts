@@ -106,6 +106,84 @@ describe("C10 integration", () => {
     direct.theme.setVariant("light");
     expect(direct.calls, "C10 never invalidates").not.toContain("invalidate");
   });
+  it("T4.27 (C22 I66): clearing --no-bg reaches a frame", async () => {
+    // **A row about a path rather than about a guard.** The walk ruled that
+    // `/theme light --no-bg` then `/theme light` commits nothing, because
+    // `setVariant` is a no-op on an unchanged variant — the mechanism is real
+    // and the consequence does not follow: every `/theme` appends a notice and
+    // invalidates on the verb whatever changed. Measuring the caller refuted
+    // it, and the obligation is what stays: the flag has to reach the screen.
+    const h = pipelineHarness();
+
+    h.pipeline.submit("/theme light --no-bg");
+    await settled();
+    const after = h.commits.length;
+
+    h.pipeline.submit("/theme light");
+    await settled();
+
+    expect(h.commits.length - after, "the second invocation commits").toBeGreaterThan(0);
+    expect(h.calls, "and invalidates on the verb, not on the variant").toContain("invalidate");
+  });
+
+  it("T4.28 (C22 I66): --no-bg never reaches the handler, and the variant still switches", async () => {
+    // **Two assertions, and the mutation pass is why there are two.** The
+    // outcome alone is over-determined: reading the variant from `ctx.args` and
+    // stripping the flag from `argv` are *each* sufficient, so a mutation
+    // undoing either one leaves `/theme --no-bg light` working. The mechanism
+    // is what tells them apart — `argv` for a local verb is
+    // `[verb, ...transmitted]`, and `meta.argv` records exactly what the
+    // handler was given.
+    const h = pipelineHarness();
+    h.pipeline.submit("/theme --no-bg light");
+    await settled();
+
+    expect(h.theme.current.tokens.variant, "the flag is not read as the variant").toBe("light");
+    expect(
+      h.transcript.entries.at(-1)?.doc.meta.argv,
+      "a shellOnly flag does not travel to the handler",
+    ).not.toContain("--no-bg");
+  });
+
+  it("T4.34 (C22 I66): the flag is per invocation, and the clearing is a write", async () => {
+    // **`false` has to be written, not merely not-written.** A handler that set
+    // the flag only when the flag was given is sticky: you switch themes later,
+    // get no background, and have nothing on screen explaining why. The
+    // difference is invisible in any single invocation, which is why this row
+    // reads the sequence.
+    const h = pipelineHarness();
+    h.pipeline.submit("/theme light --no-bg");
+    await settled();
+    h.pipeline.submit("/theme dark");
+    await settled();
+
+    expect(h.suppressed, "set, then cleared").toEqual([true, false]);
+  });
+
+  it("T4.29 (C22 I66, C10 I25): the warning fires only where it suppresses a paint", async () => {
+    // **Both arms**, because a warning that always fires and one that never
+    // does read the same from a passing suite. `light` declares `surface` and
+    // `dark` inherits, so the flag has a consequence on one and none on the
+    // other.
+    const warned = pipelineHarness();
+    warned.pipeline.submit("/theme light --no-bg");
+    await settled();
+    const painting = warned.transcript.entries.at(-1);
+    expect(
+      painting?.doc.blocks.some((b) => b.kind === "notice" && b.tone === "warn"),
+      "light paints, so suppressing it is worth a notice",
+    ).toBe(true);
+
+    const quiet = pipelineHarness();
+    quiet.pipeline.submit("/theme dark --no-bg");
+    await settled();
+    const inheriting = quiet.transcript.entries.at(-1);
+    expect(
+      inheriting?.doc.blocks.some((b) => b.kind === "notice" && b.tone === "warn"),
+      "dark inherits anyway, so the flag changed nothing to warn about",
+    ).toBe(false);
+  });
+
   it("T4.5 (C22 I40): /theme light persists and survives a restart", async () => {
     // **Two real sessions over one filesystem**, and the second is constructed
     // **without stopping the first** — which is the whole of T6.35. A write at

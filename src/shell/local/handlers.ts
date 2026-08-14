@@ -34,6 +34,13 @@ export type HandlerDeps = Readonly<{
    * has no state directory. A session always supplies it.
    */
   persistTheme?: (variant: "dark" | "light") => void;
+  /**
+   * `--no-bg` for this invocation (C22 I66).
+   *
+   * Not optional, unlike `persistTheme`: that one reaches a disk a harness has
+   * no reason to have, and this one is session state every caller holds.
+   */
+  setSuppressBackground: (suppressed: boolean) => void;
   history: () => readonly HistoryEntry[];
   /** Every binding C16 will dispatch, for `/help` (C23 I26). */
   bindings: () => readonly Readonly<{ keys: string; does: string }>[];
@@ -154,9 +161,23 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       ]);
     },
 
-    /** A02 Seam 4's theme row: `theme.setVariant` → the caller invalidates. */
-    theme: (argv) => {
-      const wanted = argv[0];
+    /**
+     * A02 Seam 4's theme row: `theme.setVariant` → the caller invalidates.
+     *
+     * **The variant comes from `ctx.args`, not from `argv[0]`** (C22 I66). C05
+     * parsed it and enum-checked it against the declared values, and re-deriving
+     * it here was a second reader of one fact — the duplication the widening
+     * closes rather than a field it adds. On the failure arm `args` is empty and
+     * the usage notice below is what answers, which is the arm it exists for:
+     * a local verb is not gated on validation.
+     */
+    theme: (argv, ctx) => {
+      const wanted = ctx.args["variant"];
+      // **Per invocation, and every `/theme` sets it** (C22 I66). Absent means
+      // `false`, so `/theme light --no-bg` then `/theme dark` paints again — a
+      // sticky flag is invisible state, and repeating it is one keystroke with
+      // `↑` recalling the whole line.
+      deps.setSuppressBackground(ctx.args["no-bg"] === true);
       if (wanted !== "dark" && wanted !== "light") {
         return doc("/theme", [
           block({
@@ -164,7 +185,13 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
             id: blockId("theme-usage"),
             tone: "warn",
             glyph: "warn",
-            text: `usage: /theme dark|light — got \`${wanted ?? ""}\``,
+            // **The message names the token, and `argv` is where it is.** The
+            // decision is `args`' — one reader — but this arm is reached with
+            // nothing parsed, so quoting the parsed value would say *got ``* to
+            // someone who typed `/theme purple`. The failure arm is exactly
+            // where `args` is empty, which is why the two differ here and
+            // nowhere else.
+            text: `usage: /theme dark|light — got \`${argv[0] ?? ""}\``,
           }),
         ]);
       }
@@ -179,8 +206,31 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       // means the choice does not survive the session, which is what the state
       // directory being unwritable already means for history (C20).
       deps.persistTheme?.(wanted);
+
+      // **Warn and comply, and only where the flag suppresses an actual paint**
+      // (C22 I66, C10 §4c row 5). `/theme light --no-bg` on a dark terminal
+      // re-enters the state the background ruling exists to fix, deliberately,
+      // at the user's request — transparency is a real reason and a framework
+      // refusing a preference because it knows better is worse than a legible
+      // warning. Against a theme that inherits anyway the flag changes nothing,
+      // and a notice for it would be the framework talking about itself.
+      const suppressed =
+        ctx.args["no-bg"] === true && deps.theme.current.tokens.background === "surface";
+
       return doc("/theme", [
         block({ kind: "notice", id: blockId("theme"), tone: "muted", text: `theme: ${wanted}` }),
+        ...(suppressed
+          ? [
+              block({
+                kind: "notice" as const,
+                id: blockId("theme-nobg"),
+                tone: "warn" as const,
+                glyph: "warn" as const,
+                text:
+                  `${wanted} assumes a ${wanted} terminal; without its background it may be unreadable`,
+              }),
+            ]
+          : []),
       ]);
     },
 

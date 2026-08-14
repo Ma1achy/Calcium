@@ -8,8 +8,12 @@ import {
   ratio,
   resolve,
   resolveBackground,
+  resolveBase,
   resolveTone,
+  quantisedHex,
+  validatePaintedFloors,
 } from "../../src/presentation/theme/index.js";
+import { floorFor } from "../../src/presentation/theme/index.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
 
 describe("C10 resolution", () => {
@@ -242,6 +246,116 @@ describe("C10 resolution", () => {
         expect(resolveBackground(`surface.${surface}`, current, caps(1)), surface).toEqual({});
       }
     }
+  });
+
+  it("T1.17 (I25): the base is `surface.bg` and follows it", () => {
+    // **The row that fails the day the declaration carries a colour of its own**,
+    // which is the only way the painted value and the measured one can disagree
+    // — and disagreeing is roadmap 39's own defect from the other side.
+    const light = store("light").current;
+    expect(light.tokens.background, "the light theme paints, because it cannot work otherwise").toBe(
+      "surface",
+    );
+    expect(resolveBase(light, caps(24))).toEqual(
+      resolveBackground("surface.bg", light, caps(24)),
+    );
+
+    // Follows `bg`, rather than being a second value beside it.
+    // **A different `name`, because identity is the memo key** (I11). A
+    // hand-built theme that changes a token and keeps the name gets the style
+    // resolved for the old one — which is the cache doing exactly what it is
+    // for, and the reason the store bumps a serial on every override.
+    const moved = {
+      ...light,
+      name: `${light.name}#probe`,
+      tokens: { ...light.tokens, surfaces: { ...light.tokens.surfaces, bg: "#123456" } },
+    };
+    expect(resolveBase(moved, caps(24))).toEqual({ background: { kind: "rgb", hex: "#123456" } });
+
+    // And a theme that inherits paints nothing at any depth.
+    const dark = store("dark").current;
+    expect(dark.tokens.background).toBe("terminal");
+    for (const depth of DEPTHS) expect(resolveBase(dark, caps(depth)), `depth ${depth}`).toEqual({});
+  });
+
+  it("T1.18 (I26): the base over all four rungs, in one row", () => {
+    // One row because the claim is a **ladder** and not four claims: provable at
+    // 24, provable against the cube's defined RGB at 8, best-effort at 4 where
+    // the index is the emulator's, and vacuous at 1.
+    const light = store("light").current;
+
+    expect(resolveBase(light, caps(24)), "the token's hex, verbatim").toEqual({
+      background: { kind: "rgb", hex: light.tokens.surfaces.bg },
+    });
+
+    const eight = resolveBase(light, caps(8)).background;
+    expect(eight?.kind).toBe("ansi256");
+    expect(
+      eight?.kind === "ansi256" && eight.index >= 16,
+      "16–255 only: the first sixteen are the emulator's",
+    ).toBe(true);
+
+    expect(resolveBase(light, caps(4)), "the theme's own curated index, never a computed nearest").toEqual({
+      background: { kind: "ansi16", index: light.tokens.fourBit["surface.bg"] },
+    });
+
+    expect(resolveBase(light, caps(1)), "surfaces vanish, and so do foregrounds").toEqual({});
+  });
+
+  it("T1.19 (I26): the 8-bit floor is recomputed against the quantised base", () => {
+    // **Asserted as a recomputation and not as a result.** Against the shipped
+    // tokens both numbers clear, so a row comparing outcomes would agree with
+    // the wrong one — this drives a slot to just clear its floor against the
+    // token and fail against what an 8-bit terminal actually paints.
+    const light = store("light").current;
+    const painted = quantisedHex(light.tokens, "bg");
+    expect(painted, "a painting theme has a quantised background").not.toBeNull();
+    expect(painted).not.toBe(light.tokens.surfaces.bg);
+
+    // A tone placed between the two floors: over 4.5 against the token, under it
+    // against the colour the terminal paints. The fixture is checked to be that
+    // before it is asserted against.
+    // **The background is searched too, and it has to be.** Against `#fafafa`
+    // the nearest cube entry is *lighter*, so contrast only improves and the
+    // recomputation can never fail — a fixture built on the shipped bg would
+    // assert nothing while passing. The failing direction needs a bg whose
+    // quantised value is darker than the token, and one exists.
+    const greys = Array.from({ length: 256 }, (_, i) => {
+      const c = i.toString(16).padStart(2, "0");
+      return `#${c}${c}${c}`;
+    });
+
+    const straddle = greys
+      .map((bg) => ({ bg, painted: quantisedHex({ ...light.tokens, surfaces: { ...light.tokens.surfaces, bg } }, "bg") }))
+      .flatMap(({ bg, painted: p }) =>
+        p === null
+          ? []
+          : greys
+              .filter(
+                (fg) => ratio(fg, bg) >= floorFor("default") && ratio(fg, p) < floorFor("default"),
+              )
+              .map((fg) => ({ bg, fg })),
+      )[0];
+    expect(straddle, "the fixture must straddle the two floors, or this proves nothing").toBeDefined();
+
+    const patched = {
+      ...light.tokens,
+      surfaces: { ...light.tokens.surfaces, bg: straddle!.bg },
+      palettes: {
+        ...light.tokens.palettes,
+        tone: {
+          ...light.tokens.palettes["tone"]!,
+          slots: { ...light.tokens.palettes["tone"]!.slots, default: straddle!.fg },
+        },
+      },
+    };
+
+    const errors = validatePaintedFloors(patched);
+    expect(errors.map((e) => e.path)).toContain("palettes.tone.default");
+
+    // And nothing at all for a theme that inherits: there is no painted value
+    // to check against, so the floor is the declared assumption as before.
+    expect(validatePaintedFloors({ ...patched, background: "terminal" })).toEqual([]);
   });
 
   it("both shipped variants load", () => {

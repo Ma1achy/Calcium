@@ -90,6 +90,7 @@ function deps(
     promptCursor: () => ({ row: 0, col: 2 }),
     promptSelection: () => [],
     promptFocused: () => true,
+    suppressBackground: () => false,
   spinning: () => false,
   // C22 I50 — the ghost is a paint-time read like the spinner beside it.
   ghost: () => null,

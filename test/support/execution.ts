@@ -59,6 +59,8 @@ export type PipelineHarness = Readonly<{
   theme: ThemeStore;
   /** Commit reasons in order, so Seam 4's sequences are assertable. */
   commits: string[];
+  /** Every `--no-bg` decision, in order — `false` included (C22 I66). */
+  suppressed: boolean[];
   /** Every cross-layer call C23 made, in order. */
   calls: string[];
   /** Shell commands actually spawned, for the `cd` rows. */
@@ -94,6 +96,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const theme = script.theme ?? themed.value;
 
   const commits: string[] = [];
+  /** What `/theme` wrote for `--no-bg`, in order (C22 I66). */
+  const suppressed: boolean[] = [];
   const calls: string[] = [];
   /** What reached C20 (C23 I29), for the tests that assert the record. */
   const recorded: { command: string; exitCode: number }[] = [];
@@ -263,6 +267,11 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     openUrl: () => Promise.resolve(),
     bindings: () => [{ keys: "c+c", does: "global: cancel" }],
+    // **Added because a row called it and the cast below could not** (C22 I66).
+    // `/theme`'s handler writes this, so T4.4 failed the moment it existed —
+    // which is the README's *anything added to `PipelineDeps` will be silently
+    // absent here until a row calls it*, arriving as a measurement.
+    setSuppressBackground: (next: boolean) => void suppressed.push(next),
     binary: "widget",
     commandPolicy: slashPolicy,
   } as unknown as PipelineDeps;
@@ -281,6 +290,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     session,
     theme,
     commits,
+    suppressed,
     calls,
     spawned,
     handed,

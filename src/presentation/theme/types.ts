@@ -73,6 +73,20 @@ export type Surfaces = Readonly<{
 export type ThemeTokens = Readonly<{
   name: string;
   variant: "dark" | "light";
+  /**
+   * What sits behind the text (I25, roadmap 39).
+   *
+   * **A choice and never a colour**, and the value names *where the colour comes
+   * from* rather than the act: `"terminal"` inherits, which preserves a
+   * translucent terminal and is correct for a theme designed to sit in one;
+   * `"surface"` paints `surfaces.bg`, the one surface every floor is already
+   * measured against (I19).
+   *
+   * A colour here would be a second source of truth for that surface, so a theme
+   * could paint one value and prove its floor against another — which is the
+   * defect this field exists to close, arriving from the other side.
+   */
+  background: "terminal" | "surface";
   palettes: Readonly<Record<string, PaletteSpec>>;
   surfaces: Surfaces;
   fourBit: FourBitMap;

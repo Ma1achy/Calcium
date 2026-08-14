@@ -14,6 +14,11 @@ export const DARK: ThemeTokens = Object.freeze({
   name: "prism",
   variant: "dark",
 
+  // **Inherits, and that is a decision rather than a default** (I25). A dark
+  // theme in a dark terminal is what `"terminal"` is for, and painting would
+  // destroy a translucent or blurred terminal for no legibility gained.
+  background: "terminal",
+
   surfaces: Object.freeze({
     bg: "#1a1a1a",
     bgElev: "#222222",

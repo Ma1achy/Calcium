@@ -17,6 +17,12 @@ export const LIGHT: ThemeTokens = Object.freeze({
   name: "prism",
   variant: "light",
 
+  // **The light theme paints, because it cannot work otherwise** (I25). It sets
+  // dark foregrounds and, inheriting, emits nothing behind them — so on a dark
+  // terminal it is dark-on-dark, and the name is the lie. This is the one arm of
+  // I25 the shipped set exercises.
+  background: "surface",
+
   surfaces: Object.freeze({
     bg: "#fafafa",
     bgElev: "#f0f0f0",

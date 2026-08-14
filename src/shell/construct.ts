@@ -223,6 +223,15 @@ export type Graph = Readonly<{
   promptUnderMenu: () => boolean;
   /** Past the blink threshold since the last key (C22 I64). */
   cursorIdle: () => boolean;
+  /**
+   * Has `--no-bg` turned the theme's background off (C22 I66, C10 I25)?
+   *
+   * **Read here and written through the pipeline's deps**, which is why only the
+   * reader is on the graph: `/theme`'s handler is the one writer, it is reached
+   * through `PipelineDeps`, and a setter here as well would be a second way to
+   * write one variable with no caller.
+   */
+  suppressBackground: () => boolean;
   capabilities: TerminalCapabilities;
   /**
    * C22 I6a — every component that accumulates a diagnostic, drained at §8
@@ -822,6 +831,21 @@ export async function constructGraph(
     redraw: () => void scheduler.commit("input"),
   });
 
+  /**
+   * `--no-bg`, for as long as the invocation that set it is the last `/theme`
+   * (C22 I66).
+   *
+   * **Declared above the pipeline, not beside `lastInputAt`** — the handler's
+   * writer closes over it at step 10, and a `let` executed later would be a
+   * temporal dead zone the first time `/theme` ran. At graph scope for
+   * `lastInputAt`'s reason: the frame reads it and a local
+   * handler writes it. It is **not** a theme override — an override merges into
+   * the tokens, bumps the serial and changes the theme's identity, which is
+   * sticky by construction and would put a paint decision into every cache
+   * keyed on that identity (C10 I25).
+   */
+  let suppressBackground = false;
+
   const pipeline = at("pipeline", () => {
     const p = config.pipeline({
       // A function, not a snapshot: the store freezes a fresh object per write,
@@ -872,6 +896,9 @@ export async function constructGraph(
         void config.fs.writeFile(themePath(config.stateDir), `${variant}\n`).catch(() => {
           // Best effort. A03 SS33 bans `console.*` and the debug sink is C01's.
         });
+      },
+      setSuppressBackground: (next) => {
+        suppressBackground = next;
       },
       history: stores.history,
       runner,
@@ -1278,6 +1305,7 @@ export async function constructGraph(
      * taking keys.
      */
     promptUnderMenu,
+    suppressBackground: () => suppressBackground,
     /**
      * Whether the cursor is past its idle threshold (C22 I64).
      *

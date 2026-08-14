@@ -553,6 +553,10 @@ class Session implements TuiInstance {
       // the display exactly as a stored focus does (C16 §3, C15 I19).
       promptFocused: () =>
         graph.router.target === "prompt" || graph.promptUnderMenu(),
+      // **Read at paint, not captured** (C22 I66). `/theme light --no-bg`
+      // changes it between frames, and the frame that shows the change is the
+      // one the notice commits.
+      suppressBackground: () => graph.suppressBackground(),
       // **Fresh on every paint, and that is the invariant rather than a style**
       // (C22 I38). `spinning` changes with the clock, not with the frame, so a
       // value captured when the request started can never become true — and

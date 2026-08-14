@@ -32,7 +32,7 @@
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { background, paint as paintSpans, tone } from "../presentation/blocks/paint.js";
-import { SGR_RESET } from "../terminal/escapes.js";
+import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
 import { promptFor, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
 import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
@@ -40,6 +40,7 @@ import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
+import { resolveBase } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -102,6 +103,15 @@ export type PaintDeps = Readonly<{
    * claimed the compositing since C22 was written.
    */
   ghost: () => string | null;
+  /**
+   * Whether the user has turned the theme's background off for this invocation
+   * (C22 I66, C10 I25).
+   *
+   * A function, read fresh at paint for `spinning`'s reason rather than for a
+   * new one: `/theme light --no-bg` changes it between frames, and a value
+   * captured at construction is the setting the session opened with.
+   */
+  suppressBackground: () => boolean;
 }>;
 
 /**
@@ -456,6 +466,64 @@ function ghostStyle(deps: PaintDeps): Style {
  * that wrote 41 would scroll. Neither is recoverable by the caller, so the
  * frame is refused and C22 draws the fallback.
  */
+/**
+ * The theme's background, re-established after every reset in a finished row
+ * (C22 I65, C10 I25).
+ *
+ * **One place repairs every reset a row contains**, which the walk did not expect
+ * and the implementation settled: `fitStyled` closes a cut line, `composite`
+ * writes two per composited row, `paint()` closes each styled run the *shell*
+ * draws — and by the time a row reaches here all of them are **inside this
+ * string**. `render-frame`'s per-row prefix is the one outside, and it is
+ * answered by the row's own leading base landing immediately after it.
+ *
+ * **And the set is not `SGR_RESET`, which is the correction the code made to the
+ * walk.** L1's rendered rows do not contain a full reset at all: Ink closes a
+ * foreground run with `39` and a background run with `49`, and the two are not
+ * equivalent here. `39` restores the default *foreground* and a base survives
+ * it untouched. **`49` restores the default *background* — the terminal's, not
+ * ours** — and a patch row ends with exactly that, so the padding after it would
+ * show through. The walk counted the sites that write `\x1b[0m` and the property
+ * that matters is *returns a channel to the terminal's default*, which `49`
+ * satisfies and `39` does not.
+ *
+ * **Blind spot, stated rather than left to be discovered**: a compound sequence
+ * carrying `0` or `49` among other parameters — `\x1b[0;1m` — is not repaired.
+ * Nothing in the tree emits one; `sgr()` never writes `0`, and Ink writes both
+ * closers alone. It is a measurement rather than a guarantee.
+ *
+ * **The base is a default and not a span**, which is the whole distinction: a
+ * wash sets `background` on the cells between two offsets, and every reset in
+ * the tree returns to the *terminal's* default rather than to ours. That is why
+ * a selection's wash still wins for its own cells — it sets the channel
+ * explicitly — and why the base resumes immediately after it closes.
+ *
+ * **And every row closes itself**, which is what the walk expected to need a
+ * lifecycle change for. A row that ended with the base live would leave an
+ * attribute on the wire that outlives the frame — the alternate screen restores
+ * cell contents and not SGR state — so `suspend()` and `release()` would each
+ * owe a reset, on the cursor shape's third-category path (C01 I20). Closing the
+ * row costs the same four bytes and owes nothing: no live attribute ever escapes
+ * a single row, so a handoff, a resize, an exit and a fault are all covered by
+ * the same rule and none of them needs to know a background exists.
+ *
+ * Nothing is written where a theme inherits: `sgr(NO_STYLE)` is empty, so the
+ * arm every session runs today costs one comparison per frame and produces byte
+ * for byte what it produced before.
+ */
+function based(lines: readonly string[], base: string): readonly string[] {
+  if (base === "") return lines;
+  return lines.map(
+    (line) => `${base}${line.replace(toTerminalDefault(), (seq) => `${seq}${base}`)}${SGR_RESET}`,
+  );
+}
+
+/** The screen's base, or the empty string where nothing is painted. */
+function baseSequence(deps: PaintDeps): string {
+  if (deps.suppressBackground()) return "";
+  return sgr(resolveBase(deps.theme, deps.capabilities));
+}
+
 export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   if (!heightsSum(frame)) {
     throw new FrameError(
@@ -522,12 +590,14 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
     },
   );
 
-  if (lines.length !== frame.size.rows) {
+  const painted = based(lines, baseSequence(deps));
+
+  if (painted.length !== frame.size.rows) {
     throw new FrameError(
-      `frame is ${String(lines.length)} rows for a ${String(frame.size.rows)}-row terminal`,
+      `frame is ${String(painted.length)} rows for a ${String(frame.size.rows)}-row terminal`,
     );
   }
-  return Object.freeze(lines);
+  return Object.freeze(painted);
 }
 
 /**

@@ -2754,7 +2754,7 @@ RULED 35 progress feedback        the spinner is static by a ruling whose premis
 PART  38 horizontal composition   b.row — the banner already paid for its absence by hand
                                    (width fractions ship with it; height fill is separate and
                                     waits on phase 1.1's producer-context contract)
-RULED 39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
+BUILT 39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
                                    overrides with `/theme <theme> --no-bg` (a FlagDef, free in
                                    --help, per-invocation not sticky; warn and comply). Painting
                                    makes
@@ -2800,6 +2800,44 @@ RULED 39 theme background ★      RULED: theme declares `background: "terminal"
                                    against a failure never observed, stops being inert on
                                    the day this lands and is what makes reset-then-base
                                    expressible. C10 §4c I25 I26, C22 §6g I65 I66
+                                   BUILT 2026-08-14, AND THE CODE CORRECTED THE
+                                   WALK THREE TIMES. (1) THE REPAIR SET IS NOT
+                                   `SGR_RESET`: L1's rows carry no full reset at
+                                   all — Ink closes a foreground run with `39`,
+                                   which a base survives, and a BACKGROUND run
+                                   with `49`, which returns it to the TERMINAL's
+                                   default and is what a patch row ends with. The
+                                   walk counted the sites that write `0m`; the
+                                   property is *returns a channel to the
+                                   terminal's default*. Found by checking a
+                                   fixture against the thing under test — a
+                                   notice row was the first draft and carries no
+                                   reset. (2) FOUR SITES, ONE REPAIR: by the time
+                                   a row reaches the painter every reset it holds
+                                   is inside that string, and render-frame's
+                                   prefix is answered by the row's own leading
+                                   base. (3) NO LIFECYCLE CHANGE: the walk ruled
+                                   a reset at suspend() and release() on the
+                                   cursor's third-category path — right about the
+                                   hazard, wrong about the remedy. A row that
+                                   CLOSES ITSELF makes the escaping attribute
+                                   unreachable for the same four bytes and covers
+                                   exit, fault, signal and handoff at once. A
+                                   shape is terminal state; a base is bytes in a
+                                   row, and that is where the two part.
+                                   13 mutations, 12 caught, 1 listed survivor
+                                   with its reason — reading the variant from
+                                   argv is a DUPLICATION REMOVED rather than a
+                                   defect fixed, since `shellOnly` and the args
+                                   read are each sufficient and only the pair is
+                                   lethal. The pass also found T1.23's assertion
+                                   VACUOUS in its first form: it skipped the last
+                                   part of the split, which is everything when a
+                                   row holds one occurrence, so both mutations it
+                                   exists for survived sixteen passing
+                                   assertions. And SS14 caught the repair pattern
+                                   living in the painter rather than in
+                                   escapes.ts, on its first run
 BUILT 40 as-you-type completion    the trigger, not the engine — and it makes the manifest
                                    claim visible. Largely subsumes the next line
 BUILT 41 typo detection            trivial, delightful — smaller once 40 lands. BOTH BUILT, and
@@ -2909,7 +2947,7 @@ what landed**.
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
 | 38 | PART | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` | **the width fractions this entry says ship with it do not.** `childWidths` gives every child the same width — `src/data/viewmodel/measure.ts:122` |
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
-| 39 | RULED | the ruling is in the entry; `Style.background` exists at `src/presentation/theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
+| 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
 | 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |
 | 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:185` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
 | 41 | BUILT | **both populations, one suggester.** `suggestName` — `src/data/manifest/validate.ts:147` — is the single distance-2 cutoff (C05 I18), read for unknown flags at `src/data/manifest/validate.ts:284` and unknown verbs at `src/interaction/parser/parse.ts:183`, sharing the tie-break so a second implementation cannot diverge. `test/unit/parser.test.ts` asserts distance 3 outside and 2 inside | — |

@@ -62,6 +62,9 @@ export type InFlight = "app" | "local" | "shell" | null;
  */
 const headOf = (command: string): string => command.split(/\s+/u)[0] ?? "shell";
 
+/** What a handler is told when validation failed and there is nothing parsed. */
+const EMPTY_ARGS: Readonly<Record<string, unknown>> = Object.freeze({});
+
 /**
  * The state machine of §6, as one object.
  *
@@ -141,6 +144,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       transcript: deps.transcript,
       theme: deps.theme,
       ...(deps.persistTheme === undefined ? {} : { persistTheme: deps.persistTheme }),
+      setSuppressBackground: deps.setSuppressBackground,
       history: () => deps.history.entries,
       bindings: () => deps.bindings(),
       stop: deps.stop,
@@ -582,7 +586,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   };
 
   /** C23 §2's `local` route. §8b B3's missing-handler cell is closed by `seal()`. */
-  const runLocal = async (line: string, verb: string, argv: readonly string[]): Promise<void> => {
+  const runLocal = async (
+    line: string,
+    verb: string,
+    argv: readonly string[],
+    // **What C05 already parsed, carried rather than re-derived** (C22 I66).
+    // Empty when validation failed, which a local verb is not gated on.
+    args: Readonly<Record<string, unknown>>,
+  ): Promise<void> => {
     guard.take("local", verb);
     const startedAt = deps.clock();
     try {
@@ -614,6 +625,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // one is open would replace the layer under the first handler's promise
         // — the host owns that, not this call site.
         ask: deps.confirm.ask,
+        args,
       });
       // **C23 states the command, not the handler** (I15, C22 I33) — the same
       // argument as C07 I16 makes for `doc.command` on the adapter side, and the
@@ -1355,7 +1367,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // one that forgets reads its own verb as an argument. A multi-token
           // verb (`debug dump`) makes the off-by-one an off-by-two, which is
           // the version that survives review.
-          runLocal(line, result.tool.name, result.argv.slice(result.tool.name.split(" ").length)),
+          runLocal(
+            line,
+            result.tool.name,
+            result.argv.slice(result.tool.name.split(" ").length),
+            result.validation.ok ? result.validation.args : EMPTY_ARGS,
+          ),
         );
         return;
 

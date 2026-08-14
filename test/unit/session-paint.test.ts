@@ -14,7 +14,11 @@ import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
 import { exact, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import { patchDefinition } from "../../src/presentation/patch/definition.js";
+import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
+import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
 const SESSION: SessionSnapshot = Object.freeze({
@@ -43,6 +47,7 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     overlays: () => [],
     promptCursor: () => ({ row: 0, col: 2 }),
     promptSelection: () => [],
+    suppressBackground: () => false,
     promptFocused: () => true,
     ...over,
   };
@@ -505,5 +510,125 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
     const row = rows[promptAt(f, 0)] ?? "";
     expect(row, "SGR 7 — reverse video").toContain("[7m");
     expect(washedCells(row)).toBe("abc");
+  });
+});
+
+describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", () => {
+  // **The painting arm has never run**, which is the risk this block exists for:
+  // `dark` inherits and the shipped default paints nothing, so every frame ever
+  // drawn in this suite has been drawn on the arm that emits no base. `light`
+  // declares `surface` (C10 I25) and is the only fixture that exercises it.
+  const BASE = sgr(resolveBase(LIGHT_THEME, FULL_CAPS));
+  /** Ink's close for a background run — the terminal's default, never ours. */
+  const DEFAULT_BG = "\x1b[49m";
+
+  /**
+   * A frame whose transcript row **closes a background run**, which is the
+   * sequence a base has to survive.
+   *
+   * **The fixture is checked against the thing under test before it is asserted
+   * against**, and this one moved the ruling when it was: a notice row was the
+   * first draft, and it carries no reset at all — L1 closes a foreground run
+   * with `39`, which a base survives untouched. A patch row ends with `49`,
+   * *default background*, and that is the terminal's rather than ours.
+   */
+  function styledFrame(): readonly string[] {
+    const kit = measurable({ theme: LIGHT_THEME, definitions: [patchDefinition] });
+    const rows = kit.renderToLines(
+      block({
+        kind: "patch",
+        id: "p1",
+        path: "a.ts",
+        language: "text",
+        hunks: [
+          { header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "added" }, { kind: "remove", text: "gone" }] },
+        ],
+      }),
+      40,
+    );
+    expect(
+      rows.some((r) => r.includes(DEFAULT_BG)),
+      "the fixture must carry a return-to-terminal-default to repair",
+    ).toBe(true);
+
+    // Eight rows: one header, one footer, one prompt, and a region that holds
+    // the patch's five without the viewport check refusing it.
+    return paint(frameAt(40, 8), deps({ theme: LIGHT_THEME, transcriptRows: () => rows }));
+  }
+
+  it("T1.23 (C22 I65): every reset in a painted row returns to the base, not to the terminal's", () => {
+    // **The repair is one pass over a finished row**, so the assertion is on the
+    // rows rather than on the sites: by the time a row is here, `fitStyled`'s
+    // cut-close, `composite`'s two and the shell's own `paint()` are all inside
+    // this string, and `render-frame`'s prefix is answered by the row's leading
+    // base. A frame read, because every one of these is invisible to a
+    // structural assertion — the cells that lose the base are the ones with the
+    // least on them.
+    expect(BASE, "the fixture must actually paint, or this whole block is vacuous").not.toBe("");
+
+    for (const [i, row] of styledFrame().entries()) {
+      expect(row.startsWith(BASE), `row ${String(i)} opens with the base`).toBe(true);
+
+      // **Every return to the terminal's default is followed by the base**, and
+      // the set is two sequences rather than one: `\x1b[0m` and `\x1b[49m`. A
+      // foreground close (`39`) is not in it, because a base survives one.
+      //
+      // **The row's own closing reset is removed first, and the mutation pass
+      // is why.** The first version split the whole row and skipped the last
+      // part, which asserts nothing at all when a row contains exactly one
+      // occurrence — and a patch row's `49` is at its end, so the two mutations
+      // this exists for both survived against sixteen passing assertions.
+      expect(row.endsWith(SGR_RESET), `row ${String(i)} closes itself`).toBe(true);
+      const body = row.slice(0, -SGR_RESET.length);
+
+      for (const seq of [SGR_RESET, DEFAULT_BG]) {
+        for (const [j, part] of body.split(seq).slice(1).entries()) {
+          expect(
+            part.startsWith(BASE),
+            `row ${String(i)} resumes after ${JSON.stringify(seq)} ${String(j)}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("T1.23a (C22 I65): a theme that inherits writes not one byte more", () => {
+    // The arm every existing golden frame is drawn against, asserted rather
+    // than assumed — a base applied unconditionally would change every frame in
+    // the suite and the diff would be too large to read.
+    const inheriting = paint(frameAt(40, 6), deps({ theme: DARK_THEME }));
+    expect(sgr(resolveBase(DARK_THEME, FULL_CAPS)), "dark inherits").toBe("");
+    for (const row of inheriting) expect(row.includes(BASE)).toBe(false);
+  });
+
+  it("T1.23b (C22 I65): no painted row ends with a live attribute", () => {
+    // **This is what makes every lifecycle path need nothing.** The alternate
+    // screen restores cell contents and not SGR state, so a row ending with the
+    // base live would leave the user's shell painted after exit — and the walk
+    // ruled a reset at `suspend()` and `release()` for exactly that. Closing the
+    // row makes the state unreachable instead, and covers exit, fault, signal
+    // and handoff at once rather than the paths someone remembered.
+    for (const [i, row] of styledFrame().entries()) {
+      expect(row.endsWith(SGR_RESET), `row ${String(i)}`).toBe(true);
+    }
+  });
+
+  it("T1.23c (C22 I65, C10 I25): `--no-bg` paints nothing, and the theme still says it would", () => {
+    const suppressed = paint(
+      frameAt(40, 6),
+      deps({ theme: LIGHT_THEME, suppressBackground: () => true }),
+    );
+    for (const row of suppressed) expect(row.includes(BASE)).toBe(false);
+    expect(LIGHT_THEME.tokens.background, "the declaration is untouched").toBe("surface");
+  });
+
+  it("T1.23d (C22 I65, C10 I26): at 1-bit a painting theme paints nothing", () => {
+    // The rung where the question does not arise: no background is painted and
+    // no foreground is coloured, so the frame is the terminal's own pair.
+    const mono = { ...FULL_CAPS, colourDepth: 1 as const };
+    expect(sgr(resolveBase(LIGHT_THEME, mono)), "surfaces vanish at 1-bit").toBe("");
+
+    const rows = paint(frameAt(40, 6), deps({ theme: LIGHT_THEME, capabilities: mono }));
+    for (const row of rows) expect(row.includes("\x1b[")).toBe(false);
   });
 });

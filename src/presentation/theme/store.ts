@@ -11,7 +11,7 @@
 
 import type { Result } from "../../data/viewmodel/index.js";
 import { isHex, validateTokens } from "./contrast.js";
-import { clearResolutionCache } from "./resolve.js";
+import { clearResolutionCache, validatePaintedFloors } from "./resolve.js";
 import type { ResolvedTheme, ThemeError, ThemeSet, ThemeTokens } from "./types.js";
 
 export type Overrides = Readonly<{
@@ -45,9 +45,14 @@ export function loadTheme(
   set: ThemeSet,
   variant: "dark" | "light" = "dark",
 ): Result<ThemeStore, readonly ThemeError[]> {
+  // **Both validators, both variants** (I26). `validatePaintedFloors` is a no-op
+  // for a theme that inherits, so it costs nothing on the arm every session runs
+  // and is the whole of the check on the arm that paints.
   const errors = [
     ...validateTokens(set.dark).map((e) => ({ ...e, path: `dark.${e.path}` })),
+    ...validatePaintedFloors(set.dark).map((e) => ({ ...e, path: `dark.${e.path}` })),
     ...validateTokens(set.light).map((e) => ({ ...e, path: `light.${e.path}` })),
+    ...validatePaintedFloors(set.light).map((e) => ({ ...e, path: `light.${e.path}` })),
   ];
 
   if (errors.length > 0) return Object.freeze({ ok: false as const, error: Object.freeze(errors) });
@@ -84,6 +89,7 @@ export function loadTheme(
       // half of it would leave a theme nobody authored.
       const failures = [
         ...validateTokens(patched).map((e) => ({ ...e, path: `${variant}.${e.path}` })),
+        ...validatePaintedFloors(patched).map((e) => ({ ...e, path: `${variant}.${e.path}` })),
         ...malformed(overrides),
       ];
 

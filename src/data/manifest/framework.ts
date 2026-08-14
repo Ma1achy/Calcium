@@ -57,7 +57,21 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
         summary: "which variant to use",
       }),
     ],
-    flags: [],
+    // **`shellOnly`, and that is what keeps the handler's positional read
+    // correct** (C22 I66, roadmap 39). `argv` for a local verb is
+    // `[verb, ...validation.transmitted]`, so a `shellOnly` flag is stripped
+    // before a handler sees it — declared any other way, `/theme --no-bg light`
+    // is a valid invocation that answers with a usage error. It appears in
+    // `/theme --help` with nothing else written, because `usageBlocks` walks
+    // `tool.flags` flat.
+    flags: [
+      Object.freeze({
+        name: "no-bg",
+        type: "bool" as const,
+        shellOnly: true,
+        summary: "do not paint this theme's background; keep the terminal's",
+      }),
+    ],
   }),
   Object.freeze({
     name: "history",

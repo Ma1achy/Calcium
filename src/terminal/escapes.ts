@@ -180,6 +180,28 @@ export const sgrPattern = (): RegExp => /\x1b\[[0-9;]*m/g;
 export const SGR_RESET = "\x1b[0m";
 
 /**
+ * The sequences that return a colour channel to the **terminal's** default,
+ * which is what a painted background has to survive (C22 I65, C10 I25).
+ *
+ * **Two, and the third is deliberately absent.** `\x1b[0m` resets everything and
+ * `\x1b[49m` restores the default background — Ink writes the second to close a
+ * background run, and a patch row ends with one. `\x1b[39m` restores the default
+ * *foreground* and is not in the set, because a background survives it untouched;
+ * including it would repair a sequence that needs no repair and put a base
+ * declaration into the middle of every styled run in the tree.
+ *
+ * Here rather than in the painter because it is an escape literal, and those live
+ * in one module on the write path (I1, A03 SS14) — the rule caught this on its
+ * first run against the painter's own copy.
+ *
+ * **The blind spot, stated**: a compound sequence carrying `0` or `49` among
+ * other parameters is not matched. Nothing in the tree emits one — `sgr()` never
+ * writes `0`, and Ink writes both closers alone — and that is a measurement
+ * rather than a guarantee.
+ */
+export const toTerminalDefault = (): RegExp => /\x1b\[(?:0|49)m/gu;
+
+/**
  * A style as the sequence that turns it on.
  *
  * **The depth comes from the tag, never from the format** (C10 I24). A hex

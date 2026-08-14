@@ -35,6 +35,7 @@ type PaletteSpec = Readonly<{
 type ThemeTokens = Readonly<{
   name:     string;
   variant:  "dark" | "light";
+  background: "terminal" | "surface";        // §4c — inherit, or paint `surfaces.bg`
   palettes: Readonly<Record<string, PaletteSpec>>;
   surfaces: Readonly<{
     bg: string; bgElev: string; bgDeep: string;
@@ -68,6 +69,7 @@ type Style = Readonly<{
 function resolve(ref: ColourRef, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
 function resolveTone(tone: Tone, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
 function resolveBackground(ref: ColourRef, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
+function resolveBase(theme: ResolvedTheme, caps: TerminalCapabilities): Style;   // §4c
 ```
 
 **`ColourValue` is tagged rather than a bare string**, and the tag is the point. C10 cannot write an escape (that is `terminal/escapes.ts` alone), so it hands out a description of a colour and something downstream turns it into SGR. A bare `"#7faecf"` or `"12"` makes that consumer re-derive the depth by inspecting the format, and the consumer that guesses wrong emits a truecolour sequence to a 16-colour terminal — precisely what T5.2 exists to catch. Naming the depth in the value means the writer switches on a tag it cannot misread.
@@ -327,6 +329,20 @@ floor passes, and the screen is painted a colour no floor was measured against.
   whose `bg` is `#000000` on a terminal the user configured white is legible and
   jarring, and nothing here has an opinion about that. Named so it is not
   mistaken for a gap.
+- **The foreground's own quantisation is a separate question, and the code is
+  where it surfaced.** At 8-bit a tone is a cube entry too, so a complete 8-bit
+  floor is quantised-against-quantised — and `validatePaintedFloors` measures the
+  authored foreground against the painted background. That is this entry's claim
+  exactly: painting is what makes the *background* knowable, and the foreground's
+  rung predates it and is unchanged by it. Widening the check here would bind
+  every theme to a constraint nothing in this entry measured, which is §4a's
+  argument in the mirror. Named so the narrowness reads as a decision.
+- **The failing direction only exists for some backgrounds, and the fixture had
+  to be searched for.** Against `#fafafa` the nearest cube entry is *lighter*, so
+  quantisation only improves contrast and the recomputation cannot fail on the
+  shipped light theme. T1.19 searches for a background whose quantised value is
+  darker than its token, because a fixture built on the shipped one would have
+  asserted nothing while passing.
 - **`COLORFGBG` is not read, and the entry's mismatch warning is not built.** The
   entry offers it as something the declaration *enables*; it is a second feature
   with its own reader, and folding it in would make this entry's scope the
