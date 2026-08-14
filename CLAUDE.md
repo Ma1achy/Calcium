@@ -288,6 +288,24 @@ Each of these produces code that compiles, passes review, and is wrong.
   see it. **Read the abstract against its own section before reading the section against
   the code.**
 
+- **A deferral names a condition and nothing watches it.** *"Until C17's `cursorCell` is
+  threaded through"* is a good comment — it names the simplification, the blocker and the
+  cost, which is everything a reader needs except the day it stopped being true.
+  `cursorCell` had existed for some time, was on the editor's public interface, and was
+  **read forty lines below the deferral in the same file**; two shipped defects lived in the
+  simplification it was still excusing.
+
+  **The instances are of three kinds and no instrument reaches more than one** — a code
+  comment (`paint.ts`), a roadmap row (25's *do ranking first*, whose ranking landed), and a
+  chain of citations (6.2's value set, deferred three times and answered by finding 21
+  already built). A rule is not obviously buildable: the condition is prose, and matching
+  *"until X is threaded through"* against *X exists* is the citation-resolves-against-the-
+  wrong-thing class the audit argues against automating.
+
+  So it is a habit rather than a gate: **a deferral states its blocker as a symbol, and
+  picking up the entry begins by grepping it.** Grepping `src/` for forward-looking
+  deferrals returns one line today, which is the number that makes the habit cheap.
+
 - **A correct sentence justifying the wrong decision survives being read carefully.**
   MG24 was scoped to `export interface` because *"a type alias is structural and can be
   satisfied without being named"* — which is **true**, about satisfying a type, and
