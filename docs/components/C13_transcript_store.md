@@ -194,6 +194,60 @@ The payload arrives as `append`'s `opts.payload` and is discarded unread when re
 
 ---
 
+## 5b. Persistence — the walk, and the two rulings it owes
+
+Roadmap 44 is *session resume*, and its row says the transcript is already a store
+with a cap and eviction, so **persisting it is C20's shape one level up**. The
+policy half is right and is worth restating because it is what generalises: one
+chain, failure rewinds rather than drops, and `drain` writes from the last
+*confirmed* write rather than the last issued one.
+
+**Two things the row does not say, and both were measured before anything was
+built.** F166 already corrected a third — the codec claim — by measuring that a
+document is JSON by construction (C04 I46, §5a).
+
+### 5b.1 The classification table — what holds at rest
+
+| # | the two rules that meet | the cell | disposition |
+|---|---|---|---|
+| 1 | *what reaches disk is redacted* (C20 I6) × *a document holds the far side's output* | C20's redactor is a **tokeniser over a command line** — positional rules on flag names, then entropy. A transcript document holds what the far side *printed*, and `examples/docker/src/inspect.ts:152` puts **every container environment variable** into a `keyValue` block | **RULING OWED.** The redactor does not generalise and cannot: scanning a rendered document would mean understanding every kind's semantics. This is the expensive half of C20's persistence and 44's row is silent about it |
+| 2 | *an entry has `rev`* × *append-only with an index-aligned sidecar* | **a history entry is immutable once appended; a transcript entry is not.** It is patched and settled after it would already have been written, and an index-aligned append-only file assumes a row never changes | **RULING OWED**, and this is the one that moves the design — see 5b.3 |
+| 3 | *an entry may be `live`* × *persistence* | a live entry's document is a snapshot of one poll, and its `fetch` does not survive the process. Restored, it is a panel frozen at a moment with nothing saying so | falls out of 5b.3's recommendation |
+| 4 | *an entry may be `streaming`* × *persistence* | an entry still accepting patches at exit: a half-built document, whose `status` may read `ok` before the verb finished | falls out of 5b.3 |
+| 5 | *the cap is 100,000 **blocks*** (§5) × *C20 compacts to a **row** count* | "keep the last N" is a different arithmetic on each side — C20 counts lines, C13 counts blocks across entries of wildly different size | compaction is by C13's own cap, applied to whole entries |
+
+### 5b.2 The sequence trace — what an event does to a written row
+
+| # | the sequence | what it produces | note |
+|---|---|---|---|
+| 1 | `append` → write → `patch` | the file holds `rev` 0 and memory holds `rev` 1 | the append-only assumption failing on the commonest path |
+| 2 | `append` → write → `settle` | the file holds the pending document, memory holds the final one | §5's *settling is the replacement* — the written row is the one that was never meant to be read |
+| 3 | `append` → write → `evict` | the file holds a row memory has dropped | the cap and the file disagree, and the file is the older of the two |
+| 4 | `append` → exit before the chain confirms | `drain` writes from `confirmed` | C20's policy, carried unchanged — the one row of this trace that needs nothing new |
+| 5 | `clear` → write in flight | `reset` empties both, and the queued write must not land after it | C20's chain already orders this |
+
+### 5b.3 What the trace recommends, stated as a recommendation and not a ruling
+
+**Persist settled entries only.** Rows 1, 2 and 3 of the trace are all the same
+defect — a row written before it stopped changing — and settling is precisely the
+moment it stops. An unsettled entry is by definition live or streaming, so table
+rows 3 and 4 disappear with them rather than needing rules of their own. The file
+becomes append-only in fact and not by assumption, and *drain from the last
+confirmed write* keeps its meaning one level up.
+
+What it costs is stated rather than hidden: **a session killed mid-command loses
+that command's output**, and the entry the user most wants back after a crash is
+sometimes exactly that one. The alternative — a rewritable row — buys it at the
+price of the whole index-aligned shape.
+
+**The redaction ruling is not ours to infer.** The available answers are opt-in
+persistence with the hazard documented, a per-app redactor the framework calls, or
+persisting `command` and `meta` alone — which is C20's file with extra steps and is
+not a transcript. Nothing is built here until that is decided, because the default
+in a security-shaped decision is not something a spec should acquire by omission.
+
+---
+
 ## 6. Patching
 
 **A settled entry accepts nothing further from the far side.** That is the claim the gate was always making, and stating it as *settled entries reject patches* was the accident: it gated the shell on whether the far side was still talking.

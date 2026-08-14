@@ -8213,3 +8213,67 @@ could ever have failed.
 one that fails; if nothing can be made to fail, the sweep is vacuous and that is the finding.*
 Both outcomes happened, in different halves of one property — three fabrications landed on the
 validator, and the equality half turned out to be the vacuous one.
+
+---
+
+## F168 — session resume would write container environment variables to disk, and the redactor cannot see them ★★★★
+
+| | |
+|---|---|
+| **Surface** | roadmap 44, before any of it was built |
+| **Reached for** | C20's persistence policy, which 44's row says generalises one level up |
+| **Verdict** | **the policy generalises and the *redactor* does not** — the half the row is silent about |
+| **Absorbed by** | nothing; C13 §5b records the walk and the ruling is owed |
+
+44's row says the transcript is already a store with a cap and eviction, so persisting it is
+**C20's shape one level up**. F166 corrected the codec claim in that row. This is the other
+thing it does not say, and it is the expensive one.
+
+**C20's persistence has a redactor because the thing it writes is dangerous.** `redact.ts` is a
+tokeniser over a **command line**: positional rules on flag names — `--token`, `--password`,
+`api-key` at a boundary — then entropy over the remaining tokens. C20 I6 is the principle:
+*redaction applies to persisted data only; the in-session entry keeps its value.*
+
+**A transcript document is a strictly larger surface and a differently shaped one.** It holds
+what the far side **printed**, not what the user typed. The reference app has the canonical
+case in it today:
+
+```
+examples/docker/src/inspect.ts:152
+    Env: listOf(envRows(inspected)),
+```
+
+Every environment variable of the inspected container, verbatim, into a `keyValue` block —
+which is where `POSTGRES_PASSWORD` and `AWS_SECRET_ACCESS_KEY` live on a real machine. So 44
+as its row describes it writes those to `TuiConfig.stateDir` in plain text.
+
+**And the redactor cannot be reused, which is why this is a ruling rather than a task.** It
+works on a tokenised command line, splicing C18's spans back into the string they were measured
+in. A rendered document has no tokens: to find a secret in it you would have to understand what
+each of the seventeen kinds means — a `keyValue` value, a `logs` line's message, a `code`
+block's text, a table cell — and be right about all of them. **A redactor that is wrong about
+one kind is worse than none, because it is switched on.**
+
+### The second thing, which moves the design rather than blocking it
+
+**A history entry is immutable once appended; a transcript entry is not.** It is patched and
+settled after the moment it would already have been written, so append-only with an
+index-aligned sidecar — the shape C20 uses and the shape the row promises — assumes something
+about a transcript that is false on the commonest path:
+
+| the sequence | the file | memory |
+|---|---|---|
+| `append` → write → `patch` | `rev` 0 | `rev` 1 |
+| `append` → write → `settle` | the pending document | the final one |
+| `append` → write → `evict` | the row | dropped |
+
+**The recommendation the trace produces is one line: persist settled entries only.** All three
+rows are a row written before it stopped changing, and settling is where it stops. Live and
+streaming entries are unsettled by definition, so their two questions disappear rather than
+needing rules. The cost is stated rather than hidden — a session killed mid-command loses that
+command's output, which is sometimes the entry the reader most wants back.
+
+**Neither of these is visible from the row, and both were free to find.** The redaction one
+came from reading what C20's persistence actually contains rather than what it does; the
+mutation one from putting C13's own state machine beside C20's file format. Twenty minutes,
+before a line of it existed, on an entry whose row had already been corrected once this session.
