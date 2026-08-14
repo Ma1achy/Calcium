@@ -44,6 +44,7 @@ import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { measureSequence } from "../support/viewport.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { block } from "../../src/data/viewmodel/construct.js";
+import { createChoiceSelection, defaultStart } from "../../src/shell/choice-selection.js";
 import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import type { OverlayManager } from "../../src/viewport/overlay/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
@@ -509,6 +510,87 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const placed = w.overlays.layout({ width: 80, height: 24 })[0];
     if (placed === undefined) throw new Error("unreachable");
     expect(placed.top, "below the anchor's own row").toBeGreaterThan(2);
+  });
+
+  it("T4.31 (entry 16 R1, C23 I36): one store, two starts, and the fallback is the safe end", () => {
+    // **The mutation this row exists for is a store that opens at 0.** It
+    // passes every navigation assertion, every single-choice case and every
+    // menu row, and puts a destructive verb's confirm on `yes`. A safety defect
+    // where the difference the entry expected — modular wrap against
+    // stop-at-edge — turned out not to exist at all: the two copies of the
+    // cycling agreed exactly, so the start is the whole of what is shared.
+    expect(defaultStart([{ key: "y" }, { key: "n", default: true as const }])).toBe(1);
+    expect(defaultStart([{ key: "y", default: true as const }, { key: "n" }])).toBe(0);
+    expect(defaultStart([{ key: "y" }, { key: "n" }]), "unmarked falls to the last").toBe(1);
+
+    // The menu's start, in the same store: `null` is a display and does not
+    // move, which was a guard written twice before it was one.
+    const display = createChoiceSelection(3, null);
+    display.next();
+    display.prev();
+    expect(display.at, "a display has no selection to move").toBeNull();
+
+    const chosen = createChoiceSelection(3, 0);
+    chosen.prev();
+    expect(chosen.at, "and a real one wraps, in both directions").toBe(2);
+    chosen.next();
+    expect(chosen.at).toBe(0);
+  });
+
+  it("T4.32 (C23 I36): what opens is what Esc resolves with", () => {
+    // *The marked one, else the last* was written twice — once for where the
+    // selection opens and once for what `Esc` answers — and two records of one
+    // fact disagree eventually. A question that opens on `no` and escapes to
+    // `yes` is the worst possible pair, so they share one function now and this
+    // is the row that says the pair is the claim rather than either half.
+    const w = world();
+    const answer = w.confirm.ask({
+      question: "Remove 6 containers?",
+      choices: [{ key: "y", label: "yes" }, { key: "n", label: "no" }],
+    });
+    const drawn = frameOf(w.overlays);
+    expect(drawn.find((l) => l.includes("[n]")), "opens on the last").toContain("•");
+
+    w.router.dispatch(key("escape"));
+    return expect(answer, "and escapes to it").resolves.toBe("n");
+  });
+
+  it("T4.33 (entry 16): the whole entry, read at 24 rows with a twenty-row payload", () => {
+    // **The frame both defects lived in, and neither assertion saw.** At this
+    // size the payload does not fit: before step 3 the reader was shown the
+    // question and ten rows of detail with no `[y]`, no `[n]` and no bottom
+    // border, and before step 1 the marker was a character L4 spelled. Every
+    // number was self-consistent throughout.
+    //
+    // One row for the whole entry, because each piece is satisfied by the half
+    // that is easy: a marker on the right row says nothing about whether the
+    // choices are drawn, and choices being drawn says nothing about which one
+    // is marked.
+    const w = world({}, { width: 80, height: 24 });
+    void w.confirm.ask({
+      question: "Remove 6 stopped containers?",
+      detail: block({
+        kind: "raw",
+        id: "d",
+        text: Array.from({ length: 20 }, (_, i) => `container-${String(i)}`).join("\n"),
+      }),
+      choices: YES_NO,
+    });
+
+    const placed = w.overlays.layout({ width: 80, height: 24 })[0];
+    if (placed === undefined) throw new Error("unreachable");
+    const r = measurable({ definitions: [tableDefinition] });
+    const all = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width).map(visible));
+
+    expect(all.length, "the box fits the rows it was given").toBeLessThanOrEqual(placed.height);
+    expect(all.some((l) => l.includes("...")), "the payload says it was dropped").toBe(true);
+    expect(all.some((l) => l.includes("container-0")), "and is gone").toBe(false);
+
+    const marked = all.find((l) => l.includes("[n]"));
+    expect(marked, "the safe answer is drawn").toBeDefined();
+    expect(marked, "and it is the one marked").toContain("•");
+    expect(all.find((l) => l.includes("[y]"))).not.toContain("•");
+    expect(all[all.length - 1] ?? "", "and the box closes").toMatch(/[└+]/u);
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {

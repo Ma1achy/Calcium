@@ -26,6 +26,7 @@ import type { InputEvent } from "../interaction/router/types.js";
 import type { Layer, OverlayManager, Placement } from "../viewport/overlay/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
 import { cells } from "../presentation/text.js";
+import { createChoiceSelection, defaultStart } from "./choice-selection.js";
 
 export const CONFIRM_LAYER_ID = "confirm";
 
@@ -95,7 +96,12 @@ export interface ConfirmHost {
  * for a caller that forgets, and it should forget safely.
  */
 function defaultChoice(choices: readonly Choice[]): Choice {
-  return choices.find((c) => c.default === true) ?? choices[choices.length - 1]!;
+  // **Through `defaultStart`, because it is the same rule.** *The marked one,
+  // else the last* was written twice — once for where the selection opens and
+  // once for what `Esc` resolves with — and two records of one fact disagree
+  // eventually. They must agree by construction: a question that opens on `no`
+  // and escapes to `yes` is the worst possible pair.
+  return choices[defaultStart(choices)]!;
 }
 
 /**
@@ -254,14 +260,16 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         return Promise.reject(new Error("ask() needs at least one choice"));
       }
 
-      let selected = opts.choices.findIndex((c) => c.default === true);
-      if (selected < 0) selected = opts.choices.length - 1;
+      // The shared store, with this caller's start (entry 16). The cycling is
+      // the menu's; the start is what differs, and it is supplied.
+      const selection = createChoiceSelection(opts.choices.length, defaultStart(opts.choices));
+      const selected = (): number => selection.at ?? 0;
 
       const layer: Layer = {
         id: CONFIRM_LAYER_ID,
         kind: "overlay",
         ...placementOf(opts, deps),
-        content: render(opts, selected),
+        content: render(opts, selected()),
         dismissable: false,
         // **A question is not an advisory overlay, so the default fraction is
         // the wrong one** (C15 I18). Half the region is right for a peek, which
@@ -280,7 +288,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       // **The second pass, and it drops the payload rather than marking it**
       // (entry 16 R2). See `collapsed`.
       if (truncated(deps)) {
-        deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected, true) });
+        deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected(), true) });
       }
 
       return new Promise<string>((resolve) => {
@@ -293,7 +301,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         };
 
         const redraw = (): boolean => {
-          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected) });
+          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected()) });
           deps.invalidate();
           return true;
         };
@@ -310,14 +318,14 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
             return settle(defaultChoice(opts.choices).key);
           }
           if (name === "return" || name === "enter") {
-            return settle(opts.choices[selected]!.key);
+            return settle(opts.choices[selected()]!.key);
           }
           if (name === "up" || name === "left") {
-            selected = (selected - 1 + opts.choices.length) % opts.choices.length;
+            selection.prev();
             return redraw();
           }
           if (name === "down" || name === "right" || name === "tab") {
-            selected = (selected + 1) % opts.choices.length;
+            selection.next();
             return redraw();
           }
 

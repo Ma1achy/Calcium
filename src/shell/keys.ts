@@ -31,6 +31,7 @@ import {
   SPINNER_MS,
 } from "../interaction/completion/index.js";
 import { SEARCH_ID } from "../interaction/history/index.js";
+import { createChoiceSelection } from "./choice-selection.js";
 import type {
   Candidate,
   CompletionContext,
@@ -240,7 +241,7 @@ export interface KeyEffects {
 export function createKeyEffects(deps: KeyDeps): KeyEffects {
   let candidates: readonly Candidate[] = [];
   /** `null` while the menu is a display of what is available (C19 I20). */
-  let selected: number | null = null;
+  const selection = createChoiceSelection(0, null);
   /**
    * Did a `Tab` open this menu (C19 I22)?
    *
@@ -300,10 +301,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // so a `fits` from the wrong one silently dropped candidates that fitted
     // perfectly well. `remainder` is the only thing that says *something was
     // actually cut*, and where nothing was, there is nothing to window.
-    if (remainder <= 0) return menuBlocks(candidates, selected, 0);
-    const w = menuWindow(candidates.length, selected, fits);
+    if (remainder <= 0) return menuBlocks(candidates, selection.at, 0);
+    const w = menuWindow(candidates.length, selection.at, fits);
     const slice = candidates.slice(w.start, w.start + w.shown);
-    return menuBlocks(slice, selected === null ? null : selected - w.start, remainder);
+    return menuBlocks(slice, selection.at === null ? null : selection.at - w.start, remainder);
   }
 
   function redrawMenu(): void {
@@ -325,7 +326,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    */
   function showMenu(next: readonly Candidate[], sel: number | null, prefix: string): void {
     candidates = next;
-    selected = sel;
+    selection.reset(next.length, sel);
     builtFor = prefix;
     // **A new list is measured afresh, and tier 5 is what proved it.** The
     // mutation pass reported this line dead — every `showMenu` is followed by
@@ -339,12 +340,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // the state, not the code could not reach it — and the two dead clamps
     // beside it were the first disposition. They read identically in a report.
     fits = 0;
-    const layer = menuLayer(candidates, selected, remainder, deps.anchor());
+    const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
     if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
       return;
     }
     remainder = 0;
-    deps.overlays.push(menuLayer(candidates, selected, 0, deps.anchor()));
+    deps.overlays.push(menuLayer(candidates, selection.at, 0, deps.anchor()));
   }
 
   function hasMenu(): boolean {
@@ -353,7 +354,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
   function closeMenu(): void {
     candidates = [];
-    selected = null;
+    selection.reset(0, null);
     requested = false;
     builtFor = "";
     remainder = 0;
@@ -389,7 +390,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   }
 
   function applyCandidate(whole: boolean): void {
-    const candidate = selected === null ? undefined : candidates[selected];
+    const at = selection.at;
+    const candidate = at === null ? undefined : candidates[at];
     if (candidate === undefined) return;
     applyEdit(ctxNow(), candidate, whole);
     closeMenu();
@@ -441,7 +443,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         closeMenu();
         return;
       }
-      showMenu(narrowed, selected === null ? null : 0, prefix);
+      showMenu(narrowed, selection.at === null ? null : 0, prefix);
       countRemainder();
       return;
     }
@@ -559,13 +561,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // resolve first while it is a display (C19 I20), so `↑` is history and
     // `Tab` is `complete`. The `null` arm is the guard, not a fallback.
     menuNext: () => {
-      if (candidates.length === 0 || selected === null) return;
-      selected = (selected + 1) % candidates.length;
+      if (candidates.length === 0) return;
+      selection.next();
       redrawMenu();
     },
     menuPrev: () => {
-      if (candidates.length === 0 || selected === null) return;
-      selected = (selected + candidates.length - 1) % candidates.length;
+      if (candidates.length === 0) return;
+      selection.prev();
       redrawMenu();
     },
     menuAccept: () => void applyCandidate(true),
@@ -939,7 +941,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // when it is not (C15 I14), so neither call needs a second record of
       // what is open — the question C19 I21 already settled for `showMenu`.
       deps.overlays.update(MENU_ID, {
-        placement: menuLayer(candidates, selected, remainder, at).placement,
+        placement: menuLayer(candidates, selection.at, remainder, at).placement,
       });
       deps.overlays.update(SEARCH_ID, { placement: deps.history.searchLayer(at).placement });
     },
@@ -949,7 +951,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       suppressedAt = null;
     },
     get selected() {
-      return selected;
+      return selection.at;
     },
   };
 }

@@ -22,6 +22,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/integration/confirm.test.ts";
 const CONFIRM = "src/shell/confirm.ts";
+const SELECTION = "src/shell/choice-selection.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -35,24 +36,48 @@ const run = () => {
 
 const MUTATIONS = [
   {
-    // **The selection opens on the first choice.** Arrows still move, `⏎` still
-    // resolves, every accelerator still fires — and `/prune` opens on `yes`.
-    name: "the selection opens at 0 rather than at the default",
-    file: CONFIRM,
-    from: "      let selected = opts.choices.findIndex((c) => c.default === true);\n      if (selected < 0) selected = opts.choices.length - 1;",
-    to: "      let selected = 0;",
+    // **The shared store opens at 0.** Arrows still move, `⏎` still resolves,
+    // every accelerator still fires, every menu row agrees — and `/prune` opens
+    // on `yes`. The mutation the walk named first, and it survived the store
+    // landing because the store is where a guess would live.
+    name: "the shared store opens at 0 rather than at the supplied start",
+    file: SELECTION,
+    from: "  let index = start;",
+    to: "  let index = start === null ? null : 0;",
     expect: "T4.12",
   },
   {
     // **Only the fallback, which is the subtler half.** Every caller in this
     // repository marks a default, so this is invisible until one forgets — and
-    // `confirm.ts:83` says the forgetting should be safe. The first mutation
-    // does not cover it: with a marked default both arms agree.
+    // the claim is that forgetting should be safe. The first mutation does not
+    // cover it: with a marked default both arms agree.
     name: "an unmarked question falls back to the first choice",
-    file: CONFIRM,
-    from: "      if (selected < 0) selected = opts.choices.length - 1;",
-    to: "      if (selected < 0) selected = 0;",
+    file: SELECTION,
+    from: "  return marked < 0 ? choices.length - 1 : marked;",
+    to: "  return marked < 0 ? 0 : marked;",
     expect: "T4.15",
+  },
+  {
+    // **The store infers the start instead of being handed one.** The shape the
+    // entry started from — one mechanism, so one rule — and it is wrong in the
+    // direction that matters: the menu's last candidate is not a safe answer,
+    // it is an arbitrary one, so a store that knew the confirm's rule would
+    // open the completion menu on its final entry.
+    name: "a null start becomes the last item, as the confirm's does",
+    file: SELECTION,
+    from: "    if (index === null || count <= 0) return;",
+    to: "    if (count <= 0) return;\n    if (index === null) index = count - 1;",
+    expect: "T4.31",
+  },
+  {
+    // **`Esc` answers with the first rather than the marked one**, decoupling
+    // the two halves that must agree: a question that opens on `no` and escapes
+    // to `yes`.
+    name: "the escape answer stops going through defaultStart",
+    file: CONFIRM,
+    from: "  return choices[defaultStart(choices)]!;",
+    to: "  return choices[0]!;",
+    expect: "T4.32",
   },
   {
     // **The marker shares the key's cell.** A glyph is part of a cell's width
