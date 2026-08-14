@@ -8045,3 +8045,66 @@ argument), or keep them as the structured half of a document an agent reads rath
 person. The last is the one that would explain `details` existing at all. What is not
 available is the current state, where a producer, an adapter and an app all fill fields on a
 promise nothing keeps.
+
+---
+
+## F166 — 44's blocker is a document serialiser, and a document is already JSON ★★★
+
+| | |
+|---|---|
+| **Surface** | roadmap 44's row, and roadmap 34's residue |
+| **Reached for** | entry 34's *structured export*, picked because 44 was measured as blocked on it |
+| **Verdict** | **the claim is false**, and the thing it names exists in two halves that already ship |
+| **Absorbed by** | nothing; 44's row is corrected and 34's residue reworded |
+
+44's row says, of session resume:
+
+> the **codec does not** [generalise]. What it actually needs is a document serialiser, and
+> there is none in `src/`: the only `JSON.stringify` calls are diagnostics, validation
+> messages and the fixture corpus. That is entry **34**'s structured export.
+
+**Measured instead of read.** A `ViewDocument` built through the public builders, stringified,
+parsed and revalidated:
+
+```
+direct:          ok
+round trip:      ok
+byte-identical:  true · 517 bytes
+```
+
+`notice`, `table` and `keyValue`, through `b.*`, `JSON.stringify`, `JSON.parse` and
+`validateDocument`. **The document is JSON by construction** — `src/data/viewmodel/types.ts`
+declares no function, `Map`, `Set` or `Date` member anywhere in the block union; the only
+function types in the file are `MeasureFn` and the measurer's signature, which are not
+document fields.
+
+So the serialiser is `JSON.stringify`, and the half that is actually hard — turning untrusted
+JSON back into a `ViewDocument` — is `validateDocument`, which **exists, is exported from the
+component barrel, and is called by C13's store on every append and every settle**
+(`src/viewport/transcript/store.ts:88`, `:189`).
+
+**What is genuinely missing is one line and one test**, neither of which is entry 34:
+
+| the row's claim | at HEAD |
+|---|---|
+| no document serialiser | `JSON.stringify`, and the document is pure data |
+| — | `validateDocument` is **not in `src/index.ts`**, so 44 cannot reach it from outside |
+| — | the round trip is asserted for **no** kind; there are 24, and the claim above is measured on three |
+
+**Two documents citing each other is not a record.** 34's row lists *structured export* inside a
+six-item UX bundle — animation, change highlighting, finish notifications, error remedies,
+empty states — where it plainly means *let the user export what is on screen*. 44's row reads
+that phrase as *a `ViewDocument` codec*, which is a different mechanism at a different layer,
+and the status table's residue then restated it in API terms — *no `exportAs`/`toJSON`
+anywhere in `src/`* — a phrase whose only source is the grep that checked it. **Three
+statements, one unmeasured belief**, and the third is the one that reads most like a finding
+because it names symbols.
+
+**And the conflation is what let it survive.** Both readings are about "exporting a document",
+nothing in either row forces a choice, and the reading that blocks 44 is the one that
+propagated — so 44 has sat blocked on an entry that was never about it. This is F58's shape
+exactly: the same words, two referents, and the summary picked the wrong one.
+
+**What 44 actually needs, now that the codec is not it**: a persistence *policy* for transcript
+entries — ids, revisions, ordering, the cap and eviction — which its own row already describes
+correctly and calls *C20's shape one level up*. That half is real. It is not blocked on 34.
