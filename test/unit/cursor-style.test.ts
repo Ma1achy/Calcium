@@ -6,12 +6,66 @@
 // two-sevenths of its subject while reading as total.
 import { describe, expect, it } from "vitest";
 
-import { cursorStyleFor } from "../../src/shell/cursor-style.js";
+import {
+  anyBlinking,
+  cursorStyleFor,
+  steadyWhileTyping,
+} from "../../src/shell/cursor-style.js";
 import { FOCUS_ORDER } from "../../src/interaction/router/focus.js";
 import { CURSOR_SHAPE, type CursorStyle } from "../../src/terminal/escapes.js";
 
 const BEAM: CursorStyle = { shape: "beam", blink: false };
 const BLOCK: CursorStyle = { shape: "block", blink: true };
+
+
+describe("C22 §6f — the blink machine subtracts (C22 I64)", () => {
+  it("T1.22e (C22 I64): it only ever removes blink, and a null style is untouched", () => {
+    // **The mutation this row exists for is the edge firing on a target whose
+    // style is `null`** — the boundary the shape half already ruled, and the
+    // state machine gives it a second way to be wrong. Nothing here may invent
+    // a shape in order to have something to make steady: shape and blink are
+    // one wire parameter, so *steady* is unsayable without choosing a shape.
+    expect(steadyWhileTyping(null, false), "nothing declared, typing").toBeNull();
+    expect(steadyWhileTyping(null, true), "nothing declared, idle").toBeNull();
+
+    // Declared blinking: steady while typing, blinking once idle.
+    const blinking: CursorStyle = { shape: "beam", blink: true };
+    expect(steadyWhileTyping(blinking, false), "typing").toEqual({ shape: "beam", blink: false });
+    expect(steadyWhileTyping(blinking, true), "idle").toEqual(blinking);
+
+    // **Declared steady is never made to blink**, in either phase. The
+    // declaration is the app's answer and this is a refinement of it — a
+    // machine that read *idle* as *blinking* would make it a hint instead.
+    const steady: CursorStyle = { shape: "block", blink: false };
+    expect(steadyWhileTyping(steady, false)).toEqual(steady);
+    expect(steadyWhileTyping(steady, true), "still steady when idle").toEqual(steady);
+  });
+
+  it("T1.22f (C22 I64): the wake is armed only where a declared style blinks", () => {
+    // The predicate the arming reads. A config with nothing blinking arms no
+    // wake, so an application declaring no cursor pays no composed frame per
+    // typing pause for a resolution that would emit nothing.
+    expect(anyBlinking(undefined), "no config at all").toBe(false);
+    expect(anyBlinking({}), "an empty one").toBe(false);
+    expect(
+      anyBlinking({ targets: { prompt: { shape: "beam", blink: false } } }),
+      "declared, and steady",
+    ).toBe(false);
+    expect(
+      anyBlinking({ targets: { prompt: null } }),
+      "declared as the terminal's own",
+    ).toBe(false);
+
+    expect(
+      anyBlinking({ targets: { prompt: { shape: "beam", blink: true } } }),
+      "one blinking target is enough",
+    ).toBe(true);
+    expect(
+      anyBlinking({ fallback: { shape: "block", blink: true } }),
+      "and so is a blinking fallback",
+    ).toBe(true);
+  });
+});
 
 describe("C22 §6f — the style resolves per focus target (C22 I63)", () => {
   it("T1.22 (C22 I63, §6f table row 1): a target's own style, the fallback, and a declared null", () => {

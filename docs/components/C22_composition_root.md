@@ -1142,6 +1142,16 @@ throw-leaves-state question asked of a cache instead of an exception.
   two being close is a coincidence worth naming, because the next reader will
   assume one was derived from the other. What would settle it is watching people
   type, and that has not been done.
+- **A third dead guard, and this one was copied rather than invented.** The idle
+  wake first carried the spinner's generation counter — `seq += 1`, `if (mine ===
+  seq)` — and it can never fire, because `schedule` returns a disposable that
+  calls `clearTimeout` and each keystroke cancels the previous wake. **The
+  spinner's counter is not dead and the difference is the reason**: it arms
+  without cancelling, so the counter is its only mechanism. Copying a shape
+  without its reason is how code comes to read as careful and forbid nothing —
+  `menuWindow`'s two expressions and §6e's clamp are the same finding twice
+  over, and this is the first of the three that came from a precedent rather
+  than from arithmetic.
 - **A style declared for `interaction` or `liveBlock` is expressible and
   invisible.** Both are targets and neither places a cursor: `cursorFor` answers
   from the top layer or the prompt, so those two resolve a style for a cursor
@@ -1459,7 +1469,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.22d** (I63, §6f table rows 4 and 5): the shape reaches the frame's `write`, **once** across three frames at one target, and it follows the target rather than the prompt. **The wiring rather than the mechanism**, because a seam-level row passes on the day nothing calls the seam — every other row here calls `cursorShapeSequence` directly.
 - **T1.22e** (I64): the machine **only removes blink** — a style declared blinking is steady while typing and blinking once idle; one declared steady is unchanged in both; and a `null` style is untouched in both. **The third case is the one a state machine gives a second way to go wrong**, and it is the shape half's boundary reached again: nothing may invent a shape in order to have something to make steady.
 - **T1.22f** (I64): the idle edge is armed **only where a declared style blinks** — a config with none arms no wake, so an application that declares no cursor pays no composed frame per typing pause. Asserted on the scheduler, because the frame it would compose is a no-op and reading one would show nothing either way.
-- **T1.22g** (I64): a burst of keys arms a burst of wakes and **only the last draws**, on the spinner's generation guard. Without it a hundred characters commit a hundred frames, one per stale wake, all of them identical.
+- **T1.22g** (I64): a burst of keys arms **one** wake — each keystroke cancels the previous — so five keystrokes draw one frame and not five. **The mechanism is the disposal and not a generation guard**, which is a correction the mutation pass made: the spinner's counter was copied here and is dead, because `schedule`'s disposable calls `clearTimeout` and a cancelled wake never fires. The spinner's own counter is live for the reason this one was not — it arms without cancelling (§6f.5).
+- **T1.22h** (I64): typing after the idle edge puts the cursor back to steady on the next frame. The other direction, and the row that fails if the stamp is dropped — without it the cursor is idle from the first frame and never returns.
 - **T1.21** (I62, §6e table row 1): a windowed prompt with the cursor **one editor row above the window** → the terminal cursor is not on the elision marker. The state the shipped defect needed and the one no fixture built: `cap` 4 with six editor rows put the cursor on frame row 4, the `❯ ⋯` row, because `within` came out `0` and `0` is inside `[0, cap)`. Asserted against the **painted marker row** rather than against a number, since every number agreed with every other while it was wrong.
 - **T1.21b** (I62, §6e table row 2): the same window with a selection span on that row → the marker row carries no wash. T4.26's *"the marker row is untouched"* cannot construct this, because its span is inside the window, where the marker cannot be washed either way.
 - **T1.21c** (I62, §6e.5): **a marker wherever rows are elided and nowhere else** — a mid-buffer cursor draws one above and one below with `cap − 2` content rows, and a cursor at the head draws one below only. Both cases, because the middle one alone does not carry the claim: the mutation that removes the head's bottom marker leaves it untouched (T6.50). The bottom marker is what makes the clipped wash honest (table row 4), so its absence is a defect and not a missing nicety. **A both-ends window needs `n > 2·cap − 2`** — below that the head and tail branches meet with no gap — which is arithmetic the ruling implies and did not state, found by the fixture coming back with one marker.
@@ -1645,7 +1656,8 @@ PTY harness.
 - **T6.57** (I64): a machine that adds blink as well as removing it — *idle means blinking*, whatever was declared → T1.22e fails, and a cursor an app deliberately made steady blinks anyway. The declaration stops being the answer and becomes a hint.
 - **T6.58** (I64): resolving the blink per tick rather than leaving emit-on-change to it → C01 T1.25 fails. **I63's defect one ruling along**, and the reason emit-on-change is load-bearing twice.
 - **T6.59** (I64): arming the idle wake unconditionally → T1.22f fails, and every application pays a composed frame per typing pause for a resolution that emits nothing.
-- **T6.60** (I64): dropping the generation guard → T1.22g fails, and a burst of keys draws a frame per stale wake.
+- **T6.60** (I64): leaving the previous idle wake armed → T1.22g fails, and a burst of keys draws a frame per live wake. **Not a generation guard**: that was copied from the spinner and the pass found it dead, since a disposed wake never fires.
+- **T6.61** (I64): dropping the input stamp → T1.22h fails, and the cursor is idle from the first frame and never returns to steady.
 - **T6.56** (I63, §6f table row 5): resolving the style from the prompt rather than from `router.target` → **a listed survivor with its reason**, and the reason is a gap rather than an excuse: the argument is chosen inside a private method of a session nothing constructs outside `createTui`, so no tier-1-to-4 harness runs that line. T1.22d reaches the frame's wiring and not the session's. Closing it needs a full-session harness or a tier-5 row with an overlay focused.
 - **T6.53** (I63): emitting the resolved style on every frame instead of on change → C01 T1.25 fails, and T1.22d fails at its count. Nothing is visibly wrong on any single frame, which is the whole reason the row is about a count rather than a value.
 - **T6.54** (I63, C01 I20): keeping the record across `resume()` → C01 T1.27 fails, and the shape a child left behind survives the rest of the session. The mutation that shows emit-on-change created a state to get wrong — **and the walk's first answer to it was wrong twice over**, which §6f.3 row 5 now records.

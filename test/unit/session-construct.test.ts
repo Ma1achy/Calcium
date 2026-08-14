@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 
 import { resolveConfig, type Ambient } from "../../src/shell/config.js";
+import { CURSOR_BLINK_MS } from "../../src/shell/cursor-style.js";
 import { constructGraph, STEPS, type FrameQueries } from "../../src/shell/construct.js";
 import type { FileSystem, Pipeline, PipelineDeps, TuiConfig } from "../../src/shell/types.js";
 import type { Manifest } from "../../src/data/manifest/types.js";
@@ -126,6 +127,131 @@ const wideDoc = (id: string) =>
 
 const before = (log: readonly string[], a: string, b: string): boolean =>
   log.indexOf(a) !== -1 && log.indexOf(a) < log.indexOf(b);
+
+describe("C22 §6f — the cursor's blink edge (I64)", () => {
+  /**
+   * A graph whose clock and scheduler are controllable, and whose stdin can be
+   * typed into — the wake is armed on the **input path**, so a row that calls
+   * the predicate cannot see it.
+   */
+  async function blinkHarness(cursor: TuiConfig["cursor"]) {
+    const stdout = fakeStdout({ columns: 100, rows: 30 });
+    const stdin = fakeStdin();
+    const armed: number[] = [];
+    let now = 1_700_000_000_000;
+    const pending: { at: number; fn: () => void; live: boolean }[] = [];
+
+    const config = resolveConfig(
+      {
+        name: "prism",
+        binary: "prism",
+        manifest: MANIFEST,
+        theme: defaultTheme,
+        stateDir: "/state",
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        stdin,
+        // **Required in practice** (F8): without `TERM` the capability record
+        // has no alternate screen and `acquire()` refuses to open — and this
+        // harness has to acquire, because the wake is armed on the input path
+        // and `onInput` is attached by `acquire`.
+        env: { TERM: "xterm-256color" },
+        ...(cursor === undefined ? {} : { cursor }),
+      },
+      {
+        clock: () => now,
+        cwd: "/work",
+        fs: fakeFs(),
+        schedule: (fn: () => void, ms: number) => {
+          const entry = { at: now + ms, fn, live: true };
+          pending.push(entry);
+          armed.push(ms);
+          return { [Symbol.dispose]: () => void (entry.live = false) };
+        },
+        platform: "linux" as NodeJS.Platform,
+      },
+    );
+
+    let frames = 0;
+    const graph = await constructGraph(config, {
+      stop: () => Promise.resolve(0),
+      render: () => void (frames += 1),
+      repaint: () => undefined,
+      frame: FRAME,
+      onFatal: (err) => {
+        throw err;
+      },
+    });
+    graph.lifecycle.acquire();
+
+    return {
+      graph,
+      armed,
+      type: (text: string) => stdin.emit(text),
+      advance: (ms: number) => {
+        now += ms;
+        for (const e of [...pending]) {
+          if (e.live && e.at <= now) {
+            e.live = false;
+            e.fn();
+          }
+        }
+      },
+      frames: () => frames,
+      release: () => graph.lifecycle.release(),
+    };
+  }
+
+  it("T1.22f (C22 I64): no declared style blinks, so no idle wake is armed", async () => {
+    // **The arming, not the predicate.** `anyBlinking` is asserted directly in
+    // `cursor-style.test.ts`; this is the row that says the guard is read — and
+    // the frame the unguarded version would compose is a no-op, so reading one
+    // would show nothing either way. Counted on the scheduler instead.
+    const steady = await blinkHarness({ targets: { prompt: { shape: "beam", blink: false } } });
+    const before = steady.armed.length;
+    steady.type("a");
+    expect(
+      steady.armed.slice(before).includes(CURSOR_BLINK_MS),
+      "a steady declaration arms nothing at the blink threshold",
+    ).toBe(false);
+    steady.release();
+
+    const blinking = await blinkHarness({ targets: { prompt: { shape: "beam", blink: true } } });
+    const start = blinking.armed.length;
+    blinking.type("a");
+    expect(
+      blinking.armed.slice(start).includes(CURSOR_BLINK_MS),
+      "and a blinking one does",
+    ).toBe(true);
+    blinking.release();
+  });
+
+  it("T1.22g (C22 I64): a burst of keys draws once, not once per stale wake", async () => {
+    // The spinner's generation guard, and without it a hundred characters
+    // commit a hundred identical frames — one per wake that should have been
+    // superseded.
+    const h = await blinkHarness({ targets: { prompt: { shape: "beam", blink: true } } });
+    for (const ch of "hello") h.type(ch);
+
+    const before = h.frames();
+    h.advance(CURSOR_BLINK_MS + 1);
+    expect(h.frames() - before, "one frame for five keystrokes' worth of wakes").toBe(1);
+
+    // And the read the frame makes is the idle one.
+    expect(h.graph.cursorIdle(), "past the threshold").toBe(true);
+    h.release();
+  });
+
+  it("T1.22h (C22 I64): typing again puts it back to steady", async () => {
+    const h = await blinkHarness({ targets: { prompt: { shape: "beam", blink: true } } });
+    h.type("a");
+    h.advance(CURSOR_BLINK_MS + 1);
+    expect(h.graph.cursorIdle(), "idle after the threshold").toBe(true);
+
+    h.type("b");
+    expect(h.graph.cursorIdle(), "and steady the moment a key lands").toBe(false);
+    h.release();
+  });
+});
 
 describe("C22 §3 — construction order", () => {
   it("T1.1: every step runs once, in the order §3 declares", () => {

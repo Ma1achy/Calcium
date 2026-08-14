@@ -24,12 +24,14 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/lifecycle.test.ts test/unit/cursor-style.test.ts " +
-  "test/unit/session-composite.test.ts test/unit/session-paint.test.ts";
+  "test/unit/session-composite.test.ts test/unit/session-paint.test.ts " +
+  "test/unit/session-construct.test.ts";
 const LIFECYCLE = "src/terminal/lifecycle.ts";
 const FRAME = "src/shell/render-frame.ts";
 const SESSION = "src/shell/session.ts";
 const STYLE = "src/shell/cursor-style.ts";
 const ESCAPES = "src/terminal/escapes.ts";
+const CONSTRUCT = "src/shell/construct.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -119,6 +121,62 @@ const MUTATIONS = [
     expect: "T1.22",
   },
   {
+    // **The blink edge firing on a target whose style is `null`** — the
+    // boundary the shape half already ruled, and the state machine is a second
+    // way for it to go wrong. Inventing a shape so that *steady* is expressible
+    // changes a terminal the application never asked to touch, and every visual
+    // check passes because the shape chosen is a plausible one.
+    name: "the machine invents a shape for an undeclared target",
+    file: STYLE,
+    from: "  if (style === null || !style.blink) return style;",
+    to: "  if (style === null) return idle ? { shape: \"block\", blink: true } : { shape: \"block\", blink: false };\n  if (!style.blink) return style;",
+    expect: "T1.22e",
+  },
+  {
+    // **The machine adding blink as well as removing it.** *Idle means
+    // blinking*, whatever was declared — so the declaration stops being the
+    // app's answer and becomes a hint.
+    name: "idle makes a steady style blink",
+    file: STYLE,
+    from: "  if (style === null || !style.blink) return style;\n  return idle ? style : { shape: style.shape, blink: false };",
+    to: "  if (style === null) return style;\n  return { shape: style.shape, blink: idle };",
+    expect: "T1.22e",
+  },
+  {
+    // **The idle wake armed unconditionally**, which is the spinner's rule
+    // applied where its argument does not hold: the spinner's wake follows a
+    // request, and this one follows every keystroke.
+    name: "the idle wake is armed whatever is declared",
+    file: CONSTRUCT,
+    from: "      if (!blinks) return;\n",
+    to: "",
+    expect: "T1.22f",
+  },
+  {
+    // **The previous wake left armed.** A burst of keys then arms a burst of
+    // live wakes and every one of them draws.
+    //
+    // **This row replaced a generation guard the pass found dead.** The
+    // spinner's shape — `seq += 1`, `if (mine === seq)` — was copied here, and
+    // it can never fire, because `schedule`'s disposable calls `clearTimeout`.
+    // The spinner's is live for the reason this one was not: it arms without
+    // cancelling.
+    name: "the previous idle wake is left armed",
+    file: CONSTRUCT,
+    from: "      blinkWake?.[Symbol.dispose]();\n      blinkWake = config.schedule(",
+    to: "      blinkWake = config.schedule(",
+    expect: "T1.22g",
+  },
+  {
+    // **The stamp dropped**, so the cursor is idle from the first frame and
+    // never returns to steady.
+    name: "input does not reset the idle clock",
+    file: CONSTRUCT,
+    from: "      lastInputAt = config.clock();\n      if (!blinks) return;",
+    to: "      if (!blinks) return;",
+    expect: "T1.22h",
+  },
+  {
     // **The wiring, not the mechanism.** Every row above calls the seam
     // directly, and a seam-level row passes on the day nothing calls it — so
     // the call site is mutated rather than the function.
@@ -168,7 +226,10 @@ const EXPECTED_SURVIVORS = new Map([
       "further out**: a seam-level row passes on the day nothing calls the seam, and a " +
       "frame-level row passes on the day the session calls it with the wrong argument. What " +
       "would close it is a full-session harness or a tier-5 row reading the bytes with an " +
-      "overlay focused, and neither is written; recorded rather than left as a silent pass",
+      "overlay focused, and neither is written; recorded rather than left as a silent pass. " +
+      "**Re-stated by the blink half rather than closed**: that step wrapped the call — " +
+      "`steadyWhileTyping(cursorStyleFor(target, …), idle)` — and left the argument exactly " +
+      "where it was, so the gap is unchanged and this reason is still the whole of it",
   ],
 ]);
 

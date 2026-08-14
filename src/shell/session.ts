@@ -36,7 +36,7 @@ import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { resolveFocus } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER } from "./config.js";
-import { cursorStyleFor } from "./cursor-style.js";
+import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
@@ -482,7 +482,14 @@ class Session implements TuiInstance {
       // bytes only on a transition.
       cursorShape: () =>
         graph.lifecycle.cursorShapeSequence(
-          cursorStyleFor(graph.router.target, this.config.cursor),
+          // **Two steps, and the second only ever removes blink** (I63, I64).
+          // The declaration is the app's answer; *steady while typing* is a
+          // refinement of it and never a second opinion, so a style declared
+          // steady is never made to blink and a `null` one is untouched.
+          steadyWhileTyping(
+            cursorStyleFor(graph.router.target, this.config.cursor),
+            graph.cursorIdle(),
+          ),
         ),
       // **The record is the caller's, because the write is** (I55, §4a).
       // `composeFrame` returns bytes and never puts them on a terminal, so it

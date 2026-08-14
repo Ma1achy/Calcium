@@ -69,6 +69,7 @@ import {
 } from "../terminal/lifecycle.js";
 import { makeBeforeRelease } from "./shutdown.js";
 import type { ResolvedConfig } from "./config.js";
+import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
 
 /** Where the chosen variant lives (I40). One value, one file. */
@@ -220,6 +221,8 @@ export type Graph = Readonly<{
   liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
+  /** Past the blink threshold since the last key (C22 I64). */
+  cursorIdle: () => boolean;
   capabilities: TerminalCapabilities;
   /**
    * C22 I6a — every component that accumulates a diagnostic, drained at §8
@@ -987,6 +990,15 @@ export async function constructGraph(
   refreshAnchors = () => void keys.refreshAnchors();
 
   /**
+   * When the last input batch landed, for the cursor's blink edge (C22 I64).
+   *
+   * At graph scope rather than inside the input block, because the frame reads
+   * it and the input path writes it — the same reason `promptUnderMenu` is
+   * here rather than recomputed in `session.ts`.
+   */
+  let lastInputAt = config.clock();
+
+  /**
    * Is the prompt still answering keys under whatever is on the stack (I51)?
    *
    * **One definition, two readers.** The router's precedence and the cursor's
@@ -1177,6 +1189,7 @@ export async function constructGraph(
 
   at("input", () => {
     let wake: Disposable | null = null;
+    let blinkWake: Disposable | null = null;
 
     /**
      * One commit per decoded batch, and no handler commits (I27).
@@ -1196,9 +1209,46 @@ export async function constructGraph(
     const deliver = (events: readonly InputEvent[]): void => {
       if (events.length > 0) {
         for (const e of events) router.dispatch(e);
+        stampInput();
         scheduler.commit("input");
       }
       arm();
+    };
+
+    /**
+     * The cursor's blink edge (C22 I64, §6f).
+     *
+     * **A wake on the driver's own scheduler, never a `setInterval` in
+     * `paint.ts`** — the constraint that survived the expiry of its premise.
+     * *Steady on a keystroke* is free, because a keystroke already composes a
+     * frame (I27); only the **idle edge** has no frame of its own, which is
+     * I31's shape reached through a third timer.
+     *
+     * **Armed only where a declared style blinks.** The spinner arms
+     * unconditionally on the argument that it is cheap, and its wake follows a
+     * *request*; this one would follow every keystroke, so an application
+     * declaring no cursor would pay one composed frame per typing pause for a
+     * resolution that emits nothing.
+     *
+     * **A burst of keys arms one wake, and the mechanism is the disposal rather
+     * than a generation guard.** The spinner's shape was copied here first —
+     * `seq += 1`, `if (mine === seq)` — and the mutation pass found it dead:
+     * `schedule` returns a disposable that calls `clearTimeout`, so a cancelled
+     * wake never fires and the counter can never disagree. **The spinner's own
+     * guard is not dead, and the difference is the reason**: it arms without
+     * cancelling, so the counter is its only mechanism. Copying the shape
+     * without the reason is what produced code that read as careful and
+     * forbade nothing.
+     */
+    const blinks = anyBlinking(config.cursor);
+    const stampInput = (): void => {
+      lastInputAt = config.clock();
+      if (!blinks) return;
+      blinkWake?.[Symbol.dispose]();
+      blinkWake = config.schedule(() => {
+        blinkWake = null;
+        scheduler.commit("input");
+      }, CURSOR_BLINK_MS);
     };
 
     // The three timeouts C16 reports and does not fire: the escape window, the
@@ -1228,6 +1278,14 @@ export async function constructGraph(
      * taking keys.
      */
     promptUnderMenu,
+    /**
+     * Whether the cursor is past its idle threshold (C22 I64).
+     *
+     * A **paint-time read**, on the same terms as `spinning` and the ghost
+     * (I38, I50): it changes with the clock rather than with the frame, so a
+     * value captured when the key arrived could never become true.
+     */
+    cursorIdle: () => config.clock() - lastInputAt >= CURSOR_BLINK_MS,
     liveElements,
     capabilities: detection.capabilities,
     /**
