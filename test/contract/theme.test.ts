@@ -13,6 +13,7 @@ import {
   resolve,
   resolveBackground,
   resolveTone,
+  textSurfaces,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
@@ -285,7 +286,7 @@ describe("C10 contract", () => {
 
   // --- §4a, the diff surfaces ----------------------------------------------
 
-  it("T2.14a (I22): 48 ratios — twelve slots × two diff surfaces × two variants", () => {
+  it("T2.14a (I22): twenty-four ratios per theme — twelve slots × two diff surfaces", () => {
     // Recomputed from the shipped tokens, never read from A01 A.1. The catalogue
     // is an assertion this upholds rather than a record of what someone intended,
     // which is T2.4's reason applied to the surfaces C25 made text-bearing.
@@ -304,8 +305,63 @@ describe("C10 contract", () => {
       }
     }
 
-    expect(checked, "twelve slots × two surfaces × two variants").toBe(48);
+    // **Twenty-four per theme, and the total derived from the set.** This read
+    // `toBe(48)` — twelve × two × *two variants* — which is a count in prose
+    // with no mechanism: it went stale the moment a third theme shipped, and it
+    // is the one row that noticed, correctly and for the wrong reason. The
+    // per-theme figure is the claim; the multiplier is whoever is in the set.
+    expect(checked, "twelve slots × two surfaces × every shipped theme").toBe(24 * SHIPPED.length);
     expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("T2.24 (roadmap 24): high-contrast keeps its own promise, which the framework cannot", () => {
+    // **The promise is 7 : 1 and it is nowhere expressible.** `FLOORS` is a
+    // module constant naming the *minimum* every theme must clear, so a theme
+    // that promises more has no way to declare it and no way to be held to it —
+    // which makes this row the only thing standing between "high-contrast" and a
+    // name. Asserted here rather than in the tokens, because a value that meets
+    // a target and a value that was nudged past one are the same value.
+    const hc = defaultTheme["high-contrast"];
+    expect(hc, "the set holds it").toBeDefined();
+    if (hc === undefined) return;
+
+    const PROMISE = 7;
+    const failures: string[] = [];
+    for (const [name, palette] of Object.entries(hc.palettes)) {
+      if (palette.carries !== "meaning") continue;
+      for (const [slot, value] of Object.entries(palette.slots)) {
+        for (const [surface, ground] of textSurfaces(hc)) {
+          const measured = ratio(value, ground);
+          if (measured < PROMISE) {
+            failures.push(`${name}.${slot} on ${surface}: ${measured.toFixed(2)} < ${PROMISE}`);
+          }
+        }
+      }
+    }
+    expect(failures, failures.join("\n")).toEqual([]);
+
+    // **`muted` is the slot this theme exists to answer** — 2.14–2.42 on the
+    // light variant against every candidate wash, under its own 2.5 floor, and
+    // recorded during the selection work as a reason not to pair it. Named
+    // rather than left to the sweep above, because the sweep passing does not
+    // say which slot was in question.
+    const muted = hc.palettes["tone"]?.slots["muted"];
+    expect(ratio(muted!, hc.surfaces.bg), "muted, the quietest slot here").toBeGreaterThanOrEqual(
+      PROMISE,
+    );
+
+    // And it is still recessive: quieter than `dim`, which is quieter than
+    // `default`. A promise that flattened the three would have bought the floor
+    // by losing what the tones are for.
+    const tone = (slot: string): number => ratio(hc.palettes["tone"]!.slots[slot]!, hc.surfaces.bg);
+    expect(tone("muted")).toBeLessThan(tone("dim"));
+    expect(tone("dim")).toBeLessThan(tone("default"));
+
+    // **The rung where the claim stops.** At 4-bit the values are the
+    // emulator's, so contrast is unprovable and only distinctness survives —
+    // which is what the curated map promises instead (C10 I26).
+    const five = ["ok", "warn", "error", "info", "accent"].map((t) => hc.fourBit[`tone.${t}`]);
+    expect(new Set(five).size, "distinctness is what this depth can keep").toBe(5);
   });
 
   it("T2.14b (I22): the diff surfaces are paired with exactly those twelve slots", () => {

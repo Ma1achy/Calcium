@@ -462,7 +462,16 @@ a number.
 - **Which themes to ship is not ruled here.** The entry names three — a high-contrast set, a
   solarised or gruvbox-alike, and a neutral low-saturation one — and each is a token catalogue
   that has to be authored against the floors, which is A01 A.1's work rather than this
-  component's. What this walk delivers is a set that can hold them.
+  component's. What this walk delivers is a set that can hold them. **`high-contrast` is the
+  first, and it is the set's first consumer** (A01 A.1): a third *theme* declaring `dark`, so
+  a set keyed by variant could not have held it beside the first.
+- **A theme can promise more than the floor and cannot declare it.** `FLOORS` is a module
+  constant naming the minimum every theme clears, so `high-contrast`'s 7 : 1 is authored, is
+  checked by one test row, and is invisible to `validateTokens` — which will accept a later
+  edit dropping any of its slots to 4.5 and report a theme that passes. **A per-theme floor is
+  a `ThemeTokens` field and a change to `floorFor`'s signature**, which is mechanism this
+  entry did not need and the next theme with a promise will: recorded here so the second
+  instance is where it is argued, rather than the first being widened on its own.
 - **A theme name is a user-facing string with no rules yet.** R6 names the collision; case,
   spaces and length are unruled, and completion will show whatever is there.
 - **The golden gap is filed separately and deliberately** (F163, roadmap 49). No golden test
@@ -581,6 +590,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.1** (I1): `resolveTone` called a thousand times returns identical styles and performs no I/O.
 - **T2.22** (I27): `/theme`'s declared `enum` values equal the theme set's keys, for a set of three. Asserted against the set rather than against a list, because a list here is the defect one layer over (§5a.4).
 - **T2.23** (I28, §5a.4): the contrast suite's coverage set is **derived**, asserted on the source. **A value comparison here is vacuous and the mutation pass proved it**: `["dark", "light"]` equals `Object.keys(defaultTheme)` for exactly as long as the shipped set has two members, so the row passed against the defect it was written for and would have begun failing at the moment it was meant to protect. The limit is stated in the row — it reads one file.
+- **T2.24** (roadmap 24, A01 A.1): `high-contrast` clears **7 : 1** on every `meaning` slot against both grounds, `muted` is named separately because a passing sweep does not say which slot was in question, and the three greys stay ordered — quieter than `dim`, quieter than `default`. **The only thing standing between the name and a claim**, since the framework holds every theme to the minimum and has no way to be told about a promise.
 - **T2.2** (I11): with the cache warm, results are identical to cold results for every key.
 - **T2.3** (I5): for every shipped theme, the 4-bit mapping is injective across `{ok, warn, error, info, accent}` — the tones whose confusion would be misleading rather than merely dull.
 - **T2.4** (I3): every shipped theme passes every contrast floor, on `bg` **and** `bgElev`, recomputing the ratio from the shipped token rather than reading A01 A.1's recorded figure. A theme cannot ship failing its own rule, and the catalogue is an assertion this test upholds rather than a record of what someone intended.

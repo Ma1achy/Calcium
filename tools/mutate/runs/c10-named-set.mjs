@@ -26,6 +26,9 @@ const PARSE = "src/data/manifest/parse.ts";
 const CONSTRUCT = "src/shell/construct.ts";
 const HANDLERS = "src/shell/local/handlers.ts";
 const CONTRACT = "test/contract/theme.test.ts";
+const HC = "src/presentation/theme/tokens-high-contrast.ts";
+const FOURBIT = "src/presentation/theme/four-bit.ts";
+const INDEX = "src/presentation/theme/index.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -137,6 +140,45 @@ const MUTATIONS = [
     from: '      if (typeof wanted !== "string") {',
     to: '      if (wanted !== "dark" && wanted !== "light") {',
     expect: "T4.35",
+  },
+  {
+    // **The promise dropped to the framework's floor.** `#9f9f9f` at 7.93 goes
+    // to a value that clears 4.5 and fails 7 — which `validateTokens` accepts,
+    // because `FLOORS` is a minimum and a theme cannot declare more. The row
+    // that would be the only thing between "high-contrast" and a name.
+    name: "high-contrast's quietest slot meets the floor and not the promise",
+    file: HC,
+    from: '        muted: "#9f9f9f",',
+    to: '        muted: "#767676",',
+    expect: "T2.24",
+  },
+  {
+    // **The three greys flattened.** `muted` at `default`'s value clears every
+    // floor and every promise, and loses what a recessive tone is for — so the
+    // sweep alone cannot catch it and the ordering assertion is why it is there.
+    name: "the recessive greys are flattened into the promise",
+    file: HC,
+    from: '        muted: "#9f9f9f",',
+    to: '        muted: "#ffffff",',
+    expect: "T2.24",
+  },
+  {
+    // **Two of the five collapsed at 4-bit**, which is the one promise this
+    // rung can keep and the one an accessibility theme most owes.
+    name: "high-contrast collapses two tones at 4-bit",
+    file: FOURBIT,
+    from: '  "tone.accent": 13,\n  "tone.meta": 5,\n  "tone.identifier": 6,\n\n  "syntax.keyword": 13,',
+    to: '  "tone.accent": 14,\n  "tone.meta": 5,\n  "tone.identifier": 6,\n\n  "syntax.keyword": 13,',
+    expect: "T2.3",
+  },
+  {
+    // **The theme declared but not shipped**, which is entry 24's own residue
+    // restored: a mechanism with no consumer.
+    name: "the set holds two themes again",
+    file: INDEX,
+    from: '  "high-contrast": HIGH_CONTRAST,',
+    to: "",
+    expect: "T2.24",
   },
 ];
 

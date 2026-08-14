@@ -7921,3 +7921,18 @@ entry 16 step 3's cut choices).
 **The README is the durable half.** A category whose own description names something it does
 not contain reads as covered for as long as nobody opens it, which is the compression class
 one level up: **the summary kept the claim and dropped the condition that made it true.**
+
+**Second instance, measured when `high-contrast` shipped (2026-08-14): golden's theme list is a
+literal too.** `test/golden/blocks.test.ts` opens with four hand-written variants pairing
+`DARK_THEME` and `LIGHT_THEME` with two capability records, and `table.test.ts` a two-entry
+list beside it. So the third shipped theme joined **no** golden snapshot and the suite stayed
+green — the same shape as the contrast suite's `VARIANTS`, which was fixed in the same session
+because it drove eleven floor and injectivity rows.
+
+**Not fixed here, and the reason is a cost rather than a principle.** Deriving golden's list
+from the theme set triples a snapshot corpus that already covers every block kind × four
+widths × two unicode modes, to catch token edits that the contrast rows catch by measurement
+and more precisely. **What it would actually buy is a rendering of a theme nobody has looked
+at**, which is worth having and is worth having *as a frame* — so it belongs to whoever builds
+the category above rather than to a theme. Recorded so the exemption is counted rather than
+excluded.

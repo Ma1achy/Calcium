@@ -276,6 +276,33 @@ Two collisions had to be broken, and C10 I17 is what found them. `lowlight` emit
 
 **Light `number` and `type` are the second, and it is the less obvious one.** They were the same hue at different lightness, and correcting both to the floor collapsed them onto one value — the correction *created* the collision, so only recomputation could have found it. `type` moves to a darker gold. That looks arbitrary read cold, and it is not.
 
+#### The third theme, and the first authored to the floors rather than corrected to them
+
+**`high-contrast` was solved for, and the distinction is the point of shipping it.** Every value above was authored in a mockup and then moved the minimum distance that cleared 4.5 : 1 — which is how a floor becomes a target, and it is why `muted` sits at 2.61 with nothing between it and a failure. These were derived instead: each slot names a hue and a saturation, and the lightness is the lowest one meeting **7 : 1** — WCAG AAA for body text — against both grounds. The ground is pure black, because every ratio is measured against it and it is the one surface with no headroom spent before the first token is placed.
+
+**7 : 1 is the theme's promise and the framework cannot hold it to one.** `FLOORS` names the *minimum* every theme must clear, so a theme promising more has nowhere to declare it; C10 T2.24 is the row that checks this one, and C10 §5a.6 records what a per-theme floor would take.
+
+Ratios are `bg #000000` / `bgElev #121212`.
+
+| Tone | high-contrast | | Syntax | high-contrast | |
+|---|---|---|---|---|---|
+| `default` | `#ffffff` | 21.00 / 18.74 | `keyword` | `#e46dfb` | 7.88 / 7.03 |
+| `dim` | `#c7c7c7` | 12.42 / 11.08 | `string` | `#0fb80f` | 7.88 / 7.03 |
+| `muted` | `#9f9f9f` | 7.93 / 7.08 | `comment` | `#9f9f9f` | 7.93 / 7.08 |
+| `ok` | `#0ab827` | 7.90 / 7.05 | `number` | `#f87c00` | 7.87 / 7.02 |
+| `warn` | `#c99700` | 7.91 / 7.06 | `key` | `#fb7289` | 7.87 / 7.02 |
+| `error` | `#ff7171` | 7.85 / 7.01 | `type` | `#bb9c00` | 7.87 / 7.02 |
+| `info` | `#2ea5fa` | 7.88 / 7.03 | `function` | `#5fa0fb` | 7.91 / 7.05 |
+| `accent` | `#b887fc` | 7.91 / 7.06 | `operator` | `#0aafbe` | 7.89 / 7.04 |
+| `meta` | `#eb68f7` | 7.86 / 7.01 | `punctuation` | `#d7d7d7` | 14.59 / 13.02 |
+| `identifier` | `#0eb2a5` | 7.93 / 7.07 | | | |
+
+**`muted` is the slot this theme exists to answer.** It is the thinnest margin in the two tables above — 2.61 and 2.62 — and it measured **2.14–2.42** against every candidate selection wash on light, under its own floor, which is why C10 §4b refuses to pair it there. Here it is 7.93 and still visibly quieter than `dim` at 12.4 and `default` at 21. **Recessive and readable were in tension on `#fafafa` and are not on `#000000`**: below the floor there are 1.5 units of ratio and above it there are 18, so the whole argument was about headroom rather than about what a quiet tone is.
+
+**The diff surfaces keep §4a's floors and not this theme's**, and the arithmetic is the reason. At 7 : 1 the darkest of the twelve slots that land on a diff row admits a ground of luminance 0.006 — `#001500`, twenty-one units of one channel — which is a rounding error with a hue rather than a signal. So `diffAdd #003300` and `diffRemove #3b0000` are solved against the framework's floors, which is what C10 I23 already assumes: the background is the third signal, and the marker and the toned gutter carry the distinction alone. `selection` is `#00405c`, and `tone.default` is the only slot paired with it.
+
+**What it cannot promise, stated rather than discovered.** The floor is provable at 24-bit and, against the cube's defined RGB, at 8-bit (C10 I26). At **4-bit it is not provable at all**: `surface.bg` is index 0 and the tones are the bright half, every one of them whatever the emulator's palette says. So the curated map keeps the promise that depth *can* keep — **distinctness** — and the contrast claim stops one rung above it. That is the rung an accessibility theme most owes and the one it can least guarantee.
+
 **Decorative** — the welcome art only (S02 §2), exempt from contrast floors:
 
 | | Dark | Light |

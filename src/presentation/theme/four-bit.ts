@@ -123,3 +123,49 @@ export const MUST_STAY_DISTINCT: readonly string[] = Object.freeze([
   "info",
   "accent",
 ]);
+
+/**
+ * The high-contrast map — and the rung where its claim stops (roadmap 24).
+ *
+ * **A high-contrast theme cannot promise contrast here, and this map is what it
+ * promises instead.** The sixteen are the emulator's own values, so a ratio
+ * computed against index 0 is a ratio against a colour this process cannot see
+ * — the argument the diff surfaces above already make, applied to the whole
+ * palette. What survives the rung is **distinctness** (I17), which is a property
+ * of the indices themselves, so that is what is curated: the five tones whose
+ * confusion misleads take five different indices, and every collision below is
+ * between slots whose confusion costs nothing.
+ *
+ * Bright half for the foreground, as `DARK_FOUR_BIT` does, because the ground is
+ * index 0 and the plain half is where a 16-colour terminal's dim text lives.
+ */
+export const HIGH_CONTRAST_FOUR_BIT: FourBitMap = Object.freeze({
+  "tone.default": 15,
+  "tone.dim": 7,
+  "tone.muted": 8,
+  "tone.ok": 10,
+  "tone.warn": 11,
+  "tone.error": 9,
+  "tone.info": 14,
+  "tone.accent": 13,
+  "tone.meta": 5,
+  "tone.identifier": 6,
+
+  "syntax.keyword": 13,
+  "syntax.string": 10,
+  "syntax.comment": 8,
+  "syntax.number": 11,
+  "syntax.key": 9,
+  "syntax.type": 3, // plain yellow, so `number`'s bright yellow stays its own
+  "syntax.function": 12,
+  "syntax.operator": 14,
+  "syntax.punctuation": 15,
+
+  "surface.bg": 0,
+  "surface.bgElev": 0,
+  "surface.bgDeep": 0,
+  "surface.border": 8,
+  "surface.borderStrong": 7,
+  "surface.diffAdd": 2,
+  "surface.diffRemove": 1,
+});
