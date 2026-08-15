@@ -2636,6 +2636,35 @@ it true, which is F86/F89/F92's mechanism arriving in a section written the same
 including row 8's reversal, and the queue's two hard questions are settled. **What is owed**:
 the `into` thread, as its own step, read against C23's invariants site by site.
 
+##### And classifying the nineteen makes the seam narrower than the count does
+
+**Asked before designing, and the answer moved the design.** The question is whether the arms
+differ in *which document they compose* or in *when they append relative to the guard*, and it
+is the second — which is the narrower variation, and it partitions the nineteen exactly:
+
+| group | n | when, relative to the guard | carries `line` |
+|---|---|---|---|
+| not a submission | 4 | never takes it — an action's refusal, `notify`, a refresh notice, the greeting | **no** |
+| synchronous in `route` | 5 | never takes it — usage, a parse error, a builtin, a failed builtin, invalid app validation | yes |
+| terminal, inside a runner | 9 | taken, and released by the `finally` | yes |
+| the refusal at the guard | 1 | **the site the queue replaces** | yes |
+
+**So the fifteen are one thing: the document this submission produced, arriving at the moment
+the submission is done.** They differ in which document and in whether an entry is already
+open — `runApp` appends a pending one at C23 I3's step 3, and no other runner does. That is a
+destination with two cases, which is what a target parameter is.
+
+**And the thread is not new — it is already there, under another name.** `line` reaches every
+one of the fifteen and no one of the four, because I29 needs it at exactly the sites that settle
+a submission. **The population `into` has to reach is the population `line` already reaches**,
+which turns *thread a parameter through six runners* into *widen a thread that is load-bearing
+already*, with the compiler enumerating the sites.
+
+**The four that do not carry `line` are the check that the partition is real.** A queued
+submission must never settle into a refresh notice or the greeting, and the existing
+`line === undefined` test already separates them — so the seam inherits its own guard rather
+than needing one.
+
 #### §8b · What the rulings are, and the build is a seam change rather than a list
 
 - **The queue is a list in `src/shell/execution.ts` and nothing else.** No published type, no
