@@ -90,6 +90,28 @@ const MUTATIONS = [
     to: "      const action = elements.find((p) => p.element.activate !== undefined)?.element.activate;",
     expect: "T1.16",
   },
+  {
+    // **The tail wraps** (C26 I19, §4c). The plausible wrong reading of *nothing
+    // is beyond the tail*: treat the sequence as a ring. It passes every row
+    // about stepping and every row about the head, because a ring and a line
+    // differ at exactly one cell.
+    name: "the tail wraps to the head instead of stopping",
+    file: KEYS,
+    from: "      const next = elements[i + 1];\n      if (next !== undefined) deps.focus.focusRow(addressOf(next));",
+    to: "      const next = elements[i + 1] ?? elements[0];\n      if (next !== undefined) deps.focus.focusRow(addressOf(next));",
+    expect: "T1.18",
+  },
+  {
+    // **A block's edge treated as an end**, which is the belief §4a's row 1
+    // recorded and §4c measured against the tree. It is the mutation the
+    // vocabulary would have forced: if the boundary were the kind's, stepping
+    // would have to stop where one kind ends and another begins.
+    name: "stepping stops at a block's edge",
+    file: KEYS,
+    from: "      const next = elements[i + 1];\n      if (next !== undefined) deps.focus.focusRow(addressOf(next));",
+    to: "      const next = elements[i + 1];\n      if (next !== undefined && next.blockId === elements[i]?.blockId) deps.focus.focusRow(addressOf(next));",
+    expect: "T1.18",
+  },
 ];
 
 /**
@@ -120,8 +142,14 @@ const results = runPass({
   run,
   control: {
     file: FOCUS,
-    from: "  if (elements.length === 0) return null;\n  // **In the block, on no element yet**",
-    to: "  return null;\n  // **In the block, on no element yet**",
+    // **The anchor carried the line and not the statement, and it rotted.** A
+    // `// graphemes-ok:` marker was appended to this line by a later sweep and
+    // the run has been unrunnable since — an AnchorError on the *control*, so
+    // the pass could not start at all. Nothing in `make all` runs these files,
+    // which is why it went unseen; the harness reported it correctly the moment
+    // one was run. Anchored on the statement now, without the trailing comment.
+    from: "  if (elements.length === 0) return null;",
+    to: "  return null;",
     why:
       "resolution answers null for everything — if this survives, no row drives focus through " +
       "the resolver at all and every kill below is unearned",

@@ -883,6 +883,42 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     effects.table["rowUp"]?.();
     expect(focus.current, "and a real first element does leave").toEqual({ at: "prompt" });
   });
+
+  it("T1.18 (C26 I19, §4c): the ends belong to the entry's sequence, not to a block", () => {
+    // **The row the boundary never had, and its absence is why the asymmetry
+    // read as `table`'s.** The fixture holds two blocks deliberately: with one,
+    // the entry's ends and the block's ends are the same cells and every reading
+    // of *what `↓` does at the edge* agrees.
+    const { effects, focus } = collidingEffects();
+
+    // The head. `↑` at the entry's first element leaves to its neighbouring
+    // scope — the prompt is what is beyond that end.
+    focus.enterLiveBlock({ blockId: "a", elementId: "r1" });
+    effects.table["rowUp"]?.();
+    expect(focus.current, "the head has a neighbour").toEqual({ at: "prompt" });
+
+    // The tail. Nothing is beyond it, so `↓` stops — and this is a *stop*
+    // rather than a trap, because `Esc` is bound at this target.
+    focus.enterLiveBlock({ blockId: "b", elementId: "r2" });
+    effects.table["rowDown"]?.();
+    expect(focus.current, "the tail has none, so focus does not move").toEqual({
+      at: "liveBlock",
+      element: { blockId: "b", elementId: "r2" },
+      anchor: null,
+      mode: "navigate",
+    });
+
+    // **And the seam between the two blocks is not an end at all** — the half
+    // T1.15 carries from the other direction. Asserted here too, because the
+    // ruling is about which cells are ends and a row about the ends that never
+    // looks at a non-end passes for an implementation where every block edge is
+    // one.
+    focus.enterLiveBlock({ blockId: "a", elementId: "r2" });
+    effects.table["rowDown"]?.();
+    expect(focus.current, "steps into the next block").toMatchObject({
+      element: { blockId: "b", elementId: "r1" },
+    });
+  });
 });
 
 describe("C26 §5c — the transcript's selection and semantic copy", () => {

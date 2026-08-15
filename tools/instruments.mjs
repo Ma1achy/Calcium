@@ -60,6 +60,12 @@ const COVERED = [
   // nine end up certifying a tool that prints a hard-coded answer.
   ["tools/roadmap-status.mjs", ["npx", "vitest", "run", "test/unit/roadmap-status.test.ts"]],
   ["tools/mutate/mutate.mjs", ["npx", "vitest", "run", "test/unit/mutate-harness.test.ts"]],
+  // **The exemption below leaves the inputs unwatched, and this is what watched
+  // them.** `tools/mutate/runs` is exempted as *configurations, not
+  // instruments*, which is true — and every one of them carries anchors into
+  // source that moves. Eighteen had rotted when the sweep was first run, one of
+  // them a **control**, which makes its whole run unstartable.
+  ["tools/mutate/anchors.mjs", ["npx", "vitest", "run", "test/unit/mutate-anchors.test.ts"]],
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
   ["examples/docker/tools/screen.py", ["python3", "examples/docker/tools/screen_test.py"]],
   ["examples/docker/tools/beats.py", ["python3", "examples/docker/tools/beats_test.py"]],
@@ -84,7 +90,7 @@ const COVERED = [
  */
 const NOT_INSTRUMENTS = {
   "tools/enforce": "the enforcement suite — gated by `make enforce`, with five fixtures of its own under test/unit/enforce-*",
-  "tools/mutate/runs": "mutation configurations, not instruments: each is an input to `mutate.mjs`, which is covered",
+  "tools/mutate/runs": "mutation configurations, not instruments: each is an input to `mutate.mjs`, which is covered — and their anchors are swept by `tools/mutate/anchors.mjs`, because *not an instrument* left them unwatched",
   "tools/instruments.mjs": "this runner",
   "examples/docker/tools/_fixture.py": "the fixtures' own four-line harness",
   "examples/docker/tools/registry.mjs": "the shared registry, covered by probes_test.mjs",
