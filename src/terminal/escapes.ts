@@ -128,6 +128,8 @@ export type SgrStyle = Readonly<{
   background?: SgrColour;
   bold?: boolean;
   dim?: boolean;
+  /** SGR 3, closed by the one reset like every other attribute (roadmap 50). */
+  italic?: boolean;
   inverse?: boolean;
   underline?: boolean;
 }>;
@@ -218,6 +220,10 @@ export function sgr(style: SgrStyle): string {
 
   if (style.bold === true) params.push(1);
   if (style.dim === true) params.push(2);
+  // **In numeric order, which is not decoration**: SGR parameters are applied
+  // left to right and a reader diffing two frames reads them as a sequence, so
+  // one stable order is one fewer thing that changes when nothing changed.
+  if (style.italic === true) params.push(3);
   if (style.underline === true) params.push(4);
   if (style.inverse === true) params.push(7);
 

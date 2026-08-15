@@ -148,6 +148,31 @@ export type Style = Readonly<{
   background?: ColourValue;
   bold?: boolean;
   dim?: boolean;
+  /**
+   * **An attribute a renderer sets, never a palette slot's fallback** — which is
+   * the whole of why it can be one field (roadmap 50, reversing entry 11's
+   * ruling (c) on 2026-08-15).
+   *
+   * 11(c) read *if inline emphasis lands, bold takes `Style.bold` and italic
+   * takes `underline` or stays literal*. That decided a fallback before anything
+   * needed one, and it decided it onto a channel that is already spoken for:
+   * §4a's own comment says *word-level emphasis is `underline`'s* (C25 I10), so
+   * a diff's word-level marker and a markdown emphasis would have been the same
+   * attribute meaning two things — the class this repo refuses everywhere else.
+   *
+   * **It survives every depth, and for the reason `bold` does**: `sgr()` writes
+   * attributes unconditionally and consults no depth, because an attribute is
+   * not a colour. It does **not** join `MonoClass`, and that is the check rather
+   * than an omission — `MONO` is the *typographic fallback for a palette slot*,
+   * three classes deep, and a slot resolving to italic would be the framework
+   * deciding that some tone is emphatic in a cursive way. That is the app-domain
+   * knowledge `PaletteSpec.classes` exists to refuse.
+   *
+   * At ASCII, or on a terminal that ignores SGR, an italic run renders as plain
+   * text. **No typographic fallback is owed** — it is the same loss `bold` takes
+   * and it costs no cells, so nothing measured is wrong.
+   */
+  italic?: boolean;
   inverse?: boolean;
   underline?: boolean;
 }>;

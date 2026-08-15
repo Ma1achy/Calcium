@@ -1111,6 +1111,17 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "whose whole purpose is to be called from outside it cannot satisfy that scope " +
     "however many consumers it has",
 
+  // --- a field whose consumer is a ruling away ------------------------------
+  "SgrStyle.italic":
+    "roadmap 50 — `Style.italic` and its SGR-3 twin are the *capability*, and the " +
+    "consumer is span-level styling, which the entry's own ORDER puts behind spans " +
+    "in the view model. **The rule is right and firing for the right reason**: " +
+    "nothing sets italic today. It is recorded rather than deleted because entry " +
+    "11's ruling (c) was reversed for exactly this shape — *no consumer* was true " +
+    "of a field nobody could use because it did not exist, which is not an " +
+    "argument, it is the absence of one. The equality arm is the watch: the day a " +
+    "renderer sets it, this entry fails and is removed",
+
   // --- diagnostics: published to be read by a test, never by a component ----
   "LineEditor.killBuffer":
     "diagnostics, and already an explicit exception in C16 T2.14's non-editing list",
