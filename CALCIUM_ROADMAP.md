@@ -1721,6 +1721,98 @@ them, padding to the tallest, which *is* the list above. And **tier selection by
 width is the block-boundary window's shape**: pick the variant that fits from a declared set,
 rather than computing one.
 
+#### §8a · The walk, 2026-08-15 — and it is a table because there are no events
+
+**The artefact's shape is a decision.** `art(spec, caps, width)` is a pure function of its
+three arguments; nothing is in flight, nothing arrives between two rules, and there is no
+sequence to trace. Every interaction it has is **structural** — two rules that both hold at
+rest — which is C18 §8a's shape and not C16's. Choosing a trace here because the fallback
+chain reads like a ladder would have indexed the artefact by rungs, and every row would have
+been governed by one rule and found nothing.
+
+The rules, named so the cells can cite them:
+
+- **A1** a variant declares its tier; use the one for this tier.
+- **A2** a lower tier is safe at a higher depth; use it when this tier's is missing.
+- **A3** nothing declared → the text, styled. Never nothing and never a throw.
+- **A4** *the tier threshold is each variant's own measured width* — docker-tui's, measured
+  while building the banner rather than assumed.
+- **A5** each variant is validated at construction.
+
+| # | state | rules meeting | ruling |
+|---|---|---|---|
+| 1 | both declared · ASCII terminal · both fit | A1, A2 | ascii. A1 excludes blocks by tier and A2 supplies the answer |
+| 2 | both declared · full terminal · **both fit** | A1, A4 | blocks — **tier wins when width does not decide** |
+| 3 | both declared · full terminal · **blocks too wide, ascii fits** | A1, A4 | **A4 wins.** Eligibility is tier **and** fits, and the chain resumes at the next rung |
+| 4 | only blocks declared · ASCII terminal | A2, A3 | the text. A2 has no lower rung to offer |
+| 5 | only ascii declared · full terminal | A1, A2 | ascii — the forgiving direction, and the middle rung's whole purpose |
+| 6 | every declared variant too wide · the text fits | A4, A3 | the text. **A3's rung is reached by width and not only by absence**, which the chain above does not say |
+| 7 | the text is itself wider than the terminal | A3, A4 | it **wraps**. A4 does not reach the last rung, because there is nothing below to fall to |
+| 8 | `text` empty and nothing declared | A3, A5 | a construction error. *The always-available fallback* that is empty makes the declaration able to produce nothing, which is A3's own refusal |
+| 9 | a declared variant contains a tab | A5, A3 | **throws**, and A3 does not forbid it |
+| 10 | what the throw in 9 leaves behind | A5 | nothing — and it is asked rather than assumed |
+
+**Row 3 is the one that pays for the table, and the entry above does not have it.** The
+declaration form is `variants: { blocks, ascii }` — tiers, with no width anywhere in it —
+while A4 says the threshold is each variant's own measurement. Both are correct and they
+overlap in exactly one cell: a blocks variant that is eligible and does not fit. docker-tui
+measured the consequence from the other side: whale + **ASCII** wordmark is **76 cells**, which
+sits comfortably inside the tier its own document reserved for the whale alone, so a fixed
+threshold would have drawn a lone whale on an 80-column terminal with room for the name beside
+it. Selection is therefore **tier-eligible ∧ fits, in declared order**, and *report measured
+cells* stops being a report.
+
+**Row 9 is two failures under one sentence.** *The fallback is a fallback, not a filter* is
+about art that is **missing**; a variant carrying a tab is a **programming error**, and C04
+already throws `BlockShapeError` for shape. Reading A3 as covering both would mean a tab
+silently selecting the next rung — the art would render, correctly, on the machine that wrote
+it, which is the failure class this entry exists for.
+
+**Row 10 because a ruling that throws owes it.** C13's `settle(id, doc)` is the measured case:
+a correct decision to throw created a state two components away that C23 I9 forbids. Here the
+answer is *nothing* — `art` holds no store and mutates nothing — and that is worth one line
+rather than being left as obvious, because obvious is what it looked like there too.
+
+#### §8b · Three of the four validation checks are no longer the entry's to build
+
+Measured against the tree rather than inferred, and this is the deferral table's own column:
+**the condition is written where the claim is and what met it is written somewhere else.**
+
+| the check | disposition at HEAD | what met it |
+|---|---|---|
+| **no tab characters** | **the only one that survives**, and it is the sharpest | nothing. Measured: `stripControl` keeps a tab **by design** — its own comment says *tab is expanded rather than dropped* — and `cells("a\tb")` is **3** while the terminal advances eight |
+| **uniform line width** | **closed by roadmap 38** | `rawDefinition.render` is `fit(line, width)` per row, so a ragged art in a `group` column is padded to the column. The failure was hand-concatenation, which is what `group` replaced |
+| **report measured cells** | **absorbed rather than delivered** | it is A4, the selection mechanism. An app that never writes a threshold cannot write a wrong one |
+| **row-count alignment** | **closed by roadmap 38** | `Group.align?: readonly Valign[]` |
+
+**And the fourth row is a contradiction live in the tree, which the walk found by going to
+look.** `examples/docker/src/banner.ts` says *"What is still the app's: the wordmark's leading
+blank row, which is a vertical alignment a row group has no opinion about (a short child sits
+at the top)."* `Valign` in `src/data/viewmodel/types.ts` says *"The banner is its consumer: the
+wordmark carries a blank first row so its seven lines sit on the whale's hull, which is
+`bottom` written into the art by hand."*
+
+**Both sentences are correct about their own half and they contradict each other.** The type's
+author knew precisely which hand-padding the field replaced and named it; the consumer went on
+paying for it and recorded that the framework had no opinion. Neither was looking at the other,
+which is the third instance of that shape and the first found live rather than in a diff.
+
+#### §8c · What is built, and what it is not
+
+- **A builder, not a block kind.** `art()` in `src/presentation/art.ts`, published from
+  `src/index.ts`. `mermaidCode` is the precedent and the argument is the same one: art is
+  **pre-composed text**, nothing about it needs a renderer, and a seventeenth kind in the
+  published vocabulary before the freeze — with one consumer — is the disposal 50 got.
+- **The last rung is a `notice`, tone `accent`, no glyph**, and the mechanism was checked
+  before the ruling was written down. `raw` cannot carry a style, so *the text, styled* named
+  an operation the layer below does not have — C23 §8a A4's class. `accent`'s mono class is
+  `emphasised`, so the rung is bold at 1-bit and coloured where there is colour, and a notice
+  **wraps** where `raw` would truncate, which is row 7.
+- **It never returns nothing.** Deciding there is no room for a banner at all stays the app's,
+  and already is: `FLOOR` in `banner.ts` is 40 columns.
+- **No `artVariants()` export.** The measured widths are the selection and are asserted in the
+  rows; a table for an app to read is an export nothing consumes until something reads it.
+
 #### Generated art, later and only for the text case
 
 A wordmark is **text plus a font** — figlet's model, and figlet has hundreds of fonts, some
@@ -2895,9 +2987,24 @@ BUILT 21 --help per verb ★        BUILT, and the row described the state befor
                                    REPLACES the result rather than selecting among renderings,
                                    and usageBlocks lists every flag flat, so nothing needs the
                                    distinction. C05 §8b.7
-      22 b.art — banners          sparse variants, fallback ends at styled text, and VALIDATION
-                                   PER VARIANT (no tabs, uniform width, measured cells) — ~30
-                                   lines that would have caught every banner defect
+      22 b.art — banners          sparse variants, fallback ends at styled text, and
+                                   validation per variant. WALKED 2026-08-15 IN §8a-§8c,
+                                   with no code, and the walk moved it twice. A CLASSIFICATION TABLE, not a
+                                   trace: `art` is a pure function of spec, caps and width, so
+                                   every interaction it has is structural. Row 3 is the cell
+                                   the entry did not have — *a variant declares its tier* meets
+                                   *the threshold is each variant's own measured width*, and
+                                   selection is tier-eligible AND FITS rather than by tier
+                                   alone. THREE OF THE FOUR VALIDATION CHECKS ARE NO LONGER
+                                   THIS ENTRY'S: uniform width and row-count alignment are
+                                   closed by roadmap 38's `fit` and `Valign`, measured cells is
+                                   absorbed into selection, and only the tab check survives —
+                                   `stripControl` keeps a tab by design and `cells` reads it as
+                                   1 against the terminal's 8. A BUILDER RATHER THAN A KIND
+                                   when it is written, on `mermaidCode`'s precedent, so the
+                                   published vocabulary gains nothing before the freeze. The last rung is a `notice` because `raw` cannot
+                                   carry a style — the operation was checked before the ruling
+                                   was written down
 BUILT 23 selection styling ★      BUILT 2026-08-13 — `surfaces.selection` with a
                                    `selectionPairs` sibling in `contrast.ts`, `selectionSpans`
                                    in `editor/layout.ts`, and the wash applied in
