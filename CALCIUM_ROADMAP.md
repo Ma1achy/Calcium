@@ -2782,7 +2782,15 @@ BUILT 28 prompt cursor-following  the window exists and is tail-anchored; the fi
                                    interaction while the mode has no bindings and
                                    `Keymap.mergeBlock` has no caller). The queued count still
                                    waits on 33. So 29 is still a slot with nothing to put in
-                                   it, and the reason is now a grep rather than a memory
+                                   it, and the reason is now a grep rather than a memory.
+                                   RE-CHECKED A THIRD TIME 2026-08-15, unmoved, and a SIXTH
+                                   consumer arrived: entry 15's boundary ruling wants a
+                                   selection row count — *selected 40, copied 400* — and the
+                                   readout it would sit on DOES NOT EXIST IN ANY FILE (F161).
+                                   **SIX FEATURES WANT THIS ROW AND NOT ONE OF THEM CAN
+                                   LAND**, which is a different fact from *open*: the entry
+                                   is not waiting on a decision, it is the place six separate
+                                   deferrals have come to rest
       30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
                                    a string, so the transcript renders what it actually is
 PART  31 completion ranking       prefix-matched and unranked today. Recency-first is nearly

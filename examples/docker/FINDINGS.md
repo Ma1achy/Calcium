@@ -7776,6 +7776,19 @@ that is the only view of it you get from outside.**
 
 ## F161 — a shared mark with four consumers, and none of the four can take it ★★★
 
+> **Two further instances, 2026-08-15, and both were the assistant's own.** The `⎿` slot's
+> four consumers turned out to be two at most, neither buildable. *The selection readout* — a
+> place a selection's row count would go, referred to across a conversation and planned
+> against — **appears in no file in the repository**: zero matches in `docs/`, and the one hit
+> in `src/` is an unrelated sentence about a table's detail row. The nearest surface that
+> exists is `TuiConfig.chrome.footer`, one app-supplied row, which is roadmap 29's whole
+> subject.
+>
+> **Both were named with a definite article and planned against**, which is the tell: *a
+> mechanism referred to as though it exists is not evidence that it does, and the question that
+> reaches it is where it is written.* The habit is the one already running — go and find the
+> file — and it has now caught two of the author's own claims and reshaped five findings.
+
 **The claim, about to be built:** *there is now a hanging-continuation slot with four
 consumers — the fault notice, `--help`'s flags, the pending entry and a view's trace line —
 one of which ships; F122 is the finding for authoring a mark at five sites, so it is cheaper
