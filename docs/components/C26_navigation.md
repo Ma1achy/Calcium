@@ -209,6 +209,12 @@ genuinely open — a kind declaring both — is now a single question instead of
 re-declare across every kind. **That cell is ruled in §4b**, which is the next section rather
 than later work.
 
+**Row 1's subject is wrong as well as the axis, and §4c is where that is measured.** *`↑` at
+the first element leaves; `↓` at the last does nothing* is a property of the **entry's**
+sequence — `liveElements` is flat across the entry's blocks — and reads as `table`'s here
+because the case in hand had one table. Left as written, with the correction beside it: a row
+that was true of its fixture and wrong about its subject is the more useful record.
+
 **The axis this table is drawn on is wrong, and roadmap 46's kind is what showed it.**
 Recorded here rather than only in the code that found it, because a table read for its cells is
 read without its commit message.
@@ -300,6 +306,85 @@ untouched by this ruling and orthogonal to it: **what `↓` does *inside* a bloc
 does *at its boundary* are two questions**, and only the second still wants a vocabulary the
 tree does not have. Recorded so the two are not settled together by something that only
 answers the first.
+
+**§4c answers it, and the first thing it found was that the asymmetry is not `table`'s.** The
+sequence is the live entry's, flat across its blocks, so a block's edge is not a boundary at
+all — which is why no per-kind value could ever have named this one.
+
+---
+
+## 4c. The boundary — the ends are the sequence's, and the sequence is the entry's
+
+§4b answered what `↓` does *inside* a block and said the boundary was a second question still
+wanting a vocabulary the tree does not have. This is that question, and the input is §4a's
+result: **zero of four kinds fit, and the axis is wrong.**
+
+### The measurement first, because it moves the subject
+
+**A block's edge is not a boundary.** `liveElements` is `elementsIn(entry.doc.blocks, width)` —
+one flat list over the **whole live entry** — so `↓` at the last element of one block steps into
+the first of the next, and nothing at that seam is an edge at all. T1.15 already asserts it: two
+tables, and the third `↓` lands in the second table.
+
+**So §4a's row 1 attributes the asymmetry to the wrong thing.** *`↑` at the first element leaves
+to the prompt; `↓` at the last does nothing* is true of the **entry's** first and last element,
+and reads there as a property of `table` because the fixture had one table. **A per-kind
+vocabulary cannot express a property of the entry's sequence**, whatever values it offers — which
+is §4a's *the axis is wrong* arriving a second time and much sharper: not *the values are
+symmetric and the tree is not*, but *the subject is not the kind*.
+
+### The ruling — a boundary is a neighbour question
+
+The elements are one sequence and each end either has a neighbouring scope or does not:
+
+    head   the prompt is the neighbour   ↑ moves to it
+    tail   nothing is beyond             ↓ has nowhere to go and stops
+
+**The rule is symmetric and the neighbours are not.** So there is nothing to declare, no
+`escape-*` value to pick and no field to add — the same outcome §4b reached for the interior, by
+the same route: the fact was already in the tree and the vocabulary was asking a different
+question.
+
+**So `ArrowPolicy`'s edge values are the part with no inhabitant**, and saying which part is
+the point: I15's resolution shape — global → kind → per-node — is untouched and keeps the
+subject §4b gave it, a kind declaring both `window` and `elements` that wants `↓` to scroll.
+What has no subject is `escape-vertical`, `escape-horizontal` and `escape-all`, because the
+boundary they name belongs to the entry's sequence and not to any kind.
+
+### The candidate this displaces, and the check that displaced it
+
+The obvious reading of the same observation is **whence**: focus enters by `↓` from the prompt
+past history's bottom (`historyNext`), so *the escape is back the way focus came in*. It
+describes the tree exactly — every case the tree can produce today, both vocabularies agree on.
+
+**They disagree the day §6 lands, and only one stays right.** Pointer resolution focuses the
+innermost element containing the cell, so a click can enter at the tail. Under *whence* that
+entry has no direction to go back the way of, and `↑` would have to escape to nowhere. Under
+*neighbour* the click changes nothing: the sequence and its ends are where they were, `↑` walks
+to the head and leaves there, which is both what the code already does and what the reader
+means. **A vocabulary checked only against the routes that exist is checked against one route**
+— entry has exactly one today, which is precisely why the asymmetry looked like a kind's
+property.
+
+### The pushed view, checked as §4 requires
+
+It is entered by a **push** and left by `escape` → `viewPop`; its nine bindings step hunks and
+page a viewport and never step an element. **It has no sequence, so it has no ends** — the
+boundary question does not arise rather than being answered differently. Not a third value: the
+absence of the subject, which is row 3's finding in §4a and holds unchanged here.
+
+### The order is not the screen's, and that is worth stating rather than absorbing
+
+`↓` at the prompt enters at the **first** element — the top of a block drawn **above** the
+prompt — and `↑` there returns to it. So the element spatially nearest the prompt is the one
+that cannot reach it, because the prompt is *behind* it in the sequence and not below it. The
+spatial reading would have `↓` at the tail return to the prompt, and it is refused for §4b's
+reason and not for tidiness: that gives one key two meanings at one target — step, and leave —
+which is the shape §4b removed from the interior. **Any vocabulary naming up and down would be
+naming the key rather than the movement**, and `escape-vertical`'s axis was never the screen's.
+
+**What the reader is owed instead is a way out that is not an arrow, and it exists**: `Esc` at
+`liveBlock` is `focusPrompt`, bound today. The tail is a stop and not a trap.
 
 ---
 
@@ -554,6 +639,15 @@ notice here.
   separating**: *paging does not move focus* is already true of `pushedView` by construction,
   since focus there is the view and not an element; *the window follows* has no subject until
   a kind declares both `window` and `elements`, which none does (§4a).
+- **I19** — **A boundary is a neighbour question, and the sequence is the entry's** (§4c). The
+  live entry's elements are one flat list across its blocks, so a block's edge is not a
+  boundary; only the sequence's ends are. At an end a movement key **moves to the neighbouring
+  scope if there is one and stops if there is not** — the prompt neighbours the head, nothing
+  is beyond the tail — which is one symmetric rule over asymmetric neighbours rather than a
+  per-kind policy. **No `ArrowPolicy` edge value can state it**, because the subject is the
+  entry's sequence and not the kind; I15's resolution shape is untouched and keeps §4b's
+  subject. A scope entered by a push has no sequence and therefore no ends,
+  and `Esc` is its exit as it is the head's non-directional one.
 
 ---
 
@@ -876,6 +970,7 @@ is the shape a spec commit should have.
 10. Element resolution is a pull (I11).
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
 12. Movement keys move focus and the window follows; paging keys move the window and not focus; a focused element outside the window is legal and the next movement key steps from it (I18, I7). The default is read off which of `elements` and `window` a kind declares, and a kind wanting otherwise uses I15's override rather than a new field.
+13. **A boundary is a neighbour question and the sequence is the entry's** — a block's edge is not an end, an end moves to its neighbouring scope or stops, and `ArrowPolicy`'s **edge values are not adopted** because no per-kind value can name a property of the entry's sequence (I19, §4c).
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -894,6 +989,7 @@ Named against the invariants; the tiers are the six.
   implementation. **Two fabrications confirm it is live**, as F134's did.
 - **T1.42, T1.43** (I17, §5c) — an element's `copy` carries **every declared column**, including the ones the width dropped, is the same text at 60 columns and at 200, and is untruncated. The control is `planColumns(...).dropped` being non-empty at that width: without it the row passes for a table that drops nothing. The expand column contributes its **cell**, not the marker a renderer puts there.
 - **T1.44, T1.45, T1.46** (I16, §5c) — `⇧↓` twice leaves the anchor where it was and `y` copies the range newline-joined; an unshifted motion collapses, so `y` afterwards copies one row; and `⇧↑` at the first element stays in the block, where unshifted `↑` leaves. **Two extensions in the first, because one passes whichever end moved** — C17 T1.23's argument one level up.
+- **T1.18** (I19, §4c) — **the tail stops and the head leaves, asserted at the entry's ends rather than a block's.** T1.15 already carries the other half: two tables, and `↓` at the first's last element steps into the second, so a block's edge is not an end. The row that was missing is the tail — `↓` at the entry's last element leaves focus where it is — and its absence is why the asymmetry read as `table`'s for as long as it did. The fixture holds **two** blocks, because one block makes the entry's ends and the block's ends the same cells and every reading agrees.
 - **T2.x** (I2) — the ladder still derives from `FOCUS_ORDER` with the mode present:
   exhaustive over the target union, not over a hand-written list.
 - **T2.x** (I8) — a click and the equivalent walk reach the **same element object**, asserted
