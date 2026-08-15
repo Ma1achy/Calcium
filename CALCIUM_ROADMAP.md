@@ -2569,7 +2569,7 @@ BUILT 16 ONE POPUP ★             confirm · completion · peek · question are
                                    two are additions. And the design's parameter list said
                                    TWO — onSelect, dismissable — while the two consumers
                                    differ on a third, PLACEMENT: the confirm is
-                                   `{kind: "centred"}` at `src/shell/confirm.ts:148` and the
+                                   `{kind: "centred"}` at `src/shell/confirm.ts:234` and the
                                    menu is anchored. The design's own §1 draws it anchored,
                                    so the figure and the list disagreed with the code in
                                    opposite directions and not with each other.

@@ -906,6 +906,15 @@ read wants and what a gate cannot use.
 That property is what row 2 below is decided by, and it is why the row changed
 under the build.
 
+**And the residue has since been shown to move, which the founding claim asserts and the
+landing measurement could not.** `ErrorLike.stage` was *cleared* on the day this landed —
+cleared by `examples/docker` writing it at twelve sites of its own, which F165 then ruled was
+the app authoring a fact only the framework can know. With the twelve writes removed and
+nothing else changed, measured both ways round on the same tree: **88 → 89 candidates, 226 →
+225 clearings**, and the single member that moved is `ErrorLike.stage`. A residue that measures
+use responds to a change in use, and the landing figures above are kept as the measurement they
+were rather than being refreshed — the second measurement is worth more than a current one.
+
 #### The walk — indexed by rule interaction, and a table because none of these is
 event-mediated
 

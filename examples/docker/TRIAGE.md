@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 12 | **3 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 14 | **6** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about** |
-| **11** | [A gate that passes without checking](#11) | 32 | **10** | — | 8 closed · **5 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F156 is the first found by a foreign runner rather than by us** |
+| **11** | [A gate that passes without checking](#11) | 33 | **11** | — | 8 closed · **6 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -119,7 +119,7 @@ reach it. **Seven closes is the strongest evidence in this document that a shape
 | **F41** | `Patch.collapsedAfter`, `actions` | open |
 | **F21** | the action model, from a keystroke | open — the dispatch route |
 | **F23** | `view: true` on a local tool | open — accepted, does nothing |
-| **F165** | **`ErrorLike.code`, `.stage`, `.details` — set by three producers, the adapter mapping and the app's own twelve sites; rendered by nothing.** The first thing roadmap 48's residue was read for, and it listed one of the three: the other two were *cleared* by the app naming them, which is the instrument's direction working as described. **The twelve sites were then read, and they split the three**: `stage` is a per-file constant restating the kind of function it sits in, so the framework already knows it (F13's class, group 1); `code` and `details` come off the far side's own envelope and are the one place narrowing costs something | **partly fixed** — `code` is rendered beside the message and all three members are kept. **The removal of `stage` was ruled and the compiler falsified it**: eight framework sites write real runtime values (`parse`, `spawn`, `handoff`, `local`, `transport`), so the axis keeps the field and moves the app's twelve writes. Those twelve are the open half |
+| **F165** | **`ErrorLike.code`, `.stage`, `.details` — set by three producers, the adapter mapping and the app's own twelve sites; rendered by nothing.** The first thing roadmap 48's residue was read for, and it listed one of the three: the other two were *cleared* by the app naming them, which is the instrument's direction working as described. **The twelve sites were then read, and they split the three**: `stage` is a per-file constant restating the kind of function it sits in, so the framework already knows it (F13's class, group 1); `code` and `details` come off the far side's own envelope and are the one place narrowing costs something | **partly fixed** — `code` is rendered beside the message and all three members are kept. **The removal of `stage` was ruled and the compiler falsified it**: eight framework sites write real runtime values (`parse`, `spawn`, `handoff`, `local`, `transport`), so the axis keeps the field and moves the app's twelve writes. **Fixed** — the twelve are gone, and the app's suite is 308 before and 308 after: fourteen assertions touch `.error` and every one reads `message`, so the field was write-only for its whole life. What moved is the instrument — roadmap 48's residue went 88 → 89 candidates, and the one member that moved is `ErrorLike.stage`, cleared until now by the app's own writes |
 
 **F78 is the sharpest instance yet and it is worse than the others by a specific mechanism.**
 `b.live` throws when neither `fetch` nor `stream` is given, and throws again when both are —
@@ -497,10 +497,11 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **13: 6 closed, 7 open**
+## 11 · A gate that passes without checking — **14: 6 closed, 8 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
+| **F169** | **`make roadmap`, for the half of the file that is not a table row** | `roadmap-status.mjs` matches `\| N \| BUILT\|PART\|RULED \| … \|` and resolves the citations in that cell. **Entry bodies are never scanned** — 81 citations, 39 of them with a line — so the target reports 49/49 while resolving 56% of the file's citations, and the one stale citation a census found (`src/shell/confirm.ts:148`, blank) was in the unchecked half. The census also priced the exposure: **143 of 326 prose citations carry a line number**, 73% in the roadmap against 19% in `docs/`. **Open** — widening the resolver needs a basename search for the 50 bare-name body citations, and `src/progress.ts` exists in both trees, which is the resolve-against-the-wrong-file class. Six unresolved citations fixed |
 | **F163** | **the golden suite, for anything the painter decides** | `test/golden/README.md` says *frames*, and not one of the four files is one: all go through `renderToLines`, and **no golden test imports from `src/shell/`**. So the base, the prompt window, the selection wash, the chrome, the frame arithmetic, the cursor sequences and the write-as-a-diff have never appeared in a snapshot — the category built to catch exactly this class of change stops one layer below it. Found by re-measuring roadmap 39's residue, whose stated reason was true and was not the reason. **Open** — roadmap 49, because a golden *frame* is test infrastructure with more consumers than the entry that found it |
 | **F162** | **`make test`, for a test file's own types** | vitest transpiles rather than typechecks, so a type error **inside** a test row is invisible to that row: T4.31 ran, asserted and went green in a file `tsc` refuses. `check` covers it and `afb88c4` published a clean `check` for a commit that does not typecheck — which makes the remedy an ordering one, **`check` last, not first**. **Fixed** |
 | **F2** | a CI job | Calcium was not a publishable package, and the job proved nothing |
@@ -724,7 +725,7 @@ a triage is a thing asserted. Specifically:
   yield in this repository is the one this file is most exposed to, because grouping and ranking
   is exactly the operation that lends a claim authority it has not earned.
 - **A finding that was never filed at all.** Not hypothetical. **F81 spent a whole step as a
-  comment** at `src/progress.ts:31`, ending *"filed rather than worked around"* — and it was not
+  comment** at `examples/docker/src/progress.ts:31`, ending *"filed rather than worked around"* — and it was not
   filed. So the strongest group on this list looked like three consumers rather than four, and
   nothing that sorts `FINDINGS.md` could have known. SP5 checks that every citation resolves to
   a finding that exists; **nothing checks whether something that should be a finding is one.**

@@ -57,7 +57,7 @@ const errorDoc = (
   schema: "tui.view/1",
   command,
   status: "error",
-  error: { message, stage: "local" },
+  error: { message },
   blocks: [b.notice.error(message), ...extra],
   meta: { adapter: "destructive" },
 });

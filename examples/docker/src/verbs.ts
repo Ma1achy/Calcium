@@ -62,7 +62,7 @@ function failureDoc(
     schema: "tui.view/1",
     command: ctx.command,
     status: "error",
-    error: { message, stage: "adapter" },
+    error: { message },
     blocks: [b.notice.error(message)],
     meta: { adapter },
   };

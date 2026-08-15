@@ -2060,7 +2060,7 @@ carries `| undefined`. The rest are filed rather than changed, because a varianc
 for no consumer is a guess about the next one.
 
 **DISPOSED, and the disposition is the sentence above.** `TuiConfig.capabilities` reads
-`Partial<TerminalCapabilities> | undefined` today (`src/shell/types.ts:432`), with *"fixed here
+`Partial<TerminalCapabilities> | undefined` today (`src/shell/types.ts:484`), with *"fixed here
 because this is the field with a consumer"* beside it. The fourteen others are deliberately
 unwidened. **So there is no task here unless a second consumer appears** — this is a ruling
 already taken, and it was sitting in a plan as work.
@@ -2535,7 +2535,7 @@ misleading citation and the misleading citation can sit in one document indefini
 
 **Closed as an audit** — `DOCKER_TUI_SURFACES.md` §9's *Exercises* line no longer claims the
 tone, and the drawing is kept with the claim recorded beside it, because redrawing it would
-lose what was intended. `src/logs.ts:58` still builds `b.raw(text, …)`; the substance never
+lose what was intended. `examples/docker/src/logs.ts:58` still builds `b.raw(text, …)`; the substance never
 changed and the fix was always going to be the sentence.
 
 **And the where-is-this-written check widened it.** This entry says `b.logs` has no consumer
@@ -3368,7 +3368,7 @@ axis that has no home.
 ### Why it is filed now and not in step 11
 
 **It was written down and it was written down in the wrong place.** The reasoning
-above existed the whole time as a comment at `src/progress.ts:31` and again at
+above existed the whole time as a comment at `examples/docker/src/progress.ts:31` and again at
 `:160`, and the first of them ends:
 
 > This is F30/F49/F51's fourth consumer, **filed rather than worked around**.
@@ -4061,7 +4061,7 @@ that nothing spawned** — a test checking only the blocks would pass while the 
 
 | ruling | at HEAD |
 |---|---|
-| reserve `--help` framework-side | `FRAMEWORK_FLAGS`, `src/data/manifest/framework.ts:126`, `shellOnly: true`, appended to every tool (C05 I22) |
+| reserve `--help` framework-side | `FRAMEWORK_FLAGS`, `src/data/manifest/framework.ts:148`, `shellOnly: true`, appended to every tool (C05 I22) |
 | `/help` shrinks to two levels | `src/shell/local/handlers.ts:110` groups by C05 §3's partition, with `/help keys` as a second question |
 
 **And *blocked on F39* resolved the other way round.** F39 was closed by C05 I21 — `--help` is
@@ -8132,8 +8132,36 @@ type system is exhaustive about it by construction.
 **Rendered now**: `documents.ts` prefixes the notice with the code when there is one, which is
 the cheapest possible consumer and the half a reader can search for. `details` has no renderer
 yet — it is structure rather than a sentence, and what draws it is a C09 question — so T1.42
-asserts the document still carries it rather than letting it be dropped quietly. **The twelve
-app sites are not yet changed**, and that is the remaining half of this finding.
+asserts the document still carries it rather than letting it be dropped quietly.
+
+### The open half, closed — and nothing failed, which is what it measured
+
+The twelve writes are gone. The app's typecheck is clean and its suite is **308 passed before
+and 308 passed after**, with no expected value anywhere changed.
+
+**The prediction was that rows would fail and that a changed expectation would show the app
+had been writing something wrong.** Fourteen assertions in the app's suite touch `.error`, and
+every one of them reads `message` or asserts existence. Not one reads `stage`. So the removal
+is invisible to the suite **by construction** — the field was write-only for its whole life:
+twelve authored sites, no renderer, no assertion, no frame.
+
+That is weaker evidence than a failing row and it is still worth having, because it is the
+same shape F13 names: *not the app's to author, authored twelve times* — and the reason
+nobody noticed is that nothing anywhere was looking at it.
+
+**What did move is the instrument, and that is the confirmation.** Roadmap 48's residue
+**cleared** `ErrorLike.stage` on the day it landed, and cleared it *because the app named it*.
+Measured both ways round on the same tree:
+
+| | candidates | clearings | ambiguous |
+|---|---|---|---|
+| with the twelve writes | 88 / 327 | 226 | 144 |
+| without them | **89 / 327** | 225 | 144 |
+
+The single member that moved is `ErrorLike.stage`, from cleared to candidate. **A residue that
+measures use responds to a change in use**, which is the founding claim of A03 §9 exercised
+rather than asserted — and it means the instrument would have listed `stage` from the start
+had the app not been supplying its own clearing.
 
 
 ---
@@ -8318,3 +8346,84 @@ command's output, which is sometimes the entry the reader most wants back.
 came from reading what C20's persistence actually contains rather than what it does; the
 mutation one from putting C13's own state machine beside C20's file format. Twenty minutes,
 before a line of it existed, on an entry whose row had already been corrected once this session.
+
+
+---
+
+## F169 — a `file:line` citation is a claim that expires, and the gate reads half of them ★★★
+
+| | |
+|---|---|
+| **Surface** | `CALCIUM_ROADMAP.md`, `docs/`, `examples/docker/*.md` |
+| **Found by** | a census, prompted by one citation breaking under an unrelated edit |
+
+**The prompt was cheap and the answer was not the expected one.** Editing
+`src/data/viewmodel/types.ts` for F165 shifted a line the roadmap cited, and `make roadmap`
+failed on *`src/data/viewmodel/types.ts:440` is blank*. The gate did its job; the question it
+raised is how much of the prose is exposed that way — because if most citations carry a line,
+**every edit to a cited file is a documentation edit**, and that is a tax the verifier makes
+visible without removing.
+
+### The census
+
+Every backticked path into `src/`, `tools/`, `test/` or `examples/` in every `.md` in the
+repository, split by whether it carries a line number:
+
+| | `file:line` | `file` alone | lined |
+|---|---|---|---|
+| `CALCIUM_ROADMAP.md` | 79 | 29 | **73%** |
+| `examples/docker` | 49 | 88 | 36% |
+| `docs/` | 15 | 62 | 19% |
+| `CLAUDE.md`, `README.md` | 0 | 4 | 0% |
+| **total** | **143** | **183** | **44%** |
+
+**So it is neither a handful nor most of them — it is concentrated.** The specs, which are the
+contract and the thing most read, are 19% lined and cite a file plus a symbol; the roadmap,
+which is a working record rewritten constantly, is 73%. The tax exists and it falls almost
+entirely on the document that is cheapest to repair, which is the disposition rather than a
+coincidence: a spec citation has to survive years and a roadmap citation has to survive a step.
+
+### Six unresolved, and the three kinds
+
+Resolving all 143 against the tree — the file exists, the line is within it, the line is not
+blank, which is `roadmap-status.mjs`'s own standard:
+
+| kind | count | instance |
+|---|---|---|
+| the target moved | 3 | `src/shell/confirm.ts:148` → `:234`, `src/shell/types.ts:432` → `:484`, `src/data/manifest/framework.ts:126` → `:148` |
+| the path is ambiguous between two trees | 2 | `src/progress.ts:31` in the app's own docs — there is one under `examples/docker/src/` and the census resolved it from the repo root |
+| **cited outside what the gate reads** | 1 | `confirm.ts:148`, in an entry body rather than an evidence cell |
+
+All six are fixed. The second kind is worth its own line: `src/logs.ts` and `src/progress.ts`
+exist in both trees, so a bare `src/` citation inside `examples/docker` means whichever the
+reader assumes. Qualified now.
+
+### The number that matters: the gate reads the evidence cell and not the entry
+
+`roadmap-status.mjs` matches `| N | BUILT|PART|RULED | … |` and resolves the citations in that
+cell. Entry bodies — where the reading notes, the walk records and the corrections live — are
+never scanned:
+
+| | citations | with a line |
+|---|---|---|
+| evidence cells — **checked** | 101 | 72 |
+| entry bodies — **unchecked** | 81 | **39** |
+
+**`make roadmap` reports 49/49 and resolves 56% of the file's citations.** The one stale
+citation this census found was in the unchecked half, which is what a blind spot looks like
+from inside: the gate was green, correctly, about the part it reads.
+
+### Why the rule is not built here, stated rather than left implicit
+
+Widening the resolver to entry bodies is one change to an existing tool and it is refused for
+a measured reason: **50 of the 81 body citations name a bare file with no directory**, 30 of
+them with a line — `confirm.ts:194`, `keys.ts:496` — written that way because the surrounding
+sentence has already said which component. Resolving those needs a basename search, and `src/progress.ts` versus
+`examples/docker/src/progress.ts` is the case where a basename search resolves against the
+wrong file and reports green. That is the class `docs/COMMITMENT_INVARIANT_AUDIT.md`
+§Fourth pass argues should not be automated.
+
+So the disposition is a habit and a number rather than a gate: **the roadmap's entry bodies
+are unverified prose, and a citation there is worth a symbol rather than a line.** The census
+is repeatable in twenty lines and is written down in this finding; what it costs to re-run is
+the argument for not building the ambiguous half of it.
