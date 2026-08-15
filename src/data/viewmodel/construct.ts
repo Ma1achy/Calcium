@@ -247,8 +247,19 @@ export function* descendants(b: Block, seen: WeakSet<object> = new WeakSet()): G
   if (seen.has(b)) return;
   seen.add(b);
 
+  // **`scroll` was missing here and the cap could not see it** (C04 I47, C13
+  // I17). `cap.ts` counts through this walk rather than a copy of it, and its
+  // comment names the hazard exactly — *a second copy would miss the next
+  // container kind added to the vocabulary, silently, in the component that
+  // decides what to evict.* There is no second copy; the one walk enumerates
+  // kinds, so the defence was against duplication and the failure was
+  // enumeration. A `scroll` of five hundred children counted **one** against the
+  // 100,000-block cap, which is the unenforceable-cap sentence D40's own rule
+  // states about `group`.
+  //
+  // Found by reading entry 15's boundary question, not by anything watching this.
   const nested: readonly Block[] =
-    b.kind === "panel" || b.kind === "group"
+    b.kind === "panel" || b.kind === "group" || b.kind === "scroll"
       ? b.children
       : b.kind === "table"
         ? b.rows.flatMap((r) => r.detail ?? [])

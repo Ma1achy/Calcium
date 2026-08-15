@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { scrollDefinition } from "../../src/presentation/blocks/kinds/containers.js";
-import { validateDocument } from "../../src/data/viewmodel/index.js";
+import { descendants, validateDocument } from "../../src/data/viewmodel/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { Block, Scroll } from "../../src/data/viewmodel/index.js";
@@ -214,6 +214,25 @@ describe("C04 §3c — the frame, read", () => {
   it("T2.28 (C04 I49): a container that hides nothing draws two rows and no marker", () => {
     // The control for the row above, in the frame rather than in `measure`.
     expect(frame(scroll(4, [flat("a"), flat("b")]))).toEqual(["a", "b"]);
+  });
+});
+
+describe("C04 §3c — the container is a tree, and the cap has to see it", () => {
+  it("T2.30 (C13 I17, C04 I47): a scroll's children count against the session cap", () => {
+    // **`descendants` enumerated `panel` and `group` and stopped**, so a
+    // container of five hundred children counted one — the unenforceable-cap
+    // sentence D40 states about `group`, arriving through the kind added after
+    // it was written.
+    //
+    // `cap.ts` counts through this walk rather than a copy, and its comment
+    // names the hazard as *a second copy would miss the next container kind*.
+    // There was no second copy: the one walk lists kinds, so the defence was
+    // against duplication and the failure was enumeration. The row asserts the
+    // count rather than the walk, because a caller counting is what the cap
+    // does.
+    const block = scroll(2, [flat("a"), flat("b"), flat("c")]);
+
+    expect([...descendants(block)].length, "three children, not zero").toBe(3);
   });
 });
 

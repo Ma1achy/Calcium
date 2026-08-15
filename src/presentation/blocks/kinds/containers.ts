@@ -231,6 +231,35 @@ function offsetOf(block: Scroll, ctx: RenderContext, content: number): number {
   return Math.min(Math.max(0, Math.trunc(held)), most);
 }
 
+/**
+ * A child's source text, for C26 I17's semantic copy.
+ *
+ * **The source and never the rendering**: no width is consulted, so a truncated
+ * cell and a dropped column cannot reach it and the text is the same at every
+ * terminal size. A kind whose source this cannot express contributes nothing
+ * rather than its painted rows, which is the invariant's own direction — and
+ * `table` is deliberately absent, because C11 already declares a richer `copy`
+ * per row and a second answer here would be two sources for one fact.
+ */
+function copyTextOf(child: Block): string {
+  switch (child.kind) {
+    case "raw":
+    case "notice":
+    case "tip":
+    case "code":
+      return child.text;
+    case "logs":
+      return child.lines.map((l) => l.message).join("\n");
+    case "scroll":
+      return child.children
+        .map(copyTextOf)
+        .filter((t) => t !== "")
+        .join("\n");
+    default:
+      return "";
+  }
+}
+
 export const scrollDefinition: BlockDefinition<Scroll> = {
   kind: "scroll",
 
@@ -257,6 +286,13 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
           level: "block" as const,
           rows: Object.freeze({ from: r.from, to: r.to }),
           cols: Object.freeze({ from: 0, to: w }),
+          // **A child with no `copy` makes `y` a silent no-op** (C26 I17).
+          // `copyElement` filters undefined and empty out and returns early on
+          // an empty result, so a container whose elements carried none was a
+          // key that did nothing and said nothing — the empty-block class. `y`
+          // on a container has an obvious meaning and it was unimplemented
+          // rather than refused.
+          copy: copyTextOf(r.child),
         }),
       ),
     );
