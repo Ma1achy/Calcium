@@ -2665,6 +2665,33 @@ submission must never settle into a refresh notice or the greeting, and the exis
 `line === undefined` test already separates them — so the seam inherits its own guard rather
 than needing one.
 
+##### The seam was built, and it does not land alone
+
+**Built and measured, 2026-08-15.** `Settle = { line, into }` replacing `line: string` on
+`refuse`, `runShell`, `runHandoff`, `runLocal`, `runIntoView`, `runApp`, `start` and `route`;
+`appendAndCommit` settling into `into` when it is set and appending when it is not. The
+compiler enumerated **exactly the fifteen** the classification predicted, which is the
+prediction being tested rather than restated, and the whole suite passed **unchanged** —
+2968 rows, no test edited. A seam that changes no behaviour is what a seam should be.
+
+**And that is also why it cannot be committed by itself.** `into` is `null` at every call site
+until the queue exists, and a branch nothing reaches is A03 §2's vacuity class in code — the
+thing this repo refuses in rules, refused in the same way here. So the seam lands **with** its
+consumer or not at all.
+
+**The near-miss is worth recording, because it looks like a second consumer and is not.**
+`runApp` already does the `into` thing at `execution.ts:1045` and `:1062` — `settleWithDocument(
+pendingId, doc)` then `recordHistory(line, doc)` then a commit — which is `appendAndCommit`'s
+body with two deliberate differences: it does **not** `resetFocus`, because a settlement is not
+an append and focus must not jump out of the entry the reader is in, and it commits
+`"completion"` rather than `"input"`. Converting it would be a behaviour change wearing a
+refactor's clothes, and the two differences are exactly the ones a green suite would not show.
+
+**What is left of 33 is therefore one commit and not two**: C23's own ruling first — I5's
+*disposition* moves from a refusal to a deferral while its property, *no part of the submission
+takes effect now*, is what a strictly sequential queue preserves — then the seam, the list, the
+drain and the four rows that assert the refusal today.
+
 #### §8b · What the rulings are, and the build is a seam change rather than a list
 
 - **The queue is a list in `src/shell/execution.ts` and nothing else.** No published type, no
