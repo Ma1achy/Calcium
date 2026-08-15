@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { cell, rebuild } from "../../data/viewmodel/index.js";
+import { cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -714,8 +714,21 @@ function live(spec: LiveSpec): Panel {
   return panel;
 }
 
+/**
+ * A markdown document's block half (roadmap 11).
+ *
+ * **Returns a sequence and not a block**, which is why it is exempt from the
+ * builder table's per-block rows for `b.seq`'s reason: one markdown source is a
+ * run of blocks, and wrapping it in a `group` would decide a layout the source
+ * did not ask for.
+ */
+function markdown(source: string, opts?: { readonly idPrefix?: string }): readonly Block[] {
+  return markdownBlocks(source, opts?.idPrefix);
+}
+
 export const b = {
   live,
+  markdown,
   rule,
   notice,
   kv,

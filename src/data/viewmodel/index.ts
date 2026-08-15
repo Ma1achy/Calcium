@@ -67,6 +67,8 @@ export { applyPatch } from "./patch.js";
 
 export { childBlocks, hasChildren, isContainerKind, type ContainerBlock } from "./tree.js";
 
+export { markdownBlocks } from "./markdown.js";
+
 export {
   BORDER_INSET,
   ROW_GUTTER,

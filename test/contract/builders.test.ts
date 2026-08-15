@@ -168,6 +168,7 @@ describe("C24 §4 — the nineteen builders", () => {
       col: "a ColumnDef, for b.table",
       row: "a TableRow, for b.table",
       seq: "a sequence helper — it composes blocks and returns no block",
+      markdown: "a sequence helper — one source is a run of blocks (roadmap 11)",
       id: "cell shorthand", ok: "cell shorthand", warn: "cell shorthand",
       error: "cell shorthand", dim: "cell shorthand", meta: "cell shorthand",
       fill: "an Action", exec: "an Action", open: "an Action",
