@@ -12,6 +12,14 @@ someone evaluating Calcium is likely to be building something like it.
 
 ## 0 · What changed since the sketch, measured
 
+**STEP 0 IS RUN — 2026-08-15, `docs/design/AGENT_TUI_STEP0.md`.** Reasoning and tool calls
+were confirmed to arrive as typed parts, against `qwen3.5:9b` on ollama, from the devcontainer.
+Four findings moved this document — the part shape and its id collision in §2, the
+reasoning ratio in §6 and §14, the parser risk in §5 — and each is marked where it sits. **The one worth
+carrying into every section below: reasoning is 90 stream parts against text's 22, and 44.7
+seconds of a turn before anything else arrives.** Every drawing here was made against reasoning
+as an aside.
+
 **The question primitive is built.** `ctx.ask()` takes a choice list, resolves a promise, and
 entry 16 generalised it: `AskOptions` carries `placement`, `dismissable` and `onSelect`, with
 `resolve(text)` for free-text answers. **The sketch's highest-value gap — A3 — is now *use it*
@@ -84,6 +92,19 @@ error           a notice, with the failure named
 
 **Seven lines.** Which is what makes `agent-tui` **an adapter, not an agent framework** — and
 it makes the boundary enforce itself, because the loop is not ours.
+
+**MEASURED (S0-1): fifteen part types, and the shape is not a switch.** Every content run
+arrives bracketed `-start` → `-delta`… → `-end`, and each bracket carries an **`id`** —
+`txt-0`, `reasoning-0`, `call_9nkphd3f`. That id is the block id, so the adapter is three verbs
+over an id rather than a seven-way switch on a type: **start mints a live block, delta patches
+it, end settles it** — which is C13's live-entry lifecycle exactly. A better fit than the table
+above assumed, and the correction is worth taking before the switch gets written, because the
+switch would have had to grow the id-keyed state back by hand.
+
+**And the ids collide across steps (S0-4).** Two reasoning runs arrived in one turn, both under
+`reasoning-0`. The id is unique within a *step*; the transcript is flatter than that. **This is
+C26 §8b.6's defect in another component** — an address that is unique in its own scope used in a
+wider one — and the remedy is the same shape: the address is `(step index, part id)`.
 
 ---
 
@@ -293,6 +314,14 @@ equivalent; the scripted fake is the always-works path.
 parsed correctly* — and those are exactly the two part types this example is about. **Verify
 against the chosen model on day one rather than discovering it in a frame.**
 
+**MEASURED (S0-5), and it corrects the row above: that risk is MLX's specifically and is not a
+property of "the local path".** Ollama parses server-side — a stock `qwen3.5:9b` pull emitted
+both part kinds with no flags, no configuration and no model-specific setup. **So ollama is the
+verified default and MLX is the alternative**, which inverts the table: the entry that has
+actually been run was the footnote, and the one carrying the fragile step was the default on no
+measurement. The generalisation from *MLX needs two flags* to *the local path is fragile* is the
+compression class, caught by running it.
+
 **And this is C06 I15's second real check.** docker-tui verified fixture/subprocess/emulated
 substitutability once. Three far sides with different latency, streaming granularity and
 failure modes is a different check — **a local model streams token-by-token where an API
@@ -323,6 +352,17 @@ chunks**, which stresses the patch path harder than anything docker-tui did.
 **A7 moved ahead of A3 and A4** — both read wrong without it. An approval with nothing saying
 what is running looks like the session hung, and A4's ruling *is* the held state.
 ```
+
+**MEASURED (S0-3): A7 is load-bearing for step 1, not step 3.** The note above moves A7 ahead
+of A3 and A4 because *an approval with nothing saying what is running looks like the session
+hung.* **The same sentence is true of the first forty-five seconds of every turn** — that is the
+measured figure, and it lands before any tool call or any text. So A1 minimal has A3's problem
+and has it first, and step 1 is not *text-delta → a streaming patch, nothing else*; it is that
+plus something on screen while nothing is arriving.
+
+**Reasoning moves with it.** Step 8 rules the treatment against a real stream, which is still
+right — but the collapsed header is on screen for most of a turn from step 1 onward, so what
+step 1 owes is the header, and step 8 keeps the body.
 
 **Step 0 first and separately.** docker-tui's step 1 proved a far side you have not run
 invalidates the design — `docker ps --json` was `unknown flag`, and `--format json` on `top`
@@ -793,6 +833,18 @@ depends on state — and if that state lives on the block it is fine (a `rev` mo
 but if it lives on focus it is I17's forbidden case. **The collapse is content, not focus, so
 it should be safe** — verify rather than assume.
 
+### What step 0 changed about this section, and it is the weight rather than the ruling
+
+**The ruling stands: nothing measured argues for a block kind.** What does not stand is the
+premise underneath the whole section — that reasoning is an aside. It is **90 stream parts
+against text's 22**, and **569 characters of working to produce the five-character answer
+`ready`.** By time, 44.7 seconds of a turn before anything else arrived.
+
+So *collapsed by default* is right and **the collapsed header is the primary surface**, not the
+degenerate case. The tick of its token count is what the user watches, and it should be drawn
+and read as the main thing on screen rather than as the state a block is in before it is
+expanded. S0-3.
+
 ### The gutter is the 1-bit answer
 
 Expanded, the body must read as *not the answer* without colour:
@@ -812,6 +864,11 @@ gutter carries it**, which is F34's rule applied to a content class rather than 
 **Multiple reasoning blocks per turn.** The model reasons, calls a tool, reasons again — so
 they are separate blocks separated by the call, not one merged block. **Separate is right**
 because the tool call happened between them and merging would lie about the order.
+
+**MEASURED, and the far side produced both halves of it.** Step 0's single turn emitted exactly
+that sequence — reason, call, reason — which confirms the ruling. It also emitted **the same id
+for both runs**, so an adapter keying on the part id merges them silently, which is the lie this
+paragraph forbids arriving by a route the paragraph does not name. S0-4.
 
 **It streams into a collapsed block.** The body grows while the header is what is on screen,
 so the header's token count ticks and the body arrives unseen. **That is the pending entry's

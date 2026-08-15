@@ -3044,6 +3044,19 @@ failure names an *enforcement rule* — "SS10 finds no terminal env read outside
 capabilities.ts" — which reads as a real violation and sends a reader to look for
 one. The scans walk 174 files, and they are the slowest rows in tiers 1 to 4.
 
+**A fourth reading, 2026-08-15, and it is the one that says what the ratio does not
+measure.** With load average **19.63** — nearly four times F73's original 5.2, an unrelated
+process at 440% CPU — T3.15 read **4.08**, *lower* than the 6.0 measured at 5.2. So the ratio
+is not a load gauge: it is bimodal, and its magnitude carries no information about how busy the
+box is. Anyone reading 4.08 as "less contention than last time" has the relationship backwards,
+which is the same trap as *a quiet machine is not less contention*.
+
+**And the failing set moved again**, which is the property already recorded: `test/revert/lifecycle.test.ts`
+T6.5 timed out at its 5 s budget in the same run and has never appeared in this class before.
+Both were green on an immediate rerun, unchanged. A changed set reads as noise where an
+identical one would have read as evidence — which is why the rerun is the ruling and not the
+first result.
+
 
 ---
 
