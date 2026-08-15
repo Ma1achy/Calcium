@@ -2580,7 +2580,81 @@ PART  10 question / menu primitive biggest unlock for agent UIs — lands inside
                                    resolving against an unrelated thing (29's `chromeRows`,
                                    44's `history/persist.ts`), and the reason the blanket
                                    claim *the symbols these entries name are absent* is wrong
-                                   about this row while its conclusion is right
+                                   about this row while its conclusion is right.
+
+                                   PLANNED 2026-08-15, AND THE SPAN HALF DECIDES THE SHAPE.
+                                   MEASURED FIRST, because the mapping follows from it:
+
+                                   (1) NO SPAN-LEVEL STYLING EXISTS IN THE VIEW MODEL. Tone
+                                   attaches to a BLOCK, a Cell, a keyValue row, an events row
+                                   or a pill — never to a run inside text, and there is no
+                                   `{text, tone}[]` shape anywhere in
+                                   `src/data/viewmodel/types.ts`. So inline emphasis is a NEW
+                                   MECHANISM, not a mapping, and that is the entry's whole
+                                   shape rather than a detail of it.
+
+                                   (2) BOLD IS NOT A COLOUR AND SURVIVES 1-BIT. `MONO` in
+                                   `presentation/theme/resolve.ts` is what a meaning palette
+                                   collapses to at depth 1: emphasised → `{bold: true}`,
+                                   deemphasised → `{dim: true}`. So the degradation question
+                                   for bold does not arise — bold IS the 1-bit answer, at every
+                                   depth, and no typographic fallback is owed.
+
+                                   (3) ITALIC HAS NO REPRESENTATION AT ANY DEPTH. `Style` is
+                                   colour · background · bold · dim · inverse · underline. That
+                                   is a C10 public-type question, not a degradation one, and it
+                                   needs a consumer before it is asked.
+
+                                   (4) THE BLOCK HALF MAPS ALMOST ONE-TO-ONE, and every target
+                                   exists: headings → `rule`, which already carries `label`;
+                                   fenced code → `code`, language resolved by the 16 registered
+                                   with highlight.js; tables → `table`; blockquote → `notice`
+                                   with a glyph gutter, which `prefixCells` in
+                                   `presentation/blocks/kinds/simple.ts` already draws for
+                                   `notice` and `tip`.
+
+                                   RULED, SIX THINGS:
+
+                                   (a) SPLIT THE ENTRY. Block-level markdown is a mapping and
+                                   lands with NO new type. Inline emphasis is a view-model
+                                   change and is a separate entry. Landing them together
+                                   conflates a translation with a vocabulary extension, and the
+                                   second is the one that touches a frozen public type.
+
+                                   (b) SHIP THE BLOCK HALF FIRST, INLINE AS LITERAL TEXT.
+                                   `**bold**` renders as `**bold**`. It needs no mechanism, it
+                                   is the same at every depth, a terminal reader already reads
+                                   markdown source, and it is reversible — which is what makes
+                                   it the right first answer rather than a placeholder.
+
+                                   (c) NO ITALIC IN `Style`. If inline emphasis lands, bold
+                                   takes `Style.bold` and italic takes `underline` or stays
+                                   literal. Adding a field to a published type before the
+                                   freeze needs a consumer, and there is none.
+
+                                   (d) LISTS → `raw` WITH A MARKER, not a new kind and not
+                                   `keyValue`, whose shape is label/value and not a bullet. The
+                                   marker is a C09 glyph slot and never a literal (F6).
+
+                                   (e) NO DEPENDENCY FOR THE BLOCK SUBSET, and this is NOT
+                                   lowlight's shape. `lowlight` was taken because the domain is
+                                   large and rendering is incidental — a lexer per language,
+                                   180 KB measured. The markdown SUBSET an agent CLI emits is
+                                   small and closed: ATX headings, fenced code, pipe tables,
+                                   bullet lists, blockquotes, paragraphs. Scope it as that
+                                   named subset rather than as "markdown", and a full CommonMark
+                                   parser stays out by the entry's own terms. If inline spans
+                                   later need CommonMark semantics — reference definitions,
+                                   entities, emphasis precedence — the domain IS large there and
+                                   the question is asked again with `micromark` as the candidate.
+
+                                   (f) NO TABLE ALIGNMENT SYNTAX until a consumer asks.
+
+                                   WHAT WOULD CHANGE (b): a consumer that needs emphasis
+                                   RENDERED rather than literal. Then the view-model change goes
+                                   first and the mapping follows it, in that order — the reverse
+                                   builds a translator against a vocabulary that cannot express
+                                   its output
 BUILT 12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
                                    to change one. Anticipated in a comment, never built.
                                    Smallest fix, biggest effect, invalidation already exists
@@ -3333,9 +3407,7 @@ what landed**.
 | 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **11 is in this list on a corrected reading**, 2026-08-15: the word
-`markdown` **is** in `src/`, as a highlight.js language on C09's `code` block, and the feature
-— a document translated into blocks — is absent. The claim was right and its evidence was not. **48** joins them measured rather than
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** (on a corrected reading, 2026-08-15: the word `markdown` **is** in `src/`, as a highlight.js language on C09's `code` block — the claim was right and its evidence was not, and the sentence was first written at the end of this list, where the signal read `code.ts` as **37**'s symbol and reported a carrier that carries nothing) · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
 is open with its first candidate already refused. · **26**, **32** — the symbols the entries name are

@@ -233,13 +233,29 @@ describe("roadmap-status — the Order column's verifier", () => {
     // **The mutation, because a count that cannot move is not a measurement.** A
     // signal asserted only against itself passes whatever it reports, which is the
     // shape RS1 already had to be rewritten for.
-    const before = /grep reach · (\d+)\//u.exec(run().out)?.[1];
-    // The anchor moved when 16 left the confirmed-OPEN list and took its
-    // parenthetical with it. Anchored on the bare id run now, which is the form
-    // an entry has *before* anyone gives it a symbol — the state under test.
-    const given = mutate("**9** · **11** · **22**", "**9** · **11** · **22** (no `b.art` in `src/`)");
+    // **Third anchor, and it is derived now rather than moved again.** It sat on
+    // 16's parenthetical, then on the bare run `**9** · **11** · **22**` — which
+    // broke the moment 11 was given a symbol, the very event this row is about.
+    // Any literal from the list is a hostage to the list changing.
+    //
+    // So the entry is chosen from the report: take the first id the signal says
+    // rests on a blanket claim, give that one a symbol, assert the count rises.
+    // The circularity is only in *which* entry is picked; the assertion — the
+    // count moves by exactly one — is independent of what the tool said.
+    const first = run().out;
+    const before = Number(/grep reach · (\d+)\//u.exec(first)?.[1]);
+    const blanket = /blanket claim — ([\d, ]+)/u.exec(first)?.[1]?.split(",") ?? [];
+    const id = blanket[0]?.trim();
+    expect(id, "the signal names at least one blanket entry").toBeDefined();
+
+    // **The separator is part of the anchor, and leaving it out cost a run.**
+    // `**9**` occurs earlier in the document than the confirmed-OPEN list, so
+    // the parenthetical landed somewhere the signal does not read and the count
+    // did not move — a mutation that applied and asserted nothing, which is the
+    // shape the harness reports apart from a survivor for a reason.
+    const given = mutate(`**${String(id)}** ·`, `**${String(id)}** (no \`b.art\` in \`src/\`) ·`);
     const after = /grep reach · (\d+)\//u.exec(run(given).out)?.[1];
-    expect(Number(after), "22 now carries its own symbol").toBe(Number(before) + 1);
+    expect(Number(after), `${String(id)} now carries its own symbol`).toBe(before + 1);
   });
 
   it("RS5: an entry in two of the three sets fails", () => {
