@@ -3498,9 +3498,35 @@ THE SWEEP IS DONE, AND THE RULE CAME FIRST.
                                    a capability means widening a builder signature in a
                                    component this change does not touch; a prefix list is
                                    auditable where seven `// narrow-ok` markers meaning *not
-                                   yet* would teach the annotation two meanings. THE PALETTE
-                                   IS STILL OWED, and it is the other freeze-relevant half of
-                                   this entry
+                                   yet* would teach the annotation two meanings. THE PALETTE'S CONSUMER
+                                   QUESTION IS ANSWERED AND THE ANSWER IS NEITHER OPTION:
+                                   it does not wait for a consumer and the sparkline is not
+                                   it. C12 ALREADY HAS ONE AND IT IS ALREADY LYING —
+                                   `SERIES_TONES = ["accent", "info", "ok", "warn"]` in
+                                   `src/presentation/plot/definition.ts`, cycled by
+                                   `toneOf(series, index)` at `index % 4`. Two defects, both
+                                   the ones this entry predicts in the abstract, in shipped
+                                   code: SEMANTIC BLEED — series three is `ok` and series four
+                                   is `warn`, so a plot of four unrelated quantities tells the
+                                   reader one is good and one needs attention, which is D29's
+                                   own rule inverted — and SILENT REUSE, since a fifth series
+                                   is `accent` again and the frame says two things are the
+                                   same thing. THAT IS THE CAP'S ARGUMENT, MEASURED RATHER
+                                   THAN REASONED: *silently reusing a colour is a segmentation
+                                   that lies* is not a prediction here, it is `% 4`.
+                                   SO THE RULING: the palette is warranted NOW, Okabe-Ito at
+                                   the top rungs, capped at eight, and a surface declaring more
+                                   categories than the palette distinguishes is REFUSED at
+                                   construction rather than wrapped — the same disposal C04
+                                   I47 gives an unaimable container. `Tone` cannot carry it:
+                                   its members are ok/warn/error/dim/muted/default and every
+                                   one is a judgement, so a categorical value would be a sixth
+                                   judgement meaning *no judgement*. NOT BUILT HERE: it mints
+                                   a public palette surface before the freeze, which is the
+                                   one class of decision this session does not take alone —
+                                   and unlike the ambiguous-width field, nothing about it is
+                                   fixed by detection, so there is no half that lands early.
+                                   The measurement is what the decision needs and it is above
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
