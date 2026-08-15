@@ -28,6 +28,41 @@ emoji form. That is the row that stops the next addition being `▓ ▒ ░`.
 
 ---
 
+## ★ Measured against `ambiguousWidth`, 2026-08-15 — and it is a fifth catalogue error
+
+**Every style in this document was checked with `cells()` at both conventions, now that the
+field exists.** The result is stronger than the correction section below predicted, and it
+contradicts the framing of the determinate table:
+
+```
+halfblock  ▐ ░   narrow 1 1   wide 2 2   AMBIGUOUS
+rectangle  ▬ ░   narrow 1 1   wide 2 2   AMBIGUOUS
+beads      ▪ ▫   narrow 1 1   wide 2 2   AMBIGUOUS
+posts      ▮ ▯   narrow 1 1   wide 2 2   AMBIGUOUS
+slant      ▰ ▱   narrow 1 1   wide 2 2   AMBIGUOUS
+squares    ◼ ◻   narrow 1 1   wide 2 2   AMBIGUOUS
+comet      ▬▪▫░  narrow 1111  wide 2222  AMBIGUOUS
+braille    ⣿ ␠   narrow 1 1   wide 1 1   stable
+ascii      # -   narrow 1 1   wide 1 1   stable
+arrow      = ␠ > narrow 1 1 1 wide 1 1 1 stable
+```
+
+**Six of the seven unicode styles are ambiguous throughout, and `braille` is the only unicode
+style that is width-stable.** The table below says *`▐` is the only narrow half block*, which is
+true and is about a different question — which glyph is one cell **at the narrow convention** —
+and it reads as though the others were the wide ones. They are not: they are *Ambiguous*, so
+every one of them is one cell on a terminal that says narrow and two on one that says wide, and
+a bar whose glyphs double is not a bar.
+
+**So `ambiguousWidth` is a tier here and not a filter**, exactly as `spinnerFrames` already
+treats it: each style declares `narrowOnly`, and a `wide` terminal falls to `ascii`. Six styles
+carry the flag, `braille` does not, and that is the whole of the field's effect on this
+document. **The refusal list is therefore not a list of styles that cannot ship** — it is the
+narrow tier, which is what the correction section argues and what this measurement makes exact.
+
+**The fifth catalogue error, and it is the same shape as the other four**: a statement true
+about the glyph it names, generalised to the set it sits in.
+
 ## Determinate — a total is known
 
 | name | on | off | notes |
