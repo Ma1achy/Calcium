@@ -198,7 +198,7 @@ already declared:
 |---|---|---|
 | `elements` only | steps elements | `table` |
 | `window` only | moves a viewport | `logs`, `patch` |
-| **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | none |
+| **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | **none, and the build kept it that way** — see the correction below |
 | neither | passes through; the block is atomic | `keyValue`, `code`, `plot` |
 
 **Nothing is adopted here and no field is added.** The check's job was to say whether the
@@ -208,6 +208,28 @@ result is not written down is a check nobody can tell was run*, and because the 
 genuinely open — a kind declaring both — is now a single question instead of a vocabulary to
 re-declare across every kind. **That cell is ruled in §4b**, which is the next section rather
 than later work.
+
+**The axis this table is drawn on is wrong, and roadmap 46's kind is what showed it.**
+Recorded here rather than only in the code that found it, because a table read for its cells is
+read without its commit message.
+
+`window` in the column above means **`BlockDefinition.window`** — the seam by which the
+transcript slices a block it is only partly showing. §4b's *the window follows the focused
+element* means a **container's own viewport**. Those are two senses of one word, and the table
+sorted kinds by the first while the ruling was about the second.
+
+**The kind that would have inhabited cell 3 declares only `elements`.** A `scroll` has a
+viewport — its offset — and needs no `BlockDefinition.window` at all: that seam exists to bound
+the first frame of a kind that can be enormous, and a bounded region is at most `height + 1`
+rows by construction. It was tried the other way and **sixteen rows of C09's window conformance
+sweep refused it**, one line each: `window` must return a block that *measures the slice*, and
+a declared height cannot measure less without becoming a different box.
+
+**So cell 3 is still empty, and the ruling that filled it is unaffected.** §4b is about
+viewports and stands exactly as written; what was wrong is the claim that declaring
+`BlockDefinition.window` is how a kind says it has one. The column would be honest renamed *has
+its own viewport*, at which point `logs` and `patch` leave it and `scroll` joins — which is a
+different table and is not drawn here, because nothing yet depends on it.
 
 **One premise of §4 survives intact and is worth separating from the rest**: resolution
 global → kind → per-node is familiar machinery, and nothing above bears on it. What the check
