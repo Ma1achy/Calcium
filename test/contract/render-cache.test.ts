@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildGraph } from "../support/session.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 
 const doc = (id: string) => ({
   schema: "tui.view/1" as const,
@@ -63,6 +64,62 @@ describe("C22 §6c — the cache's C13 arms", () => {
     expect(graph.rendered.size, "one gone").toBe(1);
     expect(graph.rendered.get(a, 0, 80, "", "t"), "the deleted one").toBeUndefined();
     expect(graph.rendered.get(b, 0, 80, "", "t"), "and its neighbour stayed").toEqual(["b"]);
+  });
+
+  // **The fourth axis, and the audit that found it.** *A cache key is wrong
+  // until you have listed everything the render reads.* Listed against
+  // `visibleRows`: the registry (sealed), the blocks (`rev`), the width, the
+  // window range, the theme, the focus — all keyed — and `capabilities`, which
+  // is not. The file's own header refutes the argument that would have excused
+  // it: *both are about height*, said of theme **and** capabilities, and only
+  // theme was then added.
+  //
+  // The omission is safe, and for a fact the header did not state: the record is
+  // built once at construction step 2 and nothing in `src/` reassigns it. That
+  // is `ctx.tick`'s treatment one paragraph below — *the axis is absent and the
+  // value is constant together, and threading either obliges the other* — and
+  // these two rows are what stop it going quiet.
+  it("T4.18c (I58): capabilities is an appearance axis, so its absence is load-bearing", async () => {
+    const { graph } = await buildGraph();
+    // **A `rule`, and the fixture was changed after it failed to respond.** The
+    // first draft used the `notice` above and the two renderings were byte-identical:
+    // it draws text and a tone, and neither moves with `unicode`. A fixture must be
+    // shown to respond to the thing under test before it is asserted against
+    // (`test/support/README.md`), and this is the third instance of that rule.
+    // `rule` draws `g.horizontal` — `─` at full, `-` at ascii.
+    const blocks = [{ kind: "rule" as const, id: "r", label: "one" }];
+    const render = (capabilities: typeof graph.capabilities): readonly string[] =>
+      renderSequenceToLines(graph.blocks, blocks, 80, {
+        theme: graph.theme.current,
+        capabilities,
+        focus: null,
+      });
+
+    expect(
+      render({ ...graph.capabilities, unicode: "ascii" }),
+      "the same block draws differently under a different capability record",
+    ).not.toEqual(render({ ...graph.capabilities, unicode: "full" }));
+  });
+
+  it("T4.18d (I58): and the record never moves, which is the whole of why the key may omit it", async () => {
+    // **The premise asserted rather than described** (C26 §8b.8's shape). A
+    // re-detect on resize, or a `/ascii` toggle, makes this row fail — and that
+    // is the day the key needs the axis T4.18c says matters.
+    const { graph, resize } = await buildGraph();
+    const before = graph.capabilities;
+    let resized = 0;
+    graph.lifecycle.onResize(() => { resized += 1; });
+
+    graph.theme.setTheme("light");
+    resize({ columns: 120, rows: 40 });
+
+    // **Both events asserted to have happened**, or the row is an identity
+    // check across nothing — a `setTheme` that silently no-opped and a resize
+    // the fake swallowed would leave it green and vacuous.
+    expect(graph.theme.current.name, "the theme moved").toBe("prism/light");
+    expect(resized, "and the resize was delivered").toBeGreaterThan(0);
+
+    expect(graph.capabilities, "the same record, not an equal one").toBe(before);
   });
 
   it("T4.18b (I58): clear drops every slot", async () => {
