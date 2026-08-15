@@ -466,6 +466,52 @@ premise that there is something to resolve.
 
 ---
 
+## 4e. (b)'s walk — and the first output is that the collision cannot happen
+
+Roadmap 7's remaining question: *a pushed view binds `n p g G pageup pagedown`, and interact on
+a table inside it should give those to the table — the first case where the outer scope's
+bindings and the inner one's are the **same** keys.* Both artefacts, because this has state and
+structure, and the structural half is where it comes apart.
+
+**Every row below is measured at HEAD.** Nothing here is a prediction about a design.
+
+### The classification table — structural, at rest
+
+| # | the two rules that meet | ruling |
+|---|---|---|
+| 1 | *a block's keys merge into `liveBlock`* (A01 D4) × *interaction is the mode that hands the block its keys* (§2, commitment 3) | **FINDING, and it is the walk's first output.** D4 is explicit — *a live block may bind letters, but only once focus has been moved into it (`↓`), and C16 merges those bindings into the `liveBlock` target.* So `Keymap.mergeBlock`, the seam that reads like interact's producer, supplies **a different rung by architectural decision**. §8b.8 measured *no caller*; this measures *no target*. **Interaction mode has no candidate producer**, which is a stronger and much cheaper thing to know |
+| 2 | *`activeTarget` returns `pushedView` whenever a view is open* × *an element inside that view could declare bindings* | **The collision (b) describes cannot occur.** `activeTarget` checks the layer before anything else — `overlay`, `copyMode`, `pushedView`, and only then `interaction` — so while a view is open **no key reaches a block inside it at all**. It is not two scopes binding the same keys; it is one scope taking every key. What (b) needs is a **rung above `pushedView` for an element inside the top layer**, and there is none. **A rung, not a binding** |
+| 3 | *`Esc` pops the view* × *`Esc` returns from the live block* × *commitment 3's `Esc` leaves interaction first* | **Two levels, one key, and the ladder already resolves it** — `FOCUS_ORDER` holds `interaction` above `prompt`, and `⌃c` at that rung calls `setMode("navigate")` and stops there, deliberately. So the two-level escape is **expressible today and unimplemented**, which is a different state from unexpressible and is what row 1 blocks |
+| 4 | *`n`/`p` step hunks at `pushedView`* × *a table's elements are rows* | **Not a collision — dead keys.** `n`/`p` step **hunks**, which only `patch` has, so a view holding a table binds two letters that do nothing. **Dead is worse than conflicting**: a key that does nothing reads as a key that is not bound, and the reader cannot tell which |
+| 5 | *`interaction` is a rung* × *nothing sets `mode: "interact"`* | **The rung is unreachable, measured rather than inferred.** `setMode` has exactly one caller in `src/` — the `⌃c` handler — and it passes `"navigate"`. So `activeTarget`'s interaction branch cannot be true, and the mode indicator's second value has nothing to display. Already recorded in roadmap 29 from the other direction |
+
+### The sequence trace — interactions something has to happen for
+
+| # | the sequence | ruling |
+|---|---|---|
+| 1 | enter interact on a block inside a view, then `Esc` | **The sequence cannot start** (table row 2), so this answers nothing rather than answering it one way. Recorded as unreachable, because a trace row that cannot run reads exactly like one that passes |
+| 2 | the view's document is replaced under a focused element (`fill`, `putBlock`) | I10's fall-forward re-resolves against **the live entry's** list, and a view's elements are in no list — `elementsIn` has one caller and it reads `stores.transcript.liveId`. **The re-resolution has no subject at this scope**: table row 2 arriving through an event |
+| 3 | `⌃c` at each rung with interact open | measured, and each rung undoes the innermost thing entered: `copyMode` → `exitCopyMode`; `overlay` → pop if `dismissable`; `pushedView` → `popLayer`; `interaction` → `setMode("navigate")`, staying on the row; `liveBlock` → `toPrompt`. **The ladder is right and its interaction rung is dead** for row 5's reason |
+| 4 | the view pops while focus is inside a block in it | same as 2 — there is no *inside* to be in. Named because it is the sequence an implementation would reach for first when wiring a second caller of `elementsIn`, and it would produce a stored address into a document nothing displays |
+
+### What (b) is actually blocked on, in order
+
+1. **A rung above `pushedView`** for an element inside the top layer. Nothing in the tree has
+   one, and adding it is a change to `FOCUS_ORDER` — *the array order **is** the priority* —
+   which is the one artefact C16's spec pass exists to keep single.
+2. **A producer for the bindings**, and A01 D4 says the existing seam is not it. So the ruling
+   owed is upstream of C26: either D4 changes, or **interaction mode's purpose is not handing
+   the block its keys** — and if it is not, it has no purpose that anything in the tree
+   expresses.
+
+**Nothing is built here and the order matters more than either item.** (b) reads as a keymap
+question and is a ladder question; the walk's job was to say which, and both artefacts were
+needed to see it — the table found the missing rung, and the trace found that every sequence
+about it is unreachable, which is the same fact in the form that would otherwise have been
+tested and passed.
+
+---
+
 ## 5. Element resolution — one declaration, keyboard and pointer
 
 ```typescript

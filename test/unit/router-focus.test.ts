@@ -12,6 +12,7 @@ import {
   type FocusInputs,
 } from "../../src/interaction/router/focus.js";
 import type { FocusTarget } from "../../src/interaction/router/types.js";
+import { readdirSync, readFileSync } from "node:fs";
 import { addr, placed } from "../support/focus.js";
 
 const base: FocusInputs = {
@@ -253,6 +254,36 @@ describe("C16 §3 — the stored location", () => {
     expect(resolveFocus(addr("r1", "a"), []), "nothing to resolve against").toBeNull();
     expect(resolveFocus(null, list), "in the block, on no element yet").toBe(0);
     expect(resolveFocus(null, []), "and still null with nothing there").toBeNull();
+  });
+
+  it("T1.3j (C26 §4e row 5, §8b.8): nothing in `src/` can put focus into interact", () => {
+    // **The vacuity, asserted rather than described.** §10 promises this row and
+    // every other row here *constructs* `mode: "interact"` on the store shape —
+    // which tests `activeTarget`'s ordering correctly and says nothing about
+    // whether the state is reachable. It is not: `setMode` has one caller, the
+    // `⌃c` rung, and it passes `"navigate"`.
+    //
+    // So the `interaction` rung of the ladder is dead code, `⏎`'s entry arm is
+    // uncommitted for a measured reason (§8b.8), and the mode indicator's second
+    // value has nothing to display (roadmap 29).
+    //
+    // **It expires by itself.** The day anything sets `"interact"`, this fails
+    // and the prose that rests on the vacuity has to be re-derived rather than
+    // quietly surviving.
+    const dir = new URL("../../src/", import.meta.url);
+    const files: string[] = [];
+    const walk = (at: URL): void => {
+      for (const entry of readdirSync(at, { withFileTypes: true })) {
+        const next = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, at);
+        if (entry.isDirectory()) walk(next);
+        else if (entry.name.endsWith(".ts")) files.push(readFileSync(next, "utf8"));
+      }
+    };
+    walk(dir);
+
+    const entering = files.filter((text) => /setMode\(\s*["']interact["']/u.test(text));
+
+    expect(entering, "no caller puts the store into interact").toEqual([]);
   });
 
   it("the stored value is frozen, so a consumer cannot move focus by mutation", () => {

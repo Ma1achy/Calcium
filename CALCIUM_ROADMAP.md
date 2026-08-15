@@ -2538,7 +2538,20 @@ PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
                                    `src/shell/construct.ts`, and it reads
                                    `stores.transcript.liveId`. So no element inside a view can
                                    be focused at all, and (b)'s key collision cannot occur until
-                                   a second caller exists. Blocker as a symbol: `liveElements`
+                                   a second caller exists. Blocker as a symbol: `liveElements`.
+                                   (b)'s WALK IS RUN — C26 §4e, both artefacts — AND THE
+                                   COLLISION CANNOT HAPPEN AT ALL: `activeTarget` returns
+                                   `pushedView` whenever a view is open, BEFORE any element
+                                   check, so a block inside a view never sees the key. Not two
+                                   scopes binding the same keys — one scope taking every key.
+                                   (b) needs a RUNG above `pushedView`, not a binding, and
+                                   `FOCUS_ORDER` is the one artefact that would change. AND
+                                   THE PRODUCER QUESTION HAS AN ANSWER THAT IS WORSE THAN
+                                   *not yet*: A01 D4 sends a block's keys to `liveBlock`, so
+                                   `Keymap.mergeBlock` is NOT interact's producer and there is
+                                   no candidate for one. Either D4 changes or interaction
+                                   mode's purpose is not handing the block its keys — a ruling
+                                   upstream of C26
 BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
       9  mermaid (text path)       cheap once the dependency is vetted, distinctive
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
@@ -2820,7 +2833,15 @@ BUILT 28 prompt cursor-following  the window exists and is tail-anchored; the fi
                                    **SIX FEATURES WANT THIS ROW AND NOT ONE OF THEM CAN
                                    LAND**, which is a different fact from *open*: the entry
                                    is not waiting on a decision, it is the place six separate
-                                   deferrals have come to rest
+                                   deferrals have come to rest. FOURTH CHECK, 2026-08-15, AND
+                                   IT MOVED — DOWNWARD. The mode indicator is not a consumer
+                                   waiting on this row: C26 §4e finds interaction mode has no
+                                   CANDIDATE producer, because A01 D4 sends a block's keys to
+                                   `liveBlock` rather than to `interaction`. So its second
+                                   value is blocked on a ruling upstream of C26 and not on a
+                                   chrome row. FIVE consumers, not six, and the row is asserted
+                                   rather than described: T1.3j scans `src/` and expires the
+                                   day anything sets `"interact"`
       30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
                                    a string, so the transcript renders what it actually is
 PART  31 completion ranking       prefix-matched and unranked today. Recency-first is nearly
