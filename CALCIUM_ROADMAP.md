@@ -1797,6 +1797,32 @@ author knew precisely which hand-padding the field replaced and named it; the co
 paying for it and recorded that the framework had no opinion. Neither was looking at the other,
 which is the third instance of that shape and the first found live rather than in a diff.
 
+#### §8b2 · The axis the walk did not have, and what found it
+
+**`ambiguousWidth`, and A03's SS50 found it rather than §8a's table.** The table indexes tier
+against width and has no third column; `▄ ▀ █ ░ ▐ ▖` are `East_Asian_Width=Ambiguous`, **every
+one of them**, so a terminal declaring `wide` draws a block-element wordmark at double. A
+wordmark whose glyphs double is not a wordmark, which is the sentence `mermaid.ts` already
+makes about box drawing — and this is the second consumer to need the same switch.
+
+**Width alone does not reach it**, which is why the *tier* is what refuses: a doubled wordmark
+that still fits is drawn, twice as wide as its author measured it, on a terminal nobody
+developing the art was using. That is the entry's own failure class, arriving on an axis its
+walk did not have.
+
+**The instrument beat the artefact here, and that is worth saying plainly.** §8a's shape was
+chosen deliberately and was still indexed by the two rules the entry names — so the walk was
+exhaustive over the wrong pair. A rule table finds what two *stated* rules do together; it
+cannot supply a rule nobody stated. The enforcement scan can, because it reads the code rather
+than the document.
+
+**And the mutation pass then wrote a row.** Removing the convention from `widthOf` survived
+every assertion, because the only ambiguous art in the fixtures was the `blocks` variant and
+the tier arm already refuses that at `wide` — **the two rules masked each other exactly**. The
+ruling was stated in a comment and constrained nothing, which is A03 §2's vacuity class in
+prose. The state that separates them is art an app declares under `ascii` and draws with box
+characters: the tier has no objection, so only the measurement can be wrong. T2.84n.
+
 #### §8c · What is built, and what it is not
 
 - **A builder, not a block kind.** `art()` in `src/presentation/art.ts`, published from
@@ -2987,9 +3013,9 @@ BUILT 21 --help per verb ★        BUILT, and the row described the state befor
                                    REPLACES the result rather than selecting among renderings,
                                    and usageBlocks lists every flag flat, so nothing needs the
                                    distinction. C05 §8b.7
-      22 b.art — banners          sparse variants, fallback ends at styled text, and
-                                   validation per variant. WALKED 2026-08-15 IN §8a-§8c,
-                                   with no code, and the walk moved it twice. A CLASSIFICATION TABLE, not a
+BUILT 22 b.art — banners          sparse variants, fallback ends at styled text, and
+                                   validation per variant. WALKED THEN BUILT 2026-08-15, and
+                                   the walk moved it twice before a line existed. A CLASSIFICATION TABLE, not a
                                    trace: `art` is a pure function of spec, caps and width, so
                                    every interaction it has is structural. Row 3 is the cell
                                    the entry did not have — *a variant declares its tier* meets
@@ -3000,9 +3026,9 @@ BUILT 21 --help per verb ★        BUILT, and the row described the state befor
                                    closed by roadmap 38's `fit` and `Valign`, measured cells is
                                    absorbed into selection, and only the tab check survives —
                                    `stripControl` keeps a tab by design and `cells` reads it as
-                                   1 against the terminal's 8. A BUILDER RATHER THAN A KIND
-                                   when it is written, on `mermaidCode`'s precedent, so the
-                                   published vocabulary gains nothing before the freeze. The last rung is a `notice` because `raw` cannot
+                                   1 against the terminal's 8. A BUILDER RATHER THAN A KIND,
+                                   on `mermaidCode`'s precedent, so the published vocabulary
+                                   gains nothing before the freeze. The last rung is a `notice` because `raw` cannot
                                    carry a style — the operation was checked before the ruling
                                    was written down
 BUILT 23 selection styling ★      BUILT 2026-08-13 — `surfaces.selection` with a
@@ -3796,6 +3822,7 @@ what landed**.
 | 42 | PART | **the seam exists and is not what the entry assumed.** `createKeymap(bindings)` takes the list rather than owning it — `src/interaction/router/keymap.ts` — with one caller passing `defaultKeymap` in `src/shell/construct.ts` | **two missing pieces of different sizes**: the conflict rule throws (`KeymapError`) where this entry says it must become a ladder, and no config surface carries overrides. Not *the table is hard-coded*, which is what the row said before it was checked |
 | 11 | PART | **the block half is built** — `markdownBlocks` in `src/data/viewmodel/markdown.ts`, exported from the barrel and reachable as `b.markdown`. Headings → `rule`, fences → `code` with the info string as the language, pipe tables → `table` with **positional** keys, bullets → `notice` with the `bullet` glyph slot and its hanging gutter, ordered items → `notice` with the number as text, quotes → muted `notice`, everything else → `raw`. Inline stays literal. T2.40–T2.47, six mutations in `tools/mutate/runs/md-subset.mjs` | **three residues, each named on the block that carries it**: heading levels collapse, because `rule` has one `label` and draws one form; a quote has no gutter, because no `Glyph` slot means *quote* and `live`'s `▌` is a homonym (F161); nesting caps at three levels. **The inline half is entry 50** and is filed rather than deferred |
 | 51 | BUILT | **all three halves.** `ambiguousWidth: "narrow" \| "wide"` on `TerminalCapabilities`, detected from the locale's language subtag under POSIX precedence with C02 I4's override; `cells(text, ambiguous)` in `src/presentation/text.ts` with an `isAmbiguous` range table; `RAMP_BRAILLE` in `src/presentation/plot/ramp.ts` returned by `rampFor` where the capability says wide, and `sparkline` padding with it. C02 I9, commitment 12, §3, §4's degradation row; T2.50–T2.54; `tools/mutate/runs/c02-ambiguous.mjs`, five mutations **The sweep is done** — SS50 in `tools/enforce/source-scans.mjs` fires on a `cells()` call naming neither the convention nor `// narrow-ok`, and it ran 43 → 0 with four annotated sites and three allow-listed files. **The palette is built** — `categorical` in `src/presentation/theme/tokens-dark.ts` and `src/presentation/theme/tokens-light.ts`, `CATEGORY_REFS` replacing the cycle in `src/presentation/plot/definition.ts`, C04 I50a refusing a ninth series in `src/data/viewmodel/validate.ts`. **The sets are built** — `SPINNER_SETS` in `src/presentation/blocks/glyphs.ts` with per-set intervals and shape-paired fallbacks, the refusal list turned into a narrow tier, and `glyphs` falling to ASCII on a wide terminal because box drawing is ambiguous throughout | **a third narrow-safe glyph set** is the refinement this leaves: `⋅ ∘ ◦` have no narrow form and `─ │ ┌` have none either, so a third set is mostly ASCII with a few survivors — worth building the day someone measures which survive. And the bar *styles* remain a catalogue: `Progress` has no `style` field and minting one with no consumer is the shape four entries this session were spent closing |
+| 22 | BUILT | **a builder in front of two existing kinds, and no seventeenth kind.** SS50 and MG24 both fired on the first `make enforce` and both were right — `art` in `src/presentation/art.ts`, published from `src/index.ts`; `ArtTier` and `ArtSpec` beside it. Selection is tier-eligible **and** fits, measured with `cells` — `widthOf` — so a `blocks` variant this terminal can draw and cannot fit falls to the next rung. The last rung is a `notice` with `tone: "accent"`, because `raw` carries no style. T2.84a–T2.84n, one per cell of §8a's table plus the two SS50 added, and `tools/mutate/runs/c09-art.mjs` — 9 mutations, 9 caught after one survivor wrote T2.84n | **three of the four validation checks were no longer this entry's**, which the walk found rather than the build: uniform line width and row-count alignment are roadmap 38's `fit` and `Valign`, and *report measured cells* is the selection rather than a report. Only the tab check survives. **MG24's answer was the consumer**: `wordmarkFor` in `examples/docker/src/banner.ts` was `art`'s loop written by hand — preference order, tier, fit — and is now the call, at the same threshold, since a composed row is `WHALE_CELLS + GAP` plus the wordmark's widest. It is `UNCONSUMED_MEMBERS`' first out-of-tree entry, a category the header counted at 1 and never wrote down. **What is NOT done**: `banner.ts` still hand-writes the vertical alignment `Valign` was added for and still says the framework has no opinion about it, and the composed `bannerRow` is a two-column group `art` cannot express — one block is its whole vocabulary |
 | 9 | BUILT | **a `code` block with a transform in front, one call wide.** `mermaidCode` in `src/presentation/mermaid.ts`, published from `src/index.ts`, calling `renderMermaidASCII` with `useAscii` from the capabilities and `colorMode: "none"`. `beautiful-mermaid` has a row in `DEPENDENCIES.md`, the first naming a non-permissive transitive licence. T2.80–T2.83 | **thin against a maintenance risk rather than a design one**: ten releases then five and a half months' silence, so a replacement costs a function body and nothing else. The rows assert the seam — the capability mapping, the colour refusal, the block's shape — and deliberately not what a flowchart looks like, which would fail on the package's next release for no reason anyone here cares about |
 | 44 | BUILT | **session resume, policy-gated.** `src/shell/construct.ts` reads `persistPolicy(manifest, config)`, and when anything is declared it loads `${stateDir}/transcript.ndjson`, seeds `createTranscriptWriter` and appends the saved documents in order. C13 I20, commitment 18; T1.28 asserts the default — an app that declares nothing persists nothing | **the ruling falls out rather than being enforced**: opening at the bottom with no offsets and no focus is what appending in order does, because none of them is written. A dropped line is announced (F35's class) rather than silently reducing the session |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
@@ -3811,7 +3838,7 @@ what landed**.
 | 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
 is open with its first candidate already refused. **Re-read twice on 2026-08-15: 388 of 1219, then 389 of 1220** after roadmap 51 added `ambiguousWidth` — one member, one exact, so the ratio is unchanged at 31.9%. **A base that moves with every landing and a ratio that does not is the entry's actual subject**: the blind spot is proportional, not absolute, and a figure re-read three times without moving is worth more than the first reading was. So the
@@ -3820,6 +3847,12 @@ base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's 
 it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
 stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
 absent  **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163). · **3** joins them on 2026-08-15 by ceasing to be uncheckable rather than by being swept: its gate was `prism-tui` and the gate is not one, so what remains is greppable from here and was measured — `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` is in the tree and lists the chart types, and `tensor` and `heatmap` occur **zero** times in the whole of `src/`, which is the entry itself rather than only its home: what is built is C12, the machinery the ML package would extend.
+
+**22 left this list on 2026-08-15**, and it is the second entry this month to leave it by
+being built rather than by being re-read. Its evidence was *there is no `art` builder*, which
+was true and is the shape that reads as coverage: an entry whose blocker is *nothing has been
+written* stays confirmable indefinitely, and confirming it is not work. What moved it was
+writing the thing.
 
 **44 left this list on 2026-08-15**, and its evidence was true to the end:
 `interaction/history/persist.ts` **is** C20's history persistence and is not session resume.

@@ -259,12 +259,28 @@ describe("roadmap-status — the Order column's verifier", () => {
     const id = blanket[0]?.trim();
     expect(id, "the signal names at least one blanket entry").toBeDefined();
 
-    // **The separator is part of the anchor, and leaving it out cost a run.**
-    // `**9**` occurs earlier in the document than the confirmed-OPEN list, so
-    // the parenthetical landed somewhere the signal does not read and the count
-    // did not move — a mutation that applied and asserted nothing, which is the
-    // shape the harness reports apart from a survivor for a reason.
-    const given = mutate(`**${String(id)}** ·`, `**${String(id)}** (no \`b.art\` in \`src/\`) ·`);
+    // **Fourth anchor, and this time nothing textual is left in it.** The third
+    // derived the *entry* from the report and then hardcoded the separator after
+    // it — ` ·` — which is a literal from the list by another name, and it broke
+    // the day the first blanket entry became one followed by a comma. The
+    // comment above it had already named the class and the fix stopped one word
+    // short of applying it.
+    //
+    // So the edit is **positional**: find the paragraph, find the entry inside
+    // it, splice there. `**9**` occurring earlier in the document — the hazard
+    // the separator was carrying — cannot arise, because the offset is taken
+    // from the paragraph rather than from the file.
+    const heading = "**Checked and confirmed OPEN**";
+    const from = ROADMAP.indexOf(heading);
+    const para = ROADMAP.slice(from, ROADMAP.indexOf("\n\n", from));
+    const at = para.indexOf(`**${String(id)}**`);
+    expect(at, `${String(id)} is discussed in the paragraph the signal reads`).toBeGreaterThan(-1);
+
+    const mark = `**${String(id)}**`;
+    const given =
+      ROADMAP.slice(0, from + at) +
+      `${mark} (no \`b.art\` in \`src/\`)` +
+      ROADMAP.slice(from + at + mark.length);
     const after = /grep reach · (\d+)\//u.exec(run(given).out)?.[1];
     expect(Number(after), `${String(id)} now carries its own symbol`).toBe(before + 1);
   });

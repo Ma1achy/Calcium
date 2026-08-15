@@ -23,7 +23,7 @@
  *   been applied, and adding one would produce nine.
  */
 
-import { cells } from "@fmx/calcium";
+import { art, cells } from "@fmx/calcium";
 import type { Block } from "@fmx/calcium";
 
 /** Columns between the whale and the wordmark. Four reads well; two is tight. */
@@ -202,14 +202,40 @@ export function bannerRow(width: number, blocks: boolean): Block | null {
   } as Block;
 }
 
-/** The wordmark the composed variant at this width would use, or `null`. */
+/**
+ * The wordmark the composed variant at this width would use, or `null`.
+ *
+ * **This was the loop `art` is**, written by hand: walk the variants in
+ * preference order, skip one the terminal cannot draw, skip one that does not
+ * fit, take the first that survives. Roadmap 22 landed it in the framework and
+ * this is the call, which is what MG24 asks for — a published member with a
+ * consumer on the other side of the seam rather than a producer alone.
+ *
+ * **The width handed over is the wordmark's own**, which is what keeps the
+ * threshold identical: `compose` pads the whale to `WHALE_CELLS` and adds
+ * `GAP`, so a composed row is exactly those plus the wordmark's widest, and
+ * `art` measuring the wordmark against `width - WHALE_CELLS - GAP` is the same
+ * comparison the composed table made. Measured rather than assumed — the golden
+ * in `DOCKER_TUI_BANNER.md` is asserted against the frame.
+ *
+ * `ambiguousWidth: "narrow"` because **this app has no signal for it**: it
+ * decides `unicode` from `LANG` in `main.ts` and nothing tells it what the
+ * terminal does with ambiguous characters. Stated rather than left implicit —
+ * the block wordmark is ambiguous throughout, so an app that did have the
+ * signal would want to pass it, and `art` would then refuse the blocks variant.
+ */
 function wordmarkFor(width: number, blocks: boolean): readonly string[] | null {
-  for (const v of VARIANTS) {
-    if (v.blocks && !blocks) continue;
-    if (widthOf(v.lines) > width) continue;
-    if (v.name === "wide-blocks") return WORDMARK_ROWS;
-    if (v.name === "wide-ascii") return WORDMARK_ASCII;
-    return null;
-  }
-  return null;
+  const chosen = art(
+    {
+      id: "banner-wordmark",
+      text: "Docker",
+      variants: { blocks: WORDMARK_ROWS.join("\n"), ascii: WORDMARK_ASCII.join("\n") },
+    },
+    { unicode: blocks ? "full" : "ascii", ambiguousWidth: "narrow" },
+    width - WHALE_CELLS - GAP,
+  );
+
+  // The last rung is a `notice`, and beside a whale it is not a wordmark —
+  // this app's floor is its own decision (roadmap 22 §8c), and it is `null`.
+  return chosen.kind === "raw" ? chosen.text.split("\n") : null;
 }

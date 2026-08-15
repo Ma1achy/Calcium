@@ -277,6 +277,20 @@ export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.
  */
 export { mermaidCode } from "./presentation/mermaid.js";
 /**
+ * A banner, from a sparse set of variants (roadmap 22).
+ *
+ * **Published for the same reason and by the same argument as `mermaidCode`.**
+ * Art is pre-composed text: nothing about it needs a renderer, so it is a
+ * transform in front rather than a seventeenth kind in the vocabulary — which
+ * is what keeps the freeze from having to carry it.
+ *
+ * It takes capabilities *and a width* because both decide, and the second is
+ * the one the sketch did not have: a `blocks` variant this terminal can draw
+ * and is too narrow for falls to the next rung rather than being truncated.
+ */
+export { art } from "./presentation/art.js";
+export type { ArtSpec, ArtTier } from "./presentation/art.js";
+/**
  * The record a `RenderContext` carries, and what `TuiConfig.capabilities`
  * overrides (C22 I49).
  *

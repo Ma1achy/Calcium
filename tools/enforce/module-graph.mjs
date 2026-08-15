@@ -1096,6 +1096,21 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- consumed, and not from `src/` ----------------------------------------
+  //
+  // **The first entry of a category the header already counted and had no
+  // instance of** — *1 had an out-of-tree consumer*, measured over 280 members
+  // and then not written down anywhere a reader would meet it.
+  "ArtSpec.variants":
+    "roadmap 22 — `art` is a builder an APP calls, on `mermaidCode`'s precedent, " +
+    "so its only consumer is out of tree by construction: `examples/docker/src/" +
+    "banner.ts` declares both variants and reads the chosen one. Wiring it inside " +
+    "`src/` would mean the framework declaring somebody's art, which is the one " +
+    "thing roadmap 22 rules the framework does not do. **This is roadmap 48's " +
+    "subject from the other side**: the rule is scoped to `src/`, and a member " +
+    "whose whole purpose is to be called from outside it cannot satisfy that scope " +
+    "however many consumers it has",
+
   // --- diagnostics: published to be read by a test, never by a component ----
   "LineEditor.killBuffer":
     "diagnostics, and already an explicit exception in C16 T2.14's non-editing list",
