@@ -663,9 +663,19 @@ export type Share = number | Readonly<{ cells: number }>;
  * only allocation and `{cells: n}` the child's own business.
  *
  * **Heights are measurable and widths are not**, and that asymmetry is the whole
- * reason this field has one axis. The banner is its consumer: the wordmark
- * carries a blank first row so its seven lines sit on the whale's hull, which is
- * `bottom` written into the art by hand.
+ * reason this field has one axis. The banner is its consumer, and **it is one
+ * now rather than in principle**: `examples/docker/src/banner.ts` hand-wrote the
+ * blank first row that puts the wordmark's seven lines on the whale's hull, and
+ * `bannerRow` passes `["top", "bottom"]` instead.
+ *
+ * **It sat unclaimed for a while, and how is worth recording here.** This
+ * sentence named the consumer and the hand-padding it replaced; the consumer's
+ * own comment said a row group *has no opinion* about vertical alignment. Both
+ * were correct about their own half, neither author was reading the other, and
+ * the suite already held the proof — K6 drew a bottom-aligned seven-row wordmark
+ * against the eight-row one and they matched. **A condition is written where the
+ * deferral is and what meets it is written somewhere else**, which is why the
+ * habit is to grep from the satisfier rather than to watch from the deferral.
  *
  * Absent is `top`, which is what a row did before this existed.
  */

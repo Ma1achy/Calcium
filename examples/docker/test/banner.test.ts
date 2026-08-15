@@ -112,6 +112,37 @@ describe("K6: the blank first row is vertical alignment, hand-written into the a
   });
 });
 
+describe("K11: the container aligns, and the ASCII arm was wrong before it did", () => {
+  it("both wordmarks sit on the whale's hull, not its spout", () => {
+    // **K6 proved the equivalence and nothing acted on it** — the app went on
+    // hand-writing the blank row and its own comment said a row group has no
+    // opinion, while `Valign`'s declaration named this banner as its consumer.
+    // Both correct about their own half, and the proof was already in this file.
+    //
+    // **The ASCII arm was never right here, and only the frame said so.** Five
+    // rows against the whale's eight, bottom-aligned by `compose`'s
+    // `alignBottom` on the hand path and top-aligned by the container on this
+    // one — so it drew against the spout. The row count is eight either way,
+    // which is why no arithmetic could have caught it.
+    const kit = measurable({});
+
+    for (const [label, blocks, mark] of [
+      ["blocks", true, /[▄▀█]/u],
+      ["ascii", false, /[_|\\/]/u],
+    ] as const) {
+      const drawn = kit
+        .renderToLines(bannerRow(120, blocks) as Block, 120)
+        // Past the whale's column — `WHALE_CELLS` plus this file's gap — so
+        // what is left is the wordmark's own rows and nothing else.
+        .map((l) => l.slice(44).replace(/\s+$/u, ""));
+
+      expect(drawn, `${label}: eight rows`).toHaveLength(8);
+      expect(drawn[0], `${label}: nothing beside the spout`).toBe("");
+      expect(drawn[7], `${label}: the last row carries art`).toMatch(mark);
+    }
+  });
+});
+
 describe("the three build-time claims", () => {
   it("K1: no tab characters anywhere — in the art, or in the document that holds it", () => {
     // **A real hazard, not tidiness.** A tab is one cell to `cells()` and eight

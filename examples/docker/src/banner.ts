@@ -181,9 +181,12 @@ export function banner(width: number, blocks: boolean): Block | null {
  * and holding the two arts in one block without either of them knowing the
  * other's width.
  *
- * What is still the app's: the **wordmark's leading blank row**, which is a
- * vertical alignment a row group has no opinion about (a short child sits at the
- * top), and the variant choice, which is this file's own tiering.
+ * What is still the app's: the **variant choice**, which is this file's own
+ * tiering — and nothing else. The wordmark's leading blank row was here too, and
+ * `align` took it: `Valign`'s own declaration named this banner as its consumer
+ * while this comment said the container had no opinion, **both correct about
+ * their own half and contradicting each other**, with K6 sitting in the suite
+ * proving the equivalence neither was reading.
  */
 export function bannerRow(width: number, blocks: boolean): Block | null {
   if (width < FLOOR) return null;
@@ -199,6 +202,17 @@ export function bannerRow(width: number, blocks: boolean): Block | null {
       { kind: "raw", id: "banner-wordmark", text: wordmark.join("\n") },
     ],
     flex: [{ cells: WHALE_CELLS + GAP - 1 }, 1],
+    // **The vertical alignment, and it is the container's now** (C04 I45).
+    // K6 proved the equivalence — a bottom-aligned seven-row wordmark draws what
+    // the eight-row one draws — and then nothing acted on it, which is what the
+    // sentence this replaces recorded as *a row group has no opinion*.
+    //
+    // **It also fixes the ASCII arm, which was never right here.** That art is
+    // five rows against the whale's eight and its own declaration says
+    // bottom-aligned; `compose` did that with `alignBottom` and this path did
+    // not, so the row group drew it against the whale's spout. The frame is what
+    // said so — the row count was eight either way.
+    align: ["top", "bottom"],
   } as Block;
 }
 
@@ -229,7 +243,11 @@ function wordmarkFor(width: number, blocks: boolean): readonly string[] | null {
     {
       id: "banner-wordmark",
       text: "Docker",
-      variants: { blocks: WORDMARK_ROWS.join("\n"), ascii: WORDMARK_ASCII.join("\n") },
+      // **Without the leading blank row**, because the container aligns now.
+      // `WORDMARK_ROWS` keeps it: the hand-composed `banner()` path is asserted
+      // against `DOCKER_TUI_BANNER.md`'s fenced block row for row, and that
+      // document's art genuinely has eight entries with the first blank.
+      variants: { blocks: WORDMARK_ROWS.slice(1).join("\n"), ascii: WORDMARK_ASCII.join("\n") },
     },
     { unicode: blocks ? "full" : "ascii", ambiguousWidth: "narrow" },
     width - WHALE_CELLS - GAP,
