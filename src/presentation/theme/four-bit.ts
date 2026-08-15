@@ -38,6 +38,21 @@ export const DARK_FOUR_BIT: FourBitMap = Object.freeze({
   "tone.meta": 13,
   "tone.identifier": 6,
 
+
+  // **Eight indices that must stay pairwise distinct**, which is the cap's
+  // 4-bit expression: the palette promises `n` distinguishable categories and
+  // sixteen colours is where that promise is hardest to keep. Curated rather
+  // than computed, for `FourBitMap`'s own reason — nearest-of-16 by RGB
+  // distance collapses hues that the eye separates easily.
+  "categorical.c1": 3,
+  "categorical.c2": 6,
+  "categorical.c3": 2,
+  "categorical.c4": 11,
+  "categorical.c5": 12,
+  "categorical.c6": 1,
+  "categorical.c7": 5,
+  "categorical.c8": 7,
+
   "syntax.keyword": 13,
   "syntax.string": 10,
   "syntax.comment": 8,
@@ -98,6 +113,16 @@ export const LIGHT_FOUR_BIT: FourBitMap = Object.freeze({
   "syntax.function": 4,
   "syntax.operator": 6,
   "syntax.punctuation": 0,
+
+  // The cap's 4-bit expression — see DARK_FOUR_BIT.
+  "categorical.c1": 3,
+  "categorical.c2": 6,
+  "categorical.c3": 2,
+  "categorical.c4": 5,
+  "categorical.c5": 4,
+  "categorical.c6": 1,
+  "categorical.c7": 13,
+  "categorical.c8": 8,
 
   "surface.bg": 15,
   "surface.bgElev": 15,
@@ -160,6 +185,16 @@ export const HIGH_CONTRAST_FOUR_BIT: FourBitMap = Object.freeze({
   "syntax.function": 12,
   "syntax.operator": 14,
   "syntax.punctuation": 15,
+
+  // The cap's 4-bit expression — see DARK_FOUR_BIT.
+  "categorical.c1": 11,
+  "categorical.c2": 14,
+  "categorical.c3": 10,
+  "categorical.c4": 3,
+  "categorical.c5": 12,
+  "categorical.c6": 9,
+  "categorical.c7": 13,
+  "categorical.c8": 7,
 
   "surface.bg": 0,
   "surface.bgElev": 0,

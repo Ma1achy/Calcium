@@ -23,7 +23,7 @@
 import type { AmbiguousWidth } from "../text.js";
 import type { ReactElement } from "react";
 import { glyphs } from "../blocks/glyphs.js";
-import { clampSpans, paint, padStart, rows, tone, type Span } from "../blocks/paint.js";
+import { clampSpans, paint, padStart, rows, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, truncate } from "../text.js";
 import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
@@ -31,17 +31,27 @@ import { labelWidth, xLabelRow, yLabels } from "./axes.js";
 import { seriesRange, type Range } from "./scale.js";
 import { sparkline } from "./sparkline.js";
 import { stripHeights } from "./strips.js";
-import type { Plot, Series, Tone } from "../../data/viewmodel/index.js";
+import type { Plot, Series } from "../../data/viewmodel/index.js";
+import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 
 /** The narrowest plot area worth drawing a curve in. Below it, furniture goes. */
 const MIN_AREA = 4;
 
-/** The tones series cycle through when there is colour to distinguish them. */
-const SERIES_TONES: readonly Tone[] = Object.freeze(["accent", "info", "ok", "warn"]);
+/** The categorical palette's slots, in order (C10, roadmap 51). */
+const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
+  "categorical.c1",
+  "categorical.c2",
+  "categorical.c3",
+  "categorical.c4",
+  "categorical.c5",
+  "categorical.c6",
+  "categorical.c7",
+  "categorical.c8",
+]);
 
-/** A rasterised series and the tone it carries. */
-type Layer = Readonly<{ glyphRows: readonly string[]; tone: Tone }>;
+/** A rasterised series and the colour it carries. */
+type Layer = Readonly<{ glyphRows: readonly string[]; ref: ColourRef }>;
 
 /** Everything the row builders need, resolved once. */
 type Layout = Readonly<{
@@ -52,8 +62,24 @@ type Layout = Readonly<{
   width: number;
 }>;
 
-function toneOf(series: Series, index: number): Tone {
-  return series.tone ?? SERIES_TONES[index % SERIES_TONES.length] ?? "accent"; // cells-ok — a tone-cycle index
+/**
+ * Which colour a series carries (roadmap 51).
+ *
+ * **The cycle is gone rather than widened**, and that is the change. It read
+ * `SERIES_TONES[index % SERIES_TONES.length]` over four *judgement* tones, so a
+ * plot of four unrelated quantities said series three was good and series four
+ * wanted attention — D29 inverted — and a fifth series repeated the first,
+ * which is a segmentation that lies. C04 I50a refuses the ninth series at
+ * construction, so there is no index here that the palette cannot answer, and
+ * the modulo that used to hide that is not replaced by a wider one.
+ *
+ * **A declared `tone` still wins**, because naming `error` for a series *is* a
+ * judgement and the app is entitled to make it. What the default may not do is
+ * make one by accident.
+ */
+function refOf(series: Series, index: number): ColourRef {
+  if (series.tone !== undefined) return `tone.${series.tone}`;
+  return CATEGORY_REFS[index] ?? "categorical.c1"; // cells-ok — a category index
 }
 
 /**
@@ -103,31 +129,31 @@ function mergedRow(
 ): readonly Span[] {
   const spans: Span[] = [];
   let run = "";
-  let runTone: Tone | null = null;
+  let runRef: ColourRef | null = null;
 
   const flush = (): void => {
     if (run === "") return;
     spans.push(
-      runTone === null
+      runRef === null
         ? { text: run }
-        : { text: run, style: tone(runTone, ctx.theme, ctx.capabilities) },
+        : { text: run, style: slot(runRef, ctx.theme, ctx.capabilities) },
     );
     run = "";
   };
 
   for (let x = 0; x < layout.areaWidth; x += 1) {
     let cell = " ";
-    let cellTone: Tone | null = null;
+    let cellRef: ColourRef | null = null;
     for (const layer of layers) {
       const candidate = [...(layer.glyphRows[rowIndex] ?? "")][x] ?? " ";
       if (isBlank(candidate)) continue;
       cell = candidate;
-      cellTone = layer.tone;
+      cellRef = layer.ref;
       break;
     }
-    if (cellTone !== runTone) {
+    if (cellRef !== runRef) {
       flush();
-      runTone = cellTone;
+      runRef = cellRef;
     }
     run += cell;
   }
@@ -215,7 +241,7 @@ function stackedRows(
 
     if (first !== undefined) {
       const glyphRows = curveRows(first, range, layout.areaWidth, curveHeight, ctx.capabilities);
-      const layer: Layer = { glyphRows, tone: toneOf(first, 0) };
+      const layer: Layer = { glyphRows, ref: refOf(first, 0) };
       for (let i = 0; i < curveHeight; i += 1) {
         out.push(
           line(
@@ -246,7 +272,7 @@ function stackedRows(
   series.forEach((s, index) => {
     const stripRows = heights[index] ?? 0;
     const glyphRows = curveRows(s, range, layout.areaWidth, stripRows, ctx.capabilities);
-    const layer: Layer = { glyphRows, tone: toneOf(s, index) };
+    const layer: Layer = { glyphRows, ref: refOf(s, index) };
     for (let i = 0; i < stripRows; i += 1) {
       out.push(
         line(
@@ -280,7 +306,7 @@ function overlaidRows(
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   const layers: readonly Layer[] = block.series.map((s, index) => ({
     glyphRows: curveRows(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
-    tone: toneOf(s, index),
+    ref: refOf(s, index),
   }));
 
   return Array.from({ length: layout.areaRows }, (_, i) =>
@@ -351,8 +377,8 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
         [
           {
             text: spark,
-            style: tone(
-              first === undefined ? "default" : toneOf(first, 0),
+            style: slot(
+              first === undefined ? "tone.default" : refOf(first, 0),
               ctx.theme,
               ctx.capabilities,
             ),

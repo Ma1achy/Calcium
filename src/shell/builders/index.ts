@@ -355,6 +355,15 @@ function plot(
   },
 ): Plot {
   const { series, height, axes, yMin, yMax, yFormat } = spec;
+  // **The same refusal the validator makes** (C04 I50a). Two expressions of one
+  // rule, which is this file's shape throughout: the constructor is where an
+  // author finds out and the validator is where an untrusted document does.
+  if (series.length > 8) {
+    throw new TypeError(
+      `b.plot: ${String(series.length)} series and the categorical palette distinguishes 8 ` +
+        `(C04 I50a) — a ninth would repeat a colour, which reads as two series being one`,
+    );
+  }
   return finish<Plot>(
     {
       kind: "plot",

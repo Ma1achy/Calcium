@@ -3526,7 +3526,36 @@ THE SWEEP IS DONE, AND THE RULE CAME FIRST.
                                    one class of decision this session does not take alone —
                                    and unlike the ambiguous-width field, nothing about it is
                                    fixed by detection, so there is no half that lands early.
-                                   The measurement is what the decision needs and it is above
+                                   BUILT 2026-08-15, and the disposal changed with the
+                                   measurement: *mints a public surface with no detection half*
+                                   is the right caution for a SPECULATIVE palette, and this is
+                                   a fix for a plot that lies at four series and again at five.
+                                   For a fix, the surface IS the fix. `categorical` is a
+                                   `PaletteSpec` in both themes — Okabe-Ito, eight, adjusted
+                                   per theme against its own background, every slot clearing
+                                   5.1 measured — with `carries: "decoration"`, curated 4-bit
+                                   indices in all three maps, `SERIES_TONES` replaced by
+                                   `CATEGORY_REFS` and THE CYCLE REMOVED RATHER THAN WIDENED,
+                                   and C04 I50a refusing a ninth series at both gates.
+                                   THE 1-BIT RUNG IS VACUOUS BY CONSTRUCTION, checked rather
+                                   than assumed: `definition.ts` forces stacked strips at
+                                   `colourDepth === 1` for a multi-series plot, so nothing
+                                   asks for a colour there and the strips are the answer
+                                   already. If markers ever land — four independent arrivals:
+                                   plotille, ratatui, termplot, the 1-bit highlight — the
+                                   strips ruling is re-tested, which is a bigger change than
+                                   the palette and belongs to whoever picks that up.
+                                   TWO THINGS THE BUILD FOUND. The 24-bit distinctness had a
+                                   keeper already: C10 refuses two slots of one palette
+                                   rendering as one another at theme LOAD, which is stronger
+                                   than the row asserting it and was found by trying to mutate
+                                   it. And `carries: "decoration"` vs `"meaning"` is NOT
+                                   observable at any depth without `classes` — both resolve
+                                   through `MONO["normal"]` — so that mutation was withdrawn
+                                   rather than scored. T2.60–T2.64; every golden frame that
+                                   moved was checked and the diff is colour-only, no geometry.
+                                   WHAT REMAINS OF 51: the spinner and bar sets, which are
+                                   additive
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 

@@ -236,6 +236,19 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       for (const [i, s] of b["series"].entries()) {
         if (isRecord(s)) requireFiniteNumbers(s["values"], e, at, `series[${String(i)}].values`);
       }
+      // **I50a — refused, not cycled** (roadmap 51). The categorical palette
+      // distinguishes eight, and a ninth series used to reuse the first's
+      // colour: a segmentation that says two different things are the same
+      // thing. C04 I47's disposal — a construction error rather than a
+      // rendering that lies — and the same argument, since a reader cannot see
+      // that a colour has been reused.
+      if (b["series"].length > CATEGORY_LIMIT) {
+        e.push(
+          `${at}: "series" has ${String(b["series"].length)} entries and the categorical ` +
+            `palette distinguishes ${String(CATEGORY_LIMIT)} (C04 I50a) — a ninth series ` +
+            `would repeat a colour, which reads as two series being one`,
+        );
+      }
     }
     if (b["form"] !== "line" && b["form"] !== "sparkline") {
       e.push(`${at}: "form" must be "line" or "sparkline"`);
@@ -440,6 +453,15 @@ function requireGlyph(value: unknown, e: string[], at: string): void {
       `got ${JSON.stringify(value)}; a character has no ASCII fallback and no width guarantee`,
   );
 }
+
+/**
+ * How many series one plot may carry (C04 I50a, roadmap 51).
+ *
+ * The number is the categorical palette's size and it lives here because this is
+ * where the refusal is: a limit stated where the colours are would be a rule
+ * about rendering, and this is a rule about what a document may say.
+ */
+const CATEGORY_LIMIT = 8;
 
 /**
  * Children of a container, for the recursive walk. Total on malformed input.

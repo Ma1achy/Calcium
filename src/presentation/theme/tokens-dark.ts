@@ -79,6 +79,49 @@ export const DARK: ThemeTokens = Object.freeze({
       }),
     }),
 
+    /**
+     * **`n` distinct things, no order, no judgement** — the third axis, beside
+     * `tone` and the change axis (roadmap 51).
+     *
+     * `tone` structurally cannot carry this: every member is a judgement, so a
+     * categorical value would be a sixth judgement meaning *no judgement*. C12
+     * cycled series through `["accent", "info", "ok", "warn"]` for want of one,
+     * which told the reader that series three was good and series four wanted
+     * attention — D29's *no information by colour alone* inverted into
+     * information that is not there.
+     *
+     * **`carries: "decoration"`, and that is the whole point.** A meaning palette
+     * collapses to the class it declared at 1-bit; this one collapses to the
+     * foreground, because there is nothing to preserve. **The 1-bit rung is
+     * vacuous by construction rather than unavailable**: C12 forces stacked
+     * strips at `colourDepth === 1` for a multi-series plot, so nothing ever asks
+     * for a colour to distinguish series there — the distinction is spatial and
+     * the palette has no subject.
+     *
+     * **Eight, capped, and the cap is the ruling.** More categories than the
+     * palette distinguishes is refused at construction (C04 I47's disposal),
+     * because silently reusing a colour is a segmentation that lies — and that
+     * is measured rather than argued: `index % 4` shipped.
+     *
+     * Okabe-Ito, adjusted per theme against its own background. The canonical
+     * set is designed for print on white: its black is 1.21 against this ground
+     * and its blue 3.36, so the two are replaced by a neutral and a lighter
+     * blue. Every slot clears 6.2 here, measured.
+     */
+    categorical: Object.freeze({
+      carries: "decoration",
+      monochrome: "foreground",
+      slots: Object.freeze({
+        c1: "#e69f00",
+        c2: "#56b4e9",
+        c3: "#3cbf9a",
+        c4: "#f0e442",
+        c5: "#8fa8ff",
+        c6: "#f07a3c",
+        c7: "#e4a3c4",
+        c8: "#cfcfcf",
+      }),
+    }),
     syntax: Object.freeze({
       carries: "meaning",
       monochrome: "typographic",
