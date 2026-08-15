@@ -29,6 +29,19 @@ export type RenderContext = Readonly<{
   width: number;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * Scroll offsets by block id, in **rows** (C04 I48).
+   *
+   * **View state, arriving the way focus does** — a record the container looks
+   * itself up in rather than a value threaded down the tree. Rows and not an
+   * element index, so a resize re-interprets it and a reader who scrolled
+   * halfway stays halfway (C04 §3c trace 4).
+   *
+   * Absent is zero. It is clamped where it is read and never corrected where it
+   * is written, because a store fixed up on every patch is one that accumulates
+   * (C23 I47).
+   */
+  scrollOffsets?: Readonly<Record<string, number>>;
   focus: FocusState | null;
   /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer

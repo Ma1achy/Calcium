@@ -55,6 +55,7 @@ import type {
   Logs,
   Notice,
   Panel,
+  Scroll,
   Patch,
   Pills,
   Plot,
@@ -525,6 +526,38 @@ function panel(
  * does not match the children are all authoring mistakes with no reading, and
  * the constructor is where an author finds out.
  */
+/**
+ * A bounded region (C04 §3c, C04 I47).
+ *
+ * **Throws rather than returning an invalid block**, as `group` does for a bad
+ * share: an empty container is a scroll nobody can aim and a non-positive
+ * height is a box that shows nothing, and neither has a reading to fall back
+ * on. The validator refuses both as well — the constructor is where an author
+ * finds out, and the validator is where an untrusted document does.
+ */
+function scroll(
+  height: number,
+  children: readonly Block[],
+  opts?: BlockOpts,
+): Scroll {
+  if (!Number.isInteger(height) || height < 1) {
+    throw new TypeError(
+      `b.scroll: height is a positive integer — got ${JSON.stringify(height)}`,
+    );
+  }
+  if (children.length === 0) {
+    throw new TypeError(
+      "b.scroll: a bounded region needs at least one child — its elements are one per child, " +
+        "so an empty one is a container nobody can aim (C04 I47)",
+    );
+  }
+  return finish<Scroll>(
+    { kind: "scroll", id: idOf(opts, "scroll"), height, children } as Scroll,
+    opts,
+    false,
+  );
+}
+
 function group(
   direction: "row" | "column",
   children: readonly Block[],
@@ -703,6 +736,7 @@ export const b = {
   tip,
   panel,
   group,
+  scroll,
   raw,
   spinner,
 

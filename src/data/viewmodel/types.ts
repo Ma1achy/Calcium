@@ -674,6 +674,40 @@ export type Valign = "top" | "middle" | "bottom";
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
 export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
 
+/**
+ * A bounded region: a box of declared height holding children (C04 §3c, I47).
+ *
+ * **C26 §4b's cell 3 — the one kind declaring both `elements` and `window`.**
+ * `↓` steps a child and the window follows; `PgUp`/`PgDn` move the window and
+ * leave focus alone. The offset is **view state** and is not here: it is a row
+ * count held by L4, droppable, restored by no resume (I48).
+ *
+ * **Reach for one where bounding is the point** — a view, the live entry, a
+ * dashboard, an activity region. In the scrolling transcript a long block is
+ * already fine, because the transcript is what scrolls; wrapping a 400-line
+ * result in one there hides 380 rows, and after I48 it hides them permanently
+ * until block-to-block focus lands (roadmap 46, C26 §11).
+ */
+export type Scroll = Readonly<{
+  kind: "scroll";
+  id: string;
+  /**
+   * The **content** height, in rows. A positive integer.
+   *
+   * The residue marker is chrome the container adds on top of it (I49), so the
+   * box is `height` rows of content and one more when the children do not fit.
+   */
+  height: number;
+  /**
+   * At least one, and an empty one is a construction error (I47).
+   *
+   * **The elements are one per child**, which is what makes *no elements* and
+   * *no children* the same fact — and that is the whole reason the refusal can
+   * live here rather than in the renderer (§3c cell 5).
+   */
+  children: readonly Block[];
+}> & Gap;
+
 export type Block =
   | Rule
   | Notice
@@ -691,6 +725,7 @@ export type Block =
   | Tip
   | Panel
   | Group
+  | Scroll
   | Raw;
 
 export type BlockKind = Block["kind"];

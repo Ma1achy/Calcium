@@ -304,6 +304,35 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     checkAlign(b, e, at);
   },
   raw: (b, e, at) => requireString(b, "text", e, at),
+  /**
+   * C04 I47, §3c cell 5 — **refused at parse, not corrected at render.**
+   *
+   * A container with no children has no elements, so it is a scroll nobody can
+   * aim: an offset with nothing to move it. Rendering it as an empty box would
+   * be *correcting* a document that cannot mean anything, which is the
+   * placement rule's mistake (C15 I20) and `resolve(key)` with no choices.
+   *
+   * **Expressible here only because the elements are one per child.** The
+   * element list is L1's to compute and `data/` cannot call into it; the
+   * correspondence is what turns a question about elements into a question
+   * about `children.length`.
+   */
+  scroll: (b, e, at) => {
+    requireArray(b, "children", e, at);
+    if (isArray(b["children"]) && b["children"].length === 0) {
+      e.push(
+        `${at}: a "scroll" needs at least one child (C04 I47) — its elements are one per ` +
+          `child, so an empty one is a container nobody can aim`,
+      );
+    }
+    const height = b["height"];
+    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+      e.push(
+        `${at}: "height" must be a positive integer (C04 I47) — got ${JSON.stringify(height)}; ` +
+          `a box of zero rows shows nothing and has no reading to fall back on`,
+      );
+    }
+  },
 });
 
 /**
@@ -414,7 +443,7 @@ function requireGlyph(value: unknown, e: string[], at: string): void {
 /** Children of a container, for the recursive walk. Total on malformed input. */
 function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
   const kind = b["kind"];
-  if (kind === "panel" || kind === "group") {
+  if (kind === "panel" || kind === "group" || kind === "scroll") {
     return isArray(b["children"]) ? b["children"] : [];
   }
   if (kind === "table" && isArray(b["rows"])) {

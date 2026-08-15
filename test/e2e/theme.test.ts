@@ -30,7 +30,7 @@ describe("C10 e2e", () => {
   //
   // **It exists now.** C11 and C12 have their own goldens and C25's are at
   // `test/golden/patch.test.ts`; this is the vocabulary in one frame, which is a
-  // different claim from any of them — that the seventeen render *together*, in both
+  // different claim from any of them — that the eighteen render *together*, in both
   // variants, at all four depths, without one of them throwing on a capability the
   // others tolerate.
   it("T5.1: every block kind renders in both variants at all four depths", () => {

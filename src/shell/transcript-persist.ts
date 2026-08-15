@@ -19,7 +19,7 @@
  *
  * **Nothing here redacts, and that is a ruling rather than an omission** (C13
  * §5b.4). C20's redactor works on a tokenised command line; a rendered document
- * has seventeen kinds and no tokens, and a redactor wrong about one kind is
+ * has eighteen kinds and no tokens, and a redactor wrong about one kind is
  * worse than none because it is switched on. The verb declares instead — C05
  * I25 — and a verb that declares nothing is not written.
  */

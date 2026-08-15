@@ -282,7 +282,7 @@ an entry is written iff  its verb opts in  AND  the entry has settled (5b.3)
 
 **There is no framework redactor, and the argument for that is the argument
 against one.** C20's works because a command line has tokens; a rendered document
-has seventeen kinds and none, so being right about all of them is the requirement
+has eighteen kinds and none, so being right about all of them is the requirement
 and being wrong about one is silent — **a redactor wrong about one kind is worse
 than none, because it is switched on.** A per-app redactor is the same trap with
 the blame moved: it is still a scanner over rendered output, and it still has to be
@@ -392,7 +392,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost. The count recurses through nested blocks (`panel.children`, `group.children`, a row's `detail`) and never through rows.
 - **I18** — C13 imports nothing from `terminal/` or `presentation/`.
 - **I19** — Readers take `TranscriptView`, never `TranscriptStore`. The mutators and the §5a payload window are reachable only from L4, so no consumer above can append, clear, or see a debug buffer it was never given.
-- **I20** — **An entry reaches disk only if its verb declared persistence and the entry has settled** (§5b). Both halves are load-bearing and each answers a different failure. *Settled* makes the file append-only **in fact rather than by assumption**: a transcript entry is patched and settled after a history entry would already have been immutable, so a row written earlier is a row that disagrees with memory — and a missing last entry is recovered by running the command again where a divergent file is not recovered at all. *Declared* is because **the framework never redacts and cannot**: C20's redactor works on a tokenised command line, a rendered document has seventeen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. The verb is the unit because that is where the knowledge is — the same ground C05 I19 already gives `handoff`, *the app author is the only party who can know this*. Off by default, since a missing feature is visible on the first resume and **a leaked secret is not visible at all** (F168).
+- **I20** — **An entry reaches disk only if its verb declared persistence and the entry has settled** (§5b). Both halves are load-bearing and each answers a different failure. *Settled* makes the file append-only **in fact rather than by assumption**: a transcript entry is patched and settled after a history entry would already have been immutable, so a row written earlier is a row that disagrees with memory — and a missing last entry is recovered by running the command again where a divergent file is not recovered at all. *Declared* is because **the framework never redacts and cannot**: C20's redactor works on a tokenised command line, a rendered document has eighteen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. The verb is the unit because that is where the knowledge is — the same ground C05 I19 already gives `handoff`, *the app author is the only party who can know this*. Off by default, since a missing feature is visible on the first resume and **a leaked secret is not visible at all** (F168).
 
 ---
 

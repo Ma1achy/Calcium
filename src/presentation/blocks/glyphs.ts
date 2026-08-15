@@ -51,9 +51,21 @@ export type GlyphSet = Readonly<{
   // Progress.
   progressFull: string;
   progressEmpty: string;
+
+  /**
+   * The residue marker's lead, on a bounded region (C04 I49).
+   *
+   * **A slot and never a literal** — F122's rule. The fallback is `~` and not
+   * `...`, and T2.5 is what decided it: every pair is 1:1 by cell count, and
+   * three dots are three cells where `⋯` is one. That is the same
+   * measurement that made the ASCII truncation marker `~` (C04 §5), reached a
+   * second time by a rule rather than by an author.
+   */
+  residue: string;
 }>;
 
 const UNICODE: GlyphSet = Object.freeze({
+  residue: "\u22ef",
   horizontal: "─",
   vertical: "│",
   topLeft: "┌",
@@ -80,6 +92,7 @@ const UNICODE: GlyphSet = Object.freeze({
 });
 
 const ASCII: GlyphSet = Object.freeze({
+  residue: "~",
   horizontal: "-",
   vertical: "|",
   topLeft: "+",

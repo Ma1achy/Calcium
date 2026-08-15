@@ -40,6 +40,10 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 [38;2;138;138;138m|[39mtwo lines                             [38;2;138;138;138m|[39m
 |of text                               |
 [38;2;138;138;138m+--------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
 ── raw · measured 2 · rendered 2
@@ -87,6 +91,10 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 [38;2;138;138;138m|[39mtwo lines                                                 [38;2;138;138;138m|[39m
 |of text                                                   |
 [38;2;138;138;138m+----------------------------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
 ── raw · measured 2 · rendered 2
@@ -134,6 +142,10 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 [38;2;138;138;138m|[39mtwo lines                                                                     [38;2;138;138;138m|[39m
 |of text                                                                       |
 [38;2;138;138;138m+------------------------------------------------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
 ── raw · measured 2 · rendered 2
@@ -181,6 +193,10 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 [38;2;138;138;138m|[39mtwo lines                                                                                                             [38;2;138;138;138m|[39m
 |of text                                                                                                               |
 [38;2;138;138;138m+----------------------------------------------------------------------------------------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
 ── raw · measured 2 · rendered 2
@@ -228,6 +244,10 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 40 1`] = `
 [38;2;138;138;138m│[39mtwo lines                             [38;2;138;138;138m│[39m
 │of text                               │
 [38;2;138;138;138m└──────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
 ── raw · measured 2 · rendered 2
@@ -275,6 +295,10 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 60 1`] = `
 [38;2;138;138;138m│[39mtwo lines                                                 [38;2;138;138;138m│[39m
 │of text                                                   │
 [38;2;138;138;138m└──────────────────────────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
 ── raw · measured 2 · rendered 2
@@ -322,6 +346,10 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 80 1`] = `
 [38;2;138;138;138m│[39mtwo lines                                                                     [38;2;138;138;138m│[39m
 │of text                                                                       │
 [38;2;138;138;138m└──────────────────────────────────────────────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
 ── raw · measured 2 · rendered 2
@@ -369,6 +397,10 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 120 1`] = `
 [38;2;138;138;138m│[39mtwo lines                                                                                                             [38;2;138;138;138m│[39m
 │of text                                                                                                               │
 [38;2;138;138;138m└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;138;138;138m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
 ── raw · measured 2 · rendered 2
@@ -416,6 +448,10 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 [38;2;105;108;119m|[39mtwo lines                             [38;2;105;108;119m|[39m
 |of text                               |
 [38;2;105;108;119m+--------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
 ── raw · measured 2 · rendered 2
@@ -463,6 +499,10 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 [38;2;105;108;119m|[39mtwo lines                                                 [38;2;105;108;119m|[39m
 |of text                                                   |
 [38;2;105;108;119m+----------------------------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
 ── raw · measured 2 · rendered 2
@@ -510,6 +550,10 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 [38;2;105;108;119m|[39mtwo lines                                                                     [38;2;105;108;119m|[39m
 |of text                                                                       |
 [38;2;105;108;119m+------------------------------------------------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
 ── raw · measured 2 · rendered 2
@@ -557,6 +601,10 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 [38;2;105;108;119m|[39mtwo lines                                                                                                             [38;2;105;108;119m|[39m
 |of text                                                                                                               |
 [38;2;105;108;119m+----------------------------------------------------------------------------------------------------------------------+[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m~ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
 ── raw · measured 2 · rendered 2
@@ -604,6 +652,10 @@ exports[`C09 T2.10 — golden frames > light-unicode at 40 1`] = `
 [38;2;105;108;119m│[39mtwo lines                             [38;2;105;108;119m│[39m
 │of text                               │
 [38;2;105;108;119m└──────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                right
 ── raw · measured 2 · rendered 2
@@ -651,6 +703,10 @@ exports[`C09 T2.10 — golden frames > light-unicode at 60 1`] = `
 [38;2;105;108;119m│[39mtwo lines                                                 [38;2;105;108;119m│[39m
 │of text                                                   │
 [38;2;105;108;119m└──────────────────────────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                          right
 ── raw · measured 2 · rendered 2
@@ -698,6 +754,10 @@ exports[`C09 T2.10 — golden frames > light-unicode at 80 1`] = `
 [38;2;105;108;119m│[39mtwo lines                                                                     [38;2;105;108;119m│[39m
 │of text                                                                       │
 [38;2;105;108;119m└──────────────────────────────────────────────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                    right
 ── raw · measured 2 · rendered 2
@@ -745,6 +805,10 @@ exports[`C09 T2.10 — golden frames > light-unicode at 120 1`] = `
 [38;2;105;108;119m│[39mtwo lines                                                                                                             [38;2;105;108;119m│[39m
 │of text                                                                                                               │
 [38;2;105;108;119m└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘[39m
+── scroll · measured 3 · rendered 3
+one
+two
+[38;2;105;108;119m⋯ 0 above, 1 below[39m
 ── group · measured 1 · rendered 1
 left                                                        right
 ── raw · measured 2 · rendered 2

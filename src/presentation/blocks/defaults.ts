@@ -8,7 +8,7 @@
  * (§3, commitment 2).
  */
 import { codeDefinition } from "./kinds/code.js";
-import { groupDefinition, panelDefinition } from "./kinds/containers.js";
+import { groupDefinition, panelDefinition, scrollDefinition } from "./kinds/containers.js";
 import {
   comparisonDefinition,
   eventsDefinition,
@@ -40,5 +40,6 @@ export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
   tipDefinition,
   panelDefinition,
   groupDefinition,
+  scrollDefinition,
   rawDefinition,
 ] as BlockDefinition[]);

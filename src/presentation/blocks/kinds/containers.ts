@@ -23,7 +23,8 @@ import {
   ROW_GUTTER,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
-import type { Block, Group, MeasureFn, Panel } from "../../../data/viewmodel/index.js";
+import type { Block, Group, MeasureFn, Panel, Scroll } from "../../../data/viewmodel/index.js";
+import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, paint, tone } from "../paint.js";
@@ -185,6 +186,149 @@ const DOWN = {
   middle: "center",
   bottom: "flex-end",
 } as const;
+
+// --- scroll -----------------------------------------------------------------
+
+/**
+ * The child row ranges, in **content** coordinates (C04 §3c cell 8, C26 I4).
+ *
+ * Content and not box, and the exception is forced: clipping to what is visible
+ * would make `elements` depend on the offset, which C26 I3 refuses. The offset
+ * is the one map from these rows to drawn rows.
+ */
+function childRanges(
+  block: Scroll,
+  width: number,
+  measureChild: MeasureFn,
+): readonly Readonly<{ child: Block; from: number; to: number }>[] {
+  const out: { child: Block; from: number; to: number }[] = [];
+  let at = 0; // cells-ok — a row cursor, not a width
+  for (const child of block.children) {
+    const height = measureChild(child, width);
+    out.push({ child, from: at, to: at + height });
+    at += height;
+  }
+  return out;
+}
+
+/** The content's total height, which decides the residue row (C04 I49). */
+function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): number {
+  const ranges = childRanges(block, width, measureChild);
+  const last = ranges.at(-1); // cells-ok — a child count, not a width
+  return last === undefined ? 0 : last.to;
+}
+
+/**
+ * The offset, clamped at read (C04 I48, §3c cell 4).
+ *
+ * **Never corrected at write.** A store fixed up on every patch is one that
+ * accumulates, which C23 I47 forbids of view state — so a stale value is a
+ * number this function bounds and nothing else ever sees.
+ */
+function offsetOf(block: Scroll, ctx: RenderContext, content: number): number {
+  const held = ctx.scrollOffsets?.[block.id] ?? 0;
+  const most = Math.max(0, content - block.height);
+  return Math.min(Math.max(0, Math.trunc(held)), most);
+}
+
+export const scrollDefinition: BlockDefinition<Scroll> = {
+  kind: "scroll",
+
+  /**
+   * `height`, plus the residue row where the content cannot fit (C04 I47, C04 I49).
+   *
+   * **The condition is on `(block, width)` and never on the offset**, which is
+   * what keeps the box the same size as the reader scrolls — a content area
+   * that shrank when residue appeared would jitter, and `measure` would depend
+   * on view state.
+   */
+  measure(block: Scroll, width: number, measureChild: MeasureFn): number {
+    const w = normaliseWidth(width);
+    return block.height + (contentHeight(block, w, measureChild) > block.height ? 1 : 0);
+  },
+
+  /** One per child, at block level — which is what makes C04 I47's refusal expressible. */
+  elements(block: Scroll, width: number, measureChild: MeasureFn): readonly NavElement[] {
+    const w = normaliseWidth(width);
+    return Object.freeze(
+      childRanges(block, w, measureChild).map((r) =>
+        Object.freeze({
+          id: r.child.id,
+          level: "block" as const,
+          rows: Object.freeze({ from: r.from, to: r.to }),
+          cols: Object.freeze({ from: 0, to: w }),
+        }),
+      ),
+    );
+  },
+
+  /**
+   * **No `window`, and the sweep is what said so** (C04 §3c cell 1).
+   *
+   * The walk ruled that two windows compose — the transcript's slicing the box
+   * and the offset choosing what fills it — and the build found the composition
+   * is not this kind's to make. `window` must return a block that *measures the
+   * slice*, and a bounded region's height is declared: it cannot measure less
+   * without becoming a different box. Sixteen rows of the conformance sweep say
+   * it in one line each.
+   *
+   * **And nothing is lost, because the reason `window` exists does not apply
+   * here.** It bounds the first frame of a kind that can be enormous — `logs`,
+   * `patch` — and a scroll is at most `height + 1` rows by construction.
+   * `windowSequence` keeps a kind declaring none whole and pays for it out of
+   * `skipRows`, which is exactly right for a block that is already small.
+   *
+   * **The correction this forces is in the classification, not here.** C26 §4a's
+   * 2 × 2 sorted kinds by whether they declare `BlockDefinition.window` and read
+   * that as *the container has a viewport*. Those are two senses of one word: a
+   * scroll has a viewport, in the offset, and needs no `window` at all. So the
+   * cell that was said to be empty still is, and this kind is not its inhabitant.
+   */
+
+  render(block: Scroll, ctx: RenderContext): ReactElement {
+    const width = normaliseWidth(ctx.width);
+    const content = contentHeight(block, width, ctx.measureChild);
+    const offset = offsetOf(block, ctx, content);
+    const g = glyphs(ctx.capabilities);
+
+    const ranges = childRanges(block, width, ctx.measureChild);
+    const shown = ranges.filter((r) => r.to > offset && r.from < offset + block.height);
+
+    const children: ReactElement[] = shown.map((r) =>
+      createElement(
+        Box,
+        { key: r.child.id, width, flexDirection: "column" },
+        ctx.renderChild(r.child, width),
+      ),
+    );
+
+    // **The residue, both directions** (C04 I49). A settled container keeps the
+    // offset it had, so content is hidden above as well as below — and a
+    // bounded region that says neither is the empty-block class (F123).
+    if (content > block.height) {
+      const above = offset;
+      const below = Math.max(0, content - block.height - offset);
+      const dim = tone("dim", ctx.theme, ctx.capabilities);
+      // **The separator is a comma and not a middle dot.** The first version
+      // used one and C09 T4.4 caught it under unicode:"ascii" -- a literal
+      // non-ASCII character in the very row written to keep the *mark* out of
+      // the source. F6's class, one token to the right of where it was watched
+      // for, and a comma needs no slot because it is the same everywhere.
+      const text = `${g.residue} ${String(above)} above, ${String(below)} below`;
+      children.push(
+        createElement(
+          Text,
+          { key: "residue" },
+          paint(clampSpans([{ text: truncate(text, width, ctx.capabilities), style: dim }], width, ctx.capabilities)),
+        ),
+      );
+    }
+
+    // **No height on the Box.** `measure` already told the caller how tall this
+    // is, and stating it here would be a second record of one number.
+    return createElement(Box, { flexDirection: "column", width }, ...children);
+  },
+};
 
 export const groupDefinition: BlockDefinition<Group> = {
   kind: "group",

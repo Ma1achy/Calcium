@@ -289,7 +289,7 @@ all unwritable — three tests and an invariant resting on an argument that did 
 exist. `b.panel` had the same shape of hole against `footer`, which S12 §2 and
 S13 §2 both draw and C04's `Panel` has carried since.
 
-The seventeen positional builders take `opts?` last. **`b.table`, `b.plot`,
+The eighteen positional builders take `opts?` last. **`b.table`, `b.plot`,
 `b.progress`, `b.patch` and `b.panel` spread `BlockOpts` into the spec object
 they already take** rather than growing a second bag beside it — two places for
 one set of fields is the drift a shared type prevents, and it is the argument

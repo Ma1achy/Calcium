@@ -455,7 +455,17 @@ notice here.
 - **I3** — `elements` is pure in `(block, width)`. Focus is not a parameter, so a
   focus-dependent geometry is unrepresentable rather than forbidden.
 - **I4** — Every element's rows lie within `[0, measure(block, width))` and its columns within
-  `[0, width)`.
+  `[0, width)` — **except a bounded container, whose elements lie within its content and not
+  within its box** (C04 §3c cell 8). The exception is forced rather than chosen: a scroll's
+  children extend past the box by construction, and both ways of keeping them inside it are
+  worse. Clipping the list to what is visible makes `elements` depend on the offset, which I3
+  forbids — focus is not a parameter and neither is any other view state. Measuring the box as
+  its content makes the block's height depend on how much it holds, which is the one thing a
+  bounded region exists not to do. **So the offset is the single map from content rows to box
+  rows**, which is §4b's *the window is a rendering consequence* restated as an addressing
+  rule, and the pointer resolves through it (I8). **Found by the compiler rather than by
+  either walk artefact**: neither indexes one component's invariant against a kind that did
+  not exist when it was written.
 - **I5** — The element list is in reading order, non-decreasing by `(rows.from, cols.from)`.
 - **I6** — Two elements at the same `level` share no cell. Nesting across levels is the
   structure and is not a violation.

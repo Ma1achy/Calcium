@@ -344,7 +344,18 @@ describe("C22 §3 step 11 — the effect table", () => {
     for (const kind of ["table", "plot", "patch"]) {
       expect(graph.blocks.kinds, `${kind} has no renderer`).toContain(kind);
     }
-    expect(graph.blocks.kinds.length, "and C09's fourteen are still there").toBe(17);
+    // **Fifteen defaults plus these three, and the split moved with `scroll`** --
+    // which is why this was read rather than swept: the sentence said *fourteen*
+    // and the total said 17, and a kind added to C09's defaults changes both
+    // numbers by one in different places.
+    //
+    // **A hand-maintained total, and that is the finding rather than the fix.**
+    // It cannot be derived here: `graph.blocks.kinds` is the registry's own
+    // answer, so comparing it to itself proves nothing, and the union is a type.
+    // C04 T2.10 holds the derivable half -- a literal list checked against
+    // `BlockKind` at compile time, where adding a kind is a type error. This row
+    // is the runtime half and it can only count.
+    expect(graph.blocks.kinds.length, "C09's fifteen and the three registered").toBe(18);
   });
 
   it("T2.15 (C16 I22): ↓ into the live block, ↑ and Esc back out — as one sequence", async () => {
