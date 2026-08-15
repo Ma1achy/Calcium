@@ -664,6 +664,62 @@ to decline, which is the shape C09 I1's neighbours keep rejecting.
 
 ---
 
+## 3c. The scroll container — a declared height, and an offset that is not the block's
+
+Roadmap 46's kind, and **C26 §4b's cell 3 gets its first inhabitant**: the one kind declaring
+both `elements` and `window`. That cell was ruled while empty, which is what made it cheap to
+get wrong, so this section is the ruling meeting a subject.
+
+```typescript
+export type Scroll = Readonly<{
+  kind: "scroll";
+  id: string;
+  /** Interior rows. A positive integer, and the content may exceed it. */
+  height: number;
+  children: readonly Block[];
+}>;
+```
+
+**The elements are one per child**, at `level: "block"`. That correspondence is not a
+convenience: it makes *has no elements* and *has no children* the same fact, which is what
+lets the refusal below live in `data/` without calling into L1.
+
+**`height` is declared and `measure` never sees it unresolved** — roadmap 38's
+resolve-then-measure, and the third ruling in this project with that shape (I44's fixed shares
+and I45's alignment are the other two). `measure(block, width)` returns `height` at every
+width and every offset.
+
+### The walk — both artefacts, because the kind has structure and state
+
+**C26 §8a's rule applied rather than cited**: a component with structure *and* state needs a
+table *and* a trace, and taking the trace alone because the scrolling is the obvious thing is
+how the structural half goes unexamined.
+
+#### The classification table — interactions that hold at rest
+
+| # | the two rules that meet | ruling |
+|---|---|---|
+| 1 | *`measure` returns `height`* × *the transcript windows every block* | **Two windows compose and neither is the other's business.** The transcript's `window(block, width, from, to)` slices the scroll's **box** — the `height` rows it draws — and the offset chooses which children fill that box. `window` is never told the offset and never adds it. Stated because the obvious implementation adds the two and is wrong by exactly the offset, in a direction that looks like an off-by-one at the top of a tall entry |
+| 2 | *elements are one per child* × *I14, ids unique nested children included* | `(scroll.id, child.id)` is unique with **no new uniqueness rule**, which is C26 §8b R3's argument arriving a second time. §4b's address is well-founded here rather than asserted |
+| 3 | *the offset is view state* × *`measure` never sees anything that animates* | **The offset changes no height, and that is the whole reason it can be view state.** The box is `height` rows at every offset, so nothing keyed on `(block, width)` moves and C14's index never rebuilds. An offset that changed height would be a document patch and would belong to C13 |
+| 4 | *content shorter than the box* × *an offset exists* | **Clamped at read, never corrected at write.** A store that had to be fixed up on every patch is a store that accumulates, which is exactly what C23 I47 forbids of view state |
+| 5 | *a container must be aimable* × *elements are one per child* | **`children: []` is a construction error, refused at parse.** *A container declaring an offset and no elements* is the rule, and the correspondence above is what makes it expressible where the validator lives. Refused rather than corrected at render — C15 I20's placement precedent, and the same argument as `resolve(key)` throwing on no choices |
+| 6 | *only the live entry holds focus* × *a container scrolls if it is focusable* | **FINDING, and it is a decision rather than a detail.** `focusFor` answers non-null only for the live entry, so **every scroll above the live one is unaimable** and shows its first `height` rows for the life of the session with the rest unreachable. The archive's surface note says the opposite of ordinary blocks — *frozen: rendered, scrollable, not focusable* — so *scroll follows focus* and *frozen blocks scroll* cannot both hold. **Ruled: a settled scroll keeps its offset and cannot be moved.** The alternative is block-to-block focus above the live entry, which is C26 §11's deferral and not this kind's to take |
+| 7 | *a scroll among another's children* | **Legal and flat.** One element per child, and a child that is a scroll is one stop: `↓` steps *to* it and entering it is C26 §4's scope stack, which is unbuilt. Recorded rather than refused, because the flat reading needs no rule and refusing needs one |
+
+#### The sequence trace — interactions something has to happen for
+
+| # | the sequence | ruling |
+|---|---|---|
+| 1 | focus enters, then `↓` past the last visible child | the offset advances until the child's **last** row is inside the box; **a child taller than the box aligns to its top**, which is the only answer stable under a second `↓` |
+| 2 | `PgDn`, then `↓` | C26 §4b: `↓` steps from the **focused** element, so the offset comes back to it. The assertion is which element focus reaches, never the resulting offset |
+| 3 | a patch replaces the children with fewer | the offset is past the end and is **clamped at read**. Nothing writes, because nothing but the renderer reads it |
+| 4 | a resize | children re-measure and every element's rows move. **The offset is a row count, not an element index** — so it is re-interpreted rather than re-derived, and a reader who scrolled halfway stays halfway instead of jumping to whichever element used to be at that index. This is the ruling an obvious implementation gets wrong, and no cell of the table reaches it |
+| 5 | the entry is evicted or the transcript cleared | the offsets drop **on `rendered`'s own subscription** — same arm, same place in `construct.ts`, so a future eviction path cannot drop one and keep the other |
+| 6 | the entry settles | table cell 6. The offset is kept and frozen |
+
+---
+
 ## 4. Patches
 
 **Four ops carry data and one carries view state, and that split is the whole reason the fifth exists.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -897,6 +953,8 @@ persisted document rests on.
 - **I45** — **A row aligns its children in its own height, and that is the only axis there is.** **Vertical placement is inside the row's height**, which a row already computes as its tallest child and otherwise discards. **A horizontal axis was ruled and refused by the build**: every renderer fits its output to the width it is handed, so a child fills its allocation and aligning a ten-cell box inside a ten-cell one is a no-op — placing it would mean knowing how wide the content *is*, and `measure(block, width) → height` does not answer that. Heights are measurable and widths are not, which is the same missing preferred width that made weights the only allocation (I44), arriving a third time. The axis that exists has a shipped consumer: the banner's wordmark carries a **blank first row** so its seven lines sit on the whale's hull, which is vertical alignment hand-written into the art exactly as the padded whale was a fixed width hand-written into it (§3, roadmap 38). It defaults to `top`, which is what a row does today, so an absent field renders byte for byte as before. **`measure` is untouched**: alignment moves rendered lines inside a box the container already sized, so the row is still the tallest child and every cache keyed on `(block, width)` is unaffected — the containment argument that made weights safe, applied to position instead of size. A child that is not placed is aligned by nobody.
 
 - **I46** — **A valid document survives a JSON round trip unchanged, and the validator refuses what JSON cannot carry.** The union holds no function, `Map`, `Set` or `Date`, so `JSON.stringify` is the serialiser and `validateDocument` is the parser — which is why persistence needs no codec (F166) and why this had to be stated before something rested on it. **Where the type says `number` the validator requires a finite one, elements of numeric arrays included.** Two defects were found by writing the property rather than by the property failing: `NaN` and `Infinity` were accepted, and JSON writes them as `null`, so a document persisted and reloaded was a *different document that revalidated clean*; and `Series.values` and `Cell.spark` were never element-checked at all, so a string, a `null` or an object in a numeric array validated with or without a round trip — the wider half, and the one an untrusted document turns on. **Two inequalities are knowingly tolerated and named rather than closed**: `-0` writes as `0`, which renders identically and is not worth narrowing the type for, and an explicit `undefined` property is dropped, which no constructor can produce because `exactOptionalPropertyTypes` makes it a distinct type and every one spreads-if-present (§5a).
+- **I47** — **A `scroll` declares a positive integer `height` and at least one child, and both are refused at parse.** Its elements are **one per child**, so *no elements* and *no children* are one fact and the aimability rule is expressible where the validator lives (§3c cell 5). `measure(block, width)` returns `height` at every width and every offset — the box does not change size, which is what keeps the offset out of every geometry cache and out of C14's index (§3c cell 3). **The transcript's window slices the box and never the content** (§3c cell 1).
+- **I48** — **The scroll offset is view state: a row count, per container, droppable, clamped at read.** **Rows and not an element index**, so a resize re-interprets it rather than moving the reader to whichever element used to sit there (§3c trace 4). It is never corrected at write — a store that had to be fixed up on every patch is one that accumulates, which C23 I47 forbids of view state — and it is dropped with the entry on the same subscription that drops the rendered rows. **A settled entry's scroll keeps its offset and cannot be moved**, because only the live entry holds focus and a container scrolls if it is focusable (§3c cell 6); the content below the box is unreachable there, and that is a ruling rather than an oversight. **Resume restores no offset**, which follows from view state and is C13 I20's consumer.
 
 ---
 
@@ -949,6 +1007,8 @@ persisted document rests on.
 41. **A share is a weight or a cell count**, fixed satisfied before weighted and placement unchanged — so a declared width is exact where it fits and is dropped like any other child where it does not (I44, §3).
 42. **A row aligns in its own height and measures the same either way** — and the vertical one is what the banner's blank first row was doing by hand (I45, §3).
 43. **A document is JSON, so persistence needs no codec** — and the validator refuses what JSON cannot carry, finite numbers included and numeric array elements with them, because a document that round-trips into a *different valid document* is worse than one that is refused (I46, §5a).
+44. **A `scroll` is a box of declared height holding children**, its elements are one per child, and an empty one is a construction error rather than a container nobody can aim (I47, §3c).
+45. **The offset is view state in rows** — droppable, per container, clamped at read, restored by no resume, and frozen once the entry settles (I48, §3c).
 
 ---
 
