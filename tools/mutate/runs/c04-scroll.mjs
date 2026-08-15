@@ -15,7 +15,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/contract/scroll.test.ts";
+const CMD = "npx vitest run test/contract/scroll.test.ts test/contract/render-cache.test.ts test/integration/scroll-wiring.test.ts";
 const SRC = "src/presentation/blocks/kinds/containers.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -77,6 +77,18 @@ const MUTATIONS = [
     expect: "T2.22",
   },
   {
+    // **The fourth axis omitted from the render cache key** (C04 I48, C22 §6c).
+    // Third instance of focus own story: a fact the render reads that moves
+    // nothing in (entry, rev, width, focus, theme). It fails nothing until a row
+    // scrolls twice and reads the frame, which is why T4.18e exists and why this
+    // row could not be written until the store did.
+    name: "the render cache key ignores the scroll offset",
+    file: "src/shell/session.ts",
+    from: "\\u0000${offsets}`;",
+    to: "`;",
+    expect: "T4.41",
+  },
+  {
     // **The offset trusted rather than clamped** (C04 I48, cell 4). Nothing in
     // the tree writes one yet, so this is the arm that will matter the day L4
     // does — and it is live now because `ctx.scrollOffsets` is readable.
@@ -97,16 +109,16 @@ const MUTATIONS = [
  * `ANCHOR MISSED` every run. The day the store and the axis land, it becomes a
  * mutation against `session.ts`'s key and this note goes.
  */
-const EXPECTED_SURVIVORS = new Map([
-  [
-    "the offset is used as given, without the clamp",
-    "**nothing writes an offset yet**, so `ctx.scrollOffsets` is absent at every call site and " +
-      "`held` is 0 — a clamp of 0 and a trunc of 0 are the same number. The arm is live code and " +
-      "an unreachable branch at once, which is C04 §3c cell 4's own vacuity: *clamped at read* " +
-      "cannot be tested until something writes a value out of range. It becomes killable in the " +
-      "commit that adds the store, and the arm below fails on that day",
-  ],
-]);
+const EXPECTED_SURVIVORS = new Map();
+
+// **The clamp exemption was removed by its own staleness arm**, which is the
+// argument for arms over predictions in one run. It read *nothing writes an
+// offset yet, so a clamp of 0 and a trunc of 0 are the same number* -- true
+// when it was written and false the moment L4 landed. The first pass after the
+// store existed reported EXEMPTION IS STALE rather than quietly excusing a
+// mutation that had become killable, and T2.29 is the row that kills it. A dead
+// reason left in place reads as a considered survivor for as long as nobody
+// re-derives it.
 
 const results = await runPass({
   read,

@@ -47,6 +47,7 @@ import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
+import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
@@ -225,6 +226,8 @@ export type Graph = Readonly<{
    * comment warning about the second could not see it.
    */
   liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
+  /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
+  pageBlock: (direction: 1 | -1) => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   /** Past the blink threshold since the last key (C22 I64). */
@@ -267,6 +270,7 @@ export type Graph = Readonly<{
    * asked for again.
    */
   rendered: RenderCache;
+  scrollOffsets: ScrollOffsets;
   overlays: ReturnType<typeof createOverlayManager>;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
@@ -546,9 +550,21 @@ export async function constructGraph(
     // hold a rendered document nothing can reach, for the life of the session.
     // C14's `HeightCache` takes the same two changes for the same reason.
     const rendered = new RenderCache();
+    // **One subscription for both** (C04 I48). The rendered rows and the offset
+    // that chose them are the same fact about the same entry, and two callbacks
+    // would be two places for a future eviction path to reach one and miss the
+    // other.
+    const scrollOffsets = new ScrollOffsets();
     transcript.subscribe((change) => {
-      if (change.kind === "evict") for (const id of change.ids) rendered.delete(id);
-      else if (change.kind === "clear") rendered.clear();
+      if (change.kind === "evict") {
+        for (const id of change.ids) {
+          rendered.delete(id);
+          scrollOffsets.delete(id);
+        }
+      } else if (change.kind === "clear") {
+        rendered.clear();
+        scrollOffsets.clear();
+      }
     });
 
     const overlays = createOverlayManager({ registry: built.blocks });
@@ -740,6 +756,7 @@ export async function constructGraph(
       transcript,
       viewport,
       rendered,
+      scrollOffsets,
       overlays,
       history,
       editor,
@@ -1059,6 +1076,35 @@ export async function constructGraph(
     return built.blocks.elementsIn(entry.doc.blocks, deps.frame.overlayRegion().width);
   };
 
+  /**
+   * Page the focused container's own window (C04 I48, C26 I18).
+   *
+   * **Here rather than in `keys.ts`**, for `liveElements`'s reason: a page is
+   * the container's height less one row of overlap, and the height is
+   * `measure(block, width)` — a registry call at the frame's width, which is
+   * this file's to make and not the effect table's.
+   *
+   * **Focus does not move**, which is the invariant and not an omission: the
+   * store is nudged and nothing touches `focus`. A focused element outside the
+   * box is the legal state C26 I18 names, and the next `↓` steps from it.
+   */
+  const pageBlock = (direction: 1 | -1): void => {
+    const entryId = stores.transcript.liveId;
+    if (entryId === null) return;
+    const at = focus.current;
+    if (at.at !== "liveBlock" || at.element === null) return;
+
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const block = entry?.doc.blocks.find((b) => b.id === at.element?.blockId);
+    if (block === undefined) return;
+
+    // One row of overlap, which is what lets a reader join two screens — and
+    // a floor of one, so a box of a single row still moves.
+    const height = built.blocks.measure(block, deps.frame.overlayRegion().width);
+    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1));
+    scheduler.commit("input");
+  };
+
   const keys = createKeyEffects({
     editor: stores.editor,
     completion: built.completion,
@@ -1090,6 +1136,7 @@ export async function constructGraph(
     // second's stated reason (cheap on arrows, expensive on `enter`) was
     // falsified by this very walk: both call `liveElements()`.
     liveElements,
+    pageBlock,
     liveEntryId: () => stores.transcript.liveId,
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
     onAction: (action, from) => {
@@ -1403,6 +1450,7 @@ export async function constructGraph(
      */
     cursorIdle: () => config.clock() - lastInputAt >= CURSOR_BLINK_MS,
     liveElements,
+    pageBlock,
     capabilities: detection.capabilities,
     /**
      * C22 I6a — construction, then the session, then what the session contained.

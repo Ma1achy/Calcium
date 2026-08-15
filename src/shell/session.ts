@@ -751,7 +751,15 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     // common case; a large one re-renders as it scrolls, and only the rows on
     // screen.
     const range = `${String(from)}\u0000${String(to)}`;
-    const held = graph.rendered.get(entry.id, entry.rev, width, `${key}\u0000${range}`, theme);
+    // **The fourth axis, and it is the one that fails silently** (C04 I48). A
+    // scroll offset changes what is rendered and moves none of `rev`, width,
+    // focus or theme — focus's own story a third time — so without this a
+    // reader who scrolls away and back is served the frame they left. It fails
+    // nothing until a row scrolls twice and reads the frame, which is why
+    // T4.18e is written that way.
+    const offsets = graph.scrollOffsets.key(entry.id);
+    const slot = `${key}\u0000${range}\u0000${offsets}`;
+    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
     const lines =
       held ??
       renderSequenceToLines(graph.blocks, windowed.blocks, width, {
@@ -764,9 +772,10 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
         // still broken — a partially-populated context, which counting
         // references cannot see.
         focus,
+        scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
       });
     if (held === undefined) {
-      graph.rendered.set(entry.id, entry.rev, width, `${key}\u0000${range}`, theme, lines);
+      graph.rendered.set(entry.id, entry.rev, width, slot, theme, lines);
     }
 
     // **The chrome is unwindowed and the blocks are**, so the slice is taken

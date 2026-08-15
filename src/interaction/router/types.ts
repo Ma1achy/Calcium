@@ -229,6 +229,8 @@ export type KeyAction =
   | "focusPrompt"
   | "rowUp"
   | "rowDown"
+  | "blockPageDown"
+  | "blockPageUp"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row
   // could be moved to and not acted on. `actions.ts` implements all five arms
   // and nothing in `src/` reached it, so an app could declare a `view` action,

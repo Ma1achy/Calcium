@@ -39,6 +39,8 @@ export type RenderOptions = Readonly<{
   tick?: number;
   focus?: RenderContext["focus"];
   onAction?: RenderContext["onAction"];
+  /** Per-container scroll offsets, in rows (C04 I48). Absent is none. */
+  scrollOffsets?: RenderContext["scrollOffsets"];
 }>;
 
 /**
@@ -61,6 +63,7 @@ export function renderToLines(
     theme: options.theme,
     capabilities: options.capabilities,
     focus: options.focus ?? null,
+    ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };
@@ -108,6 +111,7 @@ export function renderSequenceToLines(
     theme: options.theme,
     capabilities: options.capabilities,
     focus: options.focus ?? null,
+    ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };

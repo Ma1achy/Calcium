@@ -345,6 +345,21 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // the same key `overlay` accepts a menu item with, which is the consistency a
   // reader has already learnt by the time they reach a row.
   { target: "liveBlock", key: { name: "enter" }, action: "rowActivate" },
+
+  // **A working key gains a second meaning, and that is a behaviour change**
+  // (C04 §3c, C26 §4b). `pageup`/`pagedown` are bound at `global` to the
+  // transcript's viewport and had no `liveBlock` row at all, so paging inside a
+  // focused block used to scroll the transcript underneath it. The ladder makes
+  // these win while focus is in a block and leaves the global pair untouched
+  // everywhere else — one key at two targets resolved by priority, which is the
+  // same shape the `pushedView` pair already notes and not the duplicate the
+  // conflict rule refuses.
+  //
+  // **Movement moves focus; paging moves the window** (C26 I18). These never
+  // touch focus, which is what makes a focused element outside the box a legal
+  // state rather than a thing to correct.
+  { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
+  { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
 ];
 
 /**

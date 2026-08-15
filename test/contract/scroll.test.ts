@@ -159,11 +159,16 @@ describe("C04 §3c trace 4 — the offset is rows, and only a resize can tell", 
 });
 
 describe("C04 §3c — the frame, read", () => {
-  const frame = (block: Scroll, width = 40): readonly string[] =>
+  const frame = (
+    block: Scroll,
+    width = 40,
+    scrollOffsets: Readonly<Record<string, number>> = {},
+  ): readonly string[] =>
     renderSequenceToLines(registry, [block], width, {
       theme: DARK_THEME,
       capabilities: FULL_CAPS,
       focus: null,
+      scrollOffsets,
     }).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
 
   it("T2.27 (C04 I49, §3c): the rows outside the box are ABSENT, not blank", () => {
@@ -184,6 +189,25 @@ describe("C04 §3c — the frame, read", () => {
       "a",
       "b",
       "⋯ 0 above, 2 below",
+    ]);
+  });
+
+  it("T2.29 (C04 I48, §3c cell 4): an offset past the end is clamped at read, and the box stays full", () => {
+    // **The mutation pass asked for this the day the store landed.** *The offset
+    // used as given, without the clamp* survived while nothing could write one
+    // out of range: `Math.trunc(0)` and a clamp of 0 are the same number, so the
+    // arm was live code and an unreachable branch at once.
+    //
+    // The store floors at zero and deliberately does not ceiling — it knows no
+    // width, so it cannot know the content's height — which makes *clamped at
+    // read* the renderer's job and this row its only witness. Paging past the
+    // end must leave the last screenful, not an empty box below the content.
+    const block = scroll(2, [flat("a"), flat("b"), flat("c"), flat("d")]);
+
+    expect(frame(block, 40, { s: 99 }), "the last two children, not nothing").toEqual([
+      "c",
+      "d",
+      "⋯ 2 above, 0 below",
     ]);
   });
 

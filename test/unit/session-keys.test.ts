@@ -254,6 +254,7 @@ describe("C22 §3 step 11 — the effect table", () => {
 
     const effects = createKeyEffects({
       editor: spy,
+      pageBlock: graph.pageBlock,
       completion: graph.completion,
       overlays: graph.overlays,
       history: graph.history,

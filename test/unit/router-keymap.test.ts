@@ -365,6 +365,12 @@ describe("§6 — the default table (C17 I12)", () => {
       // half the terminals.
       "global pageup": ["\u001b[5~"],
       "global pagedown": ["\u001b[6~"],
+      // C04 I48 — the same two wire forms at a second target, which is the
+      // ladder resolving one key by priority rather than a duplicate the
+      // conflict rule refuses. Pressable end to end: scroll-wiring T4.41
+      // types these exact bytes into a session and reads the frame move.
+      "liveBlock pagedown": ["\u001b[6~"],
+      "liveBlock pageup": ["\u001b[5~"],
       "global c+home": ["\u001b[1;5H", "\u001b[7;5~"],
       "global c+end": ["\u001b[1;5F", "\u001b[8;5~"],
 

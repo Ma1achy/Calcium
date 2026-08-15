@@ -132,6 +132,18 @@ export type KeyDeps = Readonly<{
   /** The entry those elements belong to, for an action's origin (C23 I37). */
   liveEntryId: () => EntryId | null;
   /**
+   * Page the focused container's own window by `direction` (C04 I48, C26 I18).
+   *
+   * **A seam and not the store**, on `liveElements`'s own argument: the block's
+   * height at the current width is what a page is, and this file knows neither
+   * the width nor the registry. L4 holds both, so L4 computes the step and this
+   * file names the intent — which keeps the effect table a transcription rather
+   * than a second place arithmetic lives.
+   *
+   * Focus does not move, and that is C26 I18 rather than an omission here.
+   */
+  pageBlock: (direction: 1 | -1) => void;
+  /**
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
    */
@@ -734,6 +746,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // for whichever handler forgets, of which only the second is invisible.
     scrollPageUp: () => void deps.viewport.pageUp(),
     scrollPageDown: () => void deps.viewport.pageDown(),
+
+    // **The focused container's own window** (C26 I18, C04 I48). The block is
+    // the one holding the focused element — a scroll's elements are its
+    // children, so the address's `blockId` *is* the container — and focus does
+    // not move, by the invariant rather than by omission.
+    //
+    // A page is the box's height less one row of overlap, which is what every
+    // pager does and what makes a reader able to join two screens. The store
+    // floors at zero and the renderer bounds the top, so nothing here clamps
+    // (C04 §3c cell 4).
+    blockPageDown: () => void deps.pageBlock(1),
+    blockPageUp: () => void deps.pageBlock(-1),
     scrollTop: () => void deps.viewport.scrollToTop(),
     scrollBottom: () => void deps.viewport.scrollToBottom(),
 

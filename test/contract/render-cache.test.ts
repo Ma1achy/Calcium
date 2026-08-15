@@ -122,6 +122,84 @@ describe("C22 §6c — the cache's C13 arms", () => {
     expect(graph.capabilities, "the same record, not an equal one").toBe(before);
   });
 
+  it("T4.18e (C04 I48): the offset key is canonical — one state, one string", async () => {
+    // **Retitled, because the first name claimed the wiring and this row is
+    // about the store.** *Scroll, read, scroll back, read* is
+    // `test/integration/scroll-wiring.test.ts` T4.41, which pages a session and
+    // reads the screen; deleting the offset from `session.ts`'s slot changes
+    // nothing here. What this row does hold is real and is a defect it found:
+    // an entry scrolled down and back held `box=0` where an untouched one held
+    // nothing, so one appearance keyed two slots and the frame a reader returns
+    // to was re-rendered rather than found. That is `focusKey`'s own warning
+    // above — a cache that misses on every frame while every assertion about
+    // correctness still passes — and it was surfaced by a mutation hunting
+    // something else, so the assertion is written down here to keep it fixed.
+    // **A single scroll passes with the key unchanged.** The first render fills
+    // the slot; the second, at a new offset, misses on nothing else and is
+    // served the frame it left — so a row that scrolled once and compared the
+    // two would see a difference and agree with the defect. The state that
+    // separates them is *back where you started*: with the offset in the key
+    // the third read is a hit on the first slot and equals it; without it, the
+    // second read already equalled the first and the assertion below is what
+    // catches that.
+    //
+    // Third instance of focus's own story (C22 §6c) — a fact the render reads
+    // that moves nothing in `(entry, rev, width, focus, theme)`.
+    const { graph } = await buildGraph();
+    const id = graph.transcript.append({
+      ...doc("one"),
+      blocks: [
+        {
+          kind: "scroll" as const,
+          id: "box",
+          height: 2,
+          children: [
+            { kind: "raw" as const, id: "a", text: "AAA" },
+            { kind: "raw" as const, id: "b", text: "BBB" },
+            { kind: "raw" as const, id: "c", text: "CCC" },
+            { kind: "raw" as const, id: "d", text: "DDD" },
+          ],
+        },
+      ],
+    });
+
+    const key = (): string => graph.scrollOffsets.key(id);
+    const top = key();
+    graph.scrollOffsets.nudge(id, "box", 2);
+    const moved = key();
+    graph.scrollOffsets.nudge(id, "box", -2);
+
+    expect(moved, "the offset reaches the key at all").not.toBe(top);
+    expect(key(), "and a round trip is byte-identical, not merely equivalent").toBe(top);
+    expect(top, "which is empty for an entry nobody scrolled").toBe("");
+
+    // Two containers, because a single one cannot show an ordering defect: a
+    // Map's insertion order would key one state two ways, and the sort is what
+    // stops it.
+    graph.scrollOffsets.nudge(id, "z", 1);
+    graph.scrollOffsets.nudge(id, "a", 1);
+    const forward = key();
+    graph.scrollOffsets.nudge(id, "z", 0);
+    expect(key(), "and is stable under a later touch that changes nothing").toBe(forward);
+    expect(forward, "sorted, not insertion-ordered").toBe("a=1,z=1");
+  });
+
+  it("T4.18f (C04 I48): the offsets drop on the same subscription as the rendered rows", async () => {
+    // **One callback for both**, so a future eviction path cannot reach one and
+    // miss the other. Driven through `clear`, which is the arm the real graph
+    // can reach (T4.18a's note explains why `evict` is not drivable here).
+    const { graph } = await buildGraph();
+    const id = graph.transcript.append(doc("one"));
+    graph.rendered.set(id, 0, 80, "", "t", ["row"]);
+    graph.scrollOffsets.nudge(id, "box", 3);
+    expect(graph.scrollOffsets.size, "one entry holding an offset").toBe(1);
+
+    graph.transcript.clear();
+
+    expect(graph.rendered.size, "the rows went").toBe(0);
+    expect(graph.scrollOffsets.size, "and the offsets went with them").toBe(0);
+  });
+
   it("T4.18b (I58): clear drops every slot", async () => {
     const { graph } = await buildGraph();
     const id = graph.transcript.append(doc("one"));
