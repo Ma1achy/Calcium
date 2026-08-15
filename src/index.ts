@@ -264,6 +264,18 @@ export type { BlockDefinition, RenderContext } from "./presentation/blocks/index
  * has to be readable or the fallback is indistinguishable from a mistake.
  */
 export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.js";
+
+/**
+ * A Mermaid diagram as a `code` block (roadmap 9).
+ *
+ * **Published because the app is the caller.** A diagram arrives as text from a
+ * far side and becomes a block on the way in, which is an adapter's or a live
+ * part's decision, not the framework's — so this is a transform an app reaches
+ * for rather than a kind the vocabulary grows. It takes capabilities because
+ * the renderer's ASCII switch is C02 I9's tier (box drawing is ambiguous
+ * throughout), and a `ProducerContext` carries them.
+ */
+export { mermaidCode } from "./presentation/mermaid.js";
 /**
  * The record a `RenderContext` carries, and what `TuiConfig.capabilities`
  * overrides (C22 I49).

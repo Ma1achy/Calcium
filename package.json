@@ -45,6 +45,7 @@
     "audit": "npm audit --audit-level=high"
   },
   "dependencies": {
+    "beautiful-mermaid": "1.1.3",
     "highlight.js": "11.11.1",
     "ink": "7.1.1",
     "lowlight": "3.3.0",

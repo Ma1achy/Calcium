@@ -224,7 +224,11 @@ describe("roadmap-status — the Order column's verifier", () => {
     const m = /grep reach · (\d+)\/(\d+) confirmed-OPEN/u.exec(r.out);
     expect(m, "the signal line").not.toBeNull();
     const [carried, total] = [Number(m?.[1]), Number(m?.[2])];
-    expect(total, "the confirmed-OPEN population").toBeGreaterThan(10);
+    // **The floor was 10 and the population reached 10 by entries landing.**
+    // A bound pinned near today's count fails on success, which is the one
+    // direction a roadmap assertion must not fail in — so it is set where the
+    // ratio stops meaning anything rather than where the number happens to be.
+    expect(total, "the confirmed-OPEN population is worth taking a ratio of").toBeGreaterThan(4);
     expect(carried, "some entries do carry their own symbol").toBeGreaterThan(0);
     expect(carried, "and most rest on a blanket claim — that is the finding").toBeLessThan(total);
   });

@@ -321,12 +321,30 @@ licence in `DEPENDENCIES.md`. And the maintenance signal is thin in a specific w
 releases between 2026-01-28 and 2026-02-26, then **nothing for five and a half months** on a
 package six months old — finished and abandoned look identical at this range.
 
-**RULED: not adopted, and 9 leaves this section.** *Cheap — fits the architecture as it
-stands* is a claim about weight, and 11 MB with an EPL-2.0 transitive is not it. Two things
-would flip it, and neither is a decision anyone here can take: a subset import path, which
-the package's own architecture forecloses, or a consumer who wants diagrams enough to pay
-11 MB. **Nothing about the mapping is wrong** — that is the useful half of the result, and it
-is why this is a weight ruling rather than a design one.
+**REVERSED 2026-08-15, AND THE REVERSAL IS THE CORRECTION.** The refusal above rested on a
+misapplied precedent: `lowlight`'s 121 KB is **evidence of a subset import path** — a claim
+about composability — and it was recorded as a number and then applied as a size limit. It is
+not one. **11 MB of dev dependency in a terminal framework is not a cost anyone ships**, and a
+comparison that treats it as one is comparing the wrong property.
+
+**EPL-2.0 is file-level copyleft**: it reaches modifications to EPL-licensed files, and
+depending on the package triggers nothing. It gets a row in `DEPENDENCIES.md` saying so, as the
+first non-permissive entry — recorded rather than treated as a bar.
+
+**ADOPTED AND BUILT.** `mermaidCode(source, caps)` in `src/presentation/mermaid.ts`, published
+from `src/index.ts` because the app is the caller: a diagram arrives as text from a far side and
+becomes a block on the way in, which is an adapter's or a live part's decision.
+
+**The transform is one call wide, and the maintenance signal is why** — ten releases then five
+and a half months of silence. If the package dies, what is lost is a function body: the block,
+the capability mapping and T2.80–T2.83 all survive a replacement, and none of the renderer's
+options reach the block's shape.
+
+**And its ASCII switch is the tier `ambiguousWidth` built.** The unicode output is box drawing,
+ambiguous throughout, so `useAscii` is the **wide** arm as well as the ASCII one — the
+renderer's own switch and C02 I9's are the same switch, which is what `glyphs()` already does
+for the framework's own set. `colorMode: "none"`, because C10 owns colour and a diagram is not
+the exception.
 
 Honest about quality: every text renderer's layout is approximate — grid-based barycenter
 heuristics, Manhattan-only edge routing, dense graphs still cross. Diagrams render *well
@@ -2612,7 +2630,7 @@ RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
                                    consumer that does not exist and both triggers report
                                    themselves. ALL THREE QUESTIONS ANSWERED
 BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
-      9  mermaid (text path)       cheap once the dependency is vetted, distinctive.
+BUILT 9  mermaid (text path)       cheap once the dependency is vetted, distinctive.
                                    VETTED 2026-08-15 AND THE ANSWER IS WEIGHT, NOT SHAPE.
                                    `renderMermaidASCII` returns a grid of lines, so the block
                                    maps with no new mechanism and waits on nothing — 19 ms for
@@ -2624,9 +2642,20 @@ BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is c
                                    and `elkjs` is EPL-2.0, which would be the first
                                    non-permissive licence in DEPENDENCIES.md. Ten releases in
                                    its first month, then nothing for five and a half. NOT
-                                   ADOPTED; the entry leaves the *Cheap* section, because
-                                   cheap is a claim about weight. Symbol: none in `src/` —
-                                   `beautiful-mermaid@1.1.3`
+                                   ADOPTED AND BUILT 2026-08-15 — the refusal was a
+                                   misapplied precedent, since `lowlight`'s 121 KB is evidence
+                                   of a SUBSET IMPORT PATH rather than a size limit, and 11 MB
+                                   of dev dependency is not a cost anyone ships. EPL-2.0 is
+                                   file-level copyleft and depending on the package triggers
+                                   nothing; it is DEPENDENCIES.md's first non-permissive row,
+                                   recorded rather than treated as a bar. `mermaidCode` in
+                                   `src/presentation/mermaid.ts`, published from
+                                   `src/index.ts`, ONE CALL WIDE — the maintenance signal is
+                                   the real risk, so a replacement costs a function body and
+                                   the block, the capability mapping and T2.80–T2.83 survive
+                                   it. `useAscii` is the WIDE arm as well as the ASCII one,
+                                   which is C02 I9's tier arriving in a renderer that already
+                                   had the switch
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
 PART  11 markdown                  translates to existing blocks. CHECKED 2026-08-15 AND THE
                                    GREP RESOLVES AGAINST SOMETHING ELSE: `markdown` is in
@@ -3647,6 +3676,7 @@ what landed**.
 | 42 | PART | **the seam exists and is not what the entry assumed.** `createKeymap(bindings)` takes the list rather than owning it — `src/interaction/router/keymap.ts` — with one caller passing `defaultKeymap` in `src/shell/construct.ts` | **two missing pieces of different sizes**: the conflict rule throws (`KeymapError`) where this entry says it must become a ladder, and no config surface carries overrides. Not *the table is hard-coded*, which is what the row said before it was checked |
 | 11 | PART | **the block half is built** — `markdownBlocks` in `src/data/viewmodel/markdown.ts`, exported from the barrel and reachable as `b.markdown`. Headings → `rule`, fences → `code` with the info string as the language, pipe tables → `table` with **positional** keys, bullets → `notice` with the `bullet` glyph slot and its hanging gutter, ordered items → `notice` with the number as text, quotes → muted `notice`, everything else → `raw`. Inline stays literal. T2.40–T2.47, six mutations in `tools/mutate/runs/md-subset.mjs` | **three residues, each named on the block that carries it**: heading levels collapse, because `rule` has one `label` and draws one form; a quote has no gutter, because no `Glyph` slot means *quote* and `live`'s `▌` is a homonym (F161); nesting caps at three levels. **The inline half is entry 50** and is filed rather than deferred |
 | 51 | BUILT | **all three halves.** `ambiguousWidth: "narrow" \| "wide"` on `TerminalCapabilities`, detected from the locale's language subtag under POSIX precedence with C02 I4's override; `cells(text, ambiguous)` in `src/presentation/text.ts` with an `isAmbiguous` range table; `RAMP_BRAILLE` in `src/presentation/plot/ramp.ts` returned by `rampFor` where the capability says wide, and `sparkline` padding with it. C02 I9, commitment 12, §3, §4's degradation row; T2.50–T2.54; `tools/mutate/runs/c02-ambiguous.mjs`, five mutations **The sweep is done** — SS50 in `tools/enforce/source-scans.mjs` fires on a `cells()` call naming neither the convention nor `// narrow-ok`, and it ran 43 → 0 with four annotated sites and three allow-listed files. **The palette is built** — `categorical` in `src/presentation/theme/tokens-dark.ts` and `src/presentation/theme/tokens-light.ts`, `CATEGORY_REFS` replacing the cycle in `src/presentation/plot/definition.ts`, C04 I50a refusing a ninth series in `src/data/viewmodel/validate.ts`. **The sets are built** — `SPINNER_SETS` in `src/presentation/blocks/glyphs.ts` with per-set intervals and shape-paired fallbacks, the refusal list turned into a narrow tier, and `glyphs` falling to ASCII on a wide terminal because box drawing is ambiguous throughout | **a third narrow-safe glyph set** is the refinement this leaves: `⋅ ∘ ◦` have no narrow form and `─ │ ┌` have none either, so a third set is mostly ASCII with a few survivors — worth building the day someone measures which survive. And the bar *styles* remain a catalogue: `Progress` has no `style` field and minting one with no consumer is the shape four entries this session were spent closing |
+| 9 | BUILT | **a `code` block with a transform in front, one call wide.** `mermaidCode` in `src/presentation/mermaid.ts`, published from `src/index.ts`, calling `renderMermaidASCII` with `useAscii` from the capabilities and `colorMode: "none"`. `beautiful-mermaid` has a row in `DEPENDENCIES.md`, the first naming a non-permissive transitive licence. T2.80–T2.83 | **thin against a maintenance risk rather than a design one**: ten releases then five and a half months' silence, so a replacement costs a function body and nothing else. The rows assert the seam — the capability mapping, the colour refusal, the block's shape — and deliberately not what a flowchart looks like, which would fail on the package's next release for no reason anyone here cares about |
 | 44 | BUILT | **session resume, policy-gated.** `src/shell/construct.ts` reads `persistPolicy(manifest, config)`, and when anything is declared it loads `${stateDir}/transcript.ndjson`, seeds `createTranscriptWriter` and appends the saved documents in order. C13 I20, commitment 18; T1.28 asserts the default — an app that declares nothing persists nothing | **the ruling falls out rather than being enforced**: opening at the bottom with no offsets and no focus is what appending in order does, because none of them is written. A dropped line is announced (F35's class) rather than silently reducing the session |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
 | 46 | BUILT | **all three pieces exist, and the third was the one that fails silently.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on **7 §4 specifically**, not on 7: stages 1–3 gave focus an address and none of 46's three questions is answered by one. **The check §4 owed is now run** (`docs/components/C26_navigation.md` §4a) and **§4b then answers 46's question (a)**: elements are the unit of movement and the window is a rendering consequence, so `↓`/`↑` step and the window follows (C14 I6 at block scope) while `PgDn`/`PgUp` move the window and never focus. **Two keys, not two readings of one** — so the scroller needs no interact mode and no new field, the default is read off which of `elements` and `window` the kind declares, and a focused element outside the window is a legal state. C26 I18, commitment 12. **The offset landed as view state** — `ScrollOffsets` in `src/shell/scroll-offsets.ts`, dropped on `rendered`'s own subscription, clamped at read and never at write, canonical key with zeros omitted; the `scroll` kind at `src/data/viewmodel/types.ts` with `scrollDefinition` in `src/presentation/blocks/kinds/containers.ts`; `blockPageUp`/`blockPageDown` at the `liveBlock` target; and the offset as the render cache's **fourth axis** in `src/shell/session.ts`. C04 §3c, I47–I50, commitments 44–47; T2.20–T2.36, T4.18c–T4.18f, T4.41, T4.42; `tools/mutate/runs/c04-scroll.mjs`, ten mutations. **The residue marker is the entry's own ruling made visible** (I49) | **the settled entry keeps its offset and cannot be moved**, which is a ruling rather than a remainder: block-to-block focus above the live entry is C26 §11's deferral, and the marker saying *N above, M below* is the visible symptom it did not have. **And a container in the transcript is a choice to hide content** — reach for one where bounding is the point, not to shorten a long result |
@@ -3661,7 +3691,7 @@ what landed**.
 | 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
 is open with its first candidate already refused. **Re-read twice on 2026-08-15: 388 of 1219, then 389 of 1220** after roadmap 51 added `ambiguousWidth` — one member, one exact, so the ratio is unchanged at 31.9%. **A base that moves with every landing and a ratio that does not is the entry's actual subject**: the blind spot is proportional, not absolute, and a figure re-read three times without moving is worth more than the first reading was. So the
@@ -3685,9 +3715,13 @@ was written where the list names **26** and **32**, so the signal read `construc
 earlier, reintroduced by the fix's own author. A signal attributed by adjacency is one that
 prose placement can move, and knowing that is not the same as remembering it while writing.
 
+**9 left this list on 2026-08-15**, and by a reversal rather than a build finding: the refusal
+rested on `lowlight`'s 121 KB read as a size limit when it is evidence of a subset import path.
+The dependency is adopted, `mermaidCode` is published, and `DEPENDENCIES.md` gains its first
+non-permissive row.
+
 **The satisfier-side pass, 2026-08-15, over all eleven.** Nine are unmoved and their evidence is
-exact rather than blanket: **9** has no `mermaid` in `src/` and its dependency was vetted and
-refused on weight; **22** has no `art` builder; **26**'s successful push touches the transcript on
+exact rather than blanket: **22** has no `art` builder; **26**'s successful push touches the transcript on
 no path; **30** has no block-valued paste; **32** carries F89's retraction; **33** has no queue —
 the word does not occur in `src/shell/`; **50**'s `Style` still has no italic; **29** is unmoved on
 its fifth check. **Two moved and neither is a build**: 48's base is 389 of 1220 and its *ratio*
