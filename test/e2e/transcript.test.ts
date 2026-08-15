@@ -13,6 +13,10 @@ import { describe, expect, it } from "vitest";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { appendPatch, docOf } from "../support/transcript.js";
 import { doc } from "../support/blocks.js";
+import {
+  createTranscriptWriter,
+  loadTranscript,
+} from "../../src/shell/transcript-persist.js";
 
 describe("C13 e2e", () => {
   it("T5.1: a session of 500 commands → order holds, ids stay unique, nothing leaks", () => {
@@ -114,5 +118,50 @@ describe("C13 e2e", () => {
     expect(s.entries.map((e) => e.id)).toEqual([before, watch]);
     expect(s.liveId).toBe(watch);
     expect(s.patch(watch, appendPatch("still-running"))).toMatchObject({ ok: true });
+  });
+
+  it("T5.6 (I20, §5b): a streaming entry reaches disk once, when it settles", async () => {
+    // **The pair tier 4 cannot construct.** The session harness has no fixture
+    // for an adapter declaring `streams: true`, so its rows only ever see an
+    // entry that is settled at append — and a subscription writing on `patch`
+    // as well changes nothing there. Here the store is real and the streaming
+    // entry is one call away, which is what makes the tier the right home
+    // rather than a longer version of the same assertion.
+    //
+    // The sequence is §5b.2's trace, run: append streaming · patch · patch ·
+    // settle. A writer that took every change would leave four rows on disk and
+    // three of them describe a document that no longer exists.
+    const files = new Map<string, string>();
+    const fs = {
+      readFile: async (p: string) => {
+        const t = files.get(p);
+        if (t === undefined) throw new Error("ENOENT");
+        return t;
+      },
+      writeFile: async (p: string, d: string) => void files.set(p, d),
+      appendFile: async (p: string, d: string) => void files.set(p, (files.get(p) ?? "") + d),
+      appendFileSync: (p: string, d: string) => void files.set(p, (files.get(p) ?? "") + d),
+    };
+
+    const store = createTranscriptStore();
+    const writer = createTranscriptWriter(fs, "/state/transcript.ndjson");
+    // The composition root's rule, in one line: settled entries only, and an
+    // `append` is settled unless it declared otherwise.
+    store.subscribe((change) => {
+      if (change.kind !== "append" && change.kind !== "settle") return;
+      const entry = store.entries.find((e) => e.id === change.id);
+      if (entry === undefined || entry.streaming) return;
+      writer.write(entry.doc);
+    });
+
+    const watch = store.append(docOf(1, "w"), { streaming: true });
+    store.patch(watch, appendPatch("line-1"));
+    store.patch(watch, appendPatch("line-2"));
+    store.settle(watch, doc({ command: "watch", blocks: [] }));
+    await writer.flush();
+
+    const loaded = await loadTranscript(fs, "/state/transcript.ndjson");
+    expect(loaded.docs.length, "one row for one entry, written when it stopped changing").toBe(1);
+    expect(loaded.docs[0]?.command, "and it is the settled document").toBe("watch");
   });
 });

@@ -438,6 +438,15 @@ Six tiers. Every cell of the §7 transition table is covered.
 - **T1.37** (I20): an absent file is an empty resume, not an error.
 - **T1.38** (I20, §5b.5): a duplicated row collapses on load, which is what makes `drain` safe.
 - **T1.39** (I20, §5b.5): a resumed session continues the file's sequence rather than restarting it, so the newest entry does not sort to the top.
+
+Tier 4 — integration (the arc, not the mechanism)
+
+- **T4.37** (I20): start · run a declared verb and an undeclared one · stop · start → the declared verb's output is on disk and on the new session's screen, and the undeclared one is in neither. The row that sees a policy resolved before the manifest loads.
+- **T4.38** (I20, §5b.2): three restarts that run nothing leave one entry, not eight — the subscription is registered **after** the resume loop, and nothing else says so.
+- **T4.39** (I20): an app declaring no policy leaves **no file**, not an empty one.
+- **T4.40** (→ C22 I67): the state directory holds a `.gitignore` of `*`.
+- **T4.40a** (I20): the exit path writes an entry still in flight. **The mutation pass asked for this row** — the fake filesystem confirms on the next microtask, so `drain` was decoration in every assertion that existed until a fixture held the append open.
+- **T5.6** (I20, §5b.2): a streaming entry — append, patch, patch, settle — reaches disk **once**, when it settles. The pair tier 4 cannot construct, because the session harness has no adapter declaring `streams: true`. It restates the rule rather than calling the wired one, and the mutation run records that the ruling is covered and the wiring is not.
 - **T1.2** (I3): two appends → ids differ, `seq` increments, order preserved.
 - **T1.3**: appending over a live+settled entry → the previous becomes frozen+settled.
 - **T1.4** (I4): appending over a live+streaming entry → previous becomes frozen and **stays streaming**.
