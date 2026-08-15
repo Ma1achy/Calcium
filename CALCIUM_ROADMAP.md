@@ -2490,7 +2490,17 @@ PART  1  PHASE 1                   producer context · change axis · builder au
                                    ↑ serves both destinations, must precede the freeze
       2  prism-tui's first         experiment table · training curve · one live job
          surfaces                  ↑ the second consumer, and b.live's stream arm's first
-      3  the ML package            tensors, heatmaps — built with prism-tui as the consumer
+      3  the ML package            tensors, heatmaps — built with prism-tui as the consumer.
+                                   CHECKED 2026-08-15: there is NO `CALCIUM_PLOT_PRIOR_ART.md`
+                                   in the repository, and the only occurrence of *prior art*
+                                   anywhere is 9's `mermaid-ascii` line. The plot material
+                                   lives in this file — *On wrapping matplotlib: don't* and the
+                                   ML output package section above — and the sentence nearest
+                                   to a plan-it-first instruction is that section's *worth
+                                   treating as one coherent piece rather than scattered
+                                   features*, which is a scoping claim and not a sequencing
+                                   one. So the row is not missing a note that exists elsewhere;
+                                   the note and the document are both F161's shape
       4  what 2 and 3 found        phase 1's equivalent, second round
 PART  5  publication prep          error messages · the outside-reader test · 0.x · CI from the
                                    tarball
@@ -3270,7 +3280,7 @@ PART  42 rebindable keys          precedence ladder (framework < app < user), no
                                    the refusal this entry says must become a ladder; and no
                                    config surface carries overrides. Symbol: `createKeymap`
 PART  43 images (kitty)            designed already; unlocks mermaid HD + ML samples
-      44 session resume            tractable half of the persistence story. RULED: a resumed
+BUILT 44 session resume            tractable half of the persistence story. RULED: a resumed
                                    session opens at the BOTTOM and restores no scroll offset,
                                    no container offset and no focus. C23's rule from the shared
                                    pollers work — per-part state is view state only, anything
@@ -3402,7 +3412,16 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    spans first, then 11's translator stops keeping markers
                                    literal — the reverse builds a translator against a
                                    vocabulary that cannot express its output. Blocker as a
-                                   symbol: `Style` in `src/presentation/theme/types.ts`
+                                   symbol: `Style` in `src/presentation/theme/types.ts`.
+                                   AND THE RE-CHECKING STOPS HERE. This and `Rule.level` (11)
+                                   have now been checked for a consumer three times — 9 was the
+                                   third and does not want one, since a diagram's title is one
+                                   level and `rule`'s single `label` fits. A filed public type
+                                   with no consumer does not become more filed by being asked
+                                   again: THE TRIGGER IS A CONSUMER APPEARING, both entries name
+                                   their blocker as a symbol, and a grep is what answers it. Any
+                                   further round that re-checks these two is spending the
+                                   satisfier-side habit where nothing can have moved
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
@@ -3456,6 +3475,7 @@ what landed**.
 | 36 | PART | **the container half is answered, in a different shape.** C04 I49's residue row — `⋯ N above, M below`, both directions, one row, `residue` in `src/presentation/blocks/glyphs.ts` — already says *this region is bounded and there is more* at container scope. What is left is **position rather than existence** | **the transcript-scope bar is untouched**, and the constraint the answer creates is the real content: a container bar must read I49's numbers or replace the row. Two mechanisms answering *is there more* at one scope is the shape C04 I50 refuses for `copy` |
 | 42 | PART | **the seam exists and is not what the entry assumed.** `createKeymap(bindings)` takes the list rather than owning it — `src/interaction/router/keymap.ts` — with one caller passing `defaultKeymap` in `src/shell/construct.ts` | **two missing pieces of different sizes**: the conflict rule throws (`KeymapError`) where this entry says it must become a ladder, and no config surface carries overrides. Not *the table is hard-coded*, which is what the row said before it was checked |
 | 11 | PART | **the block half is built** — `markdownBlocks` in `src/data/viewmodel/markdown.ts`, exported from the barrel and reachable as `b.markdown`. Headings → `rule`, fences → `code` with the info string as the language, pipe tables → `table` with **positional** keys, bullets → `notice` with the `bullet` glyph slot and its hanging gutter, ordered items → `notice` with the number as text, quotes → muted `notice`, everything else → `raw`. Inline stays literal. T2.40–T2.47, six mutations in `tools/mutate/runs/md-subset.mjs` | **three residues, each named on the block that carries it**: heading levels collapse, because `rule` has one `label` and draws one form; a quote has no gutter, because no `Glyph` slot means *quote* and `live`'s `▌` is a homonym (F161); nesting caps at three levels. **The inline half is entry 50** and is filed rather than deferred |
+| 44 | BUILT | **session resume, policy-gated.** `src/shell/construct.ts` reads `persistPolicy(manifest, config)`, and when anything is declared it loads `${stateDir}/transcript.ndjson`, seeds `createTranscriptWriter` and appends the saved documents in order. C13 I20, commitment 18; T1.28 asserts the default — an app that declares nothing persists nothing | **the ruling falls out rather than being enforced**: opening at the bottom with no offsets and no focus is what appending in order does, because none of them is written. A dropped line is announced (F35's class) rather than silently reducing the session |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
 | 46 | BUILT | **all three pieces exist, and the third was the one that fails silently.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on **7 §4 specifically**, not on 7: stages 1–3 gave focus an address and none of 46's three questions is answered by one. **The check §4 owed is now run** (`docs/components/C26_navigation.md` §4a) and **§4b then answers 46's question (a)**: elements are the unit of movement and the window is a rendering consequence, so `↓`/`↑` step and the window follows (C14 I6 at block scope) while `PgDn`/`PgUp` move the window and never focus. **Two keys, not two readings of one** — so the scroller needs no interact mode and no new field, the default is read off which of `elements` and `window` the kind declares, and a focused element outside the window is a legal state. C26 I18, commitment 12. **The offset landed as view state** — `ScrollOffsets` in `src/shell/scroll-offsets.ts`, dropped on `rendered`'s own subscription, clamped at read and never at write, canonical key with zeros omitted; the `scroll` kind at `src/data/viewmodel/types.ts` with `scrollDefinition` in `src/presentation/blocks/kinds/containers.ts`; `blockPageUp`/`blockPageDown` at the `liveBlock` target; and the offset as the render cache's **fourth axis** in `src/shell/session.ts`. C04 §3c, I47–I50, commitments 44–47; T2.20–T2.36, T4.18c–T4.18f, T4.41, T4.42; `tools/mutate/runs/c04-scroll.mjs`, ten mutations. **The residue marker is the entry's own ruling made visible** (I49) | **the settled entry keeps its offset and cannot be moved**, which is a ruling rather than a remainder: block-to-block focus above the live entry is C26 §11's deferral, and the marker saying *N above, M below* is the visible symptom it did not have. **And a container in the transcript is a choice to hide content** — reach for one where bounding is the point, not to shorten a long result |
 | 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:441` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
@@ -3472,10 +3492,26 @@ what landed**.
 **Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
-is open with its first candidate already refused. · **26**, **32** — the symbols the entries name are
-absent  · **44** —
-`interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
-which is worth saying because it reads as coverage. **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds four test files and **not one imports from `src/shell/`**, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
+is open with its first candidate already refused. **Re-read 2026-08-15: 388 of 1219**, so the
+base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's own figure is
+**not** re-measured here, because it is a proposal rather than a shipped signal and re-running
+it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
+stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
+absent  **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
+
+**44 left this list on 2026-08-15**, and its evidence was true to the end:
+`interaction/history/persist.ts` **is** C20's history persistence and is not session resume.
+Something else is — `src/shell/construct.ts` loads a saved transcript behind a declared policy,
+seeds the writer and appends the documents in order, so the session opens at the bottom on the
+newest of them and restores no offsets and no focus, which is 44's own ruling falling out of
+`append` rather than needing a rule. **Second entry this session whose citation resolved while
+its conclusion had expired**, after 11's.
+
+**And its first placement moved a number, for the second time in one session.** The paragraph
+was written where the list names **26** and **32**, so the signal read `construct.ts` as
+**32**'s symbol — the identical proximity defect that had put `code.ts` against **37** an hour
+earlier, reintroduced by the fix's own author. A signal attributed by adjacency is one that
+prose placement can move, and knowing that is not the same as remembering it while writing.
 
 **11 left this list on 2026-08-15** with its block half landed and its inline half filed as **50**;
 its stay here was corrected first — the word `markdown` **is** in `src/`, as a highlight.js

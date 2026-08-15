@@ -7790,6 +7790,14 @@ that is the only view of it you get from outside.**
 
 ## F161 — a shared mark with four consumers, and none of the four can take it ★★★
 
+> **Third instance, 2026-08-15: `CALCIUM_PLOT_PRIOR_ART.md`.** Cited as carrying a
+> plan-it-first note that Order #3's row was said to be missing. **There is no such file**, and
+> the only occurrence of *prior art* in the repository is entry 9's `mermaid-ascii` line. The
+> plot material lives in `CALCIUM_ROADMAP.md`, and the sentence nearest to the one remembered —
+> *worth treating as one coherent piece rather than scattered features* — is a **scoping** claim
+> and not a sequencing one. So the row is not missing a note that exists elsewhere: the note and
+> the document are both this finding's shape, and the instrument found them in the same question.
+>
 > **Two further instances, 2026-08-15, and both were the assistant's own.** The `⎿` slot's
 > four consumers turned out to be two at most, neither buildable. *The selection readout* — a
 > place a selection's row count would go, referred to across a conversation and planned
