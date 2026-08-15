@@ -622,7 +622,7 @@ enforcement rule and sends a reader looking for a violation that does not exist.
 | | the victim shape |
 |---|---|
 | **F69** | a **threshold** — T5.3a asserts a background stream advanced by more than three while sixty keystrokes are processed. On a contended runner it advanced by one. Same commit, red on a branch and green on `main` four minutes later |
-| **F73** | a **timeout** and a **ratio** — six tier-2 source scans timed out at 15 s having taken 24 s; C17 T3.15 read 6.0 against a limit of 3 on a 1 MB paste |
+| **F73** | a **timeout** and a **ratio** — six tier-2 source scans timed out at 15 s having taken 24 s; C17 T3.15 read 6.0 against a limit of 3 on a 1 MB paste. **Read 4.05 again on 2026-08-15**, on a docs-only commit that touched no `src/`, green on an immediate re-run at load average 3.0 — a second measurement of the same row, and the one that makes *not an algorithmic regression* a fact rather than an inference |
 
 **The ratio is the one worth naming**, because it fails in a way that reads as an algorithmic
 regression rather than as a busy machine. So the class is not *slow rows time out*: it is

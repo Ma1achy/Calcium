@@ -198,19 +198,86 @@ already declared:
 |---|---|---|
 | `elements` only | steps elements | `table` |
 | `window` only | moves a viewport | `logs`, `patch` |
-| **both** | **ambiguous — this is the scroller, and it is one cell rather than a vocabulary** | none |
+| **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | none |
 | neither | passes through; the block is atomic | `keyValue`, `code`, `plot` |
 
 **Nothing is adopted here and no field is added.** The check's job was to say whether the
 vocabulary survives contact with four kinds, and it does not; what replaces it is §4's
-remaining design work and wants its own ruling. Recorded now because *a check whose negative
+remaining design work, and §4b is that ruling for the one cell this table could not close. Recorded now because *a check whose negative
 result is not written down is a check nobody can tell was run*, and because the cell that is
 genuinely open — a kind declaring both — is now a single question instead of a vocabulary to
-re-declare across every kind.
+re-declare across every kind. **That cell is ruled in §4b**, which is the next section rather
+than later work.
 
 **One premise of §4 survives intact and is worth separating from the rest**: resolution
 global → kind → per-node is familiar machinery, and nothing above bears on it. What the check
 refuses is the *vocabulary being resolved*, not the resolution.
+
+---
+
+## 4b. The ruling — elements are the unit of movement, the window is a consequence
+
+**A kind declaring both is not a conflict.** §4a left that cell open on the reading that `↓`
+inside a scroller is ambiguous — *step the next element* and *scroll the container* both
+correct, with nothing to choose between them. The ruling is that the second is not a reading
+of `↓` at all:
+
+    ↓ ↑           step an element. The window follows to keep it visible
+    PgDn PgUp     move the window. Focus does not move
+
+**Stepping past the window's edge *requires* the window to follow**, so the two are not
+competing interpretations of one key — they are one movement with a rendering consequence.
+The alternative reading needed `↓` to do two things; this one has it do one, and the window
+is not a second thing being decided.
+
+**And it is C14's rule at block scope rather than a new one.** C14 I6 is *the viewport follows
+the thing the reader is attending to*, which is already the transcript's behaviour and already
+the shape C26 I10 reuses for restoring focus. A container is the same rule one level down, so
+this is a third instance of a rule the tree has rather than a rule invented for the cell.
+
+### Three consequences, and the second is a legal state worth naming
+
+**1 · The default is derivable, so nothing is declared.** `elements` present → `↓` steps;
+`elements` absent → `↓` scrolls. The 2 × 2 in §4a is read off the two fields directly, and
+**a kind declaring both that wants `↓` to scroll uses §4's existing global → kind → per-node
+override** — the resolution shape §4a confirmed is untouched. No new field, and the override
+has a subject the day the first such kind exists.
+
+**2 · A focused element outside the window is legal.** Page past it and focus stays where it
+was. This is worth stating as a permitted state rather than left to be inferred, because it is
+the state an implementation is most likely to "correct" — a paging key that also drags focus
+along looks tidy and destroys the reader's place. **C14's anchor precedent is exactly this**: a
+reader who scrolled away is still working where they were.
+
+**3 · The next `↓` steps from the focused element, not from the top of the view**, so the
+window comes back to it. *Focus is where you are; the window is where you are looking*, and a
+movement key moves the first. An implementation computing the next element from the window's
+top passes every test written about an unscrolled block, which is why this has its own row and
+its own mutation.
+
+### What this does not settle, said rather than absorbed
+
+**The pushed view is cell 2 today** — window-only — so nothing here changes it. **The day a
+kind inside a view declares `elements`, the view becomes cell 3 and `↓` steps**, at which
+point `n`/`p` stepping hunks may be redundant. **That is the keymap's question and not this
+ruling's**, and it is named here so it is not later mistaken for a consequence of it (→ C16,
+and §4's own question (b) about the outer and inner scopes binding the same keys).
+
+**`PgDn` is bound at `global` today and this ruling gives it a second meaning.**
+`pageup`/`pagedown` reach `scrollPageUp`/`scrollPageDown` — the *transcript's* viewport — and
+there is no `liveBlock` binding for them at all. A container that pages its own window needs
+one, and the ladder then makes it win while focus is inside the block. **That is legal by the
+keymap's own rule** — the `pushedView` bindings already note that one key at two targets is
+resolved by the ladder rather than being the duplicate the conflict rule refuses — but it is a
+**behaviour change for a key that works today**, and it is named here rather than discovered
+when the binding lands.
+
+**And `table`'s asymmetry stands.** §4a found `↑` at the first element leaving to the prompt
+while `↓` at the last does nothing, and no `ArrowPolicy` value names a direction. That is
+untouched by this ruling and orthogonal to it: **what `↓` does *inside* a block and what `↓`
+does *at its boundary* are two questions**, and only the second still wants a vocabulary the
+tree does not have. Recorded so the two are not settled together by something that only
+answers the first.
 
 ---
 
@@ -392,8 +459,10 @@ notice here.
 - **I5** — The element list is in reading order, non-decreasing by `(rows.from, cols.from)`.
 - **I6** — Two elements at the same `level` share no cell. Nesting across levels is the
   structure and is not a violation.
-- **I7** — A kind declaring both `window` and `elements` owes their agreement (§5). **Vacuous
-  while the intersection is empty**, and the premise is recorded so it can be re-checked.
+- **I7** — A kind declaring both `window` and `elements` owes their agreement (§5), and
+  §4b says what the agreement **is**: the window is a function of the focused element, never
+  an independent position. **Vacuous while the intersection is empty**, and the premise is
+  recorded so it can be re-checked.
 - **I8** — The keyboard and the pointer resolve against the same declaration. There is no
   second source.
 - **I9** — Focus is rendered by the block and owned here (C11 I14). C26 holds a location; it
@@ -425,6 +494,14 @@ notice here.
   level the kind reports no element at is a construction error**, the way a duplicate
   binding is (→ C16 I10). An override for an absent level is unreachable and reads as
   configured, which is A03 §2's vacuity class arriving in a config value.
+- **I18** — **Movement moves focus and paging moves the window, and neither does the other's
+  job** (§4b). `↓`/`↑` step an element and the window follows to keep it visible (C14 I6 at
+  block scope); `PgDn`/`PgUp` move the window and leave focus where it is. **A focused
+  element outside the window is a legal state**, and the next movement key steps from that
+  element rather than from the window's top. **Half-vacuous, and the halves are worth
+  separating**: *paging does not move focus* is already true of `pushedView` by construction,
+  since focus there is the view and not an element; *the window follows* has no subject until
+  a kind declares both `window` and `elements`, which none does (§4a).
 
 ---
 
@@ -746,6 +823,7 @@ is the shape a spec commit should have.
 9. Focus is stored as a `(blockId, elementId)` address, and restoration is a re-resolution of it with a fall-forward, through one resolver shared by render and keys (I10).
 10. Element resolution is a pull (I11).
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
+12. Movement keys move focus and the window follows; paging keys move the window and not focus; a focused element outside the window is legal and the next movement key steps from it (I18, I7). The default is read off which of `elements` and `window` a kind declares, and a kind wanting otherwise uses I15's override rather than a new field.
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -789,6 +867,19 @@ Named against the invariants; the tiers are the six.
   and it **fails the day either changes** — which is when the second effect and I14's first
   level go live and this row is inverted. A premise recorded and unchecked is a premise that
   goes quiet (F102's disposal, and T2.17's shape for the `window` × `elements` agreement).
+- **T3.x** (I18, §4b) — stepping past the window's bottom edge: focus advances by one **and**
+  the window moves to hold it. **The control is a step that stays inside the window**, where
+  the offset must not move — without it the row passes for an implementation that re-windows
+  on every keystroke, which is right about the assertion and wrong about the mechanism.
+- **T3.x** (I18, §4b) — `PgDn` past the focused element: focus is **unchanged** and the
+  element is outside the window, asserted as the legal state it is; then `↓` lands on the
+  element **after the focused one** and the window contains it. The row asserts which element
+  focus reaches, not the resulting offset — an offset assertion is satisfied by an
+  implementation that stepped from the window's top and happened to arrive at the same place.
+- **T6.x** (I18) — `PgDn` moving focus as well → the second row fails; the next `↓` computed
+  from the window's top rather than from the focused element → the second row's last assertion
+  fails. **Both are removals of the ruling rather than changes to it**, which is the shape a
+  wiring mutation takes.
 - **T6.x** (I6) — making disjointness global → the nesting fixtures fail.
 - **T6.x** (I11) — turning the pull into a subscription → the half-applied-store row fails.
 - **T6.x** (I2) — moving the mode out of `FOCUS_ORDER` into a pre-dispatch flag → the ladder
