@@ -366,7 +366,7 @@ function washed(row: string, span: CellSpan, deps: PaintDeps): string {
   const style = selectionStyle(deps);
   const before = sliceCells(row, 0, span.from);
   const inside = sliceCells(row, span.from, span.to);
-  const after = sliceCells(row, span.to, cells(row));
+  const after = sliceCells(row, span.to, cells(row, deps.capabilities.ambiguousWidth));
   return `${before}${paintSpans([{ text: inside, style }])}${after}`;
 }
 
@@ -422,7 +422,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     : out.length - 1;
   const row = out[last];
   if (row !== undefined && deps.spinning()) {
-    const at = cells(row.trimEnd());
+    const at = cells(row.trimEnd(), deps.capabilities.ambiguousWidth);
     if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${spinnerGlyph(deps.capabilities)}`, width);
     return out;
   }
@@ -443,8 +443,8 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   // different word, and `Tab` would insert the whole one.
   const suggestion = deps.ghost();
   if (row !== undefined && suggestion !== null && suggestion !== "") {
-    const at = cells(row.trimEnd());
-    if (at + cells(suggestion) <= width) {
+    const at = cells(row.trimEnd(), deps.capabilities.ambiguousWidth);
+    if (at + cells(suggestion, deps.capabilities.ambiguousWidth) <= width) {
       const style = ghostStyle(deps);
       out[last] = exact(`${sliceCells(row, 0, at)}${paintSpans([{ text: suggestion, style }])}`, width);
     }

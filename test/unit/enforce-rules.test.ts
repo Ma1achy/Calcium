@@ -453,6 +453,16 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'return compose({ command, status, meta: { origin: "defect" } });',
   },
   {
+    // **The state the whole tree was in until C02 I9 landed.** A width taken
+    // with no convention named: correct on a Western terminal, half the answer
+    // on a CJK one, and identical to a correct call from every test that runs
+    // narrow. The rule exists because reading for this is the seventeen-count
+    // sweep's shape.
+    rule: "SS50",
+    file: "src/presentation/blocks/paint.ts",
+    source: "const short = width - cells(text);",
+  },
+  {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
     // resolving its own variable, which reads as C22 owning the default rather
     // than as the framework reading the environment.

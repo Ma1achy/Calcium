@@ -68,7 +68,9 @@ export function numberWidth(block: Patch): number {
     for (const line of hunk.lines) {
       for (const no of [line.oldNo, line.newNo]) {
         if (no === undefined) continue;
-        const w = cells(String(no));
+        // narrow-ok — a line number. Digits are ASCII and the fast path in
+  // `cells()` returns before the ambiguous table is consulted.
+  const w = cells(String(no)); // narrow-ok
         if (w > widest) widest = w;
       }
     }

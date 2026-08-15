@@ -149,7 +149,10 @@ function choiceBlock(choices: readonly Choice[], selected: number): Block {
 /** The widest `[k]`, so the labels line up whatever the accelerators are. */
 function keyWidth(choices: readonly Choice[]): number {
   let widest = 1;
-  for (const c of choices) widest = Math.max(widest, cells(c.key) + 2);
+  // narrow-ok — a choice's `key` is the keyboard key that selects it, so it
+  // is one ASCII character by construction (C15's confirm builder refuses
+  // anything a keystroke cannot produce).
+  for (const c of choices) widest = Math.max(widest, cells(c.key) + 2); // narrow-ok
   return widest;
 }
 

@@ -132,7 +132,7 @@ describe("the S-series' illustrated heights", () => {
     const file = "docs/surfaces/S01_the_frame.md";
     const lines = frameLines(file, 0);
     const rows = frameRows(file, 0);
-    const width = Math.max(...lines.map(displayCells));
+    const width = Math.max(...lines.map((l) => displayCells(l)));
 
     // **`findIndex` — the first `❯`, and checked rather than assumed.** In a
     // *rendered* frame the first one is a transcript echo, because C22 I33 draws

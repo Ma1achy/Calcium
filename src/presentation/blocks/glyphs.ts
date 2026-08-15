@@ -204,5 +204,9 @@ export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode
  * trusting the two columns above to stay in step.
  */
 export function glyphCells(token: Glyph): number {
-  return cells(GLYPH_TABLE[token][0]);
+  // narrow-ok — the two renderings of one slot are compared against each
+  // other, and the comparison holds under either convention: an ambiguous
+  // pair is 1:1 at narrow and 2:2 at wide. Passing a capability here would
+  // make a property of the table depend on the terminal reading it.
+  return cells(GLYPH_TABLE[token][0]); // narrow-ok
 }

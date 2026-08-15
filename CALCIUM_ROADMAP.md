@@ -3481,17 +3481,26 @@ PART  51 MOTION AND MEASURE SETS ★  spinners · bar styles · A CATEGORICAL PA
                                    ramp and its measurement agree. T2.50–T2.54, five mutations
                                    in `tools/mutate/runs/c02-ambiguous.mjs`, constancy on
                                    T4.18d rather than a second row.
-                                   WHAT REMAINS, AND IT IS NAMED RATHER THAN SWEPT: `cells()`
-                                   defaults to narrow, so the other ~40 call sites measure
-                                   narrow until each is threaded — including `truncate` and
-                                   `wrapCells` inside `text.ts` itself, whose helper carries
-                                   the same default. A wide session therefore measures a
-                                   sparkline correctly and still wraps a box-drawing paragraph
-                                   as though it were narrow. The sweep is one change plus a
-                                   scan rule that makes forgetting a site loud; the field and
-                                   its first consumer are what could land without it. THE
-                                   PALETTE IS STILL OWED, and it is the other freeze-relevant
-                                   half of this entry
+THE SWEEP IS DONE, AND THE RULE CAME FIRST.
+                                   SS50 fires on a `cells()` call naming neither the
+                                   convention nor `// narrow-ok`, which turned forty blind
+                                   edits into a list that reported itself and shrank visibly:
+                                   43 → 37 → 17 → 0. `truncate`, `truncateParts`, `wrapCells`,
+                                   `hardWrapCells`, `sliceCells`, `fitStyled`, `displayCells`
+                                   and `expandTabs` all take the convention now, so a WRAPPED
+                                   PARAGRAPH is right and not only a sparkline — the common
+                                   case as well as the sharp one. FOUR SITES ARE ANNOTATED,
+                                   NOT THREADED, each with its reason on the line: a glyph
+                                   slot's two renderings compared with each other, a line
+                                   number, a confirm key, the prompt gutter's substitution
+                                   pair. THREE FILES ARE ALLOW-LISTED — C19's menu, C20's
+                                   history layers, the fallback adapter — because giving them
+                                   a capability means widening a builder signature in a
+                                   component this change does not touch; a prefix list is
+                                   auditable where seven `// narrow-ok` markers meaning *not
+                                   yet* would teach the annotation two meanings. THE PALETTE
+                                   IS STILL OWED, and it is the other freeze-relevant half of
+                                   this entry
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 

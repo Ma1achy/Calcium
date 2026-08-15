@@ -762,6 +762,44 @@ export const SCANS = [
     scope: "src/", allow: ["src/shell/execution.ts"],
     why: "`origin: \"defect\"` is the framework reporting a failure it contained (C23 §5a). A second producer is the word widening into `something went wrong`, which is what `refresh` did before SS46" },
 
+  // SS50 — a measurement that has not said which convention it is under.
+  //
+  // **The rule came before the sweep, and that ordering is the point.** Forty
+  // `cells()` calls default to narrow, and finding them by reading is the
+  // seventeen-count sweep's shape: a blind pass over a population nobody can
+  // enumerate. With the rule first, the population is a list that reports
+  // itself and shrinks visibly — which is also what makes the exemptions below
+  // auditable rather than remembered.
+  //
+  // **The annotation is a claim, not a suppression** (SS40's distinction).
+  // `// narrow-ok` asserts that this measurement is right under either
+  // convention — because the text is ASCII, or because the two sides of a
+  // comparison move together. It does not mean "the scan complained".
+  //
+  // **The pattern asks whether the line mentions the capability at all**,
+  // rather than counting arguments. A first version looked for a comma before
+  // the closing paren and fired on `cells(text.replace(sgrPattern(), ""),
+  // ambiguous)` — a correctly threaded call, reported because the first `)`
+  // belonged to a nested call. A line-based rule cannot parse; what it can do is
+  // ask for a word that only appears when the decision has been taken.
+  //
+  // **Three files are allow-listed and each is the same reason**: C19's menu,
+  // C20's history layers and the fallback adapter build display text where no
+  // capability is in scope, and giving them one means widening a builder
+  // signature in a component this change does not otherwise touch. They measure
+  // under the default until those signatures move (roadmap 51). A prefix
+  // allow-list is auditable; marking seven lines with an annotation that means
+  // "not yet" would teach `// narrow-ok` to mean two things.
+  { id: "SS50", spec: "C02 I9 · C02 §3",
+    pattern: /\bcells\((?!.*ambiguous)(?!.*\/\/ *narrow-ok)/i,
+    scope: "src/",
+    allow: [
+      "src/interaction/completion/menu.ts",
+      "src/interaction/history/layers.ts",
+      "src/shell/fallback.ts",
+    ],
+    why: "a display measurement says which ambiguous-width convention it is under, or says why it does not need to (C02 I9)" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

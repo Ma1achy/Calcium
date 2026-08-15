@@ -6,6 +6,7 @@
  * `layout` function so that the only way they can disagree is if someone edits
  * one of them and not the call.
  */
+import type { AmbiguousWidth } from "../../text.js";
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
@@ -63,9 +64,9 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     // present, the row was exactly the width, and every assertion held.
     const lead = label === "" ? g.horizontal.repeat(2) : `${g.horizontal.repeat(2)} `;
     const gap = label === "" ? 0 : 1;
-    const room = width - cells(lead) - gap - cells(meta);
+    const room = width - cells(lead, ctx.capabilities.ambiguousWidth) - gap - cells(meta, ctx.capabilities.ambiguousWidth);
     const shown = truncate(label, Math.max(0, room), ctx.capabilities);
-    const fill = Math.max(0, width - cells(lead) - cells(shown) - gap - cells(meta));
+    const fill = Math.max(0, width - cells(lead, ctx.capabilities.ambiguousWidth) - cells(shown, ctx.capabilities.ambiguousWidth) - gap - cells(meta, ctx.capabilities.ambiguousWidth));
 
     const dim = tone("dim", ctx.theme, ctx.capabilities);
     return rows([
@@ -171,7 +172,7 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // The bar takes the residual (\u00a73), which is what makes this one row at any
     // width rather than one row at most widths. It can reach zero, and a bar of
     // no cells is still a row: the label and the percentage carry the meaning.
-    const barWidth = Math.max(0, width - cells(labelColumn) - cells(percent) - 2);
+    const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - 2);
     const filled = Math.round(ratio * barWidth);
 
     return rows([
@@ -205,7 +206,11 @@ export const progressDefinition: BlockDefinition<Progress> = {
  * while its renderer packed chips would disagree at exactly the widths where a
  * chip lands on a boundary.
  */
-function chipRows(block: Pills, width: number): readonly (readonly string[])[] {
+function chipRows(
+  block: Pills,
+  width: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): readonly (readonly string[])[] {
   const limit = normaliseWidth(width);
   const out: string[][] = [];
   let line: string[] = [];
@@ -213,7 +218,7 @@ function chipRows(block: Pills, width: number): readonly (readonly string[])[] {
 
   for (const chip of block.chips) {
     const text = stripControl(chip.label);
-    const w = cells(text);
+    const w = cells(text, ambiguous);
     const needed = line.length === 0 ? w : w + CHIP_GAP; // cells-ok
     if (used + needed > limit && line.length > 0) { // cells-ok
       out.push(line);

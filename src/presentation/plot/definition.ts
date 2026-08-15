@@ -20,6 +20,7 @@
  * is the last thing to lose room. Carrying `(yLabelWidth, axed)` separately meant
  * the gutter survived at width 1 and every curve row rendered as a lone `…`.
  */
+import type { AmbiguousWidth } from "../text.js";
 import type { ReactElement } from "react";
 import { glyphs } from "../blocks/glyphs.js";
 import { clampSpans, paint, padStart, rows, tone, type Span } from "../blocks/paint.js";
@@ -147,7 +148,7 @@ function emptyRows(block: Plot, layout: Layout, ctx: RenderContext): readonly st
   const message = truncate(block.emptyMessage ?? "No data.", layout.width, ctx.capabilities);
   const middle = Math.floor((total - 1) / 2);
   const centred =
-    " ".repeat(Math.max(0, Math.floor((layout.width - cells(message)) / 2))) + message;
+    " ".repeat(Math.max(0, Math.floor((layout.width - cells(message, ctx.capabilities.ambiguousWidth)) / 2))) + message;
   const styled = line(
     [{ text: centred, style: tone("muted", ctx.theme, ctx.capabilities) }],
     layout,
@@ -292,9 +293,9 @@ function overlaidRows(
 }
 
 /** The widest series label — the stacked form's label column (§5). */
-function seriesLabelWidth(series: readonly Series[]): number {
+function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth = "narrow"): number {
   let widest = 0;
-  for (const s of series) widest = Math.max(widest, cells(s.label ?? ""));
+  for (const s of series) widest = Math.max(widest, cells(s.label ?? "", ambiguous));
   return widest;
 }
 

@@ -9,6 +9,7 @@
  * Nothing here wraps. `logs` in particular is never wrapped — predictable height
  * is what lets a tail scroll smoothly at a thousand lines a second (T5.4).
  */
+import type { AmbiguousWidth } from "../../text.js";
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
@@ -23,9 +24,9 @@ const KEY_COLUMN_CAP = 20;
 /** Two spaces between columns. One reads as a typo; three wastes a narrow terminal. */
 const COLUMN_GAP = 2;
 
-function widest(values: readonly string[], cap: number): number {
+function widest(values: readonly string[], cap: number, ambiguous: AmbiguousWidth = "narrow"): number {
   let widest = 0;
-  for (const value of values) widest = Math.max(widest, cells(value));
+  for (const value of values) widest = Math.max(widest, cells(value, ambiguous));
   return Math.min(cap, widest);
 }
 
@@ -143,7 +144,7 @@ export const logsDefinition: BlockDefinition<Logs> = {
         // The message takes the residual and truncates. Wrapping it would make
         // the block's height depend on its content, and a tail that reflows is
         // a tail nobody can read (§3, T6.10).
-        const room = Math.max(1, width - cells(ts) - LEVEL_WIDTH - COLUMN_GAP * 2);
+        const room = Math.max(1, width - cells(ts, ctx.capabilities.ambiguousWidth) - LEVEL_WIDTH - COLUMN_GAP * 2);
         const message = truncate(stripControl(line.message), room, ctx.capabilities);
 
         return paint(
@@ -185,7 +186,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
           truncate(stripControl(event.type), typeWidth, ctx.capabilities),
           typeWidth,
         );
-        const room = Math.max(1, width - cells(ts) - typeWidth - COLUMN_GAP * 2);
+        const room = Math.max(1, width - cells(ts, ctx.capabilities.ambiguousWidth) - typeWidth - COLUMN_GAP * 2);
 
         return paint(
           clampSpans(
@@ -436,7 +437,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
         );
         const detailRoom = Math.max(
           1,
-          width - cells(marker) - 1 - labelWidth - COLUMN_GAP,
+          width - cells(marker, ctx.capabilities.ambiguousWidth) - 1 - labelWidth - COLUMN_GAP,
         );
         const detail =
           step.detail === undefined

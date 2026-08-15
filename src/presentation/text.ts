@@ -54,7 +54,11 @@ export const TAB_STOP = 8;
  * is a divergence of seven — per tab, per line (C09 T3.16). Expansion happens
  * before measurement so both halves see the same string.
  */
-export function expandTabs(text: string, tabStop: number = TAB_STOP): string {
+export function expandTabs(
+  text: string,
+  tabStop: number = TAB_STOP,
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
   if (!text.includes("\t")) return text;
   let out = "";
   let column = 0;
@@ -71,7 +75,7 @@ export function expandTabs(text: string, tabStop: number = TAB_STOP): string {
       continue;
     }
     out += ch;
-    column += cells(ch);
+    column += cells(ch, ambiguous);
   }
   return out;
 }
@@ -156,8 +160,8 @@ export function cells(text: string, ambiguous: AmbiguousWidth = "narrow"): numbe
  * two answers to "how wide is this line" is C09 I1's divergence in the one
  * place that moves the whole frame.
  */
-export function displayCells(text: string): number {
-  return cells(text.replace(sgrPattern(), ""));
+export function displayCells(text: string, ambiguous: AmbiguousWidth = "narrow"): number {
+  return cells(text.replace(sgrPattern(), ""), ambiguous);
 }
 
 /**
@@ -168,8 +172,13 @@ export function displayCells(text: string): number {
  * line is closed with `SGR_RESET` **only if it was cut**, so an unstyled line
  * gains no bytes and a cut one cannot bleed.
  */
-export function fitStyled(text: string, width: number, reset: string): string {
-  if (displayCells(text) === width) return text;
+export function fitStyled(
+  text: string,
+  width: number,
+  reset: string,
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
+  if (displayCells(text, ambiguous) === width) return text;
 
   const sgr = sgrPattern();
   let out = "";
@@ -193,7 +202,7 @@ export function fitStyled(text: string, width: number, reset: string): string {
 
     const ch = [...text.slice(i)][0] ?? "";
     if (ch === "") break;
-    const w = cells(ch);
+    const w = cells(ch, ambiguous);
     if (used + w > width) {
       cut = true;
       break;
@@ -235,7 +244,12 @@ export function fitStyled(text: string, width: number, reset: string): string {
  * ends first. Nothing is padded here — the caller knows whether a short tail
  * should be filled, and `paint` does.
  */
-export function sliceCells(text: string, from: number, to: number): string {
+export function sliceCells(
+  text: string,
+  from: number,
+  to: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
   const start = Math.max(0, Math.floor(from));
   const end = Math.max(start, Math.floor(to));
   if (end === start) return "";
@@ -268,7 +282,7 @@ export function sliceCells(text: string, from: number, to: number): string {
 
     const ch = [...text.slice(i)][0] ?? "";
     if (ch === "") break;
-    const w = cells(ch);
+    const w = cells(ch, ambiguous);
 
     // Straddling the left edge or the right: blanked in both directions, so the
     // window measures `to - from` either way. The left case is a separate path
@@ -379,14 +393,14 @@ function clusterCells(cluster: string, ambiguous: AmbiguousWidth = "narrow"): nu
 export function truncate(
   text: string,
   width: number,
-  caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
+  caps: Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: AmbiguousWidth }>,
   from: "start" | "end" = "end",
 ): string {
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return "";
 
   const clean = stripControl(text);
-  if (cells(clean) <= limit) return clean;
+  if (cells(clean, caps.ambiguousWidth) <= limit) return clean;
 
   // `bmp` keeps the Unicode marker: U+2026 is in the basic plane, and the
   // ASCII form is for terminals that cannot draw beyond it at all.
@@ -405,7 +419,7 @@ export function truncate(
   let kept = "";
   let used = 0;
   for (const segment of order) {
-    const w = clusterCells(segment);
+    const w = clusterCells(segment, caps.ambiguousWidth);
     if (used + w > budget) break;
     kept = from === "start" ? segment + kept : kept + segment;
     used += w;
@@ -433,12 +447,12 @@ export function truncate(
 export function truncateParts(
   text: string,
   width: number,
-  caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
+  caps: Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: AmbiguousWidth }>,
 ): Readonly<{ kept: string; suffix: string }> {
   const whole = stripControl(text);
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return { kept: "", suffix: "" };
-  if (cells(whole) <= limit) return { kept: whole, suffix: "" };
+  if (cells(whole, caps.ambiguousWidth) <= limit) return { kept: whole, suffix: "" };
 
   const marker = caps.unicode === "ascii" ? "~" : "\u2026";
   const budget = limit - 1;
@@ -447,7 +461,7 @@ export function truncateParts(
   let kept = "";
   let used = 0;
   for (const { segment } of GRAPHEMES.segment(whole)) {
-    const w = clusterCells(segment);
+    const w = clusterCells(segment, caps.ambiguousWidth);
     if (used + w > budget) break;
     kept += segment;
     used += w;
@@ -500,7 +514,11 @@ export function compareByGrapheme(a: string, b: string): number {
  * longer exact slices of the source \u2014 which is what lets syntax tokens,
  * addressed by offset, be sliced against them at all.
  */
-export function hardWrapCells(text: string, width: number): readonly string[] {
+export function hardWrapCells(
+  text: string,
+  width: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): readonly string[] {
   const limit = Math.max(1, Math.floor(width));
   const out: string[] = [];
   let line = "";
@@ -508,7 +526,7 @@ export function hardWrapCells(text: string, width: number): readonly string[] {
 
   for (const raw of GRAPHEMES.segment(text)) {
     const segment = placeable(raw.segment, limit);
-    const w = clusterCells(segment);
+    const w = clusterCells(segment, ambiguous);
     if (used + w > limit && line !== "") {
       out.push(line);
       line = "";
@@ -532,7 +550,11 @@ export function hardWrapCells(text: string, width: number): readonly string[] {
  * does not — a 10,000-character token still has to render. An explicit newline
  * always breaks, and an empty string is one line rather than none (C04 I17).
  */
-export function wrapCells(text: string, width: number): readonly string[] {
+export function wrapCells(
+  text: string,
+  width: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): readonly string[] {
   const limit = Math.max(1, Math.floor(width));
   const out: string[] = [];
 
@@ -546,7 +568,7 @@ export function wrapCells(text: string, width: number): readonly string[] {
     let used = 0;
     for (const raw of GRAPHEMES.segment(paragraph)) {
       const segment = placeable(raw.segment, limit);
-      const w = clusterCells(segment);
+      const w = clusterCells(segment, ambiguous);
 
       if (used + w > limit && line !== "") {
         const at = breakPoint(line);
@@ -557,7 +579,7 @@ export function wrapCells(text: string, width: number): readonly string[] {
           out.push(line.slice(0, at).trimEnd());
           line = line.slice(at);
         }
-        used = cells(line);
+        used = cells(line, ambiguous);
       }
       line += segment;
       used += w;

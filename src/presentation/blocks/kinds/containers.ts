@@ -79,7 +79,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
         ? `${glyphFor("live", ctx.capabilities)} ${stripControl(block.title)}`.trimEnd()
         : block.title,
     );
-    const fill = Math.max(0, inner - cells(titlePart));
+    const fill = Math.max(0, inner - cells(titlePart, ctx.capabilities.ambiguousWidth));
 
     const top = paint(
       clampSpans(
@@ -98,7 +98,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // and S13 §2 both put a pushed view's keymap here, and neither can use the
     // frame's footer — a pushed view leaves header and footer alone (C15 T4.4).
     const footerPart = railPart(block.footer);
-    const footerFill = Math.max(0, inner - cells(footerPart));
+    const footerFill = Math.max(0, inner - cells(footerPart, ctx.capabilities.ambiguousWidth));
     const bottom = paint(
       clampSpans(
         [

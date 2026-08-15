@@ -154,5 +154,8 @@ export function gutterMatchesPrompt(): boolean {
   // the same entry — and it would do so only on the terminals nobody develops
   // on. Checking the resolved prompt would pass on every machine that has the
   // unicode one, which is every machine this has ever been run on.
-  return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form));
+  // narrow-ok — `glyphs.ts`'s argument exactly: the two forms of one gutter
+  // are compared with each other, and the equality holds under either
+  // convention.
+  return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form)); // narrow-ok
 }
