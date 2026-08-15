@@ -2493,7 +2493,7 @@ RULED 6  phase 2                   the empty-block convention · rendering flags
                                    closed-set test is answered because there are NO MEMBERS —
                                    the framework understands exactly one presentation-selecting
                                    flag and does it by RESERVING THE NAME. C05 §8b, C22 §13b
-PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
+RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
                                    the small navigation items rather than sitting beside them.
                                    SPECIFIED as C26; stages 1–3 built (interaction is a focus
                                    target, blocks report elements, focus holds an address).
@@ -2551,7 +2551,22 @@ PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
                                    `Keymap.mergeBlock` is NOT interact's producer and there is
                                    no candidate for one. Either D4 changes or interaction
                                    mode's purpose is not handing the block its keys — a ruling
-                                   upstream of C26
+                                   upstream of C26. RULED 2026-08-15, C26 §4f: D4 STANDS and
+                                   the mode is NOT empty. §2's justification — *the prompt does
+                                   not compete* — is delivered by focus alone, since
+                                   `activeTarget` returns `liveBlock` once focus is in the
+                                   block. The mode's real subject is the keys `mergeBlock`
+                                   REFUSES: it throws on a collision with `global` or with an
+                                   existing `liveBlock` binding, so the ten liveBlock rows and
+                                   the four global ones are closed to every adapter by
+                                   construction, and interaction is the only rung where they
+                                   are not. Real, expressible, UNINHABITED. §8b.8's refusal
+                                   keeps its condition and the condition is now nameable:
+                                   until a block needs a key liveBlock or global already binds,
+                                   which mergeBlock's throw reports. (b) IS CLOSED AS
+                                   UNINHABITED rather than deferred — both halves need a
+                                   consumer that does not exist and both triggers report
+                                   themselves. ALL THREE QUESTIONS ANSWERED
 BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
       9  mermaid (text path)       cheap once the dependency is vetted, distinctive
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model

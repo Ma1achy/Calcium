@@ -516,6 +516,25 @@ needed to see it — the table found the missing rung, and the trace found that 
 about it is unreachable, which is the same fact in the form that would otherwise have been
 tested and passed.
 
+### The ruling: (b) is closed as uninhabited, not deferred
+
+Both halves need a consumer that does not exist, and **neither is waiting on a decision**:
+
+- **The rung** is one line of `FOCUS_ORDER` — the spec says so, and that is deliberate. What it
+  would rank is an element inside a view, and nothing produces one: `elementsIn` has a single
+  caller reading `stores.transcript.liveId`. Adding the rung first would rank an empty set.
+- **The interact half** needs the second merge target §4f names, and `mergeBlock` has no caller
+  at all, so the collision that motivates it has never been raised.
+
+**Both triggers report themselves**, which is why this is a closure rather than a deferral:
+`mergeBlock`'s throw fires the first time an adapter wants a framework key, and a second caller
+of `elementsIn` is a grep that resolves the day someone writes it. A deferral whose condition
+nothing watches is this session's six; these two are watched by the code.
+
+**So the order, if it is ever picked up: producer, then rung.** Ranking a scope with nothing in
+it is how a priority list acquires an entry nobody can test — A03 §2's vacuity class, in the one
+artefact C16's spec pass exists to keep single.
+
 ---
 
 ## 4f. The D4 ruling — the mode has a purpose, and §2 names a different one

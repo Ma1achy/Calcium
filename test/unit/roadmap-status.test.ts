@@ -155,18 +155,36 @@ describe("roadmap-status — the Order column's verifier", () => {
     //
     // The arm needs nothing outside the document, which is why it is cheap enough
     // to be exact: a row that claims something is built is PART at least.
-    // **The anchor moved when 46 shipped**, and it moved *to* the measured case:
-    // 7 is the entry the arm was written about, and its row still says *stages
-    // 1-3 built* while the entry itself is PART. A fixture pinned to whichever
-    // row happens to be PART today goes stale every time one lands; this one
-    // stales only if the instance that produced the rule is itself resolved.
+    // **Second re-anchor in one session, and the class is worth naming.** It sat
+    // on 46 until 46 shipped, then on 7 — *the instance that produced the rule* —
+    // until 7 was ruled. Any anchor into a live document expires when its row
+    // moves, and that is the cost of a fabricated violation being fabricated
+    // *somewhere real*.
+    //
+    // **Deriving the row instead would be worse**, and that is why it is not
+    // done: picking whichever PART row carries a built-word means reading the
+    // roadmap with the instrument's own rule, so the fixture would agree with it
+    // by construction and certify nothing. A fabricated violation has to be
+    // independent of the thing it is testing.
+    //
+    // **Built the other way round now, and it stops expiring.** Blanking a PART
+    // marker only reaches this arm if the entry is *also* in the confirmed-OPEN
+    // list — 7 and 46 both were, which is why it worked twice and why it broke
+    // twice. Anchoring on 27 instead failed for a different rule entirely: 27 is
+    // in none of the three sets once blanked, so RS4 fires first and RS8 is never
+    // asked. The convenient fixture is the one where two rules agree.
+    //
+    // So the state is constructed rather than found: take an entry that **is**
+    // confirmed-OPEN and give its description a claim. That is RS8's subject
+    // exactly — OPEN, listed, and saying something exists — and it depends on no
+    // marker staying where it is.
     const staled = mutate(
-      "PART  7  THE NAVIGATION MODEL",
-      "      7  THE NAVIGATION MODEL",
+      "      33 QUEUEING ★              submit while something runs",
+      "      33 QUEUEING ★              the queue is built; submit while something runs",
     );
     const r = run(staled);
-    expect(r.ok, "an OPEN row asserting three stages are built").toBe(false);
-    expect(r.out).toContain("entry 7 is OPEN and its own description says");
+    expect(r.ok, "an OPEN row claiming its queue exists").toBe(false);
+    expect(r.out).toContain("entry 33 is OPEN and its own description says");
   });
 
   it("RS8b: a built-word exemption that no longer matches its row fails", () => {
