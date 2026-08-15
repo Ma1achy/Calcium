@@ -266,10 +266,21 @@ this is a third instance of a rule the tree has rather than a rule invented for 
 ### Three consequences, and the second is a legal state worth naming
 
 **1 · The default is derivable, so nothing is declared.** `elements` present → `↓` steps;
-`elements` absent → `↓` scrolls. The 2 × 2 in §4a is read off the two fields directly, and
-**a kind declaring both that wants `↓` to scroll uses §4's existing global → kind → per-node
-override** — the resolution shape §4a confirmed is untouched. No new field, and the override
-has a subject the day the first such kind exists.
+`elements` absent → `↓` scrolls. The 2 × 2 in §4a is read off the two fields directly. No new
+field, and no policy either.
+
+**The escape hatch this paragraph offered is withdrawn** — it read: *a kind declaring both that
+wants `↓` to scroll uses §4's existing global → kind → per-node override.* §4d is why. The
+override would need an `ArrowPolicy` value meaning *scroll rather than step*, and there is
+none: `navigate` is stepping, the three `escape-*` values are §4c's boundary question, and
+`custom` is the absence of an answer. **An override with no value to express it is not an
+escape hatch, it is a sentence** — and offering one is how a derivable rule acquires a
+configuration surface nobody can use.
+
+So the derived default **stands alone**, which is the stronger form: the two fields are the
+whole of it, and a kind wanting otherwise has no consumer to want it. The day one exists it
+brings a value with it and an inhabitant for that value, which is the check both vocabularies
+have now failed.
 
 **2 · A focused element outside the window is legal.** Page past it and focus stays where it
 was. This is worth stating as a permitted state rather than left to be inferred, because it is
@@ -1051,7 +1062,7 @@ is the shape a spec commit should have.
 9. Focus is stored as a `(blockId, elementId)` address, and restoration is a re-resolution of it with a fall-forward, through one resolver shared by render and keys (I10).
 10. Element resolution is a pull (I11).
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
-12. Movement keys move focus and the window follows; paging keys move the window and not focus; a focused element outside the window is legal and the next movement key steps from it (I18, I7). The default is read off which of `elements` and `window` a kind declares, and a kind wanting otherwise uses I15's override rather than a new field.
+12. Movement keys move focus and the window follows; paging keys move the window and not focus; a focused element outside the window is legal and the next movement key steps from it (I18, I7). The default is read off which of `elements` and `window` a kind declares, and it **stands alone**: the override this once offered needed an `ArrowPolicy` value that does not exist (§4d), so it is withdrawn rather than left as a sentence.
 13. **A boundary is a neighbour question and the sequence is the entry's** — a block's edge is not an end, an end moves to its neighbouring scope or stops, and `ArrowPolicy`'s **edge values are not adopted** because no per-kind value can name a property of the entry's sequence (I19, §4c).
 14. **A fall-forward lands in navigation** — restoration moves focus to a different element, and a mode belongs to the element it was entered on (I20, I10). Vacuous until interaction mode has bindings, and stated now because it is cheap to rule and expensive to reopen.
 
