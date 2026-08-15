@@ -2545,12 +2545,30 @@ live-entry lifecycle and already exists. The transcript is where agent harnesses
 entry itself says so, and reading it as a chrome row is what put 29 in front of it.
 
 **Row 8 is step 9's class and C16's rung table is the precedent.** Two subjects under one key —
-*cancel the running verb* and *clear the queue* — and the ladder answers by scope rather than
-by preference: `inFlight` reports **the route**, so a Ctrl-C with something running cancels the
-running thing and leaves the queue, and a Ctrl-C with the queue non-empty and **nothing**
-running clears the queue. Two rungs, disjoint by construction, and neither needs a mode. What
-it costs: clearing a queue while something runs takes two presses, which is the right price for
-an irreversible action that discards work the reader typed.
+*cancel the running verb* and *clear the queue*. The first answer was two rungs by scope:
+something running → cancel it and **leave the queue**; nothing running and a non-empty queue →
+clear it. Disjoint by construction, no mode, two presses for an irreversible action.
+
+**REVERSED 2026-08-15, BY BUILDING IT.** The two-rung answer needs a **held** queue — after the
+first press, nothing is running and the queue is full, which is exactly the state rung 2 reads —
+and **nothing restarts a held queue.** Every drain hangs off `Guard.release()`, and the release
+that would have drained is the one the cancel just consumed. So the reader's options after one
+press are: press again to discard the work, or submit something else, which then runs *ahead* of
+items submitted before it and breaks the sequentiality this whole entry rests on. Take the other
+branch and let the cancel drain, and rung 2 becomes **unreachable** — each press kills one item,
+the queue is never non-empty with nothing running, and a rung no state can construct is C16's
+own §8a finding arriving in the ladder written from it.
+
+**So: one press stops everything the reader started.** `cancel()` cancels the in-flight
+invocation *and* clears the queue, and each queued entry settles as cancelled rather than
+vanishing. The cost the two-rung version was protecting against — *discarding work the reader
+typed* — is paid by row 7 rather than by a second press: the entries are already on screen,
+already have ids, and settle in place saying what happened to them. **The affordance the
+alternative was buying was a second press; what it actually buys is a stall.**
+
+This is the walk being falsified by the first thing that could falsify it. The rule interaction
+it missed is not between two of its rules — it is between one ruling and the **funnel**, and
+neither artefact shape indexes the mechanism a ruling depends on.
 
 ##### The table, and it is the half a trace cannot reach
 
@@ -2587,8 +2605,9 @@ additive, and taking the jump away once someone relies on it is not.
   to pass, and the comment saying so was written before this entry needed it.
 - **One entry, appended at submission, live at drain**, so the queue is visible in the
   transcript and 29 is not a blocker.
-- **Ctrl-C by scope, not by mode**: something running → cancel it; nothing running and a
-  non-empty queue → clear it.
+- **Ctrl-C stops everything the reader started**: `cancel()` cancels the in-flight invocation
+  and clears the queue, each queued entry settling as cancelled in place. Not two rungs — see
+  row 8, which was ruled that way and reversed by building it.
 - **Everything queues**, and the `/help` case is a named residue with its axis stated.
 
 #### Background execution — related, larger, and a different thing
@@ -3278,9 +3297,14 @@ PART  31 completion ranking       prefix-matched and unranked today. Recency-fir
                                    lifecycle, so the queue is visible in the transcript and the
                                    chrome row a counter would want is not owed. Ctrl-C answers
                                    BY SCOPE — running → cancel it, nothing running and a queue
-                                   → clear it — which is C16's ladder rather than a mode, and
-                                   `inFlight` reports the route rather than a boolean for
-                                   exactly that reason.
+                                   → clear it — REVERSED 2026-08-15 BY BUILDING IT, because
+                                   the two-rung answer needs a HELD QUEUE and nothing restarts
+                                   one: every drain hangs off `Guard.release()`, and the release
+                                   that would drain is the one the cancel consumed. The other
+                                   branch makes rung 2 unreachable. So one press stops
+                                   everything the reader started, and row 7 is what pays for it
+                                   — the entries are on screen and settle as cancelled rather
+                                   than vanishing.
                                    THE RESIDUE IS `/help` QUEUEING behind a long build: the
                                    tempting rule is the WHO IS WRITING axis, it is inferred
                                    from two cases, and C13's was re-founded three times before
