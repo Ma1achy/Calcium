@@ -2570,7 +2570,17 @@ RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
 BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
       9  mermaid (text path)       cheap once the dependency is vetted, distinctive
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
-      11 markdown                  translates to existing blocks
+      11 markdown                  translates to existing blocks. CHECKED 2026-08-15 AND THE
+                                   GREP RESOLVES AGAINST SOMETHING ELSE: `markdown` is in
+                                   `src/` — as a highlight.js LANGUAGE registered by C09's
+                                   `code` block, `presentation/blocks/kinds/code.ts`. That is
+                                   syntax colouring for a fenced markdown source, not a
+                                   translation to blocks, and nothing turns a document into
+                                   `notice`/`table`/`code`. Third instance of a sweep term
+                                   resolving against an unrelated thing (29's `chromeRows`,
+                                   44's `history/persist.ts`), and the reason the blanket
+                                   claim *the symbols these entries name are absent* is wrong
+                                   about this row while its conclusion is right
 BUILT 12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
                                    to change one. Anticipated in a comment, never built.
                                    Smallest fix, biggest effect, invalidation already exists
@@ -3323,7 +3333,9 @@ what landed**.
 | 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **11 is in this list on a corrected reading**, 2026-08-15: the word
+`markdown` **is** in `src/`, as a highlight.js language on C09's `code` block, and the feature
+— a document translated into blocks — is absent. The claim was right and its evidence was not. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
 is open with its first candidate already refused. · **26**, **32** — the symbols the entries name are
