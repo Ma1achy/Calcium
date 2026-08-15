@@ -904,7 +904,11 @@ listed so the Order list can point here instead of carrying a duplicate:
 - **16** one popup — the confirm and the completion menu are two mechanisms today; whichever
   survives is an interaction-mode consumer.
 - block-to-block movement · column and cell movement · the focusable-block concept · clickable
-  rows and links — §3 and §5.
+  rows and links — §3 and §5. **Block-to-block movement now has a visible symptom, which it
+  did not when this list was written**: only the live entry holds focus, so a `scroll` in a
+  settled entry cannot be aimed, and C04 I49 makes it *say* how much is unreachable — *⋯ 12
+  above · 368 below*. A deferral whose cost is a number on the screen is one that gets
+  revisited, where a deferral with no symptom is one nobody can point at (C04 §3c cell 6).
 - `pushedView`'s nine flat bindings — §2 and trace 6.
 
 ## 12. Out of scope

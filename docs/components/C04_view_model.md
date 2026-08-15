@@ -704,7 +704,7 @@ how the structural half goes unexamined.
 | 3 | *the offset is view state* × *`measure` never sees anything that animates* | **The offset changes no height, and that is the whole reason it can be view state.** The box is `height` rows at every offset, so nothing keyed on `(block, width)` moves and C14's index never rebuilds. An offset that changed height would be a document patch and would belong to C13 |
 | 4 | *content shorter than the box* × *an offset exists* | **Clamped at read, never corrected at write.** A store that had to be fixed up on every patch is a store that accumulates, which is exactly what C23 I47 forbids of view state |
 | 5 | *a container must be aimable* × *elements are one per child* | **`children: []` is a construction error, refused at parse.** *A container declaring an offset and no elements* is the rule, and the correspondence above is what makes it expressible where the validator lives. Refused rather than corrected at render — C15 I20's placement precedent, and the same argument as `resolve(key)` throwing on no choices |
-| 6 | *only the live entry holds focus* × *a container scrolls if it is focusable* | **FINDING, and it is a decision rather than a detail.** `focusFor` answers non-null only for the live entry, so **every scroll above the live one is unaimable** and shows its first `height` rows for the life of the session with the rest unreachable. The archive's surface note says the opposite of ordinary blocks — *frozen: rendered, scrollable, not focusable* — so *scroll follows focus* and *frozen blocks scroll* cannot both hold. **Ruled: a settled scroll keeps its offset and cannot be moved.** The alternative is block-to-block focus above the live entry, which is C26 §11's deferral and not this kind's to take |
+| 6 | *only the live entry holds focus* × *a container scrolls if it is focusable* | **FINDING, and it is a decision rather than a detail.** `focusFor` answers non-null only for the live entry, so **every scroll above the live one is unaimable** and shows its first `height` rows for the life of the session with the rest unreachable. The archive's surface note says the opposite of ordinary blocks — *frozen: rendered, scrollable, not focusable* — so *scroll follows focus* and *frozen blocks scroll* cannot both hold. **Ruled: a settled scroll keeps its offset and cannot be moved.** The alternative is block-to-block focus above the live entry, which is C26 §11's deferral and not this kind's to take. **And it says so** — see the residue below: a bounded region with a marker is normal, one that silently ends is a defect (F123's class) |
 | 7 | *a scroll among another's children* | **Legal and flat.** One element per child, and a child that is a scroll is one stop: `↓` steps *to* it and entering it is C26 §4's scope stack, which is unbuilt. Recorded rather than refused, because the flat reading needs no rule and refusing needs one |
 
 #### The sequence trace — interactions something has to happen for
@@ -717,6 +717,40 @@ how the structural half goes unexamined.
 | 4 | a resize | children re-measure and every element's rows move. **The offset is a row count, not an element index** — so it is re-interpreted rather than re-derived, and a reader who scrolled halfway stays halfway instead of jumping to whichever element used to be at that index. This is the ruling an obvious implementation gets wrong, and no cell of the table reaches it |
 | 5 | the entry is evicted or the transcript cleared | the offsets drop **on `rendered`'s own subscription** — same arm, same place in `construct.ts`, so a future eviction path cannot drop one and keep the other |
 | 6 | the entry settles | table cell 6. The offset is kept and frozen |
+
+### The residue, and the row it costs
+
+**A silent bound is the empty-block class.** F123 already ruled the shape: the fallback adapter
+writes *"Showing the first 2,000 rows; N more were not rendered"*, and D40's eviction carries a
+marker for the same reason. So the container renders what it is hiding, **in both directions**,
+because a settled container keeps the offset it had — resetting it would lose the position the
+reader chose, and that means content is hidden above as well as below:
+
+    ⋯ 12 above · 368 below
+
+**Two things it buys past honesty.** *This region is bounded and there is more* is a sentence a
+reader accepts; *this region ended* is a bug report. And **C26 §11's deferral gains a visible
+symptom** — block-to-block focus has none today, and a marker saying 368 rows are unreachable
+is one. A deferral with a visible cost is a deferral that gets revisited, which is this
+session's four-instance finding pointed forwards instead of backwards.
+
+**The marker costs a row, and which row is a rule interaction the ruling created.** Working it
+through rather than assuming, because I47 already constrains the answer:
+
+- **Not a row taken from the box when there is residue.** Whether residue exists depends on the
+  offset, so the content area would change size as the reader scrolls — jitter, and `measure`
+  would depend on view state, which I47 forbids.
+- **Not an unconditional row either**, which would be stable and would draw *⋯ 0 above · 0
+  below* under a container whose content fits.
+- **A row the container adds when its content cannot fit**, which depends on `(block, width)`
+  alone: `measure` returns `height + 1` where the children measure taller than `height`, and
+  `height` where they do not. **Pure in `(block, width)`, stable under every offset**, and the
+  same conditional shape as C11's action bar — which adds two rows on a property of the block
+  and never on a property of the view.
+
+So `height` is the **content** height and the marker is chrome the container adds, exactly as a
+panel's border is. **The glyph comes from C09's table and is never written as a literal**
+(I38's argument, and F6 is the instance): `⋯` degrades to `...` under ASCII like every other.
 
 ---
 
@@ -953,8 +987,9 @@ persisted document rests on.
 - **I45** — **A row aligns its children in its own height, and that is the only axis there is.** **Vertical placement is inside the row's height**, which a row already computes as its tallest child and otherwise discards. **A horizontal axis was ruled and refused by the build**: every renderer fits its output to the width it is handed, so a child fills its allocation and aligning a ten-cell box inside a ten-cell one is a no-op — placing it would mean knowing how wide the content *is*, and `measure(block, width) → height` does not answer that. Heights are measurable and widths are not, which is the same missing preferred width that made weights the only allocation (I44), arriving a third time. The axis that exists has a shipped consumer: the banner's wordmark carries a **blank first row** so its seven lines sit on the whale's hull, which is vertical alignment hand-written into the art exactly as the padded whale was a fixed width hand-written into it (§3, roadmap 38). It defaults to `top`, which is what a row does today, so an absent field renders byte for byte as before. **`measure` is untouched**: alignment moves rendered lines inside a box the container already sized, so the row is still the tallest child and every cache keyed on `(block, width)` is unaffected — the containment argument that made weights safe, applied to position instead of size. A child that is not placed is aligned by nobody.
 
 - **I46** — **A valid document survives a JSON round trip unchanged, and the validator refuses what JSON cannot carry.** The union holds no function, `Map`, `Set` or `Date`, so `JSON.stringify` is the serialiser and `validateDocument` is the parser — which is why persistence needs no codec (F166) and why this had to be stated before something rested on it. **Where the type says `number` the validator requires a finite one, elements of numeric arrays included.** Two defects were found by writing the property rather than by the property failing: `NaN` and `Infinity` were accepted, and JSON writes them as `null`, so a document persisted and reloaded was a *different document that revalidated clean*; and `Series.values` and `Cell.spark` were never element-checked at all, so a string, a `null` or an object in a numeric array validated with or without a round trip — the wider half, and the one an untrusted document turns on. **Two inequalities are knowingly tolerated and named rather than closed**: `-0` writes as `0`, which renders identically and is not worth narrowing the type for, and an explicit `undefined` property is dropped, which no constructor can produce because `exactOptionalPropertyTypes` makes it a distinct type and every one spreads-if-present (§5a).
-- **I47** — **A `scroll` declares a positive integer `height` and at least one child, and both are refused at parse.** Its elements are **one per child**, so *no elements* and *no children* are one fact and the aimability rule is expressible where the validator lives (§3c cell 5). `measure(block, width)` returns `height` at every width and every offset — the box does not change size, which is what keeps the offset out of every geometry cache and out of C14's index (§3c cell 3). **The transcript's window slices the box and never the content** (§3c cell 1).
+- **I47** — **A `scroll` declares a positive integer `height` and at least one child, and both are refused at parse.** Its elements are **one per child**, so *no elements* and *no children* are one fact and the aimability rule is expressible where the validator lives (§3c cell 5). `measure(block, width)` returns `height`, plus I49's residue row where the content cannot fit — and **the same value at every offset**, which is the property that matters: the box does not change size as the reader scrolls, which is what keeps the offset out of every geometry cache and out of C14's index (§3c cell 3). I49's condition is on `(block, width)` for exactly that reason. **The transcript's window slices the box and never the content** (§3c cell 1).
 - **I48** — **The scroll offset is view state: a row count, per container, droppable, clamped at read.** **Rows and not an element index**, so a resize re-interprets it rather than moving the reader to whichever element used to sit there (§3c trace 4). It is never corrected at write — a store that had to be fixed up on every patch is one that accumulates, which C23 I47 forbids of view state — and it is dropped with the entry on the same subscription that drops the rendered rows. **A settled entry's scroll keeps its offset and cannot be moved**, because only the live entry holds focus and a container scrolls if it is focusable (§3c cell 6); the content below the box is unreachable there, and that is a ruling rather than an oversight. **Resume restores no offset**, which follows from view state and is C13 I20's consumer.
+- **I49** — **A scroll whose content cannot fit draws a residue marker, in both directions, and pays a row for it out of its own height.** *N above · M below* rather than silence: a bounded region with a marker is normal and one that silently ends is a defect (F123's class, D40's eviction marker). **`measure` returns `height + 1` exactly where the children measure taller than `height`, and `height` where they do not** — the condition is on `(block, width)` and never on the offset, so the content area does not change size as the reader scrolls and I47's offset-independence survives the marker rather than being weakened by it. The glyph is C09's and never a literal (F6).
 
 ---
 
@@ -1009,6 +1044,7 @@ persisted document rests on.
 43. **A document is JSON, so persistence needs no codec** — and the validator refuses what JSON cannot carry, finite numbers included and numeric array elements with them, because a document that round-trips into a *different valid document* is worse than one that is refused (I46, §5a).
 44. **A `scroll` is a box of declared height holding children**, its elements are one per child, and an empty one is a construction error rather than a container nobody can aim (I47, §3c).
 45. **The offset is view state in rows** — droppable, per container, clamped at read, restored by no resume, and frozen once the entry settles (I48, §3c).
+46. **A bounded region says what it is hiding** — both directions, one row, and the row is spent on a property of the block rather than of the view (I49, §3c).
 
 ---
 

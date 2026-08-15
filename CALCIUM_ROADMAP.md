@@ -3066,7 +3066,17 @@ PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    menu, a paste chip's peek (30), a live block, a pushed
                                    view's inner blocks — and the render cache key is wrong
                                    the day one scrolls (13). Selection across a scrolled
-                                   boundary is the part that needs ruling, with 15
+                                   boundary is the part that needs ruling, with 15.
+                                   WHEN TO REACH FOR ONE, because a container is a choice to
+                                   hide content and after C04 §3c cell 6 it hides it
+                                   PERMANENTLY until block-to-block focus lands: a bounded
+                                   region where BOUNDING IS THE POINT — a view, the live
+                                   entry, a dashboard, the activity region. IN THE SCROLLING
+                                   TRANSCRIPT A LONG BLOCK IS ALREADY FINE, because the
+                                   transcript is what scrolls; an app that wraps a 400-line
+                                   result in a container there has chosen to hide 380 rows and
+                                   probably did not mean to. SPECIFIED as C04 §3c with both
+                                   walk artefacts, I47-I49 and commitments 44-46
       48 MG24 IS BLIND ON THE       the freeze protects the surface `src/index.ts` names, and
          PUBLIC SURFACE ★           MG24 matches members BY NAME — so a published field with
                                    no reader passes the moment any type anywhere declares
