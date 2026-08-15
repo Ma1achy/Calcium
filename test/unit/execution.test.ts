@@ -1707,6 +1707,33 @@ describe("C23 §3b — time-driven updates", () => {
     ).toBe(true);
     expect(stallBlocks(blocks), "replaced in place — still exactly one").toBe(1);
   });
+
+  it("T3.22 (C09 §4): the stall notice carries the continuation mark, on an entry that has a command line", async () => {
+    // **The one consumer that is not a `noticeDoc`**, so nothing in
+    // `documents.ts` covers it and T2.96 cannot reach it. It qualifies on the
+    // same shape and by a different route: the entry is streaming, so its
+    // command chrome is on screen above, and the notice reports what the
+    // *entry* is doing rather than anything the far side emitted.
+    //
+    // Asserted together with the command, because the mark is only correct
+    // while there is a line for it to hang from — a row asserting the glyph
+    // alone would pass on the day the pending entry stopped carrying one.
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise(() => undefined);
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+    h.tick(130_000);
+
+    const entry = h.transcript.entries[0];
+    expect(entry?.doc.command, "there is a line above it").toBe("/tail");
+    const stall = entry?.doc.blocks.find((b) => b.id === "stall-notice");
+    expect(stall?.kind === "notice" ? stall.glyph : undefined).toBe("continuation");
+  });
 });
 
 describe("C23 §4 — the submit row's two other steps", () => {

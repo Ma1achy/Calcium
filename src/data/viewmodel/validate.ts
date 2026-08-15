@@ -35,10 +35,34 @@ const STATUSES: ReadonlySet<string> = new Set<DocumentStatus>([
   "proposed",
 ]);
 
-const GLYPHS: ReadonlySet<Glyph> = new Set<Glyph>([
-  "ok", "warn", "error", "info", "pending", "working", "running",
-  "queued", "cancelled", "expand", "collapse", "live", "bullet",
-]);
+/**
+ * **Built from a `Record` over the union, and that is the whole point.**
+ *
+ * This was `new Set<Glyph>([...])`, which type-checks with a member missing —
+ * a `Set`'s element type constrains what may go in and says nothing about what
+ * must. Adding `continuation` to `Glyph` therefore compiled, and every muted
+ * notice became an invalid document at run time. It did not surface as a
+ * failure either: `enqueue` contains its append (§5a), so the queue silently
+ * stopped queueing and seven rows failed about *queueing* rather than about a
+ * glyph. **A list that fails open at compile time and closed at run time,
+ * behind a deliberate swallow, is the worst of the three copies of this
+ * vocabulary.**
+ *
+ * The `Record` is the idiom `KIND_CHECKS` below already argues for, in this
+ * file, for this reason — a member added without an entry stops compiling.
+ *
+ * A03's SS39 keeps its literal list, and the disposition differs because the
+ * failure direction does: a stale scan list rejects a new token loudly at the
+ * commit that adds it, where this one accepted it silently.
+ */
+const GLYPH_MEMBERS = {
+  ok: true, warn: true, error: true, info: true, pending: true,
+  working: true, running: true, queued: true, cancelled: true,
+  expand: true, collapse: true, live: true, bullet: true,
+  continuation: true,
+} satisfies Record<Glyph, true>;
+
+const GLYPHS: ReadonlySet<Glyph> = new Set(Object.keys(GLYPH_MEMBERS) as Glyph[]);
 
 /**
  * The field each action kind carries beside `label`.

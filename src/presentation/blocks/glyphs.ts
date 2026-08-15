@@ -513,6 +513,14 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     collapse: ["▾", "v"],
     live: ["▌", "|"],
     bullet: ["•", "-"],
+    // **U+23BF is `East_Asian_Width=Neutral` — one cell under both
+    // conventions**, where `└` and `╰` are Ambiguous and draw two, as do `▲`
+    // and `⋯` above. That buys nothing today, because `glyphs()` discards the
+    // Unicode set wholesale at `ambiguousWidth: "wide"` and this table follows
+    // `unicode` alone. Recorded because §4's note says a third set of narrow
+    // survivors is the better answer the day someone measures one, and this is
+    // one. The ASCII half is `tree(1)`'s rendering of the same hook.
+    continuation: ["⎿", "`"],
   });
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */

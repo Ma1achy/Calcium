@@ -196,7 +196,19 @@ export type Glyph =
   | "expand"
   | "collapse"
   | "live"
-  | "bullet";
+  | "bullet"
+  /**
+   * A line subordinate to the one above it (C09 §4).
+   *
+   * **The only token whose eligibility is a property of the entry rather than
+   * of the block.** Every other arm names a state the block is in; this one
+   * names a relationship to a line that has to exist. C22's `commandRows`
+   * returns `[]` for `command: ""`, so a document with no command line has
+   * nothing for it to hang from and the mark would subordinate the block to a
+   * different submission's entry. C09 §4 names the two blocks in the position
+   * and the two that look as though they are.
+   */
+  | "continuation";
 
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);

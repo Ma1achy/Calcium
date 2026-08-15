@@ -318,6 +318,15 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 
 **And it is a glyph slot rather than a prefix on the text, which is the whole reason it fits.** `notice` puts the glyph on the first row and indents every continuation row under the *text* (§3's hanging gutter), so a multi-row result sits beneath its mark instead of under a lone character. `docs/design/AGENT_TUI_DESIGN.md` §A1 reached the same mechanism from the other end — *a prefix reserving its columns, which `noticeDoc` already does* — and that is corroboration for the mechanism only. Its own consumer is a tool result in an application stopped at step 0, so it is written down and it is not a count.
 
+**The residue, found by reading the frame and by nothing else.** The mark lands flush left, in the same gutter the prompt uses:
+
+```
+❯ /ps --all
+⎿ queued behind /logs
+```
+
+Both gutters are two cells, so the mark's text and the command's text align — the notice reads as the prompt's *sibling*, which is the one relationship the mark exists to deny. `AGENT_TUI_DESIGN.md` §A1 draws it indented by two under its parent and the framework cannot express that: `notice` has a glyph gutter and no indent field, and nothing between a document's blocks and its command line carries depth. **So the mark is correct within the mechanism that exists and the figure it came from assumes one that does not** — the same shape as a ruling naming an operation the layer below has no verb for. Recorded as owed rather than fixed here, because an indent is a block-schema question and this is a vocabulary entry. Every assertion about the mark passes with it flush; only the frame says otherwise.
+
 **On the character, measured rather than chosen.** `⎿` is `East_Asian_Width=Neutral` — **one cell under both conventions**. The corner a reader would reach for instead is not: `└` and `╰` are Ambiguous and draw two cells wide, as do `▲` and `⋯` already in these tables. That does not buy anything *today*, because `glyphs()` discards the whole Unicode set at `ambiguousWidth: "wide"` and this table follows `unicode` alone — so it is a property of the character and not yet an argument. It is recorded because §4's own note says a third set of narrow survivors is *the better answer the day someone measures one*, and this is a measurement, filed where that note can find it.
 
 The ASCII half is `` ` ``, which is `tree(1)`'s rendering of the same hook in its ASCII mode — a precedent rather than a preference, and degradation preserving meaning rather than appearance.

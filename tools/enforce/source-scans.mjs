@@ -640,13 +640,23 @@ export const SCANS = [
   // with no ASCII fallback is visible only under `LANG=C`, only to the users
   // least able to say what they are looking at.
   //
+  // **The token list is a second copy of the union, and it stays one deliberately.**
+  // Adding `continuation` to `Glyph` made this rule fail, which is how the
+  // duplication announced itself — and the obvious fix, deriving the list from
+  // `types.ts`, is the wrong one here. The two failure directions are not
+  // symmetric: a list that has gone stale rejects a legitimate new token loudly,
+  // at the commit that adds it, with the fix one word long. A derivation that
+  // mis-parses the union — and it now carries interleaved doc comments — widens
+  // the rule silently, which is the failure this scan exists to prevent, arriving
+  // through the scan itself. So: literal, and the cost is one word per token.
+  //
   // The pattern matches a glyph position whose literal is *not* a token, so
   // `glyph: "error"` passes and `glyph: "✗"` does not. Scoped to `src/`: the
   // one file that holds the characters writes them as table rows rather than in
   // a glyph position, so it needs no exemption — and an exemption nobody needs
   // is a door left open.
   { id: "SS39", spec: "C04 I6 · C09 §4",
-    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet)["'`])/,
+    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|continuation)["'`])/,
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 

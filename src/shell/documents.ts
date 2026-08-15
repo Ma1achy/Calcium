@@ -179,7 +179,26 @@ export function noticeDoc(
   metaSpec: MetaSpec,
   status: DocumentStatus = "ok",
 ): ViewDocument {
-  const glyph = GLYPH_OF[tone];
+  // **`muted` takes the continuation mark, and the condition is the command**
+  // (C09 §4). Eligibility is a property of the *entry*, not of the block: the
+  // mark says *this line belongs to the one above it*, and `commandRows`
+  // returns `[]` for `command: ""`, so with no command line the mark would
+  // subordinate this notice to whatever entry happens to precede it — a
+  // different submission.
+  //
+  // **Written as the condition rather than at the call sites**, which is the
+  // same argument the table above makes. Four muted notices reach this today —
+  // `queued behind`, `X finished`, `X opened a view`, a builtin's result — and
+  // they were found by stating the shape and looking, not by memory: all four
+  // are the entry's only block, saying what the *entry* did rather than what
+  // the far side emitted. A fifth arriving with `command: ""` gets the right
+  // answer without anyone deciding.
+  //
+  // F15's fault notice is exactly that fifth case and it is already here: it
+  // is `error`, so the tone alone would have spared it — but only by accident,
+  // and its own `command` is `""`.
+  const glyph =
+    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];
   return compose({
     command,
     status,
