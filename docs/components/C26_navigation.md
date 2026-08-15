@@ -61,6 +61,12 @@ This solves key collision **structurally** rather than key by key: a block in in
 owns its keys and the prompt does not compete for them. It is the same trade as the `⌃Home`
 ruling, made once instead of per binding.
 
+**That sentence is true and it is not this mode's reason — §4f.** The prompt already does not
+compete: with focus in the block `activeTarget` returns `liveBlock`, and A01 D4's merged
+bindings are live there. What the mode is actually for is narrower and is expressed by
+`mergeBlock`'s **throw**: a block cannot bind a key `liveBlock` or `global` already binds, and
+interaction is the only rung where those are out of scope.
+
 `⏎` enters interaction on the focused element. `Esc` leaves it. **Two-level escape** — the
 first exits interaction, the second leaves the scope — is what makes drilling in
 non-frustrating: the reader is never one keypress from losing their position.
@@ -479,7 +485,7 @@ structure, and the structural half is where it comes apart.
 
 | # | the two rules that meet | ruling |
 |---|---|---|
-| 1 | *a block's keys merge into `liveBlock`* (A01 D4) × *interaction is the mode that hands the block its keys* (§2, commitment 3) | **FINDING, and it is the walk's first output.** D4 is explicit — *a live block may bind letters, but only once focus has been moved into it (`↓`), and C16 merges those bindings into the `liveBlock` target.* So `Keymap.mergeBlock`, the seam that reads like interact's producer, supplies **a different rung by architectural decision**. §8b.8 measured *no caller*; this measures *no target*. **Interaction mode has no candidate producer**, which is a stronger and much cheaper thing to know |
+| 1 | *a block's keys merge into `liveBlock`* (A01 D4) × *interaction is the mode that hands the block its keys* (§2, commitment 3) | **FINDING, and it is the walk's first output.** D4 is explicit — *a live block may bind letters, but only once focus has been moved into it (`↓`), and C16 merges those bindings into the `liveBlock` target.* So `Keymap.mergeBlock`, the seam that reads like interact's producer, supplies **a different rung by architectural decision**. §8b.8 measured *no caller*; this measures *no target*. **Interaction mode has no candidate producer**, which is a stronger and much cheaper thing to know. **→ §4f revises this**: D4 stands, and the mode's subject turns out to be the keys `mergeBlock` **refuses** — so the producer's shape is known (the same seam, a different target, colliding keys only) and it is still absent |
 | 2 | *`activeTarget` returns `pushedView` whenever a view is open* × *an element inside that view could declare bindings* | **The collision (b) describes cannot occur.** `activeTarget` checks the layer before anything else — `overlay`, `copyMode`, `pushedView`, and only then `interaction` — so while a view is open **no key reaches a block inside it at all**. It is not two scopes binding the same keys; it is one scope taking every key. What (b) needs is a **rung above `pushedView` for an element inside the top layer**, and there is none. **A rung, not a binding** |
 | 3 | *`Esc` pops the view* × *`Esc` returns from the live block* × *commitment 3's `Esc` leaves interaction first* | **Two levels, one key, and the ladder already resolves it** — `FOCUS_ORDER` holds `interaction` above `prompt`, and `⌃c` at that rung calls `setMode("navigate")` and stops there, deliberately. So the two-level escape is **expressible today and unimplemented**, which is a different state from unexpressible and is what row 1 blocks |
 | 4 | *`n`/`p` step hunks at `pushedView`* × *a table's elements are rows* | **Not a collision — dead keys.** `n`/`p` step **hunks**, which only `patch` has, so a view holding a table binds two letters that do nothing. **Dead is worse than conflicting**: a key that does nothing reads as a key that is not bound, and the reader cannot tell which |
@@ -509,6 +515,69 @@ question and is a ladder question; the walk's job was to say which, and both art
 needed to see it — the table found the missing rung, and the trace found that every sequence
 about it is unreachable, which is the same fact in the form that would otherwise have been
 tested and passed.
+
+---
+
+## 4f. The D4 ruling — the mode has a purpose, and §2 names a different one
+
+§4e left a ruling upstream: either A01 D4 stands and interaction mode is not for handing a
+block its keys, or D4 changes and `mergeBlock` targets `interaction`. **Neither, and the third
+answer was already in the tree.**
+
+### Stage 1's argument was about ordering, and it is untouched either way
+
+§2's *the mode is a focus target* rests on one thing: **C16 §5's ladder has no order of its
+own**, because its rungs are handlers registered on focus targets. A mode consulted as a flag
+would be a second priority list, and the ladder would acquire an order to disagree with —
+which is the defect C16's own spec pass found. **That argument says nothing about purpose.** So
+the rung's placement and the mode's subject are separable, and everything below leaves
+`FOCUS_ORDER` exactly as it is.
+
+### D4 stands, and §2's justification for the mode is delivered without it
+
+§2 says interaction *solves key collision structurally: a block in interaction owns its keys
+and the prompt does not compete for them.* **Measured, the prompt already does not compete.**
+With focus in the block, `activeTarget` returns `liveBlock` — `stored.at` is not `prompt`, so
+the `prompt` row does not match — and D4's merged bindings are live at that target. `/ps`'s
+`f` and `s` work today by focus alone, which is exactly what D4 says and why D4 is right.
+
+**So §2's stated reason for the mode is satisfied one rung down.** That is the finding, and it
+is the shape a correct sentence justifying the wrong decision always has: the sentence is true
+about collisions and untrue as a reason for *this* mechanism.
+
+### What the mode is for, expressed in the tree by the seam D4 names
+
+`mergeBlock` does not shadow a colliding key — **it throws**:
+
+> *block keymap binds `x`, which `<binding>` already binds… the global wins and the refusal is
+> loud.*
+
+Checked against `global` **and** against an existing `liveBlock` binding. So a block that wants
+a key the framework already owns has **no way to ask for it**: the ten rows bound at
+`liveBlock` — `↑ ↓ ⇧↑ ⇧↓ ⏎ Esc PgUp PgDn y ⌥v` — and the four at `global`, `PgUp`, `PgDn`,
+`⌃Home`, `⌃End`, are closed to every adapter, permanently and by construction.
+
+**Interaction mode is the rung where they are not.** A mode that takes every key is precisely
+the scope in which the framework's own `liveBlock` bindings are out of scope, and it is the
+only construct in the design that could hand `↓` or `⏎` to a block. That purpose is narrower
+than §2's *sends keys to the thing focused* and it is the one the tree can actually express.
+
+### The disposition, and it is not a deferral
+
+- **D4 stands.** Non-colliding block keys belong to `liveBlock`, reached by `↓`. Shipped and
+  correct.
+- **The mode keeps its rung**, on the ordering argument, which stands alone.
+- **§2 is corrected rather than left**: its justification is `liveBlock`'s, and the mode's
+  subject is the refusal above.
+- **§8b.8's refusal stays conditional and the condition becomes nameable.** Not *until the mode
+  has bindings* — which invites exactly the wrong producer, the one D4 assigns elsewhere — but
+  **until a block needs a key `liveBlock` or `global` already binds.** That condition has a
+  trigger in the code: `mergeBlock`'s throw. A deferral whose condition is a `throw` someone
+  will hit is one that reports itself, which is the opposite of this session's six.
+- **No consumer has ever needed it.** `mergeBlock` has no caller, so the collision that would
+  require the mode has never been raised — the purpose is real, expressible, and uninhabited.
+  Recorded that way rather than as *the mode has no purpose*, because the two disagree about
+  what happens the first time an adapter wants `⏎`.
 
 ---
 
@@ -1099,7 +1168,7 @@ is the shape a spec commit should have.
 
 1. The scope stack is `entry → block → row → cell`, at most four deep (I1).
 2. Navigation and interaction are modes, and interaction is a focus target (I2).
-3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, because the mode has no bindings and the seam that would supply them has no producer (§8b.8). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
+3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, and §4f names the condition rather than leaving it as *the mode has no bindings*: **until a block needs a key `liveBlock` or `global` already binds**, which `mergeBlock`'s throw reports the first time it happens (§8b.8, §4f). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
 4. `ArrowPolicy` and `EscapePolicy` resolve global → kind → per-node override, and an override for a level the kind does not report is a construction error (I15).
 5. `BlockDefinition.elements` is optional, pure in `(block, width)`, and is the single source for both keyboard and pointer (I3, I8).
 6. Element lists satisfy containment, reading order, per-level disjointness and stability (I4, I5, I6) — checked generically by a conformance sweep, as `window`'s equality is.
