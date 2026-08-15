@@ -242,6 +242,33 @@ price of the whole index-aligned shape, and the two losses are not comparable:
 **a missing last entry is recovered by running the command again, and a file whose
 rows disagree with memory is not recovered at all.**
 
+### 5b.5 What the build changed: a row on disk needs an identity
+
+**The trace's row 4 said `drain` carries C20's policy unchanged, and the code
+disagreed.** `drain` writes from the last *confirmed* write, so a row the chain
+had already **issued** is written synchronously and written again when the held
+append lands. C20 tolerates exactly this and says so — *the duplicate this may
+produce is collapsed on load* — and what makes that safe there is an entry
+identity the loader can collapse by. A bare document has none.
+
+So a persisted row is an envelope, `{seq, doc}`, and the loader keys by `seq`
+with last-write-wins. **The writer tolerates the duplicate and the reader removes
+it**, which is C20's division rather than a new one.
+
+**And the envelope's key is the file's, not the session's.** A writer seeded with
+documents alone renumbers from 1, so a session resuming rows 5 and 6 appends `seq`
+3 and the next load sorts the newest entry above the two it followed. The seed
+keeps what it read and the counter continues from the highest seen — **found by
+reading the diff**, which is the third finding in this section that neither walk
+artefact reached.
+
+**It was found by a test that could construct `issued > confirmed`, and the
+obvious fixture could not.** Written as *write, then drain*, both counters are
+still zero — `pump` advances `issued` inside the chain, which has not run — so
+drain-from-issued and drain-from-confirmed slice identically and the row passes
+for either. The mutation pass is what said so, and the fixture that replaced it
+holds an append open.
+
 ### 5b.4 The framework never redacts, and persistence is declared per verb
 
 **RULED.** Nothing is written unless an app declares a policy, and the declaration
@@ -399,6 +426,18 @@ Six tiers. Every cell of the §7 transition table is covered.
 ### Tier 1 — unit
 
 - **T1.1**: `append` on an empty store → one entry, live, `liveId` set.
+- **T1.28** (I20, §5b.4): an app that declares nothing persists nothing — the default, and the reason declaring the policy is what switches the feature on.
+- **T1.29** (→ C05 I25): `persist: true` opts a verb in; **absent, `false` and unknown are all refusals**, one assertion each, because a check reading `!== false` passes the first alone.
+- **T1.30** (I20): `persist: "all"` is the one-line opt-in and needs no manifest.
+- **T1.31** (I20): a document with `meta.verb: null` — a fault, a stall, the resume warning itself — is never written, and `"all"` does not sweep it up.
+- **T1.32** (I20, → C04 I46): a block carrying a newline is still one row, and the document comes back the one that was written.
+- **T1.33** (I20): a failed write rewinds, the next one catches up, and the cause is warned once.
+- **T1.34** (I20, §5b.5): `drain` writes from the last **confirmed** write. The fixture holds an append open, because *write then drain* leaves both counters at zero and the row passes for either answer — the mutation pass is what said so.
+- **T1.35** (I20, §5b.5): seeding holds the loaded rows; compaction rewrites the file from them, so a count is data loss rather than inefficiency.
+- **T1.36** (I20): a damaged line is dropped, counted and the rest kept — an unparseable row, an invalid document and a row with no `seq`.
+- **T1.37** (I20): an absent file is an empty resume, not an error.
+- **T1.38** (I20, §5b.5): a duplicated row collapses on load, which is what makes `drain` safe.
+- **T1.39** (I20, §5b.5): a resumed session continues the file's sequence rather than restarting it, so the newest entry does not sort to the top.
 - **T1.2** (I3): two appends → ids differ, `seq` increments, order preserved.
 - **T1.3**: appending over a live+settled entry → the previous becomes frozen+settled.
 - **T1.4** (I4): appending over a live+streaming entry → previous becomes frozen and **stays streaming**.

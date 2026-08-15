@@ -176,6 +176,7 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     platform: ambient.platform,
     fs: config.fs ?? ambient.fs,
     stateDir: config.stateDir ?? DEFAULT_STATE_DIR,
+    ...(config.persist === undefined ? {} : { persist: config.persist }),
     openUrl: config.openUrl,
     stdout: config.stdout ?? process.stdout,
     stdin: config.stdin ?? process.stdin,

@@ -25,7 +25,18 @@ export type Drainable = Readonly<{ drain: () => void }>;
  * Both calls are cases where the synchronous-looking option is the wrong one,
  * and both are load-bearing in a way review does not catch.
  */
-export function makeBeforeRelease(runner: ProcessRunner, history: Drainable): () => void {
+export function makeBeforeRelease(
+  runner: ProcessRunner,
+  history: Drainable,
+  /**
+   * Anything else holding unconfirmed writes — the transcript writer, once
+   * a verb declares persistence (C13 I20). **A list rather than a second
+   * named parameter**, because the argument for (b) below is about the
+   * *kind* — a pending promise is not waited for at exit — and it is the
+   * same argument for every writer this session ever gains.
+   */
+  also: readonly Drainable[] = [],
+): () => void {
   return () => {
     // (a) `killAll()` returns a Promise and is **deliberately not awaited**.
     //
@@ -49,5 +60,6 @@ export function makeBeforeRelease(runner: ProcessRunner, history: Drainable): ()
     // flight is lost, and that append is the command the user has just typed.
     // `drain` is the synchronous member `FileSystem.appendFileSync` exists for.
     history.drain();
+    for (const d of also) d.drain();
   };
 }

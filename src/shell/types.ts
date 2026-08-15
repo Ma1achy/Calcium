@@ -488,6 +488,20 @@ export type TuiConfig = Readonly<{
   fs?: FileSystem;
   /** Default `.calcium`, beside the project. The **app** resolves its own variable (I20). */
   stateDir?: string;
+  /**
+   * Session resume (C13 I20, roadmap 44).
+   *
+   * **Absent means nothing is persisted**, and declaring a policy is what
+   * switches the feature on rather than a flag that turns it off: an app that
+   * never thought about it gets no persistence and no mystery, and an app with
+   * nothing to hide writes `"all"`.
+   *
+   * `"all"` persists every verb's settled output. Anything finer is declared
+   * per verb — `ToolDef.persist` (C05 I25) — because the app author is the only
+   * party who can know what a verb's output contains, and **the framework never
+   * redacts**.
+   */
+  persist?: "all";
   /** Default: the OS handler, http/https only. */
   openUrl?: (url: URL) => Promise<void>;
   stdout?: NodeJS.WriteStream;

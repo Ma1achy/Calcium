@@ -68,6 +68,12 @@ import {
   type TerminalLifecycle,
 } from "../terminal/lifecycle.js";
 import { makeBeforeRelease } from "./shutdown.js";
+import {
+  createTranscriptWriter,
+  loadTranscript,
+  persistPolicy,
+  persists,
+} from "./transcript-persist.js";
 import type { ResolvedConfig } from "./config.js";
 import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
@@ -570,6 +576,20 @@ export async function constructGraph(
     // notice is drawn. Only a genuinely unwritable path reaches the catch.
     try {
       await config.fs.mkdir(config.stateDir);
+      // **The directory ignores itself** (I67). `.calcium` sits beside the
+      // project, so a theme preference is committable today and a persisted
+      // transcript is the moment a verb declares one (C13 I20). Writing the
+      // rule here rather than documenting it means it does not depend on the
+      // app author having thought of it, and `*` inside the directory beats
+      // whatever the project's own ignore file says.
+      //
+      // Unconditional rather than written-if-absent: an app that deliberately
+      // un-ignored this directory has done something the framework should not
+      // be helping with, and a read-then-write would be two syscalls to reach
+      // the same place. Failure is silent — the `catch` below is for a
+      // directory that could not be made at all, which is the case worth a
+      // notice.
+      await config.fs.writeFile(`${config.stateDir}/.gitignore`, "*\n").catch(() => undefined);
     } catch {
       transcript.append(
         noticeDoc(
@@ -665,7 +685,67 @@ export async function constructGraph(
       );
     }
 
-    return { transcript, viewport, rendered, overlays, history, editor, theme: themed.value };
+    // **Session resume** (C13 I20, roadmap 44). Off unless the app declared a
+    // policy, and the decision is taken here because L4 is the one place that
+    // holds the manifest, the config and the store at once — A02 Seam 4, and
+    // the reason C13 knows nothing about verbs.
+    const policy = persistPolicy(built.manifest.manifest ?? null, config);
+    const persisting = policy.all || policy.declared.size > 0;
+    const transcriptWriter = createTranscriptWriter(
+      config.fs,
+      `${config.stateDir}/transcript.ndjson`,
+    );
+    if (persisting) {
+      const loaded = await loadTranscript(config.fs, `${config.stateDir}/transcript.ndjson`);
+      transcriptWriter.seed(loaded.rows);
+      // Appended in order, so the session opens at the bottom on the newest of
+      // them — 44's ruling, and it falls out of `append` rather than needing a
+      // rule: no scroll offset, no container offset and no focus is restored
+      // because none of them is written.
+      for (const doc of loaded.docs) transcript.append(doc);
+
+      // **A dropped line is said out loud** (F35's class). Silently discarding
+      // part of a resume file is absence indistinguishable from failure: the
+      // session looks like one that had fewer commands in it, and nothing
+      // anywhere says otherwise.
+      if (loaded.discarded > 0) {
+        transcript.append(
+          noticeDoc(
+            "",
+            `${String(loaded.discarded)} line${loaded.discarded === 1 ? "" : "s"} of the ` +
+              `saved transcript could not be read and ${loaded.discarded === 1 ? "was" : "were"} ` +
+              `skipped`,
+            "warn",
+            { origin: "refresh" },
+          ),
+        );
+      }
+
+      // **What is written is decided on `settle`, and on an `append` that is
+      // already settled.** A non-streaming entry is settled the moment it
+      // arrives — `streaming` is what unsettled means (C13 §2) — so both
+      // changes carry an entry that will not move again, and no other change
+      // does. `patch` deliberately writes nothing: a row written before it
+      // stopped changing is the whole of §5b.2.
+      transcript.subscribe((change) => {
+        if (change.kind !== "append" && change.kind !== "settle") return;
+        const entry = transcript.entries.find((e) => e.id === change.id);
+        if (entry === undefined || entry.streaming) return;
+        if (!persists(policy, entry.doc)) return;
+        transcriptWriter.write(entry.doc);
+      });
+    }
+
+    return {
+      transcript,
+      viewport,
+      rendered,
+      overlays,
+      history,
+      editor,
+      theme: themed.value,
+      transcriptWriter,
+    };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("stores", cause);
   });
@@ -697,7 +777,7 @@ export async function constructGraph(
       stdin: config.stdin,
       capabilities: detection.capabilities,
       onFatal: deps.onFatal,
-      beforeRelease: makeBeforeRelease(runner, stores.history),
+      beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
     }),
   );

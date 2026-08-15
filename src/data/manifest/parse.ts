@@ -454,6 +454,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const streams = takeOptionalBoolean(raw, "streams", e, at);
   const oneShot = takeOptionalBoolean(raw, "oneShot", e, at);
   const hidden = takeOptionalBoolean(raw, "hidden", e, at);
+  const persist = takeOptionalBoolean(raw, "persist", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
 
@@ -549,6 +550,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     ...(streams === undefined ? {} : { streams }),
     ...(oneShot === undefined ? {} : { oneShot }),
     ...(hidden === undefined ? {} : { hidden }),
+    ...(persist === undefined ? {} : { persist }),
     ...(interactive === undefined ? {} : { interactive }),
     ...(view === undefined ? {} : { view }),
   };
