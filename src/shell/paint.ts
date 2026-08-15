@@ -139,7 +139,7 @@ const ELISION: readonly [unicode: string, ascii: string] = Object.freeze(["⋯",
  * exists and is not called, which from the call site is indistinguishable from
  * one that does not exist.
  */
-function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode">): string {
+function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): string {
   return spinnerFrames(caps)[0] ?? "";
 }
 
