@@ -17,6 +17,7 @@ vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 const FIELDS: readonly (keyof TerminalCapabilities)[] = [
   "colourDepth",
   "unicode",
+  "ambiguousWidth",
   "synchronisedUpdate",
   "bracketedPaste",
   "mouse",
@@ -41,7 +42,7 @@ const FIXTURES: readonly NodeJS.ProcessEnv[] = [
 ];
 
 describe("C02 contract", () => {
-  it("T2.1 (I1): exactly the seven documented keys, all present, for every fixture", () => {
+  it("T2.1 (I1): exactly the eight documented keys, all present, for every fixture", () => {
     for (const env of FIXTURES) {
       const { capabilities } = detectCapabilities(env);
       expect(Object.keys(capabilities).sort(), JSON.stringify(env)).toEqual([...FIELDS].sort());

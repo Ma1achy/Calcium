@@ -34,6 +34,7 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   colourDepth: 24,
   unicode: "full",
+  ambiguousWidth: "narrow",
   synchronisedUpdate: true,
   bracketedPaste: true,
   mouse: true,

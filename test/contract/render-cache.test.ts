@@ -105,6 +105,12 @@ describe("C22 §6c — the cache's C13 arms", () => {
     // **The premise asserted rather than described** (C26 §8b.8's shape). A
     // re-detect on resize, or a `/ascii` toggle, makes this row fail — and that
     // is the day the key needs the axis T4.18c says matters.
+    //
+    // **`ambiguousWidth` rides on this row** (C02 I9), and deliberately gets no
+    // row of its own: it is a field of the record this asserts the identity of,
+    // so a second assertion would be one rule expressed twice — the shape C02 I7
+    // had to be allow-listed for. A verb that toggled it would invalidate every
+    // measured height and C14's whole index, and this is where that fails.
     const { graph, resize } = await buildGraph();
     const before = graph.capabilities;
     let resized = 0;

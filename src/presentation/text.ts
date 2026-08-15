@@ -77,13 +77,36 @@ export function expandTabs(text: string, tabStop: number = TAB_STOP): string {
 }
 
 /**
+ * Whether `East_Asian_Width=Ambiguous` glyphs are one cell or two (C02 I9).
+ *
+ * **Declared by the caller and never read here**, which is what keeps this file
+ * free of an import from `terminal/`: only L1 measures, and a width function
+ * that consulted a capability would be one L0's data half could never call.
+ */
+export type AmbiguousWidth = "narrow" | "wide";
+
+/**
  * Display width in terminal cells, grapheme-aware.
  *
  * A cluster is measured as a unit: a ZWJ family emoji is 2 cells, not 2 per
  * component; a base plus combining marks is the base's width; a variation
  * selector adds nothing of its own.
+ *
+ * **`ambiguous` defaults to `narrow`, which is today's behaviour**, so every
+ * existing call is unchanged and the callers that hold a capability opt in. That
+ * is a **partial** adoption by construction: a site that holds the capability and
+ * does not pass it measures narrow while the frame beside it is drawn wide, and
+ * the ASCII fast path above returns early regardless — correctly, since no ASCII
+ * character is ambiguous. Roadmap 51 carries the sweep of the remaining sites and
+ * the scan rule that would make forgetting one loud.
+ *
+ * **The partiality reaches inside this file too**: `truncate` and `wrapCells`
+ * measure through `clusterCells`, whose own default is narrow, so a wide session
+ * measures a sparkline correctly and still wraps a box-drawing paragraph as
+ * though it were narrow. Named here rather than left for a reader to discover —
+ * the sweep is one change and this is the first half of it.
  */
-export function cells(text: string): number {
+export function cells(text: string, ambiguous: AmbiguousWidth = "narrow"): number {
   if (text === "") return 0;
 
   // **The printable-ASCII path, and it is an equality rather than an
@@ -109,7 +132,7 @@ export function cells(text: string): number {
 
   let total = 0;
   for (const { segment } of GRAPHEMES.segment(stripControl(text))) {
-    total += clusterCells(segment);
+    total += clusterCells(segment, ambiguous);
   }
   return total;
 }
@@ -327,7 +350,7 @@ export function clusterWidth(cluster: string): number {
  * column — and a regional-indicator pair is one flag of two cells rather than
  * two glyphs of two.
  */
-function clusterCells(cluster: string): number {
+function clusterCells(cluster: string, ambiguous: AmbiguousWidth = "narrow"): number {
   const points = [...cluster];
   const base = points[0]?.codePointAt(0);
   if (base === undefined) return 0;
@@ -336,7 +359,8 @@ function clusterCells(cluster: string): number {
   if (points.some((p) => p.codePointAt(0) === 0xfe0f)) return 2;
   if (isRegionalIndicator(base)) return 2;
 
-  return isWide(base) ? 2 : 1;
+  if (isWide(base)) return 2;
+  return ambiguous === "wide" && isAmbiguous(base) ? 2 : 1;
 }
 
 /**
@@ -617,6 +641,42 @@ function isZeroWidth(cp: number): boolean {
 
 function isRegionalIndicator(cp: number): boolean {
   return cp >= 0x1f1e6 && cp <= 0x1f1ff;
+}
+
+/**
+ * `East_Asian_Width=Ambiguous`, the ranges that appear in terminal output (C02
+ * I9).
+ *
+ * **Not the whole property, and the omission is deliberate.** UAX #11 lists
+ * hundreds of ranges, most of them Cyrillic, Greek and Latin letters with
+ * accents that no terminal renderer has ever drawn two cells wide in practice
+ * because the fonts do not have wide forms for them. What this covers is the
+ * part that is *drawn as geometry* and therefore actually doubles: box drawing,
+ * block elements, geometric shapes, arrows, the dingbat marks C09 draws from,
+ * and the enclosed alphanumerics.
+ *
+ * **The test of a range's inclusion is whether the tree draws from it.** Every
+ * one below has a caller: `RAMP_UNICODE`'s lower blocks, `GLYPH_TABLE`'s marks,
+ * C09's borders, C12's axes. A range with no caller would be a claim about
+ * terminals nobody here has measured — which is the shape this whole finding is
+ * about.
+ *
+ * A width library was the alternative and DEPENDENCIES.md already refuses one
+ * for `cells()`: two implementations of one rule diverge in the cases nobody
+ * tests.
+ */
+function isAmbiguous(cp: number): boolean {
+  return (
+    (cp >= 0x2010 && cp <= 0x2027) || // general punctuation: dashes, quotes, ellipsis
+    (cp >= 0x2190 && cp <= 0x21ff) || // arrows
+    (cp >= 0x2200 && cp <= 0x22ff) || // mathematical operators
+    (cp >= 0x2460 && cp <= 0x24ff) || // enclosed alphanumerics
+    (cp >= 0x2500 && cp <= 0x257f) || // box drawing
+    (cp >= 0x2580 && cp <= 0x259f) || // block elements — RAMP_UNICODE lives here
+    (cp >= 0x25a0 && cp <= 0x25ff) || // geometric shapes — ▌ ● ○ ▸ ▾
+    (cp >= 0x2600 && cp <= 0x26ff) || // miscellaneous symbols
+    (cp >= 0x2b00 && cp <= 0x2b1f) // arrows and shapes, supplemental
+  );
 }
 
 function isWide(cp: number): boolean {

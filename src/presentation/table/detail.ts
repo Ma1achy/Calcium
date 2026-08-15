@@ -51,7 +51,7 @@ export function detailBlocks(
   block: Table,
   row: TableRow,
   plan: PlannedColumns,
-  caps?: Pick<TerminalCapabilities, "unicode">,
+  caps?: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): readonly Block[] {
   const own = row.detail ?? [];
   if (plan.dropped.length === 0) return own; // cells-ok

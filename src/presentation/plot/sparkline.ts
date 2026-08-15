@@ -39,7 +39,7 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 export function sparkline(
   values: readonly number[],
   width: number,
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): string {
   const w = Math.max(0, Math.floor(width));
   if (w === 0) return "";
@@ -77,8 +77,10 @@ export function sparkline(
   // C11 calls this for a **table cell**, what breaks is column alignment for
   // every row below, not a chart looking odd.
   //
-  // Left as a comment rather than fixed here, because the fix is a declared
-  // capability — `ambiguousWidth`, roadmap 51 — and a field on a published type
-  // is not a decision to take inside a renderer.
-  return " ".repeat(Math.max(0, w - cells(drawn))) + drawn;
+  // **Fixed now, and in two places.** `rampFor` returns the braille ramp when
+  // the capability says wide — every glyph of which is narrow — and the padding
+  // below measures with the capability, so the two agree whichever ramp came
+  // back. Measuring alone would not have been enough: it would have padded the
+  // wide ramp correctly to a width no table cell could hold.
+  return " ".repeat(Math.max(0, w - cells(drawn, caps.ambiguousWidth))) + drawn;
 }

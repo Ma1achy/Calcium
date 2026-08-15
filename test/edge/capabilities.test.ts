@@ -16,6 +16,7 @@ describe("C02 edge cases", () => {
     expect(capabilities).toEqual({
       colourDepth: 1,
       unicode: "ascii",
+      ambiguousWidth: "narrow",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -45,7 +46,7 @@ describe("C02 edge cases", () => {
     } as unknown as Partial<TerminalCapabilities>);
 
     expect(capabilities.colourDepth).toBe(24);
-    expect(Object.keys(capabilities)).toHaveLength(7);
+    expect(Object.keys(capabilities)).toHaveLength(8);
     expect(warnings).toEqual([]);
   });
 

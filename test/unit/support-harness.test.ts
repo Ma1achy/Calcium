@@ -69,6 +69,7 @@ describe("harness parameters — fake-terminal", () => {
     const all = capabilities({
       colourDepth: 1,
       unicode: "ascii",
+      ambiguousWidth: "narrow",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -78,6 +79,7 @@ describe("harness parameters — fake-terminal", () => {
     expect(all).toEqual({
       colourDepth: 1,
       unicode: "ascii",
+      ambiguousWidth: "narrow",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,

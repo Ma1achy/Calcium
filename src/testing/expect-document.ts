@@ -172,6 +172,7 @@ const MEANING_TONES: ReadonlySet<Tone> = new Set<Tone>([
 const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   colourDepth: 24,
   unicode: "full",
+  ambiguousWidth: "narrow",
   synchronisedUpdate: true,
   bracketedPaste: true,
   mouse: true,
