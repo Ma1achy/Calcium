@@ -2594,11 +2594,55 @@ here is the conservative one — **everything queues** — and the axis is writt
 question it is. It is reversible in the direction that matters: letting something jump later is
 additive, and taking the jump away once someone relies on it is not.
 
-#### §8b · What the rulings are, so the build is mechanical
+##### Row 7's mechanism does not exist, and that is the third blocker
+
+**Measured by building it, 2026-08-15.** *An entry appended at submission and made live at
+drain* needs the drained submission's document to arrive at an entry that **already has an id**.
+C13 has the operation — `append(doc, { streaming: true })` then `settle(id, doc)`, and
+`execution.ts:904` already uses exactly that pair for the app route's pending entry. **What does
+not exist is a place to put it.**
+
+There is no single point at which a submission's document reaches the transcript. The section
+above said *one refusal site and one funnel*, and that is true of **taking** the queue and of
+**draining** it and false of the entry:
+
+```
+appendAndCommit          19 call sites
+route's own arms          6, each appending its own document
+the async runners         5, two of which append their pending entry
+                             DIRECTLY rather than through appendAndCommit
+```
+
+So `into` — *settle here rather than appending* — has to be threaded through `route`,
+`runLocal`, `runApp`, `runShell`, `runHandoff` and `runIntoView`, each site sitting under an
+invariant (I1 one entry per submission, I3 the pending entry precedes the transport, I29 history
+at settlement) that has to be re-read against the change. **That is a C23 seam change, not a
+list in a file**, and it is the entry's third blocker — the first two being the two questions
+§8a settled.
+
+**The alternative was measured and refused.** A module-scoped *settle into this next time*
+variable reaches every arm with no threading and is consumed by whichever `appendAndCommit`
+fires first — a refresh notice, an identity notice, an action's refusal. That is a flag two
+components can set where the codebase's own argument (`op: "expand"` over `viewState: true`)
+says a named operation is the only unforgeable form.
+
+**This is the class the walk keeps finding, in the walk.** C23 §8a A4's ruling assumed a delete
+`ViewPatch` does not have; C04's `weights` deferral was met by a field its own doc named. Here
+§8a row 7 named an operation that exists **and no seam to call it from**, and §8b then said *so
+the build is mechanical* — a summary that kept the body's claim and dropped the condition making
+it true, which is F86/F89/F92's mechanism arriving in a section written the same hour.
+
+**What is unblocked by this**: nothing in §8a or §8b changes except the cost. The rulings stand,
+including row 8's reversal, and the queue's two hard questions are settled. **What is owed**:
+the `into` thread, as its own step, read against C23's invariants site by site.
+
+#### §8b · What the rulings are, and the build is a seam change rather than a list
 
 - **The queue is a list in `src/shell/execution.ts` and nothing else.** No published type, no
   `TuiConfig` field, no chrome row. It touches `src/index.ts` not at all, which is what makes
-  this buildable before the freeze without spending any of it.
+  this buildable before the freeze without spending any of it. **The list is the cheap half and
+  it is not the work** — see the row above: the entry needs `into` threaded through six
+  runners, and that is a C23 seam change.
 - **Enqueue replaces the refusal at the guard**, after I12's shutdown check and after `empty`,
   both of which precede it today for reasons that survive.
 - **Drain happens in `Guard.release()`**, because it is the one place every exit is guaranteed
@@ -3305,7 +3349,17 @@ PART  31 completion ranking       prefix-matched and unranked today. Recency-fir
                                    everything the reader started, and row 7 is what pays for it
                                    — the entries are on screen and settle as cancelled rather
                                    than vanishing.
-                                   THE RESIDUE IS `/help` QUEUEING behind a long build: the
+                                   AND ROW 7'S MECHANISM HAS NO SEAM, measured by building
+                                   it: C13 has `append(streaming)` + `settle(id, doc)` and
+                                   `execution.ts:904` already uses the pair, but a submission's
+                                   document has NO SINGLE ARRIVAL POINT — `appendAndCommit` has
+                                   19 call sites, `route` has six arms each appending its own,
+                                   and two async runners append their pending entry directly.
+                                   So `into` threads through six runners under I1, I3 and I29,
+                                   which is a C23 SEAM CHANGE rather than a list, and §8b's
+                                   *the build is mechanical* was a summary that dropped the
+                                   condition making it true. THE RULINGS STAND; only the cost
+                                   moved. THE RESIDUE IS `/help` QUEUEING behind a long build: the
                                    tempting rule is the WHO IS WRITING axis, it is inferred
                                    from two cases, and C13's was re-founded three times before
                                    the third case broke it — so everything queues and the axis
