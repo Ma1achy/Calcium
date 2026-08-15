@@ -2513,17 +2513,30 @@ PART  1  PHASE 1                   producer context · change axis · builder au
                                    ↑ serves both destinations, must precede the freeze
       2  prism-tui's first         experiment table · training curve · one live job
          surfaces                  ↑ the second consumer, and b.live's stream arm's first
-      3  the ML package            tensors, heatmaps — built with prism-tui as the consumer.
-                                   CHECKED 2026-08-15: there is NO `CALCIUM_PLOT_PRIOR_ART.md`
-                                   in the repository, and the only occurrence of *prior art*
-                                   anywhere is 9's `mermaid-ascii` line. The plot material
-                                   lives in this file — *On wrapping matplotlib: don't* and the
-                                   ML output package section above — and the sentence nearest
-                                   to a plan-it-first instruction is that section's *worth
-                                   treating as one coherent piece rather than scattered
-                                   features*, which is a scoping claim and not a sequencing
-                                   one. So the row is not missing a note that exists elsewhere;
-                                   the note and the document are both F161's shape
+      3  the ML package            tensors, heatmaps. TWO CORRECTIONS, 2026-08-15, and the
+                                   first removes this entry's gate. *Built with prism-tui as
+                                   the consumer* says who validates the design, not who has to
+                                   exist first — and the stronger reading is false in the tree
+                                   anyway: `examples/docker/src/container.ts` calls `b.plot`
+                                   today, so the machinery this entry extends has a real
+                                   consumer that is not prism. A GATE THAT WAS NEVER ONE, and
+                                   3 therefore leaves the unchecked list. THE SECOND IS THIS
+                                   ROW'S OWN CHECK, WHICH EXPIRED ONE COMMIT AFTER IT WAS
+                                   WRITTEN: it recorded that no `CALCIUM_PLOT_PRIOR_ART.md`
+                                   was in the repository, and
+                                   `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` has been there since
+                                   6611f9f — the very next commit after fc5ff14, which wrote
+                                   the check. Nothing re-read it, because NOTHING CHECKS A
+                                   NEGATIVE CLAIM: check 1 resolves a marked row's citations
+                                   and its verdict is inverted here, since resolution is what
+                                   this sentence denied. `roadmap-status.mjs` now carries the
+                                   arm that closes it. THE PLANNING PASS IS THE REAL BLOCKER
+                                   and the document says so in its own header — *when roadmap
+                                   #3 comes up, plan it before building it*: ~40 chart types
+                                   listed, consumers named for about a dozen, so this entry
+                                   could produce forty of F21's shape. Two of the five
+                                   decisions it owes are public types, which puts the pass
+                                   ahead of the freeze rather than after it
       4  what 2 and 3 found        phase 1's equivalent, second round
 PART  5  publication prep          error messages · the outside-reader test · 0.x · CI from the
                                    tarball
@@ -3699,7 +3712,7 @@ base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's 
 **not** re-measured here, because it is a proposal rather than a shipped signal and re-running
 it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
 stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
-absent  **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
+absent  **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163). · **3** joins them on 2026-08-15 by ceasing to be uncheckable rather than by being swept: its gate was `prism-tui` and the gate is not one, so what remains is greppable from here and was measured — `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` is in the tree and lists the chart types, and `tensor` and `heatmap` occur **zero** times in the whole of `src/`, which is the entry itself rather than only its home: what is built is C12, the machinery the ML package would extend.
 
 **44 left this list on 2026-08-15**, and its evidence was true to the end:
 `interaction/history/persist.ts` **is** C20's history persistence and is not session resume.
@@ -3902,11 +3915,19 @@ it. That is A03 §2's vacuity class arriving in the instrument again, which is t
 grep-reach signal was nearly built in. This is a **read**, like the sixth sweep's two arms, and
 nothing reaches it but running it.
 
-**Not checked, and named rather than left to look checked:** 2, 3, 4. Three of forty-five, and
-they are the three that **cannot** be checked from here: each names `prism-tui`, a consumer
-repository that does not exist in this tree. That is a different state from *not looked at* and
-it is said rather than folded into the other two — an OPEN nobody verified reads exactly like
-one somebody did, and so does one nobody could.
+**Not checked, and named rather than left to look checked:** 2, 4. Two of fifty-one, and they
+are the two that **cannot** be checked from here: each names `prism-tui`, a consumer repository
+that does not exist in this tree. That is a different state from *not looked at* and it is said
+rather than folded into the other two — an OPEN nobody verified reads exactly like one somebody
+did, and so does one nobody could.
+
+**The third left this list rather than being checked in it**, and the distinction is the
+paragraph's own subject. Entry 3 was here because it named `prism-tui`, and naming a consumer
+is not the same as waiting on one: *with prism-tui as the consumer* says who validates the
+design. Nothing in the entry needed that repository to exist, and the tree says so —
+`examples/docker/src/container.ts` calls `b.plot` today. **A membership test that reads for a
+name rather than for a dependency will hold whichever entries mention the right word**, which
+is how an entry sat in the uncheckable set while carrying a check somebody had run and dated.
 
 **The second sweep found a ninth stale entry**, which is the argument for having run it: 19's
 *every SIGWINCH rebuilds the Fenwick index* has been false since C14 I8 landed. Nine of

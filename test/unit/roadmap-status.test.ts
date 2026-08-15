@@ -135,7 +135,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     // unconfirmed and unnamed — which is exactly what an entry silently added to
     // the Order list looks like, and it is indistinguishable from a verified OPEN
     // by reading.
-    const r = run(mutate("2, 3, 4. Three of", "2, 3. Three of"));
+    const r = run(mutate("2, 4. Two of", "2. Two of"));
     expect(r.ok).toBe(false);
     expect(r.out).toContain("entries in neither the column");
     expect(r.out).toContain("4");
@@ -188,16 +188,23 @@ describe("roadmap-status — the Order column's verifier", () => {
   });
 
   it("RS8b: a built-word exemption that no longer matches its row fails", () => {
-    // **The equality arm, which is what keeps the two exemptions honest.** The
-    // pattern fired on four rows and two were real; 3 and 15 use a built-word
-    // without asserting anything exists — *built with prism-tui as the consumer*
-    // and *is built three times*. Narrowing the regex to exclude them would also
-    // stop it seeing the next phrasing, so they are named exemptions quoting the
-    // sentence. An exemption checked by membership alone is one that outlives its
-    // reason, which is the failure every over-permissive list in this repo has had.
+    // **The equality arm, which is what keeps the exemption honest.** The pattern
+    // fired on four rows and two were real; 3 and 15 use a built-word without
+    // asserting the entry's own subject exists. Narrowing the regex to exclude them
+    // would also stop it seeing the next phrasing, so they are named exemptions
+    // quoting the sentence. An exemption checked by membership alone is one that
+    // outlives its reason, which is the failure every over-permissive list in this
+    // repo has had.
+    //
+    // **And the arm has now caught an exemption whose reason was wrong rather than
+    // stale, which is the case membership could never reach.** 3's old exemption
+    // quoted *built with prism-tui as the consumer* and reasoned that prism-tui does
+    // not exist in this tree — true, and it made the entry's gate the consumer's
+    // absence. The row now quotes the phrase in order to rule that it is not a gate,
+    // so the exemption had to be re-earned on the sentence that replaced it.
     const reworded = mutate(
-      "tensors, heatmaps — built with prism-tui as the consumer",
-      "tensors, heatmaps — made together with prism-tui as the consumer",
+      "says who validates the design, not who has to",
+      "settles who validates the design, not who has to",
     );
     const r = run(reworded);
     expect(r.ok, "the quoted sentence is gone").toBe(false);
@@ -265,9 +272,52 @@ describe("roadmap-status — the Order column's verifier", () => {
   it("RS5: an entry in two of the three sets fails", () => {
     // 13 is BUILT. Naming it in the unchecked list as well makes the document say
     // two things, and a partition that only checked coverage would pass.
-    const r = run(mutate("2, 3, 4. Three of", "2, 3, 4, 13. Three of"));
+    const r = run(mutate("2, 4. Two of", "2, 4, 13. Two of"));
     expect(r.ok).toBe(false);
     expect(r.out).toContain("in two of the three sets");
+  });
+
+  it("RS10: a row saying a file is absent fails when the file exists", () => {
+    // **The direction check 1 cannot look.** It resolves a *marked* row's citations
+    // and a negative claim inverts the verdict: *there is no `X`* passes hardest on
+    // the day it becomes false, because `X` now resolves.
+    //
+    // The measured case is entry 3 — `fc5ff14` recorded that no
+    // `CALCIUM_PLOT_PRIOR_ART.md` was in the repository and `6611f9f`, **the next
+    // commit**, added it under `docs/notes/`. Nine commits went past it and the
+    // satisfier-side sweep could not have caught it: 3 was in the unchecked
+    // paragraph for naming `prism-tui`, so nothing resolved its row at all.
+    //
+    // **The fixture is constructed rather than anchored on entry 3**, for RS8's
+    // reason: this session is rewriting that row, and an anchor into the sentence
+    // under repair expires the moment the repair lands. 33 is confirmed-OPEN and
+    // stays OPEN, and `session.ts` is a basename that exists — which is also what
+    // the arm's own resolver is for, since `locate` looks at the root and `src/`
+    // only and this claim is about the whole tree.
+    const r = run(
+      mutate(
+        "      33 QUEUEING ★              submit while something runs",
+        "      33 QUEUEING ★              there is NO `session.ts`; submit while something runs",
+      ),
+    );
+    expect(r.ok, "a file the row says is absent and that exists").toBe(false);
+    expect(r.out).toContain("entry 33 says there is no `session.ts`");
+    expect(r.out).toContain("shell/session.ts` exists");
+  });
+
+  it("RS10b: a negative claim that is true passes — the control", () => {
+    // **Without this row the arm is indistinguishable from one that fires on the
+    // phrasing.** A check that failed every *there is no X* would pass RS10 exactly
+    // as well, and the roadmap's legitimate absence claims are the population it
+    // would break.
+    const r = run(
+      mutate(
+        "      33 QUEUEING ★              submit while something runs",
+        "      33 QUEUEING ★              there is NO `queue-engine.ts`; submit while something runs",
+      ),
+    );
+    expect(r.ok, "the file genuinely is not there").toBe(true);
+    expect(r.out).not.toContain("queue-engine.ts");
   });
 
   it("RS6: an Order block with no entries fails rather than reporting a clean scan", () => {
