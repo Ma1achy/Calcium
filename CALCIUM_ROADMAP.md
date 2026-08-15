@@ -2515,6 +2515,48 @@ A structured buffer makes C19, C20, C22 and C23 all take a new shape before a si
 drawn. A sentinel grapheme plus a side map is **C17-local**, and the seven readers keep working
 on the day the chip exists — which is what makes the first version reversible.
 
+##### The table lists readers of `text`, and three of them read an INDEX with it
+
+**Found going to place the sentinel, 2026-08-15, and it moves the design.** The seven-reader
+table above is a list of *what consumes the string*, and it is the wrong axis for the question
+it was answering. **Three of the seven pass a buffer index alongside it**:
+
+```
+keys.ts:293    contextAt(editor.text, editor.cursor, manifest)
+keys.ts:563    contextAt(editor.text, editor.cursor, manifest)
+session.ts:579 contextAt(editor.text, editor.cursor, manifest)   — the ghost
+session.ts:549 selectionSpans(editor.text, sel.anchor, sel.head, …)
+```
+
+**So the obvious implementation of *the seven readers keep working* does not work.** The
+tempting move is to have the `text` getter **resolve** chips to their content — every reader
+sees a plain string, nothing else changes, and the sentinel never escapes. It is wrong for a
+reason the table cannot show: `cursor`, `anchor` and `head` are indices into the **raw** buffer,
+and the moment a chip precedes one of them the pair disagrees. Completion would complete at the
+wrong offset and the selection wash would paint the wrong run — **both silently, and both only
+in a frame.**
+
+**So resolution is at the submission site and nowhere else** (`construct.ts:1215`), and the
+sentinel is therefore visible to `contextAt`, `selectionSpans` and C20. Each has to tolerate it,
+and each tolerates it differently:
+
+| reader | what a sentinel does there |
+|---|---|
+| `selectionSpans` | **fine by construction** — one grapheme, and the walk seam gives it the label's width |
+| `contextAt` | a sentinel inside a token, which C18's classifier has never seen. **The row that has to exist** |
+| `history.previous`, `searchOpen` | a sentinel reaching **C20's store**, which persists to a file. The second row the entry owes |
+| `promptHasText` | a buffer holding only a chip is non-empty, and a length check on the raw buffer and one on the resolved string **can disagree by construction** |
+
+**That last one is the state that separates the two readings**, and it is why *resolve in the
+getter* reads as harmless: with a chip-only buffer, `text.length > 0` is true either way, and
+every other assertion agrees too. It is the cheapest row and it is the one that would have been
+left out.
+
+**And the finding generalises past this entry**: a table indexed by *who consumes X* is blind to
+a consumer that reads X **and something derived from X's shape**. The seven-reader table is a
+correct answer to *how many components see the string* and the wrong instrument for *can the
+string change*.
+
 ##### The submission ruling, and the tree makes it forced rather than likely
 
 **A chip resolves to its content at submission.** Not *almost certainly right* — the alternative
@@ -3470,7 +3512,13 @@ BUILT 28 prompt cursor-following  the window exists and is tail-anchored; the fi
                                    is the finding — `editor.text` leaves C17 as a string at
                                    seven sites, so a structured buffer is a change to C19, C20,
                                    C22 and C23 before one chip is drawn, while a sentinel plus
-                                   a side map is C17-local and reversible. A CHIP RESOLVES TO
+                                   a side map is C17-local and reversible — BUT NOT BY
+                                   RESOLVING IN THE `text` GETTER, which is §8a's correction:
+                                   THREE OF THE SEVEN READ A BUFFER INDEX ALONGSIDE THE STRING
+                                   (`contextAt` three times, `selectionSpans`), so a resolving
+                                   getter disagrees with `cursor`, `anchor` and `head` the
+                                   moment a chip precedes one — completion at the wrong offset
+                                   and the wash on the wrong run, both only in a frame. A CHIP RESOLVES TO
                                    ITS CONTENT AT SUBMISSION, and the tree makes that forced
                                    rather than likely: `construct.ts:1215` hands C23 a string,
                                    C18 classifies a string, C20 stores strings, and the far
