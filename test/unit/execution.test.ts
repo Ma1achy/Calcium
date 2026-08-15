@@ -629,9 +629,13 @@ describe("C23 §2 — the seven routes", () => {
     expect(h.commits).toHaveLength(0);
   });
 
-  it("T1.6 (I5): a second submission while one is in flight is refused, whole-line", async () => {
-    // §8b B4 — refusal is unconditional, so the `cd` does not take effect even
-    // though it needs nothing C23 is holding.
+  it("T1.6 (I5): a second submission while one is in flight takes effect in no part", async () => {
+    // **The mechanism moved and the property did not** — I5 was *refused with a
+    // notice, never queued* until 2026-08-15 and is now a queue, and this row is
+    // written against the half that did not change. §8b B4's argument is about
+    // *partial effect*, so the assertion that carries it is `cwd`: the `cd` must
+    // not move the working directory out from under the command that is running,
+    // whether the line is discarded or deferred.
     let release: (() => void) | undefined;
     const h = harness({
       invoke: () => new Promise((r) => { release = () => r(result({ exitCode: 0 })); }),
@@ -643,14 +647,29 @@ describe("C23 §2 — the seven routes", () => {
     await settled();
 
     expect(h.session.snapshot.cwd, "nothing half-happened").toBe("/work");
-    const refusal = h.transcript.entries.at(-1);
+    const queued = h.transcript.entries.at(-1);
     expect(
-      refusal?.doc.blocks.some((b) => b.kind === "notice" && /still running/.test(b.text)),
-      "and the refusal names what is running",
+      queued?.doc.blocks.some((b) => b.kind === "notice" && /queued behind/.test(b.text)),
+      "and the entry names what it is waiting on",
     ).toBe(true);
 
+    const queuedId = h.transcript.entries.at(-1)?.id;
+    const before = h.transcript.entries.length;
+
+    // **And the deferral is a deferral rather than a loss**, which is the half a
+    // refusal did not have: the `cd` runs once its predecessor settles.
     release?.();
     await settled();
+    await settled();
+    expect(h.session.snapshot.cwd, "it ran, in the order it was typed").toBe("/tmp");
+
+    // **This route is what exercises the seam's own branch**, and the mutation
+    // pass is what said so: `/ps` is the app route, which reuses the queued
+    // entry as its *pending* entry and settles it directly — so ignoring `into`
+    // inside `appendAndCommit` survived every row until one queued something
+    // that is not an app verb. `builtinThenShell` goes through the funnel.
+    expect(h.transcript.entries.length, "settled in place, no second row").toBe(before);
+    expect(h.transcript.entries.at(-1)?.id, "the entry it was given when typed").toBe(queuedId);
   });
 
   it("T4.7b: resetFocus is called after the append and before the commit", async () => {
@@ -730,10 +749,23 @@ describe("C23 §2 — the seven routes", () => {
       throw new Error("the same thing, again");
     }) as typeof h.transcript.append;
 
+    // Five submissions, and every one of them routes: `/help` answers
+    // synchronously and takes no guard, so none is queued behind another. The
+    // row is about the fault collection, and the queue must not change what it
+    // counts — which it would if the five became one route and four appends.
     for (let i = 0; i < 5; i += 1) h.pipeline.submit("/help");
     await settled();
 
-    expect(h.pipeline.faults.filter((f) => f.includes("the same thing"))).toHaveLength(1);
+    // **One per stage, and the stages are two now.** The first `/help` routes and
+    // its append throws; the four behind it take the guard, so they enqueue and
+    // *that* append throws. Deduplication is by `(stage, cause)` — the same
+    // cause at two sites is two facts, and collapsing them would hide the second
+    // site entirely. What I48 forbids is the *repetition*, and five submissions
+    // still produce two records rather than five.
+    const swallowed = h.pipeline.faults.filter((f) => f.includes("the same thing"));
+    expect(swallowed, "one per site, not one per submission").toHaveLength(2);
+    expect(swallowed.filter((f) => f.includes("appendAndCommit"))).toHaveLength(1);
+    expect(swallowed.filter((f) => f.includes("enqueue"))).toHaveLength(1);
   });
 
   it("T1.47 (I49): a throw after the append still resets focus and still returns the id", async () => {
@@ -969,12 +1001,160 @@ describe("C23 tier 3 — edges", () => {
     expect(h.transcript.entries[0]?.streaming, "and it is settled").toBe(false);
   });
 
-  it("T3.17 (I5): a refused submission creates no pending entry", async () => {
-    // The refusal is an entry (§8b B5) and the *pending* one is what must not
-    // exist — an orphan that never settles and holds a live id.
-    let release: (() => void) | undefined;
+  it("T3.18 (I5): two queued, one completion — the second waits", async () => {
+    // **The mutation this row exists for is `while (queue.length > 0)`.** A drain
+    // that empties the queue on one release passes every one-item fixture: two
+    // submissions and one completion is the smallest state that can tell the
+    // difference, and it is not a state a test reaches by accident.
+    const releases: (() => void)[] = [];
     const h = harness({
-      invoke: () => new Promise((r) => { release = () => r(result({ exitCode: 0 })); }),
+      invoke: () => new Promise((r) => releases.push(() => r(result({ exitCode: 0 })))),
+    });
+
+    h.pipeline.submit("/ps");
+    await new Promise((r) => setTimeout(r, 0));
+    h.pipeline.submit("/ps");
+    h.pipeline.submit("/ps");
+    await settled();
+
+    expect(releases, "one invocation, two waiting").toHaveLength(1);
+
+    releases[0]?.();
+    await settled();
+    await settled();
+
+    expect(releases, "b started and c did not").toHaveLength(2);
+  });
+
+  it("T3.19 (I5): submitted second settles second — the pair, not either half", async () => {
+    // **A row asserting only that both settle passes for a queue that drains as
+    // a stack.** The claim is the order, so the assertion is the sequence of
+    // commands as they settle, and it needs the two to be distinguishable —
+    // which a fixture using one line twice would not give.
+    // **Identity is the entry id, not the command**, because the fixture's verb
+    // takes no distinguishing argument — and an id is the stronger subject
+    // anyway: it is what §8a row 7 says survives from submission to settlement.
+    const releases: (() => void)[] = [];
+    const h = harness({
+      invoke: () => new Promise((r) => releases.push(() => r(result({ exitCode: 0 })))),
+    });
+
+    h.pipeline.submit("/ps");
+    await new Promise((r) => setTimeout(r, 0));
+    const typed = [h.transcript.entries.at(-1)?.id];
+    h.pipeline.submit("/ps");
+    typed.push(h.transcript.entries.at(-1)?.id);
+    h.pipeline.submit("/ps");
+    typed.push(h.transcript.entries.at(-1)?.id);
+    await settled();
+
+    expect(new Set(typed).size, "three distinct entries, in typed order").toBe(3);
+
+    const settledOrder: (string | undefined)[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const before = new Set(
+        h.transcript.entries.filter((e) => !e.streaming).map((e) => e.id),
+      );
+      const next = releases.shift();
+      if (next === undefined) break;
+      next();
+      await settled();
+      await settled();
+      for (const e of h.transcript.entries) {
+        if (!e.streaming && !before.has(e.id)) settledOrder.push(e.id);
+      }
+    }
+
+    expect(settledOrder, "typed order is settled order").toEqual(typed);
+  });
+
+  it("T3.21 (I5, C22 §13a): a queued VIEW invocation settles the entry it was given", async () => {
+    // **§13a's sentence stopped covering this route the day the queue landed.**
+    // It ruled *it pops rather than settling, because there is no entry to
+    // settle* — true of a view submitted directly, which appends nothing on the
+    // way in. A deferred one appended its entry when it was typed, so without a
+    // settlement here that entry streams for ever, marked *queued behind*
+    // something that finished long ago.
+    //
+    // Found by reading the diff rather than by a failing row, which is why the
+    // row exists: nothing else in the suite queues a view.
+    let release: (() => void) | undefined;
+    let calls = 0;
+    const h = harness({
+      invoke: () => {
+        calls += 1;
+        return calls === 1
+          ? new Promise((r) => { release = () => r(result({ exitCode: 0 })); })
+          : Promise.resolve(result({ exitCode: 0 }));
+      },
+    });
+
+    h.pipeline.submit("/ps");
+    await new Promise((r) => setTimeout(r, 0));
+    h.pipeline.submit("/ps --watch");
+    await settled();
+
+    const queuedId = h.transcript.entries.at(-1)?.id;
+    expect(
+      h.transcript.entries.filter((e) => e.streaming).length,
+      "the running one and the queued one",
+    ).toBe(2);
+
+    release?.();
+    await settled();
+    await settled();
+
+    expect(
+      h.transcript.entries.find((e) => e.id === queuedId)?.streaming,
+      "the view opened and its entry closed",
+    ).toBe(false);
+  });
+
+  it("T3.20 (I5): Ctrl-C clears the queue, and the entries say so", async () => {
+    // **`clearQueue()` before `guard.release()`, and the order is the ruling.**
+    // Reversed, the release drains and the next queued item starts on the
+    // keystroke meant to stop everything — which a single-item fixture cannot
+    // see, because with nothing behind it there is nothing to start.
+    const h = harness({ invoke: () => new Promise<never>(() => undefined) });
+
+    h.pipeline.submit("/ps");
+    await new Promise((r) => setTimeout(r, 0));
+    h.pipeline.submit("/ps");
+    h.pipeline.submit("/ps");
+    await settled();
+
+    h.pipeline.cancel();
+    await settled();
+    await settled();
+
+    const texts = h.transcript.entries.flatMap((e) =>
+      e.doc.blocks.filter((b) => b.kind === "notice").map((b) => (b as { text: string }).text),
+    );
+    expect(texts.filter((t) => /cancelled before it ran/.test(t)), "both, not one").toHaveLength(2);
+    expect(
+      h.transcript.entries.some((e) => /queued behind/.test(JSON.stringify(e.doc))),
+      "and nothing is left saying it is still waiting",
+    ).toBe(false);
+  });
+
+  it("T3.17 (I5): a deferred submission is ONE entry, not two", async () => {
+    // **The defect the obvious build reintroduces.** Every route arm appends by
+    // default, so a queued submission naturally puts a row on screen when it is
+    // typed and a second when it runs. The seam that prevents it is `Settle`'s
+    // `into`, and this row is what can see the difference at all — the counts
+    // are identical at every other moment.
+    // The first blocks, the second does not — otherwise the entry stays open
+    // because its verb is genuinely still running, and the row would be
+    // asserting the fixture rather than the settle.
+    let release: (() => void) | undefined;
+    let calls = 0;
+    const h = harness({
+      invoke: () => {
+        calls += 1;
+        return calls === 1
+          ? new Promise((r) => { release = () => r(result({ exitCode: 0 })); })
+          : Promise.resolve(result({ exitCode: 0 }));
+      },
     });
 
     h.pipeline.submit("/ps");
@@ -983,15 +1163,23 @@ describe("C23 tier 3 — edges", () => {
     h.pipeline.submit("/ps");
     await settled();
 
-    expect(h.transcript.entries.length, "one refusal notice, no second pending entry")
-      .toBe(before + 1);
-    expect(
-      h.transcript.entries.filter((e) => e.streaming),
-      "exactly one entry is still streaming — the first",
-    ).toHaveLength(1);
+    expect(h.transcript.entries.length, "the queued entry, and no third").toBe(before + 1);
+    const queuedId = h.transcript.entries.at(-1)?.id;
 
     release?.();
     await settled();
+    // The drain starts the second route *after* the first settles, so its own
+    // async chain is a turn behind — one `settled()` covers the release and the
+    // second covers what the release started.
+    await settled();
+
+    // **The same id, still, and no fourth entry.** Asserting only the count
+    // would pass for a build that removed the queued row and appended a fresh
+    // one; asserting only the id would pass for a build that appended a second
+    // and left the first streaming. The pair is the claim.
+    expect(h.transcript.entries.length, "it settled in place").toBe(before + 1);
+    expect(h.transcript.entries.at(-1)?.id, "into the entry it already had").toBe(queuedId);
+    expect(h.transcript.entries.filter((e) => e.streaming), "nothing left open").toHaveLength(0);
   });
 
   it("T3.17 (I50, F151): a failing shell command produces an entry rather than a refusal", async () => {
@@ -1935,13 +2123,44 @@ describe("C23 §4 — the submit row's two other steps", () => {
 
   it("T1.21b (I29): a refusal is a submission and is recorded", async () => {
     // History is not a log of successes — the user typed it and pressed Enter,
-    // so `↑` recalls it. Driven through the guard, which is the refusal a
+    // so `↑` recalls it. Driven through the guard, which is the deferral a
     // session actually produces.
-    const h = harness({ invoke: () => new Promise<never>(() => undefined) });
+    //
+    // **And I29 moved with the mechanism, which is the point of the row.** A
+    // refusal settled a submission the moment it was refused, so history was
+    // written then. A queued submission has not run, so writing it at
+    // submission would record a line that may still be cancelled — history is
+    // written by the route that drains it, through the funnel, exactly as an
+    // unqueued submission's is. The two halves below assert that ordering
+    // rather than only the presence.
+    // **The first invocation blocks and the second does not**, so the drained
+    // route actually completes — a fixture where both hang would assert the
+    // *absence* below and never reach the presence, which is the half that
+    // matters. `test/support/README.md`'s rule: a fixture is shown to respond to
+    // the thing under test before it is asserted against.
+    let release: (() => void) | undefined;
+    let calls = 0;
+    const h = harness({
+      invoke: () => {
+        calls += 1;
+        return calls === 1
+          ? new Promise((r) => { release = () => r(result({ exitCode: 0 })); })
+          : Promise.resolve(result({ exitCode: 0 }));
+      },
+    });
     h.pipeline.submit("/ps");
+    await new Promise((r) => setTimeout(r, 0));
     h.pipeline.submit("/ps --mine");
     await settled();
 
-    expect(h.recorded.map((r) => r.command), "the refused line is in C20").toContain("/ps --mine");
+    expect(
+      h.recorded.map((r) => r.command),
+      "not yet — it has not run",
+    ).not.toContain("/ps --mine");
+
+    release?.();
+    await settled();
+
+    expect(h.recorded.map((r) => r.command), "and now it is in C20").toContain("/ps --mine");
   });
 });

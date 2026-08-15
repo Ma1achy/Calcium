@@ -98,6 +98,18 @@ class Guard {
   release(): void {
     this.#route = null;
     this.#verb = null;
+    // **Roadmap 33's drain, at the one place every exit is guaranteed to pass.**
+    // The comment above was written before this entry needed it, and it is why
+    // the queue attaches here rather than at each runner's `finally`: a drain
+    // per exit path is a drain the next route forgets.
+    this.#onRelease?.();
+  }
+
+  /** Set once by the pipeline — `Guard` is constructed before `drain` exists. */
+  #onRelease: (() => void) | undefined;
+
+  onRelease(fn: () => void): void {
+    this.#onRelease = fn;
   }
 }
 
@@ -129,6 +141,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
   const guard = new Guard();
   const local = createLocalRegistry();
+
+  /**
+   * Roadmap 33 — submissions taken while something runs (C23 I5, as re-ruled).
+   *
+   * **A list in this file and nothing else.** No published type, no `TuiConfig`
+   * field, no chrome row, `src/index.ts` untouched. The cost was never the list:
+   * it was `Settle` above, without which a queued submission puts one row on
+   * screen when it is typed and a second when it runs.
+   */
+  type Queued = Readonly<{
+    line: string;
+    result: Exclude<ParseResult, { kind: "empty" }>;
+    id: EntryId;
+  }>;
+  const queue: Queued[] = [];
 
   // **Registered before the app's and before `seal()`** (C22 I3, C23 I27). The
   // six are rows in every manifest (C05 §3), which is what makes them reachable
@@ -261,6 +288,40 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   };
 
   /**
+   * **Where a submission's document goes, and it is a value rather than a flag.**
+   *
+   * Nineteen `appendAndCommit` call sites partition by *when they append
+   * relative to the guard*, and the fifteen that settle a submission are exactly
+   * the fifteen that carry `line`, because I29 needs it at those and no others.
+   * So the destination travels a thread that is load-bearing already, and the
+   * four sites that are **not** submissions — an action's refusal, `notify`, a
+   * refresh notice, the greeting — are separated by the test that always gated
+   * history.
+   *
+   * `into` is `null` for a submission routed the moment it was typed, and an
+   * `EntryId` for one that waited: a queued submission's entry is appended when
+   * it is typed and the route that eventually runs it settles **that** entry.
+   * **One entry with two states and never two entries** — which is the defect
+   * the obvious build reintroduces, because every arm appends by default.
+   *
+   * A record rather than a second positional parameter beside `line`: two
+   * positionals that must agree are two records of one fact, and a runner that
+   * threads one and drops the other type-checks.
+   *
+   * **`runApp` is not converted, and the reason is not obvious from reading it.**
+   * Its pair at the `settleWithDocument` calls below looks like this function's
+   * body and differs in two deliberate ways: it does **not** `resetFocus`,
+   * because a settlement is not an append and focus must not jump out of the
+   * entry the reader is in, and it commits `"completion"` rather than `"input"`.
+   * A green suite shows neither. Left alone on purpose — the duplication is
+   * apparent rather than real.
+   */
+  type Settle = Readonly<{ line: string; into: EntryId | null }>;
+
+  /** A submission routed as it was typed — the ordinary case. */
+  const now = (line: string): Settle => ({ line, into: null });
+
+  /**
    * The one place a document reaches the transcript, and the one place the
    * frame is committed for a submission (Seam 4's submit row).
    *
@@ -277,12 +338,24 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    */
   const appendAndCommit = (
     doc: Parameters<typeof deps.transcript.append>[0],
-    /** The line as typed, when this append settles a submission (I29). */
-    line?: string,
+    /**
+     * The submission this settles, when it settles one (I29). Absent at the four
+     * sites that are not submissions — the same test that always gated history.
+     */
+    settle?: Settle,
   ): string | null => {
+    const line = settle?.line;
     let id: string | null = null;
     try {
-      id = deps.transcript.append(doc);
+      // **The two cases of one destination.** A submission that waited already
+      // has its entry; appending here would put a row on screen when it was
+      // typed and a second when it ran.
+      if (settle?.into != null) {
+        deps.transcript.settle(settle.into, doc);
+        id = settle.into;
+      } else {
+        id = deps.transcript.append(doc);
+      }
       declareLive(id, doc.blocks);
       if (line !== undefined) recordHistory(line, doc);
       deps.resetFocus();
@@ -330,10 +403,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     deps.history.append(line, doc.meta.exitCode ?? 0);
   };
 
-  /** C23 I5's refusal. An ordinary append with `origin: "user"` — see C23 §8b B5. */
-  const refuse = (line: string, reason: string): void => {
-    appendAndCommit(noticeDoc(line, reason, "warn", { origin: "user" }), line);
-  };
+  // **C23 I5's refusal had one caller and the queue is what that caller does
+  // now.** Removed rather than kept: a function whose comment explains a
+  // behaviour the shell no longer has is the kind of thing a reader trusts. Its
+  // reason did not go with it — it is quoted at the `enqueue` call, because the
+  // reason was always about *no part takes effect now* and never about
+  // discarding the line.
 
   const submit = (line: string): void => {
     // **C23 I12 first, before anything else is read.** A submission after shutdown
@@ -358,15 +433,111 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     deps.editor.clear();
 
     if (guard.route !== null) {
-      // **Whole-line and unconditional** (C23 I5, C23 §8b B4). No part of a refused
-      // submission takes effect, including a `builtin` that needs nothing C23
-      // is holding: a refused line that silently moved the working directory is
-      // a lie about what the tool did.
-      refuse(line, `${guard.verb ?? "a command"} is still running`);
+      // **Whole-line and unconditional, and the property is the same one it
+      // always was** (C23 I5, C23 §8b B4). No part of a deferred submission
+      // takes effect while something is in flight, including a `builtin` that
+      // needs nothing C23 is holding: a line that silently moved the working
+      // directory out from under the running command is a lie about what the
+      // tool did. The deferral is a **queue** rather than a refusal since
+      // 2026-08-15, which is the stronger satisfier of that rule — the reader's
+      // line is neither lost nor applied out of order.
+      //
+      // Everything queues, strictly. The rule that would let a `local` handler
+      // jump is the **who is writing** axis, and it is inferred from two cases:
+      // the roadmap entry carries it as the open question it is.
+      enqueue(line, result);
       return;
     }
 
-    route(line, result);
+    route(now(line), result);
+  };
+
+  /**
+   * The deferred submission's entry, appended **when it is typed** (roadmap 33).
+   *
+   * `streaming: true`, so the queue is visible where this reader is already
+   * looking. That is what makes roadmap 29's contested chrome row not owed —
+   * reading *a queue you cannot see is a queue you forget you typed into* as a
+   * counter is what put 29 in front of this.
+   *
+   * **Not through `appendAndCommit`**: nothing has settled, so I29's history
+   * append would record a line that has not run. History is written by the route
+   * that drains it, through the funnel, exactly as an unqueued submission's is.
+   */
+  const enqueue = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
+    // **Contained, because C23 I2 admits no escaping failure and this append is
+    // outside the funnel's catch** (§5). Found by T1.46 rather than by reading:
+    // `/help` takes the guard, so with a throwing transcript the second and
+    // subsequent submissions now enqueue instead of routing, and an uncaught
+    // throw here leaves `submit` — a keystroke taking the process down. The
+    // funnel's own catch never covered this path because this path is new.
+    //
+    // A submission that cannot be shown is dropped rather than queued blind: a
+    // queued item with no entry is invisible **and** still runs, which is worse
+    // than not running.
+    let id: EntryId;
+    try {
+      id = deps.transcript.append(
+        noticeDoc(line, `queued behind ${guard.verb ?? "a command"}`, "muted", { origin: "user" }),
+        { streaming: true },
+      );
+    } catch (cause) {
+      contain("enqueue", cause);
+      return;
+    }
+    queue.push({ line, result, id });
+    deps.scheduler.commit("input");
+  };
+
+  /**
+   * **The loop is gated on the guard, not on the queue.**
+   *
+   * One item per release is wrong: a `builtin` completes synchronously and never
+   * takes the guard, so `release()` never fires again and everything behind it
+   * stalls. Draining outright is the other wrong answer — it starts every item at
+   * once, and sequentiality is the whole point. **The condition is *nothing is
+   * running***, which is exactly what makes an item's predecessor finished.
+   */
+  let draining = false;
+  const drain = (): void => {
+    // I12, and for I12's reason: after shutdown begins, nothing appends.
+    if (deps.session().stopping) return;
+    // Insurance rather than an observed path: every release reached from inside
+    // a route today is a microtask later. A route that released synchronously
+    // would shift twice from one release.
+    if (draining) return;
+    draining = true;
+    try {
+      while (guard.route === null) {
+        const next = queue.shift();
+        if (next === undefined) return;
+        route({ line: next.line, into: next.id }, next.result);
+      }
+    } finally {
+      draining = false;
+    }
+  };
+  guard.onRelease(drain);
+
+  /**
+   * C23 I5's `Ctrl-C` half: **one press stops everything the reader started.**
+   *
+   * The two-rung answer — cancel the running thing, leave the queue, clear it on
+   * a second press — needs a *held* queue, and nothing restarts one: every drain
+   * hangs off `release()` and the release that would drain is the one the cancel
+   * consumed. Letting the cancel drain instead makes the second rung unreachable.
+   *
+   * **The work is not discarded silently**, and the entry appended at submission
+   * is what pays for that: it already exists and settles in place saying what
+   * happened to it.
+   */
+  const clearQueue = (): void => {
+    for (const item of queue.splice(0)) {
+      deps.transcript.settle(
+        item.id,
+        noticeDoc(item.line, "cancelled before it ran", "warn", { origin: "user" }),
+      );
+    }
   };
 
   /**
@@ -438,7 +609,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * What is here instead is true under every policy: the exit code, and the
    * shell's own line naming the token it could not find.
    */
-  const runShell = async (line: string, command: string): Promise<void> => {
+  const runShell = async (settle: Settle, command: string): Promise<void> => {
+    // `line` is read throughout; `settle` carries where its document goes.
+    const { line } = settle;
+
     guard.take("shell", headOf(command));
     try {
       const child = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd });
@@ -499,12 +673,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             truncated: child.overflowed,
           },
         }),
-        line,
+        settle,
       );
     } catch (cause) {
       appendAndCommit(
         errorDoc(line, { message: String(cause), stage: "spawn" }, { origin: "user" }),
-        line,
+        settle,
       );
     } finally {
       // C23 §8a A5 — every exit releases it, this one included.
@@ -538,11 +712,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * commit while suspended paints onto the child's screen.
    */
   const runHandoff = async (
-    line: string,
+    settle: Settle,
     argv: readonly string[],
     label: string,
     kind: "shell" | "app",
   ): Promise<void> => {
+    // `line` is read throughout; `settle` carries where its document goes.
+    const { line } = settle;
     guard.take(kind, label);
     try {
       deps.lifecycle.suspend();
@@ -573,12 +749,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           : code === 0
             ? noticeDoc(line, `${label} finished`, "muted", { origin: "user" })
             : noticeDoc(line, `${label} exited ${String(code)}`, "warn", { origin: "user" }, "error"),
-        line,
+        settle,
       );
     } catch (cause) {
       appendAndCommit(
         errorDoc(line, { message: String(cause), stage: "handoff" }, { origin: "user" }),
-        line,
+        settle,
       );
     } finally {
       guard.release();
@@ -587,13 +763,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
   /** C23 §2's `local` route. §8b B3's missing-handler cell is closed by `seal()`. */
   const runLocal = async (
-    line: string,
+    settle: Settle,
     verb: string,
     argv: readonly string[],
     // **What C05 already parsed, carried rather than re-derived** (C22 I66).
     // Empty when validation failed, which a local verb is not gated on.
     args: Readonly<Record<string, unknown>>,
   ): Promise<void> => {
+    // `line` is read throughout; `settle` carries where its document goes.
+    const { line } = settle;
     guard.take("local", verb);
     const startedAt = deps.clock();
     try {
@@ -608,7 +786,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             { message: `no handler is registered for \`${verb}\``, stage: "local" },
             { origin: "user" },
           ),
-          line,
+          settle,
         );
         return;
       }
@@ -654,7 +832,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         argv,
         durationMs: deps.clock() - startedAt,
       });
-      appendAndCommit(doc, line);
+      appendAndCommit(doc, settle);
       // A02 Seam 4's theme row: `theme.setTheme` → `scheduler.invalidate`.
       // C10 never invalidates; the sequence is L4's, which is the seam.
       if (verb === "theme") deps.scheduler.invalidate();
@@ -667,7 +845,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           { message: `\`${verb}\` failed: ${String(cause)}`, stage: "local" },
           { origin: "user" },
         ),
-        line,
+        settle,
       );
     } finally {
       guard.release();
@@ -688,10 +866,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    */
   const runIntoView = async (
     displayed: string,
-    line: string,
+    settle: Settle,
     verb: string,
     result: Extract<ParseResult, { kind: "app" }>,
   ): Promise<void> => {
+    // `line` is read throughout; `settle` carries where its document goes.
+    const { line } = settle;
     const controller = new AbortController();
 
     /**
@@ -784,6 +964,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         origin: "user",
         tool: result.tool,
       });
+      // **A queued view invocation still owns an entry, and this route has no
+      // settlement of its own** (roadmap 33; C22 §13a). §13a ruled *it pops
+      // rather than settling, because there is no entry to settle*, and that was
+      // true of a view submitted directly — it appends nothing on the way in.
+      // A **deferred** one appended its entry when it was typed, so the sentence
+      // no longer covers it and the entry would stream for ever, marked *queued
+      // behind* something that finished long ago.
+      //
+      // Settled before the fill, so the ordering holds if the fill refuses.
+      if (settle.into !== null) {
+        deps.transcript.settle(
+          settle.into,
+          noticeDoc(line, `${verb} opened a view`, "muted", { origin: "user" }),
+        );
+      }
       if (!deps.documentView.fill(doc)) return;
       // **Declare-on-push, which had no call site until now** (C23 I33a, F20).
       // `declareLive` hard-coded an entry host because an entry was the only
@@ -827,7 +1022,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * verbs — and the half it missed were the ones that take the terminal (F119).
    */
   const runApp = async (
-    line: string,
+    settle: Settle,
     // **The gate's placement, made a compile obligation** (I38). `route` checks
     // `validation.ok` above the interactive split, and narrowing the parameter
     // here is what stops that check drifting back into this function: two
@@ -838,6 +1033,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       validation: Extract<ValidationResult, { ok: true }>;
     },
   ): Promise<void> => {
+    // `line` is read throughout; `settle` carries where its document goes.
+    const { line } = settle;
     const verb = result.tool.name;
 
     // Step 1 — the carried result, now read in `route` above the interactive
@@ -893,15 +1090,23 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     if (asView) {
       const refusal = deps.documentView.open(displayed);
       if (refusal === null) {
-        await runIntoView(displayed, line, verb, result);
+        await runIntoView(displayed, settle, verb, result);
         return;
       }
-      appendAndCommit(errorDoc(line, { message: refusal }, { origin: "user", verb }), line);
+      appendAndCommit(errorDoc(line, { message: refusal }, { origin: "user", verb }), settle);
       return;
     }
 
     // Step 3 — the pending entry. Before step 4. This is the ordering.
-    const pendingId = deps.transcript.append(
+    //
+    // **A deferred submission already has one, and this is the site the compiler
+    // could not check** (roadmap 33). `into` type-checks at every one of the
+    // fifteen and only here does it change *when* an entry comes into being:
+    // appending a fresh pending entry over a queued one leaves the queued row on
+    // screen for ever and puts a second beneath it. The entry appended when the
+    // line was typed **is** this route's pending entry — same id, same
+    // `streaming`, and the settle below closes it exactly as it always did.
+    const pendingId = settle.into ?? deps.transcript.append(
       compose({
         command: displayed,
         blocks: [],
@@ -1263,13 +1468,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * The guard is released here too, because a route that fails before its own
    * `finally` never reaches one (C23 §8a A5).
    */
-  const start = (line: string, run: Promise<void>): void => {
+  const start = (settle: Settle, run: Promise<void>): void => {
+    // `line` is read throughout; `settle` carries where its document goes.
+    const { line } = settle;
+
     void run.catch((cause: unknown) => {
       guard.release();
       try {
         appendAndCommit(
           errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user" }),
-          line,
+          settle,
         );
       } catch (second) {
         // The document itself is unbuildable. C23 §5's stage whose failure loses
@@ -1297,7 +1505,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * asserts is now over six reachable arms rather than seven with one that can
    * never run — a dead branch being A03 §2's class in code rather than in a rule.
    */
-  const route = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
+  const route = (
+    settle: Settle,
+    result: Exclude<ParseResult, { kind: "empty" }>,
+  ): void => {
+    // `line` is read throughout; `settle` carries where its document goes.
+    const { line } = settle;
+
     // **`--help` is answered here, before the local/app split** (C05 I22, F92).
     //
     // Both routes have it, because C05 reserves it on every tool — so putting
@@ -1314,13 +1528,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       result.validation.ok &&
       result.validation.args["help"] === true
     ) {
-      appendAndCommit(usageDoc(line, result.tool), line);
+      appendAndCommit(usageDoc(line, result.tool), settle);
       return;
     }
 
     switch (result.kind) {
       case "error":
-        appendAndCommit(errorDoc(line, result.error, { origin: "user" }), line);
+        appendAndCommit(errorDoc(line, result.error, { origin: "user" }), settle);
         return;
 
       case "builtin": {
@@ -1329,7 +1543,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           applied.ok
             ? noticeDoc(line, `${result.name} ${applied.text}`, "muted", { origin: "user" })
             : errorDoc(line, { message: applied.message }, { origin: "user" }),
-          line,
+          settle,
         );
         return;
       }
@@ -1339,10 +1553,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // is the other half: one that fails does not delegate.
         const applied = applyBuiltin(result.name, result.args);
         if (!applied.ok) {
-          appendAndCommit(errorDoc(line, { message: applied.message }, { origin: "user" }), line);
+          appendAndCommit(errorDoc(line, { message: applied.message }, { origin: "user" }), settle);
           return;
         }
-        start(line, runShell(line, result.rest));
+        start(settle, runShell(settle, result.rest));
         return;
       }
 
@@ -1351,16 +1565,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // string handed to `sh -c` is the same one either way, and the flag is
         // the only difference between the two routes.
         start(
-          line,
+          settle,
           result.interactive
-            ? runHandoff(line, ["sh", "-c", result.command], headOf(result.command), "shell")
-            : runShell(line, result.command),
+            ? runHandoff(settle, ["sh", "-c", result.command], headOf(result.command), "shell")
+            : runShell(settle, result.command),
         );
         return;
 
       case "local":
         start(
-          line,
+          settle,
           // **The arguments, not the whole argv.** `ParseResult.argv` begins
           // with the verb — `["theme", "light"]` — and a handler knows its own
           // name, so passing it back means every handler indexes from 1 and the
@@ -1368,7 +1582,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // verb (`debug dump`) makes the off-by-one an off-by-two, which is
           // the version that survives review.
           runLocal(
-            line,
+            settle,
             result.tool.name,
             result.argv.slice(result.tool.name.split(" ").length),
             result.validation.ok ? result.validation.args : EMPTY_ARGS,
@@ -1395,7 +1609,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
               result.validation.errors[0] ?? { message: `${result.tool.name}: invalid arguments` },
               { origin: "user", verb: result.tool.name },
             ),
-            line,
+            settle,
           );
           return;
         }
@@ -1409,10 +1623,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // terminal and there is no stdout to read (C05 I19 refuses `streams`
         // with it).
         start(
-          line,
+          settle,
           result.interactive
-            ? runHandoff(line, [deps.binary, ...result.argv], result.tool.name, "app")
-            : runApp(line, { ...result, validation: result.validation }),
+            ? runHandoff(settle, [deps.binary, ...result.argv], result.tool.name, "app")
+            : runApp(settle, { ...result, validation: result.validation }),
         );
         return;
       }
@@ -1691,7 +1905,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     cancel: () => {
       // The in-flight invocation first, so the entry settles with what it had
       // (C23 I10), then the guard.
+      // **The queue goes with it, and before the release** — the order is the
+      // whole of the ruling. Reversed, the release drains and the next queued
+      // item starts on the keystroke that was meant to stop everything.
       cancelInFlight?.();
+      clearQueue();
       guard.release();
     },
 

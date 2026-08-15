@@ -43,6 +43,35 @@ function run(text?: string): { ok: boolean; out: string } {
   }
 }
 
+/**
+ * The Order row of a confirmed-OPEN entry, **derived rather than quoted**.
+ *
+ * **Fourth anchor expiry in one session, and the third for RS8 alone.** It sat
+ * on 46 until 46 shipped, then on 7 until 7 was ruled, then on 33 until 33 was
+ * built — and each time the comment said *any literal from the list is a hostage
+ * to the list changing* and the fix quoted a different literal. RS9b's fix is the
+ * one that generalises: take the subject from the tool's own report and splice
+ * positionally.
+ *
+ * The circularity is only in *which* entry is picked. What each row asserts —
+ * that the arm fires, that it does not fire on a true claim — is independent of
+ * which one the report named.
+ */
+function openRow(text: string): Readonly<{ at: number; end: number; line: string }> {
+  const m = /grep reach · \d+\/\d+[^\n]*?claim(?: — ([\d, ]+))?/u.exec(run().out);
+  const id = (m?.[1] ?? "").split(",")[0]?.trim();
+  expect(id, "the report names a confirmed-OPEN entry").toBeTruthy();
+
+  const from = text.indexOf("## Order\n\n```\n") + "## Order\n\n```\n".length;
+  const block = text.slice(from, text.indexOf("\n```\n", from));
+  const re = new RegExp(`^.{6}${String(id)} .*$`, "mu");
+  const hit = re.exec(block);
+  expect(hit, `entry ${String(id)} has an Order row`).not.toBeNull();
+
+  const at = from + (hit?.index ?? 0);
+  return { at, end: at + (hit?.[0].length ?? 0), line: hit?.[0] ?? "" };
+}
+
 /** A fabrication, asserted to have changed something. */
 function mutate(from: string, to: string): string {
   expect(ROADMAP, `the anchor "${from}" is in the roadmap`).toContain(from);
@@ -178,13 +207,10 @@ describe("roadmap-status — the Order column's verifier", () => {
     // confirmed-OPEN and give its description a claim. That is RS8's subject
     // exactly — OPEN, listed, and saying something exists — and it depends on no
     // marker staying where it is.
-    const staled = mutate(
-      "      33 QUEUEING ★              submit while something runs",
-      "      33 QUEUEING ★              the queue is built; submit while something runs",
-    );
-    const r = run(staled);
-    expect(r.ok, "an OPEN row claiming its queue exists").toBe(false);
-    expect(r.out).toContain("entry 33 is OPEN and its own description says");
+    const row = openRow(ROADMAP);
+    const r = run(`${ROADMAP.slice(0, row.end)} — it is built${ROADMAP.slice(row.end)}`);
+    expect(r.ok, "an OPEN row claiming its subject exists").toBe(false);
+    expect(r.out).toMatch(/entry \d+ is OPEN and its own description says/u);
   });
 
   it("RS8b: a built-word exemption that no longer matches its row fails", () => {
@@ -310,14 +336,12 @@ describe("roadmap-status — the Order column's verifier", () => {
     // stays OPEN, and `session.ts` is a basename that exists — which is also what
     // the arm's own resolver is for, since `locate` looks at the root and `src/`
     // only and this claim is about the whole tree.
+    const row = openRow(ROADMAP);
     const r = run(
-      mutate(
-        "      33 QUEUEING ★              submit while something runs",
-        "      33 QUEUEING ★              there is NO `session.ts`; submit while something runs",
-      ),
+      `${ROADMAP.slice(0, row.end)} there is NO \`session.ts\`${ROADMAP.slice(row.end)}`,
     );
     expect(r.ok, "a file the row says is absent and that exists").toBe(false);
-    expect(r.out).toContain("entry 33 says there is no `session.ts`");
+    expect(r.out).toMatch(/entry \d+ says there is no `session\.ts`/u);
     expect(r.out).toContain("shell/session.ts` exists");
   });
 
@@ -326,11 +350,9 @@ describe("roadmap-status — the Order column's verifier", () => {
     // phrasing.** A check that failed every *there is no X* would pass RS10 exactly
     // as well, and the roadmap's legitimate absence claims are the population it
     // would break.
+    const row = openRow(ROADMAP);
     const r = run(
-      mutate(
-        "      33 QUEUEING ★              submit while something runs",
-        "      33 QUEUEING ★              there is NO `queue-engine.ts`; submit while something runs",
-      ),
+      `${ROADMAP.slice(0, row.end)} there is NO \`queue-engine.ts\`${ROADMAP.slice(row.end)}`,
     );
     expect(r.ok, "the file genuinely is not there").toBe(true);
     expect(r.out).not.toContain("queue-engine.ts");

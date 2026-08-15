@@ -761,7 +761,13 @@ Per submission.
 - **I2** — No stage failure escapes; every one produces a document. For patch application the mechanism is C04's `PatchResult` (C04 I15) rather than a caught throw: the failure is a value on the return path, so "settled with what it had" is something C23 *does* with a result, not something it recovers from.
 - **I3** — The pending entry is appended before the transport is invoked.
 - **I4** — Validation is carried from C18, never recomputed.
-- **I5** — A second submission on any foreground route while one is in flight is refused with a notice, never queued. C23's guard is authoritative; C06's is a backstop. **Refusal is whole-line and unconditional**: no part of a refused submission takes effect, including a `builtin` that needs nothing C23 is holding. Stated because the sympathetic reading — a `cd` is instantaneous, let it through — is what someone re-derives, and a refused line that silently moved the working directory is a lie about what the tool did, discoverable only when the *next* command runs somewhere unexpected (§8b B4).
+- **I5** — A second submission on any foreground route while one is in flight **takes effect in no part now**. C23's guard is authoritative; C06's is a backstop. **The deferral is whole-line and unconditional**: no part of a deferred submission takes effect while something is in flight, including a `builtin` that needs nothing C23 is holding. Stated because the sympathetic reading — a `cd` is instantaneous, let it through — is what someone re-derives, and a line that silently moved the working directory before its predecessor finished is a lie about what the tool did, discoverable only when the *next* command runs somewhere unexpected (§8b B4).
+
+  **RULED 2026-08-15 — the mechanism moved and the property did not.** This invariant read *is refused with a notice, never queued*, which stated a **disposition** and a **property** in one sentence and made the disposition sound load-bearing. Roadmap 33 changes the disposition: a second submission is **queued**, strictly sequentially, and runs when its predecessor settles. **Every word of the property survives it** — the whole line waits, no part of it takes effect early, and the `cd` the paragraph is written about still cannot move the working directory out from under the command that is running. A queue is the *stronger* satisfier of the same rule than a refusal was, because the reader's line is neither lost nor applied out of order.
+
+  **What the old wording was protecting is now protected by ordering rather than by discarding.** *Never queued* was not an argument; it was the absence of a queue, written as though it were a decision. The argument is §8b B4's, and B4 is untouched.
+
+  Two things carry the change and are named here so the invariant is checkable: the deferred submission's entry exists from the moment it is typed (roadmap 33 §8a row 7 — appended `streaming: true`, settled by the route that eventually runs it, **one entry with two states and never two entries**), and `Ctrl-C` while something is in flight cancels the running invocation **and** clears the queue, each queued entry settling in place as cancelled (§8a row 8, ruled two-rung and reversed by building it — see the roadmap entry).
 - **I6** — Streaming subscriptions do not hold the submission guard.
 - **I7** — `session.lastUuid` is set only from `meta.resultId`; a verb declaring none leaves it unchanged.
 - **I8** — Patches commit `"stream"`; settlement commits `"completion"`.
@@ -817,7 +823,7 @@ Per submission.
 1. Seven routes, one per `ParseResult` kind; `empty` produces no entry (I1).
 2. The pending entry is appended before the subprocess starts (I3).
 3. Validation travels from C18 and is never recomputed (I4).
-4. The submission guard covers every foreground route, is checked before the pending entry is appended, and refuses whole lines unconditionally; streams are exempt (I5, I6).
+4. The submission guard covers every foreground route, is checked before the pending entry is appended, and **defers whole lines unconditionally**; streams are exempt (I5, I6). Deferral was refusal until 2026-08-15 — see I5, where the property is unchanged and only the mechanism moved.
 5. `$_` comes from `meta.resultId` alone; nothing is inferred (I7).
 6. Patches coalesce at `"stream"`; settlement flushes at `"completion"` (I8).
 7. Frozen entries keep streaming until settled (I9).
@@ -1062,8 +1068,8 @@ registry after step 10.
 |---|---|---|---|---|
 | `empty` | nothing (I1) | nothing | nothing | **B5.** Two rules, one outcome |
 | `error` | entry | refused? | refused | An error document spawns nothing — see B5 |
-| `builtin` | apply, notice | refused (B4) | refused | |
-| `builtinThenShell` | apply, delegate | refused whole (B4) | refused | |
+| `builtin` | apply, notice | **deferred whole** (B4) | deferred | |
+| `builtinThenShell` | apply, delegate | **deferred whole** (B4) | deferred | |
 | `local` | run handler | refused | **B1** | **B3** if unregistered |
 | `app` | §3 | refused (I5) | refused | **B2** if `validation.ok === false` |
 | `shell` | `spawnShell` | refused (I5, T3.16) | refused | |
@@ -1122,7 +1128,18 @@ submission; I11 says built-ins apply **before** any delegation. Read in either
 order both are satisfied, and the outcomes differ: the `cd` persists and the
 delegation is refused, or the whole line is refused and the `cd` is lost.
 
-**Ruled: refuse the whole line. Nothing half-happens.**
+**Ruled: the whole line, together. Nothing half-happens.**
+
+**And it survived the mechanism changing under it, 2026-08-15**, which is the
+test a ruling of this shape gets. I5 now **defers** rather than refusing, so the
+`cd` is no longer lost — it runs when its predecessor settles, in the order the
+reader typed it. Every sentence below is about *partial effect* and none is about
+*discarding*, so the ruling holds verbatim and only its last line gets cheaper:
+losing the `cd` used to cost four characters of retyping and now costs nothing.
+**A ruling whose argument names the property rather than the disposition is one
+that does not have to be re-taken**, and the contrast is I5's own old wording,
+which put *never queued* beside the property and made the disposition read as
+load-bearing.
 
 The decisive argument is what the user watched. They typed one line and saw it
 refused; a refused command that silently changed the working directory is a lie
