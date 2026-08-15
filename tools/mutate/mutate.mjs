@@ -144,17 +144,30 @@ export function report(results) {
   // `9 survived` off a harness that stopped producing output is the failure the
   // control pair exists to prevent, arriving after the control pair has passed.
   const blind = results.filter((r) => r.noSummary);
-  // An anchor miss stays in this count, as it always has: it is not caught, and
-  // the line above it already says which kind of not-caught it is. Whether a
-  // stale anchor should be counted apart is a separate question from this one.
-  const survivors = results.filter((r) => !r.killed && !r.noSummary);
+  // **Counted apart now, and the open question above is closed by an instance.**
+  // It read: *an anchor miss stays in this count, as it always has… whether a
+  // stale anchor should be counted apart is a separate question.* The instance
+  // arrived when a mutation's anchor was rewritten by the change it was written
+  // for: the row said ANCHOR MISSED and the summary said `1 survived`. The body
+  // was right and the abstract was wrong, which is the compression class in a
+  // tool's own output — and *ANCHOR MISSED is not a survivor* is the standing
+  // rule the summary was contradicting.
+  //
+  // Both still fail the gate. What changes is what the one line says happened.
+  const stale = results.filter((r) => r.anchorMissed);
+  const survivors = results.filter((r) => !r.killed && !r.noSummary && !r.anchorMissed);
+  const staleNote =
+    stale.length === 0
+      ? ""
+      : `\n${stale.length} anchor(s) did not match — those rows ran nothing and are not survivors`;
   lines.push(
     blind.length > 0
       ? `\n${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
           `Nothing above those rows means anything`
-      : survivors.length === 0
-        ? "\nevery mutation was caught"
-        : `\n${survivors.length} survived — a finding about the tests, or about the sentence they were written from`,
+      : (survivors.length === 0
+          ? "\nevery mutation was caught"
+          : `\n${survivors.length} survived — a finding about the tests, or about the sentence they were written from`) +
+        staleNote,
   );
   return lines.join("\n");
 }

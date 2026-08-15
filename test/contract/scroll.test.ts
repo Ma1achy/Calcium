@@ -215,9 +215,63 @@ describe("C04 §3c — the frame, read", () => {
     ]);
   });
 
-  it("T2.28 (C04 I49): a container that hides nothing draws two rows and no marker", () => {
+  it("T2.28 (C04 I47, I49): an under-filled box draws its declared height and no marker", () => {
     // The control for the row above, in the frame rather than in `measure`.
-    expect(frame(scroll(4, [flat("a"), flat("b")]))).toEqual(["a", "b"]);
+    //
+    // **This row asserted the defect and passed.** It expected two rows from a
+    // box of four, which is what the renderer drew — and `measure` said four the
+    // whole time, so C25 I1 was false for this kind wherever the content was
+    // shorter than the box. Nothing caught it: the corpus's `scroll-1` holds
+    // three children in a box of two, and every other fixture here fills or
+    // overflows, so *the box pads* and *the box is exactly its children* agreed
+    // at every point either was asked about.
+    //
+    // A frame-read row is only as good as the frame it was written against, and
+    // this one was written against the frame that existed rather than the one
+    // the block declares. The builder-coverage sweep is what disagreed.
+    expect(frame(scroll(4, [flat("a"), flat("b")])), "a box of four is four rows").toEqual([
+      "a",
+      "b",
+      "",
+      "",
+    ]);
+  });
+
+  it("T2.28b (C04 §3c trace 1, C25 I1): a child taller than the box — the gap, named", () => {
+    // **A ruling that names an operation the layer below does not have.** §3c
+    // trace 1 says a child taller than the box *aligns to its top*, and taking a
+    // child's top `n` rows needs a windowing seam: `RenderContext` offers
+    // `measureChild` and `renderChild` and nothing that slices. So the child is
+    // drawn whole and C25 I1 is false for this one case.
+    //
+    // **The fix that looked available made the frame worse.** A fixed-height Box
+    // pads *and* clips — bottom-anchored, so a five-row child in a box of two
+    // drew rows three and four. Two rows, `measure` agreeing, and the box
+    // describing a different document than the one it holds. Reading the frame
+    // is what said so; the mutation had survived because both readings drew two.
+    //
+    // **This row expires by itself.** It asserts the disagreement, so the day
+    // the seam lands and the box windows its children, it fails and has to be
+    // rewritten as the assertion it should have been.
+    const tall: Block = {
+      kind: "logs",
+      id: "tall",
+      lines: ["one", "two", "three", "four", "five"].map((t) => ({
+        ts: "00:00:00",
+        level: "info" as const,
+        message: t,
+      })),
+    } as Block;
+    const block = scroll(2, [tall]);
+
+    const drawn = frame(block, 40);
+
+    expect(drawn[0], "the top is right — the offset selected this child").toContain("one");
+    expect(drawn.at(-1), "and the marker is drawn").toContain("below");
+    expect(
+      drawn.length, // cells-ok — a row count, not a width
+      "and it draws more than it measures, which is the gap this row holds open",
+    ).toBeGreaterThan(registry.measure(block, 40));
   });
 });
 

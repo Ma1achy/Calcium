@@ -339,6 +339,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       ),
     );
 
+    const residue: ReactElement[] = [];
     // **The residue, both directions** (C04 I49). A settled container keeps the
     // offset it had, so content is hidden above as well as below — and a
     // bounded region that says neither is the empty-block class (F123).
@@ -352,7 +353,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       // the source. F6's class, one token to the right of where it was watched
       // for, and a comma needs no slot because it is the same everywhere.
       const text = `${g.residue} ${String(above)} above, ${String(below)} below`;
-      children.push(
+      residue.push(
         createElement(
           Text,
           { key: "residue" },
@@ -361,9 +362,47 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       );
     }
 
-    // **No height on the Box.** `measure` already told the caller how tall this
-    // is, and stating it here would be a second record of one number.
-    return createElement(Box, { flexDirection: "column", width }, ...children);
+    // **The box states its height, and the sentence that said otherwise was
+    // correct and wrong.** It read: *`measure` already told the caller how tall
+    // this is, and stating it here would be a second record of one number.* True
+    // about records and false about this one — C25 I1 is that measure equals the
+    // rendered row count, so the two are not two records of a number, they are
+    // the contract. Without it a box of two holding one row **drew one row**, and
+    // C14 virtualises on the measured height.
+    //
+    // Found by a builder-coverage row, not by any of this kind's own eighteen:
+    // every fixture had content at least as tall as the box, so *the box pads*
+    // and *the box is exactly its children* agreed everywhere they were asked.
+    //
+    // `overflowY: "hidden"` is the other half and the same invariant: a child
+    // taller than the box drew past it in the frame while `measure` still said
+    // `height`. The clip is top-aligned at the first shown child, which is where
+    // partial-child scrolling is deliberately not attempted — the offset selects
+    // children, and a partial row would need a per-child skip C04 §3c has not
+    // ruled.
+    // **Padded with blank rows and not with a fixed-height box, and the frame is
+    // why.** `height` on the Box does pad, and it also clips **bottom-anchored**:
+    // a child of five rows in a box of two drew rows three and four. Two rows
+    // either way, `measure` agreed, and the box was describing a different
+    // document than the one it holds — which is the whole argument for reading
+    // the frame rather than the numbers. The mutation removing the clip survived
+    // because both readings drew two rows; strengthening the row to ask *which*
+    // two is what said so.
+    //
+    // **So a child taller than the box is still drawn whole and C25 I1 is still
+    // false for that one case** — named in T2.28b rather than replaced by a
+    // frame showing the wrong rows. §3c trace 1 rules it *aligns to its top*,
+    // and taking a child's top rows needs a windowing seam `RenderContext` does
+    // not have: it offers `measureChild` and `renderChild` and nothing that
+    // slices. A ruling naming an operation the layer below lacks — C23 §8a A4's
+    // class, and the remedy is a seam rather than a clip.
+    const drawn = shown.reduce((n, r) => n + ctx.measureChild(r.child, width), 0);
+    const pads = Array.from(
+      { length: Math.max(0, block.height - drawn) }, // cells-ok — a row count, not a width
+      (_unused, i) => createElement(Text, { key: `pad-${String(i)}` }, " "),
+    );
+
+    return createElement(Box, { flexDirection: "column", width }, ...children, ...pads, ...residue);
   },
 };
 

@@ -113,6 +113,16 @@ const MUTATIONS = [
     expect: "T2.34",
   },
   {
+    // **The box stops stating its height** (C04 I47, C25 I1) — the shipped
+    // defect, restored. Every fixture whose content fills or overflows the box
+    // is unchanged by it, which is why eighteen rows and a frame-read missed it.
+    name: "the box does not pad to its declared height",
+    file: SRC,
+    from: "{ length: Math.max(0, block.height - drawn) }, // cells-ok",
+    to: "{ length: 0 }, // cells-ok",
+    expect: "T2.28",
+  },
+  {
     // **The copy taken from what the box shows** (C04 I50, C26 I17). The
     // boundary-aware form, which is the tempting one: it is right for every
     // container whose content fits and wrong exactly where the ruling applies.

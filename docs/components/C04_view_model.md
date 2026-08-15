@@ -712,7 +712,7 @@ how the structural half goes unexamined.
 
 | # | the sequence | ruling |
 |---|---|---|
-| 1 | focus enters, then `↓` past the last visible child | the offset advances until the child's **last** row is inside the box; **a child taller than the box aligns to its top**, which is the only answer stable under a second `↓` |
+| 1 | focus enters, then `↓` past the last visible child | the offset advances until the child's **last** row is inside the box; **a child taller than the box aligns to its top**, which is the only answer stable under a second `↓`. **RULING NAMES AN OPERATION THAT DOES NOT EXIST** — taking a child's top `n` rows needs a windowing seam, and `RenderContext` offers `measureChild` and `renderChild` and nothing that slices. So the child is drawn whole and C25 I1 is false for that one case, held open by T2.28b, which expires by asserting the disagreement. C23 §8a A4's class, found by the build rather than by the walk |
 | 2 | `PgDn`, then `↓` | C26 §4b: `↓` steps from the **focused** element, so the offset comes back to it. The assertion is which element focus reaches, never the resulting offset |
 | 3 | a patch replaces the children with fewer | the offset is past the end and is **clamped at read**. Nothing writes, because nothing but the renderer reads it |
 | 4 | a resize | children re-measure and every element's rows move. **The offset is a row count, not an element index** — so it is re-interpreted rather than re-derived, and a reader who scrolled halfway stays halfway instead of jumping to whichever element used to be at that index. This is the ruling an obvious implementation gets wrong, and no cell of the table reaches it |
@@ -743,6 +743,13 @@ through rather than assuming, because I47 already constrains the answer:
   would depend on view state, which I47 forbids.
 - **Not an unconditional row either**, which would be stable and would draw *⋯ 0 above · 0
   below* under a container whose content fits.
+- **And the box pads to `height` with blank rows, which is not a detail.** An under-filled
+  container drew only its children and `measure` said `height`, so C25 I1 was false wherever
+  the content was shorter than the box — shipped, and invisible to eighteen rows because every
+  fixture filled or overflowed. **The padding is explicit rows and never a fixed-height Box**:
+  a height on the box pads *and* clips bottom-anchored, so a five-row child in a box of two
+  drew rows three and four — the right count, the wrong document. Read the frame, not the
+  numbers.
 - **A row the container adds when its content cannot fit**, which depends on `(block, width)`
   alone: `measure` returns `height + 1` where the children measure taller than `height`, and
   `height` where they do not. **Pure in `(block, width)`, stable under every offset**, and the
