@@ -136,6 +136,15 @@ async function readDocument(
  * list written inside the test — a test carrying its own copy of the order
  * agrees with itself under any permutation of the thing it is checking.
  */
+/**
+ * A paste of this many lines or more becomes a chip (roadmap 30).
+ *
+ * Five, and it is a judgement rather than a measurement: four lines of prompt is
+ * still a prompt and six is a wall. Said to be a judgement so nobody goes
+ * looking for the figure it was derived from.
+ */
+const CHIP_LINES = 5;
+
 export const STEPS = Object.freeze([
   "capabilities",
   "registries",
@@ -520,6 +529,9 @@ export async function constructGraph(
   // rather than about an object, so the read moved to a free function in that
   // file and neither invariant has to give.
   const size = terminalSize(config.stdout);
+  /** Roadmap 30 — the chip's display number, per session. */
+  let chipCount = 0;
+
   const stores = await (async () => {
     const transcript = createTranscriptStore(
       config.retainPayloads > 0 ? { retainPayloads: config.retainPayloads } : {},
@@ -1212,7 +1224,11 @@ export async function constructGraph(
         // it (C19 I19): suppression is per token, and the next line's first
         // token starts at the same offset the dismissed one did.
         keys.reset();
-        pipeline?.submit(stores.editor.text);
+        // **The one resolution site** (roadmap 30). C23 takes a string, C18
+        // classifies one and C05 describes `argv`, so a chip becomes its content
+        // here and no sentinel reaches the far side. Every other reader sees the
+        // buffer as it is, because three of them read an index alongside it.
+        pipeline?.submit(stores.editor.resolved);
         return true;
       }
 
@@ -1229,7 +1245,30 @@ export async function constructGraph(
       // sequence, and a printable keystroke does not advance it.
       if (e.kind === "paste") {
         built.completion.cancel();
-        stores.editor.insert(e.text, { atomic: true });
+        // Numbered per session and never reset: `[#2]` after `[#1]` was deleted
+        // is a reader seeing that something else was there, which is true.
+        // Resetting would give one prompt two `[#1]`s across two submissions.
+        // **A large paste becomes a chip** (roadmap 30). The threshold is lines
+        // and not bytes, because what makes a paste unreadable in a prompt is
+        // the rows it takes: a 4 KB single line wraps and is still one thing to
+        // read past, while five short lines are five rows of prompt.
+        //
+        // **Line count only, and the kind detection is the named residue.** The
+        // entry wants `[JSON · 47 lines]` — one parse attempt — and that is a
+        // second decision with its own failure mode, a paste that *nearly*
+        // parses. The first version says how big it is and nothing about what it
+        // is, and the label is what a reader sees, so widening it later changes a
+        // string rather than a mechanism.
+        const lines = e.text.split("\n").length;
+        if (lines >= CHIP_LINES) {
+          chipCount += 1;
+          stores.editor.insertChip({
+            label: `[#${String(chipCount)} pasted · ${String(lines)} lines]`,
+            content: e.text,
+          });
+        } else {
+          stores.editor.insert(e.text, { atomic: true });
+        }
         keys.afterEdit();
         return true;
       }

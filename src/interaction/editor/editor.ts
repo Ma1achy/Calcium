@@ -28,12 +28,53 @@ export type Motion =
   | "bufferStart"
   | "bufferEnd";
 
+/** A pasted block, standing in the buffer as one grapheme (roadmap 30). */
+export type Chip = Readonly<{ label: string; content: string }>;
+
 export interface LineEditor {
+  /**
+   * The buffer **as it is**, sentinels and all.
+   *
+   * **A resolving getter is refused, and the reason is here because no assertion
+   * shows it** (roadmap 30 §8a). Expanding chips to their content here is the
+   * obvious implementation — every reader keeps seeing a plain string and no
+   * sentinel escapes — and it is wrong: three of this member's readers pass a
+   * **buffer index** alongside it (`contextAt` at `keys.ts:293` and `:563` and
+   * `session.ts:579`, `selectionSpans` at `session.ts:549`), and `cursor`,
+   * `anchor` and `head` index the raw buffer. The moment a chip precedes one of
+   * them the pair disagrees: completion completes at the wrong offset and the
+   * wash paints the wrong run, **both silently and both only in a frame.**
+   *
+   * A chip-only buffer is why it reads as harmless — `text.length > 0` is true
+   * under either reading, and so is every other assertion anyone would write.
+   *
+   * **So resolution happens at the submission site and nowhere else.**
+   */
   readonly text: string;
+  /**
+   * The buffer with every chip replaced by its content (roadmap 30).
+   *
+   * **One caller, by construction**: the submission. C23 takes a string, C18
+   * classifies a string and C05 describes `argv`, so a chip becomes its content
+   * on the way out — the far side receives argv either way, and a manifest
+   * carrying a block would be four components' work to deliver something the
+   * transport cannot take.
+   */
+  readonly resolved: string;
+  /** What a cluster draws as, for the walk. `undefined` for ordinary text. */
+  readonly drawAs: (cluster: string) => string | undefined;
   readonly cursor: number;
   readonly lines: readonly string[];
 
   insert(text: string, opts?: Readonly<{ atomic?: boolean }>): void;
+  /**
+   * A pasted block as one grapheme (roadmap 30).
+   *
+   * Inserted through `insert`, so undo, coalescing and the region behave exactly
+   * as they do for typing — the sentinel is a character to every one of them,
+   * which is the whole of what *one grapheme to the editor* buys.
+   */
+  insertChip(chip: Chip): void;
   deleteBackward(): void;
   deleteForward(): void;
   move(motion: Motion): void;
@@ -110,9 +151,26 @@ export interface LineEditor {
   readonly redoDepth: number;
 }
 
+/**
+ * The Private Use Area, one code point per chip.
+ *
+ * **One code point is one grapheme**, which is the property the design rests on:
+ * `count`, `splitAt`, `sliceBetween`, `removeBetween`, `wordLeft` and
+ * `wordRight` are grapheme-indexed, so a chip is a character to every one of
+ * them and none has to learn what a chip is.
+ *
+ * PUA rather than U+FFFC, and it is identity rather than taste: `OBJECT
+ * REPLACEMENT CHARACTER` is one code point for every chip, so two chips in one
+ * buffer would be indistinguishable and the side map could not be keyed.
+ */
+const CHIP_BASE = 0xe000;
+
 class Editor implements LineEditor {
   #text = "";
   #cursor = 0;
+  /** Sentinel → the block it stands for. Never pruned: see `drawAs`. */
+  readonly #chips = new Map<string, Chip>();
+  #nextChip = 0;
   /** §5b — the only new state; the head is `#cursor` itself (I21). */
   #anchor: number | null = null;
   #kill = "";
@@ -121,6 +179,22 @@ class Editor implements LineEditor {
   get text(): string {
     return this.#text;
   }
+
+  get resolved(): string {
+    let out = "";
+    for (const ch of this.#text) out += this.#chips.get(ch)?.content ?? ch;
+    return out;
+  }
+
+  /**
+   * **Not pruned when a chip is deleted**, and that is deliberate. Undo restores
+   * the sentinel — `#apply` replaces the whole buffer — so a map that forgot on
+   * deletion would restore a character standing for nothing, which draws as a
+   * PUA box and resolves to itself on submission. It is bounded by the chips
+   * pasted into one prompt, and the prompt is cleared on every submit.
+   */
+  readonly drawAs = (cluster: string): string | undefined =>
+    this.#chips.get(cluster)?.label;
 
   get cursor(): number {
     return this.#cursor;
@@ -194,6 +268,15 @@ class Editor implements LineEditor {
     const { head, tail } = splitAt(this.#text, this.#cursor);
     this.#text = head + clean + tail;
     this.#cursor += count(clean);
+  }
+
+  insertChip(chip: Chip): void {
+    const sentinel = String.fromCodePoint(CHIP_BASE + this.#nextChip);
+    this.#nextChip += 1;
+    this.#chips.set(sentinel, chip);
+    // `atomic`, because a chip is its own unit of undo — the argument `undo.ts`
+    // makes for a paste, which is what this is.
+    this.insert(sentinel, { atomic: true });
   }
 
   deleteBackward(): void {
@@ -436,15 +519,15 @@ class Editor implements LineEditor {
   }
 
   layout(width: number, gutter: Gutter): readonly string[] {
-    return layout(this.#text, width, gutter);
+    return layout(this.#text, width, gutter, this.drawAs);
   }
 
   displayRows(width: number, gutter: Gutter): number {
-    return displayRows(this.#text, width, gutter);
+    return displayRows(this.#text, width, gutter, this.drawAs);
   }
 
   cursorCell(width: number, gutter: Gutter): Cell {
-    return cursorCell(this.#text, this.#cursor, width, gutter);
+    return cursorCell(this.#text, this.#cursor, width, gutter, this.drawAs);
   }
 }
 

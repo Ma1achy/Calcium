@@ -546,7 +546,18 @@ class Session implements TuiInstance {
       promptSelection: () => {
         const sel = graph.editor.selection;
         if (sel === null) return EMPTY_SPANS;
-        return selectionSpans(graph.editor.text, sel.anchor, sel.head, width, PROMPT_GUTTER);
+        return selectionSpans(
+          graph.editor.text,
+          sel.anchor,
+          sel.head,
+          width,
+          PROMPT_GUTTER,
+          // The fourth caller of the one walk, and the one the seam was nearly
+          // written without: a wash measured on sentinels and drawn over labels
+          // covers the wrong cells, and no assertion about which characters are
+          // selected shows it.
+          graph.editor.drawAs,
+        );
       },
       // C16's derived focus, read rather than stored — the cursor belongs to
       // whatever holds the keys, and a second record of that would drift from

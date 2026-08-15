@@ -226,6 +226,14 @@ describe("C22 §3 step 11 — the effect table", () => {
       "insert",
       "setText",
       "clear",
+      // **Roadmap 30's two, and each is excluded for its own reason.**
+      // `resolved` is a *read* like `text` — the buffer with chips expanded, for
+      // the submission site — and not an editing operation at all. `insertChip`
+      // is driven by the shell like `insert` above it, and by an event kind this
+      // table does not index: a **paste**, in the same handler, which is why a
+      // scan over key bindings cannot see it.
+      "resolved",
+      "insertChip",
       // Construction rather than an edit — it records no undo unit and
       // `createEditor` is its only caller (C17 §5).
       "seed",
@@ -641,7 +649,12 @@ describe("C22 §3 step 12 — the read loop", () => {
     stdin.emit(`[200~${lines}[201~`);
 
     expect(commit.mock.calls, "two hundred lines are one commit").toEqual([["input"]]);
-    expect(graph.editor.text.split("\n"), "and all of them arrived").toHaveLength(200);
+    // **Two hundred lines are one chip now** (roadmap 30), so the buffer holds a
+    // single sentinel and the content is behind it. The claim this row makes is
+    // *all of them arrived*, and `resolved` is where that is still true —
+    // asserting `text` would now be asserting the chip threshold by accident.
+    expect(graph.editor.text.length, "the buffer holds one grapheme").toBe(1);
+    expect(graph.editor.resolved.split("\n"), "and all of them arrived").toHaveLength(200);
   });
 
   it("T1.4h4 (C22 I46): Esc on a document view releases its parts, and before the dismiss", () => {
