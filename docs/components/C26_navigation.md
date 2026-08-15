@@ -419,6 +419,26 @@ So the **declarer** supplies it from the data it was given. `tableElements` join
 
 Tab-separated, because that is what pastes into a spreadsheet and into every shell tool that takes columns; newline-joined across a range, because the elements are rows. An element declaring no `copy` contributes nothing rather than a blank line — it is a place to stand, not empty data.
 
+### Across a container's boundary, the copy is not bounded either
+
+**A selection whose range crosses a scrolled container copies what the box hides, and I17 is
+already the argument.** The three forms are one rule: a column the width dropped, a value the
+width truncated, and a child the offset scrolled past are all *the rendering could not show it*,
+and the rendering is not what is copied. A copy that stopped at the boundary would change with
+the offset, which is the property I17 forbids — so the boundary needs no rule of its own, and
+that is the ruling rather than a gap in it.
+
+**Inside the container, the copy is the children's, joined** (C04 I50). Elements are one per
+child there, so *which element* and *which child* are one question, and a child whose kind
+cannot express a source contributes nothing rather than its painted rows.
+
+**Correct and surprising, and the sentence that removes the surprise does not exist.** *Selected
+40, copied 400* wants a readout, and **there is no such surface in the tree** — the nearest is
+`TuiConfig.chrome.footer`, which is `CALCIUM_ROADMAP.md` Order 29's subject. It is recorded as a
+consumer of that row rather than built here, and the reason is F161's: a mechanism referred to
+as though it exists is not evidence that it does, and the question that reaches it is where it
+is written.
+
 **And MG24 cannot see this field**, which is measured rather than assumed: removing its only consumer leaves `make enforce` green, because `LineEditor.copy()` carries the same name. F160's blind spot on a published field of the block vocabulary, and the third instance of it. Recorded here so a later reader does not take the gate's silence as coverage.
 
 ---

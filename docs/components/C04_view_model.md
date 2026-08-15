@@ -753,6 +753,36 @@ So `height` is the **content** height and the marker is chrome the container add
 panel's border is. **The glyph comes from C09's table and is never written as a literal**
 (I38's argument, and F6 is the instance): `⋯` degrades to `...` under ASCII like every other.
 
+### The boundary, and what `y` copies across it
+
+**The box hides rows and the copy carries them, and that is C26 I17 rather than an exception to
+it.** An element's `copy` is its source and never its rendering — which is already why a column
+the width dropped and a value the width truncated are both present in full. A child the offset
+scrolled out of the box is the *same fact in a third form*: the rendering could not show it, and
+the rendering is not what is copied. A boundary-aware copy would be a copy that changes with the
+offset, which is the defect I17 exists to forbid, one axis over.
+
+**So the container's element `copy` is its children's sources, joined**, and the rule that makes
+that expressible is the one this kind already has: elements are one per child (I47), so *which
+element* and *which child* are the same question. A kind whose source the join cannot express
+contributes **nothing** rather than its painted rows — the same direction I17 takes, and the
+reason a `table` is deliberately absent from it: C11 already declares a richer `copy` per row,
+and a second answer here would be two sources for one fact.
+
+**A child contributing nothing is not the same as a container contributing nothing, and the
+second was a silent no-op.** `copyElement` filters the undefined and the empty out and returns
+early on an empty result, so a container whose elements carried no `copy` at all made `y` a key
+that did nothing and said nothing — the empty-block class, in the one place a reader has no way
+to tell *there was nothing to copy* from *the key is not bound*. `y` on a container has an
+obvious meaning and it was unimplemented rather than refused, which is the worse of the two.
+
+**What the boundary still owes, and it is owed elsewhere.** A copy carrying 400 rows out of a
+box showing 12 is correct and surprising, and the sentence that removes the surprise — *selected
+40, copied 400* — needs a readout to sit on. **There is none**: no such surface exists in the
+tree, and the nearest thing that does is `TuiConfig.chrome.footer`, which is roadmap 29's whole
+subject (F161). So this is recorded as a consumer of that row and **not** as a small addition
+here: it is a surface, not a count.
+
 ---
 
 ## 4. Patches
@@ -991,6 +1021,7 @@ persisted document rests on.
 - **I47** — **A `scroll` declares a positive integer `height` and at least one child, and both are refused at parse.** Its elements are **one per child**, so *no elements* and *no children* are one fact and the aimability rule is expressible where the validator lives (§3c cell 5). `measure(block, width)` returns `height`, plus I49's residue row where the content cannot fit — and **the same value at every offset**, which is the property that matters: the box does not change size as the reader scrolls, which is what keeps the offset out of every geometry cache and out of C14's index (§3c cell 3). I49's condition is on `(block, width)` for exactly that reason. **The transcript's window slices the box and never the content** (§3c cell 1).
 - **I48** — **The scroll offset is view state: a row count, per container, droppable, clamped at read.** **Rows and not an element index**, so a resize re-interprets it rather than moving the reader to whichever element used to sit there (§3c trace 4). It is never corrected at write — a store that had to be fixed up on every patch is one that accumulates, which C23 I47 forbids of view state — and it is dropped with the entry on the same subscription that drops the rendered rows. **A settled entry's scroll keeps its offset and cannot be moved**, because only the live entry holds focus and a container scrolls if it is focusable (§3c cell 6); the content below the box is unreachable there, and that is a ruling rather than an oversight. **Resume restores no offset**, which follows from view state and is C13 I20's consumer.
 - **I49** — **A scroll whose content cannot fit draws a residue marker, in both directions, and pays a row for it out of its own height.** *N above · M below* rather than silence: a bounded region with a marker is normal and one that silently ends is a defect (F123's class, D40's eviction marker). **`measure` returns `height + 1` exactly where the children measure taller than `height`, and `height` where they do not** — the condition is on `(block, width)` and never on the offset, so the content area does not change size as the reader scrolls and I47's offset-independence survives the marker rather than being weakened by it. The glyph is C09's and never a literal (F6).
+- **I50** — **A container's element `copy` is its children's sources, joined — and the offset does not enter it.** C26 I17 at the level above: the box hiding a child is the rendering, and the rendering is not what is copied, so a copy taken across a scrolled boundary carries the hidden rows in full and is the same text at every offset and every width. A child whose kind cannot express a source contributes **nothing** rather than its painted rows, and `table` is deliberately outside the join because C11 declares a richer `copy` per row (§3c). **A container whose elements carry no `copy` at all is the empty-block class arriving at a keystroke** — `y` filtered everything out and returned early, so the key did nothing and said nothing.
 
 ---
 
@@ -1046,6 +1077,7 @@ persisted document rests on.
 44. **A `scroll` is a box of declared height holding children**, its elements are one per child, and an empty one is a construction error rather than a container nobody can aim (I47, §3c).
 45. **The offset is view state in rows** — droppable, per container, clamped at read, restored by no resume, and frozen once the entry settles (I48, §3c).
 46. **A bounded region says what it is hiding** — both directions, one row, and the row is spent on a property of the block rather than of the view (I49, §3c).
+47. **A copy is not bounded by the box that hides it** — the container's `copy` is its children's sources joined, unchanged by the offset, and a kind with no expressible source contributes nothing rather than its rendering (I50, §3c).
 
 ---
 
