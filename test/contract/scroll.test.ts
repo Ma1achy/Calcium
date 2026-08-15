@@ -348,6 +348,51 @@ describe("C04 §3c — the class: every walk that asks which blocks hold blocks"
   });
 });
 
+describe("C04 §3c — the boundary, and what a copy carries across it", () => {
+  // **The ruling needed no new principle and the rows have to show that.** C26
+  // I17 says the copy is the source and never the rendering; a child the offset
+  // scrolled past is a third form of *the rendering could not show it*, beside a
+  // dropped column and a truncated value.
+  //
+  // There is no row asserting *the same copy at every offset*, and its absence
+  // is deliberate: `elements` is not given the offset, so such a row could not
+  // be violated and would read exactly like a rule that is obeyed (A03 §2).
+  // What can be wrong is the join, and these assert that.
+
+  const copies = (block: Scroll): readonly (string | undefined)[] =>
+    registry.elementsOf(block, 40).map((e) => e.copy);
+
+  it("T2.35 (C04 I50): the children below the box are in the copy, in full", () => {
+    // A box of one row holding three children. Two of them are unreachable
+    // without scrolling and one is unreachable at every offset the box allows —
+    // and all three are copied, which is the whole of the ruling.
+    expect(copies(scroll(1, [flat("a"), flat("b"), flat("c")]))).toEqual(["a", "b", "c"]);
+  });
+
+  it("T2.35b (C04 I50): a nested container joins its own children, one level down", () => {
+    // The recursion, and the reason it is not a special case: elements are one
+    // per child, so a child that is a container is one element whose source is
+    // everything it holds. The inner box's height does not enter it either.
+    const inner = scroll(1, [flat("x"), flat("y")], "inner");
+
+    expect(copies(scroll(2, [flat("a"), inner]))).toEqual(["a", "x\ny"]);
+  });
+
+  it("T2.36 (C04 I50): a kind with no expressible source contributes nothing", () => {
+    // **Nothing rather than its painted rows** — a `rule` draws a line and has
+    // no data behind it, so joining what it renders would put a row of dashes in
+    // a paste. The empty string is what `copyElement` filters out.
+    const withRule = scroll(2, [flat("a"), { kind: "rule", id: "r" } as Block, flat("b")]);
+
+    expect(copies(withRule), "the rule contributes an empty source").toEqual(["a", "", "b"]);
+    expect(
+      copies(scroll(1, [{ kind: "rule", id: "r" } as Block])),
+      "and a container of nothing but those carries no source at all — which is " +
+        "the state `y` returned early on, saying nothing",
+    ).toEqual([""]);
+  });
+});
+
 describe("C04 §3c cell 5 — refused at parse", () => {
   const docWith = (block: unknown): unknown => ({
     schema: "tui.view/1",

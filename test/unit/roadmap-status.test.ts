@@ -155,13 +155,18 @@ describe("roadmap-status — the Order column's verifier", () => {
     //
     // The arm needs nothing outside the document, which is why it is cheap enough
     // to be exact: a row that claims something is built is PART at least.
+    // **The anchor moved when 46 shipped**, and it moved *to* the measured case:
+    // 7 is the entry the arm was written about, and its row still says *stages
+    // 1-3 built* while the entry itself is PART. A fixture pinned to whichever
+    // row happens to be PART today goes stale every time one lands; this one
+    // stales only if the instance that produced the rule is itself resolved.
     const staled = mutate(
-      "PART  46 SCROLLABLE CONTAINERS",
-      "      46 SCROLLABLE CONTAINERS",
+      "PART  7  THE NAVIGATION MODEL",
+      "      7  THE NAVIGATION MODEL",
     );
     const r = run(staled);
-    expect(r.ok, "an OPEN row asserting `elements` is built").toBe(false);
-    expect(r.out).toContain("entry 46 is OPEN and its own description says");
+    expect(r.ok, "an OPEN row asserting three stages are built").toBe(false);
+    expect(r.out).toContain("entry 7 is OPEN and its own description says");
   });
 
   it("RS8b: a built-word exemption that no longer matches its row fails", () => {

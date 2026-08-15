@@ -113,6 +113,26 @@ const MUTATIONS = [
     expect: "T2.34",
   },
   {
+    // **The copy taken from what the box shows** (C04 I50, C26 I17). The
+    // boundary-aware form, which is the tempting one: it is right for every
+    // container whose content fits and wrong exactly where the ruling applies.
+    name: "the container copies only the children the box can show",
+    file: SRC,
+    from: "          copy: copyTextOf(r.child),",
+    to: "          copy: r.to <= block.height ? copyTextOf(r.child) : \"\",",
+    expect: "T2.35",
+  },
+  {
+    // **The join stopping at one level.** A child that is itself a container
+    // carries its children's sources, and a `default` arm swallowing `scroll`
+    // reads as total — the switch answers every kind, and answers one wrongly.
+    name: "a nested container contributes no source",
+    file: SRC,
+    from: "    case \"scroll\":\n      return child.children",
+    to: "    case \"scroll-not\":\n      return child.children",
+    expect: "T2.35b",
+  },
+  {
     // **The offset trusted rather than clamped** (C04 I48, cell 4). Nothing in
     // the tree writes one yet, so this is the arm that will matter the day L4
     // does — and it is live now because `ctx.scrollOffsets` is readable.
