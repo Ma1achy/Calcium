@@ -2779,7 +2779,13 @@ PART  25 ghost text ★            drawn since PR #27. What remains: it ghosts o
                                    is static-only. Design with as-you-type — one hint, two levels
       26 view trace in transcript a full-screen view leaves no record. Append on push, PATCH on
                                    pop — sidesteps B03's no-trace-on-pop ruling, one entry, D7
-                                   intact. And ⏎ to re-enter is nearly free
+                                   intact. And ⏎ to re-enter is nearly free. RE-CHECKED
+                                   2026-08-15 and unmoved, with the evidence exact rather than
+                                   blanket: a successful push touches the transcript on NO
+                                   path. `execution.ts`'s view arm appends only when
+                                   `documentView.open` REFUSES, and its own comment says
+                                   *this is the only path on which a view verb touches it*.
+                                   Symbol: `documentView.open`
 PART  27 syntax highlighting ★    a REGRESSION against C09 §4a, not a scoping choice — the spec
                                    promises "highlighted whenever someone registers it" and there
                                    is no someone. 24 mainstream = 180 KB, measured. Phase-1-shaped
@@ -2824,7 +2830,13 @@ PART  31 completion ranking       prefix-matched and unranked today. Recency-fir
                                    (retracted — F89). Prefix-OUT is not: prose by default, verbs
                                    by exception. A RULING on defaultRoute, not a config field
       33 QUEUEING ★              submit while something runs — a stated must. Small queue,
-                                   real rulings, and Ctrl-C is ambiguous the way step 9's was
+                                   real rulings, and Ctrl-C is ambiguous the way step 9's was.
+                                   RE-CHECKED 2026-08-15: no queue of any kind in `src/shell/`
+                                   — the word does not appear. Blanket claims are what the
+                                   grep-reach signal counts, and this one is exact because the
+                                   entry names a structure rather than a symbol: there is
+                                   nothing to grep FOR until it exists, which is the shape the
+                                   signal reports rather than gates
 PART  34 UX polish set            animation (decoration never information) · change highlighting ·
                                    finish notifications · structured export · error remedies as
                                    fill actions · empty states that teach
@@ -2855,13 +2867,27 @@ RULED 35 progress feedback        the spinner is static by a ruling whose premis
                                    the framework withheld a fact it held. The elapsed tick
                                    comes from the refresh driver, never a setInterval in
                                    paint.ts
-      36 scrollbar + edge markers the terminal cannot provide one (alt screen has no scrollback)
+PART  36 scrollbar + edge markers the terminal cannot provide one (alt screen has no scrollback)
                                    and C14 already has the numbers. The edge marker is the cheap
                                    half and may matter more than the bar. AT CONTAINER SCOPE
                                    (46) it is one cell of the container's own width, not a
                                    second bar in the frame's reserved column, and ONLY THE
                                    FOCUSED CONTAINER FILLS IT — reserve always, fill on focus,
-                                   which is the focus gutter's trick and keeps width constant
+                                   which is the focus gutter's trick and keeps width constant.
+                                   CHECKED FROM THE SATISFIER'S SIDE 2026-08-15, AND THE
+                                   CONTAINER HALF IS ANSWERED IN A DIFFERENT SHAPE: 46 shipped
+                                   with C04 I49, a RESIDUE ROW — `⋯ N above, M below`, both
+                                   directions, one row, condition on `(block, width)` and never
+                                   on the offset. So *a bounded region says what it is hiding*
+                                   is already answered at container scope, in a row rather than
+                                   in a column. What is left here is POSITION rather than
+                                   existence — where in the content you are, which the row does
+                                   not say. THE CONSTRAINT THAT FOLLOWS: a container-scope bar
+                                   must read from I49's numbers or replace the row, never sit
+                                   beside it. Two mechanisms answering *is there more* at one
+                                   scope is the two-sources-for-one-fact shape C04 I50 refuses
+                                   for `copy`. Symbol: `residue` in
+                                   `src/presentation/blocks/glyphs.ts`
                                    so the cache stays safe. Mouse: click-to-seek and drag are
                                    plumbing that exists (Placed hit-testing + elements' row
                                    ranges) with no affordance; the WHEEL is the new one and it
@@ -3068,9 +3094,18 @@ BUILT 41 typo detection            trivial, delightful — smaller once 40 lands
                                    both found by the sixth sweep because NEITHER NAMES A
                                    SYMBOL — a grep sweep passes over an entry with nothing to
                                    grep and records a confirmation it did not make
-      42 rebindable keys          precedence ladder (framework < app < user), not a refusal —
+PART  42 rebindable keys          precedence ladder (framework < app < user), not a refusal —
                                    a user override IS a collision. Unbind is `action: null`, a
-                                   VALUE not an absence, and it falls through to the next rung
+                                   VALUE not an absence, and it falls through to the next rung.
+                                   CHECKED 2026-08-15 AND THE SEAM ALREADY EXISTS:
+                                   `createKeymap(bindings)` takes the list rather than owning
+                                   it — `src/interaction/router/keymap.ts` — with exactly one
+                                   caller passing `defaultKeymap`, `src/shell/construct.ts`.
+                                   So this is not *the table is hard-coded*. Two things are
+                                   missing and they are different sizes: the conflict rule
+                                   THROWS on a duplicate (`KeymapError`, same file), which is
+                                   the refusal this entry says must become a ladder; and no
+                                   config surface carries overrides. Symbol: `createKeymap`
 PART  43 images (kitty)            designed already; unlocks mermaid HD + ML samples
       44 session resume            tractable half of the persistence story. RULED: a resumed
                                    session opens at the BOTTOM and restores no scroll offset,
@@ -3237,6 +3272,8 @@ what landed**.
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` — and **that phrase is this table's own grep term, not the entry's** (F166). The entry lists *structured export* among six UX items, where it means letting a user export what is on screen. It is **not** a `ViewDocument` codec, which is what 44's row read it as |
 | 38 | BUILT | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `groupDefinition` in `src/presentation/blocks/kinds/containers.ts` — and the weights C04 §3 deferred are built: `flex?: readonly number[]` at `src/data/viewmodel/types.ts:580`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` — and `Share` closes it: `examples/docker/src/banner.ts:187` builds a row group whose frame is identical to the composed golden, and `examples/docker/src/dashboard.ts:434` puts it in the document, so **`direction: "row"` has a caller**. C04 I44, commitment 41, T3.20, T3.21, T6.23, T6.24 | **`align`, `padding` and `height: "fill"` are separate steps**, each named in C04 §3 with its reason. The wordmark's leading blank row stays the app's, because vertical alignment inside a row is not built |
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
+| 36 | PART | **the container half is answered, in a different shape.** C04 I49's residue row — `⋯ N above, M below`, both directions, one row, `residue` in `src/presentation/blocks/glyphs.ts` — already says *this region is bounded and there is more* at container scope. What is left is **position rather than existence** | **the transcript-scope bar is untouched**, and the constraint the answer creates is the real content: a container bar must read I49's numbers or replace the row. Two mechanisms answering *is there more* at one scope is the shape C04 I50 refuses for `copy` |
+| 42 | PART | **the seam exists and is not what the entry assumed.** `createKeymap(bindings)` takes the list rather than owning it — `src/interaction/router/keymap.ts` — with one caller passing `defaultKeymap` in `src/shell/construct.ts` | **two missing pieces of different sizes**: the conflict rule throws (`KeymapError`) where this entry says it must become a ladder, and no config surface carries overrides. Not *the table is hard-coded*, which is what the row said before it was checked |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
 | 46 | BUILT | **all three pieces exist, and the third was the one that fails silently.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on **7 §4 specifically**, not on 7: stages 1–3 gave focus an address and none of 46's three questions is answered by one. **The check §4 owed is now run** (`docs/components/C26_navigation.md` §4a) and **§4b then answers 46's question (a)**: elements are the unit of movement and the window is a rendering consequence, so `↓`/`↑` step and the window follows (C14 I6 at block scope) while `PgDn`/`PgUp` move the window and never focus. **Two keys, not two readings of one** — so the scroller needs no interact mode and no new field, the default is read off which of `elements` and `window` the kind declares, and a focused element outside the window is a legal state. C26 I18, commitment 12. **The offset landed as view state** — `ScrollOffsets` in `src/shell/scroll-offsets.ts`, dropped on `rendered`'s own subscription, clamped at read and never at write, canonical key with zeros omitted; the `scroll` kind at `src/data/viewmodel/types.ts` with `scrollDefinition` in `src/presentation/blocks/kinds/containers.ts`; `blockPageUp`/`blockPageDown` at the `liveBlock` target; and the offset as the render cache's **fourth axis** in `src/shell/session.ts`. C04 §3c, I47–I50, commitments 44–47; T2.20–T2.36, T4.18c–T4.18f, T4.41, T4.42; `tools/mutate/runs/c04-scroll.mjs`, ten mutations. **The residue marker is the entry's own ruling made visible** (I49) | **the settled entry keeps its offset and cannot be moved**, which is a ruling rather than a remainder: block-to-block focus above the live entry is C26 §11's deferral, and the marker saying *N above, M below* is the visible symptom it did not have. **And a container in the transcript is a choice to hide content** — reach for one where bounding is the point, not to shorten a long result |
 | 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:441` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
@@ -3250,13 +3287,21 @@ what landed**.
 | 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. **48** joins them measured rather than
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
 is open with its first candidate already refused. · **26**, **32** — the symbols the entries name are
 absent  · **44** —
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
 which is worth saying because it reads as coverage. **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds four test files and **not one imports from `src/shell/`**, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
+
+**36 and 42 left this list on 2026-08-15**, both marked PART, and both by the same check: reading
+the entry's premise against the tree rather than grepping the symbols it names. 36's *edge marker
+at container scope* was answered by 46's residue row in a different shape — a row, not a column —
+so what is left is position rather than existence. 42's *the keymap is hard-coded* was never true:
+`createKeymap` takes the list and has one caller. **Neither would have been found by the sweep's
+own method**, because both entries name a feature and not a symbol, which is exactly what the
+grep-reach signal reports.
 
 **16 left this list on 2026-08-14**, marked PART. Two of its four steps landed, and the row it
 left on was *the confirm and the completion menu are two mechanisms* — which is still true of
