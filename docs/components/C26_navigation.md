@@ -156,6 +156,64 @@ every cost to skip.
 
 ---
 
+## 4a. The check, run — and none of the four kinds fits
+
+**Run against the tree at HEAD rather than against the design.** Every row below is a binding
+or a declaration that exists, cited by symbol; nothing here is a prediction about a kind that
+might be written.
+
+**The artefact is a classification table, and that is a choice.** Every interaction here holds
+at rest — *what does `↓` do at this kind's edge* against *what this kind declares* — with no
+event between them, which is C18 §8a's shape rather than a trace's. A sequence trace over
+entering, stepping and leaving would find none of the four rows below, because none of them
+needs anything to have happened.
+
+| # | kind | what `↓` does at the edge, in the tree | does an `ArrowPolicy` value say it |
+|---|---|---|---|
+| 1 | **`table`** — the only kind declaring `elements` (`presentation/table/definition.ts`, `tableElements`) | `↑` at the **first** element leaves to the prompt (`rowUp`, `shell/keys.ts`); `↓` at the **last** does nothing (`rowDown`, same file, `if (next !== undefined)`) | **no.** `escape-vertical` names an *axis* and the tree escapes in one *direction* — back the way focus came in, since entry is `↓` from the prompt past history's bottom (`historyNext`). There is no value for *escape up, stop down* |
+| 2 | **`logs`** | declares `window` and no `elements` (`presentation/blocks/kinds/structured.ts`), so `↓` never steps an element in it at all | **the question does not arise** — and §4 above predicted *`table` and `logs` will both fit*. They are not two instances of one shape: by what each declares they are in different cells, which is the prediction falsified by the two fields rather than by a reading |
+| 3 | **`patch` in a pushed view** | `↓` is `viewPageDown` and `n`/`p` step hunks (`interaction/router/keymap.ts`, the `pushedView` target) | **no, and there is no edge.** The policy answers *what happens when stepping runs out*; here `↓` was never stepping |
+| 4 | **a scrollable container** (roadmap 46) | unbuilt — but `pushedView` **is** a scroller and it already answers: `↓` scrolls, in navigate mode, with no interact mode involved | **no**, for row 3's reason |
+
+### The outcome, recorded either way as §4 requires
+
+**Zero of four fit, and the two failure modes are different** — which is a stronger result than
+four near-misses, and it is the outcome the multi-kind rule exists to produce. Rows 3 and 4
+fail because `↓` is not an element step, so the vocabulary's question never arises. Row 1 fails
+for an unrelated reason: the question arises and the answer is asymmetric, and every value in
+the list is symmetric.
+
+**So the axis is wrong rather than the vocabulary incomplete**, which is the finding §4 named
+in advance and is C13's patch-gate class arriving where it was watched for. It is worth being
+exact about what *wrong axis* means here: `ArrowPolicy` sorts kinds by **what happens at an
+edge**, and the tree sorts them by **whether there is stepping to run out of**.
+
+**And the discrimination it was to provide is already carried by two fields that exist and
+have readers.** This is the part that could not have been designed from the outside: the
+keymap answers `↓` per *target* (`liveBlock` steps, `pushedView` pages) and cannot tell two
+kinds apart at one target — which is the gap `ArrowPolicy` was for. But the fact it needs is
+already declared:
+
+| declares | `↓` | kinds today |
+|---|---|---|
+| `elements` only | steps elements | `table` |
+| `window` only | moves a viewport | `logs`, `patch` |
+| **both** | **ambiguous — this is the scroller, and it is one cell rather than a vocabulary** | none |
+| neither | passes through; the block is atomic | `keyValue`, `code`, `plot` |
+
+**Nothing is adopted here and no field is added.** The check's job was to say whether the
+vocabulary survives contact with four kinds, and it does not; what replaces it is §4's
+remaining design work and wants its own ruling. Recorded now because *a check whose negative
+result is not written down is a check nobody can tell was run*, and because the cell that is
+genuinely open — a kind declaring both — is now a single question instead of a vocabulary to
+re-declare across every kind.
+
+**One premise of §4 survives intact and is worth separating from the rest**: resolution
+global → kind → per-node is familiar machinery, and nothing above bears on it. What the check
+refuses is the *vocabulary being resolved*, not the resolution.
+
+---
+
 ## 5. Element resolution — one declaration, keyboard and pointer
 
 ```typescript
