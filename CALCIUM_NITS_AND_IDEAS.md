@@ -32,6 +32,19 @@ repeatedly. F142's lesson arriving in a cross-reference.
 itself then changed. **If a nit turns out already built, already ruled or already an entry,
 that is the result** — the scrollable container's prompt half was entry 28 verbatim.
 
+## The drop's copy was refused — 2026-08-15
+
+A design drop carried a 517-line `CALCIUM_NITS_AND_IDEAS.md`. **It is the snapshot from before
+the distribution below**, and its eleven sections map onto entries and findings that already
+have them: item 4 is F160, item 5 is entry 35, items 6 and 10 are 15 and 46, item 8 is 36, item
+9 is 29, and item 11 — *`⎿` is a glyph slot with more than one consumer* — is one of the two
+claims the drop's own README records as invented.
+
+**Not merged, and the reason is this file's own rule**: a holding pen that only grows is a
+second roadmap with no status column, and the two disagree the first time anyone reads them
+apart. Restoring it would resurrect eleven items that were dispatched, one of them known false.
+The zip is where it remains if a destination is ever disputed.
+
 ## Where the last batch went — 2026-08-13
 
 Twelve nits, all distributed. Ten to `CALCIUM_ROADMAP.md` (entries 7, 15, 29, 35, 36, 44, and

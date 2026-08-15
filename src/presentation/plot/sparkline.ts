@@ -63,8 +63,22 @@ export function sparkline(
   };
 
   const drawn = window.map(glyph).join("");
-  // `cells()` and never `.length` (A03 SS23): every ramp glyph is one cell wide
-  // in both modes, but the padding must be measured the way the measurer measures
-  // or a table cell containing one would disagree with its planned width.
+  // `cells()` and never `.length` (A03 SS23), and the padding must be measured
+  // the way the measurer measures or a table cell containing one would disagree
+  // with its planned width.
+  //
+  // **The sentence that used to be here said *every ramp glyph is one cell wide
+  // in both modes*, and it is not true of the unicode ramp.** `▁▂▃▄▅▆▇█` are all
+  // `East_Asian_Width=Ambiguous`, which means the **terminal** decides: one cell
+  // in a Western locale, two in a CJK one or under tmux's
+  // `utf8-ambiguous-width double`. `cells()` returns 1 for every one of them and
+  // has no ambiguous handling at all, so on such a terminal the framework's
+  // measurement and the drawn frame disagree by a factor of two — and because
+  // C11 calls this for a **table cell**, what breaks is column alignment for
+  // every row below, not a chart looking odd.
+  //
+  // Left as a comment rather than fixed here, because the fix is a declared
+  // capability — `ambiguousWidth`, roadmap 51 — and a field on a published type
+  // is not a decision to take inside a renderer.
   return " ".repeat(Math.max(0, w - cells(drawn))) + drawn;
 }

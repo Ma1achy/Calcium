@@ -2460,7 +2460,12 @@ Worth treating as one coherent piece rather than scattered features:
 - **tensors / matrices / vectors** — shape and dtype headers, sensible truncation
   (`[2, 64, 768] float32`, corners shown, middle elided), the same discipline C11 applies to
   rows applied to axes
-- **heatmaps** for attention and confusion matrices
+- **heatmaps** for attention and confusion matrices. **The planned `colour → ░▒▓█` degradation
+  is unsafe and is replaced**: `▒ ▓ █` are all `East_Asian_Width=Ambiguous`, so the fallback
+  designed for the highest-value plot doubles in width wherever a terminal treats ambiguous as
+  wide — a heatmap that stops being a grid. **The braille density ramp replaces it and is
+  better on its own terms**: `⠀ ⠄ ⠆ ⠖ ⠶ ⠷ ⠿ ⣿`, eight levels against four, every one narrow.
+  Measured with the rest of the ambiguous-width finding in entry 51
 - **plots** for training curves — exists, wants the history buffer docker-tui is building
 - **images** for sample outputs, once the image block lands
 
@@ -3422,6 +3427,48 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    their blocker as a symbol, and a grep is what answers it. Any
                                    further round that re-checks these two is spending the
                                    satisfier-side habit where nothing can have moved
+      51 MOTION AND MEASURE SETS ★  spinners · bar styles · A CATEGORICAL PALETTE — and one
+                                   finding underneath all three. THE PALETTE IS THE
+                                   FREEZE-RELEVANT HALF: *n distinct things, no order, no
+                                   judgement* is a third axis beside `Tone` and the change
+                                   axis, and `Tone` structurally cannot carry it — its members
+                                   are ok/warn/error/dim/muted/default, every one a judgement.
+                                   The sets are additive and can land after. Content:
+                                   `docs/notes/CALCIUM_SPINNERS.md` (24 sets, 8 refused with
+                                   reasons) and `docs/notes/CALCIUM_BARS.md`.
+                                   AND THE FINDING: AMBIGUOUS WIDTH IS A CAPABILITY, NOT A
+                                   REFUSAL. `East_Asian_Width=Ambiguous` means the TERMINAL
+                                   decides — one cell in a Western locale, two in a CJK one —
+                                   so it is a property of where a glyph is drawn, which is what
+                                   a capability is, and `TerminalCapabilities` has no field for
+                                   it. Four instances of one cause, and one is
+                                   ALREADY IN THE TREE:
+                                   `RAMP_UNICODE = "▁▂▃▄▅▆▇█"` in
+                                   `src/presentation/plot/ramp.ts` is ambiguous in all eight
+                                   glyphs, and `sparkline` is what C11 calls for a TABLE CELL
+                                   (`src/presentation/table/detail.ts`), so a table's columns
+                                   stop aligning rather than a chart looking odd. Measured:
+                                   `cells()` returns 1 for every one of them and has no
+                                   ambiguous handling at all, so the framework's own measurer
+                                   and a CJK-locale terminal disagree by a factor of two —
+                                   C25 I1's class, on a setting the framework cannot see.
+                                   `sparkline.ts`'s own comment says *every ramp glyph is one
+                                   cell wide in both modes*, forty lines below the ramp.
+                                   The other three: the heatmap's planned `░▒▓█` (three of
+                                   four ambiguous), box drawing throughout every ASCII chart
+                                   library, and `▌`/`⚡` in `claude-statusline` — where `⚡` is
+                                   WIDE rather than ambiguous, so it is two cells on every
+                                   conforming terminal. PROPOSED: `ambiguousWidth: "narrow" |
+                                   "wide"`, DECLARED rather than detected — no probe C02 would
+                                   allow, and it is a setting the user already has in tmux,
+                                   iTerm2, Konsole and WezTerm. It unlocks the eighth-blocks
+                                   and sub-cell fill, the eight-level vertical ramp, the shade
+                                   ramp, and box drawing — which means connected line charts
+                                   with proper joins — and makes braille the fallback rather
+                                   than the ceiling. FREEZE-RELEVANT, so it belongs before
+                                   publication and in the same ruling as the palette. NOT
+                                   TAKEN HERE: it adds a field to a published type, which is
+                                   the one class of decision this session does not rule alone
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
@@ -3470,7 +3517,7 @@ what landed**.
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 31 | PART | **recency-first landed.** `rank` — `src/interaction/completion/engine.ts` — runs after `dedupe` at both call sites over an injected `recency`, and C22 supplies it from C20's history at `src/shell/construct.ts`. `null` sorts last and stably, so it refines source order rather than replacing it. C19 I26, §3a; five mutations in `tools/mutate/runs/c19-ranking.mjs` | **substring and subsequence.** Substring is **refused** and I27 says why: the verb source emits one word at a time, so the whole name never reaches the filter and widening it changes nothing. Subsequence wants a match-quality scorer, which is a separate ruling |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` — and **that phrase is this table's own grep term, not the entry's** (F166). The entry lists *structured export* among six UX items, where it means letting a user export what is on screen. It is **not** a `ViewDocument` codec, which is what 44's row read it as |
-| 38 | BUILT | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `groupDefinition` in `src/presentation/blocks/kinds/containers.ts` — and the weights C04 §3 deferred are built: `flex?: readonly number[]` at `src/data/viewmodel/types.ts:580`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` — and `Share` closes it: `examples/docker/src/banner.ts:187` builds a row group whose frame is identical to the composed golden, and `examples/docker/src/dashboard.ts:434` puts it in the document, so **`direction: "row"` has a caller**. C04 I44, commitment 41, T3.20, T3.21, T6.23, T6.24 | **`align`, `padding` and `height: "fill"` are separate steps**, each named in C04 §3 with its reason. The wordmark's leading blank row stays the app's, because vertical alignment inside a row is not built |
+| 38 | BUILT | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `groupDefinition` in `src/presentation/blocks/kinds/containers.ts` — and the weights C04 §3 deferred are built: `flex?: readonly number[]` at `src/data/viewmodel/types.ts:580`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` — and `Share` closes it: `examples/docker/src/banner.ts:187` builds a row group whose frame is identical to the composed golden, and `examples/docker/src/dashboard.ts:434` puts it in the document, so **`direction: "row"` has a caller**. C04 I44, commitment 41, T3.20, T3.21, T6.23, T6.24 | **CHECKED FROM THE SATISFIER'S SIDE 2026-08-15 AND TWO OF THE THREE HAVE MOVED.** `align` **is built and this row said it was not**: `Valign` at `src/data/viewmodel/types.ts`, `align?: readonly Valign[]` on `Group`, accepted by `b.group` and read by `groupDefinition` — `block.align?.[index]` into `justifyContent`. **And no test names it**: zero matches for `Valign` or `align` under `test/` for a group, so a published field with a renderer shipped untested while the record said it did not exist — two documents wrong about one field in opposite directions. T3.22 is the row it lacked. **`height: "fill"`'s blocker is met**, which is the deferral CLAUDE.md already names: the condition was *the producer cannot see the height*, and `ProducerContext.height` is granted at `producerContext(deps.region().height)` in `src/shell/execution.ts`, non-null exactly on the view route and `null` for a live part inside one. **`padding` is the only one of the three still a separate step.** The wordmark's leading blank row stays the app's until `padding` lands, and that is now the whole of the remainder |
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
 | 36 | PART | **the container half is answered, in a different shape.** C04 I49's residue row — `⋯ N above, M below`, both directions, one row, `residue` in `src/presentation/blocks/glyphs.ts` — already says *this region is bounded and there is more* at container scope. What is left is **position rather than existence** | **the transcript-scope bar is untouched**, and the constraint the answer creates is the real content: a container bar must read I49's numbers or replace the row. Two mechanisms answering *is there more* at one scope is the shape C04 I50 refuses for `copy` |
 | 42 | PART | **the seam exists and is not what the entry assumed.** `createKeymap(bindings)` takes the list rather than owning it — `src/interaction/router/keymap.ts` — with one caller passing `defaultKeymap` in `src/shell/construct.ts` | **two missing pieces of different sizes**: the conflict rule throws (`KeymapError`) where this entry says it must become a ladder, and no config surface carries overrides. Not *the table is hard-coded*, which is what the row said before it was checked |
@@ -3497,7 +3544,10 @@ base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's 
 **not** re-measured here, because it is a proposal rather than a shipped signal and re-running
 it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
 stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
-absent  **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
+absent  **51** joins them on the day it is filed, 2026-08-15, measured rather than assumed:
+`TerminalCapabilities` in `src/terminal/capabilities.ts` has no `ambiguousWidth` field and
+`cells()` in `src/presentation/text.ts` has no ambiguous handling — it returns 1 for every
+glyph of `RAMP_UNICODE`, which is the shipped half of the finding. · **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
 
 **44 left this list on 2026-08-15**, and its evidence was true to the end:
 `interaction/history/persist.ts` **is** C20's history persistence and is not session resume.
