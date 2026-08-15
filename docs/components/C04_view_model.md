@@ -521,7 +521,8 @@ The constraint is indirection, not scarcity. Three things depend on it and none 
 type Glyph =
   | "ok" | "warn" | "error" | "info"
   | "pending" | "working" | "running" | "queued" | "cancelled"
-  | "expand" | "collapse" | "live" | "bullet";
+  | "expand" | "collapse" | "live" | "bullet"
+  | "continuation";
 ```
 
 **The identical argument.** A glyph embedded in a block is the same character on every terminal, has no fallback at `unicode: "ascii"`, and cannot be width-checked at load. `glyph: "✗"` is `colour: "#c0ffee"` written in a different field.
@@ -534,7 +535,7 @@ C09 §4 owns the vocabulary and both renderings, and the 1:1 rule holds by const
 
 **The escape hatch, stated so that the guarantee stays absolute:** a glyph outside the vocabulary goes in the block's **text**, not its glyph field, and its behaviour under ASCII is the app's problem. That is where every action label already lives — `↗ open`, `⊘ cancel`, `⬡ pods` are text in a label, not glyph slots — and it is why the surfaces need no change. A vocabulary with an "or any string" arm is not a vocabulary.
 
-**`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `running` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
+**`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `running` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. **`continuation` is the third direction and the only token with its consumers named before it existed** (`docs/design/AGENT_TUI_DESIGN.md` §A1, which is where the mark was written down and is **not** a shipping consumer — agent-tui is stopped at step 0). It marks a line *subordinate to the one above it* rather than a state, which is why it is the first token whose eligibility is a property of the entry and not of the block: it needs a line above, and C22's `commandRows` returns `[]` for `command: ""`. So the vocabulary now contains a token a block can name in a position where it means nothing, and C09 §4 records which two blocks are in that position and which two look as though they are. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
 
 ### A categorical axis is a marker plus a derived tone, never a second palette
 

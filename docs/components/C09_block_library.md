@@ -296,10 +296,31 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 | `collapse` | `▾` | `v` | An expanded row |
 | `live` | `▌` | `\|` | The live-state gutter (D6) |
 | `bullet` | `•` | `-` | A list marker with no status meaning |
+| `continuation` | `⎿` | `` ` `` | A line subordinate to the one above — the entry's own state, under its command |
 
 **Why this is a closed union and not a string.** While the field was free, C09 emitted a block-supplied character verbatim — so the 1:1 guarantee held for the glyphs C09 chose and silently did not hold for the ones an adapter wrote. That is a guarantee that is mostly-true, and mostly-true fails only under `LANG=C`, only for the users least able to describe what they are seeing. It also drifted immediately: before tokenisation the tree carried `✗`, `✖`, `*`, `+` and `▲` in glyph positions, across five files, for three rôles.
 
 **`working` is distinct from `running` and `pending`**, and is in the vocabulary because S11 and S15 illustrate it — `◐ connecting`, `◐ mlflow starting`, `◐ layers installing`. Three states looked like two until the surfaces were read.
+
+#### `continuation`, and the two questions a status token never had to answer
+
+**It is the only token whose eligibility depends on the entry rather than the block**, so it is the only one where a consumer count is not an argument on its own (F161). Two blocks are in the position and both share a shape — a `muted` notice that is its entry's first block, saying what the *entry* is doing rather than what the far side emitted, drawn directly under the command line:
+
+| consumer | where | why it can take the mark |
+|---|---|---|
+| the stall notice | `refresh.ts`, `no output for Nm` | `muted` obliges no glyph (I6), and the entry is streaming, so its command chrome is on screen above |
+| the queued notice | `execution.ts`'s `enqueue`, `queued behind X` | `command` is the typed line, so `commandRows` draws it; the notice is the only block beneath |
+
+**And two that read as consumers and are not, each for a measured reason rather than a judgement.** This is the half worth writing down, because both were named as consumers before anyone looked:
+
+- **F15's fault notice cannot take it, for two independent reasons and neither is the obvious one.** Its `command` is `""`, and `commandRows` opens with `if (command === "") return []` — so there is no line above for a continuation to hang from, and the mark would subordinate the notice to whatever entry happens to precede it, which is a different submission. Its glyph slot is also already `error`. A reader checking either reason alone would still have got the right answer and the wrong rule.
+- **The cancelled notice cannot take it either**: `warn` is in `GLYPH_REQUIRED_TONES`, so C04 I6 has already spent the slot. Same shape as the stall notice in every other respect, which is what makes it the instructive one.
+
+**And it is a glyph slot rather than a prefix on the text, which is the whole reason it fits.** `notice` puts the glyph on the first row and indents every continuation row under the *text* (§3's hanging gutter), so a multi-row result sits beneath its mark instead of under a lone character. `docs/design/AGENT_TUI_DESIGN.md` §A1 reached the same mechanism from the other end — *a prefix reserving its columns, which `noticeDoc` already does* — and that is corroboration for the mechanism only. Its own consumer is a tool result in an application stopped at step 0, so it is written down and it is not a count.
+
+**On the character, measured rather than chosen.** `⎿` is `East_Asian_Width=Neutral` — **one cell under both conventions**. The corner a reader would reach for instead is not: `└` and `╰` are Ambiguous and draw two cells wide, as do `▲` and `⋯` already in these tables. That does not buy anything *today*, because `glyphs()` discards the whole Unicode set at `ambiguousWidth: "wide"` and this table follows `unicode` alone — so it is a property of the character and not yet an argument. It is recorded because §4's own note says a third set of narrow survivors is *the better answer the day someone measures one*, and this is a measurement, filed where that note can find it.
+
+The ASCII half is `` ` ``, which is `tree(1)`'s rendering of the same hook in its ASCII mode — a precedent rather than a preference, and degradation preserving meaning rather than appearance.
 
 **Anything outside the vocabulary is text, not a glyph.** `↗ open`, `⊘ cancel`, `⬡ pods` and `≡ logs` are action labels and footer hints — text that happens to begin with a character, never a glyph slot — and their behaviour under ASCII is the app's. That is what keeps this table's guarantee absolute rather than nearly absolute.
 
