@@ -2514,7 +2514,31 @@ PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
                                    is fine and in one mode is not. (c) I10 restores focus by
                                    address and says nothing about which MODE you return in —
                                    probably navigate, since re-entering a mode you left is
-                                   surprising, but it is unruled and cheap to rule now
+                                   surprising, but it is unruled and cheap to rule now.
+                                   TWO OF THE THREE ARE ANSWERED, 2026-08-15. (a) is C26 §4b
+                                   and §4c: elements are the unit of movement, the window
+                                   follows, PgUp/PgDn move the window and not focus; and a
+                                   boundary is a NEIGHBOUR question, not a direction — the
+                                   sequence is the entry's, so a block's edge is not an edge.
+                                   (c) is C26 I20: a fall-forward is a MOVE to a different
+                                   element, so it lands in navigation, which is the rule
+                                   focusRow already states. Vacuous until interaction has
+                                   bindings, and said so. §4 IS SHORT OF NOTHING — both policy
+                                   vocabularies are now checked, both fail on the same axis
+                                   error, and §4d records that not one value of either has an
+                                   inhabitant. (b) IS THE WHOLE REMAINDER and it is C16's, not
+                                   §4's: the day a kind inside a pushed view declares
+                                   `elements`, the view's n p g G pageup pagedown and the
+                                   inner kind's arrows want the same keys at one target.
+                                   BLOCKER CHECKED FROM THE SATISFIER'S SIDE AND IT IS NOT THE
+                                   ONE ASSUMED: a table inside a view is constructible today —
+                                   `documentView.fill(doc)` takes an arbitrary ViewDocument and
+                                   `table` declares `elements`. What is missing is that NOTHING
+                                   ASKS: `elementsIn` has exactly one caller, `liveElements` in
+                                   `src/shell/construct.ts`, and it reads
+                                   `stores.transcript.liveId`. So no element inside a view can
+                                   be focused at all, and (b)'s key collision cannot occur until
+                                   a second caller exists. Blocker as a symbol: `liveElements`
 BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
       9  mermaid (text path)       cheap once the dependency is vetted, distinctive
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model

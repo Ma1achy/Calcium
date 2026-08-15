@@ -287,7 +287,15 @@ its own mutation.
 
 **The pushed view is cell 2 today** — window-only — so nothing here changes it. **The day a
 kind inside a view declares `elements`, the view becomes cell 3 and `↓` steps**, at which
-point `n`/`p` stepping hunks may be redundant. **That is the keymap's question and not this
+point `n`/`p` stepping hunks may be redundant.
+
+**That condition is already met and the sentence names the wrong blocker** — measured
+2026-08-15 from the satisfier's side. `documentView.fill(doc)` takes an arbitrary
+`ViewDocument`, so a `table` inside a view is constructible today and it declares `elements`.
+What does not exist is anything **asking**: `elementsIn` has exactly one caller —
+`liveElements` in `src/shell/construct.ts` — and it reads `stores.transcript.liveId`. So no
+element inside a view can be focused, and the key collision cannot occur until a second caller
+exists. The blocker is a caller, not a declaration. **That is the keymap's question and not this
 ruling's**, and it is named here so it is not later mistaken for a consequence of it (→ C16,
 and §4's own question (b) about the outer and inner scopes binding the same keys).
 
