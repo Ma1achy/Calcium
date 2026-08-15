@@ -388,6 +388,65 @@ naming the key rather than the movement**, and `escape-vertical`'s axis was neve
 
 ---
 
+## 4d. The other half — `EscapePolicy`, never checked, and the value that is missing from both
+
+§4 declares **two** vocabularies and §4's check named four kinds for one of them. §4a and §4c
+are entirely about `↓` at an edge; **nothing has ever asked what `EscapePolicy` is for.** A
+section closed on the arrow half alone would be closed on half its subject, and the half left
+out is the one with a value that looks obviously right.
+
+### The check, run the same way — every `Esc` in the tree, by symbol
+
+| where | what `Esc` does today | which `EscapePolicy` value says it |
+|---|---|---|
+| `overlay` | `dismiss` — and it **respects `dismissable`**, so a confirm refuses it (`src/viewport/overlay/types.ts`, `dismissable: boolean`) | **`modal`, and it is already built somewhere else.** The value's one inhabitant is a field on C15's layer, so adopting it would be two sources for one fact — C11's `copy` argument exactly (C04 I50) |
+| `pushedView` | `viewPop` | none. It pops one scope; *bubble* is not what it does and *auto*'s two levels are not there |
+| `liveBlock` | `focusPrompt` — out of the block, one level | none. `auto` is *two-level*, and this is one |
+| `copyMode` | **nothing.** The exit is `⌃c` on the ladder, deliberately (`interaction/router/types.ts`: *entry only; the exit is §5's rung and not an action*) | the question does not arise — `Esc` is not this scope's exit at all |
+| `interaction` | **nothing is bound.** Commitment 3's *leave interaction, then leave the scope* is the one two-level escape in the design and it is unimplemented (§8b.8) | `auto` would name it, and it has no subject until the mode has bindings |
+
+### The outcome — the same axis error, at the other half
+
+**Every escape in the tree is resolved by the ladder, per *target*.** Not one of them is
+resolved by a kind, and no block definition is consulted about `Esc` anywhere. `EscapePolicy`
+is a per-kind vocabulary for a decision that is not per kind — which is §4a's finding arriving
+at the half §4a did not look at, and the reason to look was that *zero of four* is a result
+about the arrows and says nothing about the escapes.
+
+**`modal` is the one that would have been adopted**, because it is the one value that plainly
+describes something real. What it describes is `Layer.dismissable`, which shipped, has a
+reader, and is a property of the layer rather than of a kind. **A value with an inhabitant
+that lives somewhere else is the most dangerous kind of value**: it reads as evidence the
+vocabulary fits.
+
+### And the arrow half has a hole §4c missed
+
+§4c said I15's resolution shape *keeps §4b's subject* — a kind declaring both `window` and
+`elements` that wants `↓` to scroll rather than step. **That is true of the shape and false of
+the vocabulary.** `ArrowPolicy` is `navigate · escape-vertical · escape-horizontal ·
+escape-all · custom`, and **none of the five says *scroll rather than step***: `navigate` is
+stepping, the three `escape-*` values are §4c's edge question, and `custom` is the absence of
+an answer. The override §4b promised would need a value that does not exist.
+
+So the honest statement is stronger than §4c's: **not one value of either vocabulary has an
+inhabitant in the tree**, and the resolution shape (I15) is the only part of §4 with anything
+left in it — a mechanism looking for a policy to resolve.
+
+### What §4 is short of, now that both halves are checked: nothing
+
+The section's own commitment was to run the check and **record the outcome either way**. Both
+halves are run and both fail, for one reason stated twice: the vocabularies sort by **kind**
+and every decision they name is resolved by **target** or by a field that already exists.
+Nothing is adopted, no field is added, and `NavElement.arrow` and `.escape` — drawn in §5's
+declaration and withheld from the tree by MG24 (§8b) — are now withheld for a **second and
+better reason**: not *no reader yet*, but *no value either of them could carry*.
+
+**Commitment 4 is the casualty and it is named rather than quietly reinterpreted.** It commits
+both vocabularies to a resolution shape. What survives is the shape; what does not is the
+premise that there is something to resolve.
+
+---
+
 ## 5. Element resolution — one declaration, keyboard and pointer
 
 ```typescript
@@ -407,6 +466,12 @@ type NavElement = Readonly<{
   activate?: Action;
 }>;
 ```
+
+**`arrow?` and `escape?` are drawn here and have no value to carry** (§4d). They were withheld
+from the tree by MG24 for having no reader; both vocabularies have since been checked against
+every kind and every target, and not one value of either has an inhabitant. Left in the
+declaration with the finding beside them rather than deleted, because a field removed leaves no
+record of what was asked about it.
 
 **Optional, and a kind that is atomic omits it — and the argument is C09's own**, at
 `presentation/blocks/types.ts:94–104` on `window?`: *an absent member cannot be deleted by a
@@ -648,6 +713,15 @@ notice here.
   entry's sequence and not the kind; I15's resolution shape is untouched and keeps §4b's
   subject. A scope entered by a push has no sequence and therefore no ends,
   and `Esc` is its exit as it is the head's non-directional one.
+- **I20** — **A fall-forward lands in navigation, whatever mode it left.** I10 restores focus
+  by re-resolving an address, and a fall-forward resolves to a **different element** than the
+  one stored — so it is a move, and `focusRow`'s rule applies unchanged: *a mode belongs to the
+  element it was entered on, and carrying it to the next row would make `↓` mean something
+  different depending on how the reader arrived.* Re-entering a mode on an element the reader
+  never chose is that defect with the choice removed. **Vacuous today and the vacuity is the
+  point of saying so** — interaction mode has no bindings (§8b.8), so nothing observable
+  distinguishes the two answers, and the moment it has bindings this is the rule rather than a
+  question reopened with a shipped surface.
 
 ---
 
@@ -971,6 +1045,7 @@ is the shape a spec commit should have.
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
 12. Movement keys move focus and the window follows; paging keys move the window and not focus; a focused element outside the window is legal and the next movement key steps from it (I18, I7). The default is read off which of `elements` and `window` a kind declares, and a kind wanting otherwise uses I15's override rather than a new field.
 13. **A boundary is a neighbour question and the sequence is the entry's** — a block's edge is not an end, an end moves to its neighbouring scope or stops, and `ArrowPolicy`'s **edge values are not adopted** because no per-kind value can name a property of the entry's sequence (I19, §4c).
+14. **A fall-forward lands in navigation** — restoration moves focus to a different element, and a mode belongs to the element it was entered on (I20, I10). Vacuous until interaction mode has bindings, and stated now because it is cheap to rule and expensive to reopen.
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
