@@ -31,6 +31,7 @@ import {
   type Tone,
   type ViewDocument,
 } from "./types.js";
+import { childBlocks } from "./tree.js";
 
 /**
  * I1 — freeze at every nesting depth. A shallow `Object.freeze` on a document
@@ -240,6 +241,11 @@ export function rebuild<B extends Block>(spec: B): B {
  * silently, in the component that decides what to evict. C04 §5 makes the same
  * argument `cells()` makes: one implementation, or the two answers drift.
  *
+ * That comment was right about the hazard and wrong about its shape: there was
+ * no second copy, and `scroll` was missed by six *independent* enumerations.
+ * Which blocks hold blocks is `tree.ts`'s question now, and it is compiler-
+ * checked — see that file for why a `Record` and not a `Set`.
+ *
  * It yields blocks and never rows. A table's rows are not blocks; a row's
  * `detail` is. What to *count* is the caller's decision, not this walk's.
  */
@@ -247,24 +253,7 @@ export function* descendants(b: Block, seen: WeakSet<object> = new WeakSet()): G
   if (seen.has(b)) return;
   seen.add(b);
 
-  // **`scroll` was missing here and the cap could not see it** (C04 I47, C13
-  // I17). `cap.ts` counts through this walk rather than a copy of it, and its
-  // comment names the hazard exactly — *a second copy would miss the next
-  // container kind added to the vocabulary, silently, in the component that
-  // decides what to evict.* There is no second copy; the one walk enumerates
-  // kinds, so the defence was against duplication and the failure was
-  // enumeration. A `scroll` of five hundred children counted **one** against the
-  // 100,000-block cap, which is the unenforceable-cap sentence D40's own rule
-  // states about `group`.
-  //
-  // Found by reading entry 15's boundary question, not by anything watching this.
-  const nested: readonly Block[] =
-    b.kind === "panel" || b.kind === "group" || b.kind === "scroll"
-      ? b.children
-      : b.kind === "table"
-        ? b.rows.flatMap((r) => r.detail ?? [])
-        : [];
-  for (const child of nested) {
+  for (const child of childBlocks(b)) {
     yield child;
     yield* descendants(child, seen);
   }

@@ -24,6 +24,7 @@ import {
   type Result,
   type ViewDocument,
 } from "./types.js";
+import { isContainerKind } from "./tree.js";
 
 export type Validity<T> = Result<T, readonly string[]>;
 
@@ -440,10 +441,17 @@ function requireGlyph(value: unknown, e: string[], at: string): void {
   );
 }
 
-/** Children of a container, for the recursive walk. Total on malformed input. */
+/**
+ * Children of a container, for the recursive walk. Total on malformed input.
+ *
+ * The kind is asked of `tree.ts` rather than listed, and asked **by name**
+ * rather than structurally: an app-registered kind may carry a `children` array
+ * of things that are not blocks (F1), and descending into it would report
+ * errors against a document C04 is not entitled to validate.
+ */
 function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
   const kind = b["kind"];
-  if (kind === "panel" || kind === "group" || kind === "scroll") {
+  if (isContainerKind(kind)) {
     return isArray(b["children"]) ? b["children"] : [];
   }
   if (kind === "table" && isArray(b["rows"])) {

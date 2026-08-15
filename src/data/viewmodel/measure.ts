@@ -16,6 +16,7 @@
  */
 
 import type { Block, Group, MeasureFn, Panel, Share } from "./types.js";
+import type { ContainerBlock } from "./tree.js";
 
 /**
  * Width 0 is treated as 1 (T3.2). No measurer divides by zero, and no caller
@@ -152,9 +153,21 @@ export function placeable(block: Panel | Group, width: number): number {
   return Math.max(1, placed);
 }
 
-export function childWidths(block: Panel | Group, width: number): readonly number[] {
+export function childWidths(block: ContainerBlock, width: number): readonly number[] {
   if (block.kind === "panel") {
     return block.children.map(() => insetWidth(width));
+  }
+  // **A `scroll` takes the full width and insets nothing.** Its box is drawn by
+  // bounding rows, not by a border, so there is no frame to sit inside — and
+  // the residue marker is a row rather than a column (I49).
+  //
+  // This arm is here because the parameter widened to `ContainerBlock` and the
+  // compiler then refused every call site that could hand it a `scroll`. That
+  // is the seventh enumeration of the container kinds and the only one nothing
+  // had to notice by hand: `tree.ts` derived the type, and `tsc` found the
+  // function that answered for two kinds of three.
+  if (block.kind === "scroll") {
+    return block.children.map(() => atLeastOne(width));
   }
   return groupChildWidths(block, width);
 }

@@ -202,9 +202,10 @@ function childRanges(
   measureChild: MeasureFn,
 ): readonly Readonly<{ child: Block; from: number; to: number }>[] {
   const out: { child: Block; from: number; to: number }[] = [];
+  const widths = childWidths(block, width);
   let at = 0; // cells-ok — a row cursor, not a width
-  for (const child of block.children) {
-    const height = measureChild(child, width);
+  for (const [i, child] of block.children.entries()) {
+    const height = measureChild(child, widths[i] ?? 1);
     out.push({ child, from: at, to: at + height });
     at += height;
   }

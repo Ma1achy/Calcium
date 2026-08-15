@@ -10,10 +10,14 @@ import { describe, expect, it } from "vitest";
 
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { scrollDefinition } from "../../src/presentation/blocks/kinds/containers.js";
-import { descendants, validateDocument } from "../../src/data/viewmodel/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { applyPatch, descendants, validateDocument } from "../../src/data/viewmodel/index.js";
+import { b } from "../../src/shell/builders/index.js";
+import { liveParts } from "../../src/testing/live-parts.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
-import type { Block, Scroll } from "../../src/data/viewmodel/index.js";
+import type { Block, Scroll, ViewDocument } from "../../src/data/viewmodel/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
 const registry = createBlockRegistry({ defaults: true });
 const measureChild = (block: Block, width: number): number => registry.measure(block, width);
@@ -233,6 +237,114 @@ describe("C04 §3c — the container is a tree, and the cap has to see it", () =
     const block = scroll(2, [flat("a"), flat("b"), flat("c")]);
 
     expect([...descendants(block)].length, "three children, not zero").toBe(3);
+  });
+});
+
+describe("C04 §3c — the class: every walk that asks which blocks hold blocks", () => {
+  // **The instance was `descendants`; the class is that six walks enumerated the
+  // container kinds independently and four of them never heard of `scroll`.**
+  // None was a copy of any other, which is why the comment warning about a
+  // second copy did not reach them. `tree.ts` is the one answer now, derived
+  // from the union by the compiler.
+  //
+  // These rows are the four that were wrong, and each asserts an outcome a
+  // caller can see rather than the walk — a test that called `hasChildren` would
+  // pass on the day nothing else did.
+
+  const meta = {
+    verb: "x",
+    adapter: "t",
+    exitCode: 0,
+    durationMs: 0,
+    truncated: false,
+    argv: [],
+    stderr: "",
+    transport: "local",
+    origin: "user",
+  } as const;
+
+  const docOf = (blocks: readonly Block[]): ViewDocument =>
+    ({ schema: "tui.view/1", command: "/x", status: "ok", blocks, meta }) as ViewDocument;
+
+  it("T2.31 (C04 I14): `replace` reaches a block inside a scroll", () => {
+    // **The defect answered `ok`** — `rewrite` returned the scroll untouched and
+    // reported a change, which is the silent no-op `patch.ts` records against
+    // `table` arriving a second time through the kind added after that fix.
+    const doc = docOf([scroll(2, [flat("inner")])]);
+
+    const outcome = applyPatch(doc, {
+      op: "replace",
+      blockId: "inner",
+      block: { kind: "raw", id: "inner", text: "changed" },
+    });
+
+    expect(outcome.ok, outcome.ok ? "" : outcome.error.message).toBe(true);
+    const inner = outcome.ok ? [...descendants(outcome.doc.blocks[0] as Block)][0] : undefined;
+    expect(inner, "and the replacement is the block that is there now").toMatchObject({
+      text: "changed",
+    });
+  });
+
+  it("T2.32 (C04 I14): a duplicate of an id held inside a scroll is refused", () => {
+    // The other half of the same walk. `countId` not descending made a nested id
+    // invisible, so `append` would admit a second block with it — and every
+    // later `replace` addressing it has two targets and picks one.
+    const doc = docOf([scroll(2, [flat("dup")])]);
+
+    const outcome = applyPatch(doc, {
+      op: "append",
+      block: { kind: "raw", id: "dup", text: "second" },
+    });
+
+    expect(outcome.ok, "a duplicate must be refused wherever the first one lives").toBe(false);
+  });
+
+  it("T2.33 (C24 I24): a live part inside a scroll is declared and found", () => {
+    // The most expensive of the four to have shipped: the part renders its
+    // loading placeholder, ticks never reach it, and nothing anywhere reports a
+    // fault. That is exactly the dashboard fault `liveDeclarations`' own
+    // recursion was written to prevent, one container kind later.
+    const panel = b.live({
+      id: "ticker",
+      title: "Ticker",
+      fetch: () => Promise.resolve({ value: 1 }),
+      render: () => ({ kind: "raw", id: "ticker-body", text: "1" }),
+      every: 1000,
+    });
+
+    expect(liveParts(docOf([scroll(4, [panel])])), "found through the container").toHaveLength(1);
+  });
+
+  it("T2.34 (C26 §4b cell 3): the walk stops where the definition answers", () => {
+    // **And the class fix is not `descend into everything with children`.** A
+    // scroll declares one element per child, so descending would emit each child
+    // twice and the second copy at the wrong rows — content coordinates, not the
+    // sequence's. `elementsIn` asks the definition rather than a list of kinds,
+    // which is the only form that stays right for a container that answers and
+    // one that does not.
+    const table: Block = b.table({
+      id: "t",
+      columns: [b.col("a")],
+      rows: [
+        { id: "r1", cells: { a: { text: "1" } } },
+        { id: "r2", cells: { a: { text: "2" } } },
+      ],
+    });
+
+    // **The registry is local and carries C11**, because `defaults: true` does
+    // not: a table resolved through the fallback renders as `raw` and declares
+    // no elements, so the unwrapped half agreed with the wrapped one for a
+    // reason that had nothing to do with the walk. The `bare` assertion is the
+    // guard that said so — a fixture shown to respond before it is asserted
+    // against (`test/support/README.md`).
+    const withTable = createBlockRegistry({ defaults: true });
+    withTable.register(tableDefinition as unknown as BlockDefinition);
+    const inScroll = withTable.elementsIn([scroll(6, [table])], 40);
+    const bare = withTable.elementsIn([table], 40);
+
+    expect(bare.map((e) => e.element.id), "the table's own rows, unwrapped").toEqual(["r1", "r2"]);
+    expect(inScroll.map((e) => e.element.id), "one element, and it is the child").toEqual(["t"]);
+    expect(inScroll.every((e) => e.blockId === "s"), "declared by the container").toBe(true);
   });
 });
 

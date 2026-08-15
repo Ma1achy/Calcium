@@ -65,6 +65,8 @@ export { validateBlock, validateDocument, type Validity } from "./validate.js";
 
 export { applyPatch } from "./patch.js";
 
+export { childBlocks, hasChildren, isContainerKind, type ContainerBlock } from "./tree.js";
+
 export {
   BORDER_INSET,
   ROW_GUTTER,

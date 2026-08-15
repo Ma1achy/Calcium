@@ -89,6 +89,30 @@ const MUTATIONS = [
     expect: "T4.41",
   },
   {
+    // **The container kinds enumerated again**, which is the class rather than
+    // the instance. `tree.ts` derives them from the union and a `Record` keyed
+    // by the derived kind fails to compile when one is missing — but the suite
+    // does not typecheck, so this row asks the other question: with `scroll`
+    // dropped, do any *observable* rows fail? Three do, at three different
+    // layers, which is what the four independent enumerations cost before it.
+    name: "the container set forgets scroll",
+    file: "src/data/viewmodel/tree.ts",
+    from: "  scroll: true,\n",
+    to: "",
+    expect: "T2.31",
+  },
+  {
+    // **The walk descends past a container that answers for itself.** The
+    // tempting form of the class fix — *anything with children is walked into* —
+    // and it emits a scroll's children twice, the second copy at content
+    // coordinates the sequence never had. The condition is the definition's.
+    name: "elementsIn walks into every container, answered or not",
+    file: "src/presentation/blocks/registry.ts",
+    from: "        if (hasChildren(block) && !this.#ownsElements(block)) {",
+    to: "        if (hasChildren(block)) {",
+    expect: "T2.34",
+  },
+  {
     // **The offset trusted rather than clamped** (C04 I48, cell 4). Nothing in
     // the tree writes one yet, so this is the arm that will matter the day L4
     // does — and it is live now because `ctx.scrollOffsets` is readable.
