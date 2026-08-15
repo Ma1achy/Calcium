@@ -397,12 +397,24 @@ function spark(values: readonly number[], opts?: BlockOpts): Plot {
   );
 }
 
+/**
+ * `style` names a pair of glyphs and C09 resolves it against the terminal
+ * (roadmap 51). Omitted is the default, and an unknown name is too — a bar is
+ * decoration over a number that is already correct.
+ */
 function progress(
-  spec: BlockOpts & { label: string; current: number; total: number },
+  spec: BlockOpts & { label: string; current: number; total: number; style?: string },
 ): Progress {
-  const { label, current, total } = spec;
+  const { label, current, total, style } = spec;
   return finish<Progress>(
-    { kind: "progress", id: idOf(spec, "progress"), label, current, total } as Progress,
+    {
+      kind: "progress",
+      id: idOf(spec, "progress"),
+      label,
+      current,
+      total,
+      ...(style === undefined ? {} : { style }),
+    } as Progress,
     spec,
     false,
   );

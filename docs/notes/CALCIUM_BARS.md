@@ -28,6 +28,18 @@ emoji form. That is the row that stops the next addition being `▓ ▒ ░`.
 
 ---
 
+> **★ WRITTEN BY INFERENCE FROM SPOT CHECKS. MEASURE BEFORE QUOTING IT.**
+>
+> **Six assertions against this document have moved something**, and all six are
+> the same shape: a statement true about the glyph or the case it names,
+> generalised to the set it sits in. The sixth is below the fold and is the
+> cheapest to check — the `ascii` row says `#` and `-` *wrapped in `[ ]`*, and
+> the tree has drawn `#` and `.` with no brackets since C09 shipped.
+>
+> A reader quoting a row here is quoting an inference. Measuring costs one call
+> to `cells()` or one `grep`, and it is cheaper than correcting this a seventh
+> time.
+
 ## ★ Measured against `ambiguousWidth`, 2026-08-15 — and it is a fifth catalogue error
 
 **Every style in this document was checked with `cells()` at both conventions, now that the

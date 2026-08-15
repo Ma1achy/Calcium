@@ -23,6 +23,14 @@ import { cells } from "../text.js";
  * as a lookup keyed on the Unicode character, so a new rôle cannot be added
  * without deciding its fallback — and T2.5 asserts every pair is 1:1.
  */
+/**
+ * **`progressFull` and `progressEmpty` were here and are gone** (roadmap 51).
+ * A bar's glyphs are a *style* now — `barStyle(caps, name)` — so one pair fixed
+ * in the glyph set was the single-style version of a table, and MG24 said so the
+ * moment the table arrived: two published members with no consumer left in
+ * `src/`. Removed rather than exempted, because the thing that replaced them is
+ * in the same file.
+ */
 export type GlyphSet = Readonly<{
   // Box drawing — panel borders, rules.
   horizontal: string;
@@ -49,8 +57,6 @@ export type GlyphSet = Readonly<{
   sortDesc: string;
 
   // Progress.
-  progressFull: string;
-  progressEmpty: string;
 
   /**
    * The residue marker's lead, on a bounded region (C04 I49).
@@ -87,8 +93,6 @@ const UNICODE: GlyphSet = Object.freeze({
   sortAsc: "↑",
   sortDesc: "↓",
 
-  progressFull: "█",
-  progressEmpty: "░",
 });
 
 const ASCII: GlyphSet = Object.freeze({
@@ -114,8 +118,6 @@ const ASCII: GlyphSet = Object.freeze({
   sortAsc: "^",
   sortDesc: "v",
 
-  progressFull: "#",
-  progressEmpty: ".",
 });
 
 /** The pairs, for the test that asserts each is 1:1 (T2.5). */
@@ -381,6 +383,94 @@ export function spinnerFrames(
   if (caps.unicode === "ascii") return set.ascii;
   return set.narrowOnly === true && caps.ambiguousWidth === "wide" ? set.ascii : set.frames;
 }
+
+/**
+ * A determinate bar's on/off pair (roadmap 51's bar half, roadmap 22's sibling).
+ *
+ * **The same shape as `SpinnerSet` and for the same reason.** A style is a pair
+ * of glyphs plus the tier it is available at, and pairing the ASCII fallback
+ * *with* the set is what stops a caller holding one style's `on` and another's
+ * `off` — the drift the spinner table's pairing exists to prevent.
+ *
+ * **`narrowOnly` on six of the seven unicode styles, measured rather than
+ * inferred.** `▐ ░ ▬ ▪ ▫ ▮ ▯ ▰ ▱ ◼ ◻` are `East_Asian_Width=Ambiguous` every
+ * one, so a terminal declaring `wide` draws them at double and a bar whose
+ * glyphs double is not a bar. **`braille` is the only width-stable unicode
+ * style**, which `CALCIUM_BARS.md` did not say and its determinate table read
+ * against — *`▐` is the only narrow half block* is about which glyph is one cell
+ * at the narrow convention, not about which are stable across conventions.
+ */
+type BarStyle = Readonly<{
+  on: string;
+  off: string;
+  narrowOnly?: boolean;
+}>;
+
+/**
+ * **`#` and `.`, which is the ASCII pair that already shipped.**
+ *
+ * `CALCIUM_BARS.md`'s `ascii` row says `#` and `-` *wrapped in `[ ]`*; the tree
+ * drew `#` and `.` with no brackets. The catalogue is wrong a sixth time and in
+ * the same direction as the other five — written by inference rather than from
+ * the code — and the golden frames are what said so, at the ASCII widths, after
+ * the unicode ones had already gone green.
+ */
+const BAR_ASCII: BarStyle = Object.freeze({ on: "#", off: "." });
+
+/**
+ * The styles, and `ascii` is the floor every arm falls to.
+ *
+ * An unknown name is the default rather than a throw, on `spinnerFrames`'s
+ * argument: a bar is decoration over a number that is already correct, and a
+ * session that will not start because a style was misspelled is worse than one
+ * drawn with the wrong glyph.
+ */
+const BAR_STYLES: Readonly<Record<string, BarStyle>> = Object.freeze({
+  /**
+   * **The default, and it is the glyphs that already shipped** — `progressFull`
+   * and `progressEmpty` were `█` and `░`, so `block` is those two under a name.
+   *
+   * Found by the golden frames rather than by reading: making `halfblock` the
+   * default restyled every bar in the tree from solid to striped, which is a
+   * visible change to shipped output arriving as a side effect of adding a
+   * field. **A table of styles must contain the one that was already drawn**, or
+   * its default is a redesign nobody asked for.
+   */
+  block: Object.freeze({ on: "█", off: "░", narrowOnly: true }),
+  halfblock: Object.freeze({ on: "▐", off: "░", narrowOnly: true }),
+  rectangle: Object.freeze({ on: "▬", off: "░", narrowOnly: true }),
+  beads: Object.freeze({ on: "▪", off: "▫", narrowOnly: true }),
+  posts: Object.freeze({ on: "▮", off: "▯", narrowOnly: true }),
+  slant: Object.freeze({ on: "▰", off: "▱", narrowOnly: true }),
+  squares: Object.freeze({ on: "◼", off: "◻", narrowOnly: true }),
+  // **No `narrowOnly`, and it is the only one.** Braille is `Neutral`, so it is
+  // one cell under both conventions — which is what makes it the style a wide
+  // terminal keeps rather than the one it loses.
+  braille: Object.freeze({ on: "⣿", off: " " }),
+  ascii: BAR_ASCII,
+});
+
+export const DEFAULT_BAR_STYLE = "block";
+
+/**
+ * The pair a determinate bar draws with, at this terminal (roadmap 51).
+ *
+ * **`spinnerFrames`'s shape exactly**, including the order of the two tests: the
+ * unicode tier first, then the ambiguous-width tier, because a terminal that
+ * cannot draw the glyph at all is not a terminal that draws it twice as wide.
+ */
+export function barStyle(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  name: string = DEFAULT_BAR_STYLE,
+): Readonly<{ on: string; off: string }> {
+  const style = BAR_STYLES[name] ?? BAR_STYLES[DEFAULT_BAR_STYLE];
+  if (style === undefined) return BAR_ASCII;
+  if (caps.unicode === "ascii") return BAR_ASCII;
+  return style.narrowOnly === true && caps.ambiguousWidth === "wide" ? BAR_ASCII : style;
+}
+
+/** The style names, for the catalogue's own row and for a consumer listing them. */
+export const barStyleNames = (): readonly string[] => Object.freeze(Object.keys(BAR_STYLES));
 
 /**
  * The set's own tick, in milliseconds (roadmap 51).

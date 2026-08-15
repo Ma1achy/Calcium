@@ -11,7 +11,7 @@ import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
-import { glyphFor, glyphCells, glyphs } from "../glyphs.js";
+import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
 import { clampSpans, fit, pad, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -157,8 +157,11 @@ export const progressDefinition: BlockDefinition<Progress> = {
   measure: () => 1,
 
   render(block: Progress, ctx: RenderContext): ReactElement {
-    const g = glyphs(ctx.capabilities);
     const width = normaliseWidth(ctx.width);
+    // **Resolved here, per render, and never stored on the block** — the same
+    // rule `glyphs()` follows: a block names a style and the terminal decides
+    // which arm of it is drawn, so one document is correct on both terminals.
+    const bar = barStyle(ctx.capabilities, block.style);
     const total = block.total > 0 ? block.total : 1;
     const ratio = Math.min(1, Math.max(0, block.current / total));
     const percent = `${Math.round(ratio * 100)}%`;
@@ -181,11 +184,11 @@ export const progressDefinition: BlockDefinition<Progress> = {
           [
             { text: `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
             {
-              text: g.progressFull.repeat(filled),
+              text: bar.on.repeat(filled),
               style: tone("accent", ctx.theme, ctx.capabilities),
             },
             {
-              text: g.progressEmpty.repeat(barWidth - filled),
+              text: bar.off.repeat(barWidth - filled),
               style: tone("muted", ctx.theme, ctx.capabilities),
             },
             { text: ` ${percent}`, style: tone("meta", ctx.theme, ctx.capabilities) },

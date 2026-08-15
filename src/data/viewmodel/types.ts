@@ -436,6 +436,19 @@ export type Progress = Readonly<{
   label: string;
   current: number;
   total: number;
+  /**
+   * Which pair of glyphs the bar is drawn with (roadmap 51).
+   *
+   * **The gap the entry was refused for, rather than the reason to refuse it.**
+   * *No consumer* was true of a field nobody could use because it did not exist
+   * — `spinnerFrames(caps, name)` is the precedent and `barStyle(caps, name)` is
+   * the same lookup, so the app names a style and C09 resolves it against the
+   * terminal.
+   *
+   * Optional and unknown-tolerant: an absent or misspelled name is the default,
+   * because a bar is decoration over a number that is already correct.
+   */
+  style?: string;
 }> & Gap;
 
 export type Code = Readonly<{
