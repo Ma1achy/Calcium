@@ -2507,6 +2507,90 @@ The queue itself is small. **The rulings are the work:**
 - **A queued command sees state after its predecessor**, which is the whole point and needs
   saying, because it means the queue is strictly sequential and cannot be reordered.
 
+#### §8a · The walk, 2026-08-15 — and it needs both shapes
+
+**The state machine is the obvious artefact and taking it alone is the recorded mistake.** A
+submission arriving while something runs is event-mediated and wants a **trace**; what a
+submission *is* — builtin, local, verb, view — is structural, holds at rest, and wants a
+**table**. C19 needed both and had one, and its `--flag=value` defect was in the half it did
+not build. Both are below.
+
+**Where the seam is, measured before anything was designed.** `src/shell/execution.ts:365`
+refuses today — `refuse(line, "${verb} is still running")` — and `Guard.release()` carries the
+comment *every exit from `running` goes through here, including a stage failure*. **One
+refusal site and one funnel** is the whole of what the queue attaches to, and it is why this
+entry is smaller than its neighbours rather than larger. `inFlight` already reports the route
+rather than a boolean, *for C16's Ctrl-C rung* — the entry's hardest question already has a
+handle built for it.
+
+##### The trace
+
+| # | sequence | rules meeting | ruling |
+|---|---|---|---|
+| 1 | A runs · B submitted · A settles | I1, `release()` | B drains **in `release()`**, which is the only place every exit is guaranteed to pass |
+| 2 | A runs · B submitted · A **fails** | I1, `release()` | B still drains. *Including a stage failure* is already written on the funnel, and a queue that survived success only would be the more natural bug |
+| 3 | A runs · B submitted · **shutdown begins** | I12 | the queue is dropped and nothing appends. I12 precedes the guard in `submit` today and must precede the drain too |
+| 4 | A runs · B, C submitted · A settles | I1 | **B only.** Strictly sequential is not an aesthetic: C sees the state B leaves |
+| 5 | A runs · B submitted · B cancelled · A settles | I5, `release()` | nothing drains, and A's own settlement is untouched — the queue and the in-flight invocation are two subjects |
+| 6 | A runs · a blank Enter | I1's first exception | nothing queues, silently. The `empty` check precedes the guard today and must precede the enqueue |
+| 7 | A runs · B submitted — **when does B's entry appear** | I1, I28 | **immediately, as a queued entry that becomes live.** Below |
+| 8 | A runs · B submitted · **Ctrl-C** | I5, C16's ladder | the stated ambiguity. Below |
+| — | A settles · then B submitted | one rule | **not a row.** It is the path with no interaction in it, and it would restate `submit` |
+
+**Row 7 is the one that removes this entry's dependency on 29.** The entry says *a queue you
+cannot see is a queue you forget you typed into*, and the obvious reading is a chrome counter —
+which is 29's contested budget, and 29 is last. It does not need one. An entry appended at
+**submission** and made live at **drain** is one entry with two states, which is C13's
+live-entry lifecycle and already exists. The transcript is where agent harnesses show it, the
+entry itself says so, and reading it as a chrome row is what put 29 in front of it.
+
+**Row 8 is step 9's class and C16's rung table is the precedent.** Two subjects under one key —
+*cancel the running verb* and *clear the queue* — and the ladder answers by scope rather than
+by preference: `inFlight` reports **the route**, so a Ctrl-C with something running cancels the
+running thing and leaves the queue, and a Ctrl-C with the queue non-empty and **nothing**
+running clears the queue. Two rungs, disjoint by construction, and neither needs a mode. What
+it costs: clearing a queue while something runs takes two presses, which is the right price for
+an irreversible action that discards work the reader typed.
+
+##### The table, and it is the half a trace cannot reach
+
+| # | state | rules meeting | ruling |
+|---|---|---|---|
+| 1 | a `builtin` — `cd` — submitted while a verb runs | *a builtin needs nothing the guard holds* + *strictly sequential* | **it queues** |
+| 2 | a `local` handler — `/help` — while a verb runs | the same pair | **it queues**, and this is the one that will feel wrong |
+| 3 | a **view** invocation while a verb runs | C15's push + sequential | it queues; a view pushed out of order is a view over state its predecessor has not produced |
+| 4 | nothing running, queue empty | one rule | not a row |
+
+**Row 1 is why the table exists.** I5 refuses *whole-line and unconditionally*, and its own
+comment says why: *a refused line that silently moved the working directory is a lie about what
+the tool did.* A queue makes the mirror image available — a `cd` that **jumps** the queue
+changes the directory every queued item afterwards runs in. Both rules are correct and neither
+mentions the other, and no event sits between them.
+
+**Row 2 is the residue, and it is named rather than ruled.** `/help` waiting behind a
+thirty-second build is obviously wrong to a reader, and the tempting rule is *a submission
+queues iff it can observe or change what a running verb can* — the **who is writing** axis, and
+the same axis C13's patch gate needed. **It is inferred from two cases and has therefore been
+tested against one.** C13's was re-founded three times and the third case broke it, so the rule
+here is the conservative one — **everything queues** — and the axis is written down as the
+question it is. It is reversible in the direction that matters: letting something jump later is
+additive, and taking the jump away once someone relies on it is not.
+
+#### §8b · What the rulings are, so the build is mechanical
+
+- **The queue is a list in `src/shell/execution.ts` and nothing else.** No published type, no
+  `TuiConfig` field, no chrome row. It touches `src/index.ts` not at all, which is what makes
+  this buildable before the freeze without spending any of it.
+- **Enqueue replaces the refusal at the guard**, after I12's shutdown check and after `empty`,
+  both of which precede it today for reasons that survive.
+- **Drain happens in `Guard.release()`**, because it is the one place every exit is guaranteed
+  to pass, and the comment saying so was written before this entry needed it.
+- **One entry, appended at submission, live at drain**, so the queue is visible in the
+  transcript and 29 is not a blocker.
+- **Ctrl-C by scope, not by mode**: something running → cancel it; nothing running and a
+  non-empty queue → clear it.
+- **Everything queues**, and the `/help` case is a named residue with its axis stated.
+
 #### Background execution — related, larger, and a different thing
 
 Queueing is *sequential*: it waits. Background is *concurrent*: it runs while you do
@@ -3184,6 +3268,24 @@ PART  31 completion ranking       prefix-matched and unranked today. Recency-fir
                                    by exception. A RULING on defaultRoute, not a config field
       33 QUEUEING ★              submit while something runs — a stated must. Small queue,
                                    real rulings, and Ctrl-C is ambiguous the way step 9's was.
+                                   WALKED 2026-08-15 IN §8a-§8b, with no code, and it needed
+                                   BOTH SHAPES: the trace for what happens while something is
+                                   in flight, the table for what a submission IS. The seam is
+                                   one refusal site — `execution.ts:365` — and one funnel,
+                                   `Guard.release()`, whose own comment already says every exit
+                                   passes through it. IT NEEDS NOTHING OF 29: an entry appended
+                                   at submission and made live at drain is C13's live-entry
+                                   lifecycle, so the queue is visible in the transcript and the
+                                   chrome row a counter would want is not owed. Ctrl-C answers
+                                   BY SCOPE — running → cancel it, nothing running and a queue
+                                   → clear it — which is C16's ladder rather than a mode, and
+                                   `inFlight` reports the route rather than a boolean for
+                                   exactly that reason.
+                                   THE RESIDUE IS `/help` QUEUEING behind a long build: the
+                                   tempting rule is the WHO IS WRITING axis, it is inferred
+                                   from two cases, and C13's was re-founded three times before
+                                   the third case broke it — so everything queues and the axis
+                                   is written down as a question
                                    RE-CHECKED 2026-08-15: no queue of any kind in `src/shell/`
                                    — the word does not appear. Blanket claims are what the
                                    grep-reach signal counts, and this one is exact because the
