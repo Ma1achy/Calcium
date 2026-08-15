@@ -2481,6 +2481,68 @@ reference instead of fifty lines of text to re-wrap on every keystroke.
 **Worth checking before designing**: whether bracketed paste is detected, since chip-on-paste
 needs to know a paste *was* a paste rather than fast typing.
 
+#### §8a · What indexes the buffer, measured 2026-08-15 — and it decides the type
+
+**Bracketed paste is detected**, so the pre-design check above is answered: `router/decode.ts`
+carries both machines — bracketed and heuristic — and a `PasteState`, and `keys.ts:441` already
+fires `afterEdit()` on every paste.
+
+**Everything in C17 indexes by grapheme, and that is the whole reason this is tractable.**
+`#text` is a `string`; the cursor is a grapheme index; `count`, `clamp`, `splitAt`,
+`sliceBetween`, `removeBetween`, `wordLeft` and `wordRight` are all grapheme-indexed. **A chip
+that occupies one grapheme changes nothing in motion, deletion, word jumps or the selection
+anchor** — not one of them has to learn what a chip is.
+
+**So: one grapheme to the editor, a block to the renderer**, and the sentinel is a value in the
+string with a side map from it to the `Block`. Which is the prediction, confirmed rather than
+assumed.
+
+##### The buffer stays a string, and that is the finding
+
+The tempting move is a structured buffer — an array of `string | ChipRef`. **It is not one
+component's change, it is four**, because `editor.text` leaves C17 as a plain string at seven
+sites and every one of them would need its own answer:
+
+| reader | what it does with the string |
+|---|---|
+| `shell/construct.ts:1215` | `pipeline?.submit(stores.editor.text)` — **C23 takes a string** |
+| `shell/keys.ts:293`, `:563` | `contextAt(text, cursor, manifest)` — C19 completes against it |
+| `shell/keys.ts:612`, `:800` | `history.previous(text)`, `searchOpen(text)` — **C20 stores strings** |
+| `shell/session.ts:549`, `:579` | `selectionSpans(text, …)` — C09's wash |
+| `shell/construct.ts:1576` | `promptHasText` |
+
+A structured buffer makes C19, C20, C22 and C23 all take a new shape before a single chip is
+drawn. A sentinel grapheme plus a side map is **C17-local**, and the seven readers keep working
+on the day the chip exists — which is what makes the first version reversible.
+
+##### The submission ruling, and the tree makes it forced rather than likely
+
+**A chip resolves to its content at submission.** Not *almost certainly right* — the alternative
+is not reachable from here: `construct.ts:1215` hands C23 a `string`, C18 classifies a string,
+C20 stores strings, and C05's manifest describes `argv`. *The manifest gains a way to carry a
+block* is therefore a change to four components to deliver something the transport cannot take,
+since the far side receives argv either way.
+
+**What is genuinely gained is on the way back, not the way out** — the transcript renders the
+submitted content as what it is, and that needs the *entry's* document to carry the block, which
+is C23's business and not the buffer's. **Written down because the two halves read as one
+feature and only one of them touches the prompt.**
+
+##### The one place *one grapheme, N cells* actually bites
+
+`layout.ts`'s `walk` is the single measurer — *one walk, for the reason there is one `cells()`*
+— and `layout`, `displayRows`, `cursorCell` and `selectionSpans` all go through it. A chip is one
+grapheme and draws as `[JSON · 47 lines]`, so `walk` measures the sentinel and the frame draws
+the label: **that is the gutter's class and it is not circular.** A chip's width is its own
+label's, fixed and independent of the terminal width, so `walk` needs a per-cluster width
+function rather than a second pass — **one seam, and all four callers inherit it** because they
+already share the walk.
+
+##### The peek is the popup's sixth consumer and needs no ruling
+
+`detail` with no choices — the `none` arm, already legal by A7's ruling and already the shape
+the confirm, the completion menu and `agent-tui`'s question use. Named so it is not re-derived.
+
 ### ★ Queueing, background work, and what agent harnesses already solved
 
 **Agent harnesses have solved several transcript problems Calcium will hit**, and it is worth
@@ -3378,7 +3440,28 @@ BUILT 28 prompt cursor-following  the window exists and is tail-anchored; the fi
                                    rather than described: T1.3j scans `src/` and expires the
                                    day anything sets `"interact"`
       30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
-                                   a string, so the transcript renders what it actually is
+                                   a string, so the transcript renders what it actually is.
+                                   MEASURED 2026-08-15 IN §8a, no code. Bracketed paste IS
+                                   detected — `decode.ts` carries both machines and a
+                                   `PasteState` — so the entry's own pre-design check is
+                                   answered. EVERYTHING IN C17 INDEXES BY GRAPHEME, so a chip
+                                   occupying one changes nothing in motion, deletion, word
+                                   jumps or the selection anchor: one grapheme to the editor, a
+                                   block to the renderer. THE BUFFER STAYS A STRING, and that
+                                   is the finding — `editor.text` leaves C17 as a string at
+                                   seven sites, so a structured buffer is a change to C19, C20,
+                                   C22 and C23 before one chip is drawn, while a sentinel plus
+                                   a side map is C17-local and reversible. A CHIP RESOLVES TO
+                                   ITS CONTENT AT SUBMISSION, and the tree makes that forced
+                                   rather than likely: `construct.ts:1215` hands C23 a string,
+                                   C18 classifies a string, C20 stores strings, and the far
+                                   side receives argv either way. The *render it as what it is*
+                                   half is the ENTRY's document, which is C23's business and
+                                   not the buffer's — two halves that read as one feature.
+                                   `layout.ts`'s `walk` is the one place *one grapheme, N
+                                   cells* bites, and it is not circular: a chip's width is its
+                                   own label's, so `walk` takes a per-cluster width function
+                                   and its four callers inherit it
 PART  31 completion ranking       prefix-matched and unranked today. Recency-first is nearly
                                    free (C20 has it) and is the most-felt. RANK BEFORE
                                    as-you-type, or the menu is worse for opening itself
