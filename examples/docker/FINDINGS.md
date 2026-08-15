@@ -8095,6 +8095,47 @@ gained nothing from them. `stage` is authored deliberately and is still worth re
 turns out not to be the axis** — what decides it is whether anyone but the framework could
 know the value.
 
+### The disposition, taken — and the removal falsified by the first compile
+
+**`stage` was ruled out and does not go.** The read that produced the ruling covered the
+**twelve app sites** and stopped there. Removing the field from `ErrorLike` failed to compile
+in **eight more**, all in `src/shell/execution.ts`, and they are a different thing entirely:
+
+```
+stage: "parse"      no manifest is loaded
+stage: "spawn"      the child could not be started
+stage: "handoff"    the terminal could not be given up
+stage: "local"      no handler, or the handler threw
+stage: "transport"  the far side failed to answer
+```
+
+**Every one is a genuine runtime discrimination**, authored by the party that knows — which is
+exactly what the axis protects. The twelve app sites were wrong for a reason the eight are
+right for: *only the framework can know which stage failed*, so the framework writing it is
+correct and the app writing it is F13's class.
+
+**So the finding stands and the remedy inverts**: the field stays, and what goes is the app's
+authorship of it. *Written by hand* decided nothing, and neither did *rendered nowhere* —
+what decided it is who could know the value, and that rule keeps all three members and moves
+twelve call sites.
+
+| member | who can know it | disposition |
+|---|---|---|
+| `code`, `details` | the far side, through the adapter mapping | **kept and read** — `errorDoc` shows the code beside the message |
+| `stage` | the framework, at eight sites in the pipeline | **kept**; the twelve app writes are the defect |
+
+**The ruling to remove it was taken on a read of twelve sites and the compiler found eight
+more in one second.** That is the cheapest possible falsification and it arrived only because
+the change was attempted — a read cannot be exhaustive about who writes a field, and the
+type system is exhaustive about it by construction.
+
+**Rendered now**: `documents.ts` prefixes the notice with the code when there is one, which is
+the cheapest possible consumer and the half a reader can search for. `details` has no renderer
+yet — it is structure rather than a sentence, and what draws it is a C09 question — so T1.42
+asserts the document still carries it rather than letting it be dropped quietly. **The twelve
+app sites are not yet changed**, and that is the remaining half of this finding.
+
+
 ---
 
 ## F166 — 44's blocker is a document serialiser, and a document is already JSON ★★★

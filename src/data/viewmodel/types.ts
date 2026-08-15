@@ -117,10 +117,38 @@ export type AdapterDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: Pro
  */
 export type LocalDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: ProducedMeta }>;
 
+/**
+ * A failure, as the party that knows describes it (F165).
+ *
+ * **The rule that sorts these members is *could anyone but the framework know
+ * this value*, and it is not the axis F58b's precedent suggested.** F58b
+ * narrowed because its fields were computed and discarded; *written by hand*
+ * turns out to decide nothing.
+ *
+ * `code` and `details` come off the far side's own error envelope
+ * (`data/adapters/mapping.ts`), so nobody else could supply them and removing
+ * them deletes its only channel for structured failure. `stage` is the
+ * framework's: `parse`, `spawn`, `handoff`, `local`, `transport` — eight sites
+ * in `shell/execution.ts`, each a genuine runtime discrimination about which
+ * stage of the pipeline failed, authored by the only party that can know.
+ *
+ * **What was wrong is who was writing it, not the field.** Twelve app sites in
+ * `examples/docker` write `stage` by hand, each a per-file constant restating
+ * the kind of function it sits in — `"local"` in a local handler, `"adapter"`
+ * in an adapter — which is F13's class: a fact the framework holds and the app
+ * is asked to author. The disposition is *the app should not be writing it*,
+ * and removing the field was the wrong remedy for the right finding.
+ *
+ * All three are rendered by `errorDoc` rather than dropped (C23 §5). Until this
+ * they were parsed, typed, frozen and thrown away.
+ */
 export type ErrorLike = Readonly<{
   message: string;
+  /** The far side's own error code, when it emits one. */
   code?: string;
+  /** Which stage of the pipeline failed. **The framework's**, never an app's. */
   stage?: string;
+  /** The far side's structured payload — what a `message` cannot carry. */
   details?: Readonly<Record<string, unknown>>;
   remediation?: string;
 }>;

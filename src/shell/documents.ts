@@ -235,7 +235,12 @@ export function errorDoc(
       id: blockId("error"),
       tone: "error",
       glyph: "error",
-      text: error.message,
+      // **The far side's own code, beside its own message** (F165). It was
+      // parsed by `mapping.ts`, typed, frozen and rendered nowhere — and a code
+      // is the half a reader can search for, where a sentence is the half they
+      // can read. Prefixed rather than given a block of its own: it qualifies
+      // the message and a second notice would read as a second failure.
+      text: error.code === undefined ? error.message : `${error.code}: ${error.message}`,
     }),
   ];
   if (error.remediation !== undefined) {
