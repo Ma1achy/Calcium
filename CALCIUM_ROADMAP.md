@@ -3084,7 +3084,13 @@ PART  36 scrollbar + edge markers the terminal cannot provide one (alt screen ha
                                    stays legitimate and a transparent terminal has no fill,
                                    so a separator cannot depend on one. The summary kept the
                                    claim and the body kept the condition, which is the
-                                   compression class in a row rather than in prose
+                                   compression class in a row rather than in prose.
+                                   RE-CHECKED 2026-08-15 FROM THE OTHER SIDE — *was the row
+                                   fixed, or only the body* — AND THE ROW CARRIES IT. That is
+                                   the question worth asking of every correction this session
+                                   made, because F86/F89/F92 are three instances of a
+                                   retraction that reached a body and not the summary above
+                                   it. This one reached both
 BUILT 38 horizontal composition   b.row — the banner already paid for its absence by hand
                                    (width fractions ship with it; height fill is separate and
                                     waits on phase 1.1's producer-context contract).
@@ -3658,12 +3664,12 @@ what landed**.
 **Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **37**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
-is open with its first candidate already refused. **Re-read 2026-08-15: 388 of 1219**, so the
+is open with its first candidate already refused. **Re-read twice on 2026-08-15: 388 of 1219, then 389 of 1220** after roadmap 51 added `ambiguousWidth` — one member, one exact, so the ratio is unchanged at 31.9%. **A base that moves with every landing and a ratio that does not is the entry's actual subject**: the blind spot is proportional, not absolute, and a figure re-read three times without moving is worth more than the first reading was. So the
 base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's own figure is
 **not** re-measured here, because it is a proposal rather than a shipped signal and re-running
 it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
 stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
-absent  **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
+absent  **50** joins them on the day it is filed, 2026-08-15, measured rather than assumed: `Style` in `src/presentation/theme/types.ts` is colour · background · bold · dim · inverse · underline, so italic has no representation at any depth and no block carries a `{text, tone}[]` run. · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
 
 **44 left this list on 2026-08-15**, and its evidence was true to the end:
 `interaction/history/persist.ts` **is** C20's history persistence and is not session resume.
@@ -3678,6 +3684,20 @@ was written where the list names **26** and **32**, so the signal read `construc
 **32**'s symbol — the identical proximity defect that had put `code.ts` against **37** an hour
 earlier, reintroduced by the fix's own author. A signal attributed by adjacency is one that
 prose placement can move, and knowing that is not the same as remembering it while writing.
+
+**The satisfier-side pass, 2026-08-15, over all eleven.** Nine are unmoved and their evidence is
+exact rather than blanket: **9** has no `mermaid` in `src/` and its dependency was vetted and
+refused on weight; **22** has no `art` builder; **26**'s successful push touches the transcript on
+no path; **30** has no block-valued paste; **32** carries F89's retraction; **33** has no queue —
+the word does not occur in `src/shell/`; **50**'s `Style` still has no italic; **29** is unmoved on
+its fifth check. **Two moved and neither is a build**: 48's base is 389 of 1220 and its *ratio*
+has not moved across three readings, and 49's count held at five golden files with none importing
+from `src/shell/` — through a capability field, a palette and sixteen spinner sets, which is the
+entry demonstrating its own claim.
+
+**And 37 was checked from the other side**: not *is the body right* but *was the row fixed*. It
+was. That is the question F86, F89 and F92 exist to make routine, and it is the first time this
+session it came back clean on the first ask.
 
 **11 left this list on 2026-08-15** with its block half landed and its inline half filed as **50**;
 its stay here was corrected first — the word `markdown` **is** in `src/`, as a highlight.js
