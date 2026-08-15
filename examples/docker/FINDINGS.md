@@ -7588,6 +7588,20 @@ the mechanism runs reads exactly like one that holds.
 
 ## F160 — MG24 matches published members by name, so any file can create a false negative ★★★ — **CLOSED as one class with F105**
 
+> **Fourth instance, 2026-08-15, and the first where the satisfier is not a member.** A
+> markdown translator written with named capture groups reads `m.groups?.["text"]`, and
+> `UNCONSUMED_MEMBERS` names `Identity.groups` — so `make enforce` failed claiming an exemption
+> had outlived its reason. Nothing about `Identity` had changed; a regular expression had
+> satisfied it. The earlier three were members of other types, which at least look like the
+> thing being matched.
+>
+> **The general form, and it answers a question that comes up whenever a gate fires on
+> something unrelated: the census is worth more than the syntax.** Two fixes were available —
+> edit the exemption, or index the captures. The first makes the gate green and makes the
+> census wrong, because the member is still unconsumed; the second costs a token per capture.
+> A signal that is edited to accommodate the code it measures stops being a measurement, and
+> the cheaper-looking fix is the one that spends the instrument.
+
 ### CLOSED — the class, not the instance, and not by tightening
 
 **F105 and F160 are one mechanism measured twice**, which is this repo's own threshold for

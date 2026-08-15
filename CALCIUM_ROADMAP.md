@@ -299,6 +299,35 @@ output quality against real diagrams. If it does not hold up, `mermaid-ascii`'s 
 (parse to a grid, A* the edges) is reimplementable, but *that* is the component-sized
 version and only worth it if the dependency fails.
 
+**VETTED 2026-08-15, AND THE SHAPE HOLDS WHILE THE WEIGHT DOES NOT.**
+
+*What is right, measured by installing it outside the tree.* `renderMermaidASCII` returns a
+**grid of text lines** — so a `mermaid` block is a `code` block with a transform in front,
+exactly as this section says, and it waits on nothing: not images, not 43. A four-node
+flowchart renders in **19 ms**, synchronously, one call. `AsciiRenderOptions.useAscii` maps
+straight onto C02's `unicode` capability, and `colorMode: "none"` keeps C10's ownership of
+colour — which is the property that made `lowlight` acceptable and `shiki` not. MIT, and the
+repo is `lukilabs/beautiful-mermaid` (Craft Docs).
+
+*What is wrong, and it is the comparison this section makes.* **`lowlight`'s row rests on
+importing only what is needed — sixteen grammars measured at 121 KB against the package's
+9.2 MB.** There is no subset here: the ASCII path **is** the layout engine, so `elkjs`
+arrives whole. Measured: **11 MB installed, three packages** — `beautiful-mermaid` 2.1 MB in
+185 files, `elkjs` 8.1 MB, `entities` 0.4 MB. That is not *the same dependency shape as
+`lowlight`*; it is two orders of magnitude away from what that row actually approved.
+
+*And two smaller things.* `elkjs` is **EPL-2.0**, which would be the first non-permissive
+licence in `DEPENDENCIES.md`. And the maintenance signal is thin in a specific way: ten
+releases between 2026-01-28 and 2026-02-26, then **nothing for five and a half months** on a
+package six months old — finished and abandoned look identical at this range.
+
+**RULED: not adopted, and 9 leaves this section.** *Cheap — fits the architecture as it
+stands* is a claim about weight, and 11 MB with an EPL-2.0 transitive is not it. Two things
+would flip it, and neither is a decision anyone here can take: a subset import path, which
+the package's own architecture forecloses, or a consumer who wants diagrams enough to pay
+11 MB. **Nothing about the mapping is wrong** — that is the useful half of the result, and it
+is why this is a weight ruling rather than a design one.
+
 Honest about quality: every text renderer's layout is approximate — grid-based barycenter
 heuristics, Manhattan-only edge routing, dense graphs still cross. Diagrams render *well
 enough to read*, not beautifully. Which is why the image path exists for when it matters.
@@ -2568,7 +2597,21 @@ RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
                                    consumer that does not exist and both triggers report
                                    themselves. ALL THREE QUESTIONS ANSWERED
 BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
-      9  mermaid (text path)       cheap once the dependency is vetted, distinctive
+      9  mermaid (text path)       cheap once the dependency is vetted, distinctive.
+                                   VETTED 2026-08-15 AND THE ANSWER IS WEIGHT, NOT SHAPE.
+                                   `renderMermaidASCII` returns a grid of lines, so the block
+                                   maps with no new mechanism and waits on nothing — 19 ms for
+                                   a four-node flowchart, `useAscii` maps to C02's `unicode`,
+                                   `colorMode: "none"` keeps colour with C10. But there is NO
+                                   SUBSET IMPORT: the ASCII path IS the layout engine, so
+                                   `elkjs` comes whole — 11 MB installed across three packages
+                                   against `lowlight`'s approved 121 KB of a 9.2 MB package,
+                                   and `elkjs` is EPL-2.0, which would be the first
+                                   non-permissive licence in DEPENDENCIES.md. Ten releases in
+                                   its first month, then nothing for five and a half. NOT
+                                   ADOPTED; the entry leaves the *Cheap* section, because
+                                   cheap is a claim about weight. Symbol: none in `src/` —
+                                   `beautiful-mermaid@1.1.3`
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
 PART  11 markdown                  translates to existing blocks. CHECKED 2026-08-15 AND THE
                                    GREP RESOLVES AGAINST SOMETHING ELSE: `markdown` is in
