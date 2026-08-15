@@ -18,11 +18,13 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/contract/continuation.test.ts test/unit/execution.test.ts test/contract/blocks.test.ts";
+  "npx vitest run test/contract/continuation.test.ts test/unit/execution.test.ts "
+  + "test/contract/blocks.test.ts test/golden/continuation.test.ts";
 const DOCS = "src/shell/documents.ts";
 const GLYPHS = "src/presentation/blocks/glyphs.ts";
 const REFRESH = "src/shell/refresh.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
+const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -84,6 +86,37 @@ const results = runPass({
       from: '    continuation: ["⎿", "`"],',
       to: '    continuation: ["└", "`"],',
       expect: "T2.94",
+    },
+    {
+      // **The second measured defect**, and the one that survived a green suite
+      // and a green golden run: the mark flush left, in the prompt's own
+      // gutter, reading as its sibling. Every block-indexed assertion holds.
+      name: "THE SECOND DEFECT: the mark has no indent and sits in the prompt's gutter",
+      file: SIMPLE,
+      from: '  ["continuation", 2],',
+      to: "",
+      expect: "T2.99",
+    },
+    {
+      // One cell was the first attempt: the mark lands *between* the command's
+      // column and its own text's, subordinate to neither. A row asserting only
+      // *the mark is indented* passes for it.
+      name: "the indent is one cell, so the mark sits between the two columns",
+      file: SIMPLE,
+      from: '  ["continuation", 2],',
+      to: '  ["continuation", 1],',
+      expect: "T2.99",
+    },
+    {
+      // **The seam the two functions exist to close.** The lead keeps the
+      // indent and the measurer loses it, so the first row is two cells wider
+      // than every continuation row under it — a hanging indent that hangs off
+      // the wrong column, at a width that wraps and nowhere else.
+      name: "the measurer drops the indent that the lead still draws",
+      file: SIMPLE,
+      from: "  return glyphCells(glyph) + 1 + (GLYPH_INDENT.get(glyph) ?? 0);",
+      to: "  return glyphCells(glyph) + 1;",
+      expect: "wrapped",
     },
     {
       // The stall notice's slot, which no `documents.ts` row can reach: it is

@@ -31,14 +31,63 @@ function proseWidth(width: number, prefix: number): number {
 }
 
 /**
+ * The tokens whose gutter carries a leading cell, and why there is exactly one.
+ *
+ * **`continuation` is the only token that names a relationship rather than a
+ * state** (C09 §4), and a subordination mark drawn flush left is not
+ * subordinate to anything: `⎿ queued` sat in the same two-cell gutter as the
+ * prompt's `❯`, so the two texts aligned and the notice read as the prompt's
+ * *sibling* — the one relationship the mark exists to deny. Every assertion
+ * passed with it wrong; only a frame-read says otherwise.
+ *
+ * **A gutter and not a field.** An `indent` on `Notice` is the second spacing
+ * field `Gap`'s note has been waiting for — *whoever writes the second spacing
+ * field is reading this line* — and roadmap 38 rules that change a
+ * *replacement* of `gapBefore` rather than an addition beside it. So the
+ * smaller change is the one that is not a public type at all: the depth belongs
+ * to the mark, which already knows it is a mark, and the block schema learns
+ * nothing.
+ *
+ * **Two cells, because that is where the command's text starts.** The mark
+ * belongs under the first cell of the line it is subordinate to, and
+ * `PROMPT_GUTTER.first` is 2 — so the mark lands beneath the command's first
+ * character and its own text one gutter further in, which is the figure
+ * `AGENT_TUI_DESIGN.md` §A1 draws. One cell was the first attempt and it puts
+ * the mark *between* the two columns, subordinate to neither.
+ *
+ * **The constant is in L4 and this is L1, so it is a literal and a test holds
+ * the two together** (T2.99). A number written here and satisfied in
+ * `shell/config.ts` is exactly the deferral shape this project keeps finding —
+ * a condition recorded in one file and met in another, with nobody holding
+ * both halves — so the coupling is asserted rather than described.
+ */
+const GLYPH_INDENT: ReadonlyMap<Glyph, number> = new Map<Glyph, number>([
+  ["continuation", 2],
+]);
+
+/**
+ * The exact string a glyph draws on a notice's first row.
+ *
+ * **The one place the lead exists**, because `prefixCells` below is its cell
+ * count and the two disagreeing is how the hanging indent slips: the first row
+ * would carry the extra cell and every continuation row would not, or the
+ * reverse, and both are frames that measure correctly and are wrong.
+ */
+function glyphLead(glyph: Glyph, caps: RenderContext["capabilities"]): string {
+  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${glyphFor(glyph, caps)} `;
+}
+
+/**
  * The cells a leading glyph and its trailing space occupy.
  *
  * Takes the *token*, not a character, and needs no capabilities: both
  * renderings are the same width by C09 §4's 1:1 rule, which is what lets
- * `measure` be correct without seeing a capability record (C04 §5).
+ * `measure` be correct without seeing a capability record (C04 §5). The
+ * indent is a property of the token too, so it costs the measurer nothing.
  */
 function prefixCells(glyph: Glyph | undefined): number {
-  return glyph === undefined ? 0 : glyphCells(glyph) + 1;
+  if (glyph === undefined) return 0;
+  return glyphCells(glyph) + 1 + (GLYPH_INDENT.get(glyph) ?? 0);
 }
 
 // --- rule ------------------------------------------------------------------
@@ -110,7 +159,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
           {
             text:
               index === 0 && block.glyph !== undefined
-                ? `${glyphFor(block.glyph, ctx.capabilities)} `
+                ? glyphLead(block.glyph, ctx.capabilities)
                 : " ".repeat(prefix),
             style,
           },

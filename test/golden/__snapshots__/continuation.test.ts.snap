@@ -1,0 +1,67 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the continuation mark, in an entry > ascii at 40 1`] = `
+"── queued
+> /ps --all
+  \` queued behind /logs
+── stalled
+> /ps --all
+  \` no output for 2m
+── wrapped
+> /ps --all
+  \` a queued line long enough to wrap,
+    so the hanging gutter is visible
+    under the mark
+── cancelled
+> /ps --all
+! cancelled before it ran"
+`;
+
+exports[`the continuation mark, in an entry > ascii at 56 1`] = `
+"── queued
+> /ps --all
+  \` queued behind /logs
+── stalled
+> /ps --all
+  \` no output for 2m
+── wrapped
+> /ps --all
+  \` a queued line long enough to wrap, so the hanging
+    gutter is visible under the mark
+── cancelled
+> /ps --all
+! cancelled before it ran"
+`;
+
+exports[`the continuation mark, in an entry > unicode at 40 1`] = `
+"── queued
+❯ /ps --all
+  ⎿ queued behind /logs
+── stalled
+❯ /ps --all
+  ⎿ no output for 2m
+── wrapped
+❯ /ps --all
+  ⎿ a queued line long enough to wrap,
+    so the hanging gutter is visible
+    under the mark
+── cancelled
+❯ /ps --all
+▲ cancelled before it ran"
+`;
+
+exports[`the continuation mark, in an entry > unicode at 56 1`] = `
+"── queued
+❯ /ps --all
+  ⎿ queued behind /logs
+── stalled
+❯ /ps --all
+  ⎿ no output for 2m
+── wrapped
+❯ /ps --all
+  ⎿ a queued line long enough to wrap, so the hanging
+    gutter is visible under the mark
+── cancelled
+❯ /ps --all
+▲ cancelled before it ran"
+`;

@@ -318,14 +318,25 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 
 **And it is a glyph slot rather than a prefix on the text, which is the whole reason it fits.** `notice` puts the glyph on the first row and indents every continuation row under the *text* (§3's hanging gutter), so a multi-row result sits beneath its mark instead of under a lone character. `docs/design/AGENT_TUI_DESIGN.md` §A1 reached the same mechanism from the other end — *a prefix reserving its columns, which `noticeDoc` already does* — and that is corroboration for the mechanism only. Its own consumer is a tool result in an application stopped at step 0, so it is written down and it is not a count.
 
-**The residue, found by reading the frame and by nothing else.** The mark lands flush left, in the same gutter the prompt uses:
+**The indent, found by reading the frame and by nothing else — and closed.** The mark first landed flush left, in the same two-cell gutter the prompt uses, so its text and the command's text aligned and the notice read as the prompt's *sibling*:
 
 ```
 ❯ /ps --all
-⎿ queued behind /logs
+⎿ queued behind /logs        ← wrong: the one relationship the mark exists to deny
 ```
 
-Both gutters are two cells, so the mark's text and the command's text align — the notice reads as the prompt's *sibling*, which is the one relationship the mark exists to deny. `AGENT_TUI_DESIGN.md` §A1 draws it indented by two under its parent and the framework cannot express that: `notice` has a glyph gutter and no indent field, and nothing between a document's blocks and its command line carries depth. **So the mark is correct within the mechanism that exists and the figure it came from assumes one that does not** — the same shape as a ruling naming an operation the layer below has no verb for. Recorded as owed rather than fixed here, because an indent is a block-schema question and this is a vocabulary entry. Every assertion about the mark passes with it flush; only the frame says otherwise.
+**Every assertion passed with it wrong**, because a claim about two rows is invisible to a suite indexed by blocks. It is now indented by two, which puts the mark beneath the command's first character and its own text one gutter further in — the figure `AGENT_TUI_DESIGN.md` §A1 draws:
+
+```
+❯ /ps --all
+  ⎿ queued behind /logs
+```
+
+**A gutter, not a field, and the alternative is what decided it.** An `indent` on `Notice` is the second spacing field `Gap`'s own note has been waiting for — *whoever writes the second spacing field is reading this line* — and roadmap 38 rules that change a **replacement** of `gapBefore` rather than an addition beside it. So the option that is not a public type is also the one that is not entry 38 in disguise: the depth belongs to the mark, which already knows it is a mark, and the block schema learns nothing. `glyphLead` and `prefixCells` derive from one map, so the first row and its continuations cannot disagree about the width.
+
+**Two, because `PROMPT_GUTTER.first` is two** — and one cell was the first attempt, which puts the mark *between* the two columns, subordinate to neither. The constant is L4 and the renderer is L1, so the number is a literal with the coupling asserted rather than described (T2.99, over the rendered rows rather than over the two constants).
+
+**And a golden frame carries it now**, which is the other half of the finding: golden was unchanged when the mark landed, because no frame in the suite held one of these notices. A green golden run reads as coverage. `test/golden/continuation.test.ts` renders the *entry* — chrome plus blocks — at two widths and both unicode modes, with the `warn` notice beside it so the two gutters differing is visible rather than described.
 
 **On the character, measured rather than chosen.** `⎿` is `East_Asian_Width=Neutral` — **one cell under both conventions**. The corner a reader would reach for instead is not: `└` and `╰` are Ambiguous and draw two cells wide, as do `▲` and `⋯` already in these tables. That does not buy anything *today*, because `glyphs()` discards the whole Unicode set at `ambiguousWidth: "wide"` and this table follows `unicode` alone — so it is a property of the character and not yet an argument. It is recorded because §4's own note says a third set of narrow survivors is *the better answer the day someone measures one*, and this is a measurement, filed where that note can find it.
 
