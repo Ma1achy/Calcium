@@ -14,7 +14,7 @@
  * drawn inside a twelve-cell table cell in three separate surface specs.
  */
 import { cells } from "../text.js";
-import { rampFor, RAMP_STEPS } from "./ramp.js";
+import { ladderFor, RAMP_STEPS } from "./ramp.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /**
@@ -30,7 +30,7 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
  *
  * **ASCII in every ramp, and that is a measurement.** It must be one cell under
  * both width conventions and collide with no step of `▁▂▃▄▅▆▇█`, `.:-=+*#@` or
- * the braille ramp `rampFor` returns at `wide`. `·` `∅` `⋮` `◌` are all
+ * the braille ramp `ladderFor` returns at `wide`. `·` `∅` `⋮` `◌` are all
  * `East_Asian_Width=Ambiguous`, and `text.ts`'s table deliberately covers only
  * *the part that is drawn as geometry* — so `cells()` calls them one cell at
  * `wide` by a documented ruling, and choosing one would be wrong on a CJK
@@ -80,7 +80,9 @@ export function rampRow(
   if (w === 0) return "";
 
   const window = values.slice(Math.max(0, values.length - w)); // cells-ok — a position count
-  const ramp = [...(style.ramp ?? rampFor(caps))];
+  // **The axis, not a ramp** (I21). A sparkline cell is a column of a vertical
+  // axis, so `height` is what it draws and what it asks for.
+  const ramp = [...(style.ramp ?? ladderFor("height", caps).steps)];
   const middle = Math.floor((RAMP_STEPS - 1) / 2);
 
   const glyph = (v: number | null): string => {
@@ -156,7 +158,7 @@ export function sparkline(
   });
   // The padding is `rampRow`'s, measured with `cells()` and never `.length`
   // (A03 SS23) — the way the measurer measures, or a table cell containing one
-  // would disagree with its planned width. `rampFor` is what makes that agree
+  // would disagree with its planned width. `ladderFor` is what makes that agree
   // on a wide terminal: the block ramp is two cells per glyph there, so the fix
   // was the glyphs and the measurement together.
   return drawn;

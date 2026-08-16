@@ -18,6 +18,8 @@ import {
   setDot,
 } from "../../src/presentation/plot/raster.js";
 import {
+  ladderFor,
+  pairFor,
   RAMP_ASCII,
   RAMP_BRAILLE,
   RAMP_DENSITY,
@@ -851,5 +853,47 @@ describe("C12 I20 — the value bar, the `fill` encoding", () => {
     expect(drawn).toContain("#");
     expect(drawn).not.toContain("█");
     expect(cells(drawn, "narrow")).toBe(20);
+  });
+});
+
+describe("C12 I21 — the encoding rule", () => {
+  it("T1.28 (I21): every ladder serves the axis it is keyed under, and the stand-in is declared", () => {
+    // **Asserted over the vocabulary, not over a call**, because the property is
+    // of the table: a ladder under the wrong key is the defect, and it does not
+    // compile — so what a row can still add is that `serves` and `substitutes`
+    // say what the type cannot, which is *which* of two correct axes is an
+    // equivalence and which is a stand-in.
+    for (const caps of [FULL_CAPS, ASCII_CAPS, { ...FULL_CAPS, ambiguousWidth: "wide" as const }]) {
+      expect(ladderFor("height", caps).serves.height, `height at ${caps.unicode}`).toBe(true);
+      expect(ladderFor("density", caps).serves.density, `density at ${caps.unicode}`).toBe(true);
+    }
+
+    // The two-axis case, which is why `serves` is flags and not a list.
+    const ascii = ladderFor("density", ASCII_CAPS);
+    expect(ascii.serves).toEqual({ height: true, density: true });
+    expect(ascii.substitutes, "ASCII *is* density and *stands in for* height").toEqual(["height"]);
+
+    // And a single-axis ladder marks no substitution: `RAMP_DENSITY` on a grid
+    // is the axis itself, so there is nothing being stood in for.
+    expect(ladderFor("density", FULL_CAPS).substitutes).toBeUndefined();
+    expect(ladderFor("height", FULL_CAPS).serves.density, "a height ladder is not a density one").toBe(
+      false,
+    );
+  });
+
+  it("T1.29 (I21): a renderer asks for an axis, and `fill` is not reachable through the ladders", () => {
+    // `fill` is a pair, not a ladder: the run is the axis, so a value picks how
+    // many rather than which. A single type over both would make `filled`/`empty`
+    // a two-rung ladder, and then nothing would stop it being indexed.
+    expect(ladderFor("height", FULL_CAPS).steps).toHaveLength(RAMP_STEPS);
+    expect(ladderFor("density", FULL_CAPS).steps).toHaveLength(RAMP_STEPS);
+
+    const pair = pairFor(FULL_CAPS);
+    expect(pair.encodes).toBe("fill");
+    expect(pair.filled).not.toBe(pair.empty);
+    expect(pair.absent, "and absence is neither of them").not.toBe(pair.empty);
+
+    // The capability read that stopped being the app's (F43, F54).
+    expect(pairFor(ASCII_CAPS).filled).toBe("#");
   });
 });

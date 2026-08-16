@@ -29,7 +29,7 @@ import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
 import { labelWidth, xLabelRow, yLabels } from "./axes.js";
 import { seriesRange, type Range } from "./scale.js";
-import { densityRampFor } from "./ramp.js";
+import { ladderFor } from "./ramp.js";
 import { formatValue } from "./axes.js";
 import { rampRow, sparkline } from "./sparkline.js";
 import { stripHeights } from "./strips.js";
@@ -399,7 +399,7 @@ function heatmapRows(
   layout: Layout,
   ctx: RenderContext,
 ): readonly string[] {
-  const style = { ramp: densityRampFor(ctx.capabilities), absent: HEATMAP_ABSENT };
+  const style = { ramp: ladderFor("density", ctx.capabilities).steps, absent: HEATMAP_ABSENT };
   const out: string[] = [];
 
   // I8, unchanged: the rows that fit, then a line naming the rest. The marker is
@@ -489,7 +489,7 @@ function heatmapFurniture(
   // decoration. The clause about dropped columns goes first because it is a
   // caveat about the picture, and the picture is still there without it.
   const range_ = `${formatValue(range.min, block.yFormat)} - ${formatValue(range.max, block.yFormat)}`;
-  const swatch = densityRampFor(ctx.capabilities);
+  const swatch = ladderFor("density", ctx.capabilities).steps;
   const clause = dropped === 0 ? "" : ` · ${String(dropped)} older not shown`; // cells-ok — a position count
   const fits = (t: string): boolean => cells(t, ctx.capabilities.ambiguousWidth) <= layout.width;
 

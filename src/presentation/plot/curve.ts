@@ -16,7 +16,7 @@
  */
 import { BRAILLE_DOTS, createGrid, drawColumnSpan, drawLine, foldBraille, foldRamp, RAMP_DOTS } from "./raster.js";
 import { columnsOf, finiteSamples, rowOf, type Range } from "./scale.js";
-import { rampFor } from "./ramp.js";
+import { ladderFor } from "./ramp.js";
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -67,8 +67,10 @@ export function curveRows(
     drawLine(grid, column.x, y(column.last), next.x, y(next.first));
   });
 
-  // `rampFor` is only reached on the ASCII branch here, so the ambiguous arm
+  // `ladderFor` is only reached on the ASCII branch here, so the ambiguous arm
   // cannot apply — the braille fold below is what a unicode terminal gets, and
   // braille is narrow on both kinds.
-  return ascii ? foldRamp(grid, rampFor(caps)) : foldBraille(grid);
+  // **`height`, and this is the declared stand-in** (I21): `RAMP_ASCII` marks
+  // `height` in `substitutes`, because ink weight is being drawn for position.
+  return ascii ? foldRamp(grid, ladderFor("height", caps).steps) : foldBraille(grid);
 }

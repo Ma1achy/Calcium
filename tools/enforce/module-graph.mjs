@@ -1409,6 +1409,23 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // deleting the row is how the fact would otherwise disappear — the rule's own
   // sentence, *an exemption that outlives its reason is how the list stops being
   // read*, applied to the thing the exemption was about.
+  "Ladder.serves":
+    "**consumed by the type checker rather than by a statement.** `LADDERS` is a mapped type " +
+    "over the axis and `LadderOf<E>` reads `Record<E, true>`, so a ladder under the wrong key " +
+    "does not compile — the guarantee is the whole point and MG24 counts names in `src/`, which " +
+    "a type position is not. Verified by trying it: putting the height ladder under `density` " +
+    "is TS2322 (C12 I21, §3c)",
+  "Ladder.substitutes":
+    "**a record with no runtime reader, and that is the state rather than an oversight.** " +
+    "`RAMP_ASCII` *is* density and *stands in for* height, and the distinction cost two defects " +
+    "when it lived in a comment. As a field it is asserted by T1.28 and readable by a person; " +
+    "no renderer branches on it, because none should — a substitution changes what a reader " +
+    "infers, not what the code draws. It gains a consumer the day a legend says *ink weight " +
+    "stands in for position here*, and until then MG24 is correct and this row is the answer",
+  "Pair.encodes":
+    "**the tag that makes a `Pair` self-describing beside a `Ladder`**, and nothing branches on " +
+    "it because there is one pair. Asserted by T1.29 and read by a person; it earns a runtime " +
+    "consumer the day a second fill vocabulary exists, and MG24 is correct until then",
   "VerbRatio.derived":
     "**F99** — three of a five-field record are dead while `recorded` and `flagged` are " +
     "read, so the arithmetic producing them runs on every call and is discarded. A " +

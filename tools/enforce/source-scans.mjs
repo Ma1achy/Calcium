@@ -868,8 +868,6 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "picks its rule character from the capability in the expression that draws it",
   "src/presentation/plot/ramp.ts":
     "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
-  "src/presentation/plot/bar.ts":
-    "`ALPHABET` is the pair form the rule permits \u2014 `unicode` beside `ascii`, chosen by `caps.unicode` on the line that draws, which is the same shape `ramp.ts` and `collapse.ts` carry",
   "src/presentation/plot/curve.ts":
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
   "src/shell/config.ts":

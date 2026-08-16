@@ -408,7 +408,7 @@ exotic. `ratatui`'s `absent_value_symbol` is the same finding reached from the o
 the one to keep: **a missing sample is not a zero.**
 
 **Why `?` and why it is ASCII in every ramp.** The marker must be one cell under *both* width conventions and
-must not collide with any step of any ramp — `▁▂▃▄▅▆▇█`, `.:-=+*#@`, and the braille ramp `rampFor` returns at
+must not collide with any step of any ramp — `▁▂▃▄▅▆▇█`, `.:-=+*#@`, and the braille ramp `ladderFor` returns at
 `ambiguousWidth: "wide"`. The obvious characters are not available: `·` `∅` `⋮` `◌` are all
 `East_Asian_Width=Ambiguous`, and `text.ts`'s ambiguous table deliberately covers only *the part that is drawn as
 geometry* — so `cells()` reports them as one cell at `wide` by a documented ruling, and picking one would either
@@ -561,7 +561,7 @@ rather than preferred:
 | one range shared across rows — *the only thing that makes it a matrix and not a stack* | `seriesRange` computes over **every** series |
 | a row label that costs no plot row | §5's ruling; `seriesLabelWidth` sizes the column from the row labels, and `gutterSpans` draws them |
 | one strip per row | `stackedRows`, at strip height 1 |
-| a magnitude glyph per cell | `rampFor` — eight steps, and correct under both width conventions |
+| a magnitude glyph per cell | `ladderFor` — eight steps, and correct under both width conventions |
 | a declared height | `PlotGeometry` unchanged: `plotAreaRows` returns `height` and the row count is data |
 
 And `Plot`'s other fields survive the move rather than becoming dead: `yMin`/`yMax` pin the

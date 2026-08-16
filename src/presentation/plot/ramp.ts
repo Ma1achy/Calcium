@@ -1,13 +1,79 @@
 /**
- * The two eight-step ramps (C12 §6, A01 A.2).
+ * The encoding vocabularies (C12 §3c, I21).
  *
- * Both are exactly eight glyphs, and that is load-bearing rather than tidy: a
- * value normalised into `[0, 1]` indexes one of eight steps, and the ASCII
- * fallback must offer the same number of steps or the two forms would differ in
- * vertical resolution as well as in appearance. The cell grid is identical (I9);
- * only the glyphs change.
+ * **A ramp is not a lookup table — it encodes a value along an axis**, and both
+ * defects this component has had were a vocabulary carried into a geometry it
+ * did not fit: the heatmap took the sparkline's height ramp for a density field,
+ * and `sparkline` before it took the line's rule for positions. Each was correct
+ * next door and each rendered.
+ *
+ * ```
+ * position   a dot drawn AT a coordinate      NO vocabulary — the axis is the grid
+ * height     how full the cell is             a Ladder, eight steps
+ * density    how much ink the cell carries    a Ladder, eight steps
+ * fill       how much of a RUN is covered     a Pair, repeated to a count
+ * ```
+ *
+ * **`Ladder` deliberately does not cover `fill`.** A ladder maps one value to
+ * one glyph; a fill maps one value to a *count* of two. One type over both makes
+ * `filled`/`empty` a two-rung ladder, and then nothing stops a renderer indexing
+ * it with a normalised value — which is the category error the whole rule exists
+ * to prevent.
+ *
+ * **A renderer names an axis, never a ramp.** `LADDERS` is a mapped type over
+ * the axis, so an entry returning the wrong one does not compile: the mismatch
+ * is unspellable rather than checked.
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
+
+/** The four axes a value can be drawn along. */
+export type Encoding = "position" | "height" | "density" | "fill";
+
+/** The two that are ladders. `fill` is a Pair and `position` has no vocabulary. */
+export type LadderAxis = Extract<Encoding, "height" | "density">;
+
+/**
+ * An indexed vocabulary: a value normalised into `[0, 1]` picks one step.
+ *
+ * **`encodes` may name more than one axis and `substitutes` says which of them
+ * is a stand-in.** `RAMP_ASCII` *is* density — ASCII has only ink, which is the
+ * heatmap's own axis — and it *stands in for* height on the ASCII line, where
+ * ink weight is drawn for position because ASCII has no vertical sub-cell
+ * resolution. Both uses are correct and only one is an equivalence, and a field
+ * rather than a comment is the difference between that being enforced and being
+ * remembered (C12 §3c; the comment form was D5 in the audit).
+ */
+export type Serves = Readonly<Record<LadderAxis, boolean>>;
+
+export type Ladder = Readonly<{
+  steps: string;
+  serves: Serves;
+  substitutes?: readonly LadderAxis[];
+}>;
+
+/**
+ * A ladder that **serves** a particular axis — what `LADDERS` is keyed on.
+ *
+ * **Flags rather than a list, and the reason is `RAMP_ASCII`.** It serves two
+ * axes, so `encodes: readonly E[]` cannot type it for either: a list of both is
+ * not a list of one. `Record<E, true>` intersects, so one value satisfies
+ * `LadderOf<"density">` and `LadderOf<"height">` at once — and a single-axis
+ * ladder still fails the axis it does not serve, which is the guarantee.
+ */
+export type LadderOf<E extends LadderAxis> = Ladder & Readonly<{ serves: Readonly<Record<E, true>> }>;
+
+/**
+ * The `fill` vocabulary — a pair, repeated to a count, plus the absent mark.
+ *
+ * Not a ladder and not indexable: the run is the axis, so what a value picks is
+ * *how many* rather than *which*.
+ */
+export type Pair = Readonly<{
+  encodes: "fill";
+  filled: string;
+  empty: string;
+  absent: string;
+}>;
 
 /** Unicode: the lower-block ramp, one eighth per step. */
 export const RAMP_UNICODE = "▁▂▃▄▅▆▇█";
@@ -75,30 +141,85 @@ export const RAMP_BRAILLE = "\u2840\u28c0\u28c4\u28e4\u28e6\u28f6\u28f7\u28ff";
  */
 export const RAMP_DENSITY = "\u2804\u2814\u2816\u2836\u2837\u283f\u287f\u28ff";
 
+/** The ladders, as values carrying the axis each one encodes (I21). */
+const HEIGHT_UNICODE = Object.freeze({
+  steps: RAMP_UNICODE,
+  serves: Object.freeze({ height: true, density: false } as const),
+});
+const HEIGHT_BRAILLE = Object.freeze({
+  steps: RAMP_BRAILLE,
+  serves: Object.freeze({ height: true, density: false } as const),
+});
+const DENSITY_BRAILLE = Object.freeze({
+  steps: RAMP_DENSITY,
+  serves: Object.freeze({ height: false, density: true } as const),
+});
+
 /**
- * The ramp for these capabilities. Nothing here probes for its own (C09 I3).
+ * ASCII, which serves both axes and equals only one.
  *
- * **ASCII first, because it is the stronger constraint.** A terminal that cannot
- * draw braille cannot draw blocks either, so the ambiguous question only arises
- * once unicode is available.
+ * **It *is* density** — ASCII has only ink, which is the heatmap's own axis —
+ * **and it *stands in for* height** on the ASCII line, where ink weight is drawn
+ * for position because there is no vertical sub-cell resolution to draw. The
+ * cost of the stand-in, stated where it is taken: at ASCII a line and a filled
+ * area are hard to tell apart.
  */
-export function rampFor(
-  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
-): string {
-  if (caps.unicode === "ascii") return RAMP_ASCII;
-  return caps.ambiguousWidth === "wide" ? RAMP_BRAILLE : RAMP_UNICODE;
+const ASCII_BOTH = Object.freeze({
+  steps: RAMP_ASCII,
+  serves: Object.freeze({ height: true, density: true } as const),
+  substitutes: Object.freeze(["height"] as const),
+});
+
+/**
+ * Axis → the ladder for these capabilities (I21).
+ *
+ * **A mapped type over the axis, and that is the enforcement.** An entry
+ * returning a ladder of the wrong axis does not compile, so *`ladderFor
+ * ("density")` returns a height ramp* is unspellable in the source rather than
+ * caught by a test — the mutation that would restore this component's second
+ * defect cannot be written.
+ *
+ * **ASCII first in both arms, because it is the stronger constraint**: a
+ * terminal that cannot draw braille cannot draw blocks either, so the ambiguous
+ * question only arises once unicode is available.
+ */
+const LADDERS: { readonly [E in LadderAxis]: (caps: Caps) => LadderOf<E> } = Object.freeze({
+  height: (caps) =>
+    caps.unicode === "ascii"
+      ? ASCII_BOTH
+      : caps.ambiguousWidth === "wide"
+        ? HEIGHT_BRAILLE
+        : HEIGHT_UNICODE,
+  density: (caps) => (caps.unicode === "ascii" ? ASCII_BOTH : DENSITY_BRAILLE),
+});
+
+/** The capabilities a vocabulary is chosen against. Nothing here probes (C09 I3). */
+type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+
+/** The ladder for an axis. A renderer names the axis it draws, never a ramp. */
+export function ladderFor<E extends LadderAxis>(encodes: E, caps: Caps): LadderOf<E> {
+  return LADDERS[encodes](caps);
 }
 
-/** Ramp steps. Eight, in both modes — see the header. */
+/**
+ * The `fill` pair (C12 I20, §3b).
+ *
+ * **Not reachable through `ladderFor`**, because a fill is not indexable: the run
+ * is the axis, so a value picks *how many* rather than *which*.
+ *
+ * `—` is the absent mark: a run of nothing reads as *zero*, which is the one
+ * thing absence is not.
+ */
+export function pairFor(caps: Pick<TerminalCapabilities, "unicode">): Pair {
+  return caps.unicode === "ascii"
+    ? Object.freeze({ encodes: "fill", filled: "#", empty: ".", absent: "-" } as const)
+    : Object.freeze({ encodes: "fill", filled: "\u2588", empty: "\u2591", absent: "\u2014" } as const);
+}
+
+/**
+ * Ladder steps. Eight, in every arm — see `RAMP_BRAILLE`'s header.
+ *
+ * Load-bearing rather than tidy: a value normalised into `[0, 1]` indexes one of
+ * these, so a ladder with fewer changes the resolution as well as the look.
+ */
 export const RAMP_STEPS = 8;
-
-/**
- * The heatmap's ramp (I17). ASCII first, for `rampFor`'s reason exactly.
- *
- * **The ambiguous question does not arise**, because every braille code point is
- * narrow — so unlike `rampFor` there is no third arm here, and the density ramp
- * is correct on both kinds of terminal.
- */
-export function densityRampFor(caps: Pick<TerminalCapabilities, "unicode">): string {
-  return caps.unicode === "ascii" ? RAMP_ASCII : RAMP_DENSITY;
-}

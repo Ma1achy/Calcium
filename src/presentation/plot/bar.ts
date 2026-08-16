@@ -19,25 +19,8 @@
 import type { BarSpec } from "../../data/viewmodel/index.js";
 import { cells, truncate } from "../text.js";
 import { formatValue } from "./axes.js";
+import { pairFor } from "./ramp.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-
-/**
- * The run's two alphabets, and the reason they are here rather than in the app.
- *
- * **`examples/docker` threads a `unicode` flag by hand** because an adapter is
- * handed `AdapterContext`, which carries a width and no capabilities (F43, F54)
- * — and at `LANG=C` its `█ ░` passed through untouched beside a plot that had
- * correctly become `.::-==++**##@@`. Capability substitution covers the glyphs
- * the framework picks and not text an adapter supplies, so the fix is for the
- * framework to be the one picking.
- *
- * `—` is the absent mark and it is an em-dash at unicode: a run of nothing would
- * read as *zero*, which is the one thing absence is not (I20).
- */
-const ALPHABET = {
-  unicode: { filled: "█", empty: "░", absent: "—" },
-  ascii: { filled: "#", empty: ".", absent: "-" },
-} as const;
 
 /** The narrowest run worth drawing. Below it the number is the whole cell. */
 const MIN_RUN = 3;
@@ -65,7 +48,10 @@ export function valueBar(
   const w = Math.max(0, Math.floor(width));
   if (w === 0) return "";
 
-  const mark = caps.unicode === "ascii" ? ALPHABET.ascii : ALPHABET.unicode;
+  // **`fill`, and it is a pair rather than a ladder** (I21): the run is the
+  // axis, so a value picks how many rather than which. `pairFor` is where the
+  // capability is read, which is what stops the app threading a flag (F43).
+  const mark = pairFor(caps);
   // **Exactly `w` cells, both directions** (I20). Padding alone is right until
   // the number is wider than the cell — a five-cell column holding `1000.5%` —
   // and a row one cell over is a row the terminal wraps, adding a line no
