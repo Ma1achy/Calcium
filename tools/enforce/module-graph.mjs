@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -586,6 +586,116 @@ export const BUILDER_OMISSIONS = Object.freeze({
 });
 
 /** `Kind.field` for every block field, and whether a builder mentions it. */
+/**
+ * MG28 — a closed union field whose builders reach one arm (F180).
+ *
+ * **MG27's subject is narrower than what it reads as covering**, which is F84's
+ * shape one rule along. It asks whether a builder's constructed literal
+ * *mentions* each field, and `form: "line"` mentions `form` — so a closed union
+ * with a hardcoded arm satisfies a check about names while the other arms are
+ * buildable by nothing public. `PlotForm` has three members; `b.plot` wrote
+ * `line` and `b.spark` writes `sparkline`, and `heatmap` shipped with a walk, a
+ * validator arm, a renderer, three golden frames and a mutation pass, reachable
+ * only by reaching past the builder into `block()`.
+ *
+ * **A field is covered if *any* builder for that kind threads a parameter into
+ * it.** The rule is about the kind's public surface as a whole, not per builder:
+ * `b.spark` writing `form: "sparkline"` is a specialised door and correct, and
+ * it is `b.plot` taking the form that opens the others.
+ *
+ * ## What it cannot see, stated because an unrecorded limit reads as strength
+ *
+ * - **Top-level fields only**, as MG27 is. `Steps.steps[].state` and
+ *   `Table.sort.direction` are unions inside a nested shape, and reaching them
+ *   needs a parser rather than a line walk.
+ * - **A union of named types**, rather than of string literals, is skipped. The
+ *   subject is a *vocabulary* a consumer picks from — `"line" | "sparkline"` —
+ *   and `Foo | Bar` is a shape choice the type system already makes.
+ * - **A parameter is trusted.** A builder threading `form` through a variable
+ *   that can only hold one value would pass; nothing in the tree does that, and
+ *   distinguishing it needs flow analysis.
+ */
+function checkUnionReach(types, typeNames, fieldsOf, byKind, shared) {
+  const violations = [];
+
+  // A field's declared type text, top-level only — the same walk `fieldsOf`
+  // does, kept separate so MG27's output does not move.
+  const typeOf = (typeName, field) => {
+    const m = new RegExp(`export type ${typeName} = Readonly<\\{([\\s\\S]*?)\\n?\\}>`, "u").exec(types);
+    if (m === null) return null;
+    let depth = 0;
+    for (const line of m[1].split("\n")) {
+      const atTop = depth === 0;
+      for (const ch of line) {
+        if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+        else if (ch === ")" || ch === "]" || ch === "}") depth -= 1;
+      }
+      const f = new RegExp(`^\\s*${field}\\??\\s*:\\s*(.+?);\\s*$`, "u").exec(line);
+      if (f !== null && atTop) return f[1];
+    }
+    return null;
+  };
+
+  // A closed set of string literals, following one level of alias. Anything
+  // else — a named shape, a generic, a template literal — is not this rule's.
+  const membersOf = (text) => {
+    if (text === null) return null;
+    const direct = text.trim();
+    if (/^"[^"]+"(\s*\|\s*"[^"]+")+$/u.test(direct)) {
+      return [...direct.matchAll(/"([^"]+)"/gu)].map((m) => m[1]);
+    }
+    if (!/^\w+$/u.test(direct)) return null;
+    const alias = new RegExp(`export type ${direct} =\\s*([^;]+);`, "u").exec(types);
+    if (alias === null) return null;
+    const body = alias[1].replaceAll("\n", " ").trim();
+    if (!/^\|?\s*"[^"]+"(\s*\|\s*"[^"]+")+$/u.test(body)) return null;
+    return [...body.matchAll(/"([^"]+)"/gu)].map((m) => m[1]);
+  };
+
+  for (const typeName of typeNames) {
+    const kindMatch = new RegExp(
+      `export type ${typeName} = Readonly<\\{[\\s\\S]*?kind: "(\\w+)"`, "u",
+    ).exec(types);
+    if (kindMatch === null) continue;
+    const kind = kindMatch[1];
+    const body = shared + (byKind.get(kind) ?? "");
+    if (body === shared) continue;
+
+    for (const field of fieldsOf(typeName)) {
+      const members = membersOf(typeOf(typeName, field));
+      if (members === null || members.length < 2) continue;
+
+      // Every value this kind's builders write into the field. A bare string
+      // literal is one arm; anything else is a parameter path and opens them
+      // all — which is the state the fix for F180 put `form` into.
+      let parameterised = false;
+      const written = new Set();
+      for (const m of body.matchAll(new RegExp(`\\b${field}:\\s*([^,\\n]+)`, "gu"))) {
+        const value = m[1].trim();
+        const literal = /^"([^"]+)"/u.exec(value);
+        if (literal === null) parameterised = true;
+        else written.add(literal[1]);
+      }
+      if (parameterised || written.size === 0) continue;
+      const missing = members.filter((v) => !written.has(v));
+      if (missing.length === 0) continue;
+
+      violations.push({
+        rule: "MG28",
+        file: "src/shell/builders/index.ts",
+        message:
+          `\`${kind}.${field}\` is a closed union of ${String(members.length)} and the ` +
+          `builders write only ${[...written].map((v) => `"${v}"`).join(", ")} — ` +
+          `${missing.map((v) => `"${v}"`).join(", ")} ${missing.length === 1 ? "is" : "are"} ` +
+          `buildable by nothing public. MG27 passes this because the literal *mentions* the ` +
+          `field; a value being reachable is a different question (F180)`,
+        spec: "A03 §3, MG28",
+      });
+    }
+  }
+  return violations;
+}
+
 export function checkBuilderCoverage(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
@@ -697,7 +807,10 @@ export function checkBuilderCoverage(
       spec: "A03 §3, MG27",
     });
   }
-  return violations;
+  return [
+    ...violations,
+    ...checkUnionReach(types, typeNames, fieldsOf, byKind, shared),
+  ];
 }
 
 // --- MG3's type-only arm — the edge the rule could not see ------------------

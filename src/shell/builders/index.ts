@@ -327,9 +327,16 @@ function events(input: readonly EventLine[], opts?: BlockOpts): Events {
 }
 
 /**
- * **`yMin`, `yMax` and `yFormat` are here; `xLabels` and `emptyMessage` are
- * not** — C24 §4 carries the reasoning for each, and this comment carries the
- * one that made the pin urgent.
+ * **`emptyMessage` is the one still withheld** — C24 §4 carries the reasoning,
+ * and this comment carries the one that made the pin urgent.
+ *
+ * **`xLabels` was on that list until a surface wanted it** (F180). Its exemption
+ * read *no surface has wanted one; a caption sentence does not fit it*, and the
+ * history heatmap wants exactly the fixed three-tuple — `-N ticks`, nothing,
+ * `now`. The second clause stands and is why `axisCaption` sits beside the plot
+ * rather than in it. **A reason with two clauses expires one at a time**, and
+ * `BUILDER_OMISSIONS`'s equality arm cannot see that: it catches an entry that
+ * became unnecessary, never one whose argument did.
  *
  * **`yFormat` was withheld and the reason was about the naming** (C04 I41, F31).
  * C24 §4 said exposing it *"wants either a second format or a sentence at the

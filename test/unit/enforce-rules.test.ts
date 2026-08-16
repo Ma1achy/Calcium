@@ -643,6 +643,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // type and the builder that constructs it — so the shared `FABRICATED`
       // shape, which is one file's text, cannot express it.
       "MG27",
+      // MG28 for MG27's reason exactly, since it reads the same pair: the
+      // union's members come from `types.ts` and the builder's literals from
+      // `builders/index.ts`, and neither alone is the subject.
+      "MG28",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -1278,6 +1282,61 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
 
     expect(declared.length, "no vocabulary exports found — the pattern stopped matching").toBeGreaterThan(0);
     expect([...declared].sort()).toEqual([...RAMP_VOCABULARIES].sort());
+  });
+
+  it("MG28 fires on F180's own state, and is silent on the tree that fixed it", () => {
+    // **Its own row, because the shared harness cannot build its subject.**
+    // `checkBuilderCoverage` reads `types.ts` *and* `builders/index.ts` in full
+    // — the union's members come from one and the builder's literals from the
+    // other — so a fabrication that supplies one file with one line gives it
+    // nothing to compare. MG24 and MG3 are here for the same reason.
+    const files = srcFiles();
+    const hardcoded = (f: string): string => {
+      const src = readFileSync(f, "utf8");
+      return f.endsWith("builders/index.ts")
+        ? src.replace('form: form ?? "line",', 'form: "line",')
+        : src;
+    };
+
+    const fired = checkBuilderCoverage(files, hardcoded).filter((v) => v.rule === "MG28");
+    expect(fired, "the state the heatmap shipped in").toHaveLength(1);
+    expect(fired[0]?.message).toContain("heatmap");
+    expect(fired[0]?.message).toContain("MG27 passes this");
+
+    // **And the control, which is the half that matters here.** A rule that
+    // reports on a patched tree and on the real one is reporting on neither.
+    expect(checkBuilderCoverage(files).filter((v) => v.rule === "MG28")).toEqual([]);
+  });
+
+  it("MG28 examines a population, and the number is small on purpose", () => {
+    // **Read rather than tuned.** Six top-level block fields are closed string
+    // unions; five thread a parameter and were already right, and the sixth was
+    // F180. A rule that examined two fields and found nothing looks identical to
+    // one that examined twenty, so the figure is asserted rather than implied.
+    //
+    // The reach is deliberately narrow and its limits are in the rule's header:
+    // top-level fields only, string-literal unions only, and a parameter is
+    // trusted. Widening it to make the count larger is the tuning A03 §2 warns
+    // about — the subject is *a vocabulary a consumer picks from*, and that is
+    // what six of them are.
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const closed = [
+      "Notice.tone", "Plot.form", "Plot.yFormat",
+      "Plot.colormap", "Patch.layout", "Group.direction",
+    ];
+    for (const key of closed) {
+      const [type, field] = key.split(".");
+      expect(
+        new RegExp(`export type ${String(type)} = Readonly<`, "u").test(types),
+        `${key}'s type is gone`,
+      ).toBe(true);
+      // Required or optional — `Plot.form` is required and the rest are not,
+      // which is a fact about the schema and not about this rule's reach.
+      expect(
+        new RegExp(`^\\s*${String(field)}\\??:`, "mu").test(types),
+        `${key} is no longer declared`,
+      ).toBe(true);
+    }
   });
 
   it("MG3 fires on a fabricated *type-only* cross-half edge, which it could not see at all", () => {
