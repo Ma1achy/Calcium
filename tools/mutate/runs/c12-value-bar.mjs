@@ -13,6 +13,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/unit/plot.test.ts test/golden/states.test.ts";
 const BAR = "src/presentation/plot/bar.ts";
+const RAMP = "src/presentation/plot/ramp.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -77,10 +78,15 @@ const results = runPass({
       // **The alphabet stops substituting**, which is the defect this function
       // was moved out of the app to fix: at `LANG=C` the blocks passed through
       // untouched beside a plot that had correctly degraded.
+      //
+      // **Re-anchored onto `pairFor`, where the capability read moved** when the
+      // encoding rule landed and `ALPHABET` became the `fill` pair. Stale for a
+      // commit and invisible while it was — a single-quoted anchor, F173's blind
+      // spot. The mutation still kills, run rather than assumed.
       name: "the alphabet ignores the capability",
-      file: BAR,
-      from: '  const mark = caps.unicode === "ascii" ? ALPHABET.ascii : ALPHABET.unicode;',
-      to: "  const mark = ALPHABET.unicode;",
+      file: RAMP,
+      from: '  return caps.unicode === "ascii"\n',
+      to: "  return false\n",
       expect: "T1.27",
     },
     {

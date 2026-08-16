@@ -19,6 +19,16 @@ export type Violation = {
 };
 
 export declare const SCANS: readonly Scan[];
+
+/**
+ * SS51's subject — the four encoding vocabularies a renderer may not read.
+ *
+ * Exported so `enforce-rules.test.ts` can assert it equals the string-valued
+ * `RAMP_*` exports in `ramp.ts` in both directions: a closed pattern stops
+ * seeing a fifth ramp, and silently, which is the failure the arm converts into
+ * a red test.
+ */
+export declare const RAMP_VOCABULARIES: readonly string[];
 export declare function checkSourceScans(
   files: readonly string[],
   readFile?: (file: string) => string,

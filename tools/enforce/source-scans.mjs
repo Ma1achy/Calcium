@@ -3,6 +3,21 @@
 // waiting on the component that creates its scope.
 import { readFileSync } from "node:fs";
 
+/**
+ * The encoding vocabularies SS51 forbids reading directly — see that rule.
+ *
+ * **Exported so it can be checked against its subject rather than remembered.**
+ * `enforce-rules.test.ts` asserts this equals the string-valued `RAMP_*` exports
+ * in `ramp.ts`, both directions, so a fifth vocabulary fails a test instead of
+ * quietly falling outside a closed pattern.
+ */
+export const RAMP_VOCABULARIES = Object.freeze([
+  "RAMP_UNICODE",
+  "RAMP_ASCII",
+  "RAMP_BRAILLE",
+  "RAMP_DENSITY",
+]);
+
 /** allow: paths (or prefixes) exempt from the rule. */
 export const SCANS = [
   // --- ambient reads -------------------------------------------------------
@@ -809,6 +824,57 @@ export const SCANS = [
       "src/shell/fallback.ts",
     ],
     why: "a display measurement says which ambiguous-width convention it is under, or says why it does not need to (C02 I9)" },
+
+  // --- SS51 — a vocabulary read directly, going round the axis ---------------
+  //
+  // **The type stops the mismatch; this stops going round the type.** `ladderFor`
+  // is a mapped type over the axis, so `ladderFor("density", caps)` returning a
+  // height ladder does not compile — measured, TS2322. What it cannot stop is a
+  // renderer never asking: `import { RAMP_BRAILLE }` and indexing it, which is
+  // the exact move that produced C12's second defect. The guarantee lives in a
+  // function, and a rule that forbids the import is what makes the function the
+  // only door.
+  //
+  // ## The subject is a vocabulary, and two `RAMP_` names are not one
+  //
+  // Measured across `src/` before the pattern was written, because a broad
+  // `\bRAMP_[A-Z_]+\b` reports five lines and none of them is this rule's:
+  //
+  // | name | what it is | in scope? |
+  // |---|---|---|
+  // | `RAMP_UNICODE` `RAMP_ASCII` `RAMP_BRAILLE` `RAMP_DENSITY` | glyph sets — a value picks *which* | **yes** |
+  // | `RAMP_DOTS` (`raster.ts`) | `{x:1,y:8}`, dots per cell for the ASCII fold | no — a **homonym** |
+  // | `RAMP_STEPS` | `8`, the rung count every ladder shares | no — about all of them, not one |
+  //
+  // `RAMP_DOTS` is F161's shape arriving in a scan's own scope: a name that
+  // matches the pattern and shares nothing with the class. Allow-listing
+  // `raster.ts` by file to excuse it would put a permanent hole in a *renderer*,
+  // which is the one place the rule is for — so the pattern names the four rather
+  // than the prefix.
+  //
+  // ## Which is a closed list, and therefore has an equality arm
+  //
+  // A named set stops seeing a fifth ramp, and silently. So `RAMP_VOCABULARIES`
+  // is exported and `enforce-rules.test.ts` asserts it equals the string-valued
+  // `RAMP_*` exports in `ramp.ts` — bidirectional, the shape `MARK_EXEMPTIONS`
+  // and `EXPECTED_SURVIVORS` already have. A fifth vocabulary fails a test rather
+  // than passing a scan, and the discriminator is honest: a vocabulary is a
+  // string of glyphs, `RAMP_STEPS` is a number.
+  //
+  // ## Blind spots, stated because an unrecorded limit reads as strength
+  //
+  // - **Lexical.** `ladderFor("height", caps).steps` handed onward, or the eight
+  //   glyphs pasted as a literal, both pass. SS47 catches the paste as a *mark*
+  //   and says nothing about which axis it encodes.
+  // - **`src/` only.** Three test files import the vocabularies to assert on
+  //   them, which is the vocabulary being pinned rather than a renderer going
+  //   round the door.
+  // - **Import-shaped, not use-shaped.** It reports the line that names the
+  //   constant. A re-export under another name would pass, and there is none.
+  { id: "SS51", spec: "C12 §3c · C12 I21",
+    pattern: new RegExp(`\\b(?:${RAMP_VOCABULARIES.join("|")})\\b`),
+    scope: "src/", allow: ["src/presentation/plot/ramp.ts"],
+    why: "a renderer names the axis it draws and never a vocabulary (C12 I21) — `ladderFor` is the door, and reading a ramp constant is the move that produced the heatmap's density-for-height defect" },
 
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,

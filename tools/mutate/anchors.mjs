@@ -61,27 +61,81 @@ const KNOWN_STALE = {
   // the list anyway, because repairing an anchor without running the pass
   // produces a mutation that applies and asserts nothing, and that reads as
   // coverage from the summary line. The repair belongs to whoever runs it.
-  "docker-dashboard.mjs": 1,
+  "docker-dashboard.mjs": 2,
   "c15-centred-width.mjs": 1,
   "c19-menu-window.mjs": 1,
-  "c22-construct.mjs": 2,
+  "c22-construct.mjs": 3,
   "c22-frame-session.mjs": 2,
   "c22-selection-wash.mjs": 1,
   "c23-refresh.mjs": 10,
+
+  // **Six of these arrived at once, and none of them rotted that day** (F173).
+  // They were stale already and the checker could not see them: it matched only
+  // double-quoted `from:` values, so 108 of 465 anchors across 30 of 54 runs
+  // were outside its reading. Widening the pattern turned 357 anchors into 465
+  // and 19 misses into 25 — the six below, plus one each already counted above.
+  //
+  // **The two this session owned were repaired rather than listed** —
+  // `c12-ramp.mjs` and `c12-value-bar.mjs`, both re-anchored onto where the
+  // encoding rule moved their subject and both re-run. These four are not, for
+  // the reason at the head of this list: repairing an anchor without running the
+  // pass produces a mutation that applies and asserts nothing, which reads as
+  // coverage from the summary line.
+  "c10-categorical.mjs": 1,
+  "c26-elements.mjs": 1,
+  "c26-focus-target.mjs": 1,
 };
 
-/** Every `{file, from}` pair a run declares, control included. */
+/**
+ * A quoted literal's body, whichever quote the author used.
+ *
+ * Both are turned into JSON's one escaping so a single parser reads them: a
+ * single-quoted body may hold a bare `"` (JSON's delimiter) and a `\'` (not a
+ * JSON escape at all), and each is the reason the naive wrap-in-quotes fails.
+ */
+function unquote(body, quote) {
+  if (quote === '"') return JSON.parse(`"${body}"`);
+  return JSON.parse(`"${body.replaceAll("\\'", "'").replaceAll('"', '\\"')}"`);
+}
+
+/**
+ * Every `{file, from}` pair a run declares, control included.
+ *
+ * **Both quote styles, and reading only one was this instrument's own blind
+ * spot.** The first version matched `from: "…"` alone, so **108 of 465 anchors
+ * across 30 of 54 runs were invisible** — a gate that ran, reported a count, and
+ * could not see 23% of its subject. It was found the way the sixth blind spot
+ * says: a real stale anchor in `c02-ambiguous.mjs` survived a commit and the
+ * checker said the tree was clean, so the number it printed was checked against
+ * the tree rather than trusted. FINDINGS F173.
+ *
+ * **A count is what a working gate looks like from outside**, which is why the
+ * MA4 arm asserts equality against the tree and this comment records the figure.
+ */
 function anchorsOf(src) {
   const consts = {};
-  for (const m of src.matchAll(/^const ([A-Z_][A-Z_0-9]*) = "([^"]+)";/gm)) consts[m[1]] = m[2];
+  for (const m of src.matchAll(/^const ([A-Z_][A-Z_0-9]*) = (["'])([^"']+)\2;/gm)) consts[m[1]] = m[3];
 
   const out = [];
-  const re = /file:\s*([A-Z_][A-Z_0-9]*|"[^"]+")\s*,\s*\n\s*from:\s*"((?:[^"\\]|\\.)*)"/g;
+  // **A branch per quote style rather than a backreference**, because a class
+  // cannot exclude `\2`: one pattern over both would have to allow the delimiter
+  // inside the body and stop at the first one followed by a comma, which a value
+  // containing `",` ends early and silently. Comment lines between `file:` and
+  // `from:` are skipped — a re-anchoring usually arrives with its reason.
+  const re = new RegExp(
+    String.raw`file:\s*([A-Z_][A-Z_0-9]*|"[^"]*"|'[^']*')\s*,\s*\n\s*(?:\/\/[^\n]*\n\s*)*from:\s*` +
+      String.raw`(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')`,
+    "g",
+  );
   for (const m of src.matchAll(re)) {
     const raw = m[1];
-    const file = raw.startsWith('"') ? raw.slice(1, -1) : consts[raw];
+    const file = raw.startsWith('"') || raw.startsWith("'") ? raw.slice(1, -1) : consts[raw];
     if (file === undefined) continue;
-    out.push({ file, from: JSON.parse(`"${m[2]}"`) });
+    out.push(
+      m[2] !== undefined
+        ? { file, from: unquote(m[2], '"') }
+        : { file, from: unquote(m[3], "'") },
+    );
   }
   return out;
 }

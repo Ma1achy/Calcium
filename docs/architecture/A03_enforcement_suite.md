@@ -368,12 +368,17 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
 | SS49 | `origin: "defect"` outside the one site that means it | `src/` outside `shell/execution.ts` | C23 §5a, I48 · C04 I13 |
 | SS50 | a `cells()` call naming neither the ambiguous-width convention nor `// narrow-ok` | `src/` outside `src/interaction/completion/menu.ts`, `src/interaction/history/layers.ts` and `src/shell/fallback.ts` | C02 I9 · C02 §3 |
+| SS51 | One of the four encoding vocabularies named by `RAMP_VOCABULARIES` — `RAMP_UNICODE`, `RAMP_ASCII`, `RAMP_BRAILLE`, `RAMP_DENSITY` | `src/` outside `src/presentation/plot/ramp.ts` | C12 §3c · C12 I21 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
 | SS38 | A bare import of a package that is not a declared runtime dependency | `src/` | A04 §2, C09 §4a |
 
 **SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
+
+**SS51 forbids going round a type rather than a mismatch, and that is why it is worth having when the type already holds.** `ladderFor` is a mapped type over the encoding axis, so asking for `density` and receiving a height ladder does not compile — measured, TS2322. The move it cannot stop is a renderer never asking: importing `RAMP_BRAILLE` and indexing it, which is exactly how C12's heatmap came to draw a density field with a height ramp. The type makes the mismatch unspellable; the scan makes the function the only door.
+
+**Its pattern names four constants rather than the `RAMP_` prefix, and the reason is a homonym in its own scope.** `raster.ts` exports `RAMP_DOTS` — `{x: 1, y: 8}`, dots per cell for the ASCII fold — and `ramp.ts` exports `RAMP_STEPS`, the rung count every ladder shares. Neither is a vocabulary. A prefix pattern would report five lines, none of this rule's, and excusing `raster.ts` by file would put a permanent hole in a renderer, which is the one place the rule is for. A closed list stops seeing a fifth ramp, so `RAMP_VOCABULARIES` is exported and asserted equal to the string-valued `RAMP_*` exports in `ramp.ts` in both directions — a fifth vocabulary fails a test rather than passing a scan, and the discriminator is that a vocabulary is a string of glyphs where `RAMP_STEPS` is a number.
 
 **SS34 is the two-owners check.** Ink 7 accepts `render({ alternateScreen })` and will enter and leave it itself. C01 holds the alternate screen, so Ink must not — `held` would stop describing what was taken, and release would emit sequences for state something else already released. The framework's own option is the tempting shortcut precisely because it looks simpler at the call site.
 

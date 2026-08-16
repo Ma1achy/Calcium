@@ -33,7 +33,12 @@ import {
   checkSeamConsumers,
   publicSurfaceUseSignal,
 } from "../../tools/enforce/module-graph.mjs";
-import { checkMarks, checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
+import {
+  checkMarks,
+  checkSourceScans,
+  RAMP_VOCABULARIES,
+  SCANS,
+} from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
@@ -461,6 +466,17 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "SS50",
     file: "src/presentation/blocks/paint.ts",
     source: "const short = width - cells(text);",
+  },
+  {
+    // **The move the type cannot refuse.** `ladderFor("density", caps)` cannot
+    // return a height ladder — the mapped type rejects it, TS2322 — but nothing
+    // in the type system makes a renderer *ask*. This is the import that skips
+    // the door, and it is how the heatmap came to draw a density field with the
+    // sparkline's bottom-filled ramp: correct next door, arithmetically sound,
+    // and rows of tiny bar charts on the screen.
+    rule: "SS51",
+    file: "src/presentation/plot/definition.ts",
+    source: 'const glyphs = [...RAMP_BRAILLE];',
   },
   {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
@@ -1239,6 +1255,29 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+  });
+
+  it("SS51's vocabulary list equals `ramp.ts`'s, both directions", () => {
+    // **The price of naming four constants instead of the `RAMP_` prefix.**
+    // Two `RAMP_*` names in the tree are not vocabularies — `raster.ts`'s
+    // `RAMP_DOTS` is a dot geometry and `ramp.ts`'s `RAMP_STEPS` is a rung
+    // count — so a prefix pattern reports five lines and none of them is the
+    // rule's, and excusing `raster.ts` by file would hole the rule in a
+    // renderer. A closed list is the honest pattern and it goes stale in one
+    // direction nobody would notice: a fifth ramp lands and SS51 does not see
+    // it, reporting compliance exactly as it did the day before.
+    //
+    // **The discriminator is the type of the value.** A vocabulary is a string
+    // of glyphs a normalised value indexes; `RAMP_STEPS = 8` is a number about
+    // all of them. So the subject is derived rather than restated, and both
+    // directions are asserted — a name dropped from `ramp.ts` and left in the
+    // list is a rule scanning for something that cannot exist (A03 §2's
+    // vacuity class), which is the failure MG20's `MODE_OWNERS` had.
+    const src = readFileSync("src/presentation/plot/ramp.ts", "utf8");
+    const declared = [...src.matchAll(/^export const (RAMP_[A-Z_]+)\s*=\s*"/gm)].map((m) => m[1]!);
+
+    expect(declared.length, "no vocabulary exports found — the pattern stopped matching").toBeGreaterThan(0);
+    expect([...declared].sort()).toEqual([...RAMP_VOCABULARIES].sort());
   });
 
   it("MG3 fires on a fabricated *type-only* cross-half edge, which it could not see at all", () => {

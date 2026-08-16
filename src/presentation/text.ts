@@ -694,7 +694,7 @@ function isAmbiguous(cp: number): boolean {
     (cp >= 0x2200 && cp <= 0x22ff) || // mathematical operators
     (cp >= 0x2460 && cp <= 0x24ff) || // enclosed alphanumerics
     (cp >= 0x2500 && cp <= 0x257f) || // box drawing
-    (cp >= 0x2580 && cp <= 0x259f) || // block elements — RAMP_UNICODE lives here
+    (cp >= 0x2580 && cp <= 0x259f) || // block elements — the height ladder lives here
     (cp >= 0x25a0 && cp <= 0x25ff) || // geometric shapes — ▌ ● ○ ▸ ▾
     (cp >= 0x2600 && cp <= 0x26ff) || // miscellaneous symbols
     (cp >= 0x2b00 && cp <= 0x2b1f) // arrows and shapes, supplemental

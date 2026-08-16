@@ -8605,3 +8605,63 @@ absence of one.
 
 **The cheap half is separable**: `NO_STYLE` for *collapsed* and a distinct sentinel for *missing*
 costs nothing and makes the two cases tellable apart by anything that looks.
+
+---
+
+## F173 — the anchor checker could not see 23% of its anchors ★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/anchors.mjs`, run by `make instruments` |
+| **Reached for** | a comment edit in `text.ts` broke one anchor, and the reported count was checked against the tree rather than trusted |
+| **Verdict** | **a gate that ran, printed a number, and read 357 of 465 anchors** |
+| **Absorbed by** | fixed in place — a branch per quote style, and six newly-visible stale anchors triaged |
+
+```
+before   54 runs · 357 anchors · 19 missing across 8 run(s)
+after    54 runs · 465 anchors · 25 missing across 12 run(s)
+```
+
+`anchorsOf` matched `from:\s*"…"` and nothing else. **108 anchors — 30 of the 54 runs carry at least one — are
+single-quoted** — the style an author reaches for when the anchored source itself contains a
+double quote, which is most of the interesting ones: `caps.unicode === "ascii"`,
+`origin: "defect"`, every capability test in the tree.
+
+**It is not that the rule was wrong. It had nothing to be wrong about over a quarter of its
+subject**, which is A03 §2's vacuity class arriving in the instrument that guards against
+staleness. The exit status was the same bit for *clean* and for *did not look*.
+
+### How it surfaced, and it is the sixth blind spot's method
+
+A one-word comment edit in `text.ts` broke a double-quoted anchor in `c02-ambiguous.mjs`, which
+the checker reported. Repairing it was two minutes. **Reading the run afterwards showed a second
+anchor in the same file — `rampFor`'s old body — that had been stale since the previous commit
+and had never been reported.** The checker had said the tree was clean about a file it was
+half-reading.
+
+**Two directions, and the second is the one nothing else reaches.** The reported miss was real;
+the reported *count* was the falsification. `54 runs · 357 anchors` is what a working gate looks
+like from outside, and F161 is the same shape: a count is an argument only if you know what it
+counted.
+
+### The six it revealed
+
+| run | disposition |
+|---|---|
+| `c12-ramp.mjs` | **repaired** — re-anchored onto `LADDERS.height`, pass re-run, six mutations caught |
+| `c12-value-bar.mjs` | **repaired** — re-anchored onto `pairFor`, pass re-run, six mutations caught |
+| `c10-categorical.mjs` · `c26-elements.mjs` · `c26-focus-target.mjs` | on `KNOWN_STALE` |
+| `c22-construct.mjs` · `docker-dashboard.mjs` | each gained one, counts raised |
+
+**Two repaired and four listed, and the split is the list's own doctrine**: repairing an anchor
+without running the pass produces a mutation that applies and asserts nothing, which reads as
+coverage from the summary line. The two repaired are this session's own and were re-run; the
+four are whoever runs them next.
+
+### The limit that remains
+
+The pattern now reads both quote styles and skips comment lines between `file:` and `from:`.
+**A template literal anchor would still be invisible**, and there are none today — measured, not
+assumed. The MA4 equality arm is what would catch the population moving again, and it is only as
+good as what `anchorsOf` can parse, which is why the figure is recorded in that function's header
+rather than here alone.

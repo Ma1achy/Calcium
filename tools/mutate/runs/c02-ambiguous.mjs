@@ -50,8 +50,13 @@ const MUTATIONS = [
     // column that holds it.
     name: "the sparkline measures the wide ramp instead of swapping it",
     file: RAMP,
-    from: '  return caps.ambiguousWidth === "wide" ? RAMP_BRAILLE : RAMP_UNICODE;',
-    to: "  return RAMP_UNICODE;",
+    // **Re-anchored after `ladderFor` landed, and it was stale for a commit
+    // without the checker seeing it**: `anchors.mjs` matched only double-quoted
+    // `from:` values, and this one is single-quoted. 108 of 465 anchors were in
+    // that blind spot. Run again after re-anchoring rather than trusted — the
+    // mutation kills T2.53 exactly as the old one did.
+    from: "      : caps.ambiguousWidth === \"wide\"\n        ? HEIGHT_BRAILLE\n        : HEIGHT_UNICODE,",
+    to: "      : HEIGHT_UNICODE,",
     expect: "T2.53",
   },
   {
@@ -59,7 +64,7 @@ const MUTATIONS = [
     // one range the shipped defect lives in.
     name: "block elements are not ambiguous",
     file: TEXT,
-    from: "    (cp >= 0x2580 && cp <= 0x259f) || // block elements — RAMP_UNICODE lives here\n",
+    from: "    (cp >= 0x2580 && cp <= 0x259f) || // block elements — the height ladder lives here\n",
     to: "",
     expect: "T2.52",
   },
