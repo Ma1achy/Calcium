@@ -130,37 +130,76 @@ Recorded as a composition clause on both invariants rather than as a change to e
 
 ## 3a. The heatmap
 
-**One cell per position per row, magnitude in the ramp glyph, one range across the whole
-matrix.** Everything in this section is §6a's walk, implemented; the walk carries the arguments
-and this carries the shape.
+**One cell per position per row, magnitude in the ink of the cell, one range across the whole
+matrix.** Everything here is §6a's walk implemented, plus three corrections the first draft of
+this section got wrong — recorded rather than quietly replaced, because two of them were the
+same mistake and the shape of it is worth keeping.
 
 ```
-              ⡀⣀⣄⣤⣦⣶⣷⣿⣷⣶⣤⣄⡀⣀⣄⣤
-api           ⣤⣦⣶⣷⣿⣷⣶⣤⣄⡀?????⡀⣀
-worker        ⡀⡀⡀⣀⣄⣤⣦⣶⣷⣿⣷⣶⣤⣄⡀⣀
-db            ????????????????
+              ⠄⠔⠖⠶⠷⠿⡿⣿⡿⠿⠶⠖⠔⠖⠶⠷
+api           ⠶⠷⠿⡿⣿⡿⠿⠶⠖⠄
+worker        ⠄⠄⠄⠔⠖⠶⠷⠿⡿⣿⡿⠿⠶⠖⠄⠔
+db
               -60 ticks         now
-              ⡀⣀⣄⣤⣦⣶⣷⣿  0 – 100%
+              ⠄⠔⠖⠶⠷⠿⡿⣿  0 – 100%
 ```
+
+### The ramp is the density ramp, and it is not `RAMP_BRAILLE`
+
+`RAMP_BRAILLE` fills **bottom-up** — `⡀⣀⣄⣤⣦⣶⣷⣿` — because a sparkline cell has a vertical axis
+and the glyph is a column of that axis. **A grid cell has no vertical axis**, so a bottom-filled
+glyph reads as a bar fragment and a matrix of them reads as rows of tiny bar charts.
+
+`RAMP_DENSITY` spreads instead: `⠄⠔⠖⠶⠷⠿⡿⣿`, dot populations 1 to 8, every step narrow under
+both width conventions. It is the prior art's density ramp with **one correction of its own**:
+that set begins at `U+2800`, and blank is now what an absent cell draws, so the ramp starts at
+one dot. I16 covers all three ramps for the same reason it covered two.
+
+### An absent cell is blank
+
+`?` is the sparkline's marker and it is right there: the row is right-anchored, so a blank
+already means *fewer samples than cells*, and one character cannot mean two things. **A grid has
+no padding** — every cell is a position — and the minimum has ink, so blank is unambiguous by
+construction. A row of sixteen `?` also shouts louder than the data, which is the wrong emphasis
+for the state that means *nothing happened*.
+
+So `db` above is a stopped container: a whole row of nothing, quiet, and still occupying its row
+(§6a A3).
+
+### Colour is the second channel, not a refusal — and the vocabulary for it does not exist
+
+The first draft said *no colour, so D29 is satisfied by construction*. **That is the wrong rule
+and the wrong conclusion.** F34 is the rule: a distinction must not be carried by colour
+**alone**. A braille cell carries which dots are lit *and* its foreground colour, and the two do
+not compete — so magnitude can be **both**, with the density surviving at 1-bit when the colour
+goes. Colour is safe here precisely because density is the other carrier.
+
+**Measured before ruling it in, and the answer is neither of the two expected:**
+
+| | measured |
+|---|---|
+| per-cell foreground, in this renderer | **expressible** — `mergedRow` emits a span per run of cells, and a run may be one cell |
+| a palette that means *magnitude* | **none.** `tone` is judgement, `categorical` is identity, `syntax` is syntax |
+| `spectrum` | a **hue wheel** for declared art, consumer list closed at two (C10 I16). Non-monotonic in luminance, which is the textbook wrong colormap for a quantity |
+| an unknown `ColourRef` | resolves to `{}` — **no style, silently**, so inventing `sequential.s1` would render uncoloured with nothing saying so |
+
+So the mechanism is there and the vocabulary is not. **The heatmap ships density-only, and that
+is a state rather than a ruling against colour**: what it waits on is a fourth palette family
+that means magnitude — ordered, monotone in luminance, contrast measured per theme — which is
+the shape roadmap 51's categorical palette had and the same size of change. Named here so the
+next person finds a blocker rather than a preference.
+
+### The rest
 
 **The row order is the app's and the renderer never sorts** (§6a B1). A matrix whose rows
-reorder between frames is unreadable even though every frame is individually correct, and the
-renderer has no stable key to sort by that the app does not already have.
+reorder between frames is unreadable even though every frame is individually correct.
 
-**Columns are positions and the window is of the last `areaWidth` of them** (§6a B3, I13's rule).
-A heatmap never spreads: one cell *is* one value, so spreading would draw a value twice — a lie
-about density — or interpolate, which is inventing readings. Dropped columns are named in the
-legend rather than vanishing.
+**Columns are positions and the window is of the last `areaWidth` of them** (§6a B3). A heatmap
+never spreads: one cell *is* one value, so spreading would draw a value twice — a lie about
+density — or interpolate, which is inventing readings.
 
 **Rows that do not fit take I8's answer unchanged**: the rows that fit, and the last row of the
-plot area spent on `+N more · names`. That is the same branch `stackedRows` already has, and the
-truncation marker *is* that line — there is no field.
-
-**No colour, at any depth.** Magnitude is the glyph, so D29 is satisfied by construction rather
-than by a fallback, and the 1-bit rung is not a degradation. That is also why C04 I50a's
-eight-series cap does not bind here: the categorical palette is never consulted (§6a A7).
-
----
+plot area spent on `+N more · names`. The truncation marker *is* that line; there is no field.
 
 ## 4. Degenerate series
 
@@ -534,7 +573,7 @@ recast limit, and the golden set above.
 - **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise. *Composition (§3): under downsampling the join runs from a column's last sample to the next column's first, which is what keeps I5's span-fill connected.*
 - **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`.
 - **I16** — **Every step of every ramp is visible, and no ramp's lowest step is the character its padding uses.** Eight steps, monotone in ink. The braille arm shipped with `U+2800` — BRAILLE PATTERN BLANK — as step 0, so a sparkline at `ambiguousWidth: "wide"` drew its minimum as whitespace, which the right-anchor already uses to mean *fewer samples than cells*: one character, two meanings, in the arm nothing renders in a golden frame. *This is a property of the constant, not of a call, so it is asserted over the ramps themselves.*
-- **I17** — **A heatmap draws one cell per position per row, against a range shared by the whole matrix, and carries no colour.** The shared range is what makes it a matrix rather than a stack of unrelated sparklines; the glyph is the channel at every colour depth, so nothing is distinguished by colour alone and the 1-bit rung is not a degradation. Rows are drawn in the order the block declares them and the renderer never sorts. *A ragged matrix is refused at construction (C04 I50b), because the renderer cannot know which end of a short row is old — and without that refusal `columnsOf` stretches it to the common width and column k means a different instant in every row.*
+- **I17** — **A heatmap draws one cell per position per row, against a range shared by the whole matrix, with magnitude carried by ink density and an absent cell left blank.** The shared range is what makes it a matrix rather than a stack of unrelated sparklines. **The ramp is `RAMP_DENSITY` and never the sparkline's**: the latter fills bottom-up, which encodes height, and a grid cell has no vertical axis to encode it on. Blank is absence rather than `?` because a grid has no padding for a blank to be confused with, and the lowest step has ink. Rows are drawn in the order the block declares them and the renderer never sorts. **Colour is a second carrier and not a forbidden one** (F34): density survives 1-bit, so a magnitude colour would add rather than carry alone — it is unimplemented for want of a palette that means magnitude, not refused (§3a). *A ragged matrix is refused at construction (C04 I50b).*
 
 ---
 
@@ -553,7 +592,7 @@ recast limit, and the golden set above.
 11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
 12. Y-labels are placed at the max, mid and min rows and collapse from the middle outward rather than overflowing a short plot (I15).
 13. **Every ramp step is visible and no ramp's lowest step is its padding character**, so a minimum reading never renders as absence (I16, §6).
-14. **A heatmap is one cell per position per row against one shared range, with magnitude in the glyph and no colour** (I17, §3a).
+14. **A heatmap is one cell per position per row against one shared range, magnitude in the ink and absence left blank** (I17, §3a).
 
 ---
 
@@ -578,6 +617,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.12b** (C04 I41): `fraction` and `percent` on the **same value** produce different labels — `0.84` → `84%` and `1%`. The row a per-arm table cannot express: each arm alone is a restatement of its own rule, and the defect was that two arms meant one thing.
 - **T1.12c** (C04 I41): the two arms produce different `labelWidth`s for one range, so the gutter differs. `yFormat` is geometry; a test that only reads the label text passes against a renderer that measures the wrong set.
 - **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
+- **T1.20** (I16, I17): the heatmap's ramp is `RAMP_DENSITY` and not `RAMP_BRAILLE` — asserted as a *difference*, because both are eight narrow braille steps and a frame drawn with the wrong one is a matrix of bar fragments that every count agrees with.
+- **T1.21** (I17): an absent cell is blank and a minimum cell has ink, so the two are distinguishable in a grid — the converse of the sparkline's rule and for the same reason stated from the other side.
 - **T1.17** (I17): **a matrix and a stack of lines with the same data at the same width do not render identically.** The row worth writing first: if they match, the form member is not reaching the renderer, and nothing else about a heatmap distinguishes it from the arm it would otherwise fall into.
 - **T1.18** (I17): the range is shared across rows — two rows of different magnitude draw different glyphs for the same value, and normalising per row would make every row look alike.
 - **T1.19** (C04 I50b): the three refusals and the height, each with the converse — a heatmap that declares none of them constructs.
