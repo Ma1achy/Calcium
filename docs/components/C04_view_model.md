@@ -182,6 +182,23 @@ the event that produces typos, because `percentage` is what a reader guesses.
 
 Both are optional and independent: pinning only `yMin` at 0 is the common case, because a loss curve that autoscales its floor exaggerates every wobble near zero.
 
+**`Cell.bar` is a quantity against a scale, and it is not `progress`** (I50c, C12 §3b). The two answer different questions: `progress` is *how far through*, with a `total` that is reached; a bar is *how much*, against a ceiling that may be exceeded and may not be knowable. `examples/docker` hand-wrote one in nine lines rather than bend the other, and FINDINGS gap 3 states why — *tones are severity and a load bar borrows `warn`/`error` and means neither*.
+
+```typescript
+type BarSpec = Readonly<{
+  value: number | null;      // `null` is absent — a mark, never an empty bar
+  max: number;               // the scale's top; the fill clamps here and the number does not
+  min?: number;              // default 0
+  format?: Plot["yFormat"];  // the same vocabulary the y-labels use — one formatter, two callers
+}>;
+```
+
+**`format` is `yFormat`'s vocabulary and that is deliberate.** A bar's number and a plot's y-label are the same question — *what unit did this arrive in* — and a second enum would be a second place for I41's `fraction`/`percent` confusion to happen.
+
+**A cell carries at most one of `spark` and `bar`.** Both fill the planned width and return before truncation, so a cell with both has two renderings and no rule for which wins — refused at construction rather than resolved by declaration order.
+
+**The tone stays the app's.** A framework that shipped thresholds would ship arbitrary numbers for everyone; what it owes is that expressing the mapping costs a `tone` on the cell rather than a hand-drawn bar. The cell's existing `tone` and `glyph` carry it, which is why `BarSpec` has neither.
+
 **`form: "heatmap"` is a matrix of rows, and it refuses three things rather than ignoring them** (I50b, C12 §6a). A row is a `Series` because `seriesRange` already computes the one range that makes a matrix a matrix, and §5's label column already holds row labels at no cost in plot rows — but three of `Plot`'s affordances have no meaning for it, and an ignored member is how a type acquires a field that means nothing in one arm and everything in another:
 
 - **`tone` on a row** — magnitude owns the cell, so a per-row tone is a second colour channel fighting the first. That is `Tone` asked to carry a second axis, which is roadmap 51's finding; refusing is what stops it recurring.
@@ -439,6 +456,7 @@ type Cell = Readonly<{
   tone?:  Tone;
   glyph?: Glyph;                      // leading status glyph — a slot, never a character
   spark?: readonly (number | null)[]; // inline sparkline; `null` is a gap (I46a)
+  bar?:   BarSpec;                    // a quantity against a scale (I50c, C12 I20)
 }>;
 
 type Table = Readonly<{
@@ -1043,6 +1061,7 @@ persisted document rests on.
 - **I50** — **A container's element `copy` is its children's sources, joined — and the offset does not enter it.** C26 I17 at the level above: the box hiding a child is the rendering, and the rendering is not what is copied, so a copy taken across a scrolled boundary carries the hidden rows in full and is the same text at every offset and every width. A child whose kind cannot express a source contributes **nothing** rather than its painted rows, and `table` is deliberately outside the join because C11 declares a richer `copy` per row (§3c). **A container whose elements carry no `copy` at all is the empty-block class arriving at a keystroke** — `y` filtered everything out and returned early, so the key did nothing and said nothing.
 - **I50a** — **A plot carries at most eight series, refused at construction** (roadmap 51). The categorical palette distinguishes eight, and the ninth used to reuse the first's colour — `SERIES_TONES[index % 4]`, which said two different series were one thing and, at four, said series three was `ok` and series four `warn` when neither carried a judgement. **D29 inverted**: information that is not there, carried by colour alone. Refused rather than cycled for C04 I47's reason exactly — a reader cannot see that a colour has been reused, so a rendering that lies is worse than a document that will not build. Both gates say it: `b.plot` throws and `validateBlock` reports. **The cap is a property of the declared `form`, not of the number of series** — C12 §6a A7 is where that was forced, and it is a recast rather than an exception. A `heatmap` carries magnitude in the ramp glyph and draws **no per-row colour at any depth**, so the rule has no subject there and does not bind: a matrix of eight rows is not a matrix, and capping one at the size of a palette it never reads would be a colour rule refusing a document about something else. `line` and `sparkline` keep it **unconditionally**, including the 1-bit case where a multi-series plot stacks and distinguishes spatially: construction cannot see the colour depth, and a document that renders honestly only at one depth is not a document this type should accept. That asymmetry is the whole content of the recast — the heatmap is exempt because the palette is never consulted, not because the picture happens to survive.
 - **I50b** — **A `heatmap` refuses a row `tone`, `axes: false`, and a ragged matrix, and requires a `height`.** Three affordances with no meaning for a matrix, refused rather than ignored — because a member that means nothing in one arm is indistinguishable from one that has not been implemented yet, and the reader who finds it cannot tell which. **The ragged case is the one an app hits by accident**: rings of different ages produce rows of different lengths, and the resulting picture is self-consistent and wrong, so the refusal is what makes column `k` mean tick `k` in every row. Both gates say it: `b.plot` throws and `validateBlock` reports. *C12 §6a A4, B1 and B2 carry the arguments; C12 I17 is what the renderer then guarantees.*
+- **I50c** — **A cell carries at most one of `spark` and `bar`, and a `bar` declares a scale it may exceed.** Both fill the planned width and return before truncation, so a cell holding both has two renderings and no rule for which wins. `max` is the scale's top rather than a bound on the value: the fill clamps there and the number does not (C09 I28), because a ceiling that is not knowable — a per-core CPU percentage, a quota that can be over-committed — is the case a bar is reached for. **`value: null` is absent and draws a mark**, never an empty bar, which would read as *zero* (C12 I4's rule, in the one form where an empty run is a legible value).
 
 ---
 
@@ -1099,6 +1118,7 @@ persisted document rests on.
 45. **The offset is view state in rows** — droppable, per container, clamped at read, restored by no resume, and frozen once the entry settles (I48, §3c).
 46. **A bounded region says what it is hiding** — both directions, one row, and the row is spent on a property of the block rather than of the view (I49, §3c).
 49. **`null` is a gap in a numeric array** — the one non-number a document may carry in a numeric position, because it is the only spelling of *no reading* that survives the round trip the serialiser already performs (I46a, C12 §6a).
+51. **A quantity against a scale is not progress toward a total** — `Cell.bar` draws the first and `progress` the second, and an app that had only the second hand-wrote the first (I50c, FINDINGS gap 3).
 48. **A plot carries at most eight series** — the categorical palette's size, refused at construction rather than cycled, because a repeated colour is a segmentation that lies (I50a, roadmap 51).
 50. **A heatmap refuses what has no meaning for a matrix** — a row tone, `axes: false`, and rows of differing length — rather than ignoring it, because an ignored member reads as one not yet implemented (I50b, C12 §6a).
 47. **A copy is not bounded by the box that hides it** — the container's `copy` is its children's sources joined, unchanged by the offset, and a kind with no expressible source contributes nothing rather than its rendering (I50, §3c).

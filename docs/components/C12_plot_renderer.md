@@ -128,6 +128,51 @@ Recorded as a composition clause on both invariants rather than as a change to e
 
 ---
 
+## 3b. The value bar — the `fill` encoding
+
+**A quantity against a scale, drawn as a run.** The fourth encoding axis and the one the tree
+already wanted: `examples/docker` hand-wrote nine lines of it rather than bend `progress`, which
+answers *how far through* where the app needed *how much* (FINDINGS gap 3).
+
+```typescript
+/** One row of exactly `width` cells. For C11's `Cell.bar` — the same seam `sparkline` uses. */
+function valueBar(
+  spec: BarSpec,
+  width: number,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): string;
+```
+
+**A pure function and not a block**, for `sparkline`'s reason exactly (§2): a cell is not a
+block, and the measured consumer is a table cell. C11 imports it on the same sideways edge.
+
+```
+█████████░░░░ 84.2%      unicode
+#########..... 84.2%     ascii
+—                        absent — a mark, never an empty run
+```
+
+**The fill clamps at `max` and the number does not** (C09 I28, and it is one ruling for both
+forms now). A per-core CPU percentage has no knowable ceiling, so `101.2%` fills the run and
+keeps counting; a bar that stopped at its ceiling would draw a busy container exactly like a
+saturated one.
+
+**The number takes the width it needs and the run takes the residual**, which is `progress`'s
+rule and the reason both are `fill`: the run *is* the axis, so it is the part that may shrink.
+
+**The alphabet substitutes by capability, and that is the point of it being here.** The app
+threads a `unicode` flag by hand today because an adapter is handed `AdapterContext` and no
+capabilities (F43, F54) — and its `█ ░ —` passed through untouched at `LANG=C` beside a plot
+that had correctly degraded. A framework function gets the capabilities from `ctx` and the
+thread stops being the app's.
+
+**No tone, and no thresholds.** The cell's own `tone` and `glyph` carry the colour, so a
+framework that shipped thresholds would ship arbitrary numbers for everyone — gap 3's own
+statement is that the app should not have to *invent numbers to express a quantity*, not that
+60 and 85 are wrong. The numbers stay the app's; the drawing stops being.
+
+---
+
 ## 3a. The heatmap
 
 **One cell per position per row, magnitude in the ink of the cell, one range across the whole
@@ -623,6 +668,7 @@ recast limit, and the golden set above.
 - **I17** — **A heatmap draws one cell per position per row, against a range shared by the whole matrix, with magnitude carried by ink density and an absent cell left blank.** The shared range is what makes it a matrix rather than a stack of unrelated sparklines. **The ramp is `RAMP_DENSITY` and never the sparkline's**: the latter fills bottom-up, which encodes height, and a grid cell has no vertical axis to encode it on. Blank is absence rather than `?` because a grid has no padding for a blank to be confused with, and the lowest step has ink. Rows are drawn in the order the block declares them and the renderer never sorts. **Colour is a second carrier and not a forbidden one** (F34): density survives 1-bit, so a magnitude colour would add rather than carry alone — it is unimplemented for want of a palette that means magnitude, not refused (§3a). *A ragged matrix is refused at construction (C04 I50b).*
 - **I18** — **A heatmap spends width on columns first, then truncates its labels, and never draws an unlabelled matrix.** Row labels are the ordinate: a matrix with no names beside it is a picture of numbers. Where the width cannot spare a cell for a label beside a minimum plot area the block draws a centred notice at its declared height instead — I1 holds, and the reader is told rather than shown something they cannot read. *The line form keeps T3.3's opposite ladder, because a y-label is a scale and a row label is an identity.*
 - **I19** — **The scale legend spans the full row and never truncates its range.** The dropped-column clause goes first and the ramp swatch second; the range is what the legend exists to state, and it is the reason `axes: false` is refused (C04 I50b). A key with no scale beside it is decoration.
+- **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, and an absent value draws a mark.** One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
 
 ---
 
@@ -644,6 +690,7 @@ recast limit, and the golden set above.
 14. **A heatmap is one cell per position per row against one shared range, magnitude in the ink and absence left blank** (I17, §3a).
 15. **Width goes to columns before labels, and an unlabelled matrix is never drawn** — the opposite ladder from the line form, because a row label is an identity rather than a scale (I18, §3a).
 16. **The legend never truncates the range it exists to state** (I19, §3a).
+17. **A quantity against a scale is the `fill` encoding, drawn as a run whose number may exceed it** (I20, §3b).
 
 ---
 
@@ -668,6 +715,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.12b** (C04 I41): `fraction` and `percent` on the **same value** produce different labels — `0.84` → `84%` and `1%`. The row a per-arm table cannot express: each arm alone is a restatement of its own rule, and the defect was that two arms meant one thing.
 - **T1.12c** (C04 I41): the two arms produce different `labelWidth`s for one range, so the gutter differs. `yFormat` is geometry; a test that only reads the label text passes against a renderer that measures the wrong set.
 - **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
+- **T1.25** (I20): the fill clamps at `max` and the number does not — `101.2` of `100` fills the run and reads `101.2%`, and that frame differs from `100` of `100`.
+- **T1.26** (I20, C04 I50c): `value: null` draws a mark and not an empty run, and the two are asserted as a *difference* because an empty run is a legible value.
+- **T1.27** (I20): exactly `width` cells at every width including 1, and the run takes the residual after the number.
 - **T1.22** (I18): a heatmap whose labels exceed the width keeps a matrix and truncates the labels; below the rung where one label cell fits, it draws a notice at its declared height and **never a matrix with no names beside it**. Asserted at five widths, because the defect was a state reachable only between two of them.
 - **T1.23** (I19): the legend's range survives a label column wide enough to have truncated it, and the drop order is asserted by rendering a row too narrow for all three parts.
 - **T1.20** (I16, I17): the heatmap's ramp is `RAMP_DENSITY` and not `RAMP_BRAILLE` — asserted as a *difference*, because both are eight narrow braille steps and a frame drawn with the wrong one is a matrix of bar fragments that every count agrees with.
