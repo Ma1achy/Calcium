@@ -130,10 +130,50 @@ Every one of these is real, and each has a defined result rather than an excepti
 | Empty series | Declared height, centred empty message |
 | Single point | A dot at vertical centre |
 | All values equal | Flat line at vertical centre; y-labels all show that value. **No division by zero** |
-| `NaN`, `±Infinity` present | Filtered out before scaling; the line breaks across the gap rather than spanning it |
+| `NaN`, `±Infinity` present | Never scaled, **position kept**: the line breaks across the gap, the sparkline draws `?` there (I4) |
 | All values non-finite | Treated as empty |
 | Fewer points than dot-columns | Points spread across the full width; the line is drawn between them |
 | More points than dot-columns | Downsampled by min/max per column, so spikes survive rather than being averaged away |
+
+### Absence is a value, and it already had a representation
+
+**`Series.values` carries absence today and has since C12 shipped** — a non-finite entry is a gap, `finiteSamples`
+keeps its index, and I4 rules what the line does with it. That sentence was worth measuring because the opposite
+was written down in three places: `examples/docker/src/history.ts`'s ring comment says *`Series.values` is
+`readonly number[]` and has no gap value, so a tick that produced nothing cannot be drawn*, and a roadmap entry
+and a planning note repeated it. **The ring's whole design — drop the sample, count the gap, caption
+`58 samples · 63 ticks` — is a workaround for a limitation the type does not have.**
+
+So there is **no public-type change here and the freeze argument dissolves**. What there was is a defect: the two
+forms of one block kind disagreed about the same array.
+
+```
+values  [1, 2, 3, NaN, 7, 8, 9]
+
+line       ⣀⠤⠤⠒⠒⠉        a break — the row at the gap is empty
+        ⠐⠊⠉
+                          ← this row is blank, and that IS the gap
+           ⢀⡠⠄
+        ⣀⡠⠤⠔⠒⠉⠁
+
+sparkline, before   `      ▁▂▃▆▇█`   six glyphs — the gap closed and the row SHORTENED
+sparkline, after    `     ▁▂▃?▆▇█`   seven positions, one of them with no reading
+```
+
+**Why a marker rather than a blank.** The row is right-anchored, so a leading blank already means *fewer samples
+than cells* — and a blank at the gap would mean *a sample that is missing*. One character, two meanings, in the
+case that is not rare: a stalled fetch is bursty, so a gap at the window's left edge is ordinary rather than
+exotic. `ratatui`'s `absent_value_symbol` is the same finding reached from the other side, and its sentence is
+the one to keep: **a missing sample is not a zero.**
+
+**Why `?` and why it is ASCII in every ramp.** The marker must be one cell under *both* width conventions and
+must not collide with any step of any ramp — `▁▂▃▄▅▆▇█`, `.:-=+*#@`, and the braille ramp `rampFor` returns at
+`ambiguousWidth: "wide"`. The obvious characters are not available: `·` `∅` `⋮` `◌` are all
+`East_Asian_Width=Ambiguous`, and `text.ts`'s ambiguous table deliberately covers only *the part that is drawn as
+geometry* — so `cells()` reports them as one cell at `wide` by a documented ruling, and picking one would either
+be wrong on a CJK terminal or force a range the table's own test excludes. **ASCII is unambiguous by
+construction**, and absence has no tier because it is not a magnitude: the marker is the same character whatever
+ramp is in use, which is also what makes a `spark` column read the same on both terminals.
 
 Downsampling by min/max rather than by sampling is the one worth naming: a loss curve with a spike is *about* the spike, and taking every nth point loses it exactly when it matters.
 
@@ -183,7 +223,7 @@ Under `unicode: "ascii"`, braille is unavailable.
 - **I1** — Measured height is a function of the block alone, never of the data.
 - **I2** — Rasterisation is pure and total. No series input throws.
 - **I3** — No division by zero on a constant or single-point series.
-- **I4** — Non-finite values are filtered before scaling and never reach the grid.
+- **I4** — Non-finite values never reach the grid, and **their positions survive the filter, in both forms**. A gap is a position with no sample, so the line breaks across it and the sparkline draws its absent marker there — never a shorter row and never a closed gap. *The old wording was `filtered before scaling`, which is true of both forms and constrains only one: `finiteSamples` keeps the index and `sparkline` did not, so the sparkline satisfied the invariant exactly while spanning the gap the line broke across.*
 - **I5** — Downsampling preserves per-column minima and maxima. *Composition (§3): a column also keeps its first and last sample, because preserving only the extremes leaves I14 nothing to join.*
 - **I6** — At `colourDepth: 1`, multi-series plots stack; series are never distinguished by colour alone.
 - **I7** — Stacked strips sum to exactly `height`; series labels occupy the y-label column and consume no plot rows.
@@ -192,7 +232,7 @@ Under `unicode: "ascii"`, braille is unavailable.
 - **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 2` with, by `width` cells.
 - **I11** — C12 owns no state; every render is a pure function of block, width and context.
 - **I12** — C12 registers through C09's public `register`; it is not privileged.
-- **I13** — Sparklines are exactly one row, at every width including 1.
+- **I13** — Sparklines are exactly one row, at every width including 1, **and one cell per position rather than per sample**. A window of eight positions is eight cells whether or not every position has a reading.
 - **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise. *Composition (§3): under downsampling the join runs from a column's last sample to the next column's first, which is what keeps I5's span-fill connected.*
 - **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`.
 
