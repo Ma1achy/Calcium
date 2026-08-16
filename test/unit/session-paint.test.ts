@@ -14,7 +14,11 @@ import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
 import { exact, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import { patchDefinition } from "../../src/presentation/patch/definition.js";
+import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
+import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
 const SESSION: SessionSnapshot = Object.freeze({
@@ -42,6 +46,8 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     ghost: () => null,
     overlays: () => [],
     promptCursor: () => ({ row: 0, col: 2 }),
+    promptSelection: () => [],
+    suppressBackground: () => false,
     promptFocused: () => true,
     ...over,
   };
@@ -51,6 +57,7 @@ function frameAt(columns: number, rows: number, promptRows = 1): Composed {
   return compose({
     chrome: { header: () => [], footer: () => [] },
     session: () => SESSION,
+    copyMode: () => false,
     now: () => 1_700_000_000_000,
     size: () => ({ columns, rows }),
     promptRows: () => promptRows,
@@ -157,6 +164,7 @@ describe("C22 §6 — the paint", () => {
     const f = compose({
       chrome: { header: () => [], footer: () => [] },
       session: () => SESSION,
+      copyMode: () => false,
       now: () => 1_700_000_000_000,
       size: shrinking,
       promptRows: () => 1,
@@ -180,28 +188,46 @@ describe("C22 §6 — the paint", () => {
     expect(f.promptWanted, "and what it wanted is kept, so §3 can window").toBe(200);
     expect(f.region.height, "the viewport keeps the rest").toBe(24 - 1 - 1 - 12);
 
-    const lines = paint(f, deps({ promptRows: () => rows }));
+    // **The cursor is named, and it was not** (I62, §6e.4). *The newest rows are
+    // shown* was a consequence of the window being anchored on the buffer's end,
+    // not of the cap — and this fixture left `promptCursor` at the default row 0,
+    // so it asserted tail anchoring while reading as an assertion about the cap.
+    // After a paste the cursor is at the end, which is what makes the newest rows
+    // the right ones to show.
+    const lines = paint(
+      f,
+      deps({ promptRows: () => rows, promptCursor: () => ({ row: 199, col: 0 }) }),
+    );
     expect(lines).toHaveLength(24);
     expect(lines.some((l) => l.includes("⋯")), "windowed, with the elision marker").toBe(true);
-    expect(lines.some((l) => l.includes("line 199")), "and the newest rows are shown").toBe(true);
+    expect(
+      lines.some((l) => l.includes("line 199")),
+      "and the cursor's rows are shown, which after a paste are the newest",
+    ).toBe(true);
   });
 
-  it("T1.5b (S01 C14): a cap of one shows the last row, not a marker with nothing after it", () => {
+  it("T1.5b (S01 C14, C22 I62): a cap of one shows the cursor's row, not a marker with nothing after it", () => {
     // The window is the marker plus the rows that follow it, and at a cap of
     // one there are none: `rows.slice(len - 0)` is empty, so the prompt painted
     // as `⋯` alone with the typed command nowhere on the screen. An elision
     // that elides everything annotates nothing.
     //
+    // **The ruling is *content beats a marker*, and which row was incidental to
+    // it** (§6e.4). It read as *the last row* because the window was anchored
+    // on the buffer's end; the row shown is the cursor's, and this fixture's
+    // cursor is at row 0.
+    //
     // Reachable below the size gate, which `frame.ts` already records as a real
     // window rather than a theoretical one — a resize can arrive between the
-    // gate and the frame.
+    // gate and the frame. That is also what keeps this branch alive under I62
+    // (§6e table row 6).
     const f = frameAt(40, 3, 3);
     expect(f.promptRows, "half of three, floored").toBe(1);
 
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
     const prompt = lines[1 + f.region.height];
 
-    expect(prompt?.startsWith("❯ third"), "the last row, gutter and all").toBe(true);
+    expect(prompt?.startsWith("❯ first"), "the cursor's row, gutter and all").toBe(true);
     expect(lines.join("").includes("⋯"), "and no marker, because there is no room for one").toBe(
       false,
     );
@@ -356,5 +382,253 @@ describe("C22 T4.7 (I50) — ghost text is composited, and is appearance not geo
       deps({ promptRows: () => ["/co"], ghost: () => "ntainer", spinning: () => true }),
     );
     expect(plainOf(promptRow(painted))).not.toContain("ntainer");
+  });
+});
+
+describe("C22 — the selection wash (roadmap entry 23)", () => {
+  /**
+   * The cells whose appearance changed, as a frame-read asks it.
+   *
+   * Not *which characters were in the region* — every assertion about
+   * `selectionSpans` already answers that, and answers it identically for the
+   * defect this file is written against.
+   */
+  const washedCells = (row: string): string => {
+    const m = new RegExp("\u001b\\[[0-9;]*m(.*?)\u001b\\[0m", "u").exec(row);
+    return m?.[1] ?? "";
+  };
+
+  /** The painted index of prompt row `i`: header + viewport, then the prompt. */
+  const promptAt = (f: Composed, i: number): number => f.region.height + 1 + i;
+
+  it("T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
+    // **The invariant at every step, not a note about this one.** A row of
+    // chrome — a marker line, a bracket, a status row — is forbidden by the
+    // same rule that makes the wash free.
+    const f = frameAt(20, 10, 2);
+    const rows = () => ["one", "two"];
+    const plain = paint(f, deps({ promptRows: rows }));
+    const selected = paint(
+      f,
+      deps({ promptRows: rows, promptSelection: () => [{ row: 0, from: 2, to: 20 }] }),
+    );
+
+    expect(selected.length, "the same number of rows").toBe(plain.length);
+    for (let i = 0; i < plain.length; i += 1) {
+      expect(displayCells(selected[i] ?? ""), `row ${String(i)} is the same width`).toBe(
+        displayCells(plain[i] ?? ""),
+      );
+    }
+  });
+
+  it("T4.23 (entry 23): a row the region passes THROUGH is washed to the full width", () => {
+    // **The mutation this row was written for**, and a frame-read is the only
+    // instrument that reaches it: a wash stopping at the last cluster reads as
+    // *highlighted* rather than *selected*, and it passes every assertion about
+    // which characters are in the region — because they are all still in it.
+    const f = frameAt(20, 10, 2);
+    const rows = paint(
+      f,
+      deps({
+        promptRows: () => ["abc", "de"],
+        // From row 0's first cell into the middle of row 1, so row 0 is passed
+        // through and row 1 is where the head is.
+        promptSelection: () => [
+          { row: 0, from: 2, to: 20 },
+          { row: 1, from: 2, to: 4 },
+        ],
+      }),
+    );
+
+    const through = washedCells(rows[promptAt(f, 0)] ?? "");
+    expect(displayCells(through), "through the padding, not to the last cluster").toBe(18);
+    expect(through.startsWith("abc"), "and it still covers the text").toBe(true);
+  });
+
+  it("T4.24 (entry 23): the LAST row of a region stops at the head", () => {
+    // The control for the row above. Without it, "full width" is satisfied by
+    // washing every row of the region to the edge — a different defect, and one
+    // that looks correct on any single-row selection.
+    const f = frameAt(20, 10, 2);
+    const rows = paint(
+      f,
+      deps({
+        promptRows: () => ["abc", "de"],
+        promptSelection: () => [
+          { row: 0, from: 2, to: 20 },
+          { row: 1, from: 2, to: 4 },
+        ],
+      }),
+    );
+
+    expect(displayCells(washedCells(rows[promptAt(f, 1)] ?? "")), "two cells").toBe(2);
+  });
+
+  it("T4.26 (entry 23, S01 §3): the span is mapped through the prompt's window", () => {
+    // **The row the mutation pass demanded.** An editor row and a painted row
+    // are the same number until the prompt exceeds its cap and windows around
+    // its end — and every other row here has an unwindowed prompt, so dropping
+    // the mapping failed nothing. Four editor rows into a cap of two puts the
+    // elision marker up and shifts everything by one.
+    // Four wanted rows in a five-row terminal: the cap is `floor(rows / 2)`,
+    // which is two, so the prompt windows and the marker takes one of them.
+    const f = frameAt(20, 5, 4);
+    const rows = paint(
+      f,
+      deps({
+        promptRows: () => ["aa", "bb", "cc", "dd"],
+        // The last editor row, which is the only content row the window shows.
+        promptSelection: () => [{ row: 3, from: 2, to: 4 }],
+        // **The cursor this row was implicitly relying on** (I62, §6e.4). The
+        // window follows the cursor, so a fixture that leaves it at row 0 puts
+        // the window at the head and drops this span entirely — the mapping
+        // this row is about would then be tested by nothing.
+        promptCursor: () => ({ row: 3, col: 4 }),
+      }),
+    );
+
+    expect(washedCells(rows[promptAt(f, 0)] ?? ""), "the marker row is untouched").toBe("");
+    expect(washedCells(rows[promptAt(f, 1)] ?? ""), "the wash lands on the shown row").toBe(
+      "dd",
+    );
+  });
+
+  it("T4.25 (entry 23, C10 §4b): at 1-bit the wash is reverse video, not nothing", () => {
+    // **The rung that stops the ladder falling from a background straight to a
+    // glyph.** `resolveBackground` answers nothing where there is no colour, so
+    // a wash alone would vanish; `inverse` needs no colour at all.
+    const f = frameAt(20, 10, 1);
+    const rows = paint(
+      f,
+      deps({
+        capabilities: { ...FULL_CAPS, colourDepth: 1 },
+        promptRows: () => ["abc"],
+        promptSelection: () => [{ row: 0, from: 2, to: 5 }],
+      }),
+    );
+
+    const row = rows[promptAt(f, 0)] ?? "";
+    expect(row, "SGR 7 — reverse video").toContain("[7m");
+    expect(washedCells(row)).toBe("abc");
+  });
+});
+
+describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", () => {
+  // **The painting arm has never run**, which is the risk this block exists for:
+  // `dark` inherits and the shipped default paints nothing, so every frame ever
+  // drawn in this suite has been drawn on the arm that emits no base. `light`
+  // declares `surface` (C10 I25) and is the only fixture that exercises it.
+  const BASE = sgr(resolveBase(LIGHT_THEME, FULL_CAPS));
+  /** Ink's close for a background run — the terminal's default, never ours. */
+  const DEFAULT_BG = "\x1b[49m";
+
+  /**
+   * A frame whose transcript row **closes a background run**, which is the
+   * sequence a base has to survive.
+   *
+   * **The fixture is checked against the thing under test before it is asserted
+   * against**, and this one moved the ruling when it was: a notice row was the
+   * first draft, and it carries no reset at all — L1 closes a foreground run
+   * with `39`, which a base survives untouched. A patch row ends with `49`,
+   * *default background*, and that is the terminal's rather than ours.
+   */
+  function styledFrame(): readonly string[] {
+    const kit = measurable({ theme: LIGHT_THEME, definitions: [patchDefinition] });
+    const rows = kit.renderToLines(
+      block({
+        kind: "patch",
+        id: "p1",
+        path: "a.ts",
+        language: "text",
+        hunks: [
+          { header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "added" }, { kind: "remove", text: "gone" }] },
+        ],
+      }),
+      40,
+    );
+    expect(
+      rows.some((r) => r.includes(DEFAULT_BG)),
+      "the fixture must carry a return-to-terminal-default to repair",
+    ).toBe(true);
+
+    // Eight rows: one header, one footer, one prompt, and a region that holds
+    // the patch's five without the viewport check refusing it.
+    return paint(frameAt(40, 8), deps({ theme: LIGHT_THEME, transcriptRows: () => rows }));
+  }
+
+  it("T1.23 (C22 I65): every reset in a painted row returns to the base, not to the terminal's", () => {
+    // **The repair is one pass over a finished row**, so the assertion is on the
+    // rows rather than on the sites: by the time a row is here, `fitStyled`'s
+    // cut-close, `composite`'s two and the shell's own `paint()` are all inside
+    // this string, and `render-frame`'s prefix is answered by the row's leading
+    // base. A frame read, because every one of these is invisible to a
+    // structural assertion — the cells that lose the base are the ones with the
+    // least on them.
+    expect(BASE, "the fixture must actually paint, or this whole block is vacuous").not.toBe("");
+
+    for (const [i, row] of styledFrame().entries()) {
+      expect(row.startsWith(BASE), `row ${String(i)} opens with the base`).toBe(true);
+
+      // **Every return to the terminal's default is followed by the base**, and
+      // the set is two sequences rather than one: `\x1b[0m` and `\x1b[49m`. A
+      // foreground close (`39`) is not in it, because a base survives one.
+      //
+      // **The row's own closing reset is removed first, and the mutation pass
+      // is why.** The first version split the whole row and skipped the last
+      // part, which asserts nothing at all when a row contains exactly one
+      // occurrence — and a patch row's `49` is at its end, so the two mutations
+      // this exists for both survived against sixteen passing assertions.
+      expect(row.endsWith(SGR_RESET), `row ${String(i)} closes itself`).toBe(true);
+      const body = row.slice(0, -SGR_RESET.length);
+
+      for (const seq of [SGR_RESET, DEFAULT_BG]) {
+        for (const [j, part] of body.split(seq).slice(1).entries()) {
+          expect(
+            part.startsWith(BASE),
+            `row ${String(i)} resumes after ${JSON.stringify(seq)} ${String(j)}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("T1.23a (C22 I65): a theme that inherits writes not one byte more", () => {
+    // The arm every existing golden frame is drawn against, asserted rather
+    // than assumed — a base applied unconditionally would change every frame in
+    // the suite and the diff would be too large to read.
+    const inheriting = paint(frameAt(40, 6), deps({ theme: DARK_THEME }));
+    expect(sgr(resolveBase(DARK_THEME, FULL_CAPS)), "dark inherits").toBe("");
+    for (const row of inheriting) expect(row.includes(BASE)).toBe(false);
+  });
+
+  it("T1.23b (C22 I65): no painted row ends with a live attribute", () => {
+    // **This is what makes every lifecycle path need nothing.** The alternate
+    // screen restores cell contents and not SGR state, so a row ending with the
+    // base live would leave the user's shell painted after exit — and the walk
+    // ruled a reset at `suspend()` and `release()` for exactly that. Closing the
+    // row makes the state unreachable instead, and covers exit, fault, signal
+    // and handoff at once rather than the paths someone remembered.
+    for (const [i, row] of styledFrame().entries()) {
+      expect(row.endsWith(SGR_RESET), `row ${String(i)}`).toBe(true);
+    }
+  });
+
+  it("T1.23c (C22 I65, C10 I25): `--no-bg` paints nothing, and the theme still says it would", () => {
+    const suppressed = paint(
+      frameAt(40, 6),
+      deps({ theme: LIGHT_THEME, suppressBackground: () => true }),
+    );
+    for (const row of suppressed) expect(row.includes(BASE)).toBe(false);
+    expect(LIGHT_THEME.tokens.background, "the declaration is untouched").toBe("surface");
+  });
+
+  it("T1.23d (C22 I65, C10 I26): at 1-bit a painting theme paints nothing", () => {
+    // The rung where the question does not arise: no background is painted and
+    // no foreground is coloured, so the frame is the terminal's own pair.
+    const mono = { ...FULL_CAPS, colourDepth: 1 as const };
+    expect(sgr(resolveBase(LIGHT_THEME, mono)), "surfaces vanish at 1-bit").toBe("");
+
+    const rows = paint(frameAt(40, 6), deps({ theme: LIGHT_THEME, capabilities: mono }));
+    for (const row of rows) expect(row.includes("\x1b[")).toBe(false);
   });
 });

@@ -21,6 +21,8 @@ import type { DocumentView } from "./document-view.js";
 import type { PatchView } from "./patch-view.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
+import type { FocusTarget } from "../interaction/router/types.js";
+import type { CursorStyle } from "../terminal/escapes.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
@@ -81,6 +83,18 @@ export type ChromeContext = Readonly<{
   session: SessionSnapshot;
   now: number;
   columns: number;
+  /**
+   * Copy mode is up (C16 §5b).
+   *
+   * **Handed down rather than left to the default header**, because an app that
+   * supplies its own chrome supplies all of it — and copy mode is the one mode
+   * whose entire effect is that things stop responding. A reader whose mouse
+   * has gone dead with nothing on screen saying why has been given a bug.
+   *
+   * Not on `SessionSnapshot`: that is what a *command* runs against, and this is
+   * a property of the frame, like `columns`.
+   */
+  copyMode: boolean;
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -317,7 +331,9 @@ export type PipelineDeps = Readonly<{
   confirm: ConfirmHost;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
-  persistTheme?: (variant: "dark" | "light") => void;
+  persistTheme?: (name: string) => void;
+  /** `--no-bg` for one invocation, written by `/theme`'s handler (C22 I66). */
+  setSuppressBackground: (suppressed: boolean) => void;
   history: HistoryStore;
   runner: ProcessRunner;
   lifecycle: TerminalLifecycle;
@@ -369,6 +385,28 @@ export type TuiConfig = Readonly<{
    */
   manifest: ManifestDocument | string;
   theme: ThemeSet;
+
+  /**
+   * The cursor's shape, per focus target (C22 I63, §6f, roadmap entry 45).
+   *
+   * **Keyed on the focus target and not on the layer**, and that is a check
+   * rather than a preference: `FOCUS_ORDER` has seven members and exactly two —
+   * `overlay` and `pushedView` — are layers, so a style on `Layer` would cover
+   * two-sevenths of its subject while reading as total, and the prompt, which is
+   * the case that motivates the feature, is not a layer at all.
+   *
+   * A target with no entry takes `fallback`; a `fallback` of `null`, or absent,
+   * means **the terminal's own** — Calcium writes nothing and the user's own
+   * setting stands. `null` for a target is the same answer stated per target.
+   *
+   * There is no third inheritance link and there cannot be: `FOCUS_ORDER` is a
+   * priority list rather than a tree, so there is no containing target to
+   * inherit from.
+   */
+  cursor?: Readonly<{
+    fallback?: CursorStyle | null;
+    targets?: Partial<Record<FocusTarget, CursorStyle | null>>;
+  }>;
 
   adapters?: Readonly<Record<string, Adapter>>;
   /**
@@ -450,6 +488,20 @@ export type TuiConfig = Readonly<{
   fs?: FileSystem;
   /** Default `.calcium`, beside the project. The **app** resolves its own variable (I20). */
   stateDir?: string;
+  /**
+   * Session resume (C13 I20, roadmap 44).
+   *
+   * **Absent means nothing is persisted**, and declaring a policy is what
+   * switches the feature on rather than a flag that turns it off: an app that
+   * never thought about it gets no persistence and no mystery, and an app with
+   * nothing to hide writes `"all"`.
+   *
+   * `"all"` persists every verb's settled output. Anything finer is declared
+   * per verb — `ToolDef.persist` (C05 I25) — because the app author is the only
+   * party who can know what a verb's output contains, and **the framework never
+   * redacts**.
+   */
+  persist?: "all";
   /** Default: the OS handler, http/https only. */
   openUrl?: (url: URL) => Promise<void>;
   stdout?: NodeJS.WriteStream;

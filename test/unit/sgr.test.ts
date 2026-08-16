@@ -45,11 +45,37 @@ describe("sgr — the depth tag decides the sequence", () => {
   it("T1.19: attributes are written in a stable order, and combine with colour", () => {
     expect(sgr({ bold: true })).toBe(seq("1"));
     expect(sgr({ dim: true })).toBe(seq("2"));
+    expect(sgr({ italic: true })).toBe(seq("3"));
     expect(sgr({ underline: true })).toBe(seq("4"));
     expect(sgr({ inverse: true })).toBe(seq("7"));
     expect(sgr({ bold: true, underline: true, colour: { kind: "ansi16", index: 1 } })).toBe(
       seq("1;4;31"),
     );
+    // **Italic sits between dim and underline, and the order is asserted rather
+    // than described** (roadmap 50). SGR parameters apply left to right and a
+    // reader diffing two frames reads them as a sequence, so a row that only
+    // checked *contains 3* would pass for an emitter that appended it last.
+    expect(sgr({ bold: true, dim: true, italic: true, underline: true, inverse: true })).toBe(
+      seq("1;2;3;4;7"),
+    );
+  });
+
+  it("T1.19b (roadmap 50): italic is an attribute, so no depth takes it away", () => {
+    // **The 1-bit rung, checked rather than assumed.** `bold` survives depth 1
+    // because `sgr()` writes attributes unconditionally and consults no depth —
+    // it is not a colour, so there is nothing to degrade. Italic is the same
+    // thing, which is what makes it one field rather than a mechanism.
+    //
+    // **And it is deliberately NOT a `MonoClass`.** `MONO` is the typographic
+    // fallback a *palette slot* falls to, and a slot resolving to italic would be
+    // the framework deciding some tone is emphatic in a cursive way — the
+    // app-domain knowledge `PaletteSpec.classes` exists to refuse. Asserted here
+    // so the absence is a ruling rather than an omission.
+    expect(sgr({ italic: true }), "no colour, nothing to strip").toBe(seq("3"));
+    expect(
+      sgr({ italic: true, colour: { kind: "ansi16", index: 1 } }),
+      "and it rides beside a colour rather than replacing one",
+    ).toBe(seq("3;31"));
   });
 
   it("T1.20: an empty style writes nothing, so unstyled text carries no sequence", () => {

@@ -272,7 +272,7 @@ describe("C03 integration", () => {
     expect(frames.length, "a frame was actually written").toBeGreaterThan(0);
 
     for (const [i, rows] of frames.entries()) {
-      const widths = new Set(rows.map(displayCells));
+      const widths = new Set(rows.map((l) => displayCells(l)));
       expect(rows, `frame ${String(i)}: 30 rows`).toHaveLength(30);
       expect(widths.size, `frame ${String(i)}: composed at ${[...widths].join(", ")}`).toBe(1);
     }

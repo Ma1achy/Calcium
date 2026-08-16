@@ -54,7 +54,11 @@ export const TAB_STOP = 8;
  * is a divergence of seven — per tab, per line (C09 T3.16). Expansion happens
  * before measurement so both halves see the same string.
  */
-export function expandTabs(text: string, tabStop: number = TAB_STOP): string {
+export function expandTabs(
+  text: string,
+  tabStop: number = TAB_STOP,
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
   if (!text.includes("\t")) return text;
   let out = "";
   let column = 0;
@@ -71,10 +75,19 @@ export function expandTabs(text: string, tabStop: number = TAB_STOP): string {
       continue;
     }
     out += ch;
-    column += cells(ch);
+    column += cells(ch, ambiguous);
   }
   return out;
 }
+
+/**
+ * Whether `East_Asian_Width=Ambiguous` glyphs are one cell or two (C02 I9).
+ *
+ * **Declared by the caller and never read here**, which is what keeps this file
+ * free of an import from `terminal/`: only L1 measures, and a width function
+ * that consulted a capability would be one L0's data half could never call.
+ */
+export type AmbiguousWidth = "narrow" | "wide";
 
 /**
  * Display width in terminal cells, grapheme-aware.
@@ -82,8 +95,22 @@ export function expandTabs(text: string, tabStop: number = TAB_STOP): string {
  * A cluster is measured as a unit: a ZWJ family emoji is 2 cells, not 2 per
  * component; a base plus combining marks is the base's width; a variation
  * selector adds nothing of its own.
+ *
+ * **`ambiguous` defaults to `narrow`, which is today's behaviour**, so every
+ * existing call is unchanged and the callers that hold a capability opt in. That
+ * is a **partial** adoption by construction: a site that holds the capability and
+ * does not pass it measures narrow while the frame beside it is drawn wide, and
+ * the ASCII fast path above returns early regardless — correctly, since no ASCII
+ * character is ambiguous. Roadmap 51 carries the sweep of the remaining sites and
+ * the scan rule that would make forgetting one loud.
+ *
+ * **The partiality reaches inside this file too**: `truncate` and `wrapCells`
+ * measure through `clusterCells`, whose own default is narrow, so a wide session
+ * measures a sparkline correctly and still wraps a box-drawing paragraph as
+ * though it were narrow. Named here rather than left for a reader to discover —
+ * the sweep is one change and this is the first half of it.
  */
-export function cells(text: string): number {
+export function cells(text: string, ambiguous: AmbiguousWidth = "narrow"): number {
   if (text === "") return 0;
 
   // **The printable-ASCII path, and it is an equality rather than an
@@ -109,7 +136,7 @@ export function cells(text: string): number {
 
   let total = 0;
   for (const { segment } of GRAPHEMES.segment(stripControl(text))) {
-    total += clusterCells(segment);
+    total += clusterCells(segment, ambiguous);
   }
   return total;
 }
@@ -133,8 +160,8 @@ export function cells(text: string): number {
  * two answers to "how wide is this line" is C09 I1's divergence in the one
  * place that moves the whole frame.
  */
-export function displayCells(text: string): number {
-  return cells(text.replace(sgrPattern(), ""));
+export function displayCells(text: string, ambiguous: AmbiguousWidth = "narrow"): number {
+  return cells(text.replace(sgrPattern(), ""), ambiguous);
 }
 
 /**
@@ -145,8 +172,13 @@ export function displayCells(text: string): number {
  * line is closed with `SGR_RESET` **only if it was cut**, so an unstyled line
  * gains no bytes and a cut one cannot bleed.
  */
-export function fitStyled(text: string, width: number, reset: string): string {
-  if (displayCells(text) === width) return text;
+export function fitStyled(
+  text: string,
+  width: number,
+  reset: string,
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
+  if (displayCells(text, ambiguous) === width) return text;
 
   const sgr = sgrPattern();
   let out = "";
@@ -170,7 +202,7 @@ export function fitStyled(text: string, width: number, reset: string): string {
 
     const ch = [...text.slice(i)][0] ?? "";
     if (ch === "") break;
-    const w = cells(ch);
+    const w = cells(ch, ambiguous);
     if (used + w > width) {
       cut = true;
       break;
@@ -212,7 +244,12 @@ export function fitStyled(text: string, width: number, reset: string): string {
  * ends first. Nothing is padded here — the caller knows whether a short tail
  * should be filled, and `paint` does.
  */
-export function sliceCells(text: string, from: number, to: number): string {
+export function sliceCells(
+  text: string,
+  from: number,
+  to: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
   const start = Math.max(0, Math.floor(from));
   const end = Math.max(start, Math.floor(to));
   if (end === start) return "";
@@ -245,7 +282,7 @@ export function sliceCells(text: string, from: number, to: number): string {
 
     const ch = [...text.slice(i)][0] ?? "";
     if (ch === "") break;
-    const w = cells(ch);
+    const w = cells(ch, ambiguous);
 
     // Straddling the left edge or the right: blanked in both directions, so the
     // window measures `to - from` either way. The left case is a separate path
@@ -327,7 +364,7 @@ export function clusterWidth(cluster: string): number {
  * column — and a regional-indicator pair is one flag of two cells rather than
  * two glyphs of two.
  */
-function clusterCells(cluster: string): number {
+function clusterCells(cluster: string, ambiguous: AmbiguousWidth = "narrow"): number {
   const points = [...cluster];
   const base = points[0]?.codePointAt(0);
   if (base === undefined) return 0;
@@ -336,7 +373,8 @@ function clusterCells(cluster: string): number {
   if (points.some((p) => p.codePointAt(0) === 0xfe0f)) return 2;
   if (isRegionalIndicator(base)) return 2;
 
-  return isWide(base) ? 2 : 1;
+  if (isWide(base)) return 2;
+  return ambiguous === "wide" && isAmbiguous(base) ? 2 : 1;
 }
 
 /**
@@ -355,14 +393,14 @@ function clusterCells(cluster: string): number {
 export function truncate(
   text: string,
   width: number,
-  caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
+  caps: Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: AmbiguousWidth }>,
   from: "start" | "end" = "end",
 ): string {
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return "";
 
   const clean = stripControl(text);
-  if (cells(clean) <= limit) return clean;
+  if (cells(clean, caps.ambiguousWidth) <= limit) return clean;
 
   // `bmp` keeps the Unicode marker: U+2026 is in the basic plane, and the
   // ASCII form is for terminals that cannot draw beyond it at all.
@@ -381,7 +419,7 @@ export function truncate(
   let kept = "";
   let used = 0;
   for (const segment of order) {
-    const w = clusterCells(segment);
+    const w = clusterCells(segment, caps.ambiguousWidth);
     if (used + w > budget) break;
     kept = from === "start" ? segment + kept : kept + segment;
     used += w;
@@ -409,12 +447,12 @@ export function truncate(
 export function truncateParts(
   text: string,
   width: number,
-  caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
+  caps: Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: AmbiguousWidth }>,
 ): Readonly<{ kept: string; suffix: string }> {
   const whole = stripControl(text);
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return { kept: "", suffix: "" };
-  if (cells(whole) <= limit) return { kept: whole, suffix: "" };
+  if (cells(whole, caps.ambiguousWidth) <= limit) return { kept: whole, suffix: "" };
 
   const marker = caps.unicode === "ascii" ? "~" : "\u2026";
   const budget = limit - 1;
@@ -423,7 +461,7 @@ export function truncateParts(
   let kept = "";
   let used = 0;
   for (const { segment } of GRAPHEMES.segment(whole)) {
-    const w = clusterCells(segment);
+    const w = clusterCells(segment, caps.ambiguousWidth);
     if (used + w > budget) break;
     kept += segment;
     used += w;
@@ -476,7 +514,11 @@ export function compareByGrapheme(a: string, b: string): number {
  * longer exact slices of the source \u2014 which is what lets syntax tokens,
  * addressed by offset, be sliced against them at all.
  */
-export function hardWrapCells(text: string, width: number): readonly string[] {
+export function hardWrapCells(
+  text: string,
+  width: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): readonly string[] {
   const limit = Math.max(1, Math.floor(width));
   const out: string[] = [];
   let line = "";
@@ -484,7 +526,7 @@ export function hardWrapCells(text: string, width: number): readonly string[] {
 
   for (const raw of GRAPHEMES.segment(text)) {
     const segment = placeable(raw.segment, limit);
-    const w = clusterCells(segment);
+    const w = clusterCells(segment, ambiguous);
     if (used + w > limit && line !== "") {
       out.push(line);
       line = "";
@@ -508,7 +550,11 @@ export function hardWrapCells(text: string, width: number): readonly string[] {
  * does not — a 10,000-character token still has to render. An explicit newline
  * always breaks, and an empty string is one line rather than none (C04 I17).
  */
-export function wrapCells(text: string, width: number): readonly string[] {
+export function wrapCells(
+  text: string,
+  width: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): readonly string[] {
   const limit = Math.max(1, Math.floor(width));
   const out: string[] = [];
 
@@ -522,7 +568,7 @@ export function wrapCells(text: string, width: number): readonly string[] {
     let used = 0;
     for (const raw of GRAPHEMES.segment(paragraph)) {
       const segment = placeable(raw.segment, limit);
-      const w = clusterCells(segment);
+      const w = clusterCells(segment, ambiguous);
 
       if (used + w > limit && line !== "") {
         const at = breakPoint(line);
@@ -533,7 +579,7 @@ export function wrapCells(text: string, width: number): readonly string[] {
           out.push(line.slice(0, at).trimEnd());
           line = line.slice(at);
         }
-        used = cells(line);
+        used = cells(line, ambiguous);
       }
       line += segment;
       used += w;
@@ -617,6 +663,42 @@ function isZeroWidth(cp: number): boolean {
 
 function isRegionalIndicator(cp: number): boolean {
   return cp >= 0x1f1e6 && cp <= 0x1f1ff;
+}
+
+/**
+ * `East_Asian_Width=Ambiguous`, the ranges that appear in terminal output (C02
+ * I9).
+ *
+ * **Not the whole property, and the omission is deliberate.** UAX #11 lists
+ * hundreds of ranges, most of them Cyrillic, Greek and Latin letters with
+ * accents that no terminal renderer has ever drawn two cells wide in practice
+ * because the fonts do not have wide forms for them. What this covers is the
+ * part that is *drawn as geometry* and therefore actually doubles: box drawing,
+ * block elements, geometric shapes, arrows, the dingbat marks C09 draws from,
+ * and the enclosed alphanumerics.
+ *
+ * **The test of a range's inclusion is whether the tree draws from it.** Every
+ * one below has a caller: `RAMP_UNICODE`'s lower blocks, `GLYPH_TABLE`'s marks,
+ * C09's borders, C12's axes. A range with no caller would be a claim about
+ * terminals nobody here has measured — which is the shape this whole finding is
+ * about.
+ *
+ * A width library was the alternative and DEPENDENCIES.md already refuses one
+ * for `cells()`: two implementations of one rule diverge in the cases nobody
+ * tests.
+ */
+function isAmbiguous(cp: number): boolean {
+  return (
+    (cp >= 0x2010 && cp <= 0x2027) || // general punctuation: dashes, quotes, ellipsis
+    (cp >= 0x2190 && cp <= 0x21ff) || // arrows
+    (cp >= 0x2200 && cp <= 0x22ff) || // mathematical operators
+    (cp >= 0x2460 && cp <= 0x24ff) || // enclosed alphanumerics
+    (cp >= 0x2500 && cp <= 0x257f) || // box drawing
+    (cp >= 0x2580 && cp <= 0x259f) || // block elements — RAMP_UNICODE lives here
+    (cp >= 0x25a0 && cp <= 0x25ff) || // geometric shapes — ▌ ● ○ ▸ ▾
+    (cp >= 0x2600 && cp <= 0x26ff) || // miscellaneous symbols
+    (cp >= 0x2b00 && cp <= 0x2b1f) // arrows and shapes, supplemental
+  );
 }
 
 function isWide(cp: number): boolean {

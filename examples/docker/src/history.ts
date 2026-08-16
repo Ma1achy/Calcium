@@ -8,19 +8,34 @@
  *
  * Every ruling here is S3_WALK.md's.
  *
- * **Ticks and samples are counted separately, and that is the whole design**
- * (walk A2). `Series.values` is `readonly number[]` and has no gap value, so a
- * tick that produced nothing cannot be drawn. The three candidates were: repeat
- * the last sample (a flat run that never happened), push zero (a cliff to idle,
- * when the container is not idle but absent — DASHBOARD_WALK A3), or drop it and
- * let sixty samples spanning ninety seconds render exactly like sixty spanning
- * sixty.
+ * **Ticks and samples were counted separately, and the premise of that design
+ * expired on 2026-08-16.** Walk A2 read *`Series.values` is `readonly number[]`
+ * and has no gap value, so a tick that produced nothing cannot be drawn* — and
+ * the type carried absence the whole time. A non-finite entry **is** a gap:
+ * `finiteSamples` keeps its index and C12 I4 breaks the line across it. The
+ * claim was never measured; it was inferred from the type's signature and then
+ * quoted into a roadmap entry and a planning note as though it had been.
  *
- * The third is right, and it is only honest because the gap is *counted*.
- * `58 samples · 63 ticks` is a statement a reader can check; "the axis is
- * unreliable across a stall" is a disclaimer nobody can act on. The caption
- * reports both numbers, always, so their agreement is as visible as their
- * divergence.
+ * **And the correction was half wrong in its turn.** The gap renders, and a
+ * `NaN` gap is not a legal *document*: C04 I46 refuses a non-finite element,
+ * because `JSON.stringify` writes one as `null`. So the walk's conclusion was
+ * right, its reason was wrong, the correction's reason was right and its
+ * conclusion was wrong, and what settled it was running `validateDocument` over
+ * the block this file feeds. The spelling is `null` (C04 I46a).
+ *
+ * So the fourth candidate — the one the walk did not list because it believed it
+ * impossible — is the right one, and it is the only one that is honest about
+ * both axes: **push the gap.** The three it did list are still wrong for the
+ * reasons it gives: repeating the last sample is a flat run that never happened,
+ * zero is a cliff to idle when the container is absent rather than idle
+ * (DASHBOARD_WALK A3), and dropping it lets sixty samples spanning ninety
+ * seconds render exactly like sixty spanning sixty.
+ *
+ * **`missed` survives and the caption is unchanged**, which is the check that
+ * this is an addition rather than a redesign: the count is a total over the
+ * view's life and the gaps are where they happened, and a reader wants both.
+ * What changed is that *the axis is unreliable across a stall* stopped being a
+ * disclaimer and became something the frame shows.
  *
  * **`began` is separate from `took` for one reason** (walk A2): a fetch that
  * rejects is still a tick, and a tick counted only on success cannot see the
@@ -42,8 +57,11 @@ export interface Ring {
    * (walk A8, DASHBOARD_WALK A3).
    */
   took(value: number | null): void;
-  /** Oldest first, at most `cap` of them. */
-  readonly values: readonly number[];
+  /**
+   * Oldest first, at most `cap` of them — **one per tick, including the ticks
+   * that produced nothing**, which arrive as `null` (C04 I46a, C12 I4).
+   */
+  readonly values: readonly (number | null)[];
   /** Attempts, including the ones that produced nothing. */
   readonly ticks: number;
   /**
@@ -84,7 +102,7 @@ export interface Ring {
 export const capFor = (width: number): number => Math.max(24, width - 12);
 
 export function createRing(cap: number): Ring {
-  const values: number[] = [];
+  const values: (number | null)[] = [];
   let ticks = 0;
   let missed = 0;
   return {
@@ -92,10 +110,19 @@ export function createRing(cap: number): Ring {
       ticks += 1;
     },
     took(value) {
-      if (value === null) {
-        missed += 1;
-        return;
-      }
+      // **A gap is pushed, not skipped** (C12 I4), and **`null` is its spelling**
+      // (C04 I46a). The position with no reading: the line breaks across it and a
+      // sparkline draws `?` there, where dropping it made ninety seconds of ticks
+      // render as sixty seconds of samples. `missed` is still counted, because
+      // *where* and *how many* are different questions and the caption answers
+      // the second.
+      //
+      // **It was `NaN` for one commit and that document was invalid.** The
+      // validator refuses a non-finite element (I46) because `JSON.stringify`
+      // writes one as `null` — so the persisted form was already this shape while
+      // the declared type forbade it. Nothing here noticed, because a constructed
+      // block never reaches the validator.
+      if (value === null) missed += 1;
       values.push(value);
       if (values.length > cap) values.shift();
     },
@@ -109,6 +136,92 @@ export function createRing(cap: number): Ring {
       return missed;
     },
     cap,
+  };
+}
+
+/**
+ * One ring per container, and the rows stay rectangular by construction.
+ *
+ * **The dashboard is the surface that sees every container and keeps nothing**:
+ * `b.live`'s `render` reads the tick's snapshot alone, which is gap 1 unfilled
+ * on the other surface. `container.ts` fills it for one container; this fills it
+ * for all of them, and one container's CPU across ticks is one row of a matrix
+ * with as many rows as there are containers.
+ *
+ * **Every known container is ticked, present or not** (C12 §6a B2). A container
+ * that vanishes from a snapshot takes a `null` rather than dropping out, and a
+ * container first seen at tick 40 is back-filled with 39 of them — so **column k
+ * is tick k in every row**, which is what makes the set a matrix rather than a
+ * stack of unrelated series.
+ *
+ * That is not tidiness. `columnsOf` places a sample at `round((i / span) * (w −
+ * 1))` using *that series' own* length, so ragged rows would be stretched to a
+ * common width and column k would mean a different instant in every one —
+ * arithmetically self-consistent, and describing a different thing than it
+ * holds. Padding is the only fix and only the app can do it, because only the
+ * app knows which end is old.
+ *
+ * **Nothing is ever forgotten.** A stopped container keeps its row of absences
+ * until the view closes: that is what a heatmap of a machine looks like, and a
+ * row that disappears renumbers the ordinate under the reader.
+ */
+export interface RingSet {
+  /**
+   * One tick's readings, keyed by container id. Absent from the map and present
+   * with a `null` are the same thing here — *no reading* — because they are the
+   * same thing to a reader, and the ring counts both as missed.
+   */
+  tick(readings: ReadonlyMap<string, number | null>): void;
+  /** Ids in first-seen order, which is the order the rows are in. */
+  readonly ids: readonly string[];
+  /** The ring for an id, or `undefined` if it has never been seen. */
+  ring(id: string): Ring | undefined;
+  /** Ticks taken. Every ring has had exactly this many samples pushed. */
+  readonly ticks: number;
+}
+
+export function createRingSet(cap: number): RingSet {
+  const rings = new Map<string, Ring>();
+  const order: string[] = [];
+  let ticks = 0;
+
+  return {
+    tick(readings) {
+      // **New ids are back-filled before the tick, not after.** A ring created
+      // empty at tick 40 would be 39 samples short of every other row for the
+      // rest of the session, and the stretch that produces is invisible in every
+      // number — the row renders, at the wrong density, against a shared axis.
+      for (const id of readings.keys()) {
+        if (rings.has(id)) continue;
+        const fresh = createRing(cap);
+        for (let i = 0; i < ticks; i += 1) {
+          fresh.began();
+          fresh.took(null);
+        }
+        rings.set(id, fresh);
+        order.push(id);
+      }
+
+      // **Every known ring, not every reading.** A container missing from this
+      // snapshot is a container that produced nothing, which is a gap in its row
+      // and not an absence of row.
+      for (const id of order) {
+        const ring = rings.get(id);
+        if (ring === undefined) continue;
+        ring.began();
+        ring.took(readings.get(id) ?? null);
+      }
+      ticks += 1;
+    },
+    get ids() {
+      return order;
+    },
+    ring(id) {
+      return rings.get(id);
+    },
+    get ticks() {
+      return ticks;
+    },
   };
 }
 

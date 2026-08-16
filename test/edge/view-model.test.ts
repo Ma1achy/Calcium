@@ -5,13 +5,16 @@
 // Those wait on C09 and say so. What is C04's own is the boundary behaviour of
 // validation and patching, and the width arithmetic the measurers will share.
 import { describe, expect, it } from "vitest";
+import { b } from "../../src/shell/builders/index.js";
 import {
   applyPatch,
   atLeastOne,
   block,
   childWidths,
   document,
-  groupChildWidth,
+  groupChildWidths,
+  type Share,
+  placeable,
   insetWidth,
   normaliseWidth,
   validateBlock,
@@ -31,6 +34,20 @@ function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   return r.doc;
 }
 
+/**
+ * A `row`/`column` group of `n` trivial children — the shape `groupChildWidths`
+ * takes, since the width rule now reads the block's own weights (C04 I42).
+ */
+function rowOf(n: number, direction: "row" | "column", flex?: readonly Share[]): Group {
+  return {
+    kind: "group",
+    id: "g",
+    direction,
+    children: Array.from({ length: n }, (_, i) => ({ kind: "raw", id: `r${String(i)}`, text: "x" }) as Block),
+    ...(flex === undefined ? {} : { flex }),
+  } as Group;
+}
+
 describe("C04 width arithmetic at the boundaries", () => {
   it("T3.1 / T3.2: width 1 and width 0 both resolve, and never divide by zero", () => {
     expect(normaliseWidth(1)).toBe(1);
@@ -39,17 +56,201 @@ describe("C04 width arithmetic at the boundaries", () => {
     // A row group of eight children at width 1: the split floors to a negative
     // number before normalising, which is the arithmetic that would otherwise
     // produce NaN, Infinity, or a negative height.
-    const w = groupChildWidth("row", 1, 8);
+    const w = groupChildWidths(rowOf(8, "row"), 1)[0];
     expect(Number.isInteger(w)).toBe(true);
     expect(w).toBeGreaterThanOrEqual(1);
   });
 
+  it("T3.16 (I42, §3): equal weights measure identically to no weights", () => {
+    // **Written before any weighted row**, because it is the only assertion that
+    // separates the two gutter rules: taking the gutter proportionally is right
+    // at every equal split and wrong at every uneven one, so a suite of weighted
+    // rows agrees with both. It is also the regression guard for every existing
+    // `group` call site — six in the tree, all `column`.
+    for (const n of [2, 3, 5]) {
+      const equal = Array.from({ length: n }, () => 1);
+      for (const width of [1, 2, 7, 13, 40, 79, 80, 120, 200]) {
+        for (const direction of ["row", "column"] as const) {
+          expect(
+            groupChildWidths(rowOf(n, direction, equal), width),
+            `${direction} ${String(n)} children at ${String(width)}`,
+          ).toEqual(groupChildWidths(rowOf(n, direction), width));
+        }
+      }
+    }
+
+    // And equal weights of any magnitude are the same split — the field is a
+    // ratio, so `[2, 2]` and `[1, 1]` are one layout.
+    expect(groupChildWidths(rowOf(2, "row", [2, 2]), 80)).toEqual(
+      groupChildWidths(rowOf(2, "row"), 80),
+    );
+  });
+
+  it("T3.17 (I42): a weighted row divides the budget after the gutter", () => {
+    // 80 columns, one gutter cell off the top, 79 to divide 2 : 1 → 52 and 26.
+    // **Asserted on the widths handed down and not on the height**: two
+    // allocation rules can produce one height and differ about which child was
+    // narrow.
+    expect(groupChildWidths(rowOf(2, "row", [2, 1]), 80)).toEqual([52, 26]);
+
+    // The leftover cell is **unspent**, exactly as it is with no weights — the
+    // ruling the code corrected, because spending it would make `[1, 1]` differ
+    // from absent and T3.16 is what would have caught that.
+    expect(52 + 26 + 1, "one cell of the eighty goes to nobody").toBe(79);
+
+    // Three children, two gutters: 78 divided 3 : 2 : 1 → 39, 26, 13.
+    expect(groupChildWidths(rowOf(3, "row", [3, 2, 1]), 80)).toEqual([39, 26, 13]);
+  });
+
+  it("T3.18 (I42, §3): a narrow weighted row places left to right, never by size", () => {
+    // **The fixture was searched for rather than guessed, and the first one did
+    // not work.** Shares always sum inside the budget, so nothing is dropped
+    // until the 1-cell floor raises a share — and among floored children every
+    // width is 1, where sorting changes nothing. The two rules diverge only
+    // where a wide child sits beside several floored ones: `[20, 1, 1, 1, 1]` at
+    // nine columns gives `[4, 1, 1, 1, 1]`, and placing smallest-first fits four
+    // where left-to-right fits three.
+    const wide = rowOf(5, "row", [20, 1, 1, 1, 1]);
+    expect(groupChildWidths(wide, 9), "the shares this rests on").toEqual([4, 1, 1, 1, 1]);
+    expect(placeable(wide, 9), "left to right: the wide one, then two").toBe(3);
+
+    // Everything placed is placed at a real width, and the survivors are a
+    // prefix — the renderer slices, so position is the whole of the choice.
+    expect(groupChildWidths(wide, 9).slice(0, 3).every((w) => w >= 1)).toBe(true);
+  });
+
+  it("T3.19 (I43, → C09 §4b): the floor's boundary moves into ordinary range", () => {
+    // C09 §4b measured the width-1 substitution as degenerate — `w ≤ 2n - 1`,
+    // sixty children at 120 columns. Weights reach it with **two** children at
+    // eighty, which is why that reasoning does not carry to the weighted path.
+    expect(groupChildWidths(rowOf(2, "row", [50, 1]), 80)[1]).toBe(1);
+    expect(groupChildWidths(rowOf(2, "row"), 80)[1], "and the equal split does not").toBe(39);
+
+    // **Where the deferral's equivalence ends** (I43). Nesting expresses the
+    // same proportions and drops differently: the nested pair is one child of
+    // the outer row and goes whole.
+    const flat = rowOf(3, "row", [2, 1, 1]);
+    const nested: Group = {
+      kind: "group",
+      id: "outer",
+      direction: "row",
+      children: [
+        { kind: "raw", id: "a", text: "x" } as Block,
+        {
+          kind: "group",
+          id: "inner",
+          direction: "row",
+          children: [
+            { kind: "raw", id: "b", text: "x" } as Block,
+            { kind: "raw", id: "c", text: "x" } as Block,
+          ],
+        } as Block,
+      ],
+    } as Group;
+
+    expect(placeable(flat, 4), "three flat children, dropped one at a time").toBeLessThan(3);
+    expect(placeable(nested, 4), "two outer children, and the pair is one of them").toBe(2);
+  });
+
+  it("T3.20 (I44): a fixed share is the same number of cells at every width", () => {
+    // **Two widths in one row, because one cannot tell a cell count from a
+    // ratio.** `[40, 61]` gives 41 and 62 at 105 and 47 and 71 at 120 — right
+    // once and drifting after — which is the measurement that says the banner
+    // cannot be a proportion.
+    expect(groupChildWidths(rowOf(2, "row", [40, 61]), 105)).toEqual([41, 62]);
+    expect(groupChildWidths(rowOf(2, "row", [40, 61]), 120)).toEqual([47, 71]);
+
+    for (const width of [105, 120, 200]) {
+      const widths = groupChildWidths(rowOf(2, "row", [{ cells: 40 }, 1]), width);
+      expect(widths[0], `fixed at ${String(width)}`).toBe(40);
+      expect(widths[1], "and the weight takes what is left").toBe(width - 1 - 40);
+    }
+
+    // Fixed and weighted together: 40 cells off the top, one gutter, and the
+    // remaining 64 divided 3 : 1.
+    expect(groupChildWidths(rowOf(3, "row", [{ cells: 40 }, 3, 1]), 106)).toEqual([40, 48, 16]);
+
+    // A row of fixed children alone divides nothing, and the slack is unspent.
+    expect(groupChildWidths(rowOf(2, "row", [{ cells: 10 }, { cells: 20 }]), 80)).toEqual([10, 20]);
+  });
+
+  it("T3.21 (I44, §3): a fixed child is not privileged at placement", () => {
+    // **The fixed child is last**, which is where a fixed-first placement rule
+    // would keep it — so the two rules disagree here and nowhere a row that fits
+    // could show. Placement stays left to right, as it does for weights (I42).
+    const wide = rowOf(3, "row", [1, 1, { cells: 30 }]);
+    // Thirty cells demanded of a twelve-column row: the budget the weights
+    // divide is **negative**, so both fall to the 1-cell floor — the fixed child
+    // is satisfied in the arithmetic and then fails to be placed, which is the
+    // two questions coming apart exactly where I44 says they do.
+    const widths = groupChildWidths(wide, 12);
+    expect(widths, "the shares this rests on").toEqual([1, 1, 30]);
+
+    expect(placeable(wide, 12), "the two weighted ones, and then the budget is gone").toBe(2);
+  });
+
+  it("T3.22 (I45): a bottom-aligned short child draws what a hand-padded one draws", () => {
+    // **The banner's blank first row, expressed by the container.** A seven-row
+    // art beside an eight-row one, aligned `bottom`, must render exactly as the
+    // same art with a blank row written into it — which is what
+    // `DOCKER_TUI_BANNER.md` calls *the top pad already in the document*.
+    //
+    // Framework-side as well as in the consumer, and the mutation pass is why:
+    // the example's rows import `@fmx/calcium` and run against `dist/`, so a
+    // mutation to `src/` cannot reach them. A row that a mutation cannot touch
+    // is a row that reports nothing about the code under it.
+    const kit = measurable({});
+    const tall = b.raw(["1", "2", "3"].join("\n"));
+    const short = b.raw(["X"].join("\n"));
+    const padded = b.raw(["", "", "X"].join("\n"));
+
+    const byHand = kit.renderToLines(
+      b.group("row", [tall, padded], { flex: [{ cells: 5 }, 1] }),
+      20,
+    );
+    const byContainer = kit.renderToLines(
+      b.group("row", [tall, short], { flex: [{ cells: 5 }, 1], align: ["top", "bottom"] }),
+      20,
+    );
+    expect(byContainer.map((l) => l.replace(/\s+$/u, ""))).toEqual(
+      byHand.map((l) => l.replace(/\s+$/u, "")),
+    );
+
+    // **The control, and the default.** Without the alignment the short child
+    // sits at the top, which is what a row did before this existed — so `top`
+    // is asserted rather than assumed, and the row above is about the alignment
+    // rather than about two arts that happen to match.
+    const plain = kit.renderToLines(b.group("row", [tall, short], { flex: [{ cells: 5 }, 1] }), 20);
+    expect(plain[0], "absent means top").toContain("X");
+    expect(
+      kit.renderToLines(
+        b.group("row", [tall, short], { flex: [{ cells: 5 }, 1], align: ["top", "top"] }),
+        20,
+      ),
+      "and `top` is what absent already did",
+    ).toEqual(plain);
+  });
+
+  it("T3.23 (I45): neither axis changes a measurement", () => {
+    // **Position is not size**, which is what makes both axes cheap: the row is
+    // still its tallest child and every cache keyed on `(block, width)` is
+    // untouched. Asserted over the corpus of widths rather than at one, because
+    // an alignment that leaked into a height would leak at some widths only.
+    const kit = measurable({});
+    const plain = rowOf(2, "row");
+    const aligned: Group = { ...plain, align: ["bottom", "middle"] };
+
+    for (const width of [7, 13, 40, 80, 120]) {
+      expect(kit.measure(aligned, width), `at ${String(width)}`).toBe(kit.measure(plain, width));
+    }
+  });
+
   it("T3.6c (§3): a row group splits equally, and still measures when it cannot", () => {
-    expect(groupChildWidth("row", 80, 3), "floor((80 - 2) / 3)").toBe(26);
+    expect(groupChildWidths(rowOf(3, "row"), 80)[0], "floor((80 - 2) / 3)").toBe(26);
 
     // At width 2 with three children the split floors to 0 — every child is
     // measured at 1 rather than at 0, and the group still returns something.
-    expect(groupChildWidth("row", 2, 3)).toBe(1);
+    expect(groupChildWidths(rowOf(3, "row"), 2)[0]).toBe(1);
 
     const g: Group = block({
       kind: "group",

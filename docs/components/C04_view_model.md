@@ -134,9 +134,11 @@ type Group    = Readonly<{ kind: "group"; id: string;
                            direction: "row" | "column"; children: readonly Block[] }> & Gap;
 type Raw      = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
 
-type Series   = Readonly<{ values: readonly number[]; label?: string; tone?: Tone }>;
+type Series   = Readonly<{ values: readonly (number | null)[];   // `null` is a gap (I46a, C12 I4)
+                           label?: string; tone?: Tone }>;
+type PlotForm = "line" | "sparkline" | "heatmap";
 type Plot     = Readonly<{ kind: "plot"; id: string;
-                           form: "line" | "sparkline";
+                           form: PlotForm;
                            series: readonly Series[];
                            height?: number; axes?: boolean;
                            xLabels?: readonly [string, string, string];
@@ -179,6 +181,14 @@ the event that produces typos, because `percentage` is what a reader guesses.
 **`yMin` and `yMax` pin the vertical range.** C12 §3 says the range is computed over all series "unless the block pins them" and C12 T1.14 tests exactly that, while the shape had no field to pin it with — intent stated in prose that the schema could not carry, the same class as the missing `align` and the missing truncation side. Absent, the range is the data's; present, values outside it clamp to the edge rather than escaping the grid, which is what makes a pinned axis usable for comparing two plots rather than a way to lose points off the top.
 
 Both are optional and independent: pinning only `yMin` at 0 is the common case, because a loss curve that autoscales its floor exaggerates every wobble near zero.
+
+**`form: "heatmap"` is a matrix of rows, and it refuses three things rather than ignoring them** (I50b, C12 §6a). A row is a `Series` because `seriesRange` already computes the one range that makes a matrix a matrix, and §5's label column already holds row labels at no cost in plot rows — but three of `Plot`'s affordances have no meaning for it, and an ignored member is how a type acquires a field that means nothing in one arm and everything in another:
+
+- **`tone` on a row** — magnitude owns the cell, so a per-row tone is a second colour channel fighting the first. That is `Tone` asked to carry a second axis, which is roadmap 51's finding; refusing is what stops it recurring.
+- **`axes: false`** — the scale legend is the only thing that says what a cell means. A heatmap without one is unreadable rather than plain, so the flag that would remove it is an error and not an option.
+- **a ragged matrix** — rows of differing length. The renderer places a sample at `round((i / span) * (w − 1))` using that row's own length, so a short row is stretched to the common width and column `k` means a different instant in every row: arithmetically self-consistent, and describing a different thing than it holds. Padding is the only fix and the renderer cannot do it, because it does not know which end is old. The app does.
+
+`height` is required, exactly as `form: "line"` requires it — a matrix's row count is *data*, and a height derived from it would move every block below whenever a container started.
 
 **`form: "line"` requires `height`.** Omitting it is a construction error, not a default. A plot's height is a layout decision the surface must make, and a magic default produces silently wrong-sized plots that nobody notices are wrong. `height` is optional on the type only because `sparkline` does not take one; the constructor enforces the pairing.
 
@@ -272,6 +282,137 @@ This is a rule about a degenerate width rather than a layout feature: above `2n 
 
 A `pills` block is **one logical row**. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks, not one block that wraps — wrapping is overflow behaviour, not a layout choice.
 
+### Weights, walked by hand — roadmap 38
+
+**The deferral above named its own condition and nothing watched it.** *Add weights
+when a surface needs them, and not before* — and a surface needed them: the docker
+banner is 15 cells of triangle, one of separator and 61 of wordmark (A01 A.1), where
+an equal split of two children gives 38 and 38. It could not say so, so it
+hand-composed a `raw` block, padding the art to a uniform 40 by hand, top-padding one
+side by a row, and measuring the composed width three times before it was right.
+**Every item on roadmap 38's evidence list is the cost of a field this section
+deferred**, and the entry is written as though no container existed.
+
+**Which is why `direction: "row"` has no caller.** Six `b.group` sites in the tree —
+five in the docker example and one in the stream adapter — and every one is
+`"column"`. C09 §485 recorded *no in-tree adapter builds a row group today* as a
+reason its width-1 substitution was latent; it is still true, and the reason is this
+one rather than obscurity.
+
+#### The artefact is a table, and that is a decision
+
+Layout here is **structural**: `measure` is pure and total over `(block, width)`, no
+container holds state, and nothing accumulates between calls. A sequence trace would
+be rows about resize — and a resize is the same table evaluated at a second width,
+which is a restatement rather than an interaction. The one row that tested it is
+row 8, where a width change moves a child across the placement boundary; it is
+width-indexed, so it belongs here.
+
+#### The classification table — which rule owns a cell
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | **C11's `flex` as the precedent** | roadmap 38: *the same `flex` concept C11 already has, one level up*, and *worth following exactly* | `Column.flex` is a **boolean** — absorb the residual or do not — resting on a per-column *minimum* derived from content (C11 §3) | **R1 — the precedent cannot be followed, because the information it rests on does not exist here.** A table knows what each column would like to be; a group knows `measure(block, width) → height` and **no preferred width**. There is nothing for a child to absorb residual *from*, so the only expressible allocation is a declared proportion. Following C11 exactly would give `flex: [true, false]`, which says nothing about a 2 : 1 row. The name is kept and the mechanism is not the same one |
+| 2 | **weights × *a child that cannot be placed is not measured*** | children are placed left to right while the budget lasts | with weights the budget is no longer uniform, so the *cost* of each child differs | **R2 — placement stays left to right, by position and never by size.** Dropping the smallest or the largest would make the rendered set depend on the weights, so two documents differing only in a number would place different children — and the order is the one thing the author stated outright. **The equal split made this invisible**: with every child costing the same, by-position and by-size are the same rule |
+| 3 | a weight of `0` | a weight is a share of the budget | the floor gives every *placed* child at least 1 cell | **R3 — refused at construction.** Zero has two readings and neither adds anything: *not placed*, which the author expresses by leaving the child out, and *placed at one cell*, which is what `1` already means. A value that means two things is the defect this project has removed four times. Negatives and non-finite values go with it |
+| 4 | **the gutter, when the budget is weighted** | `n − 1` cells, one between each pair | the budget is divided in proportion | **R4 — off the top, before any share is computed.** A proportional gutter makes the separator between a 2 and a 1 narrower than the one between two 2s, and a gutter's job is identical between every pair. **Equal split makes the two identical, which is why the current rule does not say** — and taking it off the top is what makes equal weights reproduce today's arithmetic exactly, which is the row's real assertion |
+| 5 | the remainder after flooring | each child takes `floor(share)` | the floors sum to less than the budget | **R5 — the remainder is unspent, as it is today. Corrected by the code from *the remainder goes to the leftmost child, which is C11's rule*.** That ruling contradicts row 4's, and only writing both down showed it: today every child takes `floor((w − gaps) / n)` and the leftover cell is spent by nobody, so giving it to the first child would make `flex: [1, 1]` differ from no `flex` — **the exact trap the equal-weights assertion exists to catch**, introduced by the rule meant to be careful. C11's precedent does not carry for the reason row 1 gives: a table's residual exists *to be absorbed*, and a group has no child that claims it |
+| 6 | **weights × nesting** | *uneven allocation is expressible as nested groups* — this section's own remedy | a weighted row expresses the same layout in one block | **R6 — both stay, and neither supersedes, because they are not the same layout.** The equivalence holds while everything fits and ends at the placement boundary: a nested group is **one** child of the outer row and is dropped whole, where three flat children are dropped one at a time. Nesting also expresses *grouping* — a subtree that moves together, gaps, a panel around it — which a weight cannot say. **So the deferral's remedy was an approximation, and this row is where the approximation ends** |
+| 7 | weights × the 1-cell floor | every placed child measures at ≥ 1 | a small share reaches 1 far sooner than an equal one | **R7 — the floor is unchanged and the hazard is now live.** C09 §485 measured the width-1 substitution boundary as `w ≤ 2n − 1` — sixty children at 120 columns — and called it degenerate. `flex: [50, 1]` reaches width 1 for the second child at **80 columns with two children**, so a rule about a degenerate width becomes reachable at an ordinary size. Recorded with both figures, because the old one reads as *this cannot happen* |
+| 8 | weights × a width change | the placement boundary is `2n − 1` under an equal split | under weights each child has its own boundary | Confirms, and it is the row that would have been the trace's: a child crosses in or out as the width moves, the block re-measures at the new width, and nothing carries over — `measure` is `(block, width)` and C14's cache keys on both. **The height is non-monotonic in the width and always has been**; weights change which width, not the shape |
+| 9 | `flex` on a `direction: "column"` group | a column's children all take `w` | the field is on the group, which has both directions | **R9 — ignored, not an error, on this section's own precedent**: `gapBefore` inside a row group *is meaningless and is ignored rather than being an error*, so the same block travelling into either direction does not fail. **Knowingly vacuous**, which is why it is written down: an ignored field is how a value comes to be silently unread |
+| 10 | `flex.length ≠ children.length` | one weight per child | the two are declared separately | **R10 — a construction error.** Unlike row 9 there is no reading to fall back on: a two-weight list over three children is an authoring mistake, and inferring the third from anywhere would be the framework choosing a layout |
+| 11 | `align` × the unspent remainder | alignment is per child, and comes with the row | a child's rendered lines may be narrower than its allotment | **Confirms.** Alignment places rendered lines inside a width the group already computed, so it changes no measurement — the same containment that keeps `measure`'s shape. It is the entry's one addition that touches only the renderer |
+| 13 | **a child with an intrinsic width × a container with no preferred width** | R1: a group knows `measure(block, width) → height` and no preferred width | the banner's whale is **40 cells**, not 40 : 61 — a proportion cannot pin a cell count | **R13 — a share is a weight *or* a cell count**, `number \| {cells: n}`, on the field that already exists. R1 said a group cannot *ask* a child its width; this is the child *telling* it, which is the same fact from the side that has it. Measured: `[40, 61]` gives 41/62 at 105 columns and 47/71 at 120, so the gap between two fixed-size arts widens with the terminal |
+| 14 | fixed × weighted in one row | a cell count is satisfied exactly or it is not a cell count | a weight is a share of what there is | **R14 — fixed first, then weights over what remains.** Any other order makes 40 mean *about 40*. The remainder after the weighted shares is unspent, as R5 has it |
+| 15 | **declared cells exceeding the budget** | fixed-before-weighted | *a child that cannot be placed is not measured* | **R15 — both, because they answer different questions and the fork is not one.** Allocation satisfies fixed children first; **placement is unchanged** — left to right while the budget lasts, and a fixed child that still does not fit is dropped exactly as any other is. A fixed child is not privileged at placement: privileging it would make the rendered set depend on a declaration rather than on order, which is R2's ruling arriving a second time |
+| 16 | **the wordmark's leading blank row** | `align` is per child, within its allocation (row 11) | a row already computes a height — the tallest child — and does nothing with it | **R16 — `align` is two axes, and the second one has the consumer.** The banner's wordmark carries a blank first row so its seven lines sit on the whale's hull rather than its spout: **that is vertical alignment, hand-written into the art**, exactly as the padded whale was a fixed width hand-written into the art. Horizontal placement is inside the child's own width; vertical is inside the row's height, which the container has and discards |
+| 17 | **the horizontal axis × every renderer** | alignment places a child inside its allocation | a renderer **fits its output to the width it is handed** | **R17 — there is no horizontal axis, and the build refused what the walk ruled.** A child allocated ten cells emits ten-cell rows, so aligning a ten-cell box inside a ten-cell box is a no-op — measured, not reasoned. Placing it would mean knowing how wide the content actually *is*, and `measure(block, width) → height` does not answer that. **R1 a third time**: heights are measurable and widths are not, and that asymmetry is why this field has one axis rather than two |
+| 17a | the vertical axis × `measure` | a child is measured at its allocated width | alignment moves rendered lines inside a box already sized | **Confirms, and it is why the axis that exists is cheap.** The row is still its tallest child, so `measure(block, width)` is untouched and every cache, compositor and degradation path is unaffected — the containment that made weights safe |
+| 18 | vertical align × a child that is dropped | alignment is per child | *a child that cannot be placed is not measured* | Confirms: a dropped child is aligned by nobody, because it contributes to neither half. One line, because the rule composes rather than interacting |
+| 19 | **`padding` × `gapBefore`** | roadmap 38: *padding as a general property rather than `gapBefore` being the only spacing that exists* | `gapBefore` is **the one field that is vertical rhythm** (§3a), and a blank row above is padding-top | **R19 — not built, and the reason is a duplication rather than a cost.** A general `padding` would give a document two ways to say *a blank row above this block*, and the two would have to agree at every measurer, every container's child-width computation and every sequence. **If it lands, `gapBefore` becomes its top edge** and there is one field — so the change is a replacement rather than an addition, which is why it is not folded into a row about widths. **Nothing in the tree pads today**, and the note lives on `gapBefore` where the second spacing field would be written rather than here, because a condition written beside the deferral is the one nobody reads |
+| 12 | **`padding` × everything** | roadmap 38 bundles *padding as a general property rather than `gapBefore` being the only spacing* | padding on any block changes what `measure` returns for it | **R12 — not in this entry.** It is general, it changes every block's measurement, and bundling it means the weights cannot land without it. **A bundled row can only be split**: the shared blocker on the row is rarely any of the subjects' own |
+
+**Row 1 is the one that would have shipped.** The entry says the precedent is *worth
+following exactly*, and following it exactly produces a field that cannot express the
+banner — a boolean absorb-flag over a minimum nothing computes. It reads as a citation
+of a solved problem, and the two mechanisms share only a name.
+
+#### One fact answered three design questions, and it is worth stating as a rule
+
+**Heights are measurable and widths are not.** `measure(block, width) → height`
+takes a width and returns a height, so a container can always ask *how tall would
+you be here* and can never ask *how wide would you like to be*. Three independent
+questions in this entry were decided by that asymmetry and by nothing else:
+
+| the question | what the asymmetry decided |
+|---|---|
+| how a row divides its width (R1) | **weights**, not C11's boolean-over-a-minimum — there is no preferred width to absorb residual from |
+| how a child with an intrinsic size says so (R13) | **the child declares cells**, because the container cannot ask |
+| which way a row may align (R16, R17) | **vertically only** — the row knows its own height, and a child already fills the width it was handed |
+
+Three answers, one fact, and none of them was reached by looking at the other
+two. **Stated here because the next question about a container will have the same
+shape**, and because R1 read as a fact about C11 the first time — it is not: it is
+a fact about the measurement contract, and C11 is where its consequence showed.
+
+#### The rulings
+
+- **R1 — weights, not C11's boolean.** A group has no preferred width to absorb from.
+- **R2 — placement stays left to right**, by position and never by size.
+- **R3 — `0` is a construction error**, with negatives and non-finite values.
+- **R4 — the gutter comes off the top**, so equal weights reproduce today's arithmetic.
+- **R5 — the remainder is unspent**, as it is today. **Corrected by the code**: the leftmost rule contradicts R4 and would make `flex: [1, 1]` differ from no `flex`.
+- **R6 — weights and nesting both stay**; they differ at the placement boundary.
+- **R7 — the 1-cell floor is unchanged and its boundary is now reachable.**
+- **R9 — a weight on a column group is ignored**, on `gapBefore`'s precedent.
+- **R10 — a length mismatch is a construction error.**
+- **R12 — `padding` is a separate entry**, and so is `height: "fill"` (below).
+- **R16 — `align` is the vertical axis**, within the row's height, and it is the one with a
+  consumer. **Ruled as two and built as one**: the horizontal axis does not exist, because a
+  renderer fits its output to the width it is handed.
+- **R17 — R1 a third time.** Heights are measurable and widths are not, which is why one axis
+  is expressible and the other is not — the same missing preferred width that made weights the
+  only allocation and `{cells: n}` the child's own business.
+- **R18 — the axis that exists changes no measurement.**
+- **R19 — `padding` is not built**, and if it lands `gapBefore` becomes its top edge rather
+  than sitting beside it. The note is on `gapBefore`, not here.
+- **R13 — a share is a weight or a cell count**, `number | {cells: n}` on `flex`.
+- **R14 — fixed first, then weights over what remains**, or a cell count is a suggestion.
+- **R15 — placement is unchanged**, and a fixed child that does not fit is dropped like any
+  other: privileging it would make the rendered set depend on a declaration rather than on
+  order, which is R2 a second time.
+
+#### What the rulings leave behind
+
+- **The field goes on `group` and there is no `b.row`.** The name is taken — `b.row(id,
+  cells)` builds a table row and every example calls it — and the honest shape was
+  never a new container anyway: this section deferred *weights*, not a block kind.
+- **`height: "fill"` is unblocked and is not in this entry.** Roadmap 38 defers it
+  because *the producer cannot see the height — that is F37*, and `ProducerContext.height`
+  is `number | null`, non-null **iff** the document is bound by a region (I18) — which is
+  exactly the pushed-view case the entry names as the only one where *fill* has a
+  referent. So the claim is stale, the resolve-then-measure ruling the entry already
+  carries is the whole of what it needs, and it is a step of its own.
+- **Equal weights must reproduce today's arithmetic byte for byte**, which is R4's real
+  purpose and the only assertion that can catch a gutter rule that looks right.
+- **The banner is not closed by this, and the frame-read is what says so.** Two multi-line
+  `raw` blocks in a weighted row **do** compose side by side — measured, and the row places
+  them correctly at every width. What it cannot reproduce is the banner's frame: the whale is
+  padded to a fixed **40** cells with a fixed **4**-cell gap, and a proportion cannot pin a
+  cell count. `flex: [40, 61]` at 105 columns gives 41 and 62, and at 120 it gives 47 and 71 —
+  the art sits left in a box that grows, so the gap between the two arts widens with the
+  terminal. **The measured consumer needs a fixed width, and weights are a ratio**, which is
+  R1's finding arriving as a consequence: a group has no preferred width, so a child with an
+  intrinsic size has no way to say so. That is the next argument, and the banner is already
+  its measured consumer.
+- **The probe that produced this was wrong twice before it was right**, and both were the
+  instrument rather than the subject: a registry with no renderers, whose output said *notice
+  failed to render*, and then a heredoc that wrote `\n` as two characters, so a `raw` block
+  measured 1 and appeared to emit a newline into a composed row. **Both were caught by reading
+  the output rather than the verdict** — the first would have reported a fabricated defect in
+  `raw`, and the second a fabricated one in the row.
+
 ### `patch` and `comparison` are not variants of each other
 
 **They used to share a name, and that was the whole problem.** `comparison` is rows of `{field, a, b, comparison}` — a structured comparison of two values for one key, right for S07's metric table. `patch` is hunks of text with line numbers, two palettes and collapse. Merging them would produce a block whose measurement depends on which mode it is in, and C09 I1 is the invariant that cannot bend: a kind whose height rule branches on a mode flag is a kind whose measurer and renderer drift apart quietly.
@@ -297,7 +438,7 @@ type Cell = Readonly<{
   text:   string;
   tone?:  Tone;
   glyph?: Glyph;                      // leading status glyph — a slot, never a character
-  spark?: readonly number[];          // inline sparkline appended to text
+  spark?: readonly (number | null)[]; // inline sparkline; `null` is a gap (I46a)
 }>;
 
 type Table = Readonly<{
@@ -390,7 +531,8 @@ The constraint is indirection, not scarcity. Three things depend on it and none 
 type Glyph =
   | "ok" | "warn" | "error" | "info"
   | "pending" | "working" | "running" | "queued" | "cancelled"
-  | "expand" | "collapse" | "live" | "bullet";
+  | "expand" | "collapse" | "live" | "bullet"
+  | "continuation";
 ```
 
 **The identical argument.** A glyph embedded in a block is the same character on every terminal, has no fallback at `unicode: "ascii"`, and cannot be width-checked at load. `glyph: "✗"` is `colour: "#c0ffee"` written in a different field.
@@ -403,7 +545,7 @@ C09 §4 owns the vocabulary and both renderings, and the 1:1 rule holds by const
 
 **The escape hatch, stated so that the guarantee stays absolute:** a glyph outside the vocabulary goes in the block's **text**, not its glyph field, and its behaviour under ASCII is the app's problem. That is where every action label already lives — `↗ open`, `⊘ cancel`, `⬡ pods` are text in a label, not glyph slots — and it is why the surfaces need no change. A vocabulary with an "or any string" arm is not a vocabulary.
 
-**`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `running` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
+**`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `running` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. **`continuation` is the third direction and the only token with its consumers named before it existed** (`docs/design/AGENT_TUI_DESIGN.md` §A1, which is where the mark was written down and is **not** a shipping consumer — agent-tui is stopped at step 0). It marks a line *subordinate to the one above it* rather than a state, which is why it is the first token whose eligibility is a property of the entry and not of the block: it needs a line above, and C22's `commandRows` returns `[]` for `command: ""`. So the vocabulary now contains a token a block can name in a position where it means nothing, and C09 §4 records which two blocks are in that position and which two look as though they are. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
 
 ### A categorical axis is a marker plus a derived tone, never a second palette
 
@@ -533,6 +675,134 @@ to decline, which is the shape C09 I1's neighbours keep rejecting.
 
 ---
 
+## 3c. The scroll container — a declared height, and an offset that is not the block's
+
+Roadmap 46's kind, and **C26 §4b's cell 3 gets its first inhabitant**: the one kind declaring
+both `elements` and `window`. That cell was ruled while empty, which is what made it cheap to
+get wrong, so this section is the ruling meeting a subject.
+
+```typescript
+export type Scroll = Readonly<{
+  kind: "scroll";
+  id: string;
+  /** Interior rows. A positive integer, and the content may exceed it. */
+  height: number;
+  children: readonly Block[];
+}>;
+```
+
+**The elements are one per child**, at `level: "block"`. That correspondence is not a
+convenience: it makes *has no elements* and *has no children* the same fact, which is what
+lets the refusal below live in `data/` without calling into L1.
+
+**`height` is declared and `measure` never sees it unresolved** — roadmap 38's
+resolve-then-measure, and the third ruling in this project with that shape (I44's fixed shares
+and I45's alignment are the other two). `measure(block, width)` returns `height` at every
+width and every offset.
+
+### The walk — both artefacts, because the kind has structure and state
+
+**C26 §8a's rule applied rather than cited**: a component with structure *and* state needs a
+table *and* a trace, and taking the trace alone because the scrolling is the obvious thing is
+how the structural half goes unexamined.
+
+#### The classification table — interactions that hold at rest
+
+| # | the two rules that meet | ruling |
+|---|---|---|
+| 1 | *`measure` returns `height`* × *the transcript windows every block* | **Two windows compose and neither is the other's business.** The transcript's `window(block, width, from, to)` slices the scroll's **box** — the `height` rows it draws — and the offset chooses which children fill that box. `window` is never told the offset and never adds it. Stated because the obvious implementation adds the two and is wrong by exactly the offset, in a direction that looks like an off-by-one at the top of a tall entry |
+| 2 | *elements are one per child* × *I14, ids unique nested children included* | `(scroll.id, child.id)` is unique with **no new uniqueness rule**, which is C26 §8b R3's argument arriving a second time. §4b's address is well-founded here rather than asserted |
+| 3 | *the offset is view state* × *`measure` never sees anything that animates* | **The offset changes no height, and that is the whole reason it can be view state.** The box is `height` rows at every offset, so nothing keyed on `(block, width)` moves and C14's index never rebuilds. An offset that changed height would be a document patch and would belong to C13 |
+| 4 | *content shorter than the box* × *an offset exists* | **Clamped at read, never corrected at write.** A store that had to be fixed up on every patch is a store that accumulates, which is exactly what C23 I47 forbids of view state |
+| 5 | *a container must be aimable* × *elements are one per child* | **`children: []` is a construction error, refused at parse.** *A container declaring an offset and no elements* is the rule, and the correspondence above is what makes it expressible where the validator lives. Refused rather than corrected at render — C15 I20's placement precedent, and the same argument as `resolve(key)` throwing on no choices |
+| 6 | *only the live entry holds focus* × *a container scrolls if it is focusable* | **FINDING, and it is a decision rather than a detail.** `focusFor` answers non-null only for the live entry, so **every scroll above the live one is unaimable** and shows its first `height` rows for the life of the session with the rest unreachable. The archive's surface note says the opposite of ordinary blocks — *frozen: rendered, scrollable, not focusable* — so *scroll follows focus* and *frozen blocks scroll* cannot both hold. **Ruled: a settled scroll keeps its offset and cannot be moved.** The alternative is block-to-block focus above the live entry, which is C26 §11's deferral and not this kind's to take. **And it says so** — see the residue below: a bounded region with a marker is normal, one that silently ends is a defect (F123's class) |
+| 8 | *C26 I4, elements lie inside `measure`* × *the content exceeds the box* | **The walk missed this and `tsc` did not.** A child at content row 300 in a box of twelve is outside `[0, measure)`, so I4 is false for this kind as written. Clipping the list to the visible children makes `elements` depend on the offset (C26 I3 refuses it); measuring the box as its content unbounds the region. **Ruled: element rows are content rows, and C26 I4 gains this kind as its named exception** — the offset becomes the one map from content rows to box rows, which is §4b's *the window is a rendering consequence* arriving as an addressing rule. Added after the table was written, and left in place rather than folded in: a row found by the build is evidence about the artefact's reach |
+| 7 | *a scroll among another's children* | **Legal and flat.** One element per child, and a child that is a scroll is one stop: `↓` steps *to* it and entering it is C26 §4's scope stack, which is unbuilt. Recorded rather than refused, because the flat reading needs no rule and refusing needs one |
+
+#### The sequence trace — interactions something has to happen for
+
+| # | the sequence | ruling |
+|---|---|---|
+| 1 | focus enters, then `↓` past the last visible child | the offset advances until the child's **last** row is inside the box; **a child taller than the box aligns to its top**, which is the only answer stable under a second `↓`. **RULING NAMES AN OPERATION THAT DOES NOT EXIST** — taking a child's top `n` rows needs a windowing seam, and `RenderContext` offers `measureChild` and `renderChild` and nothing that slices. So the child is drawn whole and C25 I1 is false for that one case, held open by T2.28b, which expires by asserting the disagreement. C23 §8a A4's class, found by the build rather than by the walk |
+| 2 | `PgDn`, then `↓` | C26 §4b: `↓` steps from the **focused** element, so the offset comes back to it. The assertion is which element focus reaches, never the resulting offset |
+| 3 | a patch replaces the children with fewer | the offset is past the end and is **clamped at read**. Nothing writes, because nothing but the renderer reads it |
+| 4 | a resize | children re-measure and every element's rows move. **The offset is a row count, not an element index** — so it is re-interpreted rather than re-derived, and a reader who scrolled halfway stays halfway instead of jumping to whichever element used to be at that index. This is the ruling an obvious implementation gets wrong, and no cell of the table reaches it |
+| 5 | the entry is evicted or the transcript cleared | the offsets drop **on `rendered`'s own subscription** — same arm, same place in `construct.ts`, so a future eviction path cannot drop one and keep the other |
+| 6 | the entry settles | table cell 6. The offset is kept and frozen |
+
+### The residue, and the row it costs
+
+**A silent bound is the empty-block class.** F123 already ruled the shape: the fallback adapter
+writes *"Showing the first 2,000 rows; N more were not rendered"*, and D40's eviction carries a
+marker for the same reason. So the container renders what it is hiding, **in both directions**,
+because a settled container keeps the offset it had — resetting it would lose the position the
+reader chose, and that means content is hidden above as well as below:
+
+    ⋯ 12 above · 368 below
+
+**Two things it buys past honesty.** *This region is bounded and there is more* is a sentence a
+reader accepts; *this region ended* is a bug report. And **C26 §11's deferral gains a visible
+symptom** — block-to-block focus has none today, and a marker saying 368 rows are unreachable
+is one. A deferral with a visible cost is a deferral that gets revisited, which is this
+session's four-instance finding pointed forwards instead of backwards.
+
+**The marker costs a row, and which row is a rule interaction the ruling created.** Working it
+through rather than assuming, because I47 already constrains the answer:
+
+- **Not a row taken from the box when there is residue.** Whether residue exists depends on the
+  offset, so the content area would change size as the reader scrolls — jitter, and `measure`
+  would depend on view state, which I47 forbids.
+- **Not an unconditional row either**, which would be stable and would draw *⋯ 0 above · 0
+  below* under a container whose content fits.
+- **And the box pads to `height` with blank rows, which is not a detail.** An under-filled
+  container drew only its children and `measure` said `height`, so C25 I1 was false wherever
+  the content was shorter than the box — shipped, and invisible to eighteen rows because every
+  fixture filled or overflowed. **The padding is explicit rows and never a fixed-height Box**:
+  a height on the box pads *and* clips bottom-anchored, so a five-row child in a box of two
+  drew rows three and four — the right count, the wrong document. Read the frame, not the
+  numbers.
+- **A row the container adds when its content cannot fit**, which depends on `(block, width)`
+  alone: `measure` returns `height + 1` where the children measure taller than `height`, and
+  `height` where they do not. **Pure in `(block, width)`, stable under every offset**, and the
+  same conditional shape as C11's action bar — which adds two rows on a property of the block
+  and never on a property of the view.
+
+So `height` is the **content** height and the marker is chrome the container adds, exactly as a
+panel's border is. **The glyph comes from C09's table and is never written as a literal**
+(I38's argument, and F6 is the instance): `⋯` degrades to `...` under ASCII like every other.
+
+### The boundary, and what `y` copies across it
+
+**The box hides rows and the copy carries them, and that is C26 I17 rather than an exception to
+it.** An element's `copy` is its source and never its rendering — which is already why a column
+the width dropped and a value the width truncated are both present in full. A child the offset
+scrolled out of the box is the *same fact in a third form*: the rendering could not show it, and
+the rendering is not what is copied. A boundary-aware copy would be a copy that changes with the
+offset, which is the defect I17 exists to forbid, one axis over.
+
+**So the container's element `copy` is its children's sources, joined**, and the rule that makes
+that expressible is the one this kind already has: elements are one per child (I47), so *which
+element* and *which child* are the same question. A kind whose source the join cannot express
+contributes **nothing** rather than its painted rows — the same direction I17 takes, and the
+reason a `table` is deliberately absent from it: C11 already declares a richer `copy` per row,
+and a second answer here would be two sources for one fact.
+
+**A child contributing nothing is not the same as a container contributing nothing, and the
+second was a silent no-op.** `copyElement` filters the undefined and the empty out and returns
+early on an empty result, so a container whose elements carried no `copy` at all made `y` a key
+that did nothing and said nothing — the empty-block class, in the one place a reader has no way
+to tell *there was nothing to copy* from *the key is not bound*. `y` on a container has an
+obvious meaning and it was unimplemented rather than refused, which is the worse of the two.
+
+**What the boundary still owes, and it is owed elsewhere.** A copy carrying 400 rows out of a
+box showing 12 is correct and surprising, and the sentence that removes the surprise — *selected
+40, copied 400* — needs a readout to sit on. **There is none**: no such surface exists in the
+tree, and the nearest thing that does is `TuiConfig.chrome.footer`, which is roadmap 29's whole
+subject (F161). So this is recorded as a consumer of that row and **not** as a small addition
+here: it is a surface, not a count.
+
+---
+
 ## 4. Patches
 
 **Four ops carry data and one carries view state, and that split is the whole reason the fifth exists.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -659,6 +929,63 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 
 ---
 
+## 5a. The serialisation contract
+
+**A document is JSON, and nothing said so.** The block union declares no function,
+`Map`, `Set` or `Date` member — the only function types in the file are `MeasureFn`
+and the measurer's signature, neither of which is a document field — so
+`JSON.stringify` is the serialiser and `validateDocument` is the parser. That is
+why roadmap 44's persistence needs no codec (F166), and it is a property nothing
+asserted until it was written down here.
+
+**The property**: for every valid document `d`,
+`validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal
+to `d`. It is the same shape as C09's window sweep — a generic claim run over the
+whole corpus rather than a row per kind — and, like that one, what it is worth
+depends on whether anything can fail it.
+
+### The walk — a classification table, because none of this is event-mediated
+
+Four rules meet here: the **document is pure data** (I1); **`validateDocument`
+decides** what an untrusted value is; the **round trip** must preserve it; and
+**JSON's number is not JavaScript's**. The cells are where two of those overlap.
+
+| # | the two rules that meet | the cell | ruling |
+|---|---|---|---|
+| 1 | *the type says `number`* × *the round trip preserves* | `NaN` and `Infinity` — legal JavaScript numbers that JSON writes as `null` | **measured: accepted before and after, and the value changes.** A plot's `[1, NaN]` persists as `[1, null]` and revalidates clean, so the document that comes back is a *different, still-valid* document. The validator requires a **finite** number wherever the type says number |
+| 2 | *`validateDocument` decides* × *the type says `number`* | a numeric **array** — `Series.values` and `Cell.spark` | **the elements were never checked at all.** `requireArray` establishes the array and stops, so `["x"]`, `[null]` and `[{}]` validate today, round trip or no round trip. This is wider than the property that found it, and it is the half that matters for an untrusted document |
+| 3 | *pure data* × *the round trip* | a property whose value is an explicit `undefined` | `JSON.stringify` drops the key, so the parsed object lacks it. **Asserted modulo this**, and the reason is that it is unreachable through the framework: `exactOptionalPropertyTypes` makes `{gapBefore: undefined}` a different type from `{}`, and every constructor spreads-if-present rather than assigning `undefined` — the adapter mapping says so in its own comment |
+| 4 | *the type says `number`* × *the round trip* | `-0`, which JSON writes as `0` | **not refused.** `-0` is a legal number and renders identically; refusing it would narrow the type to buy an equality nobody needs. The property is asserted with a comparison that treats the two as equal, and this row is why |
+| 5 | *the round trip* × *the corpus* | which fixtures the sweep runs over | `ONE_PER_KIND` and `ADVERSARIAL`, the same corpora T2.1 uses — so a kind added without a fixture fails T2.10 before it reaches here, and the sweep **asserts its own count** rather than reporting a completion it never observed |
+
+### The half that cannot fail, stated rather than discovered
+
+**I46 has two halves and only one of them can be violated by an input.** The
+mutation pass is what asked, and the answer is worth having in the spec rather
+than in a run's exemption list.
+
+The **validator** half is not vacuous: three fabricated inputs fail it, and two of
+them were accepted for the life of the component. The **equality** half is —
+every member of the block union is a string, a number, a boolean, an array or a
+record, so `JSON.parse(JSON.stringify(d))` equals `d` for every document that can
+be constructed, and deleting the assertion changes nothing.
+
+**What falsifies it is a type change, not an input.** The day a kind carries a
+`Date`, a `Map`, a `bigint` or a class instance, that assertion is the only thing
+in the suite that says so — which is why it is kept rather than reduced to a
+validity check, and why this paragraph exists instead of a row that reads as
+covering something it cannot reach. **An invariant is vacuous until its subject
+exists**, and the honest form is to say which half is which.
+
+**What this does not settle.** Whether `validateDocument` is *published* is C24's
+question and not this one: C24 I1 removes an export used by neither app, and the
+consumer this would have is roadmap 44 — which is framework work and imports it
+directly. C24's own precedent is `ViewRefresh`, withheld until it had a driver and
+better for the wait. The property below holds either way, and it is what a
+persisted document rests on.
+
+---
+
 ## 6. Invariants
 
 - **I1** — `ViewDocument` and every `Block` are deeply immutable. All mutation is `applyPatch` returning a new value.
@@ -703,6 +1030,19 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I39** — `Panel.live` names whether a region is refreshing; C09 draws the `live` glyph from it. The block names the fact and the renderer owns the mark, so a live panel differs from a static one under ASCII and at one bit, where a character written into the title would not (F18, → C09 I5).
 - **I40** — `Comparison.labels` names what the two columns are, and their absence means positional. `a`/`b` is right about the *type* — S07 compares two runs and neither is "before" — and was never an answer to whether a consumer may say which side is which; both shipped consumers said it in a `keyValue` block above the block it explained (F33).
 - **I41** — **`yFormat` names the unit the value arrives in.** `fraction` takes `0.84`, `percent` takes `100.2`, and both render a per-cent sign — so the rendered form cannot distinguish them and naming them by it produced a member whose obvious use was wrong by a factor of 100 (F31). The arm that multiplies is `fraction`; it is the old `percent` renamed, and it carries the surprising name because it is the surprising arm. **The value is not appearance**: `labelWidth` measures the rendered labels to size the gutter (C12 §3), so an arm that changes a label's width changes the block's geometry, and this rename moves both. An unknown arm is a validation error rather than a silent fall-through to `number`.
+- **I42** — **A `row` group divides its width by declared weights, and every rule the equal split made invisible is stated with it.** The gutter comes **off the top** before any share is computed, so equal weights reproduce the current arithmetic exactly and a separator never varies with its neighbours' sizes; the remainder after flooring is **unspent**, exactly as it is under the equal split — spending it would make `flex: [1, 1]` differ from no `flex`, and C11's leftmost rule does not carry because a table's residual exists to be absorbed and a group has no child that claims it; a weight of `0` is a **construction error**, because *not placed* is expressed by omitting the child and *placed at one cell* is what `1` means; and a length that does not match the children is one too, since there is no reading to fall back on. **Placement stays left to right and never by size** (§3): with an equal split, by-position and by-cost are the same rule, and under weights they are not — dropping by size would make the rendered set depend on a number rather than on the order the author stated. **The mechanism is not C11's `flex`**, which is a boolean over a content-derived minimum: a group knows `measure(block, width) → height` and no preferred width, so there is nothing to absorb residual from and a proportion is the only expressible allocation. A weight on a `column` group is **ignored** rather than refused, on `gapBefore`'s precedent, and it is knowingly vacuous.
+- **I43** — **Weights and nested groups both express uneven allocation, and they differ where it matters.** §3 deferred weights on the grounds that *uneven allocation is expressible as nested groups*, and that equivalence holds **only while every child fits**: a nested group is one child of the outer row and is dropped whole, where flat children are dropped one at a time (§3, roadmap 38). Neither supersedes the other — nesting also expresses grouping, which a number cannot — and the 1-cell floor's boundary, measured as degenerate at `w ≤ 2n − 1`, becomes reachable at ordinary widths under weights: `[50, 1]` puts the second child at one cell in eighty columns (→ C09 §4b).
+- **I44** — **A share is a weight or a cell count, and fixed widths are satisfied before any weight is computed.** `flex` takes `number | { cells: n }`: R1 says a group cannot ask a child what width it wants, and this is the child saying so, which is the same fact from the side that holds it. **Allocation and placement answer different questions and both are stated**: fixed children take their cells off the budget first and the weighted ones divide what remains — any other order makes a cell count a suggestion — while **placement is unchanged**, left to right while the budget lasts, so a fixed child that does not fit is dropped exactly as any other is. Privileging it there would make the rendered set depend on a declaration rather than on the order the author wrote, which is I42's rule a second time. A `cells` that is not a positive integer is a construction error, on the same argument as a weight of zero (§3, roadmap 38).
+- **I45** — **A row aligns its children in its own height, and that is the only axis there is.** **Vertical placement is inside the row's height**, which a row already computes as its tallest child and otherwise discards. **A horizontal axis was ruled and refused by the build**: every renderer fits its output to the width it is handed, so a child fills its allocation and aligning a ten-cell box inside a ten-cell one is a no-op — placing it would mean knowing how wide the content *is*, and `measure(block, width) → height` does not answer that. Heights are measurable and widths are not, which is the same missing preferred width that made weights the only allocation (I44), arriving a third time. The axis that exists has a shipped consumer: the banner's wordmark carries a **blank first row** so its seven lines sit on the whale's hull, which is vertical alignment hand-written into the art exactly as the padded whale was a fixed width hand-written into it (§3, roadmap 38). It defaults to `top`, which is what a row does today, so an absent field renders byte for byte as before. **`measure` is untouched**: alignment moves rendered lines inside a box the container already sized, so the row is still the tallest child and every cache keyed on `(block, width)` is unaffected — the containment argument that made weights safe, applied to position instead of size. A child that is not placed is aligned by nobody.
+
+- **I46** — **A valid document survives a JSON round trip unchanged, and the validator refuses what JSON cannot carry.** The union holds no function, `Map`, `Set` or `Date`, so `JSON.stringify` is the serialiser and `validateDocument` is the parser — which is why persistence needs no codec (F166) and why this had to be stated before something rested on it. **Where the type says `number` the validator requires a finite one, elements of numeric arrays included.** Two defects were found by writing the property rather than by the property failing: `NaN` and `Infinity` were accepted, and JSON writes them as `null`, so a document persisted and reloaded was a *different document that revalidated clean*; and `Series.values` and `Cell.spark` were never element-checked at all, so a string, a `null` or an object in a numeric array validated with or without a round trip — the wider half, and the one an untrusted document turns on. **Two inequalities are knowingly tolerated and named rather than closed**: `-0` writes as `0`, which renders identically and is not worth narrowing the type for, and an explicit `undefined` property is dropped, which no constructor can produce because `exactOptionalPropertyTypes` makes it a distinct type and every one spreads-if-present (§5a).
+- **I46a** — **A numeric array holds finite numbers and `null`, and `null` is the gap.** The one non-number a document may carry in a numeric position, chosen because it is the only spelling of *no reading* that JSON round-trips: `JSON.stringify` writes `NaN` as `null` already, so the alternative was a value the type forbids arriving from the serialiser I46 names. **The two invariants were both correct and their overlap was a hole**: C12 I4 makes a non-finite entry a gap whose position survives, I46 refuses non-finite elements, and between them absence was expressible in memory and inexpressible in a valid document — measured, not reasoned, by running the validator over the block `examples/docker` had been building since the ring began pushing one. `NaN` and `±Infinity` stay refused; the renderer still treats them as gaps, because I2 says no series input throws and a fixture reaches it without a validator. *Found by C12's heatmap walk, reading the validator arm a matrix would need — see C12 §6a for the three passes this claim survived before it was measured.*
+- **I47** — **A `scroll` declares a positive integer `height` and at least one child, and both are refused at parse.** Its elements are **one per child**, so *no elements* and *no children* are one fact and the aimability rule is expressible where the validator lives (§3c cell 5). `measure(block, width)` returns `height`, plus I49's residue row where the content cannot fit — and **the same value at every offset**, which is the property that matters: the box does not change size as the reader scrolls, which is what keeps the offset out of every geometry cache and out of C14's index (§3c cell 3). I49's condition is on `(block, width)` for exactly that reason. **The transcript's window slices the box and never the content** (§3c cell 1).
+- **I48** — **The scroll offset is view state: a row count, per container, droppable, clamped at read.** **Rows and not an element index**, so a resize re-interprets it rather than moving the reader to whichever element used to sit there (§3c trace 4). It is never corrected at write — a store that had to be fixed up on every patch is one that accumulates, which C23 I47 forbids of view state — and it is dropped with the entry on the same subscription that drops the rendered rows. **A settled entry's scroll keeps its offset and cannot be moved**, because only the live entry holds focus and a container scrolls if it is focusable (§3c cell 6); the content below the box is unreachable there, and that is a ruling rather than an oversight. **Resume restores no offset**, which follows from view state and is C13 I20's consumer.
+- **I49** — **A scroll whose content cannot fit draws a residue marker, in both directions, and pays a row for it out of its own height.** *N above · M below* rather than silence: a bounded region with a marker is normal and one that silently ends is a defect (F123's class, D40's eviction marker). **`measure` returns `height + 1` exactly where the children measure taller than `height`, and `height` where they do not** — the condition is on `(block, width)` and never on the offset, so the content area does not change size as the reader scrolls and I47's offset-independence survives the marker rather than being weakened by it. The glyph is C09's and never a literal (F6).
+- **I50** — **A container's element `copy` is its children's sources, joined — and the offset does not enter it.** C26 I17 at the level above: the box hiding a child is the rendering, and the rendering is not what is copied, so a copy taken across a scrolled boundary carries the hidden rows in full and is the same text at every offset and every width. A child whose kind cannot express a source contributes **nothing** rather than its painted rows, and `table` is deliberately outside the join because C11 declares a richer `copy` per row (§3c). **A container whose elements carry no `copy` at all is the empty-block class arriving at a keystroke** — `y` filtered everything out and returned early, so the key did nothing and said nothing.
+- **I50a** — **A plot carries at most eight series, refused at construction** (roadmap 51). The categorical palette distinguishes eight, and the ninth used to reuse the first's colour — `SERIES_TONES[index % 4]`, which said two different series were one thing and, at four, said series three was `ok` and series four `warn` when neither carried a judgement. **D29 inverted**: information that is not there, carried by colour alone. Refused rather than cycled for C04 I47's reason exactly — a reader cannot see that a colour has been reused, so a rendering that lies is worse than a document that will not build. Both gates say it: `b.plot` throws and `validateBlock` reports. **The cap is a property of the declared `form`, not of the number of series** — C12 §6a A7 is where that was forced, and it is a recast rather than an exception. A `heatmap` carries magnitude in the ramp glyph and draws **no per-row colour at any depth**, so the rule has no subject there and does not bind: a matrix of eight rows is not a matrix, and capping one at the size of a palette it never reads would be a colour rule refusing a document about something else. `line` and `sparkline` keep it **unconditionally**, including the 1-bit case where a multi-series plot stacks and distinguishes spatially: construction cannot see the colour depth, and a document that renders honestly only at one depth is not a document this type should accept. That asymmetry is the whole content of the recast — the heatmap is exempt because the palette is never consulted, not because the picture happens to survive.
+- **I50b** — **A `heatmap` refuses a row `tone`, `axes: false`, and a ragged matrix, and requires a `height`.** Three affordances with no meaning for a matrix, refused rather than ignored — because a member that means nothing in one arm is indistinguishable from one that has not been implemented yet, and the reader who finds it cannot tell which. **The ragged case is the one an app hits by accident**: rings of different ages produce rows of different lengths, and the resulting picture is self-consistent and wrong, so the refusal is what makes column `k` mean tick `k` in every row. Both gates say it: `b.plot` throws and `validateBlock` reports. *C12 §6a A4, B1 and B2 carry the arguments; C12 I17 is what the renderer then guarantees.*
 
 ---
 
@@ -750,6 +1090,18 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 36. A mark is derived from a named fact. Where a shape names one, no field is added; where it names only a tone, a glyph slot is the remedy and it waits for a surface. Two of seven tone-bearing shapes carry a slot, and that asymmetry is a ruling rather than an oversight (I38).
 37. A panel says whether it is live, and C09 draws the slot that has existed unreachable since C04 was written (I39, → C09 I5).
 38. A comparison may name its two columns; absent, they are positional. The type's `a`/`b` was the right answer to a different question (I40).
+39. **A row group's weights state everything the equal split made invisible** — the gutter off the top, the remainder leftmost, zero and mismatched lengths refused, placement by position — and equal weights reproduce the current arithmetic exactly (I42, §3).
+40. **Weights and nesting are both kept**, because the equivalence §3 deferred weights on holds only while every child fits, and the floor's degenerate boundary is reachable at ordinary widths once shares are uneven (I43, §3).
+41. **A share is a weight or a cell count**, fixed satisfied before weighted and placement unchanged — so a declared width is exact where it fits and is dropped like any other child where it does not (I44, §3).
+42. **A row aligns in its own height and measures the same either way** — and the vertical one is what the banner's blank first row was doing by hand (I45, §3).
+43. **A document is JSON, so persistence needs no codec** — and the validator refuses what JSON cannot carry, finite numbers included and numeric array elements with them, because a document that round-trips into a *different valid document* is worse than one that is refused (I46, §5a).
+44. **A `scroll` is a box of declared height holding children**, its elements are one per child, and an empty one is a construction error rather than a container nobody can aim (I47, §3c).
+45. **The offset is view state in rows** — droppable, per container, clamped at read, restored by no resume, and frozen once the entry settles (I48, §3c).
+46. **A bounded region says what it is hiding** — both directions, one row, and the row is spent on a property of the block rather than of the view (I49, §3c).
+49. **`null` is a gap in a numeric array** — the one non-number a document may carry in a numeric position, because it is the only spelling of *no reading* that survives the round trip the serialiser already performs (I46a, C12 §6a).
+48. **A plot carries at most eight series** — the categorical palette's size, refused at construction rather than cycled, because a repeated colour is a segmentation that lies (I50a, roadmap 51).
+50. **A heatmap refuses what has no meaning for a matrix** — a row tone, `axes: false`, and rows of differing length — rather than ignoring it, because an ignored member reads as one not yet implemented (I50b, C12 §6a).
+47. **A copy is not bounded by the box that hides it** — the container's `copy` is its children's sources joined, unchanged by the offset, and a kind with no expressible source contributes nothing rather than its rendering (I50, §3c).
 
 ---
 
@@ -776,9 +1128,10 @@ Six tiers. No state machine, so no transition table.
 - **T1.14** (I15): a failing patch in the middle of a sequence leaves the document at its last good state, and the following patch still applies to it.
 - **T1.15** (I14): `validateDocument` rejects a document with two blocks sharing an id, including when one of them is nested inside a `panel`.
 - **T1.16** (I31): `validateDocument` rejects a table with two rows sharing an `id`, and accepts the same ids used in two different tables. Row ids are unique within their table, not across the document — a block id and a row id are different namespaces.
-- **T1.16** (§3): constructing a `plot` with `form: "line"` and no `height` throws; `sparkline` without one does not.
+- **T1.19** (§3): constructing a `plot` with `form: "line"` and no `height` throws; `sparkline` without one does not.
 - **T1.17** (I27): a document whose `panel` contains itself is refused by `validateDocument` with a named error, and the call returns. A shared-but-acyclic subtree appearing twice validates — the seen-set is path-scoped, and a global one would fail this.
 - **T1.18** (I1, §4b): C24's `b` produces blocks frozen exactly once — the constructor is the only freeze point, asserted by spying on it.
+- **T1.20** (I42): a weight of `0`, a negative, a non-finite, and a list whose length does not match the children — each refused at construction with a named error. **Four values in one row**, because the field's whole risk is a number that reads as meaningful and means two things.
 
 ### Tier 2 — contract / interface
 
@@ -795,6 +1148,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.9** (I11): the module graph shows no import from `terminal/` or above.
 - **T2.11** (I34): `validateBlock` accepts a `patch` carrying a `view` action whose `target` is one of the document's own block ids, and the `Action` union's five kinds are exhaustive over the validator — a sixth added without validation fails the build, exactly as T2.10 does for `Block`. The pairing is what makes the union closed rather than open with four entries written down.
 - **T2.10**: every member of the `Block` union is exhaustively handled by the validator — adding a kind without validation fails the build. *(Registry completeness — that every kind has a registered measurer and renderer — is C09's test, since C09 owns the registry.)*
+- **T2.18** (I46, §5a): the round trip, over `ONE_PER_KIND` and `ADVERSARIAL` — `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal to `d` for every fixture, and the row **asserts how many it ran**, because a sweep over an empty corpus is the same green as a sweep that passed.
+- **T2.19** (I46, §5a): the fabricated failures, which is what makes T2.18 worth running — a plot series carrying `NaN`, one carrying `Infinity`, and a `Cell.spark` carrying a string are each **refused by the validator**, and the first two were accepted before *and after* a round trip that silently rewrote them to `null`.
 
 ### Tier 3 — edge cases
 
@@ -812,6 +1167,15 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.10**: a block containing a combining mark → the base character's width, not two.
 - **T3.11**: `logs` line longer than `w` → 1 line (truncated), not wrapped. Logs never wrap; this is the property that keeps a tail's height predictable.
 - **T3.12**: a `table` where every row is expanded → height includes every detail; collapsing all returns the original.
+- **T3.16** (I42, §3): **equal weights measure identically to no weights**, at every width in the corpus and for two, three and five children. The row R4 exists for: a gutter taken proportionally is right at every equal split and wrong at every uneven one, so nothing but this comparison distinguishes the two rules.
+- **T3.17** (I42): a `[2, 1]` row at 80 — shares of 52 and 26 after one gutter cell off the top, the leftover cell unspent, and each child measured at its own width. Asserted on the widths handed down, not on the resulting height: two allocation rules can produce one height and differ on which child was narrow.
+- **T3.18** (I42, §3): a weighted row too narrow for every child places **left to right** and drops the last, whatever the weights say — asserted with the largest weight last, which is the arrangement a by-size rule would place first.
+- **T3.19** (I43, → C09 §4b): `[50, 1]` at 80 columns puts the second child at the 1-cell floor, and the same three children nested as `group(row, [a, group(row, [b, c])])` drop differently at a width where both overflow. **The row where the deferral's equivalence ends**, and it is the pair of assertions that says so rather than either alone.
+- **T3.20** (I44): `[{cells: 40}, 1]` at 105 and at 120 — the first child is **40 both times**, and the second takes what is left. Asserted at two widths in one row, because a fixed width that is right at one width and drifts at another is exactly what a ratio does, and a single width cannot tell them apart.
+- **T3.21** (I44): declared cells wider than the budget — the fixed child is **not** privileged at placement, and the row places left to right as it does with weights. Asserted with the fixed child **last**, which is where a fixed-first placement rule would keep it and this one does not.
+- **T3.22** (I45): a seven-row child beside an eight-row one, aligned `bottom`, renders identically to the same child with a blank row written into it — **the banner's own hand-alignment, expressed by the container**. And `top` reproduces the unaligned rendering byte for byte, so the default is asserted rather than assumed.
+- **T3.23** (I45): alignment measures identically to none at all, over every width in the corpus. The row that says position is not size.
+- **T3.24** (I46, §5a): the two tolerated inequalities, asserted rather than assumed — a block carrying `-0` round-trips to `0` and stays valid, and a property whose value is an explicit `undefined` loses the key. Both are stated in §5a; a row is what stops them being rediscovered as defects.
 - **T3.13**: `applyPatch` with a `merge` carrying an empty row array → `{ok: true}`, document unchanged.
 - **T3.13b** (§4): a `merge` whose payload omits half the existing rows → every omitted row survives. Absence is not deletion.
 - **T3.14**: a document at the 10,000-block cap (D40) → validation flags `truncated`, and measurement of the whole set completes within budget.
@@ -848,9 +1212,18 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.11** (I16): typing the `merge` arm as `TableRow[]` → T1.8b fails to compile, which is the point: the guard is the type, not the runtime.
 - **T6.12** (I14): dropping the uniqueness check from `validateDocument` → T1.15 fails, and T1.12's duplicate-id case stops being reachable.
 - **T6.13** (I31): dropping the row-id uniqueness check → T1.16 fails, and `merge` upserts into whichever duplicate it reaches first while focus and the render key point at the other.
-- **T6.13** (I27): swapping the path-scoped seen-set for a global one → T1.17's shared-subtree half fails; removing it entirely hangs T3.15 rather than failing it, which is why T1.17 asserts the call *returns*.
+- **T6.17** (I27): swapping the path-scoped seen-set for a global one → T1.17's shared-subtree half fails; removing it entirely hangs T3.15 rather than failing it, which is why T1.17 asserts the call *returns*.
 - **T6.14** (I17): removing the `max(1, …)` floor → T3.6b fails at all three kinds.
 - **T6.15** (§3): giving a `row` group's children the full width → T3.6c fails, and T2.1 fails at every width where a child wraps.
+- **T6.20** (I42): taking the gutter proportionally rather than off the top → T3.16 fails and T3.17's shares move by a cell. **Equal splits agree under both rules**, which is why the failing row is the one comparing weighted to unweighted rather than any row about a weighted layout.
+- **T6.21** (I42, §3): dropping by size rather than by position → T3.18 fails. Every assertion about a row that fits still passes, because the two rules are the same rule until the budget runs out.
+- **T6.22** (I42): accepting a `0` weight → T1.20 fails, and a value with two readings and no use enters a published type.
+- **T6.23** (I44): computing the weighted shares over the whole budget rather than over what the fixed children left → T3.20 fails at both widths, and a cell count becomes a suggestion.
+- **T6.24** (I44): placing fixed children before the others → T3.21 fails, and the rendered set depends on a declaration rather than on the order the author wrote.
+- **T6.25** (I45): defaulting the vertical axis to `bottom` rather than `top` → T3.22's control fails, and every existing row group moves its short children without anything asking it to.
+- **T6.26** (I45): adding the alignment offset to the measured height → T3.23 fails, and a row's height stops being its tallest child.
+- **T6.27** (I46): dropping the finiteness check back to `typeof === "number"` → T2.19 fails, and `NaN` persists as `null` under a validator that agrees twice.
+- **T6.28** (I46): checking that a numeric array *is* an array without checking its elements — the state that shipped → T2.19 fails on `Cell.spark`.
 - **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
 
 ---

@@ -9,7 +9,12 @@
  */
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
-import { childWidths, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
+import {
+  childWidths,
+  hasChildren,
+  normaliseWidth,
+  sequenceHeight,
+} from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { paint, rows, tone } from "./paint.js";
@@ -172,6 +177,15 @@ class Registry implements BlockRegistry {
     }
   };
 
+  /** Does this block's definition answer `elements` itself? (C26 §4b cell 3.) */
+  #ownsElements(block: Block): boolean {
+    try {
+      return this.#resolve(block).definition.elements !== undefined;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Every element in a **sequence**, block-local rows lifted into
    * sequence-local ones (C26 §5).
@@ -208,10 +222,16 @@ class Registry implements BlockRegistry {
             }),
           });
         }
-        // A container declares no elements of its own today; its children's are
-        // reached here. The child widths are C04's, never invented — the same
-        // `childWidths` the measurer and both renderers take (C04 §3).
-        if (block.kind === "panel" || block.kind === "group") {
+        // **A container that declares its own elements owns them.** `panel` and
+        // `group` declare none, so their children's are reached here; `scroll`
+        // declares one element per child (C26 §4b cell 3), and descending past
+        // it would emit each child twice and at the wrong coordinates — its
+        // children are placed in content space, not in this walk's.
+        //
+        // So the question is asked of the **definition** rather than of a list
+        // of kinds, which is the one form that stays right when a fourth
+        // container arrives: whichever answer it gives, this walk follows it.
+        if (hasChildren(block) && !this.#ownsElements(block)) {
           const widths = childWidths(block, atWidth);
           const before = row;
           block.children.forEach((child, i) => {

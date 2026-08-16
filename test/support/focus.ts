@@ -42,11 +42,24 @@ export const placed = (
  * `rowActivate` reads, and the one a `{ activate: undefined }` fixture would
  * quietly erase.
  */
-export const navElement = (id: string, row: number, activate?: Action): NavElement =>
+export const navElement = (
+  id: string,
+  row: number,
+  activate?: Action,
+  /**
+   * The element's source text (C26 §5c).
+   *
+   * **Deliberately unlike anything the row would render**, so a copy taken from
+   * the paint cannot pass a row that asserts this: the point of semantic copy
+   * is that the two differ.
+   */
+  copy?: string,
+): NavElement =>
   Object.freeze({
     id,
     level: "row" as const,
     rows: Object.freeze({ from: row, to: row + 1 }),
     cols: Object.freeze({ from: 0, to: 80 }),
     ...(activate === undefined ? {} : { activate }),
+    ...(copy === undefined ? {} : { copy }),
   });

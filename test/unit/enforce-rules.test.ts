@@ -31,6 +31,7 @@ import {
   checkFunctionConsumers,
   checkBuilderCoverage,
   checkSeamConsumers,
+  publicSurfaceUseSignal,
 } from "../../tools/enforce/module-graph.mjs";
 import { checkMarks, checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
@@ -452,6 +453,16 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'return compose({ command, status, meta: { origin: "defect" } });',
   },
   {
+    // **The state the whole tree was in until C02 I9 landed.** A width taken
+    // with no convention named: correct on a Western terminal, half the answer
+    // on a CJK one, and identical to a correct call from every test that runs
+    // narrow. The rule exists because reading for this is the seventeen-count
+    // sweep's shape.
+    rule: "SS50",
+    file: "src/presentation/blocks/paint.ts",
+    source: "const short = width - cells(text);",
+  },
+  {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
     // resolving its own variable, which reads as C22 owning the default rather
     // than as the framework reading the environment.
@@ -582,6 +593,9 @@ const implemented = [
 
 function srcFiles(dir = "src", out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
+    // Skipped for the roadmap-48 rows below, which walk the two examples — a
+    // second walker beside this one is where the two would drift.
+    if (entry === "node_modules" || entry === "dist" || entry === "out") continue;
     const path = `${dir}/${entry}`;
     if (statSync(path).isDirectory()) srcFiles(path, out);
     else if (/\.tsx?$/.test(entry) && !/\.d\.ts$/.test(entry)) out.push(path);
@@ -827,6 +841,183 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "CompletionEngine.spinning": "why",
     });
     expect(exempted, "a named member is exempt").toEqual([]);
+  });
+
+  // --- roadmap 48 — the public surface by use, A03 §9 ------------------------
+  //
+  // **One row per cell of the walk**, because a row governed by one rule is a
+  // restatement of that rule and finds nothing. The signal is reported and never
+  // gated, so "fires" here means *lists the right member against fabricated
+  // files* rather than *returns a violation*.
+
+  /** The smallest fabricated surface: an entry point, two owners, two apps. */
+  const surfaceFiles = (
+    entry: string,
+    decls: Record<string, string>,
+    apps: Record<string, string>,
+  ): { src: string[]; examples: string[]; read: (f: string) => string } => {
+    const all: Record<string, string> = { "src/index.ts": entry, ...decls, ...apps };
+    return {
+      src: ["src/index.ts", ...Object.keys(decls)],
+      examples: Object.keys(apps),
+      read: (f: string) => all[f] ?? "",
+    };
+  };
+
+  it("48: a name collision can only CLEAR, so the residue under-reports and cannot over-report", () => {
+    // **The founding cell, and it is F160 inverted.** MG24's verdict is
+    // *unconsumed*, so it needs the cleared side exact — and it is not, because
+    // any unrelated type declaring the name satisfies it. This verdict is
+    // *candidate*, so it needs the LISTED side exact — and a collision can only
+    // ever remove a member from the list.
+    //
+    // Two published types both carry `width`. The app names one of them and the
+    // signal cannot tell which, so **both** clear — wrongly for one of them, and
+    // in the direction that shortens the list rather than corrupting it.
+    const { src, examples, read } = surfaceFiles(
+      'export type { Panel, Chart } from "./a.js";\n',
+      {
+        "src/a.ts":
+          "export type Panel = Readonly<{ width: number; footer: string }>;\n" +
+          "export type Chart = Readonly<{ width: number; yFormat: string }>;\n",
+      },
+      { "examples/app/main.ts": "const p = { width: 40 };\n" },
+    );
+
+    const s = publicSurfaceUseSignal(src, examples, read);
+
+    expect(s.candidates.sort(), "only the members no app names at all are listed").toEqual([
+      "Chart.yFormat",
+      "Panel.footer",
+    ]);
+    expect(s.ambiguous, "both clearings are ambiguous, and neither can list").toBe(2);
+    expect(s.cleared).toBe(2);
+  });
+
+  it("48: the keyword decides nothing here — an app BUILDS an interface as readily as a record", () => {
+    // **The walk ruled that F94's split carried over, and the build falsified
+    // it.** MG24 picks its test by keyword because inside `src/` a deps record is
+    // built inline and an interface is called into. Measured against the real
+    // published surface, that is false: `CompletionSource` is declared
+    // `export interface` and `examples/docker/src/completion.ts` supplies four of
+    // its members by object literal — `slots`, `dynamic`, `ttlMs`, `cacheKey` —
+    // every one of which the split reported as a candidate.
+    //
+    // **That is the residue over-reporting, which is the one thing this signal
+    // claims it cannot do**, so the fix is not a preference. The keyword says how
+    // the framework *declares* a type; an app's use is decided by what the type is
+    // for — a declaration is supplied, a handle is called — and the entry point
+    // publishes both kinds under both keywords. The loose test everywhere is
+    // justified by the cell above: a wrongly-cleared member only shortens the
+    // list.
+    const { src, examples, read } = surfaceFiles(
+      'export type { Source, Handle } from "./a.js";\n',
+      {
+        "src/a.ts":
+          "export interface Source {\n  slots: readonly string[];\n  ttlMs: number;\n}\n" +
+          "export interface Handle {\n  stop(): void;\n  drain(): void;\n}\n",
+      },
+      { "examples/app/main.ts": "register({ slots: ['positional'] });\nh.stop();\n" },
+    );
+
+    const s = publicSurfaceUseSignal(src, examples, read);
+
+    expect(
+      s.candidates.sort(),
+      "a built interface member clears exactly as a built record member does",
+    ).toEqual(["Handle.drain", "Source.ttlMs"]);
+  });
+
+  it("48: a member named only in an example's TESTS is neither cleared nor listed", () => {
+    // A test names a field in order to assert it exists, which is evidence about
+    // the surface rather than about use. Folding it into either bucket would be
+    // wrong in both directions — cleared, and the residue misses a member no app
+    // reaches; listed, and the read is sent after a member the app's own suite
+    // is holding. A third bucket, printed.
+    const { src, examples, read } = surfaceFiles(
+      'export type { Conf } from "./a.js";\n',
+      { "src/a.ts": "export type Conf = Readonly<{ debug: boolean; clock: number }>;\n" },
+      {
+        "examples/app/main.ts": "const c = { debug: true };\n",
+        "examples/app/test/conf.test.ts": "expect(c.clock).toBe(0);\n",
+      },
+    );
+
+    const s = publicSurfaceUseSignal(src, examples, read);
+
+    expect(s.candidates, "the test-named member is not a candidate").toEqual([]);
+    expect(s.testOnly, "and it did not clear either").toBe(1);
+    expect(s.cleared).toBe(1);
+  });
+
+  it("48: the population is what `src/index.ts` exports AS A TYPE, and nothing else", () => {
+    // The freeze protects the surface the entry point names, and that is the
+    // whole subject. A member of an interior type is not a candidate for a read
+    // about the public API — MG24 already covers it, from the other side.
+    //
+    // **And the limit in the same row**: a type reachable only through an
+    // exported *value* is out of scope, which is a real gap and is stated in the
+    // signal's header rather than discovered later.
+    const { src, examples, read } = surfaceFiles(
+      'export type { Conf } from "./a.js";\nexport { make } from "./a.js";\n',
+      {
+        "src/a.ts":
+          "export type Conf = Readonly<{ debug: boolean }>;\n" +
+          "export type Interior = Readonly<{ hidden: boolean }>;\n",
+      },
+      { "examples/app/main.ts": "const x = 1;\n" },
+    );
+
+    const s = publicSurfaceUseSignal(src, examples, read);
+
+    expect(s.candidates, "the interior type is out of scope").toEqual(["Conf.debug"]);
+    expect(s.members).toBe(1);
+  });
+
+  it("48: a field a BUILDER sets is listed, and that is the blind spot rather than a defect", () => {
+    // **Asserted so the limit is a property of the instrument rather than a
+    // sentence about it.** The residue is exact about the claim it makes —
+    // *neither example names this member* — and that claim is a proxy for use
+    // with one known gap: a builder can set a field the app never names.
+    //
+    // `b.live` is the measured instance. `examples/docker` uses the mechanism
+    // `ViewRefresh` declares and reaches it through a builder whose own
+    // `LiveSpec` spells the field `staleAfter` where the published type spells
+    // it `staleAfterMs`, so all three `ViewRefresh` members are in the real
+    // residue while the mechanism ships and runs.
+    //
+    // If this row ever goes red because the member cleared, the instrument has
+    // learned to see through a builder and the header's blind spot is stale.
+    const { src, examples, read } = surfaceFiles(
+      'export type { Refresh } from "./a.js";\n',
+      { "src/a.ts": "export type Refresh = Readonly<{ staleAfterMs: number }>;\n" },
+      { "examples/app/main.ts": "b.live({ id: 'x', staleAfter: 5_000 });\n" },
+    );
+
+    const s = publicSurfaceUseSignal(src, examples, read);
+
+    expect(
+      s.candidates,
+      "the app uses the mechanism through a builder and never names the published field",
+    ).toEqual(["Refresh.staleAfterMs"]);
+  });
+
+  it("48: the signal has a subject in the real tree, and reports its own counters", () => {
+    // **An exit status is one bit and it is the same bit for clean and for
+    // did-not-run.** This signal has no exit status at all — it prints — so the
+    // equivalent failure is a population of zero reading as a clean surface. It
+    // has happened to three instruments in this repository, each reporting a
+    // completion it never observed.
+    const src = srcFiles("src");
+    const examples = [...srcFiles("examples/minimal"), ...srcFiles("examples/docker")];
+    const s = publicSurfaceUseSignal(src, examples);
+
+    expect(s.members, "the published population is not empty").toBeGreaterThan(100);
+    expect(examples.length, "both consumers are in scope").toBeGreaterThan(20);
+    expect(
+      s.cleared + s.candidates.length + s.testOnly,
+      "every member lands in exactly one bucket",
+    ).toBe(s.members);
   });
 
   it("SS47 fires: a mark in framework text, and the exemption list expires", () => {

@@ -33,8 +33,10 @@ import { focusKey } from "./render-cache.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
+import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { resolveFocus } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER } from "./config.js";
+import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
@@ -134,6 +136,9 @@ export function createTui<C extends TuiConfig>(
   return new Session(resolveConfig(config, ambient()));
 }
 
+/** One frozen empty array rather than a new one per paint (entry 23). */
+const EMPTY_SPANS: readonly CellSpan[] = Object.freeze([]);
+
 class Session implements TuiInstance {
   #state: SessionState = "created";
   #graph: Graph | null = null;
@@ -151,6 +156,16 @@ class Session implements TuiInstance {
    * it is the only place C03's flag needs an expression here.
    */
   #lastFrame: readonly string[] | null = null;
+  /**
+   * Copy mode: the reader has asked the app to step back (C16 §5b, C03 §4a).
+   *
+   * **Real state owned here, beside the other frame queries**, because the two
+   * things it drives are both this file's: the scheduler it suspends and the
+   * mouse tracking it turns off. `FocusInputs.copyMode` reads it and
+   * `activeTarget` does the rest — it is a *target*, not a third mode beside
+   * navigate and interact (roadmap 15's ruling, C26 I2's argument unchanged).
+   */
+  #copyMode = false;
 
   constructor(private readonly config: ResolvedConfig) {}
 
@@ -460,6 +475,22 @@ class Session implements TuiInstance {
       paintDeps: (frame) => this.#paintDeps(graph, frame),
       resizeViewport: (size) => void graph.viewport.resize(size),
       cursorSequence: (cursor) => graph.lifecycle.cursorSequence(cursor),
+      // **The target, not the layer** (C22 I63, §6f). `router.target` is what
+      // holds the keys, and it is defined on every frame — a layer is not, and
+      // five of the seven targets have no `Placed` at all. C01 answers with
+      // nothing when the shape has not changed, so this is a read per frame and
+      // bytes only on a transition.
+      cursorShape: () =>
+        graph.lifecycle.cursorShapeSequence(
+          // **Two steps, and the second only ever removes blink** (I63, I64).
+          // The declaration is the app's answer; *steady while typing* is a
+          // refinement of it and never a second opinion, so a style declared
+          // steady is never made to blink and a `null` one is untouched.
+          steadyWhileTyping(
+            cursorStyleFor(graph.router.target, this.config.cursor),
+            graph.cursorIdle(),
+          ),
+        ),
       // **The record is the caller's, because the write is** (I55, §4a).
       // `composeFrame` returns bytes and never puts them on a terminal, so it
       // cannot know whether they landed; this does.
@@ -504,11 +535,39 @@ class Session implements TuiInstance {
       transcriptRows: () => visibleRows(graph, width),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
       promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
+      // **The wash, mapped through the same walk the rows came from** (C17 I18,
+      // roadmap entry 23). `selection` is read here rather than a
+      // `selectionSpans` method being added to `LineEditor`, because the guard
+      // and the mapping both belong to whoever knows the width — and a method
+      // whose only caller is the painter is a member the editor does not need.
+      //
+      // Empty when there is no region, which is the common case and costs one
+      // frozen array.
+      promptSelection: () => {
+        const sel = graph.editor.selection;
+        if (sel === null) return EMPTY_SPANS;
+        return selectionSpans(
+          graph.editor.text,
+          sel.anchor,
+          sel.head,
+          width,
+          PROMPT_GUTTER,
+          // The fourth caller of the one walk, and the one the seam was nearly
+          // written without: a wash measured on sentinels and drawn over labels
+          // covers the wrong cells, and no assertion about which characters are
+          // selected shows it.
+          graph.editor.drawAs,
+        );
+      },
       // C16's derived focus, read rather than stored — the cursor belongs to
       // whatever holds the keys, and a second record of that would drift from
       // the display exactly as a stored focus does (C16 §3, C15 I19).
       promptFocused: () =>
         graph.router.target === "prompt" || graph.promptUnderMenu(),
+      // **Read at paint, not captured** (C22 I66). `/theme light --no-bg`
+      // changes it between frames, and the frame that shows the change is the
+      // one the notice commits.
+      suppressBackground: () => graph.suppressBackground(),
       // **Fresh on every paint, and that is the invariant rather than a style**
       // (C22 I38). `spinning` changes with the clock, not with the frame, so a
       // value captured when the request started can never become true — and
@@ -542,10 +601,46 @@ class Session implements TuiInstance {
     };
   }
 
+  /**
+   * Both halves of copy mode, in one place because they are one transition.
+   *
+   * **Three effects and the order is not arbitrary.** The flag moves first, so
+   * anything that reads it during the rest of this sees the new value. Then the
+   * screen: entering *suspends after* one last frame is drawn showing the
+   * indicator — otherwise the reader is told nothing and simply finds the mouse
+   * dead — and leaving *resumes*, which writes the catching-up frame itself
+   * (C03 I14).
+   *
+   * Mouse tracking last, and off only after the frame that says so is up: the
+   * terminal's own selection is what the reader is about to use, and it should
+   * not become available before the screen has stopped moving.
+   */
+  #setCopyMode(on: boolean): void {
+    const graph = this.#graph;
+    if (graph === null || this.#copyMode === on) return;
+    this.#copyMode = on;
+
+    if (on) {
+      // The indicator's frame, then the hold. `flush` rather than a bare commit
+      // so the frame is on the screen before `suspend()` can gate one.
+      graph.scheduler.commit("input");
+      graph.scheduler.flush();
+      graph.scheduler.suspend();
+      graph.lifecycle.setMouseTracking(false);
+      return;
+    }
+
+    // Tracking back first: the reader has finished selecting, and the app takes
+    // the mouse again before it takes the screen.
+    graph.lifecycle.setMouseTracking(true);
+    graph.scheduler.resume();
+  }
+
   #frameQueries(): FrameQueries {
     return {
-      copyMode: () => false,
-      exitCopyMode: () => undefined,
+      copyMode: () => this.#copyMode,
+      enterCopyMode: () => this.#setCopyMode(true),
+      exitCopyMode: () => this.#setCopyMode(false),
       entryAtRow: () => null,
       region: () => this.#composed().region,
       overlayRegion: () => this.#composed().overlayRegion,
@@ -606,6 +701,7 @@ class Session implements TuiInstance {
     return compose({
       chrome: this.config.chrome,
       session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
+      copyMode: () => this.#copyMode,
       now: this.config.clock,
       size: () => graph?.lifecycle.size() ?? { columns: 80, rows: 24 },
       // **The same number the paint path reads** (S01 §3, commitment 4 and 13).
@@ -666,7 +762,15 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     // common case; a large one re-renders as it scrolls, and only the rows on
     // screen.
     const range = `${String(from)}\u0000${String(to)}`;
-    const held = graph.rendered.get(entry.id, entry.rev, width, `${key}\u0000${range}`, theme);
+    // **The fourth axis, and it is the one that fails silently** (C04 I48). A
+    // scroll offset changes what is rendered and moves none of `rev`, width,
+    // focus or theme — focus's own story a third time — so without this a
+    // reader who scrolls away and back is served the frame they left. It fails
+    // nothing until a row scrolls twice and reads the frame, which is why
+    // T4.18e is written that way.
+    const offsets = graph.scrollOffsets.key(entry.id);
+    const slot = `${key}\u0000${range}\u0000${offsets}`;
+    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
     const lines =
       held ??
       renderSequenceToLines(graph.blocks, windowed.blocks, width, {
@@ -679,9 +783,10 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
         // still broken — a partially-populated context, which counting
         // references cannot see.
         focus,
+        scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
       });
     if (held === undefined) {
-      graph.rendered.set(entry.id, entry.rev, width, `${key}\u0000${range}`, theme, lines);
+      graph.rendered.set(entry.id, entry.rev, width, slot, theme, lines);
     }
 
     // **The chrome is unwindowed and the blocks are**, so the slice is taken

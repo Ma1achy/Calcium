@@ -25,6 +25,7 @@ import { loadTheme, defaultTheme, type ThemeStore } from "../../src/presentation
 import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { fixture } from "./manifest.js";
+import { withThemeNames } from "../../src/data/manifest/index.js";
 import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
@@ -59,6 +60,8 @@ export type PipelineHarness = Readonly<{
   theme: ThemeStore;
   /** Commit reasons in order, so Seam 4's sequences are assertable. */
   commits: string[];
+  /** Every `--no-bg` decision, in order — `false` included (C22 I66). */
+  suppressed: boolean[];
   /** Every cross-layer call C23 made, in order. */
   calls: string[];
   /** Shell commands actually spawned, for the `cd` rows. */
@@ -94,6 +97,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const theme = script.theme ?? themed.value;
 
   const commits: string[] = [];
+  /** What `/theme` wrote for `--no-bg`, in order (C22 I66). */
+  const suppressed: boolean[] = [];
   const calls: string[] = [];
   /** What reached C20 (C23 I29), for the tests that assert the record. */
   const recorded: { command: string; exitCode: number }[] = [];
@@ -150,7 +155,17 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
       seal: () => undefined,
       sealed: true,
     },
-    manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
+    // **`/theme`'s values from the store this harness was given** (C10 I27),
+    // which is the composition root's own wiring: the manifest describes the
+    // verb and the set declares the names. A fixture pinned to the shipped two
+    // would make a three-theme session's third name a validation error here and
+    // nowhere else, so a row about the handler would be a row about the fixture.
+    manifest: {
+      manifest: withThemeNames(fixture(), theme.names),
+      load: () => undefined,
+      seal: () => undefined,
+      sealed: true,
+    },
     blocks: {} as never,
     // C07 I19 / I18 — what `ProducerContext` is built from (C23 I40). Real
     // values rather than stubs: a producer told `ascii` behaves differently, and
@@ -192,7 +207,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
      * answer, so a handler that asks and ignores the reply would pass — and the
      * one test that matters is whether declining stops the command.
      */
-    confirm: createConfirmHost({ capabilities: { unicode: "full" }, overlays: harnessOverlays, invalidate: () => undefined }),
+    confirm: createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined }),
     theme,
     // `append` is real, because C23 I29 records every settled submission
     // through it — a fake without it throws inside the append funnel and the
@@ -263,6 +278,11 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     openUrl: () => Promise.resolve(),
     bindings: () => [{ keys: "c+c", does: "global: cancel" }],
+    // **Added because a row called it and the cast below could not** (C22 I66).
+    // `/theme`'s handler writes this, so T4.4 failed the moment it existed —
+    // which is the README's *anything added to `PipelineDeps` will be silently
+    // absent here until a row calls it*, arriving as a measurement.
+    setSuppressBackground: (next: boolean) => void suppressed.push(next),
     binary: "widget",
     commandPolicy: slashPolicy,
   } as unknown as PipelineDeps;
@@ -281,6 +301,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     session,
     theme,
     commits,
+    suppressed,
     calls,
     spawned,
     handed,

@@ -22,13 +22,16 @@
 import {
   accept,
   contextAt,
+  menuBlocks,
   menuLayer,
   menuRowsShown,
+  menuWindow,
   remainderOf,
   MENU_ID,
   SPINNER_MS,
 } from "../interaction/completion/index.js";
 import { SEARCH_ID } from "../interaction/history/index.js";
+import { createChoiceSelection } from "./choice-selection.js";
 import type {
   Candidate,
   CompletionContext,
@@ -77,6 +80,16 @@ export type KeyDeps = Readonly<{
   /** C16's stored focus — the one piece of it in the system (C16 §3). */
   focus: FocusStore;
   /**
+   * Enter copy mode (C16 §5b, C03 §4a).
+   *
+   * **The entry half only, and the exit is deliberately not here.** Leaving is
+   * `⌃c` on the ladder's copy-mode rung, which already calls `exitCopyMode` —
+   * so a matching effect in this table would be a second exit with an order of
+   * its own. The pair still ships together; they just do not ship *here*
+   * together.
+   */
+  enterCopyMode: () => void;
+  /**
    * The fullscreen patch view (C25 §3b, C22 I41).
    *
    * Named here rather than reached through `overlays`, because the motions are
@@ -118,6 +131,18 @@ export type KeyDeps = Readonly<{
   liveElements: () => readonly PlacedNavElement[];
   /** The entry those elements belong to, for an action's origin (C23 I37). */
   liveEntryId: () => EntryId | null;
+  /**
+   * Page the focused container's own window by `direction` (C04 I48, C26 I18).
+   *
+   * **A seam and not the store**, on `liveElements`'s own argument: the block's
+   * height at the current width is what a page is, and this file knows neither
+   * the width nor the registry. L4 holds both, so L4 computes the step and this
+   * file names the intent — which keeps the effect table a transcription rather
+   * than a second place arithmetic lives.
+   *
+   * Focus does not move, and that is C26 I18 rather than an omission here.
+   */
+  pageBlock: (direction: 1 | -1) => void;
   /**
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
@@ -198,6 +223,22 @@ export interface KeyEffects {
    * `searchEnd` takes its action for the same reason (C20 §7).
    */
   searchTyped(text: string | null): void;
+  /**
+   * The region changed — re-place whatever is anchored to the prompt.
+   *
+   * **Placement is live in C15's type and nothing was keeping it current.** The
+   * anchor is recomputed on every keystroke — `showMenu` passes `deps.anchor()`
+   * and `update` carries the placement with the content — and the resize path
+   * was not: it resized the viewport and committed a frame, and `redrawMenu`
+   * sends content alone. So a resize with the menu open left it anchored to the
+   * *previous* region height until the next keystroke. C15 clamps, so no number
+   * is inconsistent and nothing faults; the menu is simply in the wrong place,
+   * which is what a frame shows and an assertion about the anchor agrees with.
+   *
+   * Both layers, because both take the same anchor and only one of them would
+   * have been noticed.
+   */
+  refreshAnchors(): void;
   /** The line went away — close the menu and forget `Esc`'s suppression (C19 I19). */
   reset(): void;
 }
@@ -212,7 +253,7 @@ export interface KeyEffects {
 export function createKeyEffects(deps: KeyDeps): KeyEffects {
   let candidates: readonly Candidate[] = [];
   /** `null` while the menu is a display of what is available (C19 I20). */
-  let selected: number | null = null;
+  const selection = createChoiceSelection(0, null);
   /**
    * Did a `Tab` open this menu (C19 I22)?
    *
@@ -227,6 +268,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   /** The prefix the open menu was built for — "does this keystroke extend it". */
   let builtFor = "";
   let remainder = 0;
+  /**
+   * How many candidate rows the placement holds — 0 until it has been measured.
+   *
+   * **The window exists because the compositor cuts from the end** (C19 I23,
+   * `composite.ts:128`): everything the menu puts last is what it loses, and
+   * that is the indicator, the bottom edge and any candidate past the fold. A
+   * frame-read is what showed it; every assertion about the remainder agreed
+   * with the old behaviour, because the number was computed correctly and drawn
+   * nowhere.
+   */
+  let fits = 0;
   let seq = 0;
   /**
    * Where `Esc` dismissed a typed menu, as the token's start offset (C19 I19).
@@ -240,11 +292,36 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   const ctxNow = (): CompletionContext =>
     contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
 
+  /**
+   * The visible slice, so the menu draws exactly what its placement holds.
+   *
+   * `fits` is 0 until `countRemainder` has run, which means *not yet measured*
+   * rather than *nothing fits* — the first draw hands over the whole list and
+   * the second pass windows it, which is the same two-pass shape the remainder
+   * has always had and for the same reason (C15 answers only once the layer is
+   * on the stack).
+   */
+  function windowedBlocks(): ReturnType<typeof menuBlocks> {
+    // `fits` is 0 until the placement has been measured, and `menuWindow`
+    // answers *the whole list* for that — so there is no arm here. The first
+    // draft carried one, and it was dead: `menuWindow` already treats a
+    // non-positive fit as *everything*. Two expressions saying one thing, the
+    // second of which could not be violated (A03 §2).
+    // **Only a truncated placement windows anything**, and tier 5 is what
+    // insisted on the guard. `fits` is one measurement of one placement, and a
+    // dynamic source produces several in a row — a spinner, then the real set —
+    // so a `fits` from the wrong one silently dropped candidates that fitted
+    // perfectly well. `remainder` is the only thing that says *something was
+    // actually cut*, and where nothing was, there is nothing to window.
+    if (remainder <= 0) return menuBlocks(candidates, selection.at, 0);
+    const w = menuWindow(candidates.length, selection.at, fits);
+    const slice = candidates.slice(w.start, w.start + w.shown);
+    return menuBlocks(slice, selection.at === null ? null : selection.at - w.start, remainder);
+  }
+
   function redrawMenu(): void {
     if (candidates.length === 0) return;
-    deps.overlays.update(MENU_ID, {
-      content: menuLayer(candidates, selected, remainder, deps.anchor()).content,
-    });
+    deps.overlays.update(MENU_ID, { content: windowedBlocks() });
   }
 
   /**
@@ -261,14 +338,26 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    */
   function showMenu(next: readonly Candidate[], sel: number | null, prefix: string): void {
     candidates = next;
-    selected = sel;
+    selection.reset(next.length, sel);
     builtFor = prefix;
-    const layer = menuLayer(candidates, selected, remainder, deps.anchor());
+    // **A new list is measured afresh, and tier 5 is what proved it.** The
+    // mutation pass reported this line dead — every `showMenu` is followed by
+    // `countRemainder` in the same tick, so a stale `fits` looked unreadable —
+    // and the unit rows agreed, because none of them drives a *dynamic* source.
+    // A real one shows a spinner first: one row, so `fits` becomes 1, and the
+    // candidates that arrive afterwards are windowed to it. `/ps --status=`
+    // drew `running` and nothing else.
+    //
+    // So the survivor was the third disposition — the tests could not construct
+    // the state, not the code could not reach it — and the two dead clamps
+    // beside it were the first disposition. They read identically in a report.
+    fits = 0;
+    const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
     if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
       return;
     }
     remainder = 0;
-    deps.overlays.push(menuLayer(candidates, selected, 0, deps.anchor()));
+    deps.overlays.push(menuLayer(candidates, selection.at, 0, deps.anchor()));
   }
 
   function hasMenu(): boolean {
@@ -277,7 +366,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
   function closeMenu(): void {
     candidates = [];
-    selected = null;
+    selection.reset(0, null);
     requested = false;
     builtFor = "";
     remainder = 0;
@@ -297,7 +386,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // **Rows, not blocks** (C19 I23). `content.length` counts boxes, and the
     // table holding sixty candidates is one of them — so a menu clamped to ten
     // rows used to report fifty-nine missing where fifty are.
-    remainder = remainderOf(placed ?? null, candidates.length, menuRowsShown(placed ?? null));
+    fits = menuRowsShown(placed ?? null);
+    remainder = remainderOf(placed ?? null, candidates.length, fits);
     redrawMenu();
   }
 
@@ -312,7 +402,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   }
 
   function applyCandidate(whole: boolean): void {
-    const candidate = selected === null ? undefined : candidates[selected];
+    const at = selection.at;
+    const candidate = at === null ? undefined : candidates[at];
     if (candidate === undefined) return;
     applyEdit(ctxNow(), candidate, whole);
     closeMenu();
@@ -364,7 +455,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         closeMenu();
         return;
       }
-      showMenu(narrowed, selected === null ? null : 0, prefix);
+      showMenu(narrowed, selection.at === null ? null : 0, prefix);
       countRemainder();
       return;
     }
@@ -482,13 +573,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // resolve first while it is a display (C19 I20), so `↑` is history and
     // `Tab` is `complete`. The `null` arm is the guard, not a fallback.
     menuNext: () => {
-      if (candidates.length === 0 || selected === null) return;
-      selected = (selected + 1) % candidates.length;
+      if (candidates.length === 0) return;
+      selection.next();
       redrawMenu();
     },
     menuPrev: () => {
-      if (candidates.length === 0 || selected === null) return;
-      selected = (selected + candidates.length - 1) % candidates.length;
+      if (candidates.length === 0) return;
+      selection.prev();
       redrawMenu();
     },
     menuAccept: () => void applyCandidate(true),
@@ -655,6 +746,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // for whichever handler forgets, of which only the second is invisible.
     scrollPageUp: () => void deps.viewport.pageUp(),
     scrollPageDown: () => void deps.viewport.pageDown(),
+
+    // **The focused container's own window** (C26 I18, C04 I48). The block is
+    // the one holding the focused element — a scroll's elements are its
+    // children, so the address's `blockId` *is* the container — and focus does
+    // not move, by the invariant rather than by omission.
+    //
+    // A page is the box's height less one row of overlap, which is what every
+    // pager does and what makes a reader able to join two screens. The store
+    // floors at zero and the renderer bounds the top, so nothing here clamps
+    // (C04 §3c cell 4).
+    blockPageDown: () => void deps.pageBlock(1),
+    blockPageUp: () => void deps.pageBlock(-1),
     scrollTop: () => void deps.viewport.scrollToTop(),
     scrollBottom: () => void deps.viewport.scrollToBottom(),
 
@@ -701,6 +804,94 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.history.searchOlder();
       refreshSearchLayer();
     },
+
+    // --- selection (C17 §5b, I21) ------------------------------------------
+    //
+    // **Seven rows and no logic**, which is the point: `extend` is `move` with
+    // the anchor held inside C17, so nothing here decides anything and there is
+    // no second place for the two to disagree.
+    extendCharLeft: () => void deps.editor.extend("charLeft"),
+    extendCharRight: () => void deps.editor.extend("charRight"),
+    extendWordLeft: () => void deps.editor.extend("wordLeft"),
+    extendWordRight: () => void deps.editor.extend("wordRight"),
+    extendLineStart: () => void deps.editor.extend("lineStart"),
+    extendLineEnd: () => void deps.editor.extend("lineEnd"),
+    selectAll: () => void deps.editor.selectAll(),
+    // **The region reaches the kill buffer and nowhere else** (C17 §5a). The
+    // system clipboard is a separate axis — a capability question about the
+    // terminal — and folding it in here would make "one clipboard" a claim
+    // about two things, one of which C17 cannot see.
+    copySelection: () => void deps.editor.copy(),
+
+    // --- the transcript's selection (C26 §5c) ------------------------------
+    //
+    // **`rowUp`/`rowDown` with the anchor held**, and the two lines that differ
+    // are the store call. No second notion of *which element is next* — the
+    // list and the resolver are the ones the unshifted motions use, so a word
+    // this pair disagreed about could not exist.
+    extendRowDown: () => {
+      const elements = deps.liveElements();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const i = resolveFocus(current.element, elements);
+      if (i === null) return;
+      const next = elements[i + 1];
+      if (next !== undefined) deps.focus.extendRow(addressOf(next));
+    },
+    extendRowUp: () => {
+      const elements = deps.liveElements();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const i = resolveFocus(current.element, elements);
+      // **Stops at the first element rather than leaving.** `↑` unshifted exits
+      // to the prompt (C26 I13, the reader stepping out); extending is a
+      // gesture *inside* the block, and one that walked out of it would take
+      // the selection with it and leave nothing to copy.
+      if (i === null || i === 0) return;
+      const prev = elements[i - 1];
+      if (prev !== undefined) deps.focus.extendRow(addressOf(prev));
+    },
+
+    /**
+     * `y` — semantic copy (C26 §5c).
+     *
+     * **What the element *is*, never what is on screen.** Each element declares
+     * its own `copy` from the data it was given, so a dropped column, a
+     * truncation and a marker glyph are all absent from it — which is the whole
+     * of why this beats dragging, and it is invisible to any assertion about
+     * the painted frame.
+     *
+     * **One clipboard** (C17 §5a): the text lands where `⌃k` puts its and where
+     * `⌃y` reads, rather than in a second store nothing else can reach.
+     *
+     * Newline-joined over the range, because the elements are rows and rows are
+     * lines. An element declaring no `copy` contributes nothing rather than a
+     * blank line — it is a place to stand, not empty data.
+     */
+    copyElement: () => {
+      const elements = deps.liveElements();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const head = resolveFocus(current.element, elements);
+      if (head === null) return;
+      const anchor = current.anchor === null ? head : resolveFocus(current.anchor, elements);
+      if (anchor === null) return;
+
+      const text = elements
+        .slice(Math.min(anchor, head), Math.max(anchor, head) + 1)
+        .map((p) => p.element.copy)
+        .filter((c): c is string => c !== undefined && c !== "")
+        .join("\n");
+      if (text === "") return;
+      deps.editor.copyText(text);
+    },
+
+    // --- copy mode (C16 §5b) -----------------------------------------------
+    //
+    // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
+    // this table's — a second way out here would give copy mode an order of its
+    // own, which is exactly what makes it a target rather than a mode.
+    enterCopyMode: () => void deps.enterCopyMode(),
   });
 
   /**
@@ -768,12 +959,23 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       else deps.history.searchType(text);
       refreshSearchLayer();
     },
+    refreshAnchors: () => {
+      const at = deps.anchor();
+      // `update` answers *whether the layer is on the stack* and is a no-op
+      // when it is not (C15 I14), so neither call needs a second record of
+      // what is open — the question C19 I21 already settled for `showMenu`.
+      deps.overlays.update(MENU_ID, {
+        placement: menuLayer(candidates, selection.at, remainder, at).placement,
+      });
+      deps.overlays.update(SEARCH_ID, { placement: deps.history.searchLayer(at).placement });
+    },
+
     reset: () => {
       closeMenu();
       suppressedAt = null;
     },
     get selected() {
-      return selected;
+      return selection.at;
     },
   };
 }

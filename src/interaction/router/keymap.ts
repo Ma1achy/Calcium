@@ -270,6 +270,68 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "pushedView", key: { name: "down" }, action: "viewPageDown" },
   { target: "pushedView", key: { name: "escape" }, action: "viewPop" },
 
+  // --- selection (C17 §5b, entry 15 step 2) --------------------------------
+  //
+  // **Every wire form here was pressed through the real decoder before it was
+  // written down** (T2.13, T2.14), and the check cost two of the four rows it
+  // was given: `⇧⌃a`/`⇧⌃e` for line start and end are ctrl+shift+letter, which
+  // is the same `0x01` that killed `⌃⇧a`. `⇧Home`/`⇧End` replace them and are
+  // what GUI editors use anyway.
+  //
+  // **`⌥⇧←` has two wire forms and they disagreed until step 0.** A terminal
+  // sending Option as Alt gives `CSI 1;4D`; one sending it as Meta gives
+  // `CSI 1;10D`, which the decoder read as `⇧←` because `modifiersOf` never
+  // looked at xterm's bit 8. Both forms are in T2.13's table so the row cannot
+  // pass on half the terminals.
+  { target: "prompt", key: { name: "left", shift: true }, action: "extendCharLeft" },
+  { target: "prompt", key: { name: "right", shift: true }, action: "extendCharRight" },
+  { target: "prompt", key: { name: "left", meta: true, shift: true }, action: "extendWordLeft" },
+  { target: "prompt", key: { name: "right", meta: true, shift: true }, action: "extendWordRight" },
+  { target: "prompt", key: { name: "home", shift: true }, action: "extendLineStart" },
+  { target: "prompt", key: { name: "end", shift: true }, action: "extendLineEnd" },
+  // **`⌥a`, not `⌃⇧a`.** `⌃a` is line-start in every readline application and
+  // `⌃⇧a` is the same byte, so the row would have resolved against `home` and
+  // one of the two would silently never run. Not a collision — the byte has a
+  // meaning.
+  { target: "prompt", key: { name: "a", meta: true }, action: "selectAll" },
+  // **`⌥w`, the emacs `kill-ring-save` key**, and the choice is forced rather
+  // than preferred: `⌃c` is cancel at every rung of the ladder and `⌃w` is a
+  // word kill in every readline application. Checked through the decoder —
+  // `ESC w` is `m+w`, and `w` is free on the meta path.
+  { target: "prompt", key: { name: "w", meta: true }, action: "copySelection" },
+
+  // --- the transcript's selection (C26 §5c) --------------------------------
+  //
+  // **`liveBlock`, never `interaction`** — C16 §5a row A4. A block's declared
+  // keys are an open set (C26 I14), and the two being separate targets is what
+  // makes that structural rather than a rule someone has to remember.
+  //
+  // Plain `y`, because this target has no prompt competing for letters — the
+  // same argument `pushedView`'s `n`/`p`/`g` make. Checked through the decoder:
+  // `⇧↑` is `CSI 1;2A` and `⇧↓` is `CSI 1;2B`, both `s+up`/`s+down`.
+  { target: "liveBlock", key: { name: "up", shift: true }, action: "extendRowUp" },
+  { target: "liveBlock", key: { name: "down", shift: true }, action: "extendRowDown" },
+  { target: "liveBlock", key: { name: "y" }, action: "copyElement" },
+
+  // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
+  //
+  // **`⌥v` is PROVISIONAL and the word is load-bearing.** Which key enters copy
+  // mode is a question for the rebindable-keys row and is deliberately still
+  // open; shipping the mode with no way in is B1's failure inverted — a mode
+  // that can be left and never entered — so a default is picked and labelled
+  // rather than deferred. `v` for *visual*, on the meta path `⌥b`/`⌥d`/`⌥f`
+  // already use, and free in this table.
+  //
+  // **Checked through the real decoder before being written down** (T2.13,
+  // T2.14): `ESC v` decodes as `{name: "v", meta: true}`.
+  //
+  // **Two targets, not `global`.** `activeTarget` answers `global` only with no
+  // live entry and focus away from the prompt, so a `global` row would resolve
+  // almost nowhere. Not `interaction`: a block's declared keys are an open set
+  // (C26 I14) and a framework binding there shadows one — C16 §5a row A4.
+  { target: "prompt", key: { name: "v", meta: true }, action: "enterCopyMode" },
+  { target: "liveBlock", key: { name: "v", meta: true }, action: "enterCopyMode" },
+
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
   { target: "global", key: { name: "home", ctrl: true }, action: "scrollTop" },
@@ -283,6 +345,21 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // the same key `overlay` accepts a menu item with, which is the consistency a
   // reader has already learnt by the time they reach a row.
   { target: "liveBlock", key: { name: "enter" }, action: "rowActivate" },
+
+  // **A working key gains a second meaning, and that is a behaviour change**
+  // (C04 §3c, C26 §4b). `pageup`/`pagedown` are bound at `global` to the
+  // transcript's viewport and had no `liveBlock` row at all, so paging inside a
+  // focused block used to scroll the transcript underneath it. The ladder makes
+  // these win while focus is in a block and leaves the global pair untouched
+  // everywhere else — one key at two targets resolved by priority, which is the
+  // same shape the `pushedView` pair already notes and not the duplicate the
+  // conflict rule refuses.
+  //
+  // **Movement moves focus; paging moves the window** (C26 I18). These never
+  // touch focus, which is what makes a focused element outside the box a legal
+  // state rather than a thing to correct.
+  { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
+  { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
 ];
 
 /**

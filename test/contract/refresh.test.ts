@@ -297,7 +297,7 @@ describe("C23 §3b — part refresh", () => {
     expect(calls, "fetched exactly once across five intervals").toBe(1);
   });
 
-  it("T3.32 (I21): a tick during an in-flight fetch does not start a second", async () => {
+  it("T3.40 (I21): a tick during an in-flight fetch does not start a second", async () => {
     // A source slower than its interval otherwise stacks attempts until the
     // cadence means nothing — and each one lands a patch, so the screen churns.
     // **Two parts, and the second is what makes the row possible.** `armParts`

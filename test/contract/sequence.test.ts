@@ -129,3 +129,49 @@ describe("C09 T2.18 — sequences", () => {
     expect(kit.measure(gapped, 60), "and the block itself is one row, always").toBe(1);
   });
 });
+
+describe("C04 §3 — a row group's vertical alignment", () => {
+  // **`Group.align` shipped with a renderer and no test, and roadmap 38 said it
+  // did not exist at all.** Two records wrong about one published field in
+  // opposite directions, found from the satisfier's side rather than by anything
+  // watching. The row is a frame read, because `align` changes no measurement:
+  // a group is as tall as its tallest child either way, so every arithmetic
+  // assertion agrees with every implementation including one that ignores the
+  // field.
+  const registry = createBlockRegistry({ defaults: true });
+
+  const frame = (align: readonly ("top" | "middle" | "bottom")[]): readonly string[] =>
+    renderSequenceToLines(
+      registry,
+      [
+        block({
+          kind: "group",
+          id: "g",
+          direction: "row",
+          align,
+          children: [
+            block({ kind: "raw", id: "tall", text: "1\n2\n3" }),
+            block({ kind: "raw", id: "short", text: "x" }),
+          ],
+        }) as Block,
+      ],
+      20,
+      { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null },
+    ).map((l) => l.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+
+  it("T3.22 (C04 I44): the short child sits where `align` puts it", () => {
+    // Three positions, and the middle one is why this needs three rows rather
+    // than two: an implementation that treated `middle` as `top` passes a
+    // two-row test asserting only the ends.
+    // Internal runs collapse, because a row group divides the width and the
+    // second child starts at its own column — the gap is `groupChildWidths`'
+    // arithmetic and is asserted by T3.16–T3.19. What this row is about is
+    // which *line* the short child lands on.
+    const shape = (align: readonly ("top" | "middle" | "bottom")[]): readonly string[] =>
+      frame(align).map((l) => l.trim().replace(/\s+/gu, " "));
+
+    expect(shape(["top", "top"])).toEqual(["1 x", "2", "3"]);
+    expect(shape(["top", "middle"])).toEqual(["1", "2 x", "3"]);
+    expect(shape(["top", "bottom"])).toEqual(["1", "2", "3 x"]);
+  });
+});

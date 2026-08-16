@@ -20,27 +20,40 @@
  * is the last thing to lose room. Carrying `(yLabelWidth, axed)` separately meant
  * the gutter survived at width 1 and every curve row rendered as a lone `…`.
  */
+import type { AmbiguousWidth } from "../text.js";
 import type { ReactElement } from "react";
 import { glyphs } from "../blocks/glyphs.js";
-import { clampSpans, paint, padStart, rows, tone, type Span } from "../blocks/paint.js";
+import { clampSpans, paint, padStart, rows, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, truncate } from "../text.js";
 import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
 import { labelWidth, xLabelRow, yLabels } from "./axes.js";
 import { seriesRange, type Range } from "./scale.js";
-import { sparkline } from "./sparkline.js";
+import { densityRampFor } from "./ramp.js";
+import { formatValue } from "./axes.js";
+import { rampRow, sparkline } from "./sparkline.js";
 import { stripHeights } from "./strips.js";
-import type { Plot, Series, Tone } from "../../data/viewmodel/index.js";
+import type { Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
+import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 
 /** The narrowest plot area worth drawing a curve in. Below it, furniture goes. */
 const MIN_AREA = 4;
 
-/** The tones series cycle through when there is colour to distinguish them. */
-const SERIES_TONES: readonly Tone[] = Object.freeze(["accent", "info", "ok", "warn"]);
+/** The categorical palette's slots, in order (C10, roadmap 51). */
+const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
+  "categorical.c1",
+  "categorical.c2",
+  "categorical.c3",
+  "categorical.c4",
+  "categorical.c5",
+  "categorical.c6",
+  "categorical.c7",
+  "categorical.c8",
+]);
 
-/** A rasterised series and the tone it carries. */
-type Layer = Readonly<{ glyphRows: readonly string[]; tone: Tone }>;
+/** A rasterised series and the colour it carries. */
+type Layer = Readonly<{ glyphRows: readonly string[]; ref: ColourRef }>;
 
 /** Everything the row builders need, resolved once. */
 type Layout = Readonly<{
@@ -51,8 +64,24 @@ type Layout = Readonly<{
   width: number;
 }>;
 
-function toneOf(series: Series, index: number): Tone {
-  return series.tone ?? SERIES_TONES[index % SERIES_TONES.length] ?? "accent"; // cells-ok — a tone-cycle index
+/**
+ * Which colour a series carries (roadmap 51).
+ *
+ * **The cycle is gone rather than widened**, and that is the change. It read
+ * `SERIES_TONES[index % SERIES_TONES.length]` over four *judgement* tones, so a
+ * plot of four unrelated quantities said series three was good and series four
+ * wanted attention — D29 inverted — and a fifth series repeated the first,
+ * which is a segmentation that lies. C04 I50a refuses the ninth series at
+ * construction, so there is no index here that the palette cannot answer, and
+ * the modulo that used to hide that is not replaced by a wider one.
+ *
+ * **A declared `tone` still wins**, because naming `error` for a series *is* a
+ * judgement and the app is entitled to make it. What the default may not do is
+ * make one by accident.
+ */
+function refOf(series: Series, index: number): ColourRef {
+  if (series.tone !== undefined) return `tone.${series.tone}`;
+  return CATEGORY_REFS[index] ?? "categorical.c1"; // cells-ok — a category index
 }
 
 /**
@@ -102,31 +131,31 @@ function mergedRow(
 ): readonly Span[] {
   const spans: Span[] = [];
   let run = "";
-  let runTone: Tone | null = null;
+  let runRef: ColourRef | null = null;
 
   const flush = (): void => {
     if (run === "") return;
     spans.push(
-      runTone === null
+      runRef === null
         ? { text: run }
-        : { text: run, style: tone(runTone, ctx.theme, ctx.capabilities) },
+        : { text: run, style: slot(runRef, ctx.theme, ctx.capabilities) },
     );
     run = "";
   };
 
   for (let x = 0; x < layout.areaWidth; x += 1) {
     let cell = " ";
-    let cellTone: Tone | null = null;
+    let cellRef: ColourRef | null = null;
     for (const layer of layers) {
       const candidate = [...(layer.glyphRows[rowIndex] ?? "")][x] ?? " ";
       if (isBlank(candidate)) continue;
       cell = candidate;
-      cellTone = layer.tone;
+      cellRef = layer.ref;
       break;
     }
-    if (cellTone !== runTone) {
+    if (cellRef !== runRef) {
       flush();
-      runTone = cellTone;
+      runRef = cellRef;
     }
     run += cell;
   }
@@ -147,7 +176,7 @@ function emptyRows(block: Plot, layout: Layout, ctx: RenderContext): readonly st
   const message = truncate(block.emptyMessage ?? "No data.", layout.width, ctx.capabilities);
   const middle = Math.floor((total - 1) / 2);
   const centred =
-    " ".repeat(Math.max(0, Math.floor((layout.width - cells(message)) / 2))) + message;
+    " ".repeat(Math.max(0, Math.floor((layout.width - cells(message, ctx.capabilities.ambiguousWidth)) / 2))) + message;
   const styled = line(
     [{ text: centred, style: tone("muted", ctx.theme, ctx.capabilities) }],
     layout,
@@ -214,7 +243,7 @@ function stackedRows(
 
     if (first !== undefined) {
       const glyphRows = curveRows(first, range, layout.areaWidth, curveHeight, ctx.capabilities);
-      const layer: Layer = { glyphRows, tone: toneOf(first, 0) };
+      const layer: Layer = { glyphRows, ref: refOf(first, 0) };
       for (let i = 0; i < curveHeight; i += 1) {
         out.push(
           line(
@@ -245,7 +274,7 @@ function stackedRows(
   series.forEach((s, index) => {
     const stripRows = heights[index] ?? 0;
     const glyphRows = curveRows(s, range, layout.areaWidth, stripRows, ctx.capabilities);
-    const layer: Layer = { glyphRows, tone: toneOf(s, index) };
+    const layer: Layer = { glyphRows, ref: refOf(s, index) };
     for (let i = 0; i < stripRows; i += 1) {
       out.push(
         line(
@@ -279,7 +308,7 @@ function overlaidRows(
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   const layers: readonly Layer[] = block.series.map((s, index) => ({
     glyphRows: curveRows(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
-    tone: toneOf(s, index),
+    ref: refOf(s, index),
   }));
 
   return Array.from({ length: layout.areaRows }, (_, i) =>
@@ -292,9 +321,9 @@ function overlaidRows(
 }
 
 /** The widest series label — the stacked form's label column (§5). */
-function seriesLabelWidth(series: readonly Series[]): number {
+function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth = "narrow"): number {
   let widest = 0;
-  for (const s of series) widest = Math.max(widest, cells(s.label ?? ""));
+  for (const s of series) widest = Math.max(widest, cells(s.label ?? "", ambiguous));
   return widest;
 }
 
@@ -308,14 +337,19 @@ function seriesLabelWidth(series: readonly Series[]): number {
 function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): Layout {
   const areaRows = plotAreaRows(block);
   const base = { areaRows, width };
-  if (block.axes !== true) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
+  // **A heatmap is always gutter-ed**, whatever `axes` says, because the row
+  // labels *are* its ordinate — an unlabelled matrix is a picture of numbers
+  // with no way to tell which row is which. `axes: false` is refused rather than
+  // honoured (C04 I50b), so this reads the form and not the flag.
+  const axed = block.axes === true || block.form === "heatmap";
+  if (!axed) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
 
   // **What the column holds depends on the form.** A stacked plot puts series
   // names there instead of the three y-labels (§5), and sizing the column from the
   // y-labels regardless is what pushed `train │` one cell past the width and left a
   // `…` on the first row of every stacked frame. Two different sets of strings, one
   // column: it has to be measured from whichever set will be drawn.
-  const wanted = stacked
+  const wanted = stacked || block.form === "heatmap"
     ? seriesLabelWidth(block.series)
     : labelWidth(yLabels(range, areaRows, block.yFormat));
   if (width - wanted - AXIS_GUTTER >= MIN_AREA) {
@@ -332,26 +366,146 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
   return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
 }
 
+/** A grid cell is blank where nothing was reported (C12 I17, §3a). */
+const HEATMAP_ABSENT = " ";
+
+/**
+ * The matrix (I17). One cell per position per row, against the range of the
+ * whole matrix — which is the only thing that makes it a matrix rather than a
+ * stack of unrelated sparklines, and the reason the range is computed once here
+ * and passed down rather than per row.
+ */
+function heatmapRows(
+  block: Plot,
+  range: Range,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly string[] {
+  const style = { ramp: densityRampFor(ctx.capabilities), absent: HEATMAP_ABSENT };
+  const out: string[] = [];
+
+  // I8, unchanged: the rows that fit, then a line naming the rest. The marker is
+  // that line and there is no field — a series dropped in silence is the failure
+  // the branch exists to avoid, and a matrix has more rows to drop than a plot.
+  const overflow = block.series.length > layout.areaRows; // cells-ok — a row count
+  const visible = overflow ? Math.max(0, layout.areaRows - 1) : block.series.length; // cells-ok
+
+  for (let i = 0; i < visible; i += 1) {
+    const s = block.series[i];
+    if (s === undefined) continue;
+    out.push(
+      line(
+        [
+          ...gutterSpans(s.label ?? "", layout, ctx),
+          { text: rampRow(s.values, layout.areaWidth, ctx.capabilities, range, style) },
+        ],
+        layout,
+        ctx,
+      ),
+    );
+  }
+
+  if (overflow) {
+    const omitted = block.series.slice(visible).map((s, i) => s.label ?? `row ${String(visible + i + 1)}`); // cells-ok
+    out.push(
+      line(
+        [
+          ...gutterSpans("", layout, ctx),
+          {
+            text: truncate(
+              `+${String(omitted.length)} more · ${omitted.join(" · ")}`, // cells-ok — a row count
+              layout.areaWidth,
+              ctx.capabilities,
+            ),
+            style: tone("warn", ctx.theme, ctx.capabilities),
+          },
+        ],
+        layout,
+        ctx,
+      ),
+    );
+  }
+
+  // Fewer rows than the declared height keeps the height: I1 is about the block,
+  // and a matrix that shrank when a container stopped would move everything below
+  // it at exactly the moment a reader is looking at why.
+  const blanks = Math.max(0, layout.areaRows - out.length); // cells-ok — a row count
+  for (let i = 0; i < blanks; i += 1) out.push(line(gutterSpans("", layout, ctx), layout, ctx));
+  return out;
+}
+
+/**
+ * The heatmap's two rows: x-labels, then the scale legend (§2).
+ *
+ * **Not the line's two rows.** There is no axis rule, because a matrix's cells
+ * bound themselves — and the row it would have taken pays for the legend, which
+ * is the only thing that says what a cell *means*. `axes: false` is refused at
+ * construction for that reason (C04 I50b).
+ */
+function heatmapFurniture(
+  block: Plot,
+  range: Range,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly string[] {
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities);
+  const labelRow =
+    labels === ""
+      ? ""
+      : line([{ text: " ".repeat(layout.gutter) }, { text: labels, style: muted }], layout, ctx);
+
+  // **Dropped columns are named rather than vanishing** (§6a B3, I8's principle).
+  // The window is of the last `areaWidth` positions, and a reader who cannot see
+  // that some are missing reads the visible ones as the whole history.
+  const longest = block.series.reduce((n, s) => Math.max(n, s.values.length), 0); // cells-ok — a position count
+  const dropped = Math.max(0, longest - layout.areaWidth);
+  const scale =
+    `${densityRampFor(ctx.capabilities)}  ${formatValue(range.min, block.yFormat)}`
+    // ASCII, because a legend is framework text and an en dash has no
+    // substitution (C09 I22, SS47). The separator is not carrying meaning here.
+    + ` - ${formatValue(range.max, block.yFormat)}`
+    + (dropped === 0 ? "" : ` · ${String(dropped)} older not shown`); // cells-ok — a position count
+
+  return [
+    labelRow,
+    line(
+      [
+        { text: " ".repeat(layout.gutter) },
+        { text: truncate(scale, layout.areaWidth, ctx.capabilities), style: muted },
+      ],
+      layout,
+      ctx,
+    ),
+  ];
+}
+
 /**
  * The height (I1). `PlotGeometry` is what this reads, so the series is not in
  * scope — see `height.ts`.
  */
 const measure = (block: Plot): number => plotHeight(block);
 
-const render = (block: Plot, ctx: RenderContext): ReactElement => {
-  const width = Math.max(1, Math.floor(ctx.width));
-
-  if (block.form === "sparkline") {
+/**
+ * Form → rows. **A `Record` and not a switch**, for `height.ts`' reason: a
+ * `Record<PlotForm, …>` is checked in both directions, and `form === "sparkline"
+ * ? … : …` absorbed a third member in silence — a heatmap drawn as a curve, at
+ * exactly the right height.
+ */
+const FORM_ROWS: Readonly<
+  Record<PlotForm, (block: Plot, width: number, ctx: RenderContext) => readonly string[]>
+> = {
+  sparkline: (block, width, ctx) => {
     const first = block.series[0];
     const spark = sparkline(first?.values ?? [], width, ctx.capabilities);
     const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 1, width };
-    return rows([
+    return [
       line(
         [
           {
             text: spark,
-            style: tone(
-              first === undefined ? "default" : toneOf(first, 0),
+            style: slot(
+              first === undefined ? "tone.default" : refOf(first, 0),
               ctx.theme,
               ctx.capabilities,
             ),
@@ -360,22 +514,40 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
         layout,
         ctx,
       ),
-    ]);
-  }
+    ];
+  },
 
-  // `stacked` is decided before the layout, because it decides what the label
-  // column holds and therefore how wide it is.
-  const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
-  const range = seriesRange(block.series, block);
-  const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked);
-  if (range === null) return rows(emptyRows(block, layout, ctx));
+  line: (block, width, ctx) => {
+    // `stacked` is decided before the layout, because it decides what the label
+    // column holds and therefore how wide it is.
+    const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
+    const range = seriesRange(block.series, block);
+    const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked);
+    if (range === null) return emptyRows(block, layout, ctx);
 
-  const out = [
-    ...(stacked ? stackedRows(block, range, layout, ctx) : overlaidRows(block, range, layout, ctx)),
-  ];
-  if (block.axes === true) out.push(...axisRows(block, layout, ctx));
+    const out = [
+      ...(stacked
+        ? stackedRows(block, range, layout, ctx)
+        : overlaidRows(block, range, layout, ctx)),
+    ];
+    if (block.axes === true) out.push(...axisRows(block, layout, ctx));
+    return out;
+  },
 
-  return rows(out);
+  heatmap: (block, width, ctx) => {
+    const range = seriesRange(block.series, block);
+    const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, false);
+    // **Empty is a property of the block, not of a row** (§6a A3): a matrix every
+    // one of whose rows reported nothing is empty; a *row* that reported nothing
+    // is a row of blanks and keeps its place.
+    if (range === null) return emptyRows(block, layout, ctx);
+    return [...heatmapRows(block, range, layout, ctx), ...heatmapFurniture(block, range, layout, ctx)];
+  },
+};
+
+const render = (block: Plot, ctx: RenderContext): ReactElement => {
+  const width = Math.max(1, Math.floor(ctx.width));
+  return rows([...FORM_ROWS[block.form](block, width, ctx)]);
 };
 
 export const plotDefinition: BlockDefinition<Plot> = {

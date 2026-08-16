@@ -198,7 +198,7 @@ export function createInspectAdapter(): Adapter {
         // C04 I3 — required when `status` is `error`, and its absence is
         // silent: C13 throws and C23 discards, so the reader gets no entry at
         // all rather than this notice. FINDINGS F35, closed as a class.
-        ...(failure === "" ? {} : { error: { message: failure, stage: "adapter" as const } }),
+        ...(failure === "" ? {} : { error: { message: failure } }),
         blocks:
           failure !== "" || inspected === null
             ? [b.notice.error(failure)]

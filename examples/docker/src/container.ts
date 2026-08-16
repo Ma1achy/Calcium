@@ -393,7 +393,7 @@ export function createContainerAdapter(): Adapter {
         // C13 and discarded by C23 §5, so a failing invocation would have left
         // the view holding its spinner with nothing anywhere reporting a fault.
         // FINDINGS F35.
-        ...(row === null ? { error: { message: failure, stage: "adapter" as const } } : {}),
+        ...(row === null ? { error: { message: failure } } : {}),
         blocks,
         meta: { adapter: "container-stats", truncated: false },
       };

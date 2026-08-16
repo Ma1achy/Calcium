@@ -1,3 +1,22 @@
+// **A REPO test, not a package test — and `test/repo/` is what says so.**
+//
+// This file reaches into `../../../../test/support/render.ts` for `measurable`,
+// because comparing the container's rows against the hand-composed banner needs
+// a block rendered to lines, and **the published package has no way to do
+// that**: `@fmx/calcium` exports `createTui` and the builders, and rendering a
+// block outside a session is a capability only the framework's own test support
+// has.
+//
+// So the import is not sloppiness — it is a real gap in the public surface,
+// reached from the one direction that finds those. What it is not is a test of
+// the *package*, and `make proof` copies this example to a temp directory and
+// runs it against the installed tarball, where the path does not exist. The
+// gate was right: it says "the example is testing the repo, not the package",
+// and this file was.
+//
+// `test/repo/` is excluded from `npm run test:package`, which is what proof
+// runs. `npm test` still runs it, so the coverage is not lost — it is labelled.
+
 /**
  * S1's banner. Every row holds a claim from `DOCKER_TUI_BANNER.md`.
  *
@@ -12,9 +31,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cells } from "@fmx/calcium";
 import type { Raw } from "@fmx/calcium";
-import { FLOOR, banner, bannerLines, variants } from "../src/banner.ts";
+import { FLOOR, WHALE_ROWS, WORDMARK_ROWS, banner, bannerLines, bannerRow, variants } from "../../src/banner.ts";
+import { measurable } from "../../../../test/support/render.ts";
+import { b, type Block } from "@fmx/calcium";
 
-const DOC = readFileSync(new URL("../DOCKER_TUI_BANNER.md", import.meta.url), "utf8");
+const DOC = readFileSync(new URL("../../DOCKER_TUI_BANNER.md", import.meta.url), "utf8");
 const fenced = [...DOC.matchAll(/```[a-z]*\n([\s\S]*?)```/gu)].map((m) =>
   (m[1] as string).replace(/\n$/u, "").split("\n"),
 );
@@ -38,6 +59,108 @@ const COMPOSED_DOC = at(3, "composed");
 
 const text = (bl: unknown): string => (bl as Raw).text;
 const rowsOf = (bl: unknown): readonly string[] => text(bl).split("\n");
+
+describe("K5: the row container draws the banner the hand-composition drew", () => {
+  it("the frame is identical, and it is roadmap 38's acceptance test", () => {
+    // **This is the whole argument for the entry, measured rather than
+    // asserted.** Everything the composition does by hand — padding the whale to
+    // a uniform width, holding two arts side by side, keeping the wordmark's
+    // start column constant — is what a row container does, and a *proportion*
+    // could not do it: `40 : 61` gives the whale 41 columns at 105 and 47 at
+    // 120, so the gap widens with the terminal. `{cells: 43}` is 40 plus this
+    // file's 4-column gap, less the container's one cell of gutter.
+    //
+    // Rendered through C09 rather than read off a `raw` block's text, because
+    // the container's output *is* the claim.
+    const row = bannerRow(120, true);
+    expect(row, "a group at a width the composed variant fits").not.toBeNull();
+
+    const kit = measurable({});
+    const drawn = kit.renderToLines(row as Block, 120).map((l) => l.replace(/\s+$/u, ""));
+
+    expect(drawn, "the container draws what the hand-composition drew").toEqual(
+      COMPOSED_DOC.map((l) => l.replace(/\s+$/u, "")),
+    );
+  });
+});
+
+describe("K6: the blank first row is vertical alignment, hand-written into the art", () => {
+  it("a bottom-aligned seven-row wordmark draws what the eight-row one draws", () => {
+    // **The banner's second hand-written layout, and the container can express
+    // it** (C04 I45). `DOCKER_TUI_BANNER.md` says the top pad *is already in the
+    // document* — eight rows, the first blank — which puts the wordmark's
+    // baseline on the whale's hull rather than its spout. That is a vertical
+    // alignment, and a row already computes the height it would align within.
+    //
+    // **The art is not changed here**, and that is deliberate: K1–K4 assert the
+    // document's art against the doc's own fenced blocks, so editing it would
+    // fail those rows for a reason that has nothing to do with alignment. What
+    // this shows is that the *container* reproduces what the blank row does.
+    const kit = measurable({});
+    const whale = b.raw(WHALE_ROWS.join("\n"));
+    const padded = b.raw(WORDMARK_ROWS.join("\n"));
+    const unpadded = b.raw(WORDMARK_ROWS.slice(1).join("\n"));
+
+    const byHand = kit.renderToLines(
+      b.group("row", [whale, padded], { flex: [{ cells: 43 }, 1] }),
+      120,
+    );
+    const byContainer = kit.renderToLines(
+      b.group("row", [whale, unpadded], {
+        flex: [{ cells: 43 }, 1],
+        align: ["top", "bottom"],
+      }),
+      120,
+    );
+
+    expect(unpadded, "the fixture is genuinely a row shorter").not.toEqual(padded);
+    expect(byContainer.map((l) => l.replace(/\s+$/u, ""))).toEqual(
+      byHand.map((l) => l.replace(/\s+$/u, "")),
+    );
+
+    // **The control**: without the alignment the shorter art sits at the top,
+    // which is the rendering the blank row exists to prevent — so the row above
+    // is about the alignment rather than about the two arts happening to match.
+    const unaligned = kit.renderToLines(
+      b.group("row", [whale, unpadded], { flex: [{ cells: 43 }, 1] }),
+      120,
+    );
+    expect(unaligned.map((l) => l.replace(/\s+$/u, ""))).not.toEqual(
+      byHand.map((l) => l.replace(/\s+$/u, "")),
+    );
+  });
+});
+
+describe("K11: the container aligns, and the ASCII arm was wrong before it did", () => {
+  it("both wordmarks sit on the whale's hull, not its spout", () => {
+    // **K6 proved the equivalence and nothing acted on it** — the app went on
+    // hand-writing the blank row and its own comment said a row group has no
+    // opinion, while `Valign`'s declaration named this banner as its consumer.
+    // Both correct about their own half, and the proof was already in this file.
+    //
+    // **The ASCII arm was never right here, and only the frame said so.** Five
+    // rows against the whale's eight, bottom-aligned by `compose`'s
+    // `alignBottom` on the hand path and top-aligned by the container on this
+    // one — so it drew against the spout. The row count is eight either way,
+    // which is why no arithmetic could have caught it.
+    const kit = measurable({});
+
+    for (const [label, blocks, mark] of [
+      ["blocks", true, /[▄▀█]/u],
+      ["ascii", false, /[_|\\/]/u],
+    ] as const) {
+      const drawn = kit
+        .renderToLines(bannerRow(120, blocks) as Block, 120)
+        // Past the whale's column — `WHALE_CELLS` plus this file's gap — so
+        // what is left is the wordmark's own rows and nothing else.
+        .map((l) => l.slice(44).replace(/\s+$/u, ""));
+
+      expect(drawn, `${label}: eight rows`).toHaveLength(8);
+      expect(drawn[0], `${label}: nothing beside the spout`).toBe("");
+      expect(drawn[7], `${label}: the last row carries art`).toMatch(mark);
+    }
+  });
+});
 
 describe("the three build-time claims", () => {
   it("K1: no tab characters anywhere — in the art, or in the document that holds it", () => {

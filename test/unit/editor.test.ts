@@ -9,10 +9,156 @@
 import { describe, expect, it } from "vitest";
 
 import { createEditor } from "../../src/interaction/editor/index.js";
+import { selectionSpans } from "../../src/interaction/editor/index.js";
 import { UNDO_LIMIT } from "../../src/interaction/editor/undo.js";
+import type { LineEditor } from "../../src/interaction/editor/index.js";
+import { contextAt } from "../../src/interaction/completion/index.js";
+import { cells } from "../../src/presentation/text.js";
 
 const G = { first: 2, cont: 2 } as const;
 const FAMILY = "👨‍👩‍👧";
+
+describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
+  const CHIP = { label: "[#1 parse.ts · 184L]", content: "line one\nline two" } as const;
+  const GUTTER = { first: 0, cont: 0 } as const;
+
+  const withChip = (): LineEditor => {
+    const e = createEditor();
+    e.insert("read ");
+    e.insertChip(CHIP);
+    return e;
+  };
+
+  it("T2.40 (roadmap 30): the sentinel is ONE index and N cells, and only a frame shows it", () => {
+    // **The split's whole risk in one row.** A chip labelled twenty cells wide
+    // occupying one cell passes every grapheme-index assertion there is —
+    // motion, deletion, word jumps, the anchor — because to all of them it *is*
+    // one character. Only a measurement of the frame can fail, which is why the
+    // defect that actually happened lived here: `clusterWidth` measures a
+    // cluster by its base code point, so a substituted label counted as `[`.
+    const e = withChip();
+
+    expect(e.text.length, "five characters and a sentinel").toBe(6);
+    expect(e.cursor, "one position past the chip").toBe(6);
+
+    const rows = e.layout(200, GUTTER);
+    expect(rows.join(""), "the label is drawn").toContain(CHIP.label);
+    expect(rows.join(""), "and the sentinel is not").not.toMatch(/[\u{e000}-\u{f8ff}]/u);
+
+    // **The cursor sits past the label, not past one cell.**
+    expect(e.cursorCell(200, GUTTER).col).toBe("read ".length + cells(CHIP.label));
+  });
+
+  it("T2.41 (roadmap 30): a chip is one character to motion and to deletion", () => {
+    // The half that must NOT change, and the reason the entry stays inside C17.
+    const e = withChip();
+
+    e.deleteBackward();
+    expect(e.text, "one backspace removes the whole chip").toBe("read ");
+
+    e.insertChip(CHIP);
+    expect(e.cursor, "the chip is one position").toBe(6);
+    e.move("charLeft");
+    expect(e.cursor, "and one left steps over the whole of it").toBe(5);
+  });
+
+  it("T2.42 (roadmap 30): the sentinel reaches contextAt, and the buffer is what it sees", () => {
+    // **A sentinel inside a token, which C18's classifier has never seen.** It
+    // is visible here rather than resolved because `cursor` indexes the raw
+    // buffer — a resolving getter would hand `contextAt` a longer string and the
+    // same offset, and completion would land inside the pasted content.
+    const e = withChip();
+    const ctx = contextAt(e.text, e.cursor, null);
+
+    expect(ctx.input, "the buffer as it is").toBe(e.text);
+    expect(ctx.input.length, "not the resolved length").not.toBe(e.resolved.length);
+  });
+
+  it("T2.43 (roadmap 30): resolution happens at submission and nowhere else", () => {
+    // All seven readers take a string, so a sentinel reaching `submit()` becomes
+    // a control character in argv — and one reaching `history` is written to
+    // C20's file.
+    const e = withChip();
+
+    expect(e.text, "the buffer keeps it").toMatch(/[\u{e000}-\u{f8ff}]/u);
+    expect(e.resolved, "only `resolved` expands it").toBe(`read ${CHIP.content}`);
+    expect(e.resolved, "no sentinel survives").not.toMatch(/[\u{e000}-\u{f8ff}]/u);
+  });
+
+  it("T2.44 (roadmap 30): a chip-only buffer is non-empty under BOTH readings", () => {
+    // **The state that separates them, and why *resolve in the getter* reads as
+    // harmless.** `promptHasText` is `text.length > 0`; with a chip-only buffer
+    // that is true whether `text` resolves or not, and so is every other
+    // assertion anyone would write. The row exists so the agreement is recorded
+    // rather than mistaken for a proof.
+    const e = createEditor();
+    e.insertChip(CHIP);
+
+    expect(e.text.length > 0, "raw").toBe(true);
+    expect(e.resolved.length > 0, "resolved").toBe(true);
+    expect(e.text.length, "and the lengths disagree, which is the point").not.toBe(
+      e.resolved.length,
+    );
+  });
+
+  it("T2.47 (roadmap 30): two chips in one buffer are two chips", () => {
+    // **The mutation pass asked for this row.** Every other row inserts one
+    // chip, and one chip is enough for a design where every chip shares a
+    // sentinel — which is U+FFFC's shape, and the reason the PUA is allocated
+    // per chip rather than a single OBJECT REPLACEMENT CHARACTER used twice.
+    // With one chip the side map cannot be observed to be a map at all.
+    const second = { label: "[#2 notes.md · 12L]", content: "second" } as const;
+    const e = withChip();
+    e.insert(" and ");
+    e.insertChip(second);
+
+    expect(e.resolved, "each resolves to its own content").toBe(
+      `read ${CHIP.content} and ${second.content}`,
+    );
+    const drawn = e.layout(400, GUTTER).join("");
+    expect(drawn, "and each draws its own label").toContain(CHIP.label);
+    expect(drawn).toContain(second.label);
+  });
+
+  it("T2.45 (roadmap 30): the wash is measured on what is drawn", () => {
+    // The fourth caller of the one walk. A span computed over sentinels and
+    // painted over labels covers the wrong cells, and no assertion about which
+    // characters are selected shows it.
+    const e = withChip();
+    e.extend("lineStart");
+    const sel = e.selection;
+    expect(sel, "a region exists").not.toBeNull();
+
+    const spans = selectionSpans(
+      e.text,
+      sel?.anchor ?? 0,
+      sel?.head ?? 0,
+      200,
+      GUTTER,
+      e.drawAs,
+    );
+    expect(spans[0]?.to, "to the end of the label, not of the sentinel").toBe(
+      "read ".length + cells(CHIP.label),
+    );
+  });
+
+  it("T2.46 (roadmap 30): the chip wraps whole, and the row it lands on is the frame's", () => {
+    // **The acceptance at a wrapping width**, which is where a per-grapheme
+    // position and a per-cell column disagree without either looking wrong
+    // alone. The chip does not fit beside `read `, so it moves whole — and
+    // `cursorCell` has to agree with the row the label was actually drawn on.
+    const e = withChip();
+    const width = "read ".length + cells(CHIP.label) - 2;
+
+    const rows = e.layout(width, GUTTER);
+    expect(rows.length, "the chip moved to its own row").toBe(2);
+    expect(rows[1], "whole, not split").toContain(CHIP.label);
+
+    const at = e.cursorCell(width, GUTTER);
+    expect(at.row, "and the cursor is on the row the label is on").toBe(1);
+    expect(at.col, "past the whole label").toBe(cells(CHIP.label));
+  });
+});
 
 describe("C17 §2 — cursor and buffer", () => {
   it("T1.1 (I1): inserting places the cursor after the inserted graphemes", () => {
@@ -416,5 +562,324 @@ describe("C17 §2 — geometry at the edges", () => {
     expect(e.cursor, "the skip always advances when there is whitespace").toBe(4);
     e.move("wordLeft");
     expect(e.cursor).toBe(0);
+  });
+});
+
+describe("C17 §5b — selection", () => {
+  it("T1.23 (I21): two extensions leave the anchor where it was", () => {
+    // **Two, because one passes whichever end moved.** From index 0, one `⇧→`
+    // gives `[0, 1)` under both the correct implementation and one that moves
+    // the anchor — `{anchor: 0, head: 1}` and `{anchor: 1, head: 0}` describe
+    // the same characters. The second motion is where they part.
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.extend("charRight");
+    e.extend("charRight");
+
+    expect(e.selection).toEqual({ anchor: 0, head: 2 });
+    expect(e.selected).toBe("ab");
+    expect(e.cursor, "the head is the cursor, not a second position").toBe(2);
+  });
+
+  it("T1.24 (I21): the head walks back and the anchor still has not moved", () => {
+    // The same defect through a reversal rather than a repeat: an anchor that
+    // follows the motion ends up ahead of the head here, and `selected` reads
+    // the same either way because it sorts the pair.
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.extend("charRight");
+    e.extend("charRight");
+    e.extend("charLeft");
+
+    expect(e.selection).toEqual({ anchor: 0, head: 1 });
+    expect(e.selected).toBe("a");
+  });
+
+  it("T1.25 (I21): anchor === head is no region, not an empty one", () => {
+    // **Reached by moving**, not by never having selected — the two spellings
+    // of "no region" are exactly what this forbids, and a stored empty region
+    // can only be constructed this way.
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.extend("charRight");
+    expect(e.selection).not.toBeNull();
+
+    e.extend("charLeft");
+    expect(e.selection, "back where it started is no selection").toBeNull();
+    expect(e.selected).toBe("");
+  });
+
+  it("T1.26 (I21): an unshifted motion collapses", () => {
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.selectAll();
+    expect(e.selection).toEqual({ anchor: 0, head: 6 });
+
+    e.move("charLeft");
+
+    expect(e.selection).toBeNull();
+    expect(e.cursor, "and the motion still moved the cursor").toBe(5);
+  });
+
+  it("T1.27 (I21): selectAll crosses newlines — it is not lineStart to lineEnd", () => {
+    const e = createEditor({ text: "one\ntwo\nthree", cursor: 5 });
+
+    e.selectAll();
+
+    expect(e.selection).toEqual({ anchor: 0, head: 13 });
+    expect(e.selected).toBe("one\ntwo\nthree");
+  });
+
+  it("T1.28 (I22): typing over a region replaces it in one undo unit", () => {
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+    const before = e.undoDepth;
+
+    e.extend("charRight");
+    e.extend("charRight");
+    e.extend("charRight");
+    e.insert("X");
+
+    expect(e.text).toBe("Xdef");
+    expect(e.undoDepth - before, "one unit, not two").toBe(1);
+
+    // **One `undo`, and the whole original comes back.** Two units restore
+    // `"def"` first — an undo that did half the job, and correct after a
+    // second press, which is how it would read as a near-miss rather than a
+    // defect.
+    e.undo();
+    expect(e.text).toBe("abcdef");
+  });
+
+  it("T1.29 (I22): deleteBackward removes the region and not a character as well", () => {
+    // **Three graphemes, deliberately.** With a one-grapheme region the correct
+    // implementation and the one that also deletes backwards produce the same
+    // buffer, so the row would pass for both.
+    const e = createEditor({ text: "abcdef", cursor: 1 });
+
+    e.extend("charRight");
+    e.extend("charRight");
+    e.extend("charRight");
+    expect(e.selected).toBe("bcd");
+
+    e.deleteBackward();
+
+    expect(e.text, "the `a` is untouched").toBe("aef");
+    expect(e.cursor).toBe(1);
+    expect(e.selection).toBeNull();
+  });
+
+  it("T1.30 (I22): killTo collapses rather than cutting the region", () => {
+    // The kill buffer's contents are what say which of the two answers was
+    // taken — the text is the same length either way at the wrong widths.
+    const e = createEditor({ text: "alpha beta", cursor: 10 });
+
+    e.extend("charLeft");
+    e.extend("charLeft");
+    expect(e.selected).toBe("ta");
+
+    e.killTo("wordLeft");
+
+    // **Extending moved the cursor**, because the head *is* the cursor — so
+    // the motion runs from 8 and takes `be`. Cutting the region would take
+    // `ta`, and the kill buffer is the only thing that distinguishes them:
+    // both leave a buffer of the same length.
+    expect(e.killBuffer, "the motion's text, not the region's").toBe("be");
+    expect(e.text).toBe("alpha ta");
+    expect(e.selection).toBeNull();
+  });
+
+  it("T1.31 (I22, I16): a region does not survive an undo — and the kill buffer does", () => {
+    // **Both in one row, in opposite directions.** A rule that collapses
+    // everything satisfies the first half and fails the second; one that
+    // collapses nothing does the reverse. Only the pair pins it.
+    const e = createEditor({ text: "alpha beta", cursor: 10 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("beta");
+
+    e.extend("charLeft");
+    e.extend("charLeft");
+    expect(e.selection).not.toBeNull();
+
+    e.undo();
+
+    expect(e.selection, "the caret has moved; the region pointed at other text").toBeNull();
+    expect(e.killBuffer, "the clipboard is not undo state (I16)").toBe("beta");
+  });
+});
+
+describe("C17 §5a — copy writes the kill buffer", () => {
+  it("T1.32 (§5a): ⌃k then y then ⌃y yanks what y copied — one clipboard", () => {
+    // **The sequence the ruling was made on.** A second store would leave the
+    // reader with two paste targets under one paste key, and §5 already calls
+    // this buffer a clipboard and already rules on it.
+    const e = createEditor({ text: "alpha beta", cursor: 10 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer, "the kill filled it").toBe("beta");
+
+    e.move("bufferStart");
+    e.extend("wordRight");
+    expect(e.selected).toBe("alpha");
+    e.copy();
+
+    expect(e.killBuffer, "the copy replaced it — one buffer, not two").toBe("alpha");
+
+    e.move("bufferEnd");
+    e.yank();
+    expect(e.text).toBe("alpha alpha");
+  });
+
+  it("T1.33 (§5a): a copy replaces rather than appending, and ends a kill run", () => {
+    // **The control is the kill run either side of it.** §5's append is about a
+    // run of deletions building one entry; a copy is not a deletion, so a kill
+    // after one must start fresh rather than prepending to the copied text.
+    const e = createEditor({ text: "one two three", cursor: 13 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("three");
+
+    e.move("bufferStart");
+    e.extend("wordRight");
+    e.copy();
+    expect(e.killBuffer).toBe("one");
+
+    // Two copies in a row leave the second, not both.
+    e.move("bufferStart");
+    e.extend("charRight");
+    e.copy();
+    expect(e.killBuffer, "replaced, not appended").toBe("o");
+
+    // And the run is broken: this kill starts a fresh buffer rather than
+    // prepending to the copied text. `"otwo "` is what a copy that joined the
+    // run would leave, and it is a plausible-looking buffer.
+    e.move("bufferEnd");
+    e.killTo("wordLeft");
+    expect(e.killBuffer, "the copy ended the run").toBe("two ");
+  });
+
+  it("T1.34 (§5a): a copy is not an undo unit", () => {
+    // §5's reason inverted: a copy changes no text, so there is nothing to
+    // restore — and a unit here makes `undo` a no-op the user presses twice.
+    const e = createEditor({ text: "hello", cursor: 0 });
+    e.insert("X");
+    const depth = e.undoDepth;
+
+    e.selectAll();
+    e.copy();
+
+    expect(e.undoDepth, "no unit recorded").toBe(depth);
+    expect(e.text).toBe("Xhello");
+
+    e.undo();
+    expect(e.text, "one press undoes the typing").toBe("hello");
+  });
+
+  it("T1.35 (§5a): a copy with no region is a no-op, not an emptying", () => {
+    // The same guard `yank` has. Without it, `⌥w` on a bare caret silently
+    // discards whatever a previous kill put there.
+    const e = createEditor({ text: "hello", cursor: 5 });
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("hello");
+
+    e.copy();
+
+    expect(e.killBuffer, "the buffer a kill filled survives").toBe("hello");
+  });
+});
+
+describe("C17 §5b — extend obeys the kill-run rule (I16)", () => {
+  it("T1.36 (I16): an extending motion ends a kill run, with no move between", () => {
+    // **The state T1.33 could not construct.** Every sequence there had a
+    // `move` between the kill and the copy, and `move` ends the run — so
+    // removing `extend`'s own `endKill` failed nothing, and the mutation pass
+    // said so. §5's rule is *any non-kill operation ends the run*; `extend` is
+    // a non-kill operation and this is the row that holds it to that.
+    //
+    // It is also what let `copy()` drop an `endKill` of its own: the run is
+    // already over by the time a region exists, so the call there could never
+    // be the thing that ended it.
+    const e = createEditor({ text: "one two three", cursor: 13 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("three");
+
+    // No `move`. The extension is the only thing between the two kills.
+    e.extend("wordLeft");
+    expect(e.selected).toBe("two ");
+    e.copy();
+    expect(e.killBuffer).toBe("two ");
+
+    e.killTo("wordLeft");
+
+    // `"one two "` is what a still-open run produces: the second cut prepended
+    // to the copied text, one buffer describing a deletion and a copy at once.
+    expect(e.killBuffer, "a fresh entry, not a continuation of the run").toBe("one ");
+  });
+});
+
+
+describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
+  const G = { first: 2, cont: 2 } as const;
+
+  it("T1.37 (I18, entry 23): a row the region passes through runs to the FULL width", () => {
+    // **The rule, and it is a rule rather than an aesthetic.** A wash stopping
+    // at an intermediate row's last cluster reads as *highlighted*; one running
+    // through the padding reads as *selected*, and the wrap it covers is
+    // genuinely part of the region.
+    //
+    // The buffer wraps at 10 cells with a 2-cell gutter, so `"abcdefghijkl"` is
+    // two display rows of 8 and 4.
+    const spans = selectionSpans("abcdefghijkl", 0, 12, 10, G);
+
+    expect(spans).toEqual([
+      { row: 0, from: 2, to: 10 },
+      { row: 1, from: 2, to: 6 },
+    ]);
+  });
+
+  it("T1.38 (entry 23): the last row stops at the head, not at the edge", () => {
+    // The control for the row above, and the reason it cannot be folded into
+    // it: "every row to the edge" satisfies T1.37 exactly and is a different
+    // defect — one that looks correct on any single-row selection.
+    const spans = selectionSpans("abcdefghijkl", 0, 10, 10, G);
+
+    expect(spans[spans.length - 1], "row 1 stops two cells in").toEqual({
+      row: 1,
+      from: 2,
+      to: 4,
+    });
+  });
+
+  it("T1.39 (entry 23): a region inside one row is that row's cells alone", () => {
+    const spans = selectionSpans("abcdef", 1, 4, 20, G);
+    expect(spans).toEqual([{ row: 0, from: 3, to: 6 }]);
+  });
+
+  it("T1.40 (entry 23): an empty region has no spans, and the ends may arrive either way round", () => {
+    // **Both orders**, because the head can be behind the anchor and a caller
+    // that sorted them once would still pass a row asserting only the forward
+    // case.
+    expect(selectionSpans("abcdef", 3, 3, 20, G)).toEqual([]);
+    expect(selectionSpans("abcdef", 4, 1, 20, G)).toEqual(
+      selectionSpans("abcdef", 1, 4, 20, G),
+    );
+  });
+
+  it("T1.41 (I18): the spans come from the same walk `layout` returns rows from", () => {
+    // **Not a second measurement.** A span computed by re-wrapping here would
+    // part company with the drawn rows at exactly the boundary this asserts —
+    // a line that exactly fills its row, which is I19's trailing position.
+    const text = "abcdefgh";
+    const e = createEditor({ text, cursor: 0 });
+    const rows = e.layout(10, G);
+    const spans = selectionSpans(text, 0, 8, 10, G);
+
+    expect(rows.length, "one full row plus the position after it").toBe(2);
+    expect(spans[0], "the wash covers the full row it fills").toEqual({
+      row: 0,
+      from: 2,
+      to: 10,
+    });
   });
 });

@@ -8,8 +8,12 @@ import {
   ratio,
   resolve,
   resolveBackground,
+  resolveBase,
   resolveTone,
+  quantisedHex,
+  validatePaintedFloors,
 } from "../../src/presentation/theme/index.js";
+import { floorFor } from "../../src/presentation/theme/index.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
 
 describe("C10 resolution", () => {
@@ -86,11 +90,11 @@ describe("C10 resolution", () => {
     }
   });
 
-  it("T1.6: setVariant swaps the variant and clears the cache", () => {
+  it("T1.6: setTheme swaps the variant and clears the cache", () => {
     const themes = store("dark");
     expect(resolveTone("ok", themes.current, caps(24)).colour).toEqual({ kind: "rgb", hex: "#87b86c" });
 
-    themes.setVariant("light");
+    themes.setTheme("light");
 
     expect(themes.current.variant).toBe("light");
     expect(resolveTone("ok", themes.current, caps(24)).colour).toEqual({ kind: "rgb", hex: "#3c793c" });
@@ -242,6 +246,183 @@ describe("C10 resolution", () => {
         expect(resolveBackground(`surface.${surface}`, current, caps(1)), surface).toEqual({});
       }
     }
+  });
+
+  it("T1.17 (I25): the base is `surface.bg` and follows it", () => {
+    // **The row that fails the day the declaration carries a colour of its own**,
+    // which is the only way the painted value and the measured one can disagree
+    // — and disagreeing is roadmap 39's own defect from the other side.
+    const light = store("light").current;
+    expect(light.tokens.background, "the light theme paints, because it cannot work otherwise").toBe(
+      "surface",
+    );
+    expect(resolveBase(light, caps(24))).toEqual(
+      resolveBackground("surface.bg", light, caps(24)),
+    );
+
+    // Follows `bg`, rather than being a second value beside it.
+    // **A different `name`, because identity is the memo key** (I11). A
+    // hand-built theme that changes a token and keeps the name gets the style
+    // resolved for the old one — which is the cache doing exactly what it is
+    // for, and the reason the store bumps a serial on every override.
+    const moved = {
+      ...light,
+      name: `${light.name}#probe`,
+      tokens: { ...light.tokens, surfaces: { ...light.tokens.surfaces, bg: "#123456" } },
+    };
+    expect(resolveBase(moved, caps(24))).toEqual({ background: { kind: "rgb", hex: "#123456" } });
+
+    // And a theme that inherits paints nothing at any depth.
+    const dark = store("dark").current;
+    expect(dark.tokens.background).toBe("terminal");
+    for (const depth of DEPTHS) expect(resolveBase(dark, caps(depth)), `depth ${depth}`).toEqual({});
+  });
+
+  it("T1.18 (I26): the base over all four rungs, in one row", () => {
+    // One row because the claim is a **ladder** and not four claims: provable at
+    // 24, provable against the cube's defined RGB at 8, best-effort at 4 where
+    // the index is the emulator's, and vacuous at 1.
+    const light = store("light").current;
+
+    expect(resolveBase(light, caps(24)), "the token's hex, verbatim").toEqual({
+      background: { kind: "rgb", hex: light.tokens.surfaces.bg },
+    });
+
+    const eight = resolveBase(light, caps(8)).background;
+    expect(eight?.kind).toBe("ansi256");
+    expect(
+      eight?.kind === "ansi256" && eight.index >= 16,
+      "16–255 only: the first sixteen are the emulator's",
+    ).toBe(true);
+
+    expect(resolveBase(light, caps(4)), "the theme's own curated index, never a computed nearest").toEqual({
+      background: { kind: "ansi16", index: light.tokens.fourBit["surface.bg"] },
+    });
+
+    expect(resolveBase(light, caps(1)), "surfaces vanish, and so do foregrounds").toEqual({});
+  });
+
+  it("T1.19 (I26): the 8-bit floor is recomputed against the quantised base", () => {
+    // **Asserted as a recomputation and not as a result.** Against the shipped
+    // tokens both numbers clear, so a row comparing outcomes would agree with
+    // the wrong one — this drives a slot to just clear its floor against the
+    // token and fail against what an 8-bit terminal actually paints.
+    const light = store("light").current;
+    const painted = quantisedHex(light.tokens, "bg");
+    expect(painted, "a painting theme has a quantised background").not.toBeNull();
+    expect(painted).not.toBe(light.tokens.surfaces.bg);
+
+    // A tone placed between the two floors: over 4.5 against the token, under it
+    // against the colour the terminal paints. The fixture is checked to be that
+    // before it is asserted against.
+    // **The background is searched too, and it has to be.** Against `#fafafa`
+    // the nearest cube entry is *lighter*, so contrast only improves and the
+    // recomputation can never fail — a fixture built on the shipped bg would
+    // assert nothing while passing. The failing direction needs a bg whose
+    // quantised value is darker than the token, and one exists.
+    const greys = Array.from({ length: 256 }, (_, i) => {
+      const c = i.toString(16).padStart(2, "0");
+      return `#${c}${c}${c}`;
+    });
+
+    const straddle = greys
+      .map((bg) => ({ bg, painted: quantisedHex({ ...light.tokens, surfaces: { ...light.tokens.surfaces, bg } }, "bg") }))
+      .flatMap(({ bg, painted: p }) =>
+        p === null
+          ? []
+          : greys
+              .filter(
+                (fg) => ratio(fg, bg) >= floorFor("default") && ratio(fg, p) < floorFor("default"),
+              )
+              .map((fg) => ({ bg, fg })),
+      )[0];
+    expect(straddle, "the fixture must straddle the two floors, or this proves nothing").toBeDefined();
+
+    const patched = {
+      ...light.tokens,
+      surfaces: { ...light.tokens.surfaces, bg: straddle!.bg },
+      palettes: {
+        ...light.tokens.palettes,
+        tone: {
+          ...light.tokens.palettes["tone"]!,
+          slots: { ...light.tokens.palettes["tone"]!.slots, default: straddle!.fg },
+        },
+      },
+    };
+
+    const errors = validatePaintedFloors(patched);
+    expect(errors.map((e) => e.path)).toContain("palettes.tone.default");
+
+    // And nothing at all for a theme that inherits: there is no painted value
+    // to check against, so the floor is the declared assumption as before.
+    expect(validatePaintedFloors({ ...patched, background: "terminal" })).toEqual([]);
+  });
+
+  it("T1.20 (I28): a theme declaring the wrong polarity is rejected at load", () => {
+    // **The state that was legal until this landed.** `variant` was a second
+    // record of a fact the tokens carry — `luminance(bg)` answers it — and
+    // nothing checked the two agreed: I9 compares tones *to* `bg` and has no
+    // opinion about what `bg` is. So a theme could say `light` over black,
+    // resolve, and clear every floor.
+    const dark = defaultTheme["dark"]!;
+    const lying = { ...defaultTheme, liar: { ...dark, variant: "light" as const } };
+
+    const loaded = loadTheme(lying, "dark");
+    expect(loaded.ok, "a theme that lies about its own ground").toBe(false);
+    if (!loaded.ok) {
+      const messages = loaded.error.map((e) => `${e.path}: ${e.message}`).join("; ");
+      expect(messages).toContain("liar.variant");
+      // Both numbers, so the reader can check the claim rather than trust it.
+      expect(messages).toContain(dark.surfaces.bg);
+      expect(messages, "the measured luminance, not just a verdict").toMatch(/luminance is 0\.\d+/u);
+    }
+
+    // And the shipped set clears it by an order of magnitude in both directions.
+    expect(loadTheme(defaultTheme).ok).toBe(true);
+  });
+
+  it("T1.21 (I27): a set of three, and two themes of one polarity are distinct", () => {
+    // **The case a variant-keyed store could not express.** `identity()` puts
+    // the name first, so two dark themes differ — and the switch is by name,
+    // which is what stops one of them being unreachable.
+    const dark = defaultTheme["dark"]!;
+    const three = { ...defaultTheme, "high-contrast": { ...dark, name: "hc" } };
+
+    const loaded = loadTheme(three, "dark");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+
+    const store = loaded.value;
+    expect(store.names, "every theme is a name, in declaration order").toEqual([
+      "dark",
+      "light",
+      "high-contrast",
+    ]);
+
+    const before = store.current;
+    store.setTheme("high-contrast");
+    expect(store.current, "a switch between two dark themes is a switch").not.toBe(before);
+    expect(store.current.variant, "and polarity is untouched by it").toBe("dark");
+    expect(store.current.name).not.toBe(before.name);
+
+    // A name the set does not hold throws rather than no-opping, and says what
+    // it does hold. A silent no-op would report a change that did not happen.
+    expect(() => store.setTheme("solarised")).toThrow(/no theme named "solarised"/u);
+    expect(store.current.name, "and nothing moved on the way out").toBe(
+      loaded.value.current.name,
+    );
+  });
+
+  it("T1.21a (I27): the set opens on its first key, not on a name this component invented", () => {
+    // A literal default is a name C10 would be requiring of every app's set.
+    const only = { midnight: { ...defaultTheme["dark"]!, name: "midnight" } };
+    const loaded = loadTheme(only);
+    expect(loaded.ok, "a set with no `dark` in it opens").toBe(true);
+    if (loaded.ok) expect(loaded.value.current.tokens.name).toBe("midnight");
+
+    // And an empty set is refused — the one failure a token check cannot see,
+    // because it is about the collection rather than about a theme.
+    expect(loadTheme({}).ok).toBe(false);
   });
 
   it("both shipped variants load", () => {

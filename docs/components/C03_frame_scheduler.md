@@ -126,6 +126,37 @@ C01 does not call this and has no contamination concept — the shell orchestrat
 
 The recovery is always the same and always safe. A full repaint is a larger burst of output than a diff, and correctness beats byte count every time (A01 D33).
 
+## 4a. Suspension — the screen held still on purpose
+
+**Ruled before the code that needs it** (entry 15's copy mode, `CALCIUM_SELECTION_DESIGN.md` §3). A reader taking the terminal's own selection needs the screen to stop moving under it, and every path to the terminal goes through this component — which is why suspension is here rather than at one of L4's fifteen `commit` call sites.
+
+`suspend()` and `resume()` are **new members on a published L0 interface and are freeze-relevant**, and the row says so rather than leaving it to be found.
+
+### The seam is a property, not a proxy
+
+The alternative was a `render` callback that returns without composing — zero new surface, since L4 injects `render` already. **Refused, because it lies to the scheduler**: `pending` would clear and `contaminated` would clear on a frame that was never written, so C03's own state would stop describing the terminal. A property the scheduler can reason about beats one it cannot see, which is C16 I8's argument one layer down.
+
+### Suspension gates `render`, never `repaint`
+
+**This is the whole rule, and it falls on a branch `writeFrame` already has.**
+
+- **Suspension is about staleness**, which the reader has asked for. The screen is old and that is the point.
+- **Contamination is about a screen whose contents nobody knows.** Suspension may not produce that state, and it does not get to hold one that already exists.
+
+So a contaminated write goes through while suspended, and an ordinary render does not. **`resize` therefore overrides suspension**, via I7 — and the reason is the one failure the application can no longer see: width is the axis that wraps, and a wrapped line scrolls the alternate screen. A native selection over a corrupted screen is worthless, so deferring protects nothing and costs the state.
+
+### `flush()` is a no-op while suspended, and introduces no queue
+
+**The sharper of the two questions, because both obvious answers are wrong.** If `flush()` composes, suspension is advisory and the caller decides whether it applies. If it queues, the queue is state nobody has bounded.
+
+Neither happens, because **there is no queue to bound**. `commit` already collapses everything into one `state` and one `deferred` reason — O(1), and bounded by construction long before suspension existed. A suspended `flush()` forces nothing and returns; a contaminated one repaints, by the rule above.
+
+### `resume()` commits an ordinary frame, not a repaint
+
+**And the reason is the property that made `suspend()` the right seam.** Suspension writes nothing, so what is on the terminal is still the last frame written and C25's model of the screen still agrees with it. The diff is valid — larger than usual, and correct. A repaint here would be a burst of output bought with no correctness at all.
+
+`suspend()` during a write applies to the *next* frame, exactly as `invalidate()` does and for the same reason: `writeFrame` read its flags before calling out.
+
 ---
 
 ## 5. State machine
@@ -158,6 +189,8 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
   Inline-once bounds the chain at two writes; escalation means nothing is dropped. A render callback that commits on every render is pathological but legal, and without the escalation it drains forever — a livelock, not a recursion, which is why the depth argument in §3 does not catch it.
 - **I11** — Time enters C03 only through the injected `schedule`. No ambient timer, so a coalescing window is asserted against a counter rather than slept through — the same shape C06 I19 takes, stated here because the audit found this property committed to in one spec and made an invariant in the other.
 - **I12** — `lifecycle.acquired` is read at write time through a live view, never captured at construction.
+- **I13** — **Suspension gates `render` and never `repaint`.** While suspended an ordinary frame is not written and a contaminated one is, so `resize` — which implies contamination (I7) — reaches the terminal regardless of suspension. Suspension may make the screen *stale*, which is what it is for; it may not make the screen *unknown*, and it may not hold a screen that already is. `suspend()` during a write applies to the next frame, as `invalidate()` does.
+- **I14** — **Suspension introduces no queue.** `flush()` while suspended forces nothing beyond what I13 already allows, and `resume()` writes an ordinary frame rather than a repaint: suspension writes nothing, so the terminal still holds the last frame written and the diff's model of it is still true. C03's memory of deferred work stays one `state` and one `deferred` reason under suspension, exactly as without it.
 
 ---
 
@@ -176,6 +209,8 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 11. C03 receives a live read-only view of C01 and cannot acquire or release (I12).
 12. A commit arriving during a write is deferred and coalesced to the strictest reason, written inline at most once, and escalated to the timer thereafter. The chain is bounded at two writes and nothing is dropped (I10).
 13. C03 writes only the synchronised-update markers, through an injected bound `write`. Frame bytes leave through `render()`, which C03 does not own (I6, I8).
+14. `suspend()` holds the screen still without letting it become unknown: ordinary frames wait, contaminated ones are written, and a resize is therefore never deferred (I13).
+15. Suspension is bounded state, not a buffer: `flush()` forces nothing while suspended and `resume()` writes an ordinary diffed frame, not a repaint (I14). **`suspend()` and `resume()` are new members on a published L0 interface and are freeze-relevant.**
 
 ---
 
@@ -201,6 +236,11 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T1.12** (I6): with `synchronisedUpdate: true`, a write emits `2026 h` before and `2026 l` after the render callback.
 - **T1.13** (I6): with `synchronisedUpdate: false`, no `2026` byte is emitted.
 - **T1.14**: custom `windows: { stream: 16 }` → the stream timer is scheduled at 16 ms.
+- **T1.15** (I13): `suspend()` then `commit("input")` → neither callback is called. Then `resume()` → `render()` once. The pair is the assertion: a suspension that never lifts is indistinguishable from a scheduler that stopped working.
+- **T1.16** (I13): `suspend()` then `commit("resize")` → `repaint()` is called **while suspended**. Contamination overrides, because suspension may make the screen stale and may not leave it unknown — and a resize is the case where deferring costs the state the application can no longer see.
+- **T1.17** (I13): `suspend()`, `invalidate()`, `commit("input")` → `repaint()`. The same rule reached without a resize, so the row is about contamination rather than about `resize` in particular.
+- **T1.18** (I14): `commit("spinner")` then `suspend()` then `flush()` → nothing is written, and no work is held: `resume()` produces exactly **one** `render()`. A queue would produce two.
+- **T1.19** (I14): `resume()` calls `render()` and not `repaint()`, with `contaminated` false throughout. The diff's model of the screen survives suspension because suspension writes nothing — which is the property that made this the right seam rather than a `render` callback that returns early.
 
 ### Tier 2 — contract / interface
 

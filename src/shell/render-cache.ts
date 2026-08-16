@@ -28,6 +28,27 @@
  *   of one: the fact travels with the value. A hook at a fourth call site is
  *   precisely the shape this tree keeps finding unwired.
  *
+ * **And `capabilities` is the fourth thing the render reads, absent for a
+ * reason this header did not give** (T4.18c, T4.18d). The paragraph above
+ * refutes the height argument for theme *and* capabilities in one sentence —
+ * *both are true and both are about height* — and then adds theme only. A
+ * capability record is an appearance axis exactly as a theme is: `rule` draws
+ * `─` at full and `-` at ascii, at the same height, and T4.18c is that
+ * measured rather than argued.
+ *
+ * What makes the omission safe is not in the refuted sentence: **the record is
+ * built once at construction step 2 and nothing in `src/` reassigns it**, so
+ * the axis is constant for the session. That is `ctx.tick`'s treatment below,
+ * and T4.18d asserts it rather than describing it — a re-detect on resize or an
+ * `/ascii` toggle fails that row, which is the day this key needs a fifth
+ * discriminator.
+ *
+ * **The audit that found it is worth naming, because the key was right and its
+ * reasoning was not**: *a cache key is wrong until you have listed everything
+ * the render reads*. Listed against `visibleRows` — the registry (sealed), the
+ * blocks (`rev`), the width, the window range, the theme, the focus, the
+ * capabilities. Six keyed, one constant, none unaccounted for.
+ *
  * **`ctx.tick` is not here and no transcript render receives one** (I60).
  * `visibleRows` passes none, so every entry renders at 0. The day something
  * threads a tick through, an animating entry serves its first frame for the life

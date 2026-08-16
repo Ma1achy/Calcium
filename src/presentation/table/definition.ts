@@ -249,6 +249,23 @@ function textOf(line: string): string {
  * somewhere focus can be. Giving it one would put a place to stand inside the
  * thing that describes where you are standing.
  */
+/**
+ * A row's source text, for `y` (C26 §5c).
+ *
+ * **Every declared column, in declared order, at no width.** The columns this
+ * width dropped are in it and the truncation is not: the painted row is a
+ * rendering and this is the data it was rendered from. `planColumns` is
+ * deliberately not consulted — a copy that changed with the terminal's size
+ * would be the defect rather than a feature.
+ *
+ * Tab-separated, because that is what pastes into a spreadsheet and into every
+ * shell tool that takes columns. A `spark` cell contributes its `text`, which
+ * is what the surface wrote there; the sparkline itself is a rendering.
+ */
+function rowCopyText(block: Table, r: TableRow): string {
+  return block.columns.map((c) => r.cells[c.key]?.text ?? "").join("\t");
+}
+
 export function tableElements(
   block: Table,
   width: number,
@@ -270,6 +287,7 @@ export function tableElements(
         rows: Object.freeze({ from: row, to: row + height }),
         cols: Object.freeze({ from: 0, to: w }),
         ...(action === undefined ? {} : { activate: action }),
+        copy: rowCopyText(block, r),
       }),
     );
     row += height;

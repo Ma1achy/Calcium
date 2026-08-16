@@ -9,6 +9,7 @@
  * The rows a renderer produces are the rows the frame occupies (I1). Ink paints
  * them and lays out no text of its own (C09 §3).
  */
+import type { AmbiguousWidth } from "../text.js";
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
@@ -73,9 +74,9 @@ export function withBackground(style: Style | undefined, surface: Style): Style 
 }
 
 /** The display width of a row of spans, measured on the text and not the styling. */
-export function spanCells(spans: readonly Span[]): number {
+export function spanCells(spans: readonly Span[], ambiguous: AmbiguousWidth = "narrow"): number {
   let total = 0;
-  for (const span of spans) total += cells(span.text);
+  for (const span of spans) total += cells(span.text, ambiguous);
   return total;
 }
 
@@ -97,14 +98,14 @@ export function paint(spans: readonly Span[]): string {
 }
 
 /** Pad a plain string to `width` cells. Wider input is returned unchanged. */
-export function pad(text: string, width: number): string {
-  const short = width - cells(text);
+export function pad(text: string, width: number, ambiguous: AmbiguousWidth = "narrow"): string {
+  const short = width - cells(text, ambiguous);
   return short <= 0 ? text : text + " ".repeat(short);
 }
 
 /** Pad on the left — the right-aligned column of a `keyValue` or a table. */
-export function padStart(text: string, width: number): string {
-  const short = width - cells(text);
+export function padStart(text: string, width: number, ambiguous: AmbiguousWidth = "narrow"): string {
+  const short = width - cells(text, ambiguous);
   return short <= 0 ? text : " ".repeat(short) + text;
 }
 
@@ -136,15 +137,15 @@ export function fit(
 export function clampSpans(
   spans: readonly Span[],
   width: number,
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): readonly Span[] {
   const limit = Math.max(0, Math.floor(width));
-  if (spanCells(spans) <= limit) return spans;
+  if (spanCells(spans, caps.ambiguousWidth) <= limit) return spans;
 
   const out: Span[] = [];
   let used = 0;
   for (const span of spans) {
-    const w = cells(span.text);
+    const w = cells(span.text, caps.ambiguousWidth);
     if (used + w <= limit) {
       out.push(span);
       used += w;

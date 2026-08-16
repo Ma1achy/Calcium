@@ -105,6 +105,86 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().rows, "showing the same thing it showed before").toEqual(rowsBefore);
   });
 
+  it("T4.33 (C19 I23, C15 I14): a resize moves the open menu with the region", async () => {
+    // **Read from the screen, because the anchor number agrees with the wrong
+    // place.** An anchored layer stores the row it was placed against, and
+    // every writer of that row was a keystroke path: the resize handler
+    // resized the viewport and committed a frame, and `redrawMenu` sends
+    // content alone. So the menu stayed anchored to the previous region height
+    // until the next character. C15 clamps, so nothing faults and no number
+    // disagrees with any other — a row asserting `placement.row` passes on the
+    // stale value as readily as on the fresh one.
+    //
+    // The assertion is where the menu sits **relative to the prompt**: it is
+    // chrome for the prompt and belongs immediately above it, which is the one
+    // relation a stale anchor breaks and the only one a reader would name.
+    const stdin = fakeStdin();
+    const { screen, resize } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 24 });
+    await settle();
+
+    stdin.emit("/");
+    await settle();
+
+    const rowOf = (needle: string, rows: readonly string[]): number =>
+      rows.findIndex((r) => r.includes(needle));
+
+    /** The last row with anything on it above `at` — the menu's bottom edge. */
+    const bottomAbove = (rows: readonly string[], at: number): number => {
+      for (let i = at - 1; i >= 0; i -= 1) if ((rows[i] ?? "").trim() !== "") return i;
+      return -1;
+    };
+
+    const before = screen().rows;
+    const promptBefore = rowOf("❯", before);
+    expect(bottomAbove(before, promptBefore), "the menu sits directly above the prompt").toBe(
+      promptBefore - 1,
+    );
+
+    // **Taller, not shorter, and the direction is the whole row.** On a shrink
+    // the clamp pushes a stale anchor to the bottom of the region — which is
+    // where the menu belongs anyway — so the defect is invisible. Growing the
+    // terminal leaves the stale row where the old region ended, and the menu
+    // draws in the middle of the transcript with a gap beneath it.
+    resize({ columns: 100, rows: 40 });
+    await settle();
+
+    const after = screen().rows;
+    const promptAfter = rowOf("❯", after);
+    expect(promptAfter, "the prompt moved with the region").toBeGreaterThan(promptBefore);
+    expect(bottomAbove(after, promptAfter), "and the menu came with it").toBe(promptAfter - 1);
+  });
+
+  it("T4.34 (C19 I23, entry 16): the truncated menu's indicator is on the screen", async () => {
+    // **Through the real wiring, because that is where it was missing.** The
+    // window and the remainder are both unit-tested and both were right; what
+    // shipped was a call site that handed C15 every candidate and let the frame
+    // cut the tail. A row that calls `menuWindow` agrees with either version —
+    // this one drives a session, and the mutation that removes the slice in
+    // `keys.ts` is the one it exists to catch.
+    const stdin = fakeStdin();
+    // Short, so the half-region cap bites on a handful of verbs.
+    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 16 });
+    await settle();
+
+    stdin.emit("/");
+    await settle();
+
+    const rows = screen().rows;
+    const prompt = rows.findIndex((r) => r.includes("❯"));
+    const menu = rows.slice(0, prompt);
+    expect(menu.some((r) => /\+ \d+ more/u.test(r)), "the indicator is drawn").toBe(true);
+    // **And the box closes**, which is the half a row about the indicator alone
+    // does not cover: the bottom edge sits between the menu and the prompt, and
+    // C19 §6 argues it is what stops the list reading as continuous with the
+    // line below it. A window one row too generous keeps the indicator and
+    // loses this — the original defect, one row's worth — and the mutation pass
+    // is what asked for the assertion.
+    expect(menu[menu.length - 1] ?? "", "the rule closes the menu").toMatch(/^[─-]{20,}/u);
+    expect(menu[menu.length - 2] ?? "", "with the indicator directly above it").toMatch(
+      /\+ \d+ more/u,
+    );
+  });
+
   it("T4.15 (I56): a write that throws leaves the next frame whole", async () => {
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession(
@@ -714,5 +794,89 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
       after.indexOf("EROFS"),
       "the write failure is reported, and after the release",
     ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+  });
+});
+
+describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
+  it("T4.30 (C16 §5b B1): ⌥v enters, the header says COPY, mouse tracking goes off", async () => {
+    // **B1 is the row this file owes.** `copyMode` and `exitCopyMode` were both
+    // stubs for the length of C26 — routed, ordered, unreachable — and the
+    // producer landing alone would have given a mode the ⌃c rung consumes and
+    // does not end. The pair is asserted as a pair for that reason.
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    // The control: the indicator is not there before the key, so the assertion
+    // below is about the key rather than about the header always saying COPY.
+    expect(screen().rows[0], "no indicator before entry").not.toContain("COPY");
+
+    const before = stdout.output;
+    await type("\u001bv");
+
+    expect(screen().rows[0], "the mode is on screen, in the row always drawn").toContain("COPY");
+    expect(
+      stdout.output.slice(before.length),
+      "tracking off, so the terminal's own selection works",
+    ).toContain("[?1002l");
+
+    // **The indicator's frame is up before the hold takes effect** — otherwise
+    // the reader is told nothing and simply finds the mouse dead.
+    expect(screen().rows[0]).toContain("COPY");
+  });
+
+  it("T4.31 (C16 §5b B1): ⌃c leaves it, and the screen comes back", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+
+    const before = stdout.output;
+    await type("\u0003");
+
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+    expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
+  });
+
+  it("T4.32 (C03 I13): while copy mode is up, output does not move the screen", async () => {
+    // The whole point of the suspension, at the level where it is visible:
+    // a selection the reader is taking must not come to mean other text.
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    // A control first: typing moves the screen when copy mode is NOT up, so the
+    // assertion after it is about the mode and not about typing being invisible.
+    const base = screen().rows.join("\n");
+    await type("abc");
+    expect(screen().rows.join("\n"), "typing normally repaints").not.toBe(base);
+
+    await type("\u001bv");
+    const held = stdout.output;
+
+    await type("def");
+    expect(stdout.output, "nothing reaches the terminal while suspended").toBe(held);
+
+    await type("\u0003");
+    expect(stdout.output.length, "and resume writes the catching-up frame").toBeGreaterThan(
+      held.length,
+    );
   });
 });

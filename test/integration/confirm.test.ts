@@ -39,10 +39,34 @@ import { createViewport } from "../../src/viewport/viewport/index.js";
 import { createFocusStore } from "../../src/interaction/router/focus.js";
 import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../../src/interaction/router/router.js";
-import { createConfirmHost } from "../../src/shell/confirm.js";
+import { CONFIRM_WIDTH, createConfirmHost } from "../../src/shell/confirm.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { measureSequence } from "../support/viewport.js";
-import { registry } from "../support/overlay.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { block } from "../../src/data/viewmodel/construct.js";
+import { createChoiceSelection, defaultStart } from "../../src/shell/choice-selection.js";
+import type { Choice } from "../../src/shell/local/registry.js";
+import { ASCII_CAPS, measurable, visible } from "../support/render.js";
+import type { OverlayManager } from "../../src/viewport/overlay/index.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+
+/**
+ * The confirm's layer, rendered — the frame rather than the blocks.
+ *
+ * Read through C09's registry with `table` registered, because the claim being
+ * checked is about columns lining up and about a glyph a slot resolves. A
+ * structural assertion on the block sees the marker on the right row and cannot
+ * see either.
+ */
+function frameOf(overlays: OverlayManager, caps?: TerminalCapabilities): readonly string[] {
+  const layer = overlays.top;
+  if (layer === null) throw new Error("no layer to read");
+  const r = measurable({
+    definitions: [tableDefinition],
+    ...(caps === undefined ? {} : { capabilities: caps }),
+  });
+  return layer.content.flatMap((b) => r.renderToLines(b, 72).map(visible));
+}
 
 const key = (name: string, mods: Partial<Key> = {}): InputEvent => ({
   kind: "key",
@@ -56,16 +80,33 @@ const YES_NO = [
 ];
 
 /** Real C13, C14, C15, a real confirm host and a real router. */
-function world(over: Partial<RouterDeps> = {}) {
+function world(
+  over: Partial<RouterDeps> = {},
+  overlayRegion = { width: 80, height: 24 },
+  anchorAt = { row: 8, rows: 1 },
+) {
   const store = createTranscriptStore();
   const viewport = createViewport(store, { width: 80, height: 10, measureSequence });
-  const overlays = createOverlayManager({ registry });
+  // **The registry measures `table`, because the choices are one** (C09 §3).
+  // `support/overlay.ts`'s default does not register it, so an unregistered
+  // kind measures as `raw` — one row for a two-choice list — and the height
+  // C15 places is a row short of what the frame draws. The two numbers agreed
+  // everywhere until a row compared them.
+  const measured = measurable({ definitions: [tableDefinition] });
+  const overlays = createOverlayManager({
+    registry: { measureSequence: (b, w) => measured.registry.measureSequence(b, w) },
+  });
   const focus = createFocusStore();
   const invalidate = vi.fn();
   const globalSeen: InputEvent[] = [];
   let cancels = 0;
 
-  const confirm = createConfirmHost({ capabilities: { unicode: "full" }, overlays, invalidate });
+  const confirm = createConfirmHost({
+    overlays,
+    anchor: () => anchorAt,
+    overlayRegion: () => overlayRegion,
+    invalidate,
+  });
 
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),
@@ -207,7 +248,11 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     w.overlays.push({
       id: "menu",
       kind: "overlay",
-      placement: { kind: "centred" },
+      // **Anchored, because a menu is** (C15 I20 made the placement a
+      // decision rather than a default). This stands in for the completion
+      // menu while the row is about routing; it was centred with no width,
+      // which is neither what a menu is nor a placeable layer.
+      placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: [],
       dismissable: true,
     });
@@ -267,6 +312,303 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.router.dispatch(ctrlC)).toBe(true);
     expect(w.cancels()).toBe(1);
     expect(w.router.lastStages).toContain("cancel");
+  });
+
+  it("T4.12 (C23 I36, entry 16 R1): the marker opens on the default, not on the first", () => {
+    // **The mutation this row exists for**, and it is a safety defect rather
+    // than a navigation one: every assertion about arrows moving agrees with an
+    // index that opens at 0, and a destructive verb's confirm then sits on
+    // `yes`. `confirm.ts` puts the safe choice last by convention, so `yes`
+    // first and `no` marked default is the arrangement where the two readings
+    // disagree — an ordering where the default is already first passes both.
+    const w = world();
+    void w.confirm.ask({ question: "Remove 6 containers?", choices: YES_NO });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.find((l) => l.includes("[n]")), "the default carries the marker").toContain("•");
+    expect(drawn.find((l) => l.includes("[y]")), "and nothing else does").not.toContain("•");
+  });
+
+  it("T4.13 (C09 I22, F122, entry 16 A5): the choices are a block, and no glyph is written here", () => {
+    // **The seam this deletes.** `ConfirmDeps` carried `capabilities` for one
+    // reason — a `raw` block holds text, so a marker written at L4 could never
+    // be substituted — and a cell holds a slot instead. The assertion is on the
+    // ASCII rendering rather than on the type: a file that stopped taking the
+    // capability and still spelled `•` would compile and would draw `•` on a
+    // `LANG=C` terminal.
+    const w = world();
+    void w.confirm.ask({ question: "Remove 6 containers?", choices: YES_NO });
+
+    const ascii = frameOf(w.overlays, ASCII_CAPS);
+    expect(ascii.find((l) => l.includes("[n]"))).toContain("-");
+    expect(ascii.join("\n"), "the Unicode marker never reaches an ASCII terminal").not.toContain("•");
+  });
+
+  it("T4.14 (entry 16 A5): the labels align whether or not a row is marked", () => {
+    // **The frame, not the arithmetic.** A glyph is part of a cell's width
+    // rather than an addition to it, so a marker sharing the key's cell shifts
+    // the selected row two columns left of the others — self-consistent in
+    // every count, and visible only by reading the rows against each other.
+    // The `raw` form got this by padding with a space; the marker's own column
+    // is what replaces that.
+    const w = world();
+    void w.confirm.ask({ question: "Remove 6 containers?", choices: YES_NO });
+
+    const drawn = frameOf(w.overlays);
+    const at = (needle: string): number => {
+      const line = drawn.find((l) => l.includes(needle));
+      return line === undefined ? -1 : line.indexOf(needle);
+    };
+    expect(at("[y]"), "both keys start in the same column").toBe(at("[n]"));
+    expect(at("[y]")).toBeGreaterThan(0);
+  });
+
+  it("T4.15 (C23 I36, entry 16 R1): an unmarked question falls back to the last choice", () => {
+    // **`confirm.ts:83`'s argument, asserted rather than described.** Every
+    // caller in this repository marks a default, so the fallback only ever runs
+    // for a caller that forgot — and the whole claim is that forgetting should
+    // be safe. It was first written as a mutation exemption on the grounds that
+    // the state is unreachable; it is reachable in one line, and an exemption
+    // for a constructible state is a gap wearing a reason.
+    const w = world();
+    void w.confirm.ask({
+      question: "Remove 6 containers?",
+      choices: [
+        { key: "y", label: "yes" },
+        { key: "n", label: "no" },
+      ],
+    });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.find((l) => l.includes("[n]")), "the last, which is the safe one").toContain("•");
+    expect(drawn.find((l) => l.includes("[y]"))).not.toContain("•");
+  });
+
+  it("T4.16 (entry 16 A5): the key column fits the widest accelerator", () => {
+    // Two-character keys are legal — `AskOptions` puts no width on `key` — and a
+    // floor taken from one of them truncates whichever is longer. That reads as
+    // a rendering flicker rather than as a width defect, which is C19's own
+    // argument for putting its glyph in the floor (`menu.ts:39`).
+    const w = world();
+    void w.confirm.ask({
+      question: "Which?",
+      choices: [
+        { key: "y", label: "yes" },
+        { key: "no", label: "no", default: true as const },
+      ],
+    });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.join("\n"), "`[no]` is whole").toContain("[no]");
+    const at = (n: string): number => drawn.find((l) => l.includes(n))?.indexOf(n) ?? -1;
+    expect(at("yes"), "and the labels still line up").toBe(at("no ") === -1 ? at("no") : at("no "));
+  });
+
+  it("T4.17 (entry 16 A3, A6, C15 I20): placement is a parameter, and width is not derived from it", () => {
+    // **Both arms in one row, because either alone is satisfied by a constant.**
+    // A confirm that is always centred passes an assertion about `left`; one
+    // that is always anchored passes an assertion about the anchor. And the
+    // widths are the claim's other half: the centred arm declares one, without
+    // which C15 refuses it (I20), and the anchored arm declares none, which is
+    // how a layer says *the whole region* — the menu's argument, since a
+    // question anchored to the prompt is chrome for the prompt.
+    const c = world();
+    void c.confirm.ask({ question: "q?", choices: YES_NO });
+    expect(c.overlays.top?.placement).toEqual({ kind: "centred" });
+    expect(c.overlays.top?.width).toBe(CONFIRM_WIDTH);
+
+    const a = world();
+    void a.confirm.ask({ question: "q?", choices: YES_NO, placement: "anchored" });
+    expect(a.overlays.top?.placement).toEqual({
+      kind: "anchored",
+      row: 8,
+      rows: 1,
+      prefer: "above",
+    });
+    expect(a.overlays.top?.width, "the whole region, as the menu does").toBeUndefined();
+  });
+
+  it("T4.18 (entry 16 A6, C15 I14): the anchored question is still not escapable", () => {
+    // **The pairing the walk's A6 names**, and the cell nothing in the tree
+    // produced until now: `dismissable: false` with `anchored`. Placement is a
+    // live parameter and escapability is a construction one (C15 I14, and
+    // `LayerUpdate` excludes it deliberately) — so moving the box must not
+    // move the flag. The symptom of getting this wrong is "the shell froze",
+    // three components from the cause.
+    const w = world();
+    const answer = w.confirm.ask({ question: "q?", choices: YES_NO, placement: "anchored" });
+    expect(w.overlays.top?.dismissable).toBe(false);
+    expect(w.overlays.pop(), "the router cannot take it").toBeNull();
+    expect(w.overlays.top?.id).toBe("confirm");
+
+    w.router.dispatch(key("escape"));
+    return expect(answer).resolves.toBe("n");
+  });
+
+  it("T4.28 (entry 16 R2, C15 I8): a question that does not fit keeps its choices", () => {
+    // **The defect a frame found and no assertion could.** `composite.ts` writes
+    // `lines[0 … height)`, so a box that does not fit loses its tail — and this
+    // box's tail is the answers. Measured on an ordinary 24-row terminal with a
+    // twenty-row payload: the question and ten rows of detail were drawn, and
+    // no `[y]`, no `[n]` and no bottom border. The keys still worked and
+    // nothing on screen said so.
+    //
+    // So the payload is dropped rather than marked: an appended indicator is
+    // the first row lost. `…` costs the reader what they could not read anyway.
+    const w = world({}, { width: 80, height: 12 });
+    void w.confirm.ask({
+      question: "Remove 6 stopped containers?",
+      detail: block({
+        kind: "raw",
+        id: "d",
+        text: Array.from({ length: 20 }, (_, i) => `row ${String(i)}`).join("\n"),
+      }),
+      choices: YES_NO,
+    });
+
+    const placed = w.overlays.layout({ width: 80, height: 12 })[0];
+    if (placed === undefined) throw new Error("unreachable");
+    const r = measurable({ definitions: [tableDefinition] });
+    const all = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width).map(visible));
+    const drawn = all.slice(0, placed.height);
+
+    expect(drawn.some((l) => l.includes("[n]")), "the answers are on the frame").toBe(true);
+    expect(drawn.some((l) => l.includes("...")), "and the payload says it was dropped").toBe(true);
+    expect(all.length, "nothing is cut at all").toBeLessThanOrEqual(placed.height);
+    expect(drawn.some((l) => l.includes("row 0")), "the payload itself is gone").toBe(false);
+  });
+
+  it("T4.29 (entry 16 R2): a question that fits keeps its payload", () => {
+    // T4.19's control, and it cannot be folded in: dropping the detail
+    // unconditionally satisfies every assertion above.
+    const w = world();
+    void w.confirm.ask({
+      question: "Remove 1 container?",
+      detail: block({ kind: "raw", id: "d", text: "dtui-quiet" }),
+      choices: YES_NO,
+    });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.some((l) => l.includes("dtui-quiet"))).toBe(true);
+    expect(drawn.some((l) => l.includes("..."))).toBe(false);
+  });
+
+  it("T4.30 (entry 16, C15 I7): the anchored question flips when there is no room above", () => {
+    // **The flip is a field of the anchored arm and always was**, which is what
+    // step 3's check came back with: `Placement` carries `prefer` inside
+    // `{kind: "anchored"}` and nowhere else, so a centred layer has no flip to
+    // express and the type already says so. Nothing to build — the confirm
+    // inherited it the moment it could be anchored, which is what this asserts
+    // rather than a mechanism of its own.
+    // **A prompt near the top, which is a fresh session and not a contrivance:**
+    // two rows above the anchor and twenty-one below. The first draft used the
+    // default anchor and a tall payload, and the box went *above* anyway —
+    // because the truncation collapse fires first and the short form fits. Two
+    // rules meeting, and the fixture agreed with the wrong one.
+    const w = world({}, { width: 80, height: 24 }, { row: 2, rows: 1 });
+    void w.confirm.ask({ question: "q?", choices: YES_NO, placement: "anchored" });
+
+    const placed = w.overlays.layout({ width: 80, height: 24 })[0];
+    if (placed === undefined) throw new Error("unreachable");
+    expect(placed.top, "below the anchor's own row").toBeGreaterThan(2);
+  });
+
+  it("T4.31 (entry 16 R1, C23 I36): one store, two starts, and the fallback is the safe end", () => {
+    // **The mutation this row exists for is a store that opens at 0.** It
+    // passes every navigation assertion, every single-choice case and every
+    // menu row, and puts a destructive verb's confirm on `yes`. A safety defect
+    // where the difference the entry expected — modular wrap against
+    // stop-at-edge — turned out not to exist at all: the two copies of the
+    // cycling agreed exactly, so the start is the whole of what is shared.
+    // **Real `Choice` values, not the narrow shape `defaultStart` reads.** The
+    // signature takes `{ default?: true }` because that is all it looks at, and
+    // a bare literal of exactly that shape is a fixture that cannot be a
+    // choice — `tsc`'s excess-property check is what said so. A fixture must be
+    // the thing under test (`test/support/README.md`).
+    const marked: readonly Choice[] = [
+      { key: "y", label: "yes" },
+      { key: "n", label: "no", default: true },
+    ];
+    const markedFirst: readonly Choice[] = [
+      { key: "y", label: "yes", default: true },
+      { key: "n", label: "no" },
+    ];
+    const unmarked: readonly Choice[] = [
+      { key: "y", label: "yes" },
+      { key: "n", label: "no" },
+    ];
+    expect(defaultStart(marked)).toBe(1);
+    expect(defaultStart(markedFirst)).toBe(0);
+    expect(defaultStart(unmarked), "unmarked falls to the last").toBe(1);
+
+    // The menu's start, in the same store: `null` is a display and does not
+    // move, which was a guard written twice before it was one.
+    const display = createChoiceSelection(3, null);
+    display.next();
+    display.prev();
+    expect(display.at, "a display has no selection to move").toBeNull();
+
+    const chosen = createChoiceSelection(3, 0);
+    chosen.prev();
+    expect(chosen.at, "and a real one wraps, in both directions").toBe(2);
+    chosen.next();
+    expect(chosen.at).toBe(0);
+  });
+
+  it("T4.32 (C23 I36): what opens is what Esc resolves with", () => {
+    // *The marked one, else the last* was written twice — once for where the
+    // selection opens and once for what `Esc` answers — and two records of one
+    // fact disagree eventually. A question that opens on `no` and escapes to
+    // `yes` is the worst possible pair, so they share one function now and this
+    // is the row that says the pair is the claim rather than either half.
+    const w = world();
+    const answer = w.confirm.ask({
+      question: "Remove 6 containers?",
+      choices: [{ key: "y", label: "yes" }, { key: "n", label: "no" }],
+    });
+    const drawn = frameOf(w.overlays);
+    expect(drawn.find((l) => l.includes("[n]")), "opens on the last").toContain("•");
+
+    w.router.dispatch(key("escape"));
+    return expect(answer, "and escapes to it").resolves.toBe("n");
+  });
+
+  it("T4.33 (entry 16): the whole entry, read at 24 rows with a twenty-row payload", () => {
+    // **The frame both defects lived in, and neither assertion saw.** At this
+    // size the payload does not fit: before step 3 the reader was shown the
+    // question and ten rows of detail with no `[y]`, no `[n]` and no bottom
+    // border, and before step 1 the marker was a character L4 spelled. Every
+    // number was self-consistent throughout.
+    //
+    // One row for the whole entry, because each piece is satisfied by the half
+    // that is easy: a marker on the right row says nothing about whether the
+    // choices are drawn, and choices being drawn says nothing about which one
+    // is marked.
+    const w = world({}, { width: 80, height: 24 });
+    void w.confirm.ask({
+      question: "Remove 6 stopped containers?",
+      detail: block({
+        kind: "raw",
+        id: "d",
+        text: Array.from({ length: 20 }, (_, i) => `container-${String(i)}`).join("\n"),
+      }),
+      choices: YES_NO,
+    });
+
+    const placed = w.overlays.layout({ width: 80, height: 24 })[0];
+    if (placed === undefined) throw new Error("unreachable");
+    const r = measurable({ definitions: [tableDefinition] });
+    const all = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width).map(visible));
+
+    expect(all.length, "the box fits the rows it was given").toBeLessThanOrEqual(placed.height);
+    expect(all.some((l) => l.includes("...")), "the payload says it was dropped").toBe(true);
+    expect(all.some((l) => l.includes("container-0")), "and is gone").toBe(false);
+
+    const marked = all.find((l) => l.includes("[n]"));
+    expect(marked, "the safe answer is drawn").toBeDefined();
+    expect(marked, "and it is the one marked").toContain("•");
+    expect(all.find((l) => l.includes("[y]"))).not.toContain("•");
+    expect(all[all.length - 1] ?? "", "and the box closes").toMatch(/[└+]/u);
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {

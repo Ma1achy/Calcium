@@ -166,12 +166,14 @@ describe("C01 fail-on-revert", () => {
         // The frame's cursor: C01 owns the mode and yields the bytes, because
         // they must land inside the frame's one write (I19).
         "cursorSequence",
+        "cursorShapeSequence",
         "release",
         "suspend",
         "resume",
         "onResize",
         "onResume",
         "onInput",
+        "setMouseTracking",
         "size",
         "writer",
         "acquired",

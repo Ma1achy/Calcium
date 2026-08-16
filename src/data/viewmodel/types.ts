@@ -117,10 +117,38 @@ export type AdapterDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: Pro
  */
 export type LocalDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: ProducedMeta }>;
 
+/**
+ * A failure, as the party that knows describes it (F165).
+ *
+ * **The rule that sorts these members is *could anyone but the framework know
+ * this value*, and it is not the axis F58b's precedent suggested.** F58b
+ * narrowed because its fields were computed and discarded; *written by hand*
+ * turns out to decide nothing.
+ *
+ * `code` and `details` come off the far side's own error envelope
+ * (`data/adapters/mapping.ts`), so nobody else could supply them and removing
+ * them deletes its only channel for structured failure. `stage` is the
+ * framework's: `parse`, `spawn`, `handoff`, `local`, `transport` — eight sites
+ * in `shell/execution.ts`, each a genuine runtime discrimination about which
+ * stage of the pipeline failed, authored by the only party that can know.
+ *
+ * **What was wrong is who was writing it, not the field.** Twelve app sites in
+ * `examples/docker` write `stage` by hand, each a per-file constant restating
+ * the kind of function it sits in — `"local"` in a local handler, `"adapter"`
+ * in an adapter — which is F13's class: a fact the framework holds and the app
+ * is asked to author. The disposition is *the app should not be writing it*,
+ * and removing the field was the wrong remedy for the right finding.
+ *
+ * All three are rendered by `errorDoc` rather than dropped (C23 §5). Until this
+ * they were parsed, typed, frozen and thrown away.
+ */
 export type ErrorLike = Readonly<{
   message: string;
+  /** The far side's own error code, when it emits one. */
   code?: string;
+  /** Which stage of the pipeline failed. **The framework's**, never an app's. */
   stage?: string;
+  /** The far side's structured payload — what a `message` cannot carry. */
   details?: Readonly<Record<string, unknown>>;
   remediation?: string;
 }>;
@@ -168,7 +196,19 @@ export type Glyph =
   | "expand"
   | "collapse"
   | "live"
-  | "bullet";
+  | "bullet"
+  /**
+   * A line subordinate to the one above it (C09 §4).
+   *
+   * **The only token whose eligibility is a property of the entry rather than
+   * of the block.** Every other arm names a state the block is in; this one
+   * names a relationship to a line that has to exist. C22's `commandRows`
+   * returns `[]` for `command: ""`, so a document with no command line has
+   * nothing for it to hang from and the mark would subordinate the block to a
+   * different submission's entry. C09 §4 names the two blocks in the position
+   * and the two that look as though they are.
+   */
+  | "continuation";
 
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
@@ -206,7 +246,8 @@ export type Cell = Readonly<{
   text: string;
   tone?: Tone;
   glyph?: Glyph;
-  spark?: readonly number[];
+  /** Inline sparkline. `null` is a gap — a position with no reading (I46a). */
+  spark?: readonly (number | null)[];
 }>;
 
 /**
@@ -273,6 +314,18 @@ export type MergeRow = Omit<TableRow, "expanded">;
  * The height rule lives at the *sequence*, never at the block — see
  * `sequenceHeight` in `measure.ts`. Nothing else in the vocabulary produces
  * vertical space, and every surface in the S-series draws it.
+ *
+ * **If a general `padding` is ever added, this becomes its top edge** (C04 §3
+ * R19, roadmap 38). Roadmap 38 asks for padding *as a general property rather
+ * than `gapBefore` being the only spacing that exists*, and a document with both
+ * would have two ways to say *a blank row above this block* — which every
+ * measurer, every container's child-width computation and every sequence would
+ * then have to agree about. So the change is a replacement, not an addition.
+ *
+ * **The note is here rather than in the roadmap entry**, because a condition
+ * written beside the deferral is the one nobody reads: three deferrals this
+ * project has recorded were satisfied elsewhere while their text stood
+ * unchanged. Whoever writes the second spacing field is reading this line.
  */
 export type Gap = Readonly<{ gapBefore?: boolean }>;
 
@@ -339,7 +392,23 @@ export type Events = Readonly<{
 }> & Gap;
 
 export type Series = Readonly<{
-  values: readonly number[];
+  /**
+   * The readings, oldest first. **`null` is a gap** — a position that produced
+   * no reading — and it is the only non-number this array may hold (I46a).
+   *
+   * **Not `NaN`, and the difference is the serialiser.** A gap is representable
+   * in memory as any non-finite value and C12 I4 renders one correctly, so this
+   * looked for a while like a type that already carried absence. It does not
+   * carry it in a *document*: I46 refuses a non-finite element, and
+   * `JSON.stringify` writes `NaN` as `null` regardless — so the persisted form
+   * was already this shape while the declared form forbade it. `null` is the
+   * spelling that survives the round trip, which is the whole of the argument.
+   *
+   * Every consumer took it unchanged: `Number.isFinite(null)` is `false`, so
+   * `finiteSamples`, `seriesRange` and `sparkline`'s filter treat a gap exactly
+   * as they treated a `NaN`.
+   */
+  values: readonly (number | null)[];
   label?: string;
   tone?: Tone;
 }>;
@@ -349,10 +418,20 @@ export type Series = Readonly<{
  * `form: "line"` without it is a construction error, not a default (§3) — a
  * defaulted height is how C12's central property fails silently.
  */
+/**
+ * The three forms, named so every dispatcher can be exhaustive over them.
+ *
+ * **A union written inline is a union nothing can be checked against.** Every
+ * consumer of `form` was `=== "sparkline" ? … : …`, so a third member fell into
+ * the line arm at three sites and compiled — which is a heatmap rendering as a
+ * curve, silently and at the right height (C12 §6a).
+ */
+export type PlotForm = "line" | "sparkline" | "heatmap";
+
 export type Plot = Readonly<{
   kind: "plot";
   id: string;
-  form: "line" | "sparkline";
+  form: PlotForm;
   series: readonly Series[];
   height?: number;
   axes?: boolean;
@@ -396,6 +475,19 @@ export type Progress = Readonly<{
   label: string;
   current: number;
   total: number;
+  /**
+   * Which pair of glyphs the bar is drawn with (roadmap 51).
+   *
+   * **The gap the entry was refused for, rather than the reason to refuse it.**
+   * *No consumer* was true of a field nobody could use because it did not exist
+   * — `spinnerFrames(caps, name)` is the precedent and `barStyle(caps, name)` is
+   * the same lookup, so the app names a style and C09 resolves it against the
+   * terminal.
+   *
+   * Optional and unknown-tolerant: an absent or misspelled name is the default,
+   * because a bar is decoration over a number that is already correct.
+   */
+  style?: string;
 }> & Gap;
 
 export type Code = Readonly<{
@@ -558,10 +650,125 @@ export type Group = Readonly<{
   id: string;
   direction: "row" | "column";
   children: readonly Block[];
+  /**
+   * How a `row` group's width is divided — one share per child (I42, I44, §3).
+   *
+   * **Absent is an equal split**, which is what every group did before this
+   * field and what `[1, 1, …]` still means: the arithmetic is identical, and a
+   * row asserting that is what keeps the two from drifting.
+   *
+   * **Not C11's `flex`, which shares the name and not the mechanism.**
+   * `Column.flex` is a boolean over a minimum derived from the column's
+   * content — absorb the residual, or do not. A group knows
+   * `measure(block, width) → height` and **no preferred width**, so there is
+   * nothing here for a child to absorb *from*, and a declared proportion is the
+   * only allocation this level can express.
+   *
+   * Ignored on a `column` group, where every child takes the full width, on
+   * `gapBefore`'s precedent: the same block travelling into either direction
+   * should not fail. Knowingly vacuous, and said out loud because an ignored
+   * field is how a value comes to be silently unread.
+   */
+  flex?: readonly Share[];
+  /**
+   * Where each child sits inside what `flex` gave it (I45, §3).
+   *
+   * A second array beside `flex` rather than a field on it: one says how much
+   * space, the other says where in it, and merging them would make a size field
+   * carry a position. Two is the limit — a third parallel array is a record per
+   * child, and this one is not it.
+   *
+   * Ignored on a `column` group, on `flex`'s precedent and for its reason.
+   */
+  align?: readonly Valign[];
 }> & Gap;
+
+/**
+ * One child's share of a `row` group's width (I44).
+ *
+ * A **number** is a weight — a proportion of what is left. `{ cells: n }` is an
+ * intrinsic width, in cells, and it is the answer to the question R1 left open:
+ * a group cannot ask a child how wide it wants to be, so a child that knows
+ * says. The banner is the measured case — a 40-cell whale beside a wordmark —
+ * and it cannot be written as `40 : 61`, which gives 41 and 62 at 105 columns
+ * and 47 and 71 at 120.
+ *
+ * **Fixed shares are taken off the budget first**, and the weights divide what
+ * remains; any other order makes a cell count a suggestion. **Placement is
+ * unchanged**: a fixed child that does not fit is dropped exactly as any other
+ * is, because privileging it would make the rendered set depend on a
+ * declaration rather than on the order the author wrote.
+ */
+export type Share = number | Readonly<{ cells: number }>;
+
+/**
+ * Where a `row` group's child sits in the row's height (I45).
+ *
+ * **One axis, and the other one is not expressible — which is R1 a third time.**
+ * The walk ruled two: horizontal within the child's own allocation, vertical
+ * within the row's height. Building it showed only the second can exist. Every
+ * renderer fits its output to the width it is handed, so a child allocated ten
+ * cells emits ten-cell rows and there is nothing left to place: aligning a
+ * ten-cell box inside a ten-cell box is a no-op, measured. Placing it would mean
+ * knowing how wide the content actually is, and `measure(block, width) → height`
+ * does not answer that — the same missing preferred width that made weights the
+ * only allocation and `{cells: n}` the child's own business.
+ *
+ * **Heights are measurable and widths are not**, and that asymmetry is the whole
+ * reason this field has one axis. The banner is its consumer, and **it is one
+ * now rather than in principle**: `examples/docker/src/banner.ts` hand-wrote the
+ * blank first row that puts the wordmark's seven lines on the whale's hull, and
+ * `bannerRow` passes `["top", "bottom"]` instead.
+ *
+ * **It sat unclaimed for a while, and how is worth recording here.** This
+ * sentence named the consumer and the hand-padding it replaced; the consumer's
+ * own comment said a row group *has no opinion* about vertical alignment. Both
+ * were correct about their own half, neither author was reading the other, and
+ * the suite already held the proof — K6 drew a bottom-aligned seven-row wordmark
+ * against the eight-row one and they matched. **A condition is written where the
+ * deferral is and what meets it is written somewhere else**, which is why the
+ * habit is to grep from the satisfier rather than to watch from the deferral.
+ *
+ * Absent is `top`, which is what a row did before this existed.
+ */
+export type Valign = "top" | "middle" | "bottom";
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
 export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
+
+/**
+ * A bounded region: a box of declared height holding children (C04 §3c, I47).
+ *
+ * **C26 §4b's cell 3 — the one kind declaring both `elements` and `window`.**
+ * `↓` steps a child and the window follows; `PgUp`/`PgDn` move the window and
+ * leave focus alone. The offset is **view state** and is not here: it is a row
+ * count held by L4, droppable, restored by no resume (I48).
+ *
+ * **Reach for one where bounding is the point** — a view, the live entry, a
+ * dashboard, an activity region. In the scrolling transcript a long block is
+ * already fine, because the transcript is what scrolls; wrapping a 400-line
+ * result in one there hides 380 rows, and after I48 it hides them permanently
+ * until block-to-block focus lands (roadmap 46, C26 §11).
+ */
+export type Scroll = Readonly<{
+  kind: "scroll";
+  id: string;
+  /**
+   * The **content** height, in rows. A positive integer.
+   *
+   * The residue marker is chrome the container adds on top of it (I49), so the
+   * box is `height` rows of content and one more when the children do not fit.
+   */
+  height: number;
+  /**
+   * At least one, and an empty one is a construction error (I47).
+   *
+   * **The elements are one per child**, which is what makes *no elements* and
+   * *no children* the same fact — and that is the whole reason the refusal can
+   * live here rather than in the renderer (§3c cell 5).
+   */
+  children: readonly Block[];
+}> & Gap;
 
 export type Block =
   | Rule
@@ -580,6 +787,7 @@ export type Block =
   | Tip
   | Panel
   | Group
+  | Scroll
   | Raw;
 
 export type BlockKind = Block["kind"];

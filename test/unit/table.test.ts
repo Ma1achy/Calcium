@@ -17,6 +17,7 @@ import { COLUMN_GAP, planColumns, tableDefinition, tableElements } from "../../s
  */
 const drawnOrder = (block: Table, width = 160): readonly string[] =>
   tableElements(block, width, registry.measure).map((e) => e.id);
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
 import { measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
@@ -408,5 +409,53 @@ describe("C11 tier 1 — planColumns", () => {
   it("the gap is two cells, and it is the plan's own number", () => {
     expect(COLUMN_GAP).toBe(2);
     expect(planColumns(psColumns(), 160).gap).toBe(COLUMN_GAP);
+  });
+});
+
+describe("C11 — an element's `copy` is its source, not its rendering (C26 §5c)", () => {
+  const registry = createBlockRegistry({ defaults: true });
+  const copyOf = (block: Table, width: number): string =>
+    tableElements(block, width, registry.measure)[0]?.copy ?? "";
+
+  it("T1.42 (C26 §5c): the copy carries every declared column, including dropped ones", () => {
+    // **The mutation this row exists for is a copy taken from the rendering.**
+    // At 60 cells `planColumns` drops most of this table's twelve columns, and
+    // a copy assembled from what survives is *what is on screen* — which passes
+    // every assertion about what is on screen and is wrong about exactly the
+    // thing semantic copy exists for.
+    const block = psTable();
+    const narrow = copyOf(block, 60);
+    const wide = copyOf(block, 200);
+
+    const dropped = planColumns(psColumns(), 60).dropped;
+    expect(dropped.length, "the width really does drop columns").toBeGreaterThan(0);
+
+    expect(narrow, "the same text at every width — the data, not the view").toBe(wide);
+
+    // And it is the declared count, not the surviving one.
+    expect(narrow.split("\t").length).toBe(psColumns().length);
+  });
+
+  it("T1.43 (C26 §5c): the copy is untruncated, and carries no rendered decoration", () => {
+    // A value longer than any column's `maxWidth` at this width: the painted
+    // cell ends in an ellipsis and the copy does not. The row also asserts the
+    // expand column's marker is absent — a glyph nobody typed, which a copy
+    // taken from cells would carry.
+    const base = psTable({ rows: 1 });
+    const long = "a-very-long-family-name-that-will-not-fit-in-any-column";
+    const row = base.rows[0];
+    if (row === undefined) throw new Error("fixture has no row");
+    const block: Table = {
+      ...base,
+      rows: [{ ...row, cells: { ...row.cells, family: { text: long } } }],
+    };
+
+    const copy = copyOf(block, 60);
+
+    expect(copy, "the whole value").toContain(long);
+    expect(copy, "no elision marker").not.toContain("…");
+    expect(copy.split("\t")[0], "the expand column contributes its cell, not a marker").toBe(
+      block.rows[0]?.cells["expand"]?.text ?? "",
+    );
   });
 });

@@ -41,7 +41,7 @@ const names = (events: readonly InputEvent[]): string[] =>
   events.map((e) => (e.kind === "key" ? e.key.name : e.kind));
 
 describe("C16 §2 — key decoding", () => {
-  it("T1.3b (I17): `\\r` is enter and `\\n` is Ctrl-J — asserted as a pair", () => {
+  it("T1.3h (I17): `\\r` is enter and `\\n` is Ctrl-J — asserted as a pair", () => {
     // They were the same event, and only `\r` was ever asserted. A binding on
     // Ctrl-J — one of the two terminal-independent newline bindings C17 I12
     // requires — resolved against something nothing could produce, and the
@@ -60,7 +60,7 @@ describe("C16 §2 — key decoding", () => {
     ]);
   });
 
-  it("T1.3d (I17): Shift-Enter decodes, in both forms a terminal sends it", () => {
+  it("T1.3j (I17): Shift-Enter decodes, in both forms a terminal sends it", () => {
     // The third instance, and the one the mechanical check found rather than a
     // person. `u` is not in the letter table and `27` is not in the tilde
     // table, so both sequences were discarded as well-formed-but-unknown —
@@ -85,7 +85,61 @@ describe("C16 §2 — key decoding", () => {
     ]);
   });
 
-  it("T1.3c (I17): a modified key carries the unmodified key's name", () => {
+  it("T1.3e (C16 §2, I17): xterm's Meta bit is read, so 1;10D and 1;16D are different keys", () => {
+    // **The row that failed before `modifiersOf` read bit 8**, and the reason it
+    // needed fabricating rather than finding. xterm's modifier parameter is
+    // `1 + (shift 1 | alt 2 | ctrl 4 | meta 8)`, and this function read three of
+    // the four — so Meta was dropped silently and the event arrived as a
+    // **different, live** key rather than as nothing.
+    //
+    // Not the unexecuted-binding class T2.13 was built for. That class is a
+    // binding no event can produce: dead, and silent, and a walk of the keymap
+    // finds it. This one *worked*. `⌥⇧←` on a Meta-sending terminal decoded as
+    // `⇧←`, so extend-by-word would have extended by character while every
+    // assertion about `⇧←` passed — **a suite indexed by which keys the decoder
+    // produces agrees with the defect, because it produces a perfectly good
+    // key.** Nothing above the decoder can see it.
+    //
+    // **Both wire forms, and the pair is the assertion.** `1;16D` sets all four
+    // bits and was correct *by accident* — the other three were set, so the
+    // missing read changed nothing. Asserting it alone passes in the broken
+    // state; asserting that the two forms differ is what fails.
+    const { d } = decoder();
+
+    // Meta-Left: every modifier was lost, and it arrived as a bare arrow.
+    expect(feed(d, "[1;9D")).toEqual([
+      { kind: "key", key: { name: "left", ctrl: false, meta: true, shift: false, sequence: "[1;9D" } },
+    ]);
+
+    // Meta-Shift-Left, the ⌥⇧← a terminal sends when Option is Meta rather than
+    // Alt. This is the one that meant something else.
+    const metaShift = feed(d, "[1;10D");
+    expect(metaShift).toEqual([
+      { kind: "key", key: { name: "left", ctrl: false, meta: true, shift: true, sequence: "[1;10D" } },
+    ]);
+
+    // Alt-Shift-Left — the *other* wire form of the same keystroke. Both bits
+    // mean one key to every binding above, so the two forms must agree.
+    expect(feed(d, "[1;4D")).toEqual([
+      { kind: "key", key: { name: "left", ctrl: false, meta: true, shift: true, sequence: "[1;4D" } },
+    ]);
+
+    // Shift-Left, which is the key 1;10D used to become. The pair is the point:
+    // these two must not be the same event.
+    const shiftOnly = feed(d, "[1;2D");
+    expect(shiftOnly).toEqual([
+      { kind: "key", key: { name: "left", ctrl: false, meta: false, shift: true, sequence: "[1;2D" } },
+    ]);
+    expect(metaShift[0], "1;10D and 1;2D are different keys").not.toEqual(shiftOnly[0]);
+
+    // All four bits — correct before the fix and after it, which is why it is
+    // here as the control rather than as the subject.
+    expect(feed(d, "[1;16D")).toEqual([
+      { kind: "key", key: { name: "left", ctrl: true, meta: true, shift: true, sequence: "[1;16D" } },
+    ]);
+  });
+
+  it("T1.3i (I17): a modified key carries the unmodified key's name", () => {
     // `Alt-Enter` arrived as {name: "\r", meta: true} — the byte, not the name
     // the keymap uses — so C17 I12's other terminal-independent newline binding
     // also resolved against an event nothing produced. Both halves of I12 were

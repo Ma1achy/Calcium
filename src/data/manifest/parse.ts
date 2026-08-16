@@ -454,6 +454,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const streams = takeOptionalBoolean(raw, "streams", e, at);
   const oneShot = takeOptionalBoolean(raw, "oneShot", e, at);
   const hidden = takeOptionalBoolean(raw, "hidden", e, at);
+  const persist = takeOptionalBoolean(raw, "persist", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
 
@@ -549,9 +550,39 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     ...(streams === undefined ? {} : { streams }),
     ...(oneShot === undefined ? {} : { oneShot }),
     ...(hidden === undefined ? {} : { hidden }),
+    ...(persist === undefined ? {} : { persist }),
     ...(interactive === undefined ? {} : { interactive }),
     ...(view === undefined ? {} : { view }),
   };
+}
+
+/**
+ * `/theme`'s declared values, supplied where the themes are known (C10 I27).
+ *
+ * **Applied after the parse rather than threaded through it**, and the seam is
+ * the reason: a manifest describes verbs and the theme names are configuration,
+ * so the two meet at the composition root — which is the one place holding both.
+ * Threading a parameter would put a config fact into forty-four call sites that
+ * have no opinion about themes.
+ *
+ * Returns a new manifest; nothing is mutated. A manifest that never comes
+ * through here keeps an `enum` with no values, which refuses every `/theme`
+ * invocation rather than silently accepting two.
+ */
+export function withThemeNames(manifest: Manifest, names: readonly string[]): Manifest {
+  return deepFreeze({
+    ...manifest,
+    tools: manifest.tools.map((tool) =>
+      tool.name !== "theme"
+        ? tool
+        : {
+            ...tool,
+            args: tool.args.map((arg) =>
+              arg.name === "variant" ? { ...arg, values: [...names] } : arg,
+            ),
+          },
+    ),
+  });
 }
 
 /**

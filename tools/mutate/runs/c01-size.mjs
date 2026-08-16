@@ -54,7 +54,7 @@ const results = runPass({
       file: "src/terminal/lifecycle.ts",
       from: "    size: snapshotSize,",
       to: '    size: () => { if (state !== "acquired") throw new Error("not acquired"); return snapshotSize(); },',
-      expect: "T3.18c",
+      expect: "T3.18d",
     },
     {
       name: "onWinch stops sharing the accessor's snapshot",

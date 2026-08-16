@@ -61,6 +61,8 @@ describe("C15 contract — placement is a function", () => {
       // degradable and measurable like everything else in the transcript.
       content: [element],
       dismissable: true,
+      // I20, so the row fails on I4 rather than on the placement.
+      width: 20,
     };
     expect(layer.content).toHaveLength(1);
   });

@@ -111,6 +111,18 @@ export type StoredFocus =
       at: "liveBlock";
       /** `null` — in the block, on no element yet. */
       element: ElementAddress | null;
+      /**
+       * The other end of an element selection, or `null` (C26 §5c).
+       *
+       * **The same shape as C17's, one level up**: the *head* is `element`
+       * itself rather than a second position, so there is one record of where
+       * focus is and the anchor is the only new state. `anchor === element` is
+       * no selection, exactly as `anchor === head` is in the editor.
+       *
+       * One mechanism, two shapes: a character range in the prompt, a set of
+       * addresses here, and one clipboard under both (C17 §5a).
+       */
+      anchor: ElementAddress | null;
       mode: "navigate" | "interact";
     }>;
 
@@ -174,6 +186,41 @@ export type KeyAction =
   | "home"
   | "end"
   | "left"
+  // --- selection (C17 §5b, I21) --------------------------------------------
+  //
+  // **Every motion twice**, and the second half is the first with the anchor
+  // held. They are separate actions rather than a modifier on the existing
+  // rows because the keymap resolves `(target, key)` to one action — a
+  // "shifted" flag on an action would be a second dispatch mechanism beside
+  // the one C16 I19 commits to.
+  //
+  // `extendLineStart`/`extendLineEnd` are `⇧Home`/`⇧End` and **not**
+  // `⇧⌃a`/`⇧⌃e`: ctrl+shift+letter is the same `0x01` that killed `⌃⇧a` for
+  // select-all, which is two more bindings T2.13 has cost.
+  | "extendCharLeft"
+  | "extendCharRight"
+  | "extendWordLeft"
+  | "extendWordRight"
+  | "extendLineStart"
+  | "extendLineEnd"
+  | "selectAll"
+  // **Copy, and there is one clipboard** (C17 §5a). `⌥w` writes the kill
+  // buffer that `⌃k` writes and `⌃y` reads — the emacs pairing readline users
+  // already have, and the one key that does not collide with `⌃c`'s cancel.
+  | "copySelection"
+  // --- the transcript's selection (C26 §5c) ---------------------------------
+  //
+  // **`liveBlock` only, never `interaction`** (C16 §5a row A4). A block's
+  // declared keys are an open set (C26 I14), so a framework binding inside
+  // interaction silently shadows one — and the two are separate targets, so the
+  // rule is structural rather than remembered.
+  //
+  // One mechanism, two shapes: `extendRowUp`/`extendRowDown` are `rowUp`/
+  // `rowDown` with the anchor held, exactly as C17's extending motions are its
+  // ordinary ones.
+  | "extendRowUp"
+  | "extendRowDown"
+  | "copyElement"
   // --- focus (I22) ---------------------------------------------------------
   //
   // `↓` enters through `historyNext`'s second clause rather than an action of
@@ -182,6 +229,8 @@ export type KeyAction =
   | "focusPrompt"
   | "rowUp"
   | "rowDown"
+  | "blockPageDown"
+  | "blockPageUp"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row
   // could be moved to and not acted on. `actions.ts` implements all five arms
   // and nothing in `src/` reached it, so an app could declare a `view` action,
@@ -222,7 +271,18 @@ export type KeyAction =
   | "viewBottom"
   | "viewPageUp"
   | "viewPageDown"
-  | "viewPop";
+  | "viewPop"
+  // --- copy mode (C16 §5b) -------------------------------------------------
+  //
+  // **Entry only. The exit is §5's rung and not an action**, because leaving is
+  // `⌃c` and `⌃c` resolves on the ladder rather than in this table — the same
+  // split every other target has. An `exitCopyMode` row here would be a second
+  // way out with an order of its own, which is what makes copy mode a target
+  // rather than a mode in the first place.
+  //
+  // A mode with entry and no exit is B1; a mode with an exit and no entry is
+  // the same defect inverted, and just as testable.
+  | "enterCopyMode";
 
 export type Binding = Readonly<{
   target: FocusTarget;

@@ -36,10 +36,14 @@ export type {
   MergeRow,
   Notice,
   Panel,
+  Scroll,
+  Valign,
+  Share,
   Patch,
   PatchResult,
   Pills,
   Plot,
+  PlotForm,
   Progress,
   Raw,
   Result,
@@ -62,6 +66,10 @@ export { validateBlock, validateDocument, type Validity } from "./validate.js";
 
 export { applyPatch } from "./patch.js";
 
+export { childBlocks, hasChildren, isContainerKind, type ContainerBlock } from "./tree.js";
+
+export { markdownBlocks } from "./markdown.js";
+
 export {
   BORDER_INSET,
   ROW_GUTTER,
@@ -70,7 +78,7 @@ export {
   gapRows,
   placeable,
   sequenceHeight,
-  groupChildWidth,
+  groupChildWidths,
   insetWidth,
   normaliseWidth,
 } from "./measure.js";

@@ -69,6 +69,7 @@ describe("harness parameters — fake-terminal", () => {
     const all = capabilities({
       colourDepth: 1,
       unicode: "ascii",
+      ambiguousWidth: "narrow",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -78,6 +79,7 @@ describe("harness parameters — fake-terminal", () => {
     expect(all).toEqual({
       colourDepth: 1,
       unicode: "ascii",
+      ambiguousWidth: "narrow",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -493,8 +495,8 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
     expect(store("light").current.variant).toBe("light");
 
     const themed = withTone("ok", "#123456", "light");
-    expect(themed.light.palettes["tone"]?.slots["ok"]).toBe("#123456");
-    expect(themed.dark.palettes["tone"]?.slots["ok"]).not.toBe("#123456");
+    expect(themed["light"]!.palettes["tone"]?.slots["ok"]).toBe("#123456");
+    expect(themed["dark"]!.palettes["tone"]?.slots["ok"]).not.toBe("#123456");
   });
 
   it("measurable({ tick }): the tick reaches an animating renderer", () => {

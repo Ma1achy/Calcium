@@ -27,6 +27,7 @@ import type {
   ViewDocument,
   ViewPatch,
 } from "./types.js";
+import { childBlocks, hasChildren } from "./tree.js";
 
 function fail(message: string, stage: string): PatchResult {
   return { ok: false, error: Object.freeze({ message, stage, code: "patch" }) satisfies ErrorLike };
@@ -43,16 +44,12 @@ function countId(blocks: readonly Block[], id: string, seen: Set<Block> = new Se
     if (seen.has(b)) continue;
     seen.add(b);
     if (b.id === id) n += 1;
-    n += countId(childrenOf(b), id, seen);
+    n += countId(childBlocks(b), id, seen);
   }
   return n;
 }
 
-function childrenOf(b: Block): readonly Block[] {
-  if (b.kind === "panel" || b.kind === "group") return b.children;
-  if (b.kind === "table") return b.rows.flatMap((r) => r.detail ?? []);
-  return [];
-}
+
 
 /**
  * Rewrite one block by id, anywhere in the tree, preserving reference identity
@@ -69,7 +66,11 @@ function rewrite(blocks: readonly Block[], id: string, f: (b: Block) => Block): 
       return f(b);
     }
 
-    if (b.kind === "panel" || b.kind === "group") {
+    // **A `scroll` was not descended into and the patch answered `ok`** — the
+    // same defect this file's next comment records against `table`, arriving a
+    // second time through the kind added after it was fixed. The condition is
+    // `tree.ts`'s now, so the third container kind cannot repeat it.
+    if (hasChildren(b)) {
       const next = rewrite(b.children, id, f);
       if (next === b.children) return b;
       changed = true;

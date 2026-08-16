@@ -425,7 +425,6 @@ the path, on the same channel as every other thing wrong with a manifest.
 
 **And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — Calcium's own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
 
-
 ### 3c. The sequences C22 owns
 
 A02 Seam 4's rows whose owner is C22, in one place. **The Effect names are Seam
@@ -489,7 +488,6 @@ It must be **non-empty**, and that is the half worth stating. A gate that exits 
 > **`oneShot` has no subject, and T3.5b cannot be written.** `parse.ts` produces the field and `types.ts` documents it as *bypasses the TTY gate*; nothing outside the parser reads it, and the reason is one level down — **`createTui(config)` takes no argv.** §4 step 1 is "parse argv, check stdout is a TTY", and no argv parsing happens at startup at all, so the exception above has nothing to be an exception for. T3.5b is recorded as unwritable rather than written against a fabricated argv, because an assertion nobody can satisfy and an assertion nobody has written look identical once the suite is green — which §4's T3.5 note already records about a different row.
 >
 > **How it resolves**: `oneShot` reaches C22 through `config`, with the app parsing argv. That is what every other environment-derived value in this project does — C06 I18 settled exactly that pattern for `PRISM_TUI_TRANSPORT`, and §12a's theme persistence is the same shape. C22 growing an argv parser is the alternative and it is the wrong one: the framework would then own a CLI surface it has no other reason to have.
-
 
 **Gate 3b refuses, and it refuses where gate 4 defers** (I61). The two gates read the same
 terminal one line apart and take opposite decisions, so the difference is stated rather than
@@ -858,6 +856,525 @@ difference appears the day someone threads one value through one call.
 
 ---
 
+## 6e. The prompt window, walked by hand — roadmap entry 28
+
+**§6d is reserved and unwritten.** I59 and §6c both cite it as *the stage that
+bounds the first frame* — a forward reference to roadmap entry 39's work, which
+resolves against nothing today. Named here rather than taken, because a citation
+of a section that does not exist reads exactly like a citation of one that does,
+and quietly reusing the number would make both of those sentences wrong instead
+of merely unbacked.
+
+### 6e.1 — the deferral, and what was already in hand
+
+`promptWindow` anchors the window on the buffer's **end**, and says so:
+
+> *Around the end rather than around the cursor, until C17's `cursorCell` is
+> threaded through: the cursor is at the end for every case but a mid-buffer
+> edit, and showing the wrong window is worse than showing the last rows. Named
+> here so it is a known simplification rather than a silent one.*
+
+The condition it names has been met for some time. `cursorCell` is C17's
+(`editor/layout.ts`), it is on `EditorHandle`, and `PaintDeps.promptCursor`
+already carries it into this file — read forty lines below the deferral by
+`cursorFor`, and available at **both** of `promptWindow`'s call sites, since
+`promptRegion` and `cursorFor` each hold `deps`.
+
+**So the finding that matters is not the window's shape. It is that a deferral
+names a condition and nothing watches it.** Counted rather than asserted, because
+*three this month* was the first draft of this sentence and `src/` does not
+support it: grepping the tree for a forward-looking deferral naming an unmet
+blocker returns **exactly one — this line.** The other seven matches are
+past-tense records of deferrals already discharged, which is the healthy shape.
+
+The instances are real and they are of three different kinds, which is why the
+round number was tempting and wrong:
+
+| where | the deferral | its blocker |
+|---|---|---|
+| `paint.ts:254` | *until C17's `cursorCell` is threaded through* | `cursorCell` exists, is on `EditorHandle`, and is read in this same file |
+| roadmap 25, ghost text | *do ranking first* | 31's recency-first ranking landed; the entry still reads as blocked |
+| roadmap 6.2, via the sixth sweep | a value set deferred three times, each link correct | answered by finding 21 already built |
+
+**One is in code, one in a roadmap row, one in a chain of citations** — so no
+single instrument reaches all three, and A03 has no rule that reaches any.
+§6e.6 says why one is hard rather than pretending otherwise.
+
+### 6e.2 — the classification table: which rule owns a painted row
+
+Structural, and it is the half that would have gone unexamined: the window looks
+like a state machine because the cursor moves, and **both defects below are at
+rest.** Every row is a cell where two correct statements overlap.
+
+Coordinates, because the whole table turns on them: an **editor row** indexes
+C17's full layout; a **painted row** indexes the `cap` rows this region draws.
+`first` is the editor row of the window's first *content* row and `offset` is how
+many painted rows precede it — one when a marker is drawn.
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | the cursor's editor row is one **above** the window, with a marker drawn | the marker occupies painted row 0 | a row above the window is hidden, not clamped | **A shipped defect, measured.** `within = row − first + offset` is `0` for the row just above, `0` passes `0 ≤ within < cap`, and the terminal cursor is drawn **on the elision marker**. Measured at `cap` 4: editor row 2 → frame row 4, the `❯ ⋯` row. The range is tested in *painted* coordinates, where a marker row and a content row are the same kind of number |
+| 2 | the same cell, with a selection open | spans map through `first`/`offset` | a span outside the window is dropped | **The same defect, second consumer** — and this is why it is one fix. A span on the row above washes painted row 0: measured, `❯ ⋯` drawn with `surface.selection` behind it. Neither consumer is wrong about its own rule; both test the wrong coordinate |
+| 3 | the cursor at the **head**, with rows after it | the window contains the cursor | the marker means *rows above* | Rows are now elided **below**, and the vocabulary has no form for it. **A second marker on the last painted row**, and it costs a painted row — which the content budget must *subtract* rather than discover after the fact |
+| 4 | a multi-row wash crossing the window's edge | a row the region passes through washes full width | a row outside the window is dropped | **Dropped whole, and that is correct**: spans are per row, so dropping the outside rows clips the wash exactly. What is missing is not clipping but *evidence* — the reader cannot tell a wash that ends at the edge from one that continues, and row 3's bottom marker is what supplies it. The rule is therefore not decoration: **the marker is what makes the clip honest** |
+| 5 | the spinner and the ghost | written into `out[last]` *"because that is where the cursor is"* | the window follows the cursor | The premise holds only while the window is tail-anchored, and with a bottom marker `out[last]` **is the marker**. They move to the cursor's painted row — the same row in every case a spinner or ghost is actually up, since a completion is in flight over the token being typed. **The comment's stated reason becomes true rather than incidentally true**, which is the mutation-pass test applied to a sentence |
+| 6 | `cap` minus the markers is less than one | every elided end costs a painted row | at least one content row must be drawn | **Reachable, and the walk was about to rule it vacuous.** `cap = min(n, ⌊rows/2⌋)` and `MIN_ROWS` is 16, so a frame that passed the gate has `cap ≥ 8` — but T1.5b already records the case the gate does not cover: *a resize can arrive between the gate and the frame.* So `cap` of 1 and 2 are real. **At `cap` 2 the above-marker wins and one content row is drawn**; at `cap` 1 the cursor's row is drawn with no marker, which is T1.5b's rule with *the last row* replaced by *the cursor's* |
+| 7 | the prompt glyph's row | painted row 0 takes `PROMPT_GUTTER.first` | editor row 0 takes `gutter.first` in C17's walk | They agree only when painted row 0 is a marker or is editor row 0. **A marker keeps the glyph** — the prompt marks the top of its region, not the first row of the command — and that is today's behaviour, unchanged. The cell is here because a head-anchored window makes painted 0 equal editor 0 for the first time, and the two gutters have to agree on that row for the cursor's column to land |
+
+**Rows 1 and 2 are the ones that would have shipped, and they already had.**
+Neither is visible to any assertion in the tree: `Placed` is not involved, the
+arithmetic is self-consistent, and every number agrees with every other. A frame
+is what said otherwise — twice, in the same read.
+
+### 6e.3 — the sequence trace: which window the next frame draws
+
+Event-mediated, because the cursor moves and the buffer grows.
+
+| # | Sequence | The window | What the row is for |
+|---|---|---|---|
+| 1 | a wrapped command past the cap, then `Home` | tail-anchored → head-anchored in one frame | **The transition the deferral names.** Today the cursor is either hidden or drawn on the marker (table row 1); after the ruling the window moves and the cursor is on its own row |
+| 2 | `⇧←` dragging the head out of the window | the window follows the head; the anchor stays where it was | Two rules meet: *the window contains the cursor* and *the wash runs from the anchor*. The anchor's rows leave the window and their spans drop — correct — and **the marker is the only thing that says the selection continues past the edge.** Table row 4 is why that is a requirement and not a nicety |
+| 3 | a paste growing the buffer past the cap | `n` crosses `cap` between two frames | The frame before is unwindowed (`first 0`, `offset 0`); the frame after is windowed. **Nothing carries over**, because the window is a pure function of `(n, cursor, cap)` — so there is no stale window to invalidate. The row records that as a decision: a remembered window would give minimal scrolling and would need the invalidation this component keeps finding unwired |
+| 4 | a resize changing `promptRows` mid-selection | `cap` changes, and on a width change `n` and the cursor's row change with it | **Confirms rather than finds, and the confirmation is the point.** All three are read fresh at paint — `promptRows()`, `promptCursor()` and the spans all come from one C17 walk at the frame's width — and `paint` refuses a frame whose `promptWanted` disagrees with the rows handed to it (T1.5c). The failure this row was written to look for is entry 16 step 3's: a placement computed before the resize and painted after it. It cannot occur here, and it cannot because the values are functions rather than because anyone ordered them |
+
+**Row 3 is the one that changes a decision.** Statelessness is not free — it means
+the window jumps rather than scrolls when the cursor crosses an edge — and the
+alternative needs remembered state invalidated on resize, on width change and on
+every buffer edit. §6c row 10 and I60 are this component's record of what happens
+to an axis nobody threads. The jump is the cheaper wrong thing.
+
+### 6e.4 — the row the walk owes: which assertions are about the window, and which about the cursor
+
+The question was asked of T1.12e and the answer is **four rows, not one** — three
+of which change meaning under the ruling while staying green under a partial fix.
+
+| row | what it says | what it is about | after the ruling |
+|---|---|---|---|
+| **T1.12e** | *a cursor above the windowed prompt is hidden, not clamped* | **the window's arithmetic**, and it reads as the cursor's hiding *policy* | Its fixture is `promptRows: () => 1`, so it exercises **only the `cap === 1` branch**, where `offset` is 0 and no marker is drawn — and the `offset = 1` branch, where both measured defects live, is untouched by it. It also constructs a state `paint` refuses (four rows against a `promptWanted` of 1), reachable because `cursorFor` makes no such check. **Its subject disappears**: a window that contains the cursor never hides it, so the claim has to be restated rather than kept green |
+| **T1.5b** | *a cap of one shows the last row, not a marker with nothing after it* | **the marker-versus-content ruling**, which survives | Its *choice of row* is incidental to that claim and becomes wrong: the row shown is the cursor's. In its own fixture the cursor is at editor row 0, so the answer moves from `third` to `first` |
+| **T4.26** | *the span is mapped through the prompt's window* | **the mapping**, which survives | Its fixture puts the span on the last editor row with the cursor at row 0, so a cursor-following window drops that span entirely. The fixture has to name the cursor it was implicitly relying on |
+| **T4.26's second assertion** | *the marker row is untouched* | **nothing, today** | It passes because the span is inside the window, which is the case where the marker cannot be washed. **It cannot construct the state it claims** — the wash lands on the marker only from the row *above* the window, and that row is what table row 2 measured. The convenient setup is the one where both readings agree |
+
+**Three of the four are about the window and read as being about the cursor**,
+which is the shape the owed row was asking after. The fourth is the sharper one:
+an assertion that names the defect and is fixtured where the defect cannot occur.
+
+**And the implementation found a fifth the walk missed — T4.12d**, *the prompt is
+capped at half the terminal*. Two hundred editor rows in a cap of twelve, and its
+second assertion is *"and the newest rows are shown"*, which was a consequence of
+tail anchoring rather than of the cap. Its fixture leaves `promptCursor` at the
+default `{ row: 0 }`, so under the ruling the window follows the cursor to the
+head and `line 199` is nowhere. **The same class as the other three — a fixture
+relying on a cursor it never names — and the walk still did not enumerate it**,
+because §6e.4 was indexed by *rows that mention the window* and this one mentions
+the cap. The honest fixture is a cursor at the end, which is where it is after a
+paste, and the assertion then holds *because that is where the cursor is*.
+
+That is the walk being falsified by the thing it ruled on, which is what code is
+for: the artefact ruled the shape and the first run disagreed about the
+population.
+
+**And the mutation pass falsified it twice more, both about this section's own
+claims rather than about the code.**
+
+- **The two defects are not independently reachable, and §6e.2 implied they were.**
+  Restoring the painted-index test *alone* fails nothing: a cursor-following
+  window contains the cursor by construction, so the comparison that is wrong
+  about rows outside the window never meets one. **It shipped in conjunction with
+  the end anchoring**, and only the pair reproduces it. The wash's identical half
+  *is* independently reachable, because a span is not the cursor and can lie
+  outside a window the cursor is inside. So one comparison, two consumers, two
+  different reachabilities — which is why the run carries a listed survivor with
+  that as its reason rather than a weakened assertion.
+- **The middle branch's clamp was dead.** `first` was written as
+  `clamp(at − ⌊(count−1)/2⌋, 1, n − count − 1)` and removing the clamp failed
+  nothing, because the branch is entered only for `cap − 2 < at < n − cap + 1`
+  and those guards already put both markers on justified rows. It read as
+  careful and could not fire — `menuWindow`'s two dead expressions again, one
+  entry later, in code written by someone who had just recorded that finding.
+
+**And one arithmetic fact neither artefact stated**: a both-ends window needs
+`n > 2·cap − 2`. Below that the head branch and the tail branch meet with no gap
+and the middle case does not exist. Found by a fixture built at `cap` 4 with six
+rows coming back with one marker where the ruling said two.
+
+### 6e.5 — the ruling
+
+**The window contains the cursor's row, and every range test is in editor
+coordinates.**
+
+- `promptWindow` takes the cursor's editor row and returns the content range
+  explicitly: `{ rows, first, offset, count }`, where `count` is how many of the
+  painted rows are content.
+- A row is inside the window iff `first ≤ row < first + count`. **`cursorFor` and
+  `promptRegion` both test that**, rather than testing the painted index against
+  `[0, cap)` — which is the single coordinate error behind table rows 1 and 2.
+- Elision is marked at **both** ends: a marker on painted row 0 when `first > 0`,
+  a marker on the last painted row when `first + count < n`. Each costs one of
+  `cap`.
+- The content is anchored on the cursor and clamped to the buffer:
+  `first = clamp(cursor − ⌊(count − 1) / 2⌋, lo, hi)`. **This degenerates to
+  today's tail anchoring exactly when the cursor is in the last half-window** —
+  the case the deferral called *every case but a mid-buffer edit* — so the common
+  frame is unchanged, which is the argument for centring rather than for the
+  menu's keep-the-selection-last rule (`menuWindow`, entry 16 step 3). A prompt
+  wants to see what follows the edit; a menu does not.
+- The spinner and the ghost go on the **cursor's painted row** (table row 5).
+
+### 6e.6 — what the ruling leaves behind
+
+- **`cap` 2 with the cursor mid-buffer elides below without a marker.** One
+  content row and one marker, and the marker goes above. Named rather than
+  guarded: the alternative is no content row at all, which is the failure T1.5b
+  already ruled against one row lower.
+- **The ghost's column is not this entry's.** It is written into the padding after
+  the row's text; on a mid-buffer edit the cursor is not at the row's end. The
+  *row* is now right and the *column* is unchanged, and saying so is the
+  difference between a residue and a defect nobody wrote down.
+- **A deferral names a condition and nothing watches it.** A rule is not obviously buildable — the condition is prose,
+  and matching *"until X is threaded through"* against *X exists* is the
+  citation-resolves-against-the-wrong-thing class that `COMMITMENT_INVARIANT_AUDIT.md`
+  §Fourth pass argues against automating. What is cheap is the habit: **a deferral
+  states its blocker as a symbol, and picking up the entry begins by grepping it.**
+  Recorded here as the instrument rather than as a rule.
+
+---
+
+## 6f. The cursor's shape, walked by hand — roadmap entry 45
+
+The entry rules **per focus target, not global**, and stops there. The row this
+walk exists for is the one the entry does not make: **`Placed.cursor` carries a
+position and no style, and the prompt is not a layer at all** — so per-target
+style has nowhere to live today, and building the blink half first would build it
+against a seam that does not exist.
+
+### 6f.1 — the two partitions are not the same partition, and that is row 1
+
+`FOCUS_ORDER` has **seven** members: `overlay`, `copyMode`, `pushedView`,
+`interaction`, `prompt`, `liveBlock`, `global`. **Two of them are layers** —
+`overlay` and `pushedView` are the two `kind`s of `overlayTop`. The other five
+have no `Placed` at all, and the prompt, which is the entry's own example of a
+target wanting its own shape, is one of them.
+
+So a `cursorStyle` on `Layer` covers two of seven while reading as covering all,
+and *per target* and *per layer* are different partitions with two members in
+common. **The style keys on the `FocusTarget`.** `activeTarget` returns one of
+the seven on every dispatch, so the key is always defined; a layer is not always
+there. Position stays exactly where it is — a layer's geometry is genuinely the
+layer's, and a style is a property of *what kind of interaction this is*, which
+is what a target names and a box does not.
+
+`Placed.cursor` is untouched, and that is the test of the ruling rather than a
+convenience: C15 goes on knowing nothing about cursor styles, and no public type
+of C15's widens.
+
+### 6f.2 — the classification table: which rule owns a cell
+
+Structural. Indexed by rule interaction: every row is a cell where two correct
+statements overlap.
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | **the prompt, which is not a layer** | style is per focus target | position is per layer, through `Placed.cursor` | §6f.1. Different partitions, two members in common. **Style keys on the target; position is untouched** — and a style on `Layer` would cover 2 of 7 while reading as total |
+| 2 | a target declaring no style, with a style already on the wire | absent means *the terminal's own* | **nothing can un-write a `DECSCUSR`** | The resolution is two flat levels — the target's, then the session's — and the end of it is `0`, which is the terminal's **configured** default and therefore the user's own setting. *Emit nothing* is only reachable **before the first emission**, so the rule is about a transition and not about a value. A chain with three links would need a parent, and `FOCUS_ORDER` is a priority list rather than a tree: there is no containing target to inherit from |
+| 3 | **a blink transition on a target with no declared shape** | steady on a keystroke, blinking after N ms | shape and blink are **one wire parameter**, not two | **The blink machine is inert wherever nothing is declared**, and this is the fabricated boundary case. `CSI Ps SP q` encodes both — 1/2 block, 3/4 underline, 5/6 bar, blinking/steady, `0` default — so there is no way to say *make the current shape steady*. Acting would choose a shape the app never asked for, on a terminal whose own cursor was already correct |
+| 4 | the same style emitted on every frame | the cursor sequence goes out with **every** frame — `hide` leads the write, position and show close it | the terminal owns the blink **phase** | **Emit on change only, and C01 holds the last emitted value.** A style re-asserted on every frame is 60 assertions a second against a spinner's 80 ms cadence; if a terminal restarts its blink phase on `DECSCUSR` — which this walk did **not** measure and does not need to — a blinking cursor would never blink. The ruling is right either way, which is why it does not rest on the unmeasured half: fewer bytes, and no dependence on a behaviour we cannot see |
+| 5 | a layer with no cursor of its own, prompt focused underneath | the top layer owns the cursor | `cursorFor` falls through to the prompt when `promptFocused` | **The fall-through answers *position* and not *target*.** `activeTarget` is still `overlay`, so the style is the overlay's. Two different questions inside one function, and resolving the style from `promptFocused` would put the prompt's shape under a menu's cursor |
+| 6 | `global` | every target may declare a style | `global` is the no-focus rung | It is a target and may declare one; the shipped map declares none, so it takes the session default. Named because a `Partial<Record<…>>` invites *which of these are real*, and the answer is all seven |
+| 7 | `release()`, and the setting is not in `held` | C01 I6 — release emits the inverse of `held` | **a setting has no inverse** | A **second restore path** beside `held`'s, emitting `0`. I8 permits releasing a key while emitting nothing, and that reasoning is about keys; a category with no key is outside it. This is what makes row 8's taxonomy load-bearing rather than tidy |
+| 8 | `DECSCUSR` in `escapes.ts` | *"Each mode is an enter/leave pair"* | SGR is *"not a mode … no inverse to emit at release, never enters `held`"* | **Neither, and the file has exactly these two categories.** A setting has **persistent state** (unlike SGR) and **no inverse** (unlike a mode): its undo is a third value, not the negation of the first. It lands as a third kind with a declared reset, because writing it as a `mode()` would make `held` and I6 false — release would emit a *leave* that is really *set to default*, and those are different claims about the same bytes |
+| 9 | a terminal that does not implement it | the entry says it *degrades by being ignored* | `TerminalCapabilities` has no axis for it | **No capability axis, and this is a refusal with a reason so it is not re-proposed.** Any terminal that parses CSI at all consumes `CSI Ps SP q` silently, and detecting it would need a query-and-response round trip C02 does not do for anything. The degradation is the terminal's own; adding an axis would widen a public type to record something nothing can measure |
+
+**Row 4 is the one that would have shipped**, and it is invisible from every
+direction that does not read bytes: the style would be correct on every frame,
+the resolution would be correct for every target, and the symptom is a cursor
+that does not blink when it was asked to.
+
+### 6f.3 — the sequence trace: what the next frame emits
+
+| # | Sequence | What is emitted | What the row is for |
+|---|---|---|---|
+| 1 | focus moves mid-blink | the new target's resolved style, on the next frame; the blink phase restarts because the value changed | **A style change is a frame effect and the blink timer is not coalesced with it.** The timer decides *which of two forms*; the target decides *which shape*. Keeping them separate is what stops a focus change from being swallowed by an unexpired timer |
+| 2 | a keystroke while the blink timer is armed | the steady form, and the timer re-arms | **The key path needs no timer.** Every keystroke already composes a frame — one commit per batch (I27) — so *steady on a keystroke* is free. Only the **idle edge** needs the driver |
+| 3 | the idle edge fires | the blinking form, committed | A driver tick, never a `setInterval` in `paint.ts` — the constraint survives the expiry of its premise. **And it commits**, because an effect outside a batch has no frame (I31); this is the same shape as the completion continuation and the spinner's wake |
+| 4 | copy mode entered | the `copyMode` style, on the frame that enters it | **The existing ordering is already right and the row records why.** `#setCopyMode` commits *and flushes* before `suspend()`, precisely so the indicator's frame is on the screen before frames are gated — which is the same window this needs. Nothing new is owed |
+| 5 | **a handoff** | on `resume()` the record is marked **unknown**, and the next resolution is emitted whatever it is — the reset included | **The precedent is exact, the mechanism turned out weaker, and the walk's first answer was then wrong twice over.** `contaminated` exists because a child writes over the screen, and the cursor style is exactly the state a child changes and does not restore — `vim` leaves a bar behind. But `cursorSequence` is emitted on **every** frame, so nothing here needs `contaminated`: the ordinary next frame repairs it. **Row 4's emit-on-change ruling is what puts that at risk**, and this row first said *`resume()` clears the record*. The mutation pass refused it: clearing to *never emitted* restores the **leave the terminal alone** arm, so a target resolving to `null` after a handoff emits nothing and the child's bar survives — and it was **dead** besides, because `suspend()` already resets and every request for a real style re-emitted either way. The record needs a third disposition, *unknown*, distinct from both |
+| 6 | resize | nothing new; `contaminated` forces a repaint and the style rides the frame | Confirms rather than finds, and the confirmation is the point: the style is not a second thing to invalidate on resize |
+
+**Row 5 is where the walk changed its own ruling.** The trace was written
+expecting the handoff to need a restore hook; measuring what `composeFrame`
+actually emits showed the ordinary frame already covers it — and then row 4's
+optimisation reintroduced the problem in a different place. **A ruling that makes
+a state cheaper to hold creates a way for that state to be wrong**, which is the
+throw-leaves-state question asked of a cache instead of an exception.
+
+### 6f.4 — the rulings
+
+- **R1 — style keys on `FocusTarget`; position stays per layer.** `Placed.cursor`
+  is untouched and C15 learns nothing about styles.
+- **R2 — two flat levels and a transition rule.** Target's style, then the
+  session's; `0` is the end, and *emit nothing* is only reachable before the
+  first emission.
+- **R3 — shape and blink are one parameter.** The blink machine is inert where no
+  shape is declared, and every blink transition re-emits the whole style.
+- **R4 — emit on change; C01 holds the last emitted value**, and `resume()` marks
+  it **unknown** — a third disposition beside *never emitted* and a value.
+  **Corrected by the mutation pass**: the first ruling was *`resume()` clears it*,
+  which restores the leave-the-terminal-alone arm and lets a child's bar survive
+  a target resolving to `null`, and which was dead anyway because `suspend()`
+  already resets (§6f.3 row 5).
+- **R5 — a `setting` is a third category in `escapes.ts`**, with a declared reset,
+  restored at `release()` on a path of its own beside `held`'s.
+- **R6 — no capability axis**, refused with its reason.
+
+### 6f.5 — what the rulings leave behind
+
+- **The blink interval is a number nobody has measured, and it is now a number
+  with its provenance recorded.** `CURSOR_BLINK_MS` is **600 ms** and the
+  declaration says it is unmeasured, with the reasoning a re-measurement would
+  test: long enough that a pause between words does not start it — most
+  inter-key gaps are under 300 ms — and short enough that a deliberate stop
+  shows within a beat, past which the cursor reads as broken rather than idle.
+  **It is not the terminal's own blink period**, which is roughly 530 ms from
+  the VT100 and is the period of the flashing rather than a delay before it; the
+  two being close is a coincidence worth naming, because the next reader will
+  assume one was derived from the other. What would settle it is watching people
+  type, and that has not been done.
+- **A third dead guard, and this one was copied rather than invented.** The idle
+  wake first carried the spinner's generation counter — `seq += 1`, `if (mine ===
+  seq)` — and it can never fire, because `schedule` returns a disposable that
+  calls `clearTimeout` and each keystroke cancels the previous wake. **The
+  spinner's counter is not dead and the difference is the reason**: it arms
+  without cancelling, so the counter is its only mechanism. Copying a shape
+  without its reason is how code comes to read as careful and forbid nothing —
+  `menuWindow`'s two expressions and §6e's clamp are the same finding twice
+  over, and this is the first of the three that came from a precedent rather
+  than from arithmetic.
+- **A style declared for `interaction` or `liveBlock` is expressible and
+  invisible.** Both are targets and neither places a cursor: `cursorFor` answers
+  from the top layer or the prompt, so those two resolve a style for a cursor
+  that is hidden. Legal, useless, and named — because the day block-level editing
+  places a cursor (C26 §11), it becomes meaningful with no change here.
+- **A handoff costs one reset even where nothing was declared.** *Unknown* means
+  the next resolution is emitted whatever it is, so a session that declares no
+  style and shells out emits one `0 q` on its return — where a session that never
+  suspends emits nothing at all. The alternative is leaving a child's cursor on
+  the screen, and the guarantee that survives is the one that matters: **an
+  application that never suspends never touches the cursor.**
+- **`copyMode`'s style is emitted and then frozen for the duration.** Frames are
+  gated, so nothing can change it until `resume()`. That is correct and it means
+  the copy-mode style cannot animate — which is a property worth stating, since a
+  blinking copy-mode cursor would simply stop blinking at an arbitrary phase.
+
+---
+
+## 6g. Painting the theme's background, walked by hand — roadmap entry 39
+
+C10 §4c is this walk's structural half — the declaration, the surface, the depth
+ladder. This is the **event-mediated** half: what the next frame writes, and what
+is left on the wire when the session gives the terminal back.
+
+### 6g.1 — the shared mechanism the entry names is already built, and it is not the shared one
+
+The entry's mechanical note is *painting means padding every row to the region
+width, or the wash ends ragged where the text does — the same mechanism as
+selection's full-row background, one scope up; build them together rather than
+twice.*
+
+**Three of those clauses are true and the conclusion is not.**
+
+- **The padding exists and predates both.** `exact(text, width)` squares every
+  row of every region, and `render-frame.ts` already depends on it — *"every row
+  is already `exact()`-padded to the frame's width, so a rewrite covers the row it
+  replaces cell for cell and no erase sequence is needed"*. Entry 23 did not build
+  it; `washed` **consumes** it, and its comment says so: the wash runs *after*
+  `exact`, which is where the full-row half comes from.
+- **So there is nothing to build together.** Entry 23 shipped 2026-08-13 and the
+  note reads as work still owed by whichever lands second. Neither owes it.
+- **And the thing the two actually share is one layer down from where the note
+  points.** A wash is a **span**: it has a start, an end, and it sets `background`
+  on the cells between them. A theme background is a **default** — and every
+  reset in the tree returns to the *terminal's* default, not to ours.
+
+**A shared-work note that is already discharged is worse than none**, because it
+reads as coverage of the interaction it names while the real interaction is at the
+reset. That is the citation-reads-as-coverage test applied to a mechanism rather
+than to a finding: the question is never *does this name the shared part*, it is
+*would building them together have produced it*.
+
+### 6g.2 — the four reset sites, because a base is what a reset destroys
+
+Measured rather than estimated:
+
+**Corrected by the code, and the correction is the interesting half.** The walk
+counted the sites that write `SGR_RESET`; the property that matters is *returns a
+channel to the terminal's default*, and the two sets are not the same. **L1's
+rendered rows contain no full reset at all**: Ink closes a foreground run with
+`39` and a background run with `49`. A base survives `39` untouched — it restores
+the default *foreground* — and **`49` destroys it**, because the default
+background is the terminal's and not ours. A patch row ends with exactly that, so
+its padding would show through.
+
+| Site | What it writes | Why it is a reset |
+|---|---|---|
+| L1's rendered rows | `39` after a foreground run, **`49` after a background one** | `39` is not a reset for this purpose and `49` is — the distinction the walk did not have, found by checking a fixture against the thing under test |
+| `blocks/paint.ts` `paint()` | `SGR_RESET` after every styled run **the shell draws** | *"The reset closes each styled run rather than the row"* — correct, and it drops the base mid-row. **Not the block renderer's**, which was the walk's assumption |
+| `presentation/text.ts` `fitStyled` | `SGR_RESET` when a line was **cut** | Already a **parameter**: `exact` calls `fitStyled(text, width, SGR_RESET)`, so the seam for a base exists and takes one argument |
+| `shell/composite.ts` | **two** per composited row — `${head}${SGR_RESET}${body}${SGR_RESET}${tail}` | An overlay's cells and everything after them lose the base |
+| `shell/render-frame.ts` | `SGR_RESET` leading **every diffed row** | I57's prefix — see §6g.4 |
+
+**One pass repairs every reset a finished row contains**, which the walk did not
+expect: `fitStyled`, `composite` and the shell's `paint()` all write into the
+string before it reaches the painter, and `render-frame`'s prefix is answered by
+the row's own leading base. The set repaired is `\x1b[0m` and `\x1b[49m`. **The
+blind spot is stated rather than left to be found**: a compound sequence carrying
+`0` or `49` among other parameters is not repaired, nothing in the tree emits
+one, and that is a measurement rather than a guarantee.
+
+That is also why the alternative — merging the background into every
+span, the way `withBackground` does for a diff row — is refused: it would put a
+screen-level fact inside cached block bytes and give C22 I58's key a new axis it
+does not need (C10 §4c row 7).
+
+### 6g.3 — the sequence trace: what the next frame writes
+
+| # | Sequence | What is written | What the row is for |
+|---|---|---|---|
+| 1 | `/theme light` on a dark terminal | the invalidate already fires — `if (verb === "theme") deps.scheduler.invalidate()` — every row's base differs, so the diff rewrites all of them | **Confirms.** A base change is the maximal diff by construction, and the repaint that makes it correct is already wired |
+| 2 | **`/theme light --no-bg`, then `/theme light`** | a frame, and the background comes back | **The row the walk got wrong, corrected before it was built against.** The trace said *nothing is committed*: `setVariant` is a no-op when the variant is already active and *"the cache is kept"* (T3.6), which is right for the variant and blind to the flag as a second axis on the same command. **That mechanism is real and the consequence does not follow.** Every `/theme` appends a notice document through `appendAndCommit`, and `execution.ts` invalidates on the verb unconditionally — *A02 Seam 4's theme row* — so a frame is committed twice over, by a path that has nothing to do with the variant changing. **A mechanism carried to a consequence without measuring the path between them**, which is the shape the record keeps: the store's guard was read, its caller was not |
+| 3 | an overlay over painted rows | the layer's cells and the row's tail fall to the terminal's background | Reset site three, and the row that makes the count in §6g.2 measured rather than asserted. A layer is composited *after* the base is applied, so the base has to survive a mechanism that did not exist when it was written |
+| 4 | a frame diff writing four changed rows | the twenty-six unchanged rows keep the base **in their own bytes** | **Why the base is per row and not once per frame.** A base emitted at the top of a frame would be correct on a full write and wrong on every diff after it, since a diffed row is addressed with `cursorTo` and carries its own SGR — and the first frame is always a full write, so the defect ships looking fixed |
+| 5 | a handoff | nothing owed; on return the ordinary frame repaints and the base rides it | **The cursor-shape precedent, and the code refused it.** The trace ruled that `suspend()` owes a reset or the child inherits a live background — true of a row that ends with the base live, and **the implementation made that state unreachable**: a painted row closes itself, so no attribute escapes one row and the handoff needs to know nothing (§6g.6 R11) |
+| 6 | `release()` at exit | nothing owed, for row 5's reason | **The hazard is real and the remedy moved.** The alternate screen restores cell contents and not SGR state, so a row ending with the base live would leave the user's shell prompt painted with nothing on screen to explain it. Closing each row costs the same four bytes and covers exit, fault, signal and handoff at once, where a lifecycle reset covers whichever paths someone remembered |
+| 7 | resize | `contaminated` forces a repaint; the base rides it | Confirms, and the confirmation is the point: the base is not a second thing to invalidate |
+| 8 | a keystroke with `--no-bg` set | one composed frame, no cache miss | The flag is read at row assembly and never enters a rendered block's bytes, so C22 I58's key is untouched (C10 I25) |
+
+**Row 2 is the row that was wrong, and it is left in with its correction rather
+than deleted.** What survives is the obligation — a per-invocation flag has to
+reach a frame — and the finding is that **something already discharges it**: the
+notice every `/theme` appends. The difference between *nothing watches this* and
+*something already does* is the whole of the row, and only measuring the caller
+tells them apart. The wrong version would have produced a mutation that fails
+nothing, which indicts an artefact rather than the code (A03 §2).
+
+### 6g.4 — I57's prefix stops being inert, and that is the guard earning out
+
+`render-frame.ts` leads every diffed row with `SGR_RESET`, justified as
+asymmetry: *"Measured when this was written, no composed row ends with a live
+attribute, so the prefix is currently inert — four bytes a row against a colour
+that would bleed down every row below it and survive the frame, **on the day a
+renderer stops closing its own styling**."*
+
+**Painting is that day.** A row with a base ends with a live background by
+construction, so the sentence's condition arrives, the prefix becomes
+load-bearing, and *reset-then-base* is expressible at exactly the place that
+already writes the reset.
+
+Worth recording because the guard was kept on an argument that could have gone
+the other way — a cost that is real against a failure that had not been
+observed — and this is what it bought. **Both figures and the date**: four bytes
+per changed row, measured inert on 2026-08-04, load-bearing from the day the base
+lands.
+
+### 6g.5 — the flag's reader, which the entry prices at nothing
+
+**Declaring it is free and the entry is right about that**, and the *"free in
+`--help`"* half checks out: `usageBlocks` walks `tool.flags` flat, so a `FlagDef`
+on `/theme` appears in `/theme --help` with nothing else written.
+
+**Reading it is not free, and nothing in the tree can do it today.**
+
+- A local handler receives `result.argv.slice(…)`, and on the success arm
+  `argv = [verb, ...validation.transmitted]`. So a **`shellOnly`** flag is
+  stripped before the handler sees it — which is what keeps `/theme`'s positional
+  `argv[0]` read correct for `/theme --no-bg light`. **That safety is a
+  consequence of `shellOnly`, not of the handler**, and it is worth stating in
+  that direction: declared any other way, a valid invocation answers *"usage:
+  /theme dark|light — got `--no-bg`"*.
+- The handler therefore cannot see the flag at all. The only surface it has is
+  `LocalContext.command`, the line **as typed** — and re-parsing that is a second
+  parser, which is exactly the duplication `transmitted` exists to prevent:
+  *"deriving it there would be a second copy of the rules"*.
+- `--help`'s precedent does not extend. It is answered in `route()` because it
+  **replaces** the result; `--no-bg` modifies one, and answering it there would
+  put a per-verb flag in the router.
+
+**So the flag's reader is `LocalContext`, widened to carry the validated `args`
+— and that is a public type change, freeze-relevant.** The entry does not price
+it. It also closes an existing re-derivation in the same edit: `/theme` reads
+`argv[0]` and compares it against `"dark"`/`"light"` although validation already
+parsed **and enum-checked** it into `args.variant`.
+
+### 6g.6 — the rulings
+
+- **R8 — the padding is built, and it was never entry 23's.** The note is
+  discharged by `exact()`, which predates both, and what the two actually share is
+  the reset.
+- **R9 — the background is a base re-established after every return to the
+  terminal's default**, repaired in one pass over the finished row. **Corrected
+  twice by the code**: the repair is one place rather than four, and the set is
+  `0m` and `49m` rather than `SGR_RESET` alone — L1 closes a foreground run with
+  `39`, which a base survives, and a background run with `49`, which it does not.
+  It is never merged into a span, so no cached block carries it.
+- **R10 — I57's prefix becomes load-bearing** and is what makes R9 expressible.
+- **R11 — every painted row closes itself, and no lifecycle path is touched.**
+  **Corrected by the implementation**, which is the first thing that can disprove
+  a walk. The ruling was *`suspend()` and `release()` emit one reset each*, on the
+  cursor shape's third-category path — correct about the hazard, since the
+  alternate screen restores cell contents and not SGR state, and wrong about
+  where the remedy goes. A row that ends with `SGR_RESET` makes the state
+  unreachable for the same four bytes, and covers exit, fault, signal and handoff
+  at once rather than the paths someone remembered to change. **The cursor needed
+  C01 because a shape is terminal state; a base is bytes in a row, and the two
+  stopped being the same problem at exactly that difference.**
+- **R12 — `--no-bg` is `shellOnly`, and its reader is `LocalContext.args`** — a
+  public type widening, freeze-relevant, which also closes `/theme`'s own
+  re-derivation of an argument validation had already parsed.
+- **R13 — clearing the flag must reach a frame, and the commit that does it
+  already exists.** `setVariant`'s guard is blind to the flag, and it does not
+  have to be: `/theme` appends a document and invalidates on the verb whatever
+  changed. **Corrected from *the clearing must invalidate on its own account***,
+  which read the store's guard and not its caller.
+- **R14 — the notice is the handler's, and it fires only where the flag
+  suppresses an actual paint** (C10 §4c row 5). It names the consequence —
+  *light assumes a light terminal; without a background it may be unreadable* —
+  and then complies.
+
+### 6g.7 — what the rulings leave behind
+
+- **`paint()` gains an argument it will almost always be given the same value
+  for.** Every renderer in L1 reaches it, and the base is a screen fact — so the
+  parameter is a seam that reads as a widening. The alternative is worse (a
+  screen fact inside cached bytes), and the reason lives here so the next reader
+  does not re-propose it.
+- **The inheriting arm is the one every test has ever run against.** The shipped
+  default paints nothing and dark keeps `terminal`, so the painting path arrives
+  with a single theme exercising it and no golden frame in either variant covers
+  it yet. Named because it is the shape of a rung that passes by being unreached.
+- **A frame written between the reset and the base does not exist, and that is an
+  ordering claim nothing asserts.** Both are inside one string per row, so there
+  is no window — worth stating because it reads like a window, and the day
+  someone splits the write it becomes one.
+- **`LocalContext` is wider, and every handler follows it by construction.**
+  `ExactLocalHandlers` requires a handler's declared context to be mutually
+  assignable with `LocalContext`, so a handler that *names* the type gains the
+  field and a handler that copied its shape structurally is refused — which is
+  the obligation C23 I39 already imposed, doing exactly what it was built for.
+  Confirmed rather than assumed, and it is why the widening reaches every
+  handler rather than only the framework's.
+- **The harness's `as unknown as PipelineDeps` swallowed the new dep**, exactly
+  as `test/support/README.md` predicted it would: the field was absent at
+  runtime, invisible to the compiler, and found by T4.4 — a row that drives the
+  verb rather than the seam. The weakness is bounded by which fields a row
+  happens to exercise, which is the producer rule's argument rather than an
+  argument against the cast.
+- **`/theme --no-bg` with no variant is refused by validation**, since `variant`
+  is `required: true`. So *turn the background off for whatever I am using* is
+  not expressible, and the entry's own answer is the right one: that belongs in
+  the persisted preference (§12a), not in a flag.
+
+---
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -1075,6 +1592,12 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I59** — **The cache makes the second frame free and the first no cheaper, and that is why it is not the fix.** A 5,000-line block still renders every line the first time it is drawn at a width, so this stage on its own converts continuous lag into one long stall. It is recorded as an invariant rather than as a note because the failure mode is *reporting the problem solved* — §6d is what bounds the first frame, and the ordering is the finding (F90).
 - **I60** — **`ctx.tick` is not in the key and no transcript render receives one.** `visibleRows` passes no tick, so every entry renders at 0; a `steps` block animating in the transcript would serve its first frame for the life of the session and nothing here would fail. The invariant is the *pair*: the axis is absent **and** the value is constant, so the day one is threaded the other is owed — either the key gains it or live entries stop being cached (§6c trace row 10, A03 §2).
 - **I61** — **A resolved capability record that cannot open the terminal refuses at gate 3b, and the refusal names the cause rather than the consequence.** `isUsable` is the test (C02 I7), read from the **resolved** record so that a valid `capabilities` override still opens (C02 I4) — which is what forces the gate after construction and makes it accept I36's cost knowingly. It throws rather than returning, because `start()` rejecting is the only channel this path has: §8 step 3 is reached from `stop()`, and a session that never ran never calls it, so a warning into C02's collection would be **unread by construction**. The message names `env` when the record is empty or carries no `TERM`, because the cause is a config field and C01 — which raised the only prior refusal — is entitled to the capability record alone and can only name the consequence (F8).
+- **I62** — **The prompt's window contains the cursor's row, and every range test against it is in editor coordinates.** The two halves are one invariant because either alone is a defect and the second is what the first was missing. A window anchored on the buffer's end is correct until a mid-buffer edit and then puts the cursor outside itself; testing membership on the *painted* index is what made that silent, because a marker row and a content row are the same kind of number there — `within = row − first + offset` is `0` both for the first content row of an unmarked window and for the row immediately above a marked one, so the cursor was drawn **on the elision marker** and a selection span **washed** it. Both were measured in a frame and neither is visible to an assertion: the arithmetic is self-consistent and every number agrees with every other (§6e table rows 1 and 2). So `promptWindow` returns its content range, membership is `first ≤ row < first + count`, and elision is marked at **both** ends — the bottom marker is not decoration but what makes dropping the rows outside the window honest, since a wash clipped at the edge is otherwise indistinguishable from one that ends there (§6e table rows 3, 4).
+- **I63** — **A cursor style is keyed on the focus target, resolved in two flat levels, and emitted only when it changes.** The key is `FocusTarget` and not `Layer`, because the two are different partitions with two members in common: `FOCUS_ORDER` has seven members and exactly two — `overlay` and `pushedView` — are layers, so a style on `Layer` covers two-sevenths of its subject while reading as total, and the prompt, which is the entry's own example, is not a layer at all. `activeTarget` answers on every dispatch and a layer does not, so the target is the key that is always defined. **Position is untouched**: a box's geometry is the box's, a style is a property of what kind of interaction is happening, and `Placed.cursor` stays exactly as C15 wrote it. Resolution is the target's style, then the session's, and it ends at `0` — the terminal's *configured* default, which is the user's own setting — because **nothing can un-write a `DECSCUSR`**: *emit nothing* is reachable only before the first emission, so the rule is about a transition rather than a value, and a third inheritance link would need a parent that a priority list does not have. **Emitted only on change**, because the cursor sequence goes out with every frame and a style re-asserted sixty times a second is at best wasted bytes and at worst a cursor that never blinks — which makes C01's record of the last emitted value load-bearing, and `resume()` clearing it the counterpart of a child that changed it underneath (§6f, C01 I20).
+- **I64** — **The cursor blinks by subtraction, on the driver's wake, and only where a declared style asks to.** *Steady on a keystroke, blinking after N ms* is a state machine no terminal offers, and it is expressed as a refinement of the declaration rather than as a second opinion about it: the machine only ever **removes** blink, so a style declared steady is never made to blink and a `null` style is returned untouched. That last clause is the shape half's boundary reached a second way — a target that declares nothing must emit nothing, and nothing here may invent a shape in order to have something to make steady, because shape and blink are one wire parameter and *steady* is unsayable without choosing a shape (I63, §6f table row 3). **Steady is free and idle is not**: a keystroke already composes a frame (I27), so only the idle edge needs a timer, and it is a wake on the composition root's own scheduler — never a `setInterval` in `paint.ts`, which is the constraint that survived the expiry of its premise. It is **armed only where a declared style blinks**, which is where it differs from the spinner's unconditional arm: the spinner's wake follows a request and this one would follow every keystroke, so an application declaring no cursor would pay a composed frame per typing pause for a resolution that emits nothing. **And emit-on-change is load-bearing a second time here** — a machine that re-resolved per tick would put the shape on the wire at frame cadence, which is I63's defect one ruling along. The threshold is `CURSOR_BLINK_MS`, **600 ms and unmeasured**, recorded as unmeasured with the reasoning that a re-measurement would test (§6f.5).
+- **I65** — **A theme's background is a base style re-established after every reset, and never a span.** A sequence that returns a channel to the terminal's default is what a base has to survive, and that set is **`\x1b[0m` and `\x1b[49m`** — not `SGR_RESET` alone, which is what the walk counted. L1's rendered rows carry no full reset: Ink closes a foreground run with `39`, which a base survives untouched, and a background run with `49`, which returns the *background* to the terminal's own and is what a patch row ends with. Every such sequence inside a finished row is repaired in one pass by the painter, and `render-frame`'s per-row prefix is answered by the row's leading base (§6g.2). The blind spot is stated: a compound sequence carrying `0` or `49` among other parameters is not repaired, and nothing in the tree emits one — a measurement, not a guarantee. It is **not** merged into a span the way a diff row's background is, because a span is rendered inside a cached entry and a base is a fact about the screen: merging it would put a screen-level decision into C22 I58's cached bytes and oblige that key a new axis. The padding this was said to share with the selection wash is **already built and belongs to neither** — `exact()` squares every row and predates both, and `washed` consumes it (§6g.1). What the two share is the reset, one layer below where the note pointed. **Every painted row closes itself with a reset**, which makes the escaping attribute unreachable rather than repaired: no lifecycle path is touched, and a handoff, an exit, a fault and a signal are covered by one rule instead of four call sites. The cursor's shape needed C01's record because a shape *is* terminal state; a base is bytes inside a row, and that is where the two problems part (I63, C01 I20, §6g.3 rows 5 and 6).
+- **I66** — **A per-invocation presentation flag is read where the invocation is parsed and invalidates on its own account.** `--no-bg` is `shellOnly`, so `validation.transmitted` strips it and a local handler's positional argv stays correct — the safety belongs to the declaration and not to the handler, and declared otherwise a valid `/theme --no-bg light` answers with a usage error. Its reader is `LocalContext`'s validated `args`, because the only other surface a handler has is the line as typed and re-parsing that is the second parser `transmitted` exists to prevent; `--help`'s precedent does not extend, since `--help` *replaces* a result and this one modifies it. **Clearing the flag reaches a frame, and what discharges that is already built**: every `/theme` appends a notice through `appendAndCommit` and invalidates on the verb unconditionally, so the frame does not depend on `setVariant` — whose no-op guard is about the variant and is blind to the flag as a second axis on the same command. The obligation is stated here because it is the one a future refactor can silently drop: the day a `/theme` that changes nothing stops appending a document, the flag stops reaching the screen (§6g.3 row 2, §6g.5). The warning fires only where the flag suppresses an actual paint, names the consequence, and complies (→ C10 I25).
+- **I67** — **The state directory is created ignoring itself.** `stateDir` defaults to `.calcium` in the project directory, so anything written there — the theme preference, the history, and a persisted transcript once a verb declares one (C13 I20) — is a file that can be committed. The directory is created with a `.gitignore` containing `*`, which ignores the directory's contents **regardless of the project's own ignore rules** and does not depend on the app author having thought of it. It goes in beside the `mkdir` that already warns and continues, on the same ground: an unwritable state directory costs persistence and not the session, and an unwritten `.gitignore` costs the same.
 ---
 
 ## 11. Commitments
@@ -1133,6 +1656,13 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 30. An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry — the two axes C14's height cache deliberately omits are the two this one cannot (I58, C10 I11).
 31. **This stage makes the second frame free and the first no cheaper**, so it is not the fix and the spec says so where someone would otherwise stop (I59, F90).
 32. No transcript render receives a `tick`, and the key has no axis for one; threading either obliges the other (I60).
+33. **The prompt's window follows the cursor and marks elision at both ends**, and membership is tested in editor coordinates rather than painted ones — which is what kept the cursor off the elision marker and the wash off it too (I62, §6e).
+34. **A cursor style is keyed on the focus target and never on the layer**, resolved target-then-session with `0` as the end, and emitted only when it changes — `Placed.cursor` is untouched and C15 learns nothing about styles (I63, §6f, C01 I20).
+35. **The cursor blinks by subtraction**: steady while typing, blinking once idle, on a wake from the composition root's scheduler and armed only where a declared style blinks — and the machine never invents a shape, so a target declaring nothing still emits nothing (I64, §6f).
+36. **A painted background is a base re-established at every return to the terminal's default, not a span and not a padding change** — repaired in one pass over the finished row, over `0m` and `49m` rather than over a full reset alone, and the padding the entry called shared was already built and owed by neither entry (I65, §6g).
+37. **A per-invocation flag is `shellOnly`, read from the validated args, and reaches a frame when it is cleared** — which is what makes *per invocation, not sticky* observable rather than merely stated, and what discharges it is the document `/theme` already appends rather than anything this entry adds (I66, §6g, → C10 I25).
+38. **The state directory ignores itself**, written when it is created rather than left to the app's own ignore rules — because what lands there is a preference today and a transcript the moment a verb declares one (I67, → C13 I20).
+
 ---
 
 ## 12. Tests
@@ -1145,6 +1675,25 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
 - **T1.19** (I40): `/theme light` writes the variant, and a session constructed against the same `stateDir` opens light. Driven through two real sessions over one fake filesystem rather than by reading the file — the file's contents are an implementation detail and the claim is that the choice survives.
+- **T1.22** (I63, §6f table row 1): a style declared for `prompt` and a different one for `pushedView` → each resolves for its own target, and a **declared `null` is an answer rather than an absence**: `targets: { prompt: null }` means *leave the prompt's cursor alone* and must not fall through to a fallback that would override it. **The row that fails against a style on `Layer`**, because the prompt has no `Placed` — the entry's own example, so a design that cannot express it is refused by the case that motivated it.
+- **T1.22a** (I63, §6f table row 6): every member of `FOCUS_ORDER` is a key, driven off the union rather than a list written in the test — so a target added without a decision fails this row instead of resolving to the fallback for ever. Seven, asserted, because a `Partial<Record<…>>` invites *which of these are real*.
+- **T1.22c** (I63, §6f table row 3): shape and blink are one wire parameter, asserted **on the bytes** — the type permits two independent axes and `CSI Ps SP q` does not.
+- **T1.22d** (I63, §6f table rows 4 and 5): the shape reaches the frame's `write`, **once** across three frames at one target, and it follows the target rather than the prompt. **The wiring rather than the mechanism**, because a seam-level row passes on the day nothing calls the seam — every other row here calls `cursorShapeSequence` directly.
+- **T1.22e** (I64): the machine **only removes blink** — a style declared blinking is steady while typing and blinking once idle; one declared steady is unchanged in both; and a `null` style is untouched in both. **The third case is the one a state machine gives a second way to go wrong**, and it is the shape half's boundary reached again: nothing may invent a shape in order to have something to make steady.
+- **T1.22f** (I64): the idle edge is armed **only where a declared style blinks** — a config with none arms no wake, so an application that declares no cursor pays no composed frame per typing pause. Asserted on the scheduler, because the frame it would compose is a no-op and reading one would show nothing either way.
+- **T1.22g** (I64): a burst of keys arms **one** wake — each keystroke cancels the previous — so five keystrokes draw one frame and not five. **The mechanism is the disposal and not a generation guard**, which is a correction the mutation pass made: the spinner's counter was copied here and is dead, because `schedule`'s disposable calls `clearTimeout` and a cancelled wake never fires. The spinner's own counter is live for the reason this one was not — it arms without cancelling (§6f.5).
+- **T1.22h** (I64): typing after the idle edge puts the cursor back to steady on the next frame. The other direction, and the row that fails if the stamp is dropped — without it the cursor is idle from the first frame and never returns.
+- **T1.23** (I65): every return to the terminal's default inside a painted row is followed by the base, asserted on the **bytes** over both sequences. **Its fixture is checked against the thing under test first, and doing so moved the ruling**: a notice row was the first draft and carries no reset at all, so the row would have asserted nothing while passing. A patch row ends with `49`. **And the assertion itself was vacuous in its first form** — it skipped the last part of the split, which is everything when a row contains one occurrence, and both mutations it exists for survived against sixteen passing assertions.
+- **T1.23a** (I65): with no theme painting, not one byte changes anywhere in the write. The arm every existing golden frame is drawn against, asserted rather than assumed.
+- **T1.23c** (I65, → C10 I25): `--no-bg` paints nothing and the theme's declaration is untouched — the override is not a token change.
+- **T1.23d** (I65, → C10 I26): at 1-bit a painting theme emits no escape at all. The rung where the question does not arise, asserted so that *vacuous* is a measurement.
+- **T1.23b** (I65): **no painted row ends with a live attribute** — asserted over every row of a painted frame, which is what makes the lifecycle paths need nothing. The row that fails if the closing reset is dropped in favour of a `release()` hook, and it is the assertion the hook version could not make: a hook is right about the paths it was added to.
+
+- **T1.21** (I62, §6e table row 1): a windowed prompt with the cursor **one editor row above the window** → the terminal cursor is not on the elision marker. The state the shipped defect needed and the one no fixture built: `cap` 4 with six editor rows put the cursor on frame row 4, the `❯ ⋯` row, because `within` came out `0` and `0` is inside `[0, cap)`. Asserted against the **painted marker row** rather than against a number, since every number agreed with every other while it was wrong.
+- **T1.21b** (I62, §6e table row 2): the same window with a selection span on that row → the marker row carries no wash. T4.26's *"the marker row is untouched"* cannot construct this, because its span is inside the window, where the marker cannot be washed either way.
+- **T1.21c** (I62, §6e.5): **a marker wherever rows are elided and nowhere else** — a mid-buffer cursor draws one above and one below with `cap − 2` content rows, and a cursor at the head draws one below only. Both cases, because the middle one alone does not carry the claim: the mutation that removes the head's bottom marker leaves it untouched (T6.50). The bottom marker is what makes the clipped wash honest (table row 4), so its absence is a defect and not a missing nicety. **A both-ends window needs `n > 2·cap − 2`** — below that the head and tail branches meet with no gap — which is arithmetic the ruling implies and did not state, found by the fixture coming back with one marker.
+- **T1.21e** (I62, §6e table row 5): the spinner goes on the **cursor's** painted row, and the bottom marker carries none. Fixtured mid-buffer, because that is the only arrangement where the cursor's row and the last painted row differ — which is why the old justification survived so long.
+- **T1.21d** (I62, §6e.5): the cursor in the last half-window → the window is **identical** to the tail-anchored one. The row that says the common frame did not change, and the argument for centring over `menuWindow`'s keep-it-last rule.
 - **T1.19b** (I40): a `theme` file holding something that is not a variant → the base theme is retained **and a notice is in the transcript**. Two assertions because either alone passes against the other's defect: retaining silently satisfies the first, and a notice beside a switched theme satisfies the second. The control is a valid file, which must produce no notice.
 - **T1.18** (I38): a request with a slow source shows no spinner before the threshold and one after it, on a fake clock, **read off the composed frame** rather than off the engine, and the frame carrying it arrives with **no further input** — and the prompt's height and the frame's widths are identical in both, which is the half that says it is appearance. The two mutations fail differently and both must: reading `spinning` once at request time and caching it → the spinner never appears; dropping the wake → it appears only on the frame the *next keystroke* draws, so the assertion that a frame arrives with no further input is what carries it.
 - **T1.4** (I3): all four seals are closed before the input router accepts anything — C05's, C07's and C09's, and C23's local registry, which is the one a test counting only the construction-time ones would miss. C19's engine has no `seal`, and the test asserts that too: a count is the wrong assertion when one member of the set does not belong to it.
@@ -1154,8 +1703,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4f** (I43): a config omitting `identity` → the loop still runs, health settles, and nothing is appended. The default is a fetcher, not an absent loop.
 - **T1.4k** (I3b): a constructed graph's completion engine answers a bare prefix with the manifest's verbs, and a path prefix with what the injected `readDir` returns. Both, because a registration that wired only the manifest source satisfies the first — and the two filesystem sources are the ones with a dependency to forget.
 - **T1.4j** (I3a): a manifest declaring a local verb constructs when `localHandlers` supplies it, and fails naming the verb when it does not. Both halves: the failure alone is what shipped, and it read as the check working rather than as a route that did not exist.
-- **T1.4e** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
-- **T1.4f** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
+- **T1.4p** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
+- **T1.4q** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
 - **T1.4h** (I26): every `defaultKeymap` binding, pressed through a real decoder into a constructed graph, produces its documented effect — fourteen cases, driven from the table rather than listed. A hand-written list is the shape that let fourteen bindings go unexecuted while every test passed.
 - **T1.4i** (I27): a paste of two hundred lines → exactly one `commit("input")`; a scroll key → exactly one, issued by the loop and not by the handler. Both halves, because a handler that also commits passes the first.
 - **T1.4m** (I23, I23a): a session constructed from **the public entry point only** — `import { createTui } from "@fmx/calcium"`, a `ManifestDocument` literal of the app's own verbs, no deep import anywhere in the test — starts, and `/help` lists the framework's six alongside it. The constraint is the test: every existing construction harness reaches through the package boundary for `parseManifest`, so each tests a route no consumer has, and that is why both arms of `config.manifest` could be broken with the suite green. The row fails if either the `JSON.parse` or the object-arm parse is removed.
@@ -1254,11 +1803,24 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.18b** (I58): `/clear` through the real graph drops every slot, asserted on **`size`** rather than on a render count. The first version of this row was inert and removing the arm left it green: an evicted or cleared entry is gone from the transcript and `visibleRows` never asks for it again, so a render count cannot see an eviction at all. The claim is about memory, and `Viewport.stats` is the precedent for making a cache's size observable (C14 T2.3b).
 - **The `evict` arm's wiring is not drivable and the gap is named rather than papered over.** C13's cap is 100,000 blocks (C13 I17) and `construct.ts` passes no cap — `createTranscriptStore` accepts one and only `retainPayloads` is threaded through — so reaching an eviction through the real graph would take 100,001 appends. `clear` exercises the same subscription in the same wiring; the `evict` branch inside it is covered by reading. A citation reads as coverage, and this is where that would have happened.
 - **T4.21** (I8, I9, with C01, tier 5): the real shell in a real PTY at **100x12**, **100x15** and **30x16** — F67's own table — draws the fallback, and resized to 100x30 it opens. **A tier-5 row, because both halves failed only outside a unit test**: the unit rows pass their own spy sink, so a fallback written into C01's `debug` sink renders perfectly to them, and a fake lifecycle delivers a resize C01 would have dropped. The width axis is swept by the golden frames at 60/80/120/160; the height axis had no equivalent sweep, which is F67's closing sentence and the reason it took someone wanting a smaller picture.
+- **T4.22** (C11 I17, I9, entry 23): the wash changes no row count and no row width. **The invariant at every step rather than a note about this one** — a row of chrome is forbidden by the same rule that makes the wash free.
+- **T4.23** (entry 23): a display row the region passes **through** is washed to the full width, through the padding. **The row the whole shape was built for**: a wash stopping at the last cluster reads as *highlighted* rather than *selected* and passes every assertion about which characters are in the region, because they are all still in it. Only a frame-read distinguishes them.
+- **T4.24** (entry 23): the row holding the head stops at the head. T4.23's control, and it cannot be folded in — "every row to the edge" satisfies T4.23 exactly.
+- **T4.25** (entry 23, C10 §4b): at 1-bit the wash is reverse video. `resolveBackground` answers nothing without colour, so without this rung the ladder falls from a background straight to a glyph.
+- **T4.26** (entry 23, S01 §3): the span is mapped through the prompt's window. **Demanded by the mutation pass** — an editor row and a painted row are the same number until the prompt exceeds its cap, so dropping the mapping failed nothing until a row put the elision marker up.
+- **T4.30** (C16 §5b B1, with C01, C03): `⌥v` at a real session enters copy mode — the header carries `COPY`, and `1002l` reaches the stream. The control is the header **before** the key, so the row is about the key and not about the header always saying so. **The order is part of the assertion**: the indicator's frame is on screen before the hold takes effect, or the reader is told nothing and simply finds the mouse dead.
+- **T4.31** (C16 §5b B1): `⌃c` leaves it — the indicator goes and `1002h` comes back. **Asserted as a pair with T4.30 because the two ship as a pair.** The `⌃c` rung and both stubs were in the tree for the length of C26; a producer landing alone gives a mode that consumes the key and does nothing, which is worse than one nothing can reach.
+- **T4.32** (C03 I13): with copy mode up, typing writes **nothing** to the terminal, and `⌃c` writes the catching-up frame. The control is the same typing with copy mode down, which does repaint — without it the row passes for a session that had stopped rendering at all.
+- **T4.33** (C19 I23, C15 I14, entry 16): a resize moves the open menu with the region, **read from the screen**. An anchored layer stores the row it was placed against and every writer of that row was a keystroke path, so a resize left the menu anchored to the previous region height until the next character. C15 clamps, so nothing faults and no number disagrees with any other — a row asserting `placement.row` passes on the stale value as readily as on the fresh one. **Growing and not shrinking**: on a shrink the clamp pushes a stale anchor to the bottom of the region, which is where the menu belongs anyway, so the defect is invisible in that direction. Measured before the fix: the menu at row 21 with the prompt at 37.
 - **T4.20** (I6a, with C20, C23): a session whose history file is unwritable and whose pipeline swallowed an append → `stop()` writes **both** reasons to stdout, after the release. Two sources in one row because a drain over one collection satisfies a row that reads only the other, and the release ordering is asserted on the call order for the same reason C23 T4.7b asserts `resetFocus`'s.
 - **T4.19** (I59): a 2,000-line block drawn for the first time renders every line, and the second frame renders none — **the stall stated as a test**, so a later reader who finds this stage and stops has an executable statement of what it did not do.
 - **T4.13** (I55): a keystroke into a settled session writes **fewer bytes than the frame it produced**, and the screen folded from every write equals the frame `paint` composed. Two assertions and neither is sufficient alone: the byte count alone is satisfied by a diff that drops rows, and the screen equality alone is satisfied by writing everything. The screen comes from `test/support/screen.ts`, which is verified against its own control before anything is read through it.
 - **T4.14** (I55): a `SIGWINCH` writes the frame **whole** even when the composed rows are identical to the last — the terminal is resized to the size it already holds, so C14 refuses the resize (C14 I21) and the rows cannot differ, and `contaminated` is the only thing that can produce the repaint. The row that makes contamination a claim about the *screen* rather than about the frame.
 - **T4.15** (I56): a write that throws, then a successful frame → the successful frame is **whole**. Asserted with `FakeStdout.throwOn`, which is what makes the fault path constructible at all; without I56 the record survives the throw and the next frame diffs against a screen holding a prefix of a frame nobody has.
+- **T4.27** (I66): `/theme light --no-bg` then `/theme light` commits a frame and the base returns. **Counts commits**, and it is a row about a path rather than about a guard: the state is right either way, the walk's first version had the frame missing, and measuring the caller refuted it.
+- **T4.28** (I66): `/theme --no-bg light` — the flag **first** — switches the variant **and** `meta.argv` does not contain it. **Two assertions because the outcome is over-determined**, which the mutation pass found: reading the variant from `ctx.args` and stripping the flag from `argv` are each sufficient, so undoing either leaves the verb working. The mechanism is what tells them apart.
+- **T4.34** (I66): `/theme light --no-bg` then `/theme dark` writes `[true, false]`. **`false` has to be written rather than merely not written** — a handler that set the flag only when it was given is sticky, and the difference is invisible in any single invocation.
+- **T4.29** (I66, → C10 I25): `--no-bg` against a theme that inherits commits no second notice, and against one declaring `surface` commits one naming the consequence. Both arms, because a warning that always fires and one that never does read the same from a passing suite.
 
 ### Tier 5 — e2e
 
@@ -1306,12 +1868,34 @@ PTY harness.
 - **T6.33** (I37): pointing the gate at `/help` → T3.5 fails on the register, and a piped invocation answers with `↑↓ rows` and `esc prompt` for a caller that has no keyboard.
 - **T6.30** (I34): restoring the terminal's height as the viewport's — either in `#render` or by putting `resize` back in the `onResize` handler → T4.12 fails, and C04 T5.1 fails at the foot of the document. **The third instance of one class**, and the two before it were both found by a row rather than by reading: `overlayRegion` was set to `size.rows` and a pushed view covered the header, `promptRows` was composed from one record and painted from another and a wrapped prompt drew as a lone `⋯`. Each is a value that is the terminal's where the spec says the region's, self-consistent everywhere until something compares the two.
 - **T6.31** (I35): restoring the truncation in the transcript region → T1.12f fails, and T6.30's defect goes back to being invisible. It is the pair that matters: the refusal is what makes a mis-sized viewport observable, and neither the refusal nor the drift test existed while the defect did.
-- **T6.32** (I38): composing the indicator from C19's `pending` rather than `spinning` → T1.18 fails at *not yet*, and the spinner appears the instant `Tab` is pressed, which is the one thing C19 §7's threshold exists to prevent. **This is the read half's mutation, and it is not the one the invariant was first written against.** Caching the value at request time turns out not to be expressible: `#paintDeps` is rebuilt on every render, so a cache inside it *is* a fresh read, and the mutation fails nothing. Recorded as a fact about the shell rather than repaired — the same disposal as C03 T5.4's width — and the wording above names *a fresh read on every paint* because that is what the code does, while the assertion that can fail is about the threshold.
+- **T6.46** (I38): composing the indicator from C19's `pending` rather than `spinning` → T1.18 fails at *not yet*, and the spinner appears the instant `Tab` is pressed, which is the one thing C19 §7's threshold exists to prevent. **This is the read half's mutation, and it is not the one the invariant was first written against.** Caching the value at request time turns out not to be expressible: `#paintDeps` is rebuilt on every render, so a cache inside it *is* a fresh read, and the mutation fails nothing. Recorded as a fact about the shell rather than repaired — the same disposal as C03 T5.4's width — and the wording above names *a fresh read on every paint* because that is what the code does, while the assertion that can fail is about the threshold.
 - **T6.35** (I40): writing the variant at exit instead of on the change → T1.19 still passes on a clean stop and the preference is lost to every crash, so the row drives the write and then constructs a second session **without stopping the first**.
 - **T6.37** (I51): removing the forward → T4.7b fails, and typing stops the moment the menu appears — which the as-you-type menu makes unavoidable and `Tab` alone made survivable.
 - **T6.36** (I40): treating an unreadable `theme` file as fatal, or as silently absent → T1.19b fails on the notice or on the session opening at all. The two halves of C20's repair, arriving one component up.
 - **T6.34** (I39): removing the `cancel()` from the printable path → C19 T5.2 fails on its last assertion, and a menu opens for a prefix the user has typed past. The effect table's own `mine !== seq` guard does not cover it: a printable keystroke does not advance that sequence, which is why the guard looked like the mechanism and was not.
-- **T6.33** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.
+- **T6.47** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.
+- **T6.52** (I63): keying the style on the layer rather than on the target → T1.22 fails, and the prompt has no style at all while `overlay` and `pushedView` keep theirs. **Two of seven, passing every assertion the two layers can make.**
+- **T6.57** (I64): a machine that adds blink as well as removing it — *idle means blinking*, whatever was declared → T1.22e fails, and a cursor an app deliberately made steady blinks anyway. The declaration stops being the answer and becomes a hint.
+- **T6.58** (I64): resolving the blink per tick rather than leaving emit-on-change to it → C01 T1.25 fails. **I63's defect one ruling along**, and the reason emit-on-change is load-bearing twice.
+- **T6.59** (I64): arming the idle wake unconditionally → T1.22f fails, and every application pays a composed frame per typing pause for a resolution that emits nothing.
+- **T6.60** (I64): leaving the previous idle wake armed → T1.22g fails, and a burst of keys draws a frame per live wake. **Not a generation guard**: that was copied from the spinner and the pass found it dead, since a disposed wake never fires.
+- **T6.61** (I64): dropping the input stamp → T1.22h fails, and the cursor is idle from the first frame and never returns to steady.
+- **T6.62** (I65): applying the base once at the top of the frame instead of per row → T1.23 fails on the diffed rewrite alone. **The revert that passes its own first frame**, because a full write is one string and every frame after it is not.
+- **T6.62a** (I65): repairing `\x1b[0m` alone and not `\x1b[49m` → T1.23 fails. **The walk's own version of the rule**, and it is wrong for a reason no count of reset sites reaches: `49` returns the background to the terminal's and a patch row ends with one.
+- **T6.62b** (I65, → C10 I25): resolving the base without reading `--no-bg` → T1.23c fails, and the flag parses, sets and is ignored by the screen.
+- **T6.63** (I65): merging the base into every span, the way a diff row's background is merged → T1.23 passes and C22 T4.24's cache assertion fails, because a screen fact is now inside a cached entry's bytes.
+- **T6.64** (I65): dropping the closing reset from a painted row → T1.23b fails, and the shell that started the session keeps the application's background with nothing on screen to explain it. **The state the walk proposed a lifecycle hook for**, made unreachable instead.
+- **T6.65** (I66): making `/theme`'s commit conditional on something having changed → T1.24 fails, and a flag-only invocation stops reaching the screen. **Not `setVariant`'s guard**, which was the walk's first candidate and fails nothing: the frame does not come from there, and a mutation that fails nothing is a finding about the artefact (§6g.3 row 2).
+- **T6.66** (I66): declaring `--no-bg` without `shellOnly` → T4.28's `meta.argv` assertion fails, and the flag travels into the handler. **Its sibling — reading the variant from `argv[0]` — is a listed survivor with its reason**: the two mechanisms are each sufficient, so that one is a duplication removed rather than a defect fixed, and only the pair is lethal.
+- **T6.67** (I66): setting the flag only when it is given → T4.34 fails, and `--no-bg` becomes sticky: a later `/theme` gets no background with nothing on screen explaining why.
+- **T6.56** (I63, §6f table row 5): resolving the style from the prompt rather than from `router.target` → **a listed survivor with its reason**, and the reason is a gap rather than an excuse: the argument is chosen inside a private method of a session nothing constructs outside `createTui`, so no tier-1-to-4 harness runs that line. T1.22d reaches the frame's wiring and not the session's. Closing it needs a full-session harness or a tier-5 row with an overlay focused.
+- **T6.53** (I63): emitting the resolved style on every frame instead of on change → C01 T1.25 fails, and T1.22d fails at its count. Nothing is visibly wrong on any single frame, which is the whole reason the row is about a count rather than a value.
+- **T6.54** (I63, C01 I20): keeping the record across `resume()` → C01 T1.27 fails, and the shape a child left behind survives the rest of the session. The mutation that shows emit-on-change created a state to get wrong — **and the walk's first answer to it was wrong twice over**, which §6f.3 row 5 now records.
+- **T6.55** (I63, C01 I20): resolving an undeclared target to a default shape rather than to *the terminal's own* → C01 T1.26 fails, and a terminal whose cursor was already correct is overwritten by a shape nobody asked for.
+- **T6.48** (I62): testing membership on the painted index — `0 ≤ within < cap` — instead of on the editor row, **in the wash** → T1.21b fails and a span washes the elision marker. The cursor's identical half is a **listed survivor with its reason**, and the reason is a finding rather than an excuse: once the window follows the cursor there is no row outside it for the cursor to be on, so that comparison is never reached. **The two consumers are not symmetric**, because a span is not the cursor and can lie outside a window the cursor is inside — one fault, one comparison, two different reachabilities.
+- **T6.49** (I62): anchoring the window on the buffer's end again → T1.21 and T1.21c fail and **T1.21d passes**, which is the point of T1.21d existing: the tail case is identical under both rules, so a revert is invisible to every frame drawn while the cursor is where it usually is. This is also the mutation that restores the *pair* the tree shipped, since the cursor's range test only misbehaves against an end-anchored window.
+- **T6.50** (I62): dropping the bottom marker at the head while keeping the cursor-following window → T1.21c fails. **Its first draft asserted the middle case only and this mutation was caught by something else**, which is the row's own argument for covering head, middle and tail: *a marker wherever rows are elided and nowhere else* is not carried by the case with two of them.
+- **T6.51** (I62, §6e table row 5): the spinner and ghost written into `out.length − 1` again → T1.21e fails, and with a marker below they are drawn on it. The mutation that asks whether the comment's *"because that is where the cursor is"* constrains anything.
 - **T6.41** (I58): dropping `focus` from the key → T4.17's focus case fails, and moving the selection down a table leaves the highlight where it was until something else moves the entry's `rev`. The mutation nothing else catches: `rev`, width and theme are all unchanged, so every other row agrees.
 - **T6.42** (I58): dropping the theme identity from the key → T4.17's theme case fails, and `/theme light` repaints the chrome while the transcript keeps its dark colours. C03's `invalidate` still fires, which is what makes this survivable-looking: the *frame* is repainted from a cache that was not.
 - **T6.43** (I58): keying on `(entryId, rev)` alone — C14's key minus width, which is the key F90 proposed → T4.17's width case fails, and a resize redraws the transcript at the old wrapping.

@@ -47,6 +47,15 @@ export type FrameDeps = Readonly<{
   /** C01 I19's — the owner yields the bytes and the frame embeds them. */
   cursorSequence: (cursor: ReturnType<typeof cursorFor>) => string;
   /**
+   * The cursor's shape, as bytes, **empty when it has not changed** (C22 I63).
+   *
+   * Read here rather than passed as a value, for `cursorSequence`'s reason: the
+   * bytes are C01's to produce and must land inside the frame's one `write`.
+   * The emptiness is the point — a shape re-asserted with every frame is
+   * asserted at frame cadence.
+   */
+  cursorShape: () => string;
+  /**
    * The last frame this session put on **this** screen, or `null` when nothing
    * describes it (I55).
    *
@@ -120,7 +129,12 @@ export function composeFrame(deps: FrameDeps): FrameResult {
   return {
     kind: "frame",
     lines,
-    write: `${hide}${body(lines, deps)}${deps.cursorSequence(cursor)}`,
+    // **The shape leads the frame and the position closes it.** Both are C01's
+    // bytes inside one write (I19, I20); the shape goes first because it is
+    // usually empty — emitted only on change — and putting it beside the hide
+    // keeps the two cursor writes at the two ends rather than interleaved with
+    // the rows.
+    write: `${deps.cursorShape()}${hide}${body(lines, deps)}${deps.cursorSequence(cursor)}`,
   };
 }
 

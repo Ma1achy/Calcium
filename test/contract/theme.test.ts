@@ -1,17 +1,19 @@
 // C10 tier 2 — contract. Purity, the properties a shipped theme must have, and
 // the source scans that keep a palette from leaking out of its two consumers.
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import {
   defaultTheme,
   diffPairs,
+  selectionPairs,
   floorFor,
   ratio,
   resolve,
   resolveBackground,
   resolveTone,
+  textSurfaces,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
@@ -21,7 +23,20 @@ import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/t
 // default is not a margin. Re-measure before raising it.
 vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
-const VARIANTS = ["dark", "light"] as const;
+/**
+ * **Derived from the theme set, never written here** (C10 I28, §5a.4).
+ *
+ * This was `["dark", "light"] as const` and it drove eleven rows — including
+ * T2.3's 4-bit injectivity and T2.4's floors, the two the roadmap names as
+ * *already-decided rules every shipped theme passes*. A literal makes that
+ * sentence false the day a third theme ships: it is checked by nothing and the
+ * suite stays green. A coverage set a test writes for itself covers exactly what
+ * the test already knew about.
+ */
+const VARIANTS = Object.keys(defaultTheme);
+
+/** The tokens beside the name, so no row indexes a record and finds `undefined`. */
+const SHIPPED = Object.entries(defaultTheme);
 
 function sourceFiles(dir = "src"): string[] {
   const out: string[] = [];
@@ -59,12 +74,42 @@ describe("C10 contract", () => {
     }
   });
 
+  it("T2.23 (C10 I28, §5a.4): the coverage set is derived, asserted on the source", () => {
+    // **A value comparison here is vacuous and the mutation pass proved it.**
+    // The first version asserted `VARIANTS` equals `Object.keys(defaultTheme)`
+    // — which a literal `["dark", "light"]` also satisfies, exactly while the
+    // shipped set has two members. So the row passed against the defect it was
+    // written for, and would have started failing only once a third theme
+    // existed, which is the moment it was supposed to protect.
+    //
+    // **So the assertion is structural**: the declaration derives from the set.
+    // *Assert the artefact, not a proxy* — a coverage set is a property of how
+    // it was written, and no value it takes today can express that.
+    const source = readFileSync(new URL("./theme.test.ts", import.meta.url), "utf8");
+    expect(source, "the coverage set derives from the theme set").toContain(
+      "const VARIANTS = Object.keys(defaultTheme);",
+    );
+    expect(source, "and the literal it replaced is gone").not.toMatch(
+      /const VARIANTS = \[/u,
+    );
+
+    // The value half stays, because a derivation that returns nothing would
+    // leave every loop below passing over an empty set.
+    expect(VARIANTS).toEqual(Object.keys(defaultTheme));
+    expect(SHIPPED.map(([name]) => name)).toEqual(VARIANTS);
+    expect(VARIANTS.length, "or every loop below is vacuous").toBeGreaterThan(0);
+
+    // **The limit, stated**: this reads one file. Ten other rows in this suite
+    // loop `SHIPPED`, and a future file writing its own list is outside it.
+    expect(source.match(/of SHIPPED\)/gu)?.length ?? 0).toBeGreaterThan(8);
+  });
+
   it("T2.3 (I5): the 4-bit map is injective across the five tones that must stay apart", () => {
     // `ok` and `error` on one colour is a failed row that reads as a passing
     // one. `dim` and `muted` colliding costs nothing, and is not asserted.
-    for (const variant of VARIANTS) {
+    for (const [variant, tokens] of SHIPPED) {
       const indices = ["ok", "warn", "error", "info", "accent"].map(
-        (t) => defaultTheme[variant].fourBit[`tone.${t}`],
+        (t) => tokens.fourBit[`tone.${t}`],
       );
       expect(new Set(indices).size, `${variant} collapses two meaning tones at 4-bit`).toBe(5);
     }
@@ -74,8 +119,7 @@ describe("C10 contract", () => {
     // Recomputed from the shipped token, not read from A01 A.1's recorded
     // figure. That is what makes the catalogue an assertion this test upholds
     // rather than a record of what someone intended.
-    for (const variant of VARIANTS) {
-      const tokens = defaultTheme[variant];
+    for (const [variant, tokens] of SHIPPED) {
       for (const [name, palette] of Object.entries(tokens.palettes)) {
         if (palette.carries !== "meaning") continue;
 
@@ -107,11 +151,11 @@ describe("C10 contract", () => {
   it("T2.7: every Tone in C04's union has a token in every shipped theme", () => {
     // Exhaustive over the type, so adding a tone without tokens fails the build
     // rather than rendering as nothing on the day someone uses it.
-    for (const variant of VARIANTS) {
+    for (const [variant, tokens] of SHIPPED) {
       for (const tone of TONES) {
-        expect(defaultTheme[variant].palettes["tone"]?.slots[tone], `${variant} ${tone}`).toBeTypeOf("string");
+        expect(tokens.palettes["tone"]?.slots[tone], `${variant} ${tone}`).toBeTypeOf("string");
       }
-      expect(Object.keys(defaultTheme[variant].palettes["tone"]!.slots).sort()).toEqual([...TONES].sort());
+      expect(Object.keys(tokens.palettes["tone"]!.slots).sort()).toEqual([...TONES].sort());
     }
   });
 
@@ -127,8 +171,8 @@ describe("C10 contract", () => {
   });
 
   it("T2.13 (§2): syntax has exactly its nine slots in every shipped theme", () => {
-    for (const variant of VARIANTS) {
-      expect(Object.keys(defaultTheme[variant].palettes["syntax"]!.slots).sort()).toEqual(
+    for (const [, tokens] of SHIPPED) {
+      expect(Object.keys(tokens.palettes["syntax"]!.slots).sort()).toEqual(
         [...SYNTAX_SLOTS].sort(),
       );
     }
@@ -137,8 +181,7 @@ describe("C10 contract", () => {
   it("T2.14 (§2, I15): every syntax slot clears its floor on both surfaces", () => {
     // `comment` is checked at 3 : 1 and the rest at 4.5. Recessive is the
     // requirement, not a compromise on it.
-    for (const variant of VARIANTS) {
-      const tokens = defaultTheme[variant];
+    for (const [variant, tokens] of SHIPPED) {
       for (const slot of SYNTAX_SLOTS) {
         const value = tokens.palettes["syntax"]!.slots[slot]!;
         for (const surface of [tokens.surfaces.bg, tokens.surfaces.bgElev]) {
@@ -150,7 +193,7 @@ describe("C10 contract", () => {
   });
 
   it("T2.15 (§3): at depth 1 every syntax slot is typographic and emits no colour", () => {
-    for (const variant of VARIANTS) {
+    for (const [variant] of SHIPPED) {
       const themes = store(variant);
       for (const slot of SYNTAX_SLOTS) {
         const style = resolve(`syntax.${slot}`, themes.current, caps(1));
@@ -166,8 +209,8 @@ describe("C10 contract", () => {
     // The test that caught `key`/`number`, and then caught light `number`/`type`
     // — which the contrast correction itself created, so nothing but
     // recomputation could have found it.
-    for (const variant of VARIANTS) {
-      for (const [name, palette] of Object.entries(defaultTheme[variant].palettes)) {
+    for (const [variant, tokens] of SHIPPED) {
+      for (const [name, palette] of Object.entries(tokens.palettes)) {
         const values = Object.values(palette.slots);
         expect(new Set(values).size, `${variant} ${name} has two slots on one value`).toBe(values.length);
       }
@@ -182,7 +225,7 @@ describe("C10 contract", () => {
     const KINDS = ["rgb", "ansi256", "ansi16"];
     const seen = new Set<string>();
 
-    for (const variant of VARIANTS) {
+    for (const [variant] of SHIPPED) {
       const current = store(variant).current;
       const refs: ColourRef[] = [
         ...TONES.map((t) => `tone.${t}` as const),
@@ -217,7 +260,7 @@ describe("C10 contract", () => {
     // Two tones distinct in hex can quantise onto one index, and that failure is
     // invisible in the truecolour terminal where every value was authored and
     // every golden will be reviewed.
-    for (const variant of VARIANTS) {
+    for (const [variant] of SHIPPED) {
       const current = store(variant).current;
       const indices = ["ok", "warn", "error", "info", "accent"].map((t) => {
         const colour = resolveTone(t as never, current, caps(8)).colour;
@@ -228,8 +271,7 @@ describe("C10 contract", () => {
   });
 
   it("every slot and surface has a 4-bit entry, so nothing silently loses colour at depth 4", () => {
-    for (const variant of VARIANTS) {
-      const tokens = defaultTheme[variant];
+    for (const [variant, tokens] of SHIPPED) {
       for (const [name, palette] of Object.entries(tokens.palettes)) {
         if (name === "spectrum") continue; // decoration; the art is not themed at 4-bit
         for (const slot of Object.keys(palette.slots)) {
@@ -244,15 +286,14 @@ describe("C10 contract", () => {
 
   // --- §4a, the diff surfaces ----------------------------------------------
 
-  it("T2.14a (I22): 48 ratios — twelve slots × two diff surfaces × two variants", () => {
+  it("T2.14a (I22): twenty-four ratios per theme — twelve slots × two diff surfaces", () => {
     // Recomputed from the shipped tokens, never read from A01 A.1. The catalogue
     // is an assertion this upholds rather than a record of what someone intended,
     // which is T2.4's reason applied to the surfaces C25 made text-bearing.
     const failures: string[] = [];
     let checked = 0;
 
-    for (const variant of VARIANTS) {
-      const tokens = defaultTheme[variant];
+    for (const [variant, tokens] of SHIPPED) {
       for (const [palette, slot, surface, hex] of diffPairs(tokens)) {
         checked += 1;
         const value = tokens.palettes[palette]?.slots[slot];
@@ -264,8 +305,63 @@ describe("C10 contract", () => {
       }
     }
 
-    expect(checked, "twelve slots × two surfaces × two variants").toBe(48);
+    // **Twenty-four per theme, and the total derived from the set.** This read
+    // `toBe(48)` — twelve × two × *two variants* — which is a count in prose
+    // with no mechanism: it went stale the moment a third theme shipped, and it
+    // is the one row that noticed, correctly and for the wrong reason. The
+    // per-theme figure is the claim; the multiplier is whoever is in the set.
+    expect(checked, "twelve slots × two surfaces × every shipped theme").toBe(24 * SHIPPED.length);
     expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("T2.24 (roadmap 24): high-contrast keeps its own promise, which the framework cannot", () => {
+    // **The promise is 7 : 1 and it is nowhere expressible.** `FLOORS` is a
+    // module constant naming the *minimum* every theme must clear, so a theme
+    // that promises more has no way to declare it and no way to be held to it —
+    // which makes this row the only thing standing between "high-contrast" and a
+    // name. Asserted here rather than in the tokens, because a value that meets
+    // a target and a value that was nudged past one are the same value.
+    const hc = defaultTheme["high-contrast"];
+    expect(hc, "the set holds it").toBeDefined();
+    if (hc === undefined) return;
+
+    const PROMISE = 7;
+    const failures: string[] = [];
+    for (const [name, palette] of Object.entries(hc.palettes)) {
+      if (palette.carries !== "meaning") continue;
+      for (const [slot, value] of Object.entries(palette.slots)) {
+        for (const [surface, ground] of textSurfaces(hc)) {
+          const measured = ratio(value, ground);
+          if (measured < PROMISE) {
+            failures.push(`${name}.${slot} on ${surface}: ${measured.toFixed(2)} < ${PROMISE}`);
+          }
+        }
+      }
+    }
+    expect(failures, failures.join("\n")).toEqual([]);
+
+    // **`muted` is the slot this theme exists to answer** — 2.14–2.42 on the
+    // light variant against every candidate wash, under its own 2.5 floor, and
+    // recorded during the selection work as a reason not to pair it. Named
+    // rather than left to the sweep above, because the sweep passing does not
+    // say which slot was in question.
+    const muted = hc.palettes["tone"]?.slots["muted"];
+    expect(ratio(muted!, hc.surfaces.bg), "muted, the quietest slot here").toBeGreaterThanOrEqual(
+      PROMISE,
+    );
+
+    // And it is still recessive: quieter than `dim`, which is quieter than
+    // `default`. A promise that flattened the three would have bought the floor
+    // by losing what the tones are for.
+    const tone = (slot: string): number => ratio(hc.palettes["tone"]!.slots[slot]!, hc.surfaces.bg);
+    expect(tone("muted")).toBeLessThan(tone("dim"));
+    expect(tone("dim")).toBeLessThan(tone("default"));
+
+    // **The rung where the claim stops.** At 4-bit the values are the
+    // emulator's, so contrast is unprovable and only distinctness survives —
+    // which is what the curated map promises instead (C10 I26).
+    const five = ["ok", "warn", "error", "info", "accent"].map((t) => hc.fourBit[`tone.${t}`]);
+    expect(new Set(five).size, "distinctness is what this depth can keep").toBe(5);
   });
 
   it("T2.14b (I22): the diff surfaces are paired with exactly those twelve slots", () => {
@@ -274,7 +370,7 @@ describe("C10 contract", () => {
     // fine. Widening it to every `meaning` slot fails on seven tones that never
     // land on a diff background; narrowing it to `syntax` leaves the numbers and
     // the marker unchecked on the surface they are drawn on.
-    const pairs = diffPairs(defaultTheme.dark);
+    const pairs = diffPairs(defaultTheme["dark"]!);
     const slots = [...new Set(pairs.map(([palette, slot]) => `${palette}.${slot}`))].sort();
 
     expect(slots).toEqual([
@@ -294,13 +390,13 @@ describe("C10 contract", () => {
     expect([...new Set(pairs.map(([, , surface]) => surface))].sort()).toEqual(["diffAdd", "diffRemove"]);
   });
 
-  it("T2.14c (I22, §4a): seven surfaces, and the withdrawn strong pair is absent", () => {
+  it("T2.14c (I22, §4a, §4b): eight surfaces, and the withdrawn strong pair is absent", () => {
     // The pair that was specified, measured and removed. Asserted absent rather
     // than merely unmentioned: a spec that measured something out and a token
     // file that quietly kept it is exactly the drift this suite exists to stop,
     // and an unused surface with no floor behind it is what someone reaches for.
-    for (const variant of VARIANTS) {
-      const names = Object.keys(defaultTheme[variant].surfaces).sort();
+    for (const [variant, tokens] of SHIPPED) {
+      const names = Object.keys(tokens.surfaces).sort();
       expect(names, variant).toEqual([
         "bg",
         "bgDeep",
@@ -309,7 +405,30 @@ describe("C10 contract", () => {
         "borderStrong",
         "diffAdd",
         "diffRemove",
+        // §4b — the selection wash. A text-bearing surface with a pairing of
+        // its own (`selectionPairs`), not an eighth entry in the diff one.
+        "selection",
       ]);
+    }
+  });
+
+  it("T2.14d (§4b): the selection pairing is `tone.default` alone, and is not the diff one", () => {
+    // **Written because widening `diffPairs` was the first attempt and four
+    // rows refused it** — T2.14b above states outright that `tone.default`
+    // must not be in the diff pairing, and it was right: a function whose name
+    // says one thing and whose contents say two stops being readable. The
+    // sibling is asserted here so the split cannot quietly become a merge.
+    for (const [variant, tokens] of SHIPPED) {
+      const pairs = selectionPairs(tokens);
+      expect(pairs.map(([palette, slot]) => palette + "." + slot), variant).toEqual([
+        "tone.default",
+      ]);
+      expect([...new Set(pairs.map(([, , surface]) => surface))]).toEqual(["selection"]);
+      // `muted` is deliberately not paired, and C10 §4b carries the measured
+      // reason: on light it sits under its own floor against every candidate
+      // wash. Ghost text is muted and is drawn after the buffer's last
+      // cluster, so it is adjacent to a selection and never inside one.
+      expect(pairs.map(([, slot]) => slot), variant).not.toContain("muted");
     }
   });
 
@@ -324,7 +443,7 @@ describe("C10 contract", () => {
       ...SYNTAX_SLOTS.map((s) => `syntax.${s}` as ColourRef),
     ];
 
-    for (const variant of VARIANTS) {
+    for (const [variant] of SHIPPED) {
       const current = store(variant).current;
       for (const ref of refs) {
         for (const depth of DEPTHS) {

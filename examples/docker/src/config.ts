@@ -210,7 +210,7 @@ const errorDoc = (command: string, text: string, extra: readonly Block[] = []): 
   command,
   status: "error",
   // C04 I3 — required, and its absence is silent (F35).
-  error: { message: text, stage: "local" },
+  error: { message: text },
   blocks: [b.notice.error(text), ...extra],
   meta: { adapter: "config" },
 });

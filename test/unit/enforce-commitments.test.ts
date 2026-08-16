@@ -17,6 +17,7 @@ import { checkFindings, checkTriageInventory } from "../../tools/enforce/finding
 import {
   checkCommitments,
   checkOrdering,
+  checkTestRowIds,
   checkReferences,
   checkSeamFour,
   commitmentsOf,
@@ -32,6 +33,7 @@ import {
   seamRows,
   specFiles,
   tableColumn,
+  testRowsOf,
 } from "../../tools/enforce/commitments.mjs";
 
 /**
@@ -320,6 +322,122 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
       "I2",
       "I2a",
     ]);
+  });
+});
+
+describe("A03 SP7 — a test row's number is unique within its spec", () => {
+  const FILE = "docs/components/C99_x.md";
+
+  /** A tier list, in the corpus's exact form. Parses first, then judges. */
+  function rows(ids: readonly string[]): readonly [string[], ReturnType<typeof checkTestRowIds>] {
+    const source = ["# C99 — fabricated", "", "### Tier 1", "", ...ids.map((id) => `- **${id}**: text.`), ""].join(
+      "\n",
+    );
+    const read = at(source, FILE);
+    const parsed = testRowsOf(FILE, read);
+    return [parsed, checkTestRowIds([FILE], read)];
+  }
+
+  it("SP7: the real corpus, and it is a corpus", () => {
+    // The vacuity half, and this rule needs it more than SP2 does: a spec with
+    // no test rows is skipped, so a parser that stopped matching would report
+    // twenty-six clean documents in the same green line.
+    const files = specFiles();
+    expect(files.length).toBe(26);
+
+    const total = files.reduce((n, f) => n + testRowsOf(f).length, 0);
+    expect(total, "1,100 test rows at the last count; the parser must still see them").toBeGreaterThan(
+      1000,
+    );
+
+    expect(checkTestRowIds(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP7: distinct rows pass, letters and tiers included", () => {
+    const [parsed, clean] = rows(["T1.1", "T1.2", "T1.2a", "T2.1", "T2.2"]);
+    expect(parsed, "the fabrication does not parse to what it looks like").toEqual([
+      "T1.1",
+      "T1.2",
+      "T1.2a",
+      "T2.1",
+      "T2.2",
+    ]);
+    expect(clean).toEqual([]);
+  });
+
+  it("SP7: a duplicated number fails, and the message names it", () => {
+    // C04's shape: `T1.16` declared twice, once about row ids and once about a
+    // plot's height. Nothing is missing and nothing dangles, so SP1 and SP3 stay
+    // green — the number has simply stopped locating anything.
+    const [, violations] = rows(["T1.1", "T1.16", "T1.2", "T1.16"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP7");
+    expect(violations[0]?.message).toContain("declares T1.16 twice");
+  });
+
+  it("SP7: every duplicate is named, not only the first", () => {
+    // Unlike SP2's transposition, these are not consequences of each other: a
+    // tier that drifted usually carries several from one append, and a reader
+    // fixes each separately. C23 held five.
+    // **`T3.1` three times and not twice, and the mutation pass demanded it.**
+    // With pairs alone, dropping the `already listed` guard fails nothing: a
+    // number appearing twice is pushed once either way. A third occurrence is
+    // the only shape where the two readings differ, and it is the shape a tier
+    // reaches by being appended to twice.
+    const [, violations] = rows(["T3.1", "T3.1", "T6.2", "T6.2", "T3.1"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("T3.1, T6.2");
+    expect(violations[0]?.message, "named once, however many times it recurs").not.toContain(
+      "T3.1, T6.2, T3.1",
+    );
+  });
+
+  it("SP7: an `x` placeholder repeats freely, and that is the stated limit", () => {
+    // **The rule's blind spot, asserted rather than described.** A spec under
+    // construction writes `T3.x` for a row whose number is not yet decided —
+    // C26 §8b carries seven — and a placeholder is not a claim about a row. The
+    // cost is real and it is named: two rows that both stay `T3.x` are two rows
+    // this rule will never separate, and only their landing numbers close that.
+    const [parsed, clean] = rows(["T3.x", "T3.x", "T3.1"]);
+    expect(parsed, "placeholders are excluded before the comparison").toEqual(["T3.1"]);
+    expect(clean).toEqual([]);
+  });
+
+  it("SP7: a row named mid-sentence is a citation, not a declaration", () => {
+    // **The first version of this row failed nothing and the mutation pass said
+    // so.** It fabricated `see T1.2` — plain text, which the pattern could never
+    // match with or without its anchor — so dropping the anchor left every
+    // assertion green. A test must construct the state it claims, and the state
+    // here is a bolded, dashed id *inside* a line: a fail-on-revert row naming
+    // the row it breaks in the corpus's own form.
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "- **T1.1**: text.",
+      "- **T6.1**: reverting the guard - **T1.1** fails, and nothing else does.",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+    expect(testRowsOf(FILE, read), "the mid-line id is a reference").toEqual(["T1.1", "T6.1"]);
+    expect(checkTestRowIds([FILE], read)).toEqual([]);
+  });
+
+  it("SP7: an indented row is still a row", () => {
+    // The other direction, and the one the anchor was quietly getting wrong: a
+    // tier written as a nested list would be skipped entirely, and a rule that
+    // stops seeing a section reports compliance exactly like a satisfied one.
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "  - **T1.1**: text.",
+      "  - **T1.1**: text again.",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+    expect(testRowsOf(FILE, read)).toEqual(["T1.1", "T1.1"]);
+    expect(checkTestRowIds([FILE], read)[0]?.message).toContain("declares T1.1 twice");
   });
 });
 

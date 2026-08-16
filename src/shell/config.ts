@@ -141,6 +141,12 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     manifest: config.manifest,
     theme: config.theme,
 
+    // **Undefined rather than a default object** (C22 I63). An app that declares
+    // no cursor styles must leave the terminal's own alone, and an empty record
+    // resolving through a fallback of `null` says the same thing — but a default
+    // here would be a second place the answer lives, which §2's own argument
+    // against a `??` at the use site forbids.
+    cursor: config.cursor,
     adapters: config.adapters ?? {},
     // I3a — registered at step 10 before `seal()`. Defaulted like every other
     // optional field, so an app with no local verbs supplies nothing.
@@ -170,6 +176,7 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     platform: ambient.platform,
     fs: config.fs ?? ambient.fs,
     stateDir: config.stateDir ?? DEFAULT_STATE_DIR,
+    ...(config.persist === undefined ? {} : { persist: config.persist }),
     openUrl: config.openUrl,
     stdout: config.stdout ?? process.stdout,
     stdin: config.stdin ?? process.stdin,

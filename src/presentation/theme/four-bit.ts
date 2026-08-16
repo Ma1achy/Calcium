@@ -38,6 +38,21 @@ export const DARK_FOUR_BIT: FourBitMap = Object.freeze({
   "tone.meta": 13,
   "tone.identifier": 6,
 
+
+  // **Eight indices that must stay pairwise distinct**, which is the cap's
+  // 4-bit expression: the palette promises `n` distinguishable categories and
+  // sixteen colours is where that promise is hardest to keep. Curated rather
+  // than computed, for `FourBitMap`'s own reason — nearest-of-16 by RGB
+  // distance collapses hues that the eye separates easily.
+  "categorical.c1": 3,
+  "categorical.c2": 6,
+  "categorical.c3": 2,
+  "categorical.c4": 11,
+  "categorical.c5": 12,
+  "categorical.c6": 1,
+  "categorical.c7": 5,
+  "categorical.c8": 7,
+
   "syntax.keyword": 13,
   "syntax.string": 10,
   "syntax.comment": 8,
@@ -99,6 +114,16 @@ export const LIGHT_FOUR_BIT: FourBitMap = Object.freeze({
   "syntax.operator": 6,
   "syntax.punctuation": 0,
 
+  // The cap's 4-bit expression — see DARK_FOUR_BIT.
+  "categorical.c1": 3,
+  "categorical.c2": 6,
+  "categorical.c3": 2,
+  "categorical.c4": 5,
+  "categorical.c5": 4,
+  "categorical.c6": 1,
+  "categorical.c7": 13,
+  "categorical.c8": 8,
+
   "surface.bg": 15,
   "surface.bgElev": 15,
   "surface.bgDeep": 15,
@@ -123,3 +148,59 @@ export const MUST_STAY_DISTINCT: readonly string[] = Object.freeze([
   "info",
   "accent",
 ]);
+
+/**
+ * The high-contrast map — and the rung where its claim stops (roadmap 24).
+ *
+ * **A high-contrast theme cannot promise contrast here, and this map is what it
+ * promises instead.** The sixteen are the emulator's own values, so a ratio
+ * computed against index 0 is a ratio against a colour this process cannot see
+ * — the argument the diff surfaces above already make, applied to the whole
+ * palette. What survives the rung is **distinctness** (I17), which is a property
+ * of the indices themselves, so that is what is curated: the five tones whose
+ * confusion misleads take five different indices, and every collision below is
+ * between slots whose confusion costs nothing.
+ *
+ * Bright half for the foreground, as `DARK_FOUR_BIT` does, because the ground is
+ * index 0 and the plain half is where a 16-colour terminal's dim text lives.
+ */
+export const HIGH_CONTRAST_FOUR_BIT: FourBitMap = Object.freeze({
+  "tone.default": 15,
+  "tone.dim": 7,
+  "tone.muted": 8,
+  "tone.ok": 10,
+  "tone.warn": 11,
+  "tone.error": 9,
+  "tone.info": 14,
+  "tone.accent": 13,
+  "tone.meta": 5,
+  "tone.identifier": 6,
+
+  "syntax.keyword": 13,
+  "syntax.string": 10,
+  "syntax.comment": 8,
+  "syntax.number": 11,
+  "syntax.key": 9,
+  "syntax.type": 3, // plain yellow, so `number`'s bright yellow stays its own
+  "syntax.function": 12,
+  "syntax.operator": 14,
+  "syntax.punctuation": 15,
+
+  // The cap's 4-bit expression — see DARK_FOUR_BIT.
+  "categorical.c1": 11,
+  "categorical.c2": 14,
+  "categorical.c3": 10,
+  "categorical.c4": 3,
+  "categorical.c5": 12,
+  "categorical.c6": 9,
+  "categorical.c7": 13,
+  "categorical.c8": 7,
+
+  "surface.bg": 0,
+  "surface.bgElev": 0,
+  "surface.bgDeep": 0,
+  "surface.border": 8,
+  "surface.borderStrong": 7,
+  "surface.diffAdd": 2,
+  "surface.diffRemove": 1,
+});

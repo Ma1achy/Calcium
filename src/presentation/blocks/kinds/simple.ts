@@ -6,11 +6,12 @@
  * `layout` function so that the only way they can disagree is if someone edits
  * one of them and not the call.
  */
+import type { AmbiguousWidth } from "../../text.js";
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
-import { glyphFor, glyphCells, glyphs } from "../glyphs.js";
+import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
 import { clampSpans, fit, pad, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -30,14 +31,63 @@ function proseWidth(width: number, prefix: number): number {
 }
 
 /**
+ * The tokens whose gutter carries a leading cell, and why there is exactly one.
+ *
+ * **`continuation` is the only token that names a relationship rather than a
+ * state** (C09 §4), and a subordination mark drawn flush left is not
+ * subordinate to anything: `⎿ queued` sat in the same two-cell gutter as the
+ * prompt's `❯`, so the two texts aligned and the notice read as the prompt's
+ * *sibling* — the one relationship the mark exists to deny. Every assertion
+ * passed with it wrong; only a frame-read says otherwise.
+ *
+ * **A gutter and not a field.** An `indent` on `Notice` is the second spacing
+ * field `Gap`'s note has been waiting for — *whoever writes the second spacing
+ * field is reading this line* — and roadmap 38 rules that change a
+ * *replacement* of `gapBefore` rather than an addition beside it. So the
+ * smaller change is the one that is not a public type at all: the depth belongs
+ * to the mark, which already knows it is a mark, and the block schema learns
+ * nothing.
+ *
+ * **Two cells, because that is where the command's text starts.** The mark
+ * belongs under the first cell of the line it is subordinate to, and
+ * `PROMPT_GUTTER.first` is 2 — so the mark lands beneath the command's first
+ * character and its own text one gutter further in, which is the figure
+ * `AGENT_TUI_DESIGN.md` §A1 draws. One cell was the first attempt and it puts
+ * the mark *between* the two columns, subordinate to neither.
+ *
+ * **The constant is in L4 and this is L1, so it is a literal and a test holds
+ * the two together** (T2.99). A number written here and satisfied in
+ * `shell/config.ts` is exactly the deferral shape this project keeps finding —
+ * a condition recorded in one file and met in another, with nobody holding
+ * both halves — so the coupling is asserted rather than described.
+ */
+const GLYPH_INDENT: ReadonlyMap<Glyph, number> = new Map<Glyph, number>([
+  ["continuation", 2],
+]);
+
+/**
+ * The exact string a glyph draws on a notice's first row.
+ *
+ * **The one place the lead exists**, because `prefixCells` below is its cell
+ * count and the two disagreeing is how the hanging indent slips: the first row
+ * would carry the extra cell and every continuation row would not, or the
+ * reverse, and both are frames that measure correctly and are wrong.
+ */
+function glyphLead(glyph: Glyph, caps: RenderContext["capabilities"]): string {
+  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${glyphFor(glyph, caps)} `;
+}
+
+/**
  * The cells a leading glyph and its trailing space occupy.
  *
  * Takes the *token*, not a character, and needs no capabilities: both
  * renderings are the same width by C09 §4's 1:1 rule, which is what lets
- * `measure` be correct without seeing a capability record (C04 §5).
+ * `measure` be correct without seeing a capability record (C04 §5). The
+ * indent is a property of the token too, so it costs the measurer nothing.
  */
 function prefixCells(glyph: Glyph | undefined): number {
-  return glyph === undefined ? 0 : glyphCells(glyph) + 1;
+  if (glyph === undefined) return 0;
+  return glyphCells(glyph) + 1 + (GLYPH_INDENT.get(glyph) ?? 0);
 }
 
 // --- rule ------------------------------------------------------------------
@@ -63,9 +113,9 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     // present, the row was exactly the width, and every assertion held.
     const lead = label === "" ? g.horizontal.repeat(2) : `${g.horizontal.repeat(2)} `;
     const gap = label === "" ? 0 : 1;
-    const room = width - cells(lead) - gap - cells(meta);
+    const room = width - cells(lead, ctx.capabilities.ambiguousWidth) - gap - cells(meta, ctx.capabilities.ambiguousWidth);
     const shown = truncate(label, Math.max(0, room), ctx.capabilities);
-    const fill = Math.max(0, width - cells(lead) - cells(shown) - gap - cells(meta));
+    const fill = Math.max(0, width - cells(lead, ctx.capabilities.ambiguousWidth) - cells(shown, ctx.capabilities.ambiguousWidth) - gap - cells(meta, ctx.capabilities.ambiguousWidth));
 
     const dim = tone("dim", ctx.theme, ctx.capabilities);
     return rows([
@@ -109,7 +159,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
           {
             text:
               index === 0 && block.glyph !== undefined
-                ? `${glyphFor(block.glyph, ctx.capabilities)} `
+                ? glyphLead(block.glyph, ctx.capabilities)
                 : " ".repeat(prefix),
             style,
           },
@@ -156,8 +206,11 @@ export const progressDefinition: BlockDefinition<Progress> = {
   measure: () => 1,
 
   render(block: Progress, ctx: RenderContext): ReactElement {
-    const g = glyphs(ctx.capabilities);
     const width = normaliseWidth(ctx.width);
+    // **Resolved here, per render, and never stored on the block** — the same
+    // rule `glyphs()` follows: a block names a style and the terminal decides
+    // which arm of it is drawn, so one document is correct on both terminals.
+    const bar = barStyle(ctx.capabilities, block.style);
     const total = block.total > 0 ? block.total : 1;
     const ratio = Math.min(1, Math.max(0, block.current / total));
     const percent = `${Math.round(ratio * 100)}%`;
@@ -171,7 +224,7 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // The bar takes the residual (\u00a73), which is what makes this one row at any
     // width rather than one row at most widths. It can reach zero, and a bar of
     // no cells is still a row: the label and the percentage carry the meaning.
-    const barWidth = Math.max(0, width - cells(labelColumn) - cells(percent) - 2);
+    const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - 2);
     const filled = Math.round(ratio * barWidth);
 
     return rows([
@@ -180,11 +233,11 @@ export const progressDefinition: BlockDefinition<Progress> = {
           [
             { text: `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
             {
-              text: g.progressFull.repeat(filled),
+              text: bar.on.repeat(filled),
               style: tone("accent", ctx.theme, ctx.capabilities),
             },
             {
-              text: g.progressEmpty.repeat(barWidth - filled),
+              text: bar.off.repeat(barWidth - filled),
               style: tone("muted", ctx.theme, ctx.capabilities),
             },
             { text: ` ${percent}`, style: tone("meta", ctx.theme, ctx.capabilities) },
@@ -205,7 +258,11 @@ export const progressDefinition: BlockDefinition<Progress> = {
  * while its renderer packed chips would disagree at exactly the widths where a
  * chip lands on a boundary.
  */
-function chipRows(block: Pills, width: number): readonly (readonly string[])[] {
+function chipRows(
+  block: Pills,
+  width: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): readonly (readonly string[])[] {
   const limit = normaliseWidth(width);
   const out: string[][] = [];
   let line: string[] = [];
@@ -213,7 +270,7 @@ function chipRows(block: Pills, width: number): readonly (readonly string[])[] {
 
   for (const chip of block.chips) {
     const text = stripControl(chip.label);
-    const w = cells(text);
+    const w = cells(text, ambiguous);
     const needed = line.length === 0 ? w : w + CHIP_GAP; // cells-ok
     if (used + needed > limit && line.length > 0) { // cells-ok
       out.push(line);

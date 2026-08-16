@@ -78,11 +78,18 @@ describe("C17 tier 5 — at a real prompt", () => {
       const lines = Array.from({ length: 200 }, (_, i) => `echo line-${String(i)}`).join("\n");
       pty.type(`[200~${lines}[201~`);
 
-      // **The prompt is capped at half the terminal** (S01 §3), so two hundred
-      // lines do not consume the frame: at 24 rows the cap is 12, and the row
-      // that matters is that the typed text is *on the screen* rather than
-      // windowed to a marker with the command nowhere.
-      await pty.waitFor(/line-199/, 15_000);
+      // **A paste of five lines or more is a chip** (roadmap 30), so what is on
+      // the screen is the chip's label and not two hundred rows of text. This
+      // row asserted `/line-199/` and had done since before chips existed —
+      // **it went red the day the chip landed and nothing ran it**, because
+      // `make test` is tiers 1-4 and tier 5 is its own target.
+      //
+      // The ruling is unchanged and only the assertion moves: the prompt is
+      // capped at half the terminal (S01 §3), so a two-hundred-line paste does
+      // not consume the frame. The chip makes that stronger rather than weaker —
+      // one row instead of twelve — and the property worth asserting is that the
+      // **content survives**, which the submission below is what proves.
+      await pty.waitFor(/#1 pasted · 200 lines/, 15_000);
       const screen = pty.frame;
       expect(screen, "still exactly the terminal's rows").toHaveLength(24);
       expect(
@@ -95,8 +102,17 @@ describe("C17 tier 5 — at a real prompt", () => {
       // would leave two hundred prompts' worth of clearing and this frame shows
       // one empty one. The command's own output is the shell's business and not
       // this row's.
+      // **And the chip expands on submission**, which is the half a label on the
+      // screen cannot show: the editor holds one sentinel grapheme per chip and
+      // resolves it to the content when the buffer is read. If it did not, the
+      // frame above would look identical and two hundred lines would be gone.
       pty.type("\r");
-      await pty.waitFor(/echo line-199/, 15_000);
+      // `line-199` as **output**, with no `echo` before it: the far side ran the
+      // two hundredth command, which is only possible if the sentinel resolved.
+      // The old row waited for `echo line-199` — the command *echoed into the
+      // transcript* — and the transcript now shows the chip's label there, which
+      // is the pair this asserts from the other end.
+      await pty.waitFor(/line-199/, 15_000);
       expect(pty.frame, "the frame is still whole after a 200-line submission").toHaveLength(24);
       // The prompt emptying is Seam 4's property and is asserted against the
       // store at tier 1 (C23 T1.20). What this row adds is that the transcript
@@ -104,7 +120,12 @@ describe("C17 tier 5 — at a real prompt", () => {
       // hundred command rows on the screen, and the bottom of the frame is a
       // run of the pasted lines rather than a run of prompts.
       const tail = pty.frame.slice(-6).map((r) => r.trimEnd());
-      expect(tail.filter((r) => r.includes("echo line-")).length).toBeGreaterThan(1);
+      // **`line-` and not `echo line-`**: what fills the tail is the far side's
+      // *output*, because the chip resolved to two hundred commands and they
+      // ran. The old form looked for the echoed command text, which the chip
+      // replaced with its label — one grapheme in the buffer, one row in the
+      // transcript, two hundred lines through the seam.
+      expect(tail.filter((r) => r.includes("line-")).length).toBeGreaterThan(1);
       expect(tail.filter((r) => r.startsWith("❯")).length, "one prompt, not many").toBeLessThan(2);
     } finally {
       pty.kill();

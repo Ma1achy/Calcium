@@ -108,6 +108,25 @@ const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   tone: Object.freeze(["ok", "error", "muted"]),
 });
 
+/**
+ * §4b — the selection wash, and exactly one slot lands on it.
+ *
+ * **`tone.default` alone, and the narrowness is the same decision `DIFF_SLOTS`
+ * makes rather than a smaller version of it.** The prompt's text is `default`;
+ * ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is
+ * adjacent to a selection and never inside one.
+ *
+ * **The measured figures, because they are what would tempt a widening.** On the
+ * light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own
+ * 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and
+ * the fix would look like weakening the check. That is C10 §4's argument for
+ * excluding `bgDeep`, in the mirror: do not validate a slot against a surface that
+ * slot never lands on.
+ */
+const SELECTION_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  tone: Object.freeze(["default"]),
+});
+
 /** The pairing, exposed so the suite can assert its shape rather than its results. */
 export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, string, string, string])[] {
   const out: (readonly [string, string, string, string])[] = [];
@@ -125,10 +144,38 @@ export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, stri
   return Object.freeze(out);
 }
 
+/**
+ * §4b's pairing, and it is a **sibling** of `diffPairs` rather than two more
+ * entries in it.
+ *
+ * Widening `diffPairs` was the first attempt and four rows refused it — one
+ * asserting its size, one its slot list, and one stating outright that
+ * `tone.default` must not be in the diff pairing. They were right: `diffPairs`
+ * means *the diff surfaces' pairing*, and a function whose name says one thing
+ * and whose contents say two is how a check stops being readable. The same
+ * argument `DIFF_SLOTS` already makes about `textSurfaces`, one level down.
+ */
+export function selectionPairs(
+  tokens: ThemeTokens,
+): readonly (readonly [string, string, string, string])[] {
+  const hex = tokens.surfaces.selection;
+  if (!isHex(hex)) return Object.freeze([]);
+
+  const out: (readonly [string, string, string, string])[] = [];
+  for (const [palette, slots] of Object.entries(SELECTION_SLOTS)) {
+    for (const slot of slots) {
+      const value = tokens.palettes[palette]?.slots[slot];
+      if (value === undefined || !isHex(value)) continue;
+      out.push([palette, slot, "selection", hex]);
+    }
+  }
+  return Object.freeze(out);
+}
+
 function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
   const errors: ThemeError[] = [];
 
-  for (const [palette, slot, surface, hex] of diffPairs(tokens)) {
+  for (const [palette, slot, surface, hex] of [...diffPairs(tokens), ...selectionPairs(tokens)]) {
     const value = tokens.palettes[palette]?.slots[slot];
     if (value === undefined) continue;
 
@@ -140,7 +187,7 @@ function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
       path: `palettes.${palette}.${slot}`,
       message:
         `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${hex}), ` +
-        `below its floor of ${floor} : 1 — a diff background is a surface text ` +
+        `below its floor of ${floor} : 1 — a background is a surface text ` +
         `lands on, so the background moves rather than the slot`,
     });
   }
@@ -172,8 +219,44 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   }
 
   errors.push(...validateDiffSurfaces(tokens));
+  errors.push(...validateVariant(tokens));
 
   return Object.freeze(errors);
+}
+
+/**
+ * §5a — `variant` against the theme's own background (I28).
+ *
+ * **The field was a second record of a derivable fact and nothing checked it.**
+ * `luminance(surfaces.bg)` answers the same question, so a theme declaring
+ * `light` over `#000000` loaded, resolved and cleared every floor: I9 compares
+ * tones *to* `bg` and has no opinion about what `bg` is.
+ *
+ * **The threshold is the mid-point of the luminance range, and it is a coarse
+ * instrument on purpose.** This is not asking whether a theme is *readable* —
+ * every floor above does that — but whether it is describing itself. A theme
+ * sitting near 0.5 is legitimately either, and its declaration is the answer
+ * rather than the question, which is why `variant` is kept and not derived.
+ * Measured against the shipped set: dark `#1a1a1a` is 0.011 and light `#fafafa`
+ * is 0.961, so both clear it by an order of magnitude and the check has room to
+ * be wrong in neither direction.
+ */
+function validateVariant(tokens: ThemeTokens): readonly ThemeError[] {
+  const bg = tokens.surfaces.bg;
+  if (!isHex(bg)) return [];
+
+  const measured = luminance(bg);
+  const declares = measured >= 0.5 ? "light" : "dark";
+  if (declares === tokens.variant) return [];
+
+  return [
+    {
+      path: "variant",
+      message:
+        `declares "${tokens.variant}" and its background is ${bg}, whose relative ` +
+        `luminance is ${measured.toFixed(3)} — that is a ${declares} ground`,
+    },
+  ];
 }
 
 function validatePalette(

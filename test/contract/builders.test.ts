@@ -142,6 +142,10 @@ const BUILDERS: readonly Readonly<{
   { name: "tip", gaps: true, kind: "tip", make: (o) => b.tip("press ? for help", undefined, o) },
   { name: "panel", gaps: true, kind: "panel", make: (o) => b.panel("details", [b.raw("x")], o) },
   { name: "group", gaps: false, kind: "group", make: (o) => b.group("column", [b.raw("x")], o) },
+  // **`gaps: false`, like its container siblings.** A scroll is a bounded region
+  // inside a composition rather than a section heading, and `finish(..., false)`
+  // is what the builder passes.
+  { name: "scroll", gaps: false, kind: "scroll", make: (o) => b.scroll(2, [b.raw("x")], o) },
   { name: "raw", gaps: false, kind: "raw", make: (o) => b.raw("plain text", o) },
   { name: "spinner", gaps: false, kind: "steps", make: (o) => b.spinner("pulling", o) },
 ];
@@ -151,9 +155,33 @@ describe("C24 §4 — the nineteen builders", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.
-    expect(BUILDERS).toHaveLength(19);
-    expect(BUILDERS.filter((x) => x.gaps)).toHaveLength(10);
-    expect(BUILDERS.filter((x) => !x.gaps)).toHaveLength(9);
+    // **The count was the proxy and it went stale.** `b.scroll` shipped with
+    // C04 §3c and this table did not gain a row — a builder with no row, which
+    // is the exact thing the paragraph above says this assertion prevents. A
+    // literal count cannot notice a builder that was never added: 19 entries
+    // are 19 entries whatever `b` holds.
+    //
+    // **Derived from `b`'s own surface now**, with the non-block members named
+    // rather than filtered by a predicate: a predicate over return types is a
+    // second definition of *block-returning* and would drift from this one.
+    const NOT_BLOCKS: Record<string, string> = {
+      col: "a ColumnDef, for b.table",
+      row: "a TableRow, for b.table",
+      seq: "a sequence helper — it composes blocks and returns no block",
+      markdown: "a sequence helper — one source is a run of blocks (roadmap 11)",
+      id: "cell shorthand", ok: "cell shorthand", warn: "cell shorthand",
+      error: "cell shorthand", dim: "cell shorthand", meta: "cell shorthand",
+      fill: "an Action", exec: "an Action", open: "an Action",
+      live: "returns a Panel, and its own fixture is `liveParts` — C24 §7",
+    };
+    const blockBuilders = Object.keys(b).filter((k) => !Object.hasOwn(NOT_BLOCKS, k));
+
+    expect([...BUILDERS].map((x) => x.name).sort(), "every block builder has a row").toEqual(
+      blockBuilders.sort(),
+    );
+    expect(BUILDERS.filter((x) => x.gaps).length + BUILDERS.filter((x) => !x.gaps).length).toBe(
+      BUILDERS.length,
+    );
   });
 
   it("T2.9 (I15): every builder sets its own gapBefore default", () => {

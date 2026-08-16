@@ -61,6 +61,12 @@ This solves key collision **structurally** rather than key by key: a block in in
 owns its keys and the prompt does not compete for them. It is the same trade as the `⌃Home`
 ruling, made once instead of per binding.
 
+**That sentence is true and it is not this mode's reason — §4f.** The prompt already does not
+compete: with focus in the block `activeTarget` returns `liveBlock`, and A01 D4's merged
+bindings are live there. What the mode is actually for is narrower and is expressed by
+`mergeBlock`'s **throw**: a block cannot bind a key `liveBlock` or `global` already binds, and
+interaction is the only rung where those are out of scope.
+
 `⏎` enters interaction on the focused element. `Esc` leaves it. **Two-level escape** — the
 first exits interaction, the second leaves the scope — is what makes drilling in
 non-frustrating: the reader is never one keypress from losing their position.
@@ -156,6 +162,444 @@ every cost to skip.
 
 ---
 
+## 4a. The check, run — and none of the four kinds fits
+
+**Run against the tree at HEAD rather than against the design.** Every row below is a binding
+or a declaration that exists, cited by symbol; nothing here is a prediction about a kind that
+might be written.
+
+**The artefact is a classification table, and that is a choice.** Every interaction here holds
+at rest — *what does `↓` do at this kind's edge* against *what this kind declares* — with no
+event between them, which is C18 §8a's shape rather than a trace's. A sequence trace over
+entering, stepping and leaving would find none of the four rows below, because none of them
+needs anything to have happened.
+
+| # | kind | what `↓` does at the edge, in the tree | does an `ArrowPolicy` value say it |
+|---|---|---|---|
+| 1 | **`table`** — the only kind declaring `elements` (`presentation/table/definition.ts`, `tableElements`) | `↑` at the **first** element leaves to the prompt (`rowUp`, `shell/keys.ts`); `↓` at the **last** does nothing (`rowDown`, same file, `if (next !== undefined)`) | **no.** `escape-vertical` names an *axis* and the tree escapes in one *direction* — back the way focus came in, since entry is `↓` from the prompt past history's bottom (`historyNext`). There is no value for *escape up, stop down* |
+| 2 | **`logs`** | declares `window` and no `elements` (`presentation/blocks/kinds/structured.ts`), so `↓` never steps an element in it at all | **the question does not arise** — and §4 above predicted *`table` and `logs` will both fit*. They are not two instances of one shape: by what each declares they are in different cells, which is the prediction falsified by the two fields rather than by a reading |
+| 3 | **`patch` in a pushed view** | `↓` is `viewPageDown` and `n`/`p` step hunks (`interaction/router/keymap.ts`, the `pushedView` target) | **no, and there is no edge.** The policy answers *what happens when stepping runs out*; here `↓` was never stepping |
+| 4 | **a scrollable container** (roadmap 46) | unbuilt — but `pushedView` **is** a scroller and it already answers: `↓` scrolls, in navigate mode, with no interact mode involved | **no**, for row 3's reason |
+
+### The outcome, recorded either way as §4 requires
+
+**Zero of four fit, and the two failure modes are different** — which is a stronger result than
+four near-misses, and it is the outcome the multi-kind rule exists to produce. Rows 3 and 4
+fail because `↓` is not an element step, so the vocabulary's question never arises. Row 1 fails
+for an unrelated reason: the question arises and the answer is asymmetric, and every value in
+the list is symmetric.
+
+**So the axis is wrong rather than the vocabulary incomplete**, which is the finding §4 named
+in advance and is C13's patch-gate class arriving where it was watched for. It is worth being
+exact about what *wrong axis* means here: `ArrowPolicy` sorts kinds by **what happens at an
+edge**, and the tree sorts them by **whether there is stepping to run out of**.
+
+**And the discrimination it was to provide is already carried by two fields that exist and
+have readers.** This is the part that could not have been designed from the outside: the
+keymap answers `↓` per *target* (`liveBlock` steps, `pushedView` pages) and cannot tell two
+kinds apart at one target — which is the gap `ArrowPolicy` was for. But the fact it needs is
+already declared:
+
+| declares | `↓` | kinds today |
+|---|---|---|
+| `elements` only | steps elements | `table` |
+| `window` only | moves a viewport | `logs`, `patch` |
+| **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | **none, and the build kept it that way** — see the correction below |
+| neither | passes through; the block is atomic | `keyValue`, `code`, `plot` |
+
+**Nothing is adopted here and no field is added.** The check's job was to say whether the
+vocabulary survives contact with four kinds, and it does not; what replaces it is §4's
+remaining design work, and §4b is that ruling for the one cell this table could not close. Recorded now because *a check whose negative
+result is not written down is a check nobody can tell was run*, and because the cell that is
+genuinely open — a kind declaring both — is now a single question instead of a vocabulary to
+re-declare across every kind. **That cell is ruled in §4b**, which is the next section rather
+than later work.
+
+**Row 1's subject is wrong as well as the axis, and §4c is where that is measured.** *`↑` at
+the first element leaves; `↓` at the last does nothing* is a property of the **entry's**
+sequence — `liveElements` is flat across the entry's blocks — and reads as `table`'s here
+because the case in hand had one table. Left as written, with the correction beside it: a row
+that was true of its fixture and wrong about its subject is the more useful record.
+
+**The axis this table is drawn on is wrong, and roadmap 46's kind is what showed it.**
+Recorded here rather than only in the code that found it, because a table read for its cells is
+read without its commit message.
+
+`window` in the column above means **`BlockDefinition.window`** — the seam by which the
+transcript slices a block it is only partly showing. §4b's *the window follows the focused
+element* means a **container's own viewport**. Those are two senses of one word, and the table
+sorted kinds by the first while the ruling was about the second.
+
+**The kind that would have inhabited cell 3 declares only `elements`.** A `scroll` has a
+viewport — its offset — and needs no `BlockDefinition.window` at all: that seam exists to bound
+the first frame of a kind that can be enormous, and a bounded region is at most `height + 1`
+rows by construction. It was tried the other way and **sixteen rows of C09's window conformance
+sweep refused it**, one line each: `window` must return a block that *measures the slice*, and
+a declared height cannot measure less without becoming a different box.
+
+**So cell 3 is still empty, and the ruling that filled it is unaffected.** §4b is about
+viewports and stands exactly as written; what was wrong is the claim that declaring
+`BlockDefinition.window` is how a kind says it has one. The column would be honest renamed *has
+its own viewport*, at which point `logs` and `patch` leave it and `scroll` joins — which is a
+different table and is not drawn here, because nothing yet depends on it.
+
+**One premise of §4 survives intact and is worth separating from the rest**: resolution
+global → kind → per-node is familiar machinery, and nothing above bears on it. What the check
+refuses is the *vocabulary being resolved*, not the resolution.
+
+---
+
+## 4b. The ruling — elements are the unit of movement, the window is a consequence
+
+**A kind declaring both is not a conflict.** §4a left that cell open on the reading that `↓`
+inside a scroller is ambiguous — *step the next element* and *scroll the container* both
+correct, with nothing to choose between them. The ruling is that the second is not a reading
+of `↓` at all:
+
+    ↓ ↑           step an element. The window follows to keep it visible
+    PgDn PgUp     move the window. Focus does not move
+
+**Stepping past the window's edge *requires* the window to follow**, so the two are not
+competing interpretations of one key — they are one movement with a rendering consequence.
+The alternative reading needed `↓` to do two things; this one has it do one, and the window
+is not a second thing being decided.
+
+**And it is C14's rule at block scope rather than a new one.** C14 I6 is *the viewport follows
+the thing the reader is attending to*, which is already the transcript's behaviour and already
+the shape C26 I10 reuses for restoring focus. A container is the same rule one level down, so
+this is a third instance of a rule the tree has rather than a rule invented for the cell.
+
+### Three consequences, and the second is a legal state worth naming
+
+**1 · The default is derivable, so nothing is declared.** `elements` present → `↓` steps;
+`elements` absent → `↓` scrolls. The 2 × 2 in §4a is read off the two fields directly. No new
+field, and no policy either.
+
+**The escape hatch this paragraph offered is withdrawn** — it read: *a kind declaring both that
+wants `↓` to scroll uses §4's existing global → kind → per-node override.* §4d is why. The
+override would need an `ArrowPolicy` value meaning *scroll rather than step*, and there is
+none: `navigate` is stepping, the three `escape-*` values are §4c's boundary question, and
+`custom` is the absence of an answer. **An override with no value to express it is not an
+escape hatch, it is a sentence** — and offering one is how a derivable rule acquires a
+configuration surface nobody can use.
+
+So the derived default **stands alone**, which is the stronger form: the two fields are the
+whole of it, and a kind wanting otherwise has no consumer to want it. The day one exists it
+brings a value with it and an inhabitant for that value, which is the check both vocabularies
+have now failed.
+
+**2 · A focused element outside the window is legal.** Page past it and focus stays where it
+was. This is worth stating as a permitted state rather than left to be inferred, because it is
+the state an implementation is most likely to "correct" — a paging key that also drags focus
+along looks tidy and destroys the reader's place. **C14's anchor precedent is exactly this**: a
+reader who scrolled away is still working where they were.
+
+**3 · The next `↓` steps from the focused element, not from the top of the view**, so the
+window comes back to it. *Focus is where you are; the window is where you are looking*, and a
+movement key moves the first. An implementation computing the next element from the window's
+top passes every test written about an unscrolled block, which is why this has its own row and
+its own mutation.
+
+### What this does not settle, said rather than absorbed
+
+**The pushed view is cell 2 today** — window-only — so nothing here changes it. **The day a
+kind inside a view declares `elements`, the view becomes cell 3 and `↓` steps**, at which
+point `n`/`p` stepping hunks may be redundant.
+
+**That condition is already met and the sentence names the wrong blocker** — measured
+2026-08-15 from the satisfier's side. `documentView.fill(doc)` takes an arbitrary
+`ViewDocument`, so a `table` inside a view is constructible today and it declares `elements`.
+What does not exist is anything **asking**: `elementsIn` has exactly one caller —
+`liveElements` in `src/shell/construct.ts` — and it reads `stores.transcript.liveId`. So no
+element inside a view can be focused, and the key collision cannot occur until a second caller
+exists. The blocker is a caller, not a declaration. **That is the keymap's question and not this
+ruling's**, and it is named here so it is not later mistaken for a consequence of it (→ C16,
+and §4's own question (b) about the outer and inner scopes binding the same keys).
+
+**`PgDn` is bound at `global` today and this ruling gives it a second meaning.**
+`pageup`/`pagedown` reach `scrollPageUp`/`scrollPageDown` — the *transcript's* viewport — and
+there is no `liveBlock` binding for them at all. A container that pages its own window needs
+one, and the ladder then makes it win while focus is inside the block. **That is legal by the
+keymap's own rule** — the `pushedView` bindings already note that one key at two targets is
+resolved by the ladder rather than being the duplicate the conflict rule refuses — but it is a
+**behaviour change for a key that works today**, and it is named here rather than discovered
+when the binding lands.
+
+**And `table`'s asymmetry stands.** §4a found `↑` at the first element leaving to the prompt
+while `↓` at the last does nothing, and no `ArrowPolicy` value names a direction. That is
+untouched by this ruling and orthogonal to it: **what `↓` does *inside* a block and what `↓`
+does *at its boundary* are two questions**, and only the second still wants a vocabulary the
+tree does not have. Recorded so the two are not settled together by something that only
+answers the first.
+
+**§4c answers it, and the first thing it found was that the asymmetry is not `table`'s.** The
+sequence is the live entry's, flat across its blocks, so a block's edge is not a boundary at
+all — which is why no per-kind value could ever have named this one.
+
+---
+
+## 4c. The boundary — the ends are the sequence's, and the sequence is the entry's
+
+§4b answered what `↓` does *inside* a block and said the boundary was a second question still
+wanting a vocabulary the tree does not have. This is that question, and the input is §4a's
+result: **zero of four kinds fit, and the axis is wrong.**
+
+### The measurement first, because it moves the subject
+
+**A block's edge is not a boundary.** `liveElements` is `elementsIn(entry.doc.blocks, width)` —
+one flat list over the **whole live entry** — so `↓` at the last element of one block steps into
+the first of the next, and nothing at that seam is an edge at all. T1.15 already asserts it: two
+tables, and the third `↓` lands in the second table.
+
+**So §4a's row 1 attributes the asymmetry to the wrong thing.** *`↑` at the first element leaves
+to the prompt; `↓` at the last does nothing* is true of the **entry's** first and last element,
+and reads there as a property of `table` because the fixture had one table. **A per-kind
+vocabulary cannot express a property of the entry's sequence**, whatever values it offers — which
+is §4a's *the axis is wrong* arriving a second time and much sharper: not *the values are
+symmetric and the tree is not*, but *the subject is not the kind*.
+
+### The ruling — a boundary is a neighbour question
+
+The elements are one sequence and each end either has a neighbouring scope or does not:
+
+    head   the prompt is the neighbour   ↑ moves to it
+    tail   nothing is beyond             ↓ has nowhere to go and stops
+
+**The rule is symmetric and the neighbours are not.** So there is nothing to declare, no
+`escape-*` value to pick and no field to add — the same outcome §4b reached for the interior, by
+the same route: the fact was already in the tree and the vocabulary was asking a different
+question.
+
+**So `ArrowPolicy`'s edge values are the part with no inhabitant**, and saying which part is
+the point: I15's resolution shape — global → kind → per-node — is untouched and keeps the
+subject §4b gave it, a kind declaring both `window` and `elements` that wants `↓` to scroll.
+What has no subject is `escape-vertical`, `escape-horizontal` and `escape-all`, because the
+boundary they name belongs to the entry's sequence and not to any kind.
+
+### The candidate this displaces, and the check that displaced it
+
+The obvious reading of the same observation is **whence**: focus enters by `↓` from the prompt
+past history's bottom (`historyNext`), so *the escape is back the way focus came in*. It
+describes the tree exactly — every case the tree can produce today, both vocabularies agree on.
+
+**They disagree the day §6 lands, and only one stays right.** Pointer resolution focuses the
+innermost element containing the cell, so a click can enter at the tail. Under *whence* that
+entry has no direction to go back the way of, and `↑` would have to escape to nowhere. Under
+*neighbour* the click changes nothing: the sequence and its ends are where they were, `↑` walks
+to the head and leaves there, which is both what the code already does and what the reader
+means. **A vocabulary checked only against the routes that exist is checked against one route**
+— entry has exactly one today, which is precisely why the asymmetry looked like a kind's
+property.
+
+### The pushed view, checked as §4 requires
+
+It is entered by a **push** and left by `escape` → `viewPop`; its nine bindings step hunks and
+page a viewport and never step an element. **It has no sequence, so it has no ends** — the
+boundary question does not arise rather than being answered differently. Not a third value: the
+absence of the subject, which is row 3's finding in §4a and holds unchanged here.
+
+### The order is not the screen's, and that is worth stating rather than absorbing
+
+`↓` at the prompt enters at the **first** element — the top of a block drawn **above** the
+prompt — and `↑` there returns to it. So the element spatially nearest the prompt is the one
+that cannot reach it, because the prompt is *behind* it in the sequence and not below it. The
+spatial reading would have `↓` at the tail return to the prompt, and it is refused for §4b's
+reason and not for tidiness: that gives one key two meanings at one target — step, and leave —
+which is the shape §4b removed from the interior. **Any vocabulary naming up and down would be
+naming the key rather than the movement**, and `escape-vertical`'s axis was never the screen's.
+
+**What the reader is owed instead is a way out that is not an arrow, and it exists**: `Esc` at
+`liveBlock` is `focusPrompt`, bound today. The tail is a stop and not a trap.
+
+---
+
+## 4d. The other half — `EscapePolicy`, never checked, and the value that is missing from both
+
+§4 declares **two** vocabularies and §4's check named four kinds for one of them. §4a and §4c
+are entirely about `↓` at an edge; **nothing has ever asked what `EscapePolicy` is for.** A
+section closed on the arrow half alone would be closed on half its subject, and the half left
+out is the one with a value that looks obviously right.
+
+### The check, run the same way — every `Esc` in the tree, by symbol
+
+| where | what `Esc` does today | which `EscapePolicy` value says it |
+|---|---|---|
+| `overlay` | `dismiss` — and it **respects `dismissable`**, so a confirm refuses it (`src/viewport/overlay/types.ts`, `dismissable: boolean`) | **`modal`, and it is already built somewhere else.** The value's one inhabitant is a field on C15's layer, so adopting it would be two sources for one fact — C11's `copy` argument exactly (C04 I50) |
+| `pushedView` | `viewPop` | none. It pops one scope; *bubble* is not what it does and *auto*'s two levels are not there |
+| `liveBlock` | `focusPrompt` — out of the block, one level | none. `auto` is *two-level*, and this is one |
+| `copyMode` | **nothing.** The exit is `⌃c` on the ladder, deliberately (`interaction/router/types.ts`: *entry only; the exit is §5's rung and not an action*) | the question does not arise — `Esc` is not this scope's exit at all |
+| `interaction` | **nothing is bound.** Commitment 3's *leave interaction, then leave the scope* is the one two-level escape in the design and it is unimplemented (§8b.8) | `auto` would name it, and it has no subject until the mode has bindings |
+
+### The outcome — the same axis error, at the other half
+
+**Every escape in the tree is resolved by the ladder, per *target*.** Not one of them is
+resolved by a kind, and no block definition is consulted about `Esc` anywhere. `EscapePolicy`
+is a per-kind vocabulary for a decision that is not per kind — which is §4a's finding arriving
+at the half §4a did not look at, and the reason to look was that *zero of four* is a result
+about the arrows and says nothing about the escapes.
+
+**`modal` is the one that would have been adopted**, because it is the one value that plainly
+describes something real. What it describes is `Layer.dismissable`, which shipped, has a
+reader, and is a property of the layer rather than of a kind. **A value with an inhabitant
+that lives somewhere else is the most dangerous kind of value**: it reads as evidence the
+vocabulary fits.
+
+### And the arrow half has a hole §4c missed
+
+§4c said I15's resolution shape *keeps §4b's subject* — a kind declaring both `window` and
+`elements` that wants `↓` to scroll rather than step. **That is true of the shape and false of
+the vocabulary.** `ArrowPolicy` is `navigate · escape-vertical · escape-horizontal ·
+escape-all · custom`, and **none of the five says *scroll rather than step***: `navigate` is
+stepping, the three `escape-*` values are §4c's edge question, and `custom` is the absence of
+an answer. The override §4b promised would need a value that does not exist.
+
+So the honest statement is stronger than §4c's: **not one value of either vocabulary has an
+inhabitant in the tree**, and the resolution shape (I15) is the only part of §4 with anything
+left in it — a mechanism looking for a policy to resolve.
+
+### What §4 is short of, now that both halves are checked: nothing
+
+The section's own commitment was to run the check and **record the outcome either way**. Both
+halves are run and both fail, for one reason stated twice: the vocabularies sort by **kind**
+and every decision they name is resolved by **target** or by a field that already exists.
+Nothing is adopted, no field is added, and `NavElement.arrow` and `.escape` — drawn in §5's
+declaration and withheld from the tree by MG24 (§8b) — are now withheld for a **second and
+better reason**: not *no reader yet*, but *no value either of them could carry*.
+
+**Commitment 4 is the casualty and it is named rather than quietly reinterpreted.** It commits
+both vocabularies to a resolution shape. What survives is the shape; what does not is the
+premise that there is something to resolve.
+
+---
+
+## 4e. (b)'s walk — and the first output is that the collision cannot happen
+
+Roadmap 7's remaining question: *a pushed view binds `n p g G pageup pagedown`, and interact on
+a table inside it should give those to the table — the first case where the outer scope's
+bindings and the inner one's are the **same** keys.* Both artefacts, because this has state and
+structure, and the structural half is where it comes apart.
+
+**Every row below is measured at HEAD.** Nothing here is a prediction about a design.
+
+### The classification table — structural, at rest
+
+| # | the two rules that meet | ruling |
+|---|---|---|
+| 1 | *a block's keys merge into `liveBlock`* (A01 D4) × *interaction is the mode that hands the block its keys* (§2, commitment 3) | **FINDING, and it is the walk's first output.** D4 is explicit — *a live block may bind letters, but only once focus has been moved into it (`↓`), and C16 merges those bindings into the `liveBlock` target.* So `Keymap.mergeBlock`, the seam that reads like interact's producer, supplies **a different rung by architectural decision**. §8b.8 measured *no caller*; this measures *no target*. **Interaction mode has no candidate producer**, which is a stronger and much cheaper thing to know. **→ §4f revises this**: D4 stands, and the mode's subject turns out to be the keys `mergeBlock` **refuses** — so the producer's shape is known (the same seam, a different target, colliding keys only) and it is still absent |
+| 2 | *`activeTarget` returns `pushedView` whenever a view is open* × *an element inside that view could declare bindings* | **The collision (b) describes cannot occur.** `activeTarget` checks the layer before anything else — `overlay`, `copyMode`, `pushedView`, and only then `interaction` — so while a view is open **no key reaches a block inside it at all**. It is not two scopes binding the same keys; it is one scope taking every key. What (b) needs is a **rung above `pushedView` for an element inside the top layer**, and there is none. **A rung, not a binding** |
+| 3 | *`Esc` pops the view* × *`Esc` returns from the live block* × *commitment 3's `Esc` leaves interaction first* | **Two levels, one key, and the ladder already resolves it** — `FOCUS_ORDER` holds `interaction` above `prompt`, and `⌃c` at that rung calls `setMode("navigate")` and stops there, deliberately. So the two-level escape is **expressible today and unimplemented**, which is a different state from unexpressible and is what row 1 blocks |
+| 4 | *`n`/`p` step hunks at `pushedView`* × *a table's elements are rows* | **Not a collision — dead keys.** `n`/`p` step **hunks**, which only `patch` has, so a view holding a table binds two letters that do nothing. **Dead is worse than conflicting**: a key that does nothing reads as a key that is not bound, and the reader cannot tell which |
+| 5 | *`interaction` is a rung* × *nothing sets `mode: "interact"`* | **The rung is unreachable, measured rather than inferred.** `setMode` has exactly one caller in `src/` — the `⌃c` handler — and it passes `"navigate"`. So `activeTarget`'s interaction branch cannot be true, and the mode indicator's second value has nothing to display. Already recorded in roadmap 29 from the other direction |
+
+### The sequence trace — interactions something has to happen for
+
+| # | the sequence | ruling |
+|---|---|---|
+| 1 | enter interact on a block inside a view, then `Esc` | **The sequence cannot start** (table row 2), so this answers nothing rather than answering it one way. Recorded as unreachable, because a trace row that cannot run reads exactly like one that passes |
+| 2 | the view's document is replaced under a focused element (`fill`, `putBlock`) | I10's fall-forward re-resolves against **the live entry's** list, and a view's elements are in no list — `elementsIn` has one caller and it reads `stores.transcript.liveId`. **The re-resolution has no subject at this scope**: table row 2 arriving through an event |
+| 3 | `⌃c` at each rung with interact open | measured, and each rung undoes the innermost thing entered: `copyMode` → `exitCopyMode`; `overlay` → pop if `dismissable`; `pushedView` → `popLayer`; `interaction` → `setMode("navigate")`, staying on the row; `liveBlock` → `toPrompt`. **The ladder is right and its interaction rung is dead** for row 5's reason |
+| 4 | the view pops while focus is inside a block in it | same as 2 — there is no *inside* to be in. Named because it is the sequence an implementation would reach for first when wiring a second caller of `elementsIn`, and it would produce a stored address into a document nothing displays |
+
+### What (b) is actually blocked on, in order
+
+1. **A rung above `pushedView`** for an element inside the top layer. Nothing in the tree has
+   one, and adding it is a change to `FOCUS_ORDER` — *the array order **is** the priority* —
+   which is the one artefact C16's spec pass exists to keep single.
+2. **A producer for the bindings**, and A01 D4 says the existing seam is not it. So the ruling
+   owed is upstream of C26: either D4 changes, or **interaction mode's purpose is not handing
+   the block its keys** — and if it is not, it has no purpose that anything in the tree
+   expresses.
+
+**Nothing is built here and the order matters more than either item.** (b) reads as a keymap
+question and is a ladder question; the walk's job was to say which, and both artefacts were
+needed to see it — the table found the missing rung, and the trace found that every sequence
+about it is unreachable, which is the same fact in the form that would otherwise have been
+tested and passed.
+
+### The ruling: (b) is closed as uninhabited, not deferred
+
+Both halves need a consumer that does not exist, and **neither is waiting on a decision**:
+
+- **The rung** is one line of `FOCUS_ORDER` — the spec says so, and that is deliberate. What it
+  would rank is an element inside a view, and nothing produces one: `elementsIn` has a single
+  caller reading `stores.transcript.liveId`. Adding the rung first would rank an empty set.
+- **The interact half** needs the second merge target §4f names, and `mergeBlock` has no caller
+  at all, so the collision that motivates it has never been raised.
+
+**Both triggers report themselves**, which is why this is a closure rather than a deferral:
+`mergeBlock`'s throw fires the first time an adapter wants a framework key, and a second caller
+of `elementsIn` is a grep that resolves the day someone writes it. A deferral whose condition
+nothing watches is this session's six; these two are watched by the code.
+
+**So the order, if it is ever picked up: producer, then rung.** Ranking a scope with nothing in
+it is how a priority list acquires an entry nobody can test — A03 §2's vacuity class, in the one
+artefact C16's spec pass exists to keep single.
+
+---
+
+## 4f. The D4 ruling — the mode has a purpose, and §2 names a different one
+
+§4e left a ruling upstream: either A01 D4 stands and interaction mode is not for handing a
+block its keys, or D4 changes and `mergeBlock` targets `interaction`. **Neither, and the third
+answer was already in the tree.**
+
+### Stage 1's argument was about ordering, and it is untouched either way
+
+§2's *the mode is a focus target* rests on one thing: **C16 §5's ladder has no order of its
+own**, because its rungs are handlers registered on focus targets. A mode consulted as a flag
+would be a second priority list, and the ladder would acquire an order to disagree with —
+which is the defect C16's own spec pass found. **That argument says nothing about purpose.** So
+the rung's placement and the mode's subject are separable, and everything below leaves
+`FOCUS_ORDER` exactly as it is.
+
+### D4 stands, and §2's justification for the mode is delivered without it
+
+§2 says interaction *solves key collision structurally: a block in interaction owns its keys
+and the prompt does not compete for them.* **Measured, the prompt already does not compete.**
+With focus in the block, `activeTarget` returns `liveBlock` — `stored.at` is not `prompt`, so
+the `prompt` row does not match — and D4's merged bindings are live at that target. `/ps`'s
+`f` and `s` work today by focus alone, which is exactly what D4 says and why D4 is right.
+
+**So §2's stated reason for the mode is satisfied one rung down.** That is the finding, and it
+is the shape a correct sentence justifying the wrong decision always has: the sentence is true
+about collisions and untrue as a reason for *this* mechanism.
+
+### What the mode is for, expressed in the tree by the seam D4 names
+
+`mergeBlock` does not shadow a colliding key — **it throws**:
+
+> *block keymap binds `x`, which `<binding>` already binds… the global wins and the refusal is
+> loud.*
+
+Checked against `global` **and** against an existing `liveBlock` binding. So a block that wants
+a key the framework already owns has **no way to ask for it**: the ten rows bound at
+`liveBlock` — `↑ ↓ ⇧↑ ⇧↓ ⏎ Esc PgUp PgDn y ⌥v` — and the four at `global`, `PgUp`, `PgDn`,
+`⌃Home`, `⌃End`, are closed to every adapter, permanently and by construction.
+
+**Interaction mode is the rung where they are not.** A mode that takes every key is precisely
+the scope in which the framework's own `liveBlock` bindings are out of scope, and it is the
+only construct in the design that could hand `↓` or `⏎` to a block. That purpose is narrower
+than §2's *sends keys to the thing focused* and it is the one the tree can actually express.
+
+### The disposition, and it is not a deferral
+
+- **D4 stands.** Non-colliding block keys belong to `liveBlock`, reached by `↓`. Shipped and
+  correct.
+- **The mode keeps its rung**, on the ordering argument, which stands alone.
+- **§2 is corrected rather than left**: its justification is `liveBlock`'s, and the mode's
+  subject is the refusal above.
+- **§8b.8's refusal stays conditional and the condition becomes nameable.** Not *until the mode
+  has bindings* — which invites exactly the wrong producer, the one D4 assigns elsewhere — but
+  **until a block needs a key `liveBlock` or `global` already binds.** That condition has a
+  trigger in the code: `mergeBlock`'s throw. A deferral whose condition is a `throw` someone
+  will hit is one that reports itself, which is the opposite of this session's six.
+- **No consumer has ever needed it.** `mergeBlock` has no caller, so the collision that would
+  require the mode has never been raised — the purpose is real, expressible, and uninhabited.
+  Recorded that way rather than as *the mode has no purpose*, because the two disagree about
+  what happens the first time an adapter wants `⏎`.
+
+---
+
 ## 5. Element resolution — one declaration, keyboard and pointer
 
 ```typescript
@@ -175,6 +619,12 @@ type NavElement = Readonly<{
   activate?: Action;
 }>;
 ```
+
+**`arrow?` and `escape?` are drawn here and have no value to carry** (§4d). They were withheld
+from the tree by MG24 for having no reader; both vocabularies have since been checked against
+every kind and every target, and not one value of either has an inhabitant. Left in the
+declaration with the finding beside them rather than deleted, because a field removed leaves no
+record of what was asked about it.
 
 **Optional, and a kind that is atomic omits it — and the argument is C09's own**, at
 `presentation/blocks/types.ts:94–104` on `window?`: *an absent member cannot be deleted by a
@@ -249,6 +699,53 @@ inherits the property rather than being the component that breaks it.
 
 ---
 
+
+## 5c. The transcript's selection, and semantic copy
+
+**One mechanism, two shapes, one clipboard.** C17 §5b holds a character range in the prompt; this holds a set of element addresses in the transcript; both land in the kill buffer (C17 §5a). What does *not* unify is the region — a character range and a set of addresses have nothing in common but their destination, which is why there is no abstract `Selection` type anywhere.
+
+### The anchor is the only new state, one level up
+
+`StoredFocus.anchor` beside `element`, and **`element` is the head** — there is not a second position to keep in step with where focus is. `anchor === element` is no selection. `extendRow` places the anchor on the **first** extension and never touches it again; `focusRow` collapses. That is C17 I21 restated at the level above, and the defect it forbids is the same one: an extension that moves the anchor is right on the first keystroke and wrong on the second, and every assertion about *a row being selected* passes either way.
+
+**`⇧↑` stops at the first element rather than leaving the block.** Unshifted `↑` exits to the prompt — the reader stepping out (I13) — and extending is a gesture *inside* the block; one that walked out would take the selection with it and leave nothing to copy.
+
+### `y` lives in `navigate` only, and the two targets are why
+
+C16 §5a row A4: a block's declared keys are an open set (I14), so a framework binding inside interaction silently shadows one. `interaction` and `liveBlock` being separate targets makes that **structural** rather than a rule someone has to remember — the binding is declared at `liveBlock` and there is nowhere for it to leak.
+
+### `NavElement.copy` is the element's source, never its rendering
+
+**This is the whole of semantic copy and it is the one thing a raw terminal cannot offer.** The painted cells are a rendering: columns are dropped at narrow widths, values are truncated with an ellipsis, and a marker column carries a glyph nobody typed. A copy taken from them is *what is on screen* — which passes every assertion about what is on screen and is wrong about exactly what this exists for.
+
+So the **declarer** supplies it from the data it was given. `tableElements` joins every declared column's `cell.text`, in declared order, at no width — so the copy is the same text at 60 columns and at 200. `planColumns` is deliberately not consulted: a copy that changed with the terminal's size would be the defect rather than a feature.
+
+Tab-separated, because that is what pastes into a spreadsheet and into every shell tool that takes columns; newline-joined across a range, because the elements are rows. An element declaring no `copy` contributes nothing rather than a blank line — it is a place to stand, not empty data.
+
+### Across a container's boundary, the copy is not bounded either
+
+**A selection whose range crosses a scrolled container copies what the box hides, and I17 is
+already the argument.** The three forms are one rule: a column the width dropped, a value the
+width truncated, and a child the offset scrolled past are all *the rendering could not show it*,
+and the rendering is not what is copied. A copy that stopped at the boundary would change with
+the offset, which is the property I17 forbids — so the boundary needs no rule of its own, and
+that is the ruling rather than a gap in it.
+
+**Inside the container, the copy is the children's, joined** (C04 I50). Elements are one per
+child there, so *which element* and *which child* are one question, and a child whose kind
+cannot express a source contributes nothing rather than its painted rows.
+
+**Correct and surprising, and the sentence that removes the surprise does not exist.** *Selected
+40, copied 400* wants a readout, and **there is no such surface in the tree** — the nearest is
+`TuiConfig.chrome.footer`, which is `CALCIUM_ROADMAP.md` Order 29's subject. It is recorded as a
+consumer of that row rather than built here, and the reason is F161's: a mechanism referred to
+as though it exists is not evidence that it does, and the question that reaches it is where it
+is written.
+
+**And MG24 cannot see this field**, which is measured rather than assumed: removing its only consumer leaves `make enforce` green, because `LineEditor.copy()` carries the same name. F160's blind spot on a published field of the block vocabulary, and the third instance of it. Recorded here so a later reader does not take the gate's silence as coverage.
+
+---
+
 ## 6. Pointer
 
 **The plumbing is built.** SGR decoding (`decode.ts:393`), a `mouse` capability that is off
@@ -303,12 +800,24 @@ notice here.
 - **I3** — `elements` is pure in `(block, width)`. Focus is not a parameter, so a
   focus-dependent geometry is unrepresentable rather than forbidden.
 - **I4** — Every element's rows lie within `[0, measure(block, width))` and its columns within
-  `[0, width)`.
+  `[0, width)` — **except a bounded container, whose elements lie within its content and not
+  within its box** (C04 §3c cell 8). The exception is forced rather than chosen: a scroll's
+  children extend past the box by construction, and both ways of keeping them inside it are
+  worse. Clipping the list to what is visible makes `elements` depend on the offset, which I3
+  forbids — focus is not a parameter and neither is any other view state. Measuring the box as
+  its content makes the block's height depend on how much it holds, which is the one thing a
+  bounded region exists not to do. **So the offset is the single map from content rows to box
+  rows**, which is §4b's *the window is a rendering consequence* restated as an addressing
+  rule, and the pointer resolves through it (I8). **Found by the compiler rather than by
+  either walk artefact**: neither indexes one component's invariant against a kind that did
+  not exist when it was written.
 - **I5** — The element list is in reading order, non-decreasing by `(rows.from, cols.from)`.
 - **I6** — Two elements at the same `level` share no cell. Nesting across levels is the
   structure and is not a violation.
-- **I7** — A kind declaring both `window` and `elements` owes their agreement (§5). **Vacuous
-  while the intersection is empty**, and the premise is recorded so it can be re-checked.
+- **I7** — A kind declaring both `window` and `elements` owes their agreement (§5), and
+  §4b says what the agreement **is**: the window is a function of the focused element, never
+  an independent position. **Vacuous while the intersection is empty**, and the premise is
+  recorded so it can be re-checked.
 - **I8** — The keyboard and the pointer resolve against the same declaration. There is no
   second source.
 - **I9** — Focus is rendered by the block and owned here (C11 I14). C26 holds a location; it
@@ -335,9 +844,37 @@ notice here.
   no subject and the second is `liveBlock`'s existing exit. The day a block declares keys,
   both levels are first tested for real.
 - **I15** — Policies resolve global → kind → per-node override, and **an override naming a
+- **I16** — **The transcript's selection is an anchor plus the focused element**, and the focused element is the head. `anchor === element` is no selection; an extending motion moves the head and never the anchor; an unshifted motion collapses. C17 I21 at the level above, and the same two halves fail the same two ways.
+- **I17** — **An element's `copy` is its source, never its rendering.** The declarer supplies it from the data, at no width, so a dropped column and a truncation are absent from it and the text is the same at every terminal size. A copy assembled from painted cells satisfies every assertion about the painted frame, which is why this is an invariant rather than a preference.
   level the kind reports no element at is a construction error**, the way a duplicate
   binding is (→ C16 I10). An override for an absent level is unreachable and reads as
   configured, which is A03 §2's vacuity class arriving in a config value.
+- **I18** — **Movement moves focus and paging moves the window, and neither does the other's
+  job** (§4b). `↓`/`↑` step an element and the window follows to keep it visible (C14 I6 at
+  block scope); `PgDn`/`PgUp` move the window and leave focus where it is. **A focused
+  element outside the window is a legal state**, and the next movement key steps from that
+  element rather than from the window's top. **Half-vacuous, and the halves are worth
+  separating**: *paging does not move focus* is already true of `pushedView` by construction,
+  since focus there is the view and not an element; *the window follows* has no subject until
+  a kind declares both `window` and `elements`, which none does (§4a).
+- **I19** — **A boundary is a neighbour question, and the sequence is the entry's** (§4c). The
+  live entry's elements are one flat list across its blocks, so a block's edge is not a
+  boundary; only the sequence's ends are. At an end a movement key **moves to the neighbouring
+  scope if there is one and stops if there is not** — the prompt neighbours the head, nothing
+  is beyond the tail — which is one symmetric rule over asymmetric neighbours rather than a
+  per-kind policy. **No `ArrowPolicy` edge value can state it**, because the subject is the
+  entry's sequence and not the kind; I15's resolution shape is untouched and keeps §4b's
+  subject. A scope entered by a push has no sequence and therefore no ends,
+  and `Esc` is its exit as it is the head's non-directional one.
+- **I20** — **A fall-forward lands in navigation, whatever mode it left.** I10 restores focus
+  by re-resolving an address, and a fall-forward resolves to a **different element** than the
+  one stored — so it is a move, and `focusRow`'s rule applies unchanged: *a mode belongs to the
+  element it was entered on, and carrying it to the next row would make `↓` mean something
+  different depending on how the reader arrived.* Re-entering a mode on an element the reader
+  never chose is that defect with the choice removed. **Vacuous today and the vacuity is the
+  point of saying so** — interaction mode has no bindings (§8b.8), so nothing observable
+  distinguishes the two answers, and the moment it has bindings this is the rule rather than a
+  question reopened with a shipped surface.
 
 ---
 
@@ -650,7 +1187,7 @@ is the shape a spec commit should have.
 
 1. The scope stack is `entry → block → row → cell`, at most four deep (I1).
 2. Navigation and interaction are modes, and interaction is a focus target (I2).
-3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, because the mode has no bindings and the seam that would supply them has no producer (§8b.8). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
+3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, and §4f names the condition rather than leaving it as *the mode has no bindings*: **until a block needs a key `liveBlock` or `global` already binds**, which `mergeBlock`'s throw reports the first time it happens (§8b.8, §4f). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
 4. `ArrowPolicy` and `EscapePolicy` resolve global → kind → per-node override, and an override for a level the kind does not report is a construction error (I15).
 5. `BlockDefinition.elements` is optional, pure in `(block, width)`, and is the single source for both keyboard and pointer (I3, I8).
 6. Element lists satisfy containment, reading order, per-level disjointness and stability (I4, I5, I6) — checked generically by a conformance sweep, as `window`'s equality is.
@@ -659,6 +1196,9 @@ is the shape a spec commit should have.
 9. Focus is stored as a `(blockId, elementId)` address, and restoration is a re-resolution of it with a fall-forward, through one resolver shared by render and keys (I10).
 10. Element resolution is a pull (I11).
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
+12. Movement keys move focus and the window follows; paging keys move the window and not focus; a focused element outside the window is legal and the next movement key steps from it (I18, I7). The default is read off which of `elements` and `window` a kind declares, and it **stands alone**: the override this once offered needed an `ArrowPolicy` value that does not exist (§4d), so it is withdrawn rather than left as a sentence.
+13. **A boundary is a neighbour question and the sequence is the entry's** — a block's edge is not an end, an end moves to its neighbouring scope or stops, and `ArrowPolicy`'s **edge values are not adopted** because no per-kind value can name a property of the entry's sequence (I19, §4c).
+14. **A fall-forward lands in navigation** — restoration moves focus to a different element, and a mode belongs to the element it was entered on (I20, I10). Vacuous until interaction mode has bindings, and stated now because it is cheap to rule and expensive to reopen.
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -675,6 +1215,9 @@ Named against the invariants; the tiers are the six.
   over every kind declaring `elements`. The shape is C09's window conformance: it walks every
   fixture rather than asserting one, because a single-element row passes against a wrong
   implementation. **Two fabrications confirm it is live**, as F134's did.
+- **T1.42, T1.43** (I17, §5c) — an element's `copy` carries **every declared column**, including the ones the width dropped, is the same text at 60 columns and at 200, and is untruncated. The control is `planColumns(...).dropped` being non-empty at that width: without it the row passes for a table that drops nothing. The expand column contributes its **cell**, not the marker a renderer puts there.
+- **T1.44, T1.45, T1.46** (I16, §5c) — `⇧↓` twice leaves the anchor where it was and `y` copies the range newline-joined; an unshifted motion collapses, so `y` afterwards copies one row; and `⇧↑` at the first element stays in the block, where unshifted `↑` leaves. **Two extensions in the first, because one passes whichever end moved** — C17 T1.23's argument one level up.
+- **T1.18** (I19, §4c) — **the tail stops and the head leaves, asserted at the entry's ends rather than a block's.** T1.15 already carries the other half: two tables, and `↓` at the first's last element steps into the second, so a block's edge is not an end. The row that was missing is the tail — `↓` at the entry's last element leaves focus where it is — and its absence is why the asymmetry read as `table`'s for as long as it did. The fixture holds **two** blocks, because one block makes the entry's ends and the block's ends the same cells and every reading agrees.
 - **T2.x** (I2) — the ladder still derives from `FOCUS_ORDER` with the mode present:
   exhaustive over the target union, not over a hand-written list.
 - **T2.x** (I8) — a click and the equivalent walk reach the **same element object**, asserted
@@ -700,6 +1243,19 @@ Named against the invariants; the tiers are the six.
   and it **fails the day either changes** — which is when the second effect and I14's first
   level go live and this row is inverted. A premise recorded and unchecked is a premise that
   goes quiet (F102's disposal, and T2.17's shape for the `window` × `elements` agreement).
+- **T3.x** (I18, §4b) — stepping past the window's bottom edge: focus advances by one **and**
+  the window moves to hold it. **The control is a step that stays inside the window**, where
+  the offset must not move — without it the row passes for an implementation that re-windows
+  on every keystroke, which is right about the assertion and wrong about the mechanism.
+- **T3.x** (I18, §4b) — `PgDn` past the focused element: focus is **unchanged** and the
+  element is outside the window, asserted as the legal state it is; then `↓` lands on the
+  element **after the focused one** and the window contains it. The row asserts which element
+  focus reaches, not the resulting offset — an offset assertion is satisfied by an
+  implementation that stepped from the window's top and happened to arrive at the same place.
+- **T6.x** (I18) — `PgDn` moving focus as well → the second row fails; the next `↓` computed
+  from the window's top rather than from the focused element → the second row's last assertion
+  fails. **Both are removals of the ruling rather than changes to it**, which is the shape a
+  wiring mutation takes.
 - **T6.x** (I6) — making disjointness global → the nesting fixtures fail.
 - **T6.x** (I11) — turning the pull into a subscription → the half-applied-store row fails.
 - **T6.x** (I2) — moving the mode out of `FOCUS_ORDER` into a pre-dispatch flag → the ladder
@@ -724,7 +1280,11 @@ listed so the Order list can point here instead of carrying a duplicate:
 - **16** one popup — the confirm and the completion menu are two mechanisms today; whichever
   survives is an interaction-mode consumer.
 - block-to-block movement · column and cell movement · the focusable-block concept · clickable
-  rows and links — §3 and §5.
+  rows and links — §3 and §5. **Block-to-block movement now has a visible symptom, which it
+  did not when this list was written**: only the live entry holds focus, so a `scroll` in a
+  settled entry cannot be aimed, and C04 I49 makes it *say* how much is unreachable — *⋯ 12
+  above · 368 below*. A deferral whose cost is a number on the screen is one that gets
+  revisited, where a deferral with no symptom is one nobody can point at (C04 §3c cell 6).
 - `pushedView`'s nine flat bindings — §2 and trace 6.
 
 ## 12. Out of scope

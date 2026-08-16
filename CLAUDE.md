@@ -262,9 +262,19 @@ Each of these produces code that compiles, passes review, and is wrong.
   belief and not a ruling, and the cheapest moment to find that out is before something is
   built on it.
 
+  **And the answer can be *no file at all*, which is the strongest form and reads as the
+  weakest.** F161 is the measured case: a shared mark with four named consumers, one of them
+  said to ship, cited against a real finding — and the character it proposes is in no file in
+  the repository. **A count, a finding number and a shipped instance are what a ruling looks
+  like from outside**, and all three can be present with nothing behind them. Going to each
+  of the four consumers, none could take the mark: one already has the slot, one is text
+  inside a `code` block and would need a block-kind change first, one has no renderer at all,
+  and the fourth was a homonym — a log *level* named `trace`. **A count of consumers is an
+  argument only if the consumers share a shape.**
+
   **The instrument's running total, because a habit that costs twenty minutes deserves a
-  number**: it has now **disproved three findings and produced three** — F58b, F66's
-  replacement reason, and F92. It is the only one that checks the *record* rather than an
+  number**: it has now **disproved three claims and produced four** — F58b, F66's
+  replacement reason, F92 and F161. It is the only one that checks the *record* rather than an
   artefact; the frame-read checks output, the mutation pass checks tests, the audit checks
   code.
 
@@ -277,6 +287,47 @@ Each of these produces code that compiles, passes review, and is wrong.
   to look — the body usually still reads as correct, and does not have to be re-derived to
   see it. **Read the abstract against its own section before reading the section against
   the code.**
+
+- **A deferral names a condition and nothing watches it.** *"Until C17's `cursorCell` is
+  threaded through"* is a good comment — it names the simplification, the blocker and the
+  cost, which is everything a reader needs except the day it stopped being true.
+  `cursorCell` had existed for some time, was on the editor's public interface, and was
+  **read forty lines below the deferral in the same file**; two shipped defects lived in the
+  simplification it was still excusing.
+
+  **The instances are of three kinds and no instrument reaches more than one** — a code
+  comment (`paint.ts`), a roadmap row (25's *do ranking first*, whose ranking landed), and a
+  chain of citations (6.2's value set, deferred three times and answered by finding 21
+  already built). A rule is not obviously buildable: the condition is prose, and matching
+  *"until X is threaded through"* against *X exists* is the citation-resolves-against-the-
+  wrong-thing class the audit argues against automating.
+
+  So it is a habit rather than a gate: **a deferral states its blocker as a symbol, and
+  picking up the entry begins by grepping it.** Grepping `src/` for forward-looking
+  deferrals returns one line today, which is the number that makes the habit cheap.
+
+  **Three instances now, and they share a shape the first one did not show.** The condition
+  is written **where the deferral is**, and the thing that satisfies it is written
+  **somewhere else** — so nobody holding either half is looking at the other, and neither
+  half is wrong.
+
+  | the deferral | its condition | what met it, elsewhere |
+  |---|---|---|
+  | `paint.ts`'s simplification | *until `cursorCell` is threaded through* | `cursorCell` on the editor's public interface, read forty lines below |
+  | roadmap 38, on `height: "fill"` | *the producer cannot see the height — that is F37* | `ProducerContext.height`, granted by phase 1's row 2, non-null exactly in the case the entry names |
+  | C04 §3, on a `weights` field | *add weights when a surface needs them* | the banner, needing 15 / 1 / 61 against a 38 / 38 split — which hand-composed a `raw` block instead |
+
+  **The third is the one that shows the cost**, because the surface that met the condition
+  did not know it was the condition: it worked around the missing field, and the workaround
+  became roadmap 38's evidence list — *padded to a uniform 40 by hand, top-padded by one row,
+  the composed width measured three times*. A deferral that is never revisited does not stay
+  deferred; it gets paid for at every call site that needed it, in a currency nobody totals.
+
+  **And the direction to grep is from the satisfier, not from the deferral.** Two of the
+  three were found by reading an entry and checking its premises against the tree — the
+  seventh pass's own method — rather than by anything watching the condition. The habit that
+  reaches them is the one already written down: **when picking up an entry, check what its
+  claims resolve to at HEAD rather than trusting the row.**
 
 - **A correct sentence justifying the wrong decision survives being read carefully.**
   MG24 was scoped to `export interface` because *"a type alias is structural and can be

@@ -2060,7 +2060,7 @@ carries `| undefined`. The rest are filed rather than changed, because a varianc
 for no consumer is a guess about the next one.
 
 **DISPOSED, and the disposition is the sentence above.** `TuiConfig.capabilities` reads
-`Partial<TerminalCapabilities> | undefined` today (`src/shell/types.ts:432`), with *"fixed here
+`Partial<TerminalCapabilities> | undefined` today (`src/shell/types.ts:484`), with *"fixed here
 because this is the field with a consumer"* beside it. The fourteen others are deliberately
 unwidened. **So there is no task here unless a second consumer appears** — this is a ruling
 already taken, and it was sitting in a plan as work.
@@ -2535,7 +2535,7 @@ misleading citation and the misleading citation can sit in one document indefini
 
 **Closed as an audit** — `DOCKER_TUI_SURFACES.md` §9's *Exercises* line no longer claims the
 tone, and the drawing is kept with the claim recorded beside it, because redrawing it would
-lose what was intended. `src/logs.ts:58` still builds `b.raw(text, …)`; the substance never
+lose what was intended. `examples/docker/src/logs.ts:58` still builds `b.raw(text, …)`; the substance never
 changed and the fix was always going to be the sentence.
 
 **And the where-is-this-written check widened it.** This entry says `b.logs` has no consumer
@@ -3044,6 +3044,19 @@ failure names an *enforcement rule* — "SS10 finds no terminal env read outside
 capabilities.ts" — which reads as a real violation and sends a reader to look for
 one. The scans walk 174 files, and they are the slowest rows in tiers 1 to 4.
 
+**A fourth reading, 2026-08-15, and it is the one that says what the ratio does not
+measure.** With load average **19.63** — nearly four times F73's original 5.2, an unrelated
+process at 440% CPU — T3.15 read **4.08**, *lower* than the 6.0 measured at 5.2. So the ratio
+is not a load gauge: it is bimodal, and its magnitude carries no information about how busy the
+box is. Anyone reading 4.08 as "less contention than last time" has the relationship backwards,
+which is the same trap as *a quiet machine is not less contention*.
+
+**And the failing set moved again**, which is the property already recorded: `test/revert/lifecycle.test.ts`
+T6.5 timed out at its 5 s budget in the same run and has never appeared in this class before.
+Both were green on an immediate rerun, unchanged. A changed set reads as noise where an
+identical one would have read as evidence — which is why the rerun is the ruling and not the
+first result.
+
 
 ---
 
@@ -3368,7 +3381,7 @@ axis that has no home.
 ### Why it is filed now and not in step 11
 
 **It was written down and it was written down in the wrong place.** The reasoning
-above existed the whole time as a comment at `src/progress.ts:31` and again at
+above existed the whole time as a comment at `examples/docker/src/progress.ts:31` and again at
 `:160`, and the first of them ends:
 
 > This is F30/F49/F51's fourth consumer, **filed rather than worked around**.
@@ -4061,7 +4074,7 @@ that nothing spawned** — a test checking only the blocks would pass while the 
 
 | ruling | at HEAD |
 |---|---|
-| reserve `--help` framework-side | `FRAMEWORK_FLAGS`, `src/data/manifest/framework.ts:126`, `shellOnly: true`, appended to every tool (C05 I22) |
+| reserve `--help` framework-side | `FRAMEWORK_FLAGS`, `src/data/manifest/framework.ts:148`, `shellOnly: true`, appended to every tool (C05 I22) |
 | `/help` shrinks to two levels | `src/shell/local/handlers.ts:110` groups by C05 §3's partition, with `/help keys` as a second question |
 
 **And *blocked on F39* resolved the other way round.** F39 was closed by C05 I21 — `--help` is
@@ -7588,6 +7601,20 @@ the mechanism runs reads exactly like one that holds.
 
 ## F160 — MG24 matches published members by name, so any file can create a false negative ★★★ — **CLOSED as one class with F105**
 
+> **Fourth instance, 2026-08-15, and the first where the satisfier is not a member.** A
+> markdown translator written with named capture groups reads `m.groups?.["text"]`, and
+> `UNCONSUMED_MEMBERS` names `Identity.groups` — so `make enforce` failed claiming an exemption
+> had outlived its reason. Nothing about `Identity` had changed; a regular expression had
+> satisfied it. The earlier three were members of other types, which at least look like the
+> thing being matched.
+>
+> **The general form, and it answers a question that comes up whenever a gate fires on
+> something unrelated: the census is worth more than the syntax.** Two fixes were available —
+> edit the exemption, or index the captures. The first makes the gate green and makes the
+> census wrong, because the member is still unconsumed; the second costs a token per capture.
+> A signal that is edited to accommodate the code it measures stops being a measurement, and
+> the cheaper-looking fix is the one that spends the instrument.
+
 ### CLOSED — the class, not the instance, and not by tightening
 
 **F105 and F160 are one mechanism measured twice**, which is this repo's own threshold for
@@ -7612,6 +7639,89 @@ typed structurally in `keys.ts` itself. That member is **C16 I23, one of MG24's 
 founding instances**, so the arm's very first false positive is the rule's own reason for
 existing. L4 wires by injection; a consumer never imports its producer, and any rule
 assuming otherwise is describing a different architecture.
+
+### A live instance, 2026-08-13 — the blind spot in code written the same day
+
+**Filed because the two instances above are retrospective and this one is not.** Entry 15
+step 2 added two published readers to `LineEditor` in one commit: `selection` and
+`selected`. MG24 fired on `selection` and said nothing about `selected` — because
+`KeyEffects.selected`, C19's menu row, carries the same name, so the rule read a member of a
+different type in a different layer as this one's consumer.
+
+**Stronger evidence than either retrospective case, and for a reason worth naming.** F105 and
+the case below are both *a rule failing on code that was already there*, which leaves open
+the reading that the tree grew into the blind spot. This is the rule failing on the day the
+member was written, on a name a developer chose without knowing another type had it. Nothing
+about the tree's age is involved: **the collision is created by the next member anyone adds.**
+
+It also changes what the exemption list can promise. `LineEditor.selection`'s entry says the
+equality arm removes it when a consumer lands — and `selected` shows the other half of that:
+a member with the same name would never have got an entry at all, so the arm has nothing to
+expire. **The list is honest about what it holds and silent about what the rule never
+offered it.**
+
+Not a reopening. The three rejected tightenings below still stand, and this instance is
+evidence for the *class* rather than for any of them.
+
+### A third instance, same day, and it is on a **public** field
+
+**Measured the same way and it is worse than the second.** Entry 15 step 4 added
+`NavElement.copy` — the element's source text, the field semantic copy is built on.
+MG24 says nothing about it, and removing its only consumer leaves `make enforce`
+**green**: `LineEditor.copy()` carries the same name, so the rule reads a method on a
+different type in a different layer as this field's consumer. Verified by deleting the
+read in `shell/keys.ts` and running the gate, not by reading the rule.
+
+**`NavElement` is part of the block vocabulary an application declares**, where
+`selected` was a getter on an internal interface. So the blind spot now covers a
+member of a published, freeze-relevant type — and MG24 exists precisely to catch *a
+field that exists and nothing reads*, which is F21's shape and the reason the rule was
+written.
+
+**Three instances, and the third is what usually breaks the axis** — it did not. All
+three are one mechanism: matching by name alone. What it does change is the count of
+false negatives observed in code written the same day, which is now two of two new
+members that happened to collide. The collision is not rare; it is created by whichever
+name a developer reaches for.
+
+### The fourth tightening, measured 2026-08-13 — and refused with a better reason
+
+**The three below all move the *consumer* side. This one moves the *subject* side**: gate
+only on members of types `src/index.ts` names, which is the freeze-relevant population and
+the only one that cannot be fixed after publication. Smaller, and possibly exact enough to
+key by name safely.
+
+| population | members | exact | rate |
+|---|---|---|---|
+| all of `src/` | 1171 | 382 | **32.6%** |
+| public types only | 320 | 101 | **31.6%** |
+
+**The public surface is no better. It is marginally worse.** And the follow-up settles the
+narrower variant too: of the 219 colliding public members, **151 collide with another
+*public* type** — so a rule scoped public-against-public removes 68 and leaves 151.
+
+**The reason is the axis, not the threshold, and that is what makes this worth recording
+rather than retrying.** The collisions are dominated by vocabulary — `name`, `type`,
+`width`, `height`, `schema`, `argv`, `signal`, `verb` — and **a coherent public API reuses
+its vocabulary across types deliberately.** `FlagDef.name`, `ArgDef.name` and `ToolDef.name`
+are the same word because they are the same idea, and a manifest whose three declaration
+types called it three things would be worse. So narrowing to the public surface selects
+*for* the population where name reuse is a design goal.
+
+Four tightenings measured, four refused. The rule keys by name because nothing available to
+a regex over source distinguishes two types that share one.
+
+### What survives, and it is not a tightening
+
+**MG24 is blind on exactly the surface the freeze protects, and no consumer-side or
+subject-side scoping fixes it.** That is a residue rather than a bug, and it belongs where
+work is tracked rather than in a closed finding — roadmap entry 48. The shape that could
+work is not a change to MG24 at all: a **consumer written from the public surface**, which
+is the instrument that has already found variance no producer could (`a-consumer-finds-
+variance-a-producer-cannot`). A second app declaring blocks would name every field it
+actually uses, and the ones it never names are the candidates — by *use*, not by name.
+
+Still not a reopening: the tightenings are refused and the class is understood.
 
 ### The remedy F160 proposed does not key uniquely either
 
@@ -7688,3 +7798,761 @@ population of a gate and therefore a step of its own, exactly as F159's is.
 F159 came from fabricating a violation; this came from a rule firing on something that was
 not its subject. **A rule that reports the wrong instance is showing you its matching, and
 that is the only view of it you get from outside.**
+
+---
+
+## F161 — a shared mark with four consumers, and none of the four can take it ★★★
+
+> **Third instance, 2026-08-15: `CALCIUM_PLOT_PRIOR_ART.md`.** Cited as carrying a
+> plan-it-first note that Order #3's row was said to be missing. **There is no such file**, and
+> the only occurrence of *prior art* in the repository is entry 9's `mermaid-ascii` line. The
+> plot material lives in `CALCIUM_ROADMAP.md`, and the sentence nearest to the one remembered —
+> *worth treating as one coherent piece rather than scattered features* — is a **scoping** claim
+> and not a sequencing one. So the row is not missing a note that exists elsewhere: the note and
+> the document are both this finding's shape, and the instrument found them in the same question.
+>
+> **Two further instances, 2026-08-15, and both were the assistant's own.** The `⎿` slot's
+> four consumers turned out to be two at most, neither buildable. *The selection readout* — a
+> place a selection's row count would go, referred to across a conversation and planned
+> against — **appears in no file in the repository**: zero matches in `docs/`, and the one hit
+> in `src/` is an unrelated sentence about a table's detail row. The nearest surface that
+> exists is `TuiConfig.chrome.footer`, one app-supplied row, which is roadmap 29's whole
+> subject.
+>
+> **Both were named with a definite article and planned against**, which is the tell: *a
+> mechanism referred to as though it exists is not evidence that it does, and the question that
+> reaches it is where it is written.* The habit is the one already running — go and find the
+> file — and it has now caught two of the author's own claims and reshaped five findings.
+
+**The claim, about to be built:** *there is now a hanging-continuation slot with four
+consumers — the fault notice, `--help`'s flags, the pending entry and a view's trace line —
+one of which ships; F122 is the finding for authoring a mark at five sites, so it is cheaper
+to add the slot once than to correct it four times.*
+
+**Where it is written down: nowhere.** The character is in no file in this repository — not a
+spec, not a design document, not a roadmap entry, not a note, not `src/`. That is a stronger
+answer than the instrument's usual one. F58's claim lived in four documents citing each other
+and F66's was carried through four steps of one plan; **this had no record at all**, and it
+still read as settled because it named a finding (F122), a count (four) and a shipped instance.
+Those three together are what a ruling looks like from outside.
+
+**The four, measured one at a time.** Taken on the charitable reading — *four places now want a
+hanging mark* — rather than the literal one:
+
+| named consumer | what is actually there |
+|---|---|
+| **F15's fault notice** | **already has the slot.** `noticeDoc` sets `glyph` from `GLYPH_OF[tone]` — `src/shell/documents.ts:151` — and `prefixCells` in `blocks/kinds/simple.ts:39` reserves its cells, capability-free, by C09 §4's 1:1 rule. What it carries is a **severity** and not a continuation, so a second leading mark on that row is a second severity |
+| **`--help`'s flags** | **cannot take a glyph at all.** `usageBlocks` — `src/data/adapters/mapping.ts:169` — emits **one `code` block** of pre-joined text, with the flags as lines inside `text` indented two spaces. A mark there is a non-ASCII character in a `src/` string literal, which SS47 refuses by name. The change this consumer wants is **structural** — `keyValue` or a table — and having made it, it wants a *column*, not a slot |
+| **the pending entry** | **has no renderer.** `blocks: []` at `src/shell/execution.ts:895`, and entry 35's residue already says so: *nothing composes the notice, and there is no elapsed-time part*. There is nothing to put a mark on until something composes one |
+| **a view's trace line** | **does not exist.** The only `trace` in `src/` is a **log level** — `case "trace":` in `levelTone`, `blocks/kinds/structured.ts:86`, folding to `dim`. A homonym, not a consumer |
+
+**One of the four ships, and it is the one that argues against the slot.** The fault notice is
+real, drawn, and the only one with a leading mark — because a leading mark on a notice is a
+`Glyph`, and that mechanism is built. Cited as *the consumer that ships*, it reads as the first
+of four; measured, it is the demonstration that the remaining three are not the same problem.
+
+**Wrong in both directions, which is the shape to watch for.** Not four — two at most, and
+neither of those two is buildable today. And the cheapness argument runs **backwards**: adding
+one slot does not save three corrections, because the three want three different changes —
+nothing (the slot exists), a block-kind change, and a composer. **A count of consumers is an
+argument only if the consumers share a shape**, and this one was assembled by listing places
+that draw a line under something.
+
+**What no reading reaches, and why this is the sixth blind spot's instrument rather than
+review.** Every sentence in the claim is individually plausible: F122 *is* the finding about
+authoring a mark at several sites; the fault notice *does* ship; the pending entry *is* blank.
+Review checks whether the parts are true and they are. What fails is the join — *therefore
+these are four instances of one slot* — and the only thing that asks it is going to each site.
+Twenty minutes.
+
+**Running total for the instrument, because a habit that costs twenty minutes deserves a
+number: it has now disproved three claims and produced four** — F58b, F66's replacement reason,
+F92 and this. It remains the only one that checks the **record**; the frame-read checks output,
+the mutation pass checks tests, the audit checks code.
+
+**If the slot is still wanted, this is what it would need**: a consumer that draws a mark today
+and wants a different one, plus a second that would draw the same mark for the same reason. On
+today's tree there is one candidate — the pending entry, once something composes it — and one
+candidate is not a shared slot. Recorded so that the next pass does not re-derive the four.
+
+**Disposition, 2026-08-14: the drawings are a design and not a pending change.** `⏺` and `⎿`
+appear in no file in this repository, and the agent-tui surfaces that use them are a sketch of
+what a consumer might draw rather than a claim about the framework. Nothing here is owed, and
+saying so is the point — an undischarged finding and a finding whose subject was never a
+mechanism read identically once the argument for it has been retracted.
+
+---
+
+## F162 — a type error in a test file is invisible to the suite that runs it, and a green `check` was published for a commit that does not typecheck ★★
+
+**`afb88c4` does not typecheck**, and its report said `check` was clean. Found on the next
+session's first `make check`, with the working tree otherwise untouched:
+
+```
+test/integration/confirm.test.ts(522,28): error TS2353: Object literal may only specify
+  known properties, and 'key' does not exist in type 'Readonly<{ default?: true; }>'.
+```
+
+**The suite could not have caught it, and that is the durable half.** `make test` ran
+T4.31 — the row containing those lines — and passed it, along with 2808 others. Vitest
+transpiles rather than typechecks, so **a type error inside a test file is invisible to the
+test it is inside**: the row executes, asserts, and goes green. Nothing in a passing suite
+distinguishes a file that typechecks from one that does not.
+
+**Which of the two causes produced the false green cannot be reconstructed** — `check` run
+before T4.31 was written, or its counters misread — and it does not matter, because both have
+one remedy: **`check` is the last target run, not the first.** A gate run before the final edit
+is a gate not run, and it reports identically to one that was.
+
+**The defect it was hiding is small and the fixture rule already forbade it.** `defaultStart`
+takes `readonly Readonly<{ default?: true }>[]` because that is all it reads; the test handed it
+bare literals of exactly that shape, which is a fixture that **cannot be a choice**. `tsc`'s
+excess-property check is what said so. Fixed by giving the fixtures the real `Choice` type,
+labels and all — *a fixture must be the thing under test* (`test/support/README.md`), and here
+the type system was the thing enforcing it.
+
+**Related to F142's class from the other side.** F142 is a count with no mechanism; this is a
+mechanism whose result was reported without being re-run. Both publish a number that was true
+once.
+
+---
+
+## F163 — golden has never seen a frame, and its README says it has ★★
+
+| | |
+|---|---|
+| **Surface** | the golden suite itself, found while reading roadmap 24's residue |
+| **Reached for** | any golden coverage of the arm roadmap 39 added |
+| **Verdict** | **a real Calcium finding**, filed rather than fixed — roadmap 49 |
+| **Absorbed by** | nothing; the gap is stated and the entry that closes it is its own |
+
+`test/golden/README.md` reads, in full:
+
+```
+# golden
+
+Frames at 4 widths x 2 themes x 2 unicode modes.
+```
+
+**Not one of them is a frame.** `blocks`, `table`, `patch` and `plot` all go through
+`measurable().renderToLines`, which is C09's block renderer. No golden test imports anything
+from `src/shell/`, so **`paint.ts` has never appeared in a golden snapshot** — and neither has
+`composite`, `render-frame`, or the frame assembly that puts a header, a transcript, a prompt
+and a footer into `rows × columns`.
+
+**What that costs, named rather than counted.** Everything the painter alone decides is
+uncovered by the category built to cover exactly this kind of change:
+
+| Never in a golden snapshot | Where it is decided |
+|---|---|
+| the theme's background base | `paint.ts` `based` (C22 I65) |
+| the prompt window and its elision markers | `paint.ts` `promptWindow` (C22 I62) |
+| the selection wash | `paint.ts` `washed` (roadmap 23) |
+| the chrome rows, and the frame's height arithmetic | `frame.ts` + `paint.ts` (S01 §3) |
+| the cursor shape and position sequences | `render-frame.ts` (C22 I63) |
+| the diff a frame is written as | `render-frame.ts` `body` (C22 I57) |
+
+**This was found by re-measuring a residue rather than by a test.** Roadmap 39 recorded *every
+golden frame is still drawn on the inheriting branch*, whose stated reason was that `dark`
+inherits — true, and not the reason. The real one is that **golden stops one layer below the
+painter**, which no amount of adding themes changes. A residue is a claim like any other, and
+this one was wrong in the direction that made the gap look smaller than it is: had it been
+right, entry 24 would have closed it as a side effect.
+
+**Why it is not roadmap 24's to fix.** A golden *frame* category needs a composed frame, which
+needs a session's deps — a stand-in registry, capabilities, a transcript, a prompt — and the
+snapshot has to be stable across an unrelated change to any of them. That is test
+infrastructure with more consumers than a theme: every entry above touches it, and three of
+them shipped defects that a golden frame would have shown at review time (C22 §6e's two, and
+entry 16 step 3's cut choices).
+
+**The README is the durable half.** A category whose own description names something it does
+not contain reads as covered for as long as nobody opens it, which is the compression class
+one level up: **the summary kept the claim and dropped the condition that made it true.**
+
+**Second instance, measured when `high-contrast` shipped (2026-08-14): golden's theme list is a
+literal too.** `test/golden/blocks.test.ts` opens with four hand-written variants pairing
+`DARK_THEME` and `LIGHT_THEME` with two capability records, and `table.test.ts` a two-entry
+list beside it. So the third shipped theme joined **no** golden snapshot and the suite stayed
+green — the same shape as the contrast suite's `VARIANTS`, which was fixed in the same session
+because it drove eleven floor and injectivity rows.
+
+**Not fixed here, and the reason is a cost rather than a principle.** Deriving golden's list
+from the theme set triples a snapshot corpus that already covers every block kind × four
+widths × two unicode modes, to catch token edits that the contrast rows catch by measurement
+and more precisely. **What it would actually buy is a rendering of a theme nobody has looked
+at**, which is worth having and is worth having *as a frame* — so it belongs to whoever builds
+the category above rather than to a theme. Recorded so the exemption is counted rather than
+excluded.
+
+---
+
+## F164 — `src/index.ts` names a type in its header as one a reader will not find, and exports it eighty lines down ★★
+
+| | |
+|---|---|
+| **Surface** | the public APIs
+
+---
+
+## F164 — `src/index.ts` names a type in its header as one a reader will not find, and exports it two hundred lines down ★★
+
+| | |
+|---|---|
+| **Surface** | the public API's own file, found while measuring roadmap 48's population |
+| **Reached for** | the list of published types, which is the input to the by-use signal |
+| **Verdict** | **a real Calcium finding** — one file, two statements about the same decision |
+| **Absorbed by** | nothing; the header is corrected here |
+
+The file header lists **two things a reader will look for and not find**, and the first is
+`ViewRefresh`:
+
+> Exporting the declaration type of a mechanism nothing runs is A03 §2's vacuity class
+> arriving as an export … It returns with `b.live` (§5) and **not before**.
+
+`b.live` is at `src/shell/builders/index.ts:649`. `ViewRefresh` is exported at
+`src/index.ts:245`, under a note of its own saying exactly that — *back on the list … the
+condition named was the driver, not a release, and C23 I32 to I35 met it.*
+
+**Both notes are correct and they are about the same decision.** The condition was met, the
+export returned, and the sentence excusing its absence stayed where it was — so the file's
+summary and the file's body disagree about what the file exports, and only the summary is
+read first.
+
+**This is the deferral class, and it is the fourth instance.** A deferral names a condition
+and nothing watches it, and the shape the first three shared is that **the condition is
+written where the deferral is and the thing that satisfies it is written somewhere else.**
+This one tightens that: the satisfier is **in the same file**, two hundred lines apart, and
+neither half is wrong. Proximity is not what makes a deferral expire — being looked at is,
+and a header is the part of a file nobody re-reads.
+
+**It was found by a population step rather than by reading.** Roadmap 48's signal derives its
+subject from the `export type` clauses, so `ViewRefresh` appeared in a list the header says
+does not contain it. Nothing about the discrepancy is visible to a reader of either note, and
+the file typechecks, publishes and passes `make enforce` either way.
+
+**Fixed** — the header names the one withheld thing it still withholds, and records that the
+other returned, so the note that would go stale next is the one a reader can check.
+
+---
+
+## F165 — three of `ErrorLike`'s five members are produced on every route and rendered nowhere ★★★
+
+| | |
+|---|---|
+| **Surface** | every failure document, on both routes |
+| **Reached for** | `ErrorLike.details`, a candidate in roadmap 48's residue |
+| **Verdict** | **a real Calcium finding** — a published type filled by three producers and one app, read by nothing |
+| **Absorbed by** | nothing; the ruling is owed |
+
+`ErrorLike` publishes five members. `errorDoc` — `src/shell/documents.ts:227` — renders
+**two**:
+
+```
+message      → the error notice
+remediation  → a second notice, tone info
+code         → nothing
+stage        → nothing
+details      → nothing
+```
+
+`error.code`, `error.stage` and `error.details` do not appear on the right-hand side of an
+expression anywhere in `src/`. They are produced on every route that can fail:
+
+| producer | what it fills |
+|---|---|
+| `data/adapters/mapping.ts:107–115` | `code`, `stage`, `details`, **off the far side's own error envelope** |
+| `data/viewmodel/patch.ts:32` | `stage` and `code: "patch"` on a rejected patch |
+| `data/manifest/validate.ts:97` · `interaction/parser/parse.ts:45` | `details` on a validation and a parse failure |
+| `examples/docker`, **twelve sites** | `stage: "adapter"` and `stage: "local"`, by hand |
+
+**The app is the part that makes this a finding rather than an unused field.** Six call
+sites in `examples/docker` write `stage` into an `error`, which is a consumer supplying a
+field on the reasonable belief that supplying it does something. Nothing renders it, nothing
+logs it, and no test asserts it reaches a frame. The far side's structured `details` — the
+one thing a JSON-emitting CLI can say about *why* beyond a sentence — is parsed, typed,
+frozen and dropped.
+
+**Found by a residue, and the residue found one of the three.** Roadmap 48's signal lists
+`ErrorLike.details` because neither example names it. `code` and `stage` were **cleared** —
+`stage` by the app's own twelve sites, `code` by a name any type may carry — which is the
+instrument's stated direction working as described: it under-reports, and the read that
+starts from one member is what reaches the other two. **A candidate is where to look, not
+what is wrong**, and this is the first measured instance of that being the useful shape.
+
+**MG24 cannot see any of the three.** Each is *constructed* somewhere, and MG24's record arm
+counts construction as consumption for F94's reason — a deps record supplied by object
+literal is genuinely wired. For a **document** type the two are not the same act: a field a
+producer sets and no renderer reads is exactly F21's shape, and the rule that exists to
+catch it reads the setter as the consumer.
+
+**Not fixed here, and the reason is that the remedy is a ruling.** Three dispositions, and
+they are not obviously ordered: render them (a `code` in a corner and a `details` table is a
+design question C09 owns), drop them from the type (a public narrowing, F58b's shape and its
+argument), or keep them as the structured half of a document an agent reads rather than a
+person. The last is the one that would explain `details` existing at all. What is not
+available is the current state, where a producer, an adapter and an app all fill fields on a
+promise nothing keeps.
+
+### The twelve sites read, and they split the three members rather than settling them together
+
+**The count was wrong first, and how it went wrong is the point of recording it.** F165 said
+*six sites*, from a `grep | head -6`. There are **twelve**. A number produced by a truncated
+command reads exactly like a number produced by a count, which is the instrument-manufactures-
+evidence class in its simplest shape — and it survived into three documents because nothing
+about it looked derived.
+
+**Not one of the twelve is a runtime discrimination.** Each writes a literal determined by the
+kind of function it sits in — a local handler writes `"local"`, an adapter writes `"adapter"` —
+and no site chooses between the two at runtime. All twelve pair it with
+`blocks: [b.notice.error(message)]` carrying the same message the `error` object does.
+
+| what a reader has | what `stage` adds |
+|---|---|
+| a reader of the **source** is reading the local handler, or the adapter | the name of the file they are in |
+| a reader of the **screen** sees the notice | nothing; it is rendered nowhere |
+
+So it is **not** documentation-in-place. It is ballast on a required field, and `ps.ts:161`'s
+own comment says how it got there: C04 I3 requires `error` when `status` is `"error"` and its
+absence is silent (F35), so the author wrote an `ErrorLike` — and `stage` came with the type
+rather than from a decision to signal anything.
+
+**That makes `stage` group 1's shape and not this group's.** The framework already knows the
+route: C23 is what ran the local handler or the adapter. A fact the framework holds and the app
+is asked to author twelve times is F13 exactly, and the disposition is neither *narrow* nor
+*wire* — it is **the app should not be writing it**.
+
+**`code` and `details` are the opposite case, and this is where narrowing removes something
+real.** Both arrive from the far side's own error envelope at `mapping.ts:107–115`. A
+JSON-emitting CLI saying `{"code":"NO_SUCH_CONTAINER","details":{"id":"abc","exit":137}}` is
+saying something no other part of the system has, and the framework parses it, types it,
+freezes it and drops it. Narrowing the type deletes the only channel the far side has for
+structured failure.
+
+**So: three members, two dispositions, and neither is the one the finding opened with.**
+
+| member | who authors it | disposition |
+|---|---|---|
+| `stage` | the app, twelve times, as a per-file constant | **the framework's fact** — supplied or dropped, not authored (F13) |
+| `code`, `details` | the far side, through the adapter mapping | **rendered or deliberately withheld** — a C09 question, and the one place a narrowing costs something |
+
+**This session's precedent does not decide it, and that is the finding about the precedent.**
+F58b narrowed because its seven fields were *computed and thrown away* by a producer that
+gained nothing from them. `stage` is authored deliberately and is still worth removing;
+`details` is not authored at all and is worth keeping. **Whether a field is written by hand
+turns out not to be the axis** — what decides it is whether anyone but the framework could
+know the value.
+
+### The disposition, taken — and the removal falsified by the first compile
+
+**`stage` was ruled out and does not go.** The read that produced the ruling covered the
+**twelve app sites** and stopped there. Removing the field from `ErrorLike` failed to compile
+in **eight more**, all in `src/shell/execution.ts`, and they are a different thing entirely:
+
+```
+stage: "parse"      no manifest is loaded
+stage: "spawn"      the child could not be started
+stage: "handoff"    the terminal could not be given up
+stage: "local"      no handler, or the handler threw
+stage: "transport"  the far side failed to answer
+```
+
+**Every one is a genuine runtime discrimination**, authored by the party that knows — which is
+exactly what the axis protects. The twelve app sites were wrong for a reason the eight are
+right for: *only the framework can know which stage failed*, so the framework writing it is
+correct and the app writing it is F13's class.
+
+**So the finding stands and the remedy inverts**: the field stays, and what goes is the app's
+authorship of it. *Written by hand* decided nothing, and neither did *rendered nowhere* —
+what decided it is who could know the value, and that rule keeps all three members and moves
+twelve call sites.
+
+| member | who can know it | disposition |
+|---|---|---|
+| `code`, `details` | the far side, through the adapter mapping | **kept and read** — `errorDoc` shows the code beside the message |
+| `stage` | the framework, at eight sites in the pipeline | **kept**; the twelve app writes are the defect |
+
+**The ruling to remove it was taken on a read of twelve sites and the compiler found eight
+more in one second.** That is the cheapest possible falsification and it arrived only because
+the change was attempted — a read cannot be exhaustive about who writes a field, and the
+type system is exhaustive about it by construction.
+
+**Rendered now**: `documents.ts` prefixes the notice with the code when there is one, which is
+the cheapest possible consumer and the half a reader can search for. `details` has no renderer
+yet — it is structure rather than a sentence, and what draws it is a C09 question — so T1.42
+asserts the document still carries it rather than letting it be dropped quietly.
+
+### The open half, closed — and nothing failed, which is what it measured
+
+The twelve writes are gone. The app's typecheck is clean and its suite is **308 passed before
+and 308 passed after**, with no expected value anywhere changed.
+
+**The prediction was that rows would fail and that a changed expectation would show the app
+had been writing something wrong.** Fourteen assertions in the app's suite touch `.error`, and
+every one of them reads `message` or asserts existence. Not one reads `stage`. So the removal
+is invisible to the suite **by construction** — the field was write-only for its whole life:
+twelve authored sites, no renderer, no assertion, no frame.
+
+That is weaker evidence than a failing row and it is still worth having, because it is the
+same shape F13 names: *not the app's to author, authored twelve times* — and the reason
+nobody noticed is that nothing anywhere was looking at it.
+
+**What did move is the instrument, and that is the confirmation.** Roadmap 48's residue
+**cleared** `ErrorLike.stage` on the day it landed, and cleared it *because the app named it*.
+Measured both ways round on the same tree:
+
+| | candidates | clearings | ambiguous |
+|---|---|---|---|
+| with the twelve writes | 88 / 327 | 226 | 144 |
+| without them | **89 / 327** | 225 | 144 |
+
+The single member that moved is `ErrorLike.stage`, from cleared to candidate. **A residue that
+measures use responds to a change in use**, which is the founding claim of A03 §9 exercised
+rather than asserted — and it means the instrument would have listed `stage` from the start
+had the app not been supplying its own clearing.
+
+
+---
+
+## F166 — 44's blocker is a document serialiser, and a document is already JSON ★★★
+
+| | |
+|---|---|
+| **Surface** | roadmap 44's row, and roadmap 34's residue |
+| **Reached for** | entry 34's *structured export*, picked because 44 was measured as blocked on it |
+| **Verdict** | **the claim is false**, and the thing it names exists in two halves that already ship |
+| **Absorbed by** | nothing; 44's row is corrected and 34's residue reworded |
+
+44's row says, of session resume:
+
+> the **codec does not** [generalise]. What it actually needs is a document serialiser, and
+> there is none in `src/`: the only `JSON.stringify` calls are diagnostics, validation
+> messages and the fixture corpus. That is entry **34**'s structured export.
+
+**Measured instead of read.** A `ViewDocument` built through the public builders, stringified,
+parsed and revalidated:
+
+```
+direct:          ok
+round trip:      ok
+byte-identical:  true · 517 bytes
+```
+
+`notice`, `table` and `keyValue`, through `b.*`, `JSON.stringify`, `JSON.parse` and
+`validateDocument`. **The document is JSON by construction** — `src/data/viewmodel/types.ts`
+declares no function, `Map`, `Set` or `Date` member anywhere in the block union; the only
+function types in the file are `MeasureFn` and the measurer's signature, which are not
+document fields.
+
+So the serialiser is `JSON.stringify`, and the half that is actually hard — turning untrusted
+JSON back into a `ViewDocument` — is `validateDocument`, which **exists, is exported from the
+component barrel, and is called by C13's store on every append and every settle**
+(`src/viewport/transcript/store.ts:88`, `:189`).
+
+**What is genuinely missing is one line and one test**, neither of which is entry 34:
+
+| the row's claim | at HEAD |
+|---|---|
+| no document serialiser | `JSON.stringify`, and the document is pure data |
+| — | `validateDocument` is **not in `src/index.ts`**, so 44 cannot reach it from outside |
+| — | the round trip is asserted for **no** kind; there are 24, and the claim above is measured on three |
+
+**Two documents citing each other is not a record.** 34's row lists *structured export* inside a
+six-item UX bundle — animation, change highlighting, finish notifications, error remedies,
+empty states — where it plainly means *let the user export what is on screen*. 44's row reads
+that phrase as *a `ViewDocument` codec*, which is a different mechanism at a different layer,
+and the status table's residue then restated it in API terms — *no `exportAs`/`toJSON`
+anywhere in `src/`* — a phrase whose only source is the grep that checked it. **Three
+statements, one unmeasured belief**, and the third is the one that reads most like a finding
+because it names symbols.
+
+**And the conflation is what let it survive.** Both readings are about "exporting a document",
+nothing in either row forces a choice, and the reading that blocks 44 is the one that
+propagated — so 44 has sat blocked on an entry that was never about it. This is F58's shape
+exactly: the same words, two referents, and the summary picked the wrong one.
+
+**What 44 actually needs, now that the codec is not it**: a persistence *policy* for transcript
+entries — ids, revisions, ordering, the cap and eviction — which its own row already describes
+correctly and calls *C20's shape one level up*. That half is real. It is not blocked on 34.
+
+---
+
+## F167 — a numeric array was checked for being an array and never for holding numbers ★★★
+
+| | |
+|---|---|
+| **Surface** | `validateDocument`, on every route a document arrives by |
+| **Reached for** | the JSON round trip roadmap 44 rests on (F166) |
+| **Verdict** | **two real Calcium defects**, both shipped, neither reachable by any existing test |
+| **Absorbed by** | nothing; fixed here — C04 I46, T2.18, T2.19, T3.24, T6.27, T6.28 |
+
+**The first is silent in both directions, which is what makes it worth the star.** A plot
+series carrying `NaN` validated. `JSON.stringify` writes it as `null`. The reloaded document
+validated **too**. So a persisted document came back as a *different document that
+revalidated clean*, and nothing on the way through could say which of the two it was drawing.
+
+```
+validateBlock([1, NaN])        → ok
+JSON.stringify                 → [1, null]
+validateBlock([1, null])       → ok        ← the second agreement is the defect
+```
+
+**The second is wider than the round trip that found it.** `Series.values` and `Cell.spark`
+were never element-checked at all: `requireArray` established the array and stopped. A
+string, a `null` or an object in a numeric array validated with or without a round trip —
+which means an untrusted document from a far side could put anything there and C12 would do
+arithmetic on it. Nothing about persistence is involved; the property is simply what made
+anybody look.
+
+**Both were invisible to every instrument.** MG24 and MG27 walk declarations. The measurement
+sweep runs `measure` against rendered height and never asks what a value *is*. The validator's
+own suite has a row per kind, and a row indexed by *kind* tests each kind's rules against
+themselves — the defect lives where *the type says number* meets *JSON's number is not
+JavaScript's*, which is a cell no per-kind row occupies. Four other numeric fields in the same
+file — `height`, `current`, `total`, `flex` — already used `isFiniteNumber`. **The concept was
+present and the arrays were not covered by it.**
+
+### And the half that cannot fail, which the mutation pass is the only thing that asked
+
+The round-trip property has two halves and **only the validator half can be violated by an
+input**. Every member of the block union is a string, a number, a boolean, an array or a
+record — no `Date`, no `Map`, no `bigint` — so `JSON.parse(JSON.stringify(d))` equals `d` for
+every document that can be constructed, and deleting the equality assertion fails nothing.
+
+**That is the finding rather than a gap to patch.** What falsifies that half is a *type
+change*, not an input: the day a kind carries a value JSON drops, the assertion is the only
+thing in the suite that says so. It is kept, and C04 §5a says which half is which — because a
+row that reads as covering something it cannot reach is A03 §2's vacuity class wearing a test
+id, and the mutation pass is the only instrument that asks a passing assertion whether it
+could ever have failed.
+
+**Predicted, and worth recording as such.** The instruction that produced this was *fabricate
+one that fails; if nothing can be made to fail, the sweep is vacuous and that is the finding.*
+Both outcomes happened, in different halves of one property — three fabrications landed on the
+validator, and the equality half turned out to be the vacuous one.
+
+---
+
+## F168 — session resume would write container environment variables to disk, and the redactor cannot see them ★★★★
+
+| | |
+|---|---|
+| **Surface** | roadmap 44, before any of it was built |
+| **Reached for** | C20's persistence policy, which 44's row says generalises one level up |
+| **Verdict** | **the policy generalises and the *redactor* does not** — the half the row is silent about |
+| **Absorbed by** | nothing; C13 §5b records the walk and the ruling is owed |
+
+44's row says the transcript is already a store with a cap and eviction, so persisting it is
+**C20's shape one level up**. F166 corrected the codec claim in that row. This is the other
+thing it does not say, and it is the expensive one.
+
+**C20's persistence has a redactor because the thing it writes is dangerous.** `redact.ts` is a
+tokeniser over a **command line**: positional rules on flag names — `--token`, `--password`,
+`api-key` at a boundary — then entropy over the remaining tokens. C20 I6 is the principle:
+*redaction applies to persisted data only; the in-session entry keeps its value.*
+
+**A transcript document is a strictly larger surface and a differently shaped one.** It holds
+what the far side **printed**, not what the user typed. The reference app has the canonical
+case in it today:
+
+```
+examples/docker/src/inspect.ts:152
+    Env: listOf(envRows(inspected)),
+```
+
+Every environment variable of the inspected container, verbatim, into a `keyValue` block —
+which is where `POSTGRES_PASSWORD` and `AWS_SECRET_ACCESS_KEY` live on a real machine. So 44
+as its row describes it writes those to `TuiConfig.stateDir` in plain text.
+
+**And the redactor cannot be reused, which is why this is a ruling rather than a task.** It
+works on a tokenised command line, splicing C18's spans back into the string they were measured
+in. A rendered document has no tokens: to find a secret in it you would have to understand what
+each of the seventeen kinds means — a `keyValue` value, a `logs` line's message, a `code`
+block's text, a table cell — and be right about all of them. **A redactor that is wrong about
+one kind is worse than none, because it is switched on.**
+
+### The second thing, which moves the design rather than blocking it
+
+**A history entry is immutable once appended; a transcript entry is not.** It is patched and
+settled after the moment it would already have been written, so append-only with an
+index-aligned sidecar — the shape C20 uses and the shape the row promises — assumes something
+about a transcript that is false on the commonest path:
+
+| the sequence | the file | memory |
+|---|---|---|
+| `append` → write → `patch` | `rev` 0 | `rev` 1 |
+| `append` → write → `settle` | the pending document | the final one |
+| `append` → write → `evict` | the row | dropped |
+
+**The recommendation the trace produces is one line: persist settled entries only.** All three
+rows are a row written before it stopped changing, and settling is where it stops. Live and
+streaming entries are unsettled by definition, so their two questions disappear rather than
+needing rules. The cost is stated rather than hidden — a session killed mid-command loses that
+command's output, which is sometimes the entry the reader most wants back.
+
+**Neither of these is visible from the row, and both were free to find.** The redaction one
+came from reading what C20's persistence actually contains rather than what it does; the
+mutation one from putting C13's own state machine beside C20's file format. Twenty minutes,
+before a line of it existed, on an entry whose row had already been corrected once this session.
+
+
+---
+
+## F169 — a `file:line` citation is a claim that expires, and the gate reads half of them ★★★
+
+| | |
+|---|---|
+| **Surface** | `CALCIUM_ROADMAP.md`, `docs/`, `examples/docker/*.md` |
+| **Found by** | a census, prompted by one citation breaking under an unrelated edit |
+
+**The prompt was cheap and the answer was not the expected one.** Editing
+`src/data/viewmodel/types.ts` for F165 shifted a line the roadmap cited, and `make roadmap`
+failed on *`src/data/viewmodel/types.ts:440` is blank*. The gate did its job; the question it
+raised is how much of the prose is exposed that way — because if most citations carry a line,
+**every edit to a cited file is a documentation edit**, and that is a tax the verifier makes
+visible without removing.
+
+### The census
+
+Every backticked path into `src/`, `tools/`, `test/` or `examples/` in every `.md` in the
+repository, split by whether it carries a line number:
+
+| | `file:line` | `file` alone | lined |
+|---|---|---|---|
+| `CALCIUM_ROADMAP.md` | 79 | 29 | **73%** |
+| `examples/docker` | 49 | 88 | 36% |
+| `docs/` | 15 | 62 | 19% |
+| `CLAUDE.md`, `README.md` | 0 | 4 | 0% |
+| **total** | **143** | **183** | **44%** |
+
+**So it is neither a handful nor most of them — it is concentrated.** The specs, which are the
+contract and the thing most read, are 19% lined and cite a file plus a symbol; the roadmap,
+which is a working record rewritten constantly, is 73%. The tax exists and it falls almost
+entirely on the document that is cheapest to repair, which is the disposition rather than a
+coincidence: a spec citation has to survive years and a roadmap citation has to survive a step.
+
+### Six unresolved, and the three kinds
+
+Resolving all 143 against the tree — the file exists, the line is within it, the line is not
+blank, which is `roadmap-status.mjs`'s own standard:
+
+| kind | count | instance |
+|---|---|---|
+| the target moved | 3 | `src/shell/confirm.ts:148` → `:234`, `src/shell/types.ts:432` → `:484`, `src/data/manifest/framework.ts:126` → `:148` |
+| the path is ambiguous between two trees | 2 | `src/progress.ts:31` in the app's own docs — there is one under `examples/docker/src/` and the census resolved it from the repo root |
+| **cited outside what the gate reads** | 1 | `confirm.ts:148`, in an entry body rather than an evidence cell |
+
+All six are fixed. The second kind is worth its own line: `src/logs.ts` and `src/progress.ts`
+exist in both trees, so a bare `src/` citation inside `examples/docker` means whichever the
+reader assumes. Qualified now.
+
+### The number that matters: the gate reads the evidence cell and not the entry
+
+`roadmap-status.mjs` matches `| N | BUILT|PART|RULED | … |` and resolves the citations in that
+cell. Entry bodies — where the reading notes, the walk records and the corrections live — are
+never scanned:
+
+| | citations | with a line |
+|---|---|---|
+| evidence cells — **checked** | 101 | 72 |
+| entry bodies — **unchecked** | 81 | **39** |
+
+**`make roadmap` reports 49/49 and resolves 56% of the file's citations.** The one stale
+citation this census found was in the unchecked half, which is what a blind spot looks like
+from inside: the gate was green, correctly, about the part it reads.
+
+### Why the rule is not built here, stated rather than left implicit
+
+Widening the resolver to entry bodies is one change to an existing tool and it is refused for
+a measured reason: **50 of the 81 body citations name a bare file with no directory**, 30 of
+them with a line — `confirm.ts:194`, `keys.ts:496` — written that way because the surrounding
+sentence has already said which component. Resolving those needs a basename search, and `src/progress.ts` versus
+`examples/docker/src/progress.ts` is the case where a basename search resolves against the
+wrong file and reports green. That is the class `docs/COMMITMENT_INVARIANT_AUDIT.md`
+§Fourth pass argues should not be automated.
+
+So the disposition is a habit and a number rather than a gate: **the roadmap's entry bodies
+are unverified prose, and a citation there is worth a symbol rather than a line.** The census
+is repeatable in twenty lines and is written down in this finding; what it costs to re-run is
+the argument for not building the ambiguous half of it.
+
+---
+
+## F170 — the gap had no legal spelling, and two correct invariants is why ★★★★
+
+| | |
+|---|---|
+| **Surface** | `Series.values` / `Cell.spark`, on every route a document arrives by |
+| **Reached for** | C12's heatmap walk, reading the validator arm a matrix would need |
+| **Verdict** | **a real Calcium defect**, live for one commit, invisible to the whole suite |
+| **Absorbed by** | nothing; fixed here — C04 I46a, C12 I4, T1.16, T2.19 |
+
+**C12 I4** makes a non-finite entry a gap whose position survives: the line breaks across it,
+the sparkline marks it. **C04 I46** refuses a non-finite element, because `JSON.stringify`
+writes one as `null` and a document that reloads as a *different* document is worse than one
+that is refused. Each is right. Their overlap is that **absence was expressible in the type and
+inexpressible in a valid document.**
+
+```
+b.plot({ series: [{ values: [1, 2, NaN, 4] }] })   constructs — the constructor checks height and yFormat
+validateDocument(…)                               refused (I46)
+JSON.stringify(…)                                 {"values":[1,2,null,4]}   ← already not `readonly number[]`
+```
+
+**The ring had been building one since the previous commit and nothing noticed**, because a
+constructed block never reaches the validator — C04 §3's standing reason for checking in both
+places, arriving as a consequence.
+
+### Three passes over one claim, each wrong somewhere else
+
+| | claim | verdict |
+|---|---|---|
+| `history.ts`, a roadmap entry, a planning note | *the type has no gap value* | false — `NaN` renders correctly |
+| the correction that replaced them | *the type carries absence, so the freeze argument dissolves* | false at the document boundary |
+| this finding | absence is representable in memory and **not in a document**; `null` is the only spelling JSON carries | measured |
+
+**The conclusion the first pass reached was right and its reason was wrong; the second pass got
+the reason right and the conclusion wrong.** What settled it was running the validator, which
+costs a minute — and this is the sixth blind spot's instrument pointed at a claim of my own,
+which is where it had not yet been aimed.
+
+**The remedy is one member and no logic**: `readonly (number | null)[]`, with `NaN` and
+`Infinity` still refused because they round-trip into something else and `null` round-trips
+into itself. Every consumer took it unchanged — `Number.isFinite(null)` is already `false`.
+
+---
+
+## F171 — a ramp step that draws as padding, in the arm no frame renders ★★★
+
+| | |
+|---|---|
+| **Surface** | `sparkline` at `ambiguousWidth: "wide"` — which is what C11 draws into a table cell |
+| **Reached for** | C12's heatmap walk, whose subject is magnitude carried by a glyph |
+| **Verdict** | **a real Calcium defect**, shipped, and every assertion in the suite passed against it |
+| **Absorbed by** | nothing; fixed here — C12 I16, T1.15, a golden frame for the arm |
+
+`RAMP_BRAILLE` began at `U+2800` — BRAILLE PATTERN BLANK. So the **minimum** of every series
+drew as whitespace, which the right-anchor already uses to mean *fewer samples than cells*.
+
+```
+sparkline([0, 5], 6, wide)   "    ⠀⣿"     20,20,20,20,2800,28ff
+                                  └────── four pad cells and one lowest reading
+```
+
+One character, two meanings — which is precisely what C12 §4 spends a paragraph refusing for
+the *absent* case, arriving on the other arm and shipping. The ramp was also non-monotone in
+ink: dot populations `0,1,2,3,4,5,6,8`, so the last step was a double jump.
+
+**Nothing could see it.** `cells()` counts a blank braille cell as one, so every width row
+passed; `toHaveLength` counts it, so every length row passed; and **no golden frame renders the
+wide arm at all.** The only instrument that reaches a glyph nobody can see is a picture, and
+the corpus had none.
+
+### The corpus gap is measured, not inferred
+
+`test/golden/blocks.test.ts` frames `Object.values(ONE_PER_KIND)`, and `ONE_PER_KIND` is a
+`Readonly<Record<BlockKind, Block>>` — **exhaustive over kinds, one state of each**. It answers
+*does this kind render* and can answer nothing about *which state it is in*, so a new state of
+an existing kind is invisible to it by construction. That is why three consecutive behaviour
+changes — the continuation mark, the gapped series, the chip — each left golden green and each
+needed a frame added by hand. Three coincidences with one cause.

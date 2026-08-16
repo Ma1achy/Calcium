@@ -31,15 +31,16 @@
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
-import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
-import { SGR_RESET } from "../terminal/escapes.js";
+import { background, paint as paintSpans, tone } from "../presentation/blocks/paint.js";
+import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
 import { promptFor, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
 import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
-import type { Cell } from "../interaction/editor/index.js";
+import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
+import { resolveBase } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -64,6 +65,19 @@ export type PaintDeps = Readonly<{
   overlays: () => readonly Placed[];
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
+  /**
+   * The selection's cells, in the prompt's own layout (entry 23, C17 I21).
+   *
+   * **Cells to style, never cells to add** — I17 with C11 I9. The wash is a
+   * style over the same grid, exactly as the patch renderer's added and removed
+   * lines already are, so `measure` never sees it and `promptRows` is the same
+   * number with a region and without one. **A row of chrome — a marker line, a
+   * bracket, a status row — is forbidden by the same invariant**, and that is
+   * the constraint at every step rather than a note about this one.
+   *
+   * Empty when there is no region, so the common case costs one array.
+   */
+  promptSelection: () => readonly CellSpan[];
   /** Whether the prompt is where keys are going — C16's derived focus. */
   promptFocused: () => boolean;
   /**
@@ -89,6 +103,15 @@ export type PaintDeps = Readonly<{
    * claimed the compositing since C22 was written.
    */
   ghost: () => string | null;
+  /**
+   * Whether the user has turned the theme's background off for this invocation
+   * (C22 I66, C10 I25).
+   *
+   * A function, read fresh at paint for `spinning`'s reason rather than for a
+   * new one: `/theme light --no-bg` changes it between frames, and a value
+   * captured at construction is the setting the session opened with.
+   */
+  suppressBackground: () => boolean;
 }>;
 
 /**
@@ -116,7 +139,7 @@ const ELISION: readonly [unicode: string, ascii: string] = Object.freeze(["⋯",
  * exists and is not called, which from the call site is indistinguishable from
  * one that does not exist.
  */
-function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode">): string {
+function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): string {
   return spinnerFrames(caps)[0] ?? "";
 }
 
@@ -219,69 +242,187 @@ export function commandRows(
   );
 }
 
+/**
+ * The window the prompt draws, anchored on the cursor (I62, §6e).
+ *
+ * **It was anchored on the buffer's end, with the deferral naming its own
+ * blocker** — *until C17's `cursorCell` is threaded through* — and the blocker
+ * had landed: `cursorCell` is on `EditorHandle` and `PaintDeps.promptCursor`
+ * already carried it into this file, read forty lines below by `cursorFor`.
+ * Two defects lived in the simplification it was still excusing, and both were
+ * *at rest* rather than event-mediated, which is why the classification table
+ * found them and the trace would not have.
+ *
+ * **`count` exists because the range test was the defect.** Membership was
+ * tested on the painted index — `0 ≤ within < cap` — where a marker row and a
+ * content row are the same kind of number, so the row immediately above a
+ * marked window mapped to painted 0 and both consumers wrote there: the
+ * terminal cursor was drawn **on the elision marker**, and a selection span
+ * **washed** it. Returning the content range makes the honest test available
+ * to both, and neither consumer was wrong about its own rule.
+ */
 function promptWindow(
   frame: Composed,
   rows: readonly string[],
+  cursor: number,
   // The capability reaches here for the elision marker alone; `promptRegion`
   // holds `deps` and passes it down rather than a second read (C09 I22).
   caps: Pick<TerminalCapabilities, "unicode">,
 ): PromptWindow {
   const elision = caps.unicode === "ascii" ? ELISION[1] : ELISION[0];
   const cap = frame.promptRows;
+  const n = rows.length;
+  if (n <= cap) return { rows, first: 0, offset: 0, count: n };
 
-  // **A cap of one shows the last row and no marker** (S01 §3, commitment 14).
-  // The window below is the marker plus the rows after it, and at `cap = 1`
-  // there are none: the slice is empty and the prompt paints as `⋯` alone, with
-  // the typed command nowhere on the screen. An elision that elides everything
-  // annotates nothing, and one row of the command beats a marker reporting that
-  // a command exists.
-  if (rows.length <= cap) return { rows, first: 0, offset: 0 };
-  if (cap === 1) return { rows: [rows[rows.length - 1] ?? ""], first: rows.length - 1, offset: 0 };
+  const at = Math.min(Math.max(0, cursor), n - 1);
 
-  // Around the end rather than around the cursor, until C17's `cursorCell` is
-  // threaded through: the cursor is at the end for every case but a mid-buffer
-  // edit, and showing the wrong window is worse than showing the last rows.
-  // Named here so it is a known simplification rather than a silent one.
-  const first = rows.length - (cap - 1);
-  return { rows: [elision, ...rows.slice(first)], first, offset: 1 };
+  // **A cap of one shows one row and no marker** (S01 §3, commitment 14): the
+  // window is the marker plus what follows it, and at `cap = 1` there is
+  // nothing to follow — the prompt painted as `⋯` alone with the command
+  // nowhere on the screen. The row shown is now the **cursor's** rather than
+  // the last; the ruling this row carries is *content beats a marker*, and
+  // which row was always incidental to it (§6e.4).
+  if (cap === 1) return { rows: [rows[at] ?? ""], first: at, offset: 0, count: 1 };
+
+  // The cursor inside the last window's worth: identical to the tail anchoring
+  // this replaced, which is the common frame and is why the change is invisible
+  // wherever the cursor already was (T1.21d, T6.49).
+  const tail = n - (cap - 1);
+  if (at >= tail) {
+    return { rows: [elision, ...rows.slice(tail)], first: tail, offset: 1, count: cap - 1 };
+  }
+
+  // The head, where the elision is **below**. A marker at each end is what the
+  // cursor-following window obliges, and it is not decoration: spans are per
+  // row, so dropping the rows outside clips a wash exactly, and without a
+  // bottom marker a clipped wash reads as one that ended there (§6e table 4).
+  if (at <= cap - 2) {
+    return { rows: [...rows.slice(0, cap - 1), elision], first: 0, offset: 0, count: cap - 1 };
+  }
+
+  // Mid-buffer, both ends marked. **`cap = 2` leaves no content row**, and the
+  // ruling is the marker above plus the cursor's row — the residue being that
+  // rows below are elided unmarked there. Reachable despite `MIN_ROWS`: a
+  // resize can arrive between the size gate and the frame, which T1.5b already
+  // records (§6e table 6).
+  const count = cap - 2;
+  if (count < 1) return { rows: [elision, rows[at] ?? ""], first: at, offset: 1, count: 1 };
+
+  // **No clamp, and it was written with one.** The mutation pass removed it and
+  // nothing failed, which is the *code is dead* disposition rather than a
+  // missing row: this branch is entered only when `cap − 2 < at < n − cap + 1`,
+  // and those guards already put `first` at or above 1 and `first + count` at or
+  // below `n − 1`. A clamp here could never bind, so it would read as careful
+  // and forbid nothing — the same finding `menuWindow` gave up twice over
+  // (entry 16 step 3). Both markers are justified by the branch's own bounds.
+  const first = at - Math.floor((count - 1) / 2);
+  return {
+    rows: [elision, ...rows.slice(first, first + count), elision],
+    first,
+    offset: 1,
+    count,
+  };
 }
 
 /**
  * Which of the editor's rows the prompt is showing, and where they land.
  *
  * `first` is the index in the editor's full layout of the first *content* row
- * in the window, and `offset` is how many painted rows precede it — one when
- * the elision marker is drawn, zero otherwise. The cursor needs both and the
- * paint needs neither, which is why they are returned rather than inlined.
+ * in the window, `count` is how many content rows there are, and `offset` is
+ * how many painted rows precede them — one when a marker is drawn above.
+ *
+ * **`first` and `count` are a range in editor coordinates and `offset` converts
+ * to painted ones**, and keeping the two apart is the whole of I62: a test in
+ * painted coordinates cannot distinguish a content row from a marker.
  */
 type PromptWindow = Readonly<{
   rows: readonly string[];
   first: number;
+  count: number;
   offset: number;
 }>;
 
+/** Whether an editor row is one the window draws (I62). */
+function shows(window: PromptWindow, row: number): boolean {
+  return row >= window.first && row < window.first + window.count;
+}
+
+/**
+ * The selection wash, applied to a squared-off row (entry 23).
+ *
+ * **After `exact`, and that is where the full-row half comes from.** The row is
+ * already padded to `width`, so a span running to `width` washes the padding
+ * too — *selected* rather than *highlighted*. Applying this before the pad would
+ * stop at the last cluster, pass every assertion about which characters are in
+ * the region, and only be visible in a frame-read.
+ *
+ * **Reverse video is the 1-bit rung and it is here rather than in the theme.**
+ * `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash
+ * alone would fall straight from a background to nothing. `inverse` needs no
+ * colour at all and is supported essentially everywhere, which is what stops the
+ * ladder having a hole in the middle.
+ */
+function washed(row: string, span: CellSpan, deps: PaintDeps): string {
+  const style = selectionStyle(deps);
+  const before = sliceCells(row, 0, span.from);
+  const inside = sliceCells(row, span.from, span.to);
+  const after = sliceCells(row, span.to, cells(row, deps.capabilities.ambiguousWidth));
+  return `${before}${paintSpans([{ text: inside, style }])}${after}`;
+}
+
+/** The wash, or reverse video where there is no colour to wash with (§4b). */
+function selectionStyle(deps: PaintDeps): Style {
+  const bg = background("surface.selection", deps.theme, deps.capabilities);
+  return bg.background === undefined ? { inverse: true } : bg;
+}
+
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const cap = frame.promptRows;
-  const windowed = promptWindow(frame, deps.promptRows(), deps.capabilities).rows;
+  const cursor = deps.promptCursor();
+  const window = promptWindow(frame, deps.promptRows(), cursor.row, deps.capabilities);
+  const windowed = window.rows;
+  // **Mapped through the window, not assumed aligned with it.** The prompt
+  // windows when it exceeds its cap (S01 §3), so an editor row and a painted
+  // row are different numbers whenever a marker is up.
+  //
+  // **Membership is tested on the editor row and never on the painted one**
+  // (I62). `at >= 0 && at < cap` was the version that shipped, and it accepts
+  // the row immediately above a marked window — which maps to painted 0, the
+  // marker's own row, and washed it.
+  const spans = new Map<number, CellSpan>();
+  for (const span of deps.promptSelection()) {
+    if (shows(window, span.row)) spans.set(span.row - window.first + window.offset, span);
+  }
 
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
     const body = windowed[i] ?? "";
     const gutter = i === 0 ? promptFor(deps.capabilities) : " ".repeat(PROMPT_GUTTER.cont);
-    out.push(exact(gutter + body, width));
+    const squared = exact(gutter + body, width);
+    const span = spans.get(i);
+    out.push(span === undefined ? squared : washed(squared, span, deps));
   }
 
   // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on
   // after the rows are squared off, into padding the prompt already has, so
   // `measure` never sees it and `cap` is the same number whether a completion
-  // is in flight or not. Written into the *last* row because that is where the
-  // cursor is and where C19 §7 draws it: `❯ /ps --family=⠋`.
+  // is in flight or not. Written into the **cursor's** row because that is
+  // where C19 §7 draws it: `❯ /ps --family=⠋`.
+  //
+  // **It used to be `out.length - 1`, justified as *that is where the cursor
+  // is*** — true only while the window was anchored on the buffer's end, and
+  // with a marker below the last painted row **is the marker** (§6e table 5).
+  // The row is the same one in every case a spinner or ghost is actually up,
+  // since a completion is in flight over the token being typed; what changes is
+  // that the stated reason is now the reason.
   //
   // Read here rather than passed in, so the value is the one true at paint.
-  const last = out.length - 1;
+  const last = shows(window, cursor.row)
+    ? cursor.row - window.first + window.offset
+    : out.length - 1;
   const row = out[last];
   if (row !== undefined && deps.spinning()) {
-    const at = cells(row.trimEnd());
+    const at = cells(row.trimEnd(), deps.capabilities.ambiguousWidth);
     if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${spinnerGlyph(deps.capabilities)}`, width);
     return out;
   }
@@ -302,8 +443,8 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   // different word, and `Tab` would insert the whole one.
   const suggestion = deps.ghost();
   if (row !== undefined && suggestion !== null && suggestion !== "") {
-    const at = cells(row.trimEnd());
-    if (at + cells(suggestion) <= width) {
+    const at = cells(row.trimEnd(), deps.capabilities.ambiguousWidth);
+    if (at + cells(suggestion, deps.capabilities.ambiguousWidth) <= width) {
       const style = ghostStyle(deps);
       out[last] = exact(`${sliceCells(row, 0, at)}${paintSpans([{ text: suggestion, style }])}`, width);
     }
@@ -325,6 +466,64 @@ function ghostStyle(deps: PaintDeps): Style {
  * that wrote 41 would scroll. Neither is recoverable by the caller, so the
  * frame is refused and C22 draws the fallback.
  */
+/**
+ * The theme's background, re-established after every reset in a finished row
+ * (C22 I65, C10 I25).
+ *
+ * **One place repairs every reset a row contains**, which the walk did not expect
+ * and the implementation settled: `fitStyled` closes a cut line, `composite`
+ * writes two per composited row, `paint()` closes each styled run the *shell*
+ * draws — and by the time a row reaches here all of them are **inside this
+ * string**. `render-frame`'s per-row prefix is the one outside, and it is
+ * answered by the row's own leading base landing immediately after it.
+ *
+ * **And the set is not `SGR_RESET`, which is the correction the code made to the
+ * walk.** L1's rendered rows do not contain a full reset at all: Ink closes a
+ * foreground run with `39` and a background run with `49`, and the two are not
+ * equivalent here. `39` restores the default *foreground* and a base survives
+ * it untouched. **`49` restores the default *background* — the terminal's, not
+ * ours** — and a patch row ends with exactly that, so the padding after it would
+ * show through. The walk counted the sites that write `\x1b[0m` and the property
+ * that matters is *returns a channel to the terminal's default*, which `49`
+ * satisfies and `39` does not.
+ *
+ * **Blind spot, stated rather than left to be discovered**: a compound sequence
+ * carrying `0` or `49` among other parameters — `\x1b[0;1m` — is not repaired.
+ * Nothing in the tree emits one; `sgr()` never writes `0`, and Ink writes both
+ * closers alone. It is a measurement rather than a guarantee.
+ *
+ * **The base is a default and not a span**, which is the whole distinction: a
+ * wash sets `background` on the cells between two offsets, and every reset in
+ * the tree returns to the *terminal's* default rather than to ours. That is why
+ * a selection's wash still wins for its own cells — it sets the channel
+ * explicitly — and why the base resumes immediately after it closes.
+ *
+ * **And every row closes itself**, which is what the walk expected to need a
+ * lifecycle change for. A row that ended with the base live would leave an
+ * attribute on the wire that outlives the frame — the alternate screen restores
+ * cell contents and not SGR state — so `suspend()` and `release()` would each
+ * owe a reset, on the cursor shape's third-category path (C01 I20). Closing the
+ * row costs the same four bytes and owes nothing: no live attribute ever escapes
+ * a single row, so a handoff, a resize, an exit and a fault are all covered by
+ * the same rule and none of them needs to know a background exists.
+ *
+ * Nothing is written where a theme inherits: `sgr(NO_STYLE)` is empty, so the
+ * arm every session runs today costs one comparison per frame and produces byte
+ * for byte what it produced before.
+ */
+function based(lines: readonly string[], base: string): readonly string[] {
+  if (base === "") return lines;
+  return lines.map(
+    (line) => `${base}${line.replace(toTerminalDefault(), (seq) => `${seq}${base}`)}${SGR_RESET}`,
+  );
+}
+
+/** The screen's base, or the empty string where nothing is painted. */
+function baseSequence(deps: PaintDeps): string {
+  if (deps.suppressBackground()) return "";
+  return sgr(resolveBase(deps.theme, deps.capabilities));
+}
+
 export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   if (!heightsSum(frame)) {
     throw new FrameError(
@@ -391,12 +590,14 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
     },
   );
 
-  if (lines.length !== frame.size.rows) {
+  const painted = based(lines, baseSequence(deps));
+
+  if (painted.length !== frame.size.rows) {
     throw new FrameError(
-      `frame is ${String(lines.length)} rows for a ${String(frame.size.rows)}-row terminal`,
+      `frame is ${String(painted.length)} rows for a ${String(frame.size.rows)}-row terminal`,
     );
   }
-  return Object.freeze(lines);
+  return Object.freeze(painted);
 }
 
 /**
@@ -438,9 +639,16 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   }
 
   const cell = deps.promptCursor();
-  const window = promptWindow(frame, deps.promptRows(), deps.capabilities);
+  const window = promptWindow(frame, deps.promptRows(), cell.row, deps.capabilities);
+  // **The editor row, not the painted one** (I62). `within < 0 || within >=
+  // cap` was the version that shipped: the row immediately above a marked
+  // window gives `within === 0`, which is inside that range and is the elision
+  // marker's own painted row, so the terminal cursor was drawn on the marker.
+  // The window contains the cursor by construction now, so this is a guard on
+  // `promptCursor` and `promptRows` being read separately rather than the
+  // hiding policy it used to be.
+  if (!shows(window, cell.row)) return null;
   const within = cell.row - window.first + window.offset;
-  if (within < 0 || within >= frame.promptRows) return null;
 
   return { row: frame.region.top + frame.region.height + within, col: cell.col };
 }

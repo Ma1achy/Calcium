@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { cell, rebuild } from "../../data/viewmodel/index.js";
+import { cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -48,11 +48,14 @@ import type {
   Events,
   Glyph,
   Group,
+  Share,
+  Valign,
   Hunk,
   KeyValue,
   Logs,
   Notice,
   Panel,
+  Scroll,
   Patch,
   Pills,
   Plot,
@@ -352,6 +355,15 @@ function plot(
   },
 ): Plot {
   const { series, height, axes, yMin, yMax, yFormat } = spec;
+  // **The same refusal the validator makes** (C04 I50a). Two expressions of one
+  // rule, which is this file's shape throughout: the constructor is where an
+  // author finds out and the validator is where an untrusted document does.
+  if (series.length > 8) {
+    throw new TypeError(
+      `b.plot: ${String(series.length)} series and the categorical palette distinguishes 8 ` +
+        `(C04 I50a) — a ninth would repeat a colour, which reads as two series being one`,
+    );
+  }
   return finish<Plot>(
     {
       kind: "plot",
@@ -385,12 +397,24 @@ function spark(values: readonly number[], opts?: BlockOpts): Plot {
   );
 }
 
+/**
+ * `style` names a pair of glyphs and C09 resolves it against the terminal
+ * (roadmap 51). Omitted is the default, and an unknown name is too — a bar is
+ * decoration over a number that is already correct.
+ */
 function progress(
-  spec: BlockOpts & { label: string; current: number; total: number },
+  spec: BlockOpts & { label: string; current: number; total: number; style?: string },
 ): Progress {
-  const { label, current, total } = spec;
+  const { label, current, total, style } = spec;
   return finish<Progress>(
-    { kind: "progress", id: idOf(spec, "progress"), label, current, total } as Progress,
+    {
+      kind: "progress",
+      id: idOf(spec, "progress"),
+      label,
+      current,
+      total,
+      ...(style === undefined ? {} : { style }),
+    } as Progress,
     spec,
     false,
   );
@@ -509,9 +533,94 @@ function panel(
  * Gapping the group *and* the first child that carries its own default produces
  * two blank rows where the surfaces draw one.
  */
-function group(direction: "row" | "column", children: readonly Block[], opts?: BlockOpts): Group {
+/**
+ * A container. `row` divides its width by `flex`, one weight per child (C04 I42).
+ *
+ * **Weights and not a boolean, and not C11's `flex` despite the name.** A table
+ * column has a minimum derived from its content and `flex` says whether it
+ * absorbs what is left; a group knows `measure(block, width) → height` and no
+ * preferred width, so there is nothing to absorb from and a declared proportion
+ * is the only allocation this level can express.
+ *
+ * **Throws rather than returning an invalid block**, as `plot` does for a line
+ * form with no height: `0`, a negative, a non-finite value and a length that
+ * does not match the children are all authoring mistakes with no reading, and
+ * the constructor is where an author finds out.
+ */
+/**
+ * A bounded region (C04 §3c, C04 I47).
+ *
+ * **Throws rather than returning an invalid block**, as `group` does for a bad
+ * share: an empty container is a scroll nobody can aim and a non-positive
+ * height is a box that shows nothing, and neither has a reading to fall back
+ * on. The validator refuses both as well — the constructor is where an author
+ * finds out, and the validator is where an untrusted document does.
+ */
+function scroll(
+  height: number,
+  children: readonly Block[],
+  opts?: BlockOpts,
+): Scroll {
+  if (!Number.isInteger(height) || height < 1) {
+    throw new TypeError(
+      `b.scroll: height is a positive integer — got ${JSON.stringify(height)}`,
+    );
+  }
+  if (children.length === 0) {
+    throw new TypeError(
+      "b.scroll: a bounded region needs at least one child — its elements are one per child, " +
+        "so an empty one is a container nobody can aim (C04 I47)",
+    );
+  }
+  return finish<Scroll>(
+    { kind: "scroll", id: idOf(opts, "scroll"), height, children } as Scroll,
+    opts,
+    false,
+  );
+}
+
+function group(
+  direction: "row" | "column",
+  children: readonly Block[],
+  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Valign[] },
+): Group {
+  const flex = opts?.flex;
+  if (flex !== undefined) {
+    if (flex.length !== children.length) {
+      throw new TypeError(
+        `b.group: ${String(flex.length)} weights for ${String(children.length)} children`,
+      );
+    }
+    for (const share of flex) {
+      const bad =
+        typeof share === "object"
+          ? !Number.isInteger(share.cells) || share.cells <= 0
+          : !Number.isFinite(share) || share <= 0;
+      if (bad) {
+        throw new TypeError(
+          `b.group: a share is a weight above zero or {cells: n} whole columns — got ` +
+            `${JSON.stringify(share)}; omit the child to leave it unplaced, and 1 is one share`,
+        );
+      }
+    }
+  }
+
+  const align = opts?.align;
+  if (align !== undefined && align.length !== children.length) {
+    throw new TypeError(
+      `b.group: ${String(align.length)} alignments for ${String(children.length)} children`,
+    );
+  }
+
   return finish<Group>(
-    { kind: "group", id: idOf(opts, "group"), direction, children } as Group,
+    {
+      kind: "group",
+      id: idOf(opts, "group"),
+      direction,
+      children,
+      ...(flex === undefined ? {} : { flex: [...flex] }),
+      ...(align === undefined ? {} : { align: [...align] }),
+    } as Group,
     opts,
     false,
   );
@@ -626,8 +735,21 @@ function live(spec: LiveSpec): Panel {
   return panel;
 }
 
+/**
+ * A markdown document's block half (roadmap 11).
+ *
+ * **Returns a sequence and not a block**, which is why it is exempt from the
+ * builder table's per-block rows for `b.seq`'s reason: one markdown source is a
+ * run of blocks, and wrapping it in a `group` would decide a layout the source
+ * did not ask for.
+ */
+function markdown(source: string, opts?: { readonly idPrefix?: string }): readonly Block[] {
+  return markdownBlocks(source, opts?.idPrefix);
+}
+
 export const b = {
   live,
+  markdown,
   rule,
   notice,
   kv,
@@ -648,6 +770,7 @@ export const b = {
   tip,
   panel,
   group,
+  scroll,
   raw,
   spinner,
 

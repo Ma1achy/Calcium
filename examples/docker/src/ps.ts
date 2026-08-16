@@ -158,7 +158,7 @@ export function createPsAdapter(): Adapter {
         // throws and `appendAndCommit` discards, so a failing `docker ps` would
         // have produced no entry at all rather than the error notice below it.
         // Never seen, because no frame-read ever had docker fail. FINDINGS F35.
-        ...(failed ? { error: { message: failure, stage: "adapter" as const } } : {}),
+        ...(failed ? { error: { message: failure } } : {}),
         blocks: failed
           ? [b.notice.error(failure)]
           : [

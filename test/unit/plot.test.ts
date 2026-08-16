@@ -17,10 +17,20 @@ import {
   foldRamp,
   setDot,
 } from "../../src/presentation/plot/raster.js";
-import { RAMP_ASCII, RAMP_UNICODE } from "../../src/presentation/plot/ramp.js";
+import {
+  RAMP_ASCII,
+  RAMP_BRAILLE,
+  RAMP_DENSITY,
+  RAMP_STEPS,
+  RAMP_UNICODE,
+} from "../../src/presentation/plot/ramp.js";
 import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { block, type Plot } from "../../src/data/viewmodel/index.js";
+import { DARK_THEME, measurable } from "../support/render.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
+import { cells } from "../../src/presentation/text.js";
 import { lossCurve } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
@@ -405,10 +415,99 @@ describe("C12 tier 1 — sparklines", () => {
     expect(sparkline([5, 5, 5], 3, FULL_CAPS)).toBe("▄▄▄");
   });
 
-  it("T1.13: non-finite values are filtered and an empty window is blank", () => {
-    expect(sparkline([Number.NaN, 1, 2], 3, FULL_CAPS)).toBe(" ▁█");
+  it("T1.13 (I4, I13): a gap keeps its position and draws the absent marker", () => {
+    // **This row asserted the defect.** It expected `" ▁█"` — a leading blank
+    // where the gap is, which is the same character the right-anchor draws when
+    // there are fewer samples than cells. One character, two meanings, and the
+    // row was the thing saying it was correct.
+    expect(sparkline([Number.NaN, 1, 2], 3, FULL_CAPS)).toBe("?▁█");
+
+    // The interior case, where the old behaviour SHORTENED the row: seven
+    // positions came back as six glyphs, and no assertion here counted them.
+    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS)).toBe("     ▁▂▃?▆▇█");
+
+    // And the two forms agree now, which is the actual claim: the same array
+    // breaks the line and marks the sparkline, rather than breaking one and
+    // closing the other.
+    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS)).toHaveLength(12);
+
+    // All-non-finite stays empty (§4), because the line form renders the empty
+    // message for the same input — a row of markers would be the sparkline
+    // disagreeing with the plot in the other direction.
     expect(sparkline([Number.NaN], 4, FULL_CAPS)).toBe("    ");
     expect(sparkline([], 4, FULL_CAPS)).toBe("    ");
+  });
+
+  it("T1.16 (I4, C04 I46a): `null` is the gap a document carries, and it round-trips where `NaN` does not", () => {
+    // **The two spellings render identically and only one is a legal document.**
+    // `NaN` is what the type could express and `JSON.stringify` writes it as
+    // `null`, so the persisted form was already this shape while the declared
+    // type forbade it — which is why this row asserts the *serialisation* and not
+    // only the glyphs. A row that checked the picture alone passes for both and
+    // says nothing about the one that matters.
+    expect(sparkline([1, 2, 3, null, 7, 8, 9], 12, FULL_CAPS)).toBe("     ▁▂▃?▆▇█");
+    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS), "same picture").toBe(
+      sparkline([1, 2, 3, null, 7, 8, 9], 12, FULL_CAPS),
+    );
+
+    const gapped = [1, null, 3];
+    expect(JSON.parse(JSON.stringify(gapped)), "`null` survives itself").toEqual(gapped);
+    expect(
+      JSON.parse(JSON.stringify([1, Number.NaN, 3])),
+      "and `NaN` arrives back as the value the old type forbade",
+    ).toEqual(gapped);
+
+    // The line form takes it on the same terms — one guard for both, because
+    // `Number.isFinite(null)` is false.
+    expect(finiteSamples([1, null, 3])).toEqual([
+      { i: 0, v: 1 },
+      { i: 2, v: 3 },
+    ]);
+  });
+
+  it("T1.15 (I16): every ramp step is visible, monotone in ink, and never the pad character", () => {
+    // **Asserted over the constants, because the defect is a property of the
+    // set.** `RAMP_BRAILLE` began at `U+2800` — BRAILLE PATTERN BLANK — so a
+    // sparkline on a wide terminal drew its minimum as whitespace, which the
+    // right-anchor already uses for *fewer samples than cells*. Every width and
+    // length assertion in this file passed against it, and `cells()` counted it
+    // as one, which is what left the arm with nothing looking at it.
+    for (const [name, ramp] of [
+      ["unicode", RAMP_UNICODE],
+      ["ascii", RAMP_ASCII],
+      ["braille", RAMP_BRAILLE],
+    ] as const) {
+      const steps = [...ramp];
+      expect(steps, `${name} has eight steps`).toHaveLength(RAMP_STEPS);
+      for (const step of steps) {
+        expect(step.trim(), `${name}: no step is blank`).not.toBe("");
+        expect(cells(step, "narrow"), `${name}: one cell narrow`).toBe(1);
+      }
+      expect(new Set(steps).size, `${name}: no step repeats`).toBe(RAMP_STEPS);
+    }
+
+    // Monotone in ink, which the old set was not either: its dot populations ran
+    // 0,1,2,3,4,5,6,8, so the last step was a double jump.
+    const dots = [...RAMP_BRAILLE].map((c) =>
+      ((c.codePointAt(0) ?? 0) - 0x2800).toString(2).replaceAll("0", "").length,
+    );
+    expect(dots, "one dot to eight, no gaps").toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+
+    // The measured case: the minimum must not be the padding beside it.
+    const drawn = sparkline([0, 5], 6, { ...FULL_CAPS, ambiguousWidth: "wide" });
+    expect(drawn).toHaveLength(6);
+    expect(drawn[4], "the lowest reading, and it is not a space").not.toBe(" ");
+  });
+
+  it("T1.13b (I4): the marker is the same character in every ramp, because absence is not a magnitude", () => {
+    // A tiered marker would make a `spark` column read differently on two
+    // terminals for the same data — and it would have to be a step of some ramp
+    // to be tiered, which is the collision the ASCII choice avoids.
+    const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    for (const caps of [FULL_CAPS, ASCII_CAPS, WIDE]) {
+      expect(sparkline([1, Number.NaN, 9], 3, caps)).toContain("?");
+      expect(cells(sparkline([1, Number.NaN, 9], 3, caps), caps.ambiguousWidth)).toBe(3);
+    }
   });
 
   it("T1.13: the ASCII ramp is used under `unicode: 'ascii'`", () => {
@@ -467,5 +566,150 @@ describe("C12 tier 1 — strip arithmetic", () => {
         expect(total, `n=${String(n)} h=${String(h)}`).toBe(h);
       }
     }
+  });
+});
+
+describe("C12 I17 — the heatmap", () => {
+  const MATRIX = [
+    { values: [1, 2, 3, 4, 5, 6, 7, 8], label: "api" },
+    { values: [8, 7, 6, 5, 4, 3, 2, 1], label: "db" },
+  ] as const;
+
+  const heat = (over: Partial<Plot> = {}): Plot =>
+    block({
+      kind: "plot",
+      id: "hm",
+      form: "heatmap",
+      height: 2,
+      series: [...MATRIX],
+      ...over,
+    } as Plot);
+
+  const rowsOf = (b: Plot, width = 40, caps = FULL_CAPS): readonly string[] =>
+    measurable({ definitions: [plotDefinition], theme: DARK_THEME, capabilities: caps })
+      .renderToLines(b, width)
+      // The ESC as well as the CSI body: the usual `/\[[0-9;]*m/` leaves a bare
+      // `\u001b` behind, which is invisible in a snapshot and is not invisible to
+      // an anchored regex.
+      .map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+
+  it("T1.17 (I17): a matrix and a stack of lines with the same data do not render identically", () => {
+    // **The row to write first.** Every other assertion about a heatmap passes
+    // against a heatmap that fell into the line arm — the height is right, the
+    // width is right, the rows are right — so if these two match, the form
+    // member is not reaching the renderer and nothing else says so.
+    const asLine = block({
+      kind: "plot",
+      id: "hm",
+      form: "line",
+      height: 2,
+      axes: true,
+      series: [...MATRIX],
+    } as Plot);
+
+    expect(rowsOf(heat()).join("\n")).not.toBe(rowsOf(asLine).join("\n"));
+
+    // And the difference is the one that matters, not incidental furniture: a
+    // heatmap's cells come from the density ramp, which the line form never
+    // draws at all.
+    const density = [...RAMP_DENSITY];
+    expect(rowsOf(heat()).some((r) => density.some((g) => r.includes(g)))).toBe(true);
+  });
+
+  it("T1.18 (I17): the range is shared across rows, so equal values draw equal glyphs", () => {
+    // **What makes it a matrix rather than a stack of sparklines.** Normalised
+    // per row, both rows below would span the full ramp and the picture would say
+    // the two containers are equally busy — which is the comparison a heatmap
+    // exists to make, inverted.
+    const rows = rowsOf(
+      heat({
+        series: [
+          { values: [0, 0, 0, 0], label: "idle" },
+          { values: [100, 100, 100, 100], label: "busy" },
+        ],
+        height: 2,
+      }),
+    );
+    const idle = rows[0] ?? "";
+    const busy = rows[1] ?? "";
+    expect(idle.trimEnd()).not.toBe(busy.trimEnd());
+    expect(idle, "the floor is the ramp's first step").toContain(RAMP_DENSITY[0]);
+    expect(busy, "the ceiling is its last").toContain(RAMP_DENSITY[RAMP_STEPS - 1]);
+  });
+
+  it("T1.20 (I16, I17): the heatmap's ramp is the density ramp and not the sparkline's", () => {
+    // **Asserted as a difference**, because both are eight narrow braille steps:
+    // a matrix drawn with `RAMP_BRAILLE` is rows of bar fragments, and every
+    // count — width, height, cell total — agrees with it.
+    // **The premise first, because without it this row is vacuous under exactly
+    // the mutation it was written for.** Setting `RAMP_DENSITY = RAMP_BRAILLE`
+    // makes the loop below skip every glyph and pass — the mutation pass reported
+    // it CAUGHT ELSEWHERE, by a golden frame, and this row said nothing. A row
+    // governed by one rule is a restatement of that rule.
+    expect(RAMP_DENSITY, "the two ramps are different sets").not.toBe(RAMP_BRAILLE);
+    const onlyBottomFilled = [...RAMP_BRAILLE].filter((g) => !RAMP_DENSITY.includes(g));
+    expect(onlyBottomFilled.length, "and they differ in more than one step").toBeGreaterThan(4);
+
+    const rows = rowsOf(heat()).slice(0, 2).join("");
+    for (const g of onlyBottomFilled) {
+      expect(rows, `${g} fills bottom-up and a grid cell has no vertical axis`).not.toContain(g);
+    }
+  });
+
+  it("T1.21 (I17): an absent cell is blank and the minimum has ink", () => {
+    // The converse of the sparkline's rule, from the other side: `?` is right
+    // where a blank is already the padding, and a grid has no padding.
+    const rows = rowsOf(
+      heat({
+        series: [
+          { values: [null, null, null, null], label: "stopped" },
+          { values: [1, 2, 3, 4], label: "running" },
+        ],
+        height: 2,
+      }),
+    );
+    expect(rows[0], "a stopped row is quiet").not.toContain("?");
+    // Blank *cells* — the label and the axis bar are furniture and stay. What
+    // has to be true is that nothing was drawn in the grid, and that a reader
+    // can still see which row reported nothing.
+    expect(rows[0]).toMatch(/^stopped\s+│\s*$/u);
+    expect(rows[1], "and the minimum is still visible").toContain(RAMP_DENSITY[0]);
+  });
+
+  it("T1.19 (C04 I50b): the three refusals, each with its converse", () => {
+    expect(() => heat({ axes: false })).toThrow(/axes/u);
+    expect(() => heat({ series: [{ values: [1, 2], tone: "ok" }] })).toThrow(/tone/u);
+    expect(() =>
+      heat({ series: [{ values: [1, 2] }, { values: [1, 2, 3] }] }),
+    ).toThrow(/ordinate/u);
+    expect(() => block({ kind: "plot", id: "h", form: "heatmap", series: [] } as Plot)).toThrow(
+      /height/u,
+    );
+
+    // The control: a heatmap declaring none of them constructs. Without it every
+    // row above passes for a constructor that refuses every heatmap.
+    expect(() => heat()).not.toThrow();
+  });
+
+  it("T1.1 (I1): a heatmap's height is declared, and its row count is data", () => {
+    // The property the whole component rests on, at the one form where the data
+    // has a row count of its own to be confused with.
+    expect(plotHeight({ form: "heatmap", height: 4 })).toBe(6);
+    expect(rowsOf(heat({ height: 4 })), "two rows of data, four declared, plus two").toHaveLength(6);
+    expect(
+      rowsOf(heat({ height: 2, series: [...MATRIX, { values: [1, 1, 1, 1, 1, 1, 1, 1], label: "c" }] })),
+      "three rows into two still measures two plus two",
+    ).toHaveLength(4);
+  });
+
+  it("T1.1 (I8): rows that do not fit are named, never dropped in silence", () => {
+    const rows = rowsOf(
+      heat({
+        height: 2,
+        series: [...MATRIX, { values: [1, 1, 1, 1, 1, 1, 1, 1], label: "third" }],
+      }),
+    );
+    expect(rows.join("\n")).toContain("+2 more");
+    expect(rows.join("\n")).toContain("third");
   });
 });

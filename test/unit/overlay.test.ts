@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { OverlayChange } from "../../src/viewport/overlay/index.js";
-import { REGION, centred, placeIn, registry, view } from "../support/overlay.js";
+import { REGION, anchored, centred, placeIn, registry, rows, view } from "../support/overlay.js";
 
 const manager = () => createOverlayManager({ registry });
 
@@ -173,5 +173,50 @@ describe("C15 unit — one layer's geometry", () => {
     const [p] = placeIn([centred("c", 4, { width: 40 })]);
     expect(p?.left).toBe(10);
     expect(p?.width).toBe(40);
+  });
+
+  it("T1.21 (I20): a centred layer with no width is refused, and the frame says why", () => {
+    // **The throw and the state it prevents, in one row.** A row asserting only
+    // the throw says nothing about why the state is wrong, and the reason is
+    // not arithmetic — an absent width resolves to the region's (I16), so the
+    // layer is placed at `left` 0 across the whole region and is `fill` wearing
+    // `centred`'s name. The control is the same layer with a width, read for a
+    // `left` that differs from a filling layer's.
+    const m = manager();
+    expect(() =>
+      m.push({
+        id: "wide",
+        kind: "overlay",
+        placement: { kind: "centred" },
+        content: rows(3, "wide"),
+        dismissable: true,
+      }),
+    ).toThrow(/declares no width/);
+    expect(m.stack, "and nothing reached the stack").toEqual([]);
+
+    const [declared] = placeIn([centred("c", 3, { width: 40 })]);
+    const [filling] = placeIn([
+      { id: "f", kind: "overlay", placement: { kind: "fill" }, content: rows(3, "f"), dismissable: true },
+    ]);
+    expect(declared?.left, "the state I20 forbids is this one").not.toBe(filling?.left);
+    expect(filling?.left).toBe(0);
+  });
+
+  it("T1.22 (I20): an update to centred without a width is refused, and the layer survives", () => {
+    // **The route the push-time check cannot see**, because `LayerUpdate`
+    // admits `placement`. The assertion on the survivor is the half that
+    // matters: a guard that throws having already written leaves a layer
+    // neither placed nor removed.
+    const m = manager();
+    const before = anchored("a", 3, { row: 5, prefer: "below" });
+    m.push(before);
+
+    expect(() => m.update("a", { placement: { kind: "centred" } })).toThrow(/declares no width/);
+    expect(m.top, "unchanged, not half-updated").toEqual(before);
+
+    // The same update carrying a width is accepted, so the row is about the
+    // width and not about `placement` being rejected wholesale.
+    expect(m.update("a", { placement: { kind: "centred" }, width: 30 })).toBe(true);
+    expect(m.top?.placement).toEqual({ kind: "centred" });
   });
 });

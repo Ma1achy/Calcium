@@ -91,3 +91,25 @@ export declare function checkBuilderCoverage(
 
 /** MG27's reasons, keyed `Kind.field`. */
 export declare const BUILDER_OMISSIONS: Readonly<Record<string, string>>;
+
+/**
+ * Roadmap 48 — the public surface by **use**: members of the types
+ * `src/index.ts` exports, against both examples' own sources. Reported, never
+ * gated (A03 §9).
+ *
+ * `candidates` is the residue, and the direction is the point: a name collision
+ * can only ever *clear*, so the list under-reports and cannot over-report.
+ * `ambiguous` is how many clearings a collision could account for.
+ */
+export declare function publicSurfaceUseSignal(
+  files: readonly string[],
+  exampleFiles: readonly string[],
+  readFile?: (f: string) => string,
+): {
+  members: number;
+  candidates: string[];
+  cleared: number;
+  ambiguous: number;
+  testOnly: number;
+  concentrated: string[];
+};

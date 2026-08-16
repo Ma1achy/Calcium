@@ -72,6 +72,30 @@ of consistent. One constant, one behaviour, one bug report.
 
 Terminals send no key-up events and repeat held keys as fresh presses, so there is no chord support beyond modifiers. Saying so prevents someone designing a keymap that cannot work.
 
+### `modifiersOf` read three bits of four, and the fourth collapsed onto a live binding
+
+**Measured 2026-08-13 by pressing sequences through the built decoder**, while checking the bindings entry 15's selection model would add. It was a defect in shipped code, not a design input. **Fixed the same day** (T1.3e, `tools/mutate/runs/c16-modifiers.mjs`); the table below is the state it was found in.
+
+xterm's modifier parameter is `1 + (shift 1 | alt 2 | ctrl 4 | meta 8)`. `modifiersOf` mapped bits 1, 2 and 4 — the decoder's `meta` is xterm's **alt** — and **never read bit 8**. So every Meta-modified key lost its modifier silently:
+
+| sent | xterm means | decoder emits |
+|---|---|---|
+| `CSI 1;9D` | Meta-Left | **`left`** — bare, every modifier gone |
+| `CSI 1;10D` | Meta-Shift-Left | **`s+left`** — which is `⇧←`, a *different key* |
+| `CSI 1;13D` | Meta-Ctrl-Left | `c+left` |
+| `CSI 1;4D` | Alt-Shift-Left | `ms+left` — correct |
+| `CSI 1;16D` | all four | `cms+left` — correct **by accident**, since the other three bits are all set |
+
+**This is worse than the unexecuted-binding class and it is the reason to record it separately.** That class is a binding no event can produce: dead, and silent. This is an event decoding as a *different, live* binding — on a terminal that sends Meta rather than Alt, `⌥⇧←` would extend a selection by one character instead of one word, and every assertion written about `⇧←` passes while it happens. A test indexed by "which keys does the decoder produce" agrees, because it produces a perfectly good key.
+
+The fix includes bit 8 in `meta`: the `Key` shape has one alt/meta flag and both bits mean the same thing to every binding above. Splitting them would put the terminal's Option-key configuration into the keymap. **It landed before any shifted-motion binding**, because with it absent the two wire forms of `⌥⇧←` disagree about which key was pressed.
+
+**The test row is the pair, not either form.** T1.3e asserts that `CSI 1;10D` and `CSI 1;2D` decode to *different* keys, and that `CSI 1;4D` and `CSI 1;10D` decode to the *same* one. A row asserting either form alone passes in the broken state — which is exactly what `CSI 1;16D` demonstrates by being correct with the bit unread. **An assertion about one wire form of a two-form key is an assertion about the terminal you happened to test on.**
+
+Four mutations, all caught: the defect restored, bit 8 read *instead of* bit 2 (the careless fix, which breaks the Alt-sending majority every existing test was written against), `shift` claiming bit 8, and the plus-one dropped from the encoding.
+
+**And the ESC-prefixed CSI form is shredded.** `ESC ESC [ 1 ; 2 D` decodes as `m+escape` followed by six printable keys — `[`, `1`, `;`, `2`, `D` — which are text an editor would insert. The roadmap names this as a wire form `⌥⇧←` may arrive in; **no terminal has been measured emitting it**, so this is recorded as an owed check rather than a second defect. The measurement is of the decoder, which is what was run.
+
 ---
 
 ## 3. Derived focus
@@ -317,9 +341,10 @@ constructible case.
 | 4 | Non-dismissable overlay | a confirm on top — **over anything**, including copy mode and a view | T1.12, T1.12b |
 | 5 | Copy mode | `copyMode` true, no layer on the stack | T4.3 |
 | 6 | Pushed view | a view on the stack, no overlay above it | T5.3 |
-| 7 | Focus in the live block | `StoredFocus.at === "liveBlock"`, no layer, not copy mode | T1.14 |
-| 8 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
-| 9 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
+| 7 | Interaction on a block | `StoredFocus.at === "liveBlock"`, `mode === "interact"`, a live entry, no layer, not copy mode | T2.6b |
+| 8 | Focus in the live block | as above with `mode === "navigate"` | T1.14 |
+| 9 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
+| 10 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
 
 Three rows earned their place by being hard to fill, and each was a different
 defect.
@@ -338,6 +363,77 @@ gap in the table; it is a wrong answer given confidently**, because a ladder alw
 returns something. That is why re-running this table after adding a rung is part of
 the rule rather than a courtesy: rung 7's arrival renumbered two rows, and a row
 whose number moved is a citation somewhere that did not.
+
+**And rung 7 arrived a second time, by exactly that route.** C26 added `interaction`
+to `FOCUS_ORDER` and registered its `⌃c` handler (`router.ts:234`), and this table
+was not re-run — so for the length of that stage the ladder had eight rungs in code
+and seven here, with the copy-mode row's neighbours misdescribed. Found while
+reading the ladder for copy mode's own work, not by any check. The rule above says
+re-running the table is part of adding a rung; the instance that proves it is the
+one that ignored it.
+
+---
+
+## 5a. Copy mode's classification table — the three scopes at rest
+
+**Structural, not event-mediated, and it is the artefact this component tends not to
+get.** Copy mode looks like a state machine, so the trace in §5b is the obvious
+thing to write; the rows that decide the design are the ones where two rules both
+hold at rest with no event between them. Indexed by rule interaction, not by input
+coverage — a row governed by one rule restates that rule and finds nothing.
+
+The subject is one key, `⌥a`, against the four places focus can be. Two of those
+already have owners.
+
+| # | Focus at rest | What already claims the key | What select-all would claim | Ruling |
+|---|---|---|---|---|
+| A1 | Prompt, buffer has text | C17's keymap: `⌥a` is unbound; `⌥b`/`⌥d`/`⌥f` are bound on the same path | select the whole buffer | **`⌥a` binds here.** The one cell where nothing else claims it |
+| A2 | Prompt, buffer empty | as A1 | select nothing | **A no-op, not a refusal.** Selecting an empty buffer produces the empty region, which is the state the reader is already in |
+| A3 | Live block, `mode: "navigate"` | C26: arrows move between elements; `⌥a` unbound | select every row of the block? every element? | **Unbound.** See the ruling below — this is the cell that decides whether selection is a C17 concept or a system-wide one |
+| A4 | Live block, `mode: "interact"` | the block's own declared keys — **an open set** (C26 I14) | select within the block | **Unbound, and it must stay so.** A framework key inside interaction is the shadowing question C26 already ruled: keys belong to the block |
+| A5 | Copy mode | the terminal's native selection, which the app does not see | nothing the app can do | **Unbound, and the cell is why copy mode is a target.** In copy mode the app is not reading the selection at all |
+| A6 | An overlay or a pushed view on top | the layer's own answer callback (§4) | — | **Unreachable.** `activeTarget` never answers `prompt` or `liveBlock` with a layer up, so the key never arrives |
+
+### What it found
+
+**The three scopes do not want one selection type — they want one *clipboard*.** A1
+and A2 are a character range in a buffer; A3 is a set of elements; A5 is a range of
+painted cells the app cannot address. Nothing survives all three as a *region*.
+What does survive is where the copied text lands, which is §5b's first ruling and a
+C17 one.
+
+**A4 is the row that would have been got wrong.** Binding `⌥a` globally is the
+natural implementation and it silently shadows a key a block may declare — the same
+defect C26 ruled against for every other framework binding, arriving through a
+feature that has nothing to do with blocks. No sequence produces this; it is two
+correct statements overlapping at rest.
+
+**A5 says copy mode is not a scope of the selection model at all.** It is the
+absence of one: the reader is using the terminal's selection because the app's does
+not reach painted history. So "three scopes, one mechanism" is right about the
+mechanism and wrong about the count — there are **two** selection scopes and one
+mode in which the app deliberately has none.
+
+## 5b. Copy mode's sequence trace — what an event leaves behind
+
+**Event-mediated, and the first row is a defect that exists in the tree today.**
+
+| # | Sequence | What happens now | Ruling |
+|---|---|---|---|
+| B1 | Enter copy mode, press `⌃c` | `activeTarget` answers `copyMode`; the rung calls `deps.exitCopyMode()`, which is `() => undefined` (`session.ts:548`). The key is **consumed** and the mode does not end | **The producer and the exit are one piece of state or neither ships.** A mode reachable and not leavable is worse than one that is unreachable, and the tree currently has the second stub as well as the first |
+| B2 | Enter copy mode while a verb is in flight | rungs 1–2 dominate: `⌃c` cancels the verb and copy mode stays | **Correct and kept.** Cancelling the work outranks leaving a viewing mode; the reader presses `⌃c` twice, which is the ladder's shape |
+| B3 | A confirm is raised while in copy mode | rung 4 dominates copy mode (T1.12b) — the confirm takes the key | **Correct and kept**, and it is the interaction the original ladder pass got wrong in the other direction |
+| B4 | Output arrives while in copy mode | C13 appends, C14 scrolls, the terminal's selection now covers different text | **The mode must suspend the scroll or say it did not.** A selection that silently comes to mean other text is the failure this feature exists to avoid, and it has no owner yet — the open question this trace leaves |
+| B5 | `y` on a focused element, then `⌃y` at the prompt | `⌃y` yanks the kill buffer (C17 §5) — which `y` did not write | **One clipboard.** See C17 §5a |
+| B6 | `⌃k` fills the kill buffer, then `y` copies an element, then `⌃y` | under one clipboard, `⌃y` yanks the element | **Intended.** Copy is another way to fill the same buffer, and it inherits C17 §5's no-rewind ruling rather than needing a second one |
+| B7 | Entering copy mode with a selection open in the prompt | the prompt's region is still stored; the terminal now owns the screen selection | **Two selections visible, one live.** The prompt's must be dropped on entry, or the reader sees a highlight that no key acts on |
+
+### What it found
+
+B1 is the tree's state and not a hypothetical. B4 has no owner in any component and
+is the question this trace exists to raise. B7 is the interaction between the two
+surviving scopes and it only appears because A1 and A5 were written down as
+separate rows first.
 
 ---
 
@@ -590,9 +686,10 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.16** (I18): each of the three pending states, reset and then continued — a lone `Esc` mid-window, a paste between its markers, a run inside the heuristic's window. *Then* the bytes that would have completed each sequence decode as themselves, and `reset()` itself emitted nothing. Three cases rather than one, because a reset that cleared only the escape window passes any single-state test and still emits a child's keystrokes inside the next paste.
 - **T1.3c** (I3): a click at a transcript row resolves to that row's block, not to the focused target.
 - **T1.3d** (I3): a click inside an overlay's placed region resolves to the overlay even when focus is elsewhere.
-- **T1.3b** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
-- **T1.3c** (I17): `ESC \r` decodes to `{name: "enter", meta: true}` — the name the keymap uses, not the byte.
-- **T1.3d** (I17): `CSI 13;2u` and `CSI 27;2;13~` both decode to `{name: "enter", shift: true}`. Both forms, because a terminal sends one or the other and a rule satisfied by either is satisfied on half the terminals.
+- **T1.3h** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
+- **T1.3i** (I17): `ESC \r` decodes to `{name: "enter", meta: true}` — the name the keymap uses, not the byte.
+- **T1.3j** (I17): `CSI 13;2u` and `CSI 27;2;13~` both decode to `{name: "enter", shift: true}`. Both forms, because a terminal sends one or the other and a rule satisfied by either is satisfied on half the terminals.
+- **T1.3e** (I17, §2): xterm's Meta bit is read. `CSI 1;10D` and `CSI 1;2D` decode to **different** keys, and `CSI 1;10D` and `CSI 1;4D` to the **same** one — the two wire forms of `⌥⇧←`. The pair is the assertion: either form alone passes with bit 8 unread, which `CSI 1;16D` shows by being correct in the broken state. Fabricated rather than found, because the defect produces a well-formed key and nothing above the decoder can see it.
 - **T1.4**: `CSI 200~` enters buffering.
 - **T1.5** (I12): bytes during buffering emit no key events.
 - **T1.6** (I6): `CSI 201~` emits exactly one `paste` carrying the buffered text.
@@ -705,6 +802,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.9b** (I17): collapsing `\r` and `\n` back into one key → T1.3b fails, C17's Ctrl-J binding resolves against an event nothing produces, and every line of an unbracketed paste submits.
 - **T6.9c** (I17): passing the meta path's character through unnamed → T1.3c and C17 T4.2 fail, and Alt-Enter inserts nothing on every terminal.
 - **T6.9d** (I17): dropping the CSI-u and `modifyOtherKeys` branches → T1.3d and T2.13 fail, and Shift-Enter is unreachable on every terminal that sends it.
+- **T6.9e** (I17): dropping bit 8 from `modifiersOf`'s `meta` → T1.3e fails, and `⌥⇧←` arrives as `⇧←` on every terminal that sends Option as Meta — a **live** binding rather than a dead one, which is why no row above the decoder fails with it.
 
 ---
 

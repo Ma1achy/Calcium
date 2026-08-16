@@ -61,6 +61,7 @@ describe("C22 §6 — the frame", () => {
     compose({
       chrome: { header: record, footer: record },
       session: () => SESSION,
+      copyMode: () => false,
       now: tickingClock(),
       size: () => ({ columns: 100, rows: 30 }),
       promptRows: () => 1,
@@ -79,6 +80,7 @@ describe("C22 §6 — the frame", () => {
     compose({
       chrome: { header: () => [], footer: () => [] },
       session: () => SESSION,
+      copyMode: () => false,
       now: () => 1000,
       size: size.read,
       promptRows: () => 1,
@@ -101,6 +103,7 @@ describe("C22 §6 — the frame", () => {
         footer: () => [],
       },
       session: () => SESSION,
+      copyMode: () => false,
       now: () => 1000,
       size: () => ({ columns: 72, rows: 30 }),
       promptRows: () => 1,
@@ -122,6 +125,7 @@ describe("C22 §6 — the frame", () => {
       compose({
         chrome: { header: () => [], footer: () => [] },
         session: () => SESSION,
+        copyMode: () => false,
         now: () => 1000,
         size: () => ({ columns: 100, rows }),
         promptRows: () => promptRows,
@@ -154,6 +158,7 @@ describe("C22 §6 — the frame", () => {
     const f = compose({
       chrome: { header: () => [], footer: () => [] },
       session: () => SESSION,
+      copyMode: () => false,
       now: () => 1000,
       size: () => ({ columns: 100, rows: 30 }),
       promptRows: () => 1,

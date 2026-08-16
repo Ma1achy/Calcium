@@ -409,7 +409,7 @@ describe("C01 signals", () => {
     expect(lifecycle.size()).toEqual({ columns: 120, rows: 24 });
   });
 
-  it("T3.18c (I12a): size() answers while constructed, before any acquire", () => {
+  it("T3.18d (I12a): size() answers while constructed, before any acquire", () => {
     // The one dimension route not gated on state. C22 takes the viewport's
     // width and height at construction step 5, and the lifecycle is step 7 —
     // so an accessor that threw here would leave C22 with no legal way to

@@ -48,26 +48,33 @@ export function caps(colourDepth: TerminalCapabilities["colourDepth"]): Readonly
   return { colourDepth };
 }
 
-/** The shipped pair, loaded. Throws rather than handing a test a null. */
-export function store(variant: "dark" | "light" = "dark"): ThemeStore {
-  const loaded = loadTheme(defaultTheme, variant);
+/**
+ * A store opened on a **named** theme — any name the set holds (C10 I27).
+ *
+ * Throws rather than handing a test a null.
+ */
+export function store(name: string = "dark"): ThemeStore {
+  const loaded = loadTheme(defaultTheme, name);
   if (!loaded.ok) {
     throw new Error(`the shipped theme must load: ${loaded.error.map((e) => `${e.path}: ${e.message}`).join("; ")}`);
   }
   return loaded.value;
 }
 
-/** A deep, mutable copy of one variant, for breaking one field at a time. */
-export function mutable(variant: "dark" | "light" = "dark"): Record<string, unknown> {
+/** A deep, mutable copy of one shipped theme, for breaking one field at a time. */
+export function mutable(name: string = "dark"): Record<string, unknown> {
+  const tokens = defaultTheme[name];
+  if (tokens === undefined) throw new Error(`no shipped theme named "${name}"`);
   return structuredClone({
-    ...defaultTheme[variant],
-    fourBit: { ...defaultTheme[variant].fourBit },
+    ...tokens,
+    fourBit: { ...tokens.fourBit },
   }) as unknown as Record<string, unknown>;
 }
 
 /** A theme set with one tone replaced, for the rejection paths. */
-export function withTone(slot: string, value: string, variant: "dark" | "light" = "dark"): ThemeSet {
-  const base = defaultTheme[variant];
+export function withTone(slot: string, value: string, name: string = "dark"): ThemeSet {
+  const base = defaultTheme[name];
+  if (base === undefined) throw new Error(`no shipped theme named "${name}"`);
   const broken = {
     ...base,
     palettes: {
@@ -79,5 +86,7 @@ export function withTone(slot: string, value: string, variant: "dark" | "light" 
     },
   } as ThemeTokens;
 
-  return variant === "dark" ? { dark: broken, light: defaultTheme.light } : { dark: defaultTheme.dark, light: broken };
+  // **The whole set with one member replaced**, keyed by name — the two-theme
+  // spelling of this was a ternary over `dark`/`light` (C10 I27).
+  return Object.freeze({ ...defaultTheme, [name]: broken });
 }

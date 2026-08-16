@@ -14,7 +14,7 @@
  * cheapest guarantee is making the wrong thing unreachable rather than checking
  * for it afterwards.
  */
-import type { Plot } from "../../data/viewmodel/index.js";
+import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /** The fields a height depends on. Deliberately not `Plot`. */
 export type PlotGeometry = Pick<Plot, "form" | "height" | "axes">;
@@ -42,14 +42,45 @@ export const AXIS_GUTTER = 2;
  * anyway, so clamping here keeps one answer instead of two.
  */
 export function plotAreaRows(plot: PlotGeometry): number {
-  if (plot.form === "sparkline") return 1;
-  return Math.max(1, Math.floor(plot.height ?? 1));
+  return AREA_ROWS[plot.form](plot);
 }
+
+/** Declared rows per form. A `Record` for `FURNITURE_ROWS`' reason, below. */
+const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
+  sparkline: () => 1,
+  line: (plot) => Math.max(1, Math.floor(plot.height ?? 1)),
+  // **A matrix's row count is data and must not be its height** (C12 I1, §6a
+  // B1). A container starting mid-stream adds a row; the block does not grow,
+  // and the row that does not fit is named in a legend (I8).
+  heatmap: (plot) => Math.max(1, Math.floor(plot.height ?? 1)),
+};
+
+/**
+ * The furniture rows a form spends below its plot area.
+ *
+ * **A `Record` and not a switch, and that is the ruling rather than a style.**
+ * A `Record<PlotForm, …>` is checked in *both* directions — a member with no
+ * entry fails to compile, and an entry naming no member fails too. A switch with
+ * a default is checked in neither: `form === "sparkline" ? … : …` absorbed a
+ * third member in silence at three sites, and what it produced was a heatmap
+ * drawn as a curve at exactly the right height. Correctly-shaped and wrong is
+ * the class every frame-read this arc has caught.
+ *
+ * **The heatmap's two rows are not the line's two rows** (§2). The line spends
+ * them on an axis rule and x-labels; the matrix has no rule to draw — its cells
+ * bound themselves — so the row pays for the scale legend, which is the only
+ * thing that says what a cell means.
+ */
+const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
+  sparkline: () => 0,
+  line: (plot) => (plot.axes === true ? AXIS_ROWS : 0),
+  heatmap: () => AXIS_ROWS,
+};
 
 /** The block's measured height (I1). A function of the block alone. */
 export function plotHeight(plot: PlotGeometry): number {
   if (plot.form === "sparkline") return 1;
-  return plotAreaRows(plot) + (plot.axes === true ? AXIS_ROWS : 0);
+  return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot);
 }
 
 /**

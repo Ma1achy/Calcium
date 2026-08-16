@@ -77,6 +77,7 @@ describe("C02 detection", () => {
     const overrides: TerminalCapabilities = {
       colourDepth: 24,
       unicode: "full",
+      ambiguousWidth: "narrow",
       synchronisedUpdate: true,
       bracketedPaste: true,
       mouse: true,
@@ -91,6 +92,7 @@ describe("C02 detection", () => {
     const worst = {
       colourDepth: 1,
       unicode: "ascii",
+      ambiguousWidth: "narrow",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -105,6 +107,7 @@ describe("C02 detection", () => {
       isUsable({
         colourDepth: 24,
         unicode: "full",
+        ambiguousWidth: "narrow",
         synchronisedUpdate: true,
         bracketedPaste: true,
         mouse: true,

@@ -15,7 +15,11 @@ import {
 import { SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, store, SURFACES, SYNTAX_SLOTS, TONES, withTone } from "../support/theme.js";
 
-const VARIANTS = ["dark", "light"] as const;
+/**
+ * Derived, for §5a.4's reason: a literal here is a coverage set the test wrote
+ * for itself, and a third shipped theme would join none of these rows.
+ */
+const SHIPPED = Object.entries(defaultTheme);
 
 /** WCAG relative luminance, computed here so the test does not lean on the code it guards. */
 function relativeLuminance(hex: string): number {
@@ -54,9 +58,9 @@ describe("C10 fail-on-revert", () => {
     // Nearest-of-16 by RGB puts `ok` and `info` on one green and `warn` and
     // `accent` on one yellow. The curated table is asserted to be a table, and
     // to keep the five apart.
-    for (const variant of VARIANTS) {
+    for (const [, tokens] of SHIPPED) {
       const five = ["ok", "warn", "error", "info", "accent"].map(
-        (t) => defaultTheme[variant].fourBit[`tone.${t}`],
+        (t) => tokens.fourBit[`tone.${t}`],
       );
       expect(new Set(five).size).toBe(5);
     }
@@ -88,7 +92,7 @@ describe("C10 fail-on-revert", () => {
     // the theme it was, because that is what stops a frame being half in each.
     const themes = store("dark");
     const held = themes.current;
-    themes.setVariant("light");
+    themes.setTheme("light");
     expect(resolveTone("ok", held, caps(24)).colour).toEqual({ kind: "rgb", hex: "#87b86c" });
   });
 
@@ -108,8 +112,8 @@ describe("C10 fail-on-revert", () => {
     };
     // Greyscale ramp indices ascend with luminance, so the comparison is direct.
     expect(index("dim")).toBeLessThan(index("default") >= 232 ? index("default") : 256);
-    expect(ratio(defaultTheme.dark.palettes["tone"]!.slots["dim"]!, "#1a1a1a")).toBeLessThan(
-      ratio(defaultTheme.dark.palettes["tone"]!.slots["default"]!, "#1a1a1a"),
+    expect(ratio(defaultTheme["dark"]!.palettes["tone"]!.slots["dim"]!, "#1a1a1a")).toBeLessThan(
+      ratio(defaultTheme["dark"]!.palettes["tone"]!.slots["default"]!, "#1a1a1a"),
     );
   });
 
@@ -138,8 +142,7 @@ describe("C10 fail-on-revert", () => {
     // The revert that is invisible in the transcript and shows up only inside a
     // panel. Dark `muted` measured 2.31 against bgElev before the correction,
     // and against `bg` alone it passed.
-    for (const variant of VARIANTS) {
-      const tokens = defaultTheme[variant];
+    for (const [variant, tokens] of SHIPPED) {
       const muted = tokens.palettes["tone"]!.slots["muted"]!;
       expect(ratio(muted, tokens.surfaces.bgElev), `${variant} muted on bgElev`).toBeGreaterThanOrEqual(
         floorFor("muted"),
@@ -150,13 +153,13 @@ describe("C10 fail-on-revert", () => {
   it("T6.13 (I17): giving two slots one value → T2.16 fails, naming the pair", () => {
     // Both states this caught: `key`/`number`, which shipped that way in Atom
     // One, and light `number`/`type`, which the contrast correction created.
-    for (const variant of VARIANTS) {
-      const syntax = defaultTheme[variant].palettes["syntax"]!.slots;
+    for (const [, tokens] of SHIPPED) {
+      const syntax = tokens.palettes["syntax"]!.slots;
       expect(syntax["key"]).not.toBe(syntax["number"]);
       expect(syntax["type"]).not.toBe(syntax["number"]);
     }
 
-    const collided = loadTheme(withTone("info", defaultTheme.dark.palettes["tone"]!.slots["ok"]!));
+    const collided = loadTheme(withTone("info", defaultTheme["dark"]!.palettes["tone"]!.slots["ok"]!));
     expect(collided.ok).toBe(false);
     if (!collided.ok) expect(collided.error.map((e) => e.message).join()).toMatch(/must not render as one another/);
   });
@@ -214,7 +217,7 @@ describe("C10 fail-on-revert", () => {
   it("T6.14 (I17): dropping the 8-bit distinctness check → T2.17 fails", () => {
     // Nothing in a truecolour terminal would have shown it, which is the whole
     // reason the check exists rather than the review.
-    for (const variant of VARIANTS) {
+    for (const [variant] of SHIPPED) {
       const current = store(variant).current;
       const five = ["ok", "warn", "error", "info", "accent"].map((t) => {
         const colour = resolveTone(t as never, current, caps(8)).colour;
@@ -240,7 +243,7 @@ describe("C10 fail-on-revert", () => {
     // like weakening the check. This asserts the surplus explicitly so the reason
     // for the narrow pairing survives someone reading only the passing suite.
     const NEVER_ON_A_DIFF_ROW = ["default", "dim", "warn", "info", "accent", "meta", "identifier"];
-    const tokens = defaultTheme.dark;
+    const tokens = defaultTheme["dark"]!;
     const surplus: string[] = [];
 
     for (const surface of ["diffAdd", "diffRemove"] as const) {
@@ -266,7 +269,7 @@ describe("C10 fail-on-revert", () => {
     // The other direction, and the quieter one: `syntax` alone leaves the numbers
     // and the `+`/`-` marker unmeasured on the surface they are drawn on. The
     // three that would go unchecked are named, so the loss is visible.
-    const tokens = defaultTheme.dark;
+    const tokens = defaultTheme["dark"]!;
     const gutter = ["ok", "error", "muted"];
 
     for (const slot of gutter) {
@@ -289,7 +292,7 @@ describe("C10 fail-on-revert", () => {
   it("T6.20 (I2, I23): emitting a diff background at depth 1 → T1.16 fails", () => {
     // The one signal a monochrome terminal cannot show becoming the one that
     // carries the meaning. At one bit the marker and the gutter are all there is.
-    for (const variant of VARIANTS) {
+    for (const [variant] of SHIPPED) {
       const current = store(variant).current;
       for (const surface of ["diffAdd", "diffRemove"] as const) {
         expect(resolveBackground(`surface.${surface}`, current, caps(1)), surface).toEqual({});
@@ -301,7 +304,7 @@ describe("C10 fail-on-revert", () => {
     // The check doing what it is for, shown rather than trusted. A `diffAdd`
     // lifted to where a real tool would put it on a dark theme breaks `comment`
     // and `muted` first — the two recessive slots that bound the whole budget.
-    const tokens = defaultTheme.dark;
+    const tokens = defaultTheme["dark"]!;
     const broken = {
       ...tokens,
       surfaces: { ...tokens.surfaces, diffAdd: "#1b4721" },
@@ -316,6 +319,6 @@ describe("C10 fail-on-revert", () => {
     expect(errors.some((e) => e.message.includes("the background moves rather than the slot"))).toBe(
       true,
     );
-    expect(loadTheme({ dark: broken, light: defaultTheme.light }, "dark").ok).toBe(false);
+    expect(loadTheme({ dark: broken, light: defaultTheme["light"]! }, "dark").ok).toBe(false);
   });
 });

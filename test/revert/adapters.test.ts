@@ -228,7 +228,7 @@ describe("C07 fail-on-revert", () => {
     expect(createAdapterRegistry({ ps: honest }).adapt(raw(), CTX).meta.adapter).toBe("mine");
   });
 
-  it("T6.12 (I12): dropping the malformed patch before degraded → T3.19c fails", () => {
+  it("T6.13 (I12): dropping the malformed patch before degraded → T3.19c fails", () => {
     // Every degraded stream loses its first remainder line, silently, because
     // C06 classifies a line before it tests the ratio.
     const reader = createNdjsonReader();

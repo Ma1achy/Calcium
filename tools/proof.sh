@@ -123,8 +123,21 @@ install_example() {
   [ -f "node_modules/@fmx/calcium/README.md" ] \
     || die "$name: the installed package has no README.md — \`files\` and the docs disagree"
 
+  # **`test:package`, not `test`** — the suite minus anything that reaches back
+  # into the repo. `examples/docker/test/repo/` holds one such file: comparing a
+  # container's rows against a hand-composed banner needs a block rendered to
+  # lines, and the published package exports no way to do that, so the test
+  # borrows the framework's own test support. That is a finding about the public
+  # surface and it is not a claim about the tarball — which is all this gate is
+  # entitled to check. A test that cannot run here would otherwise be deleted or
+  # the gate weakened; labelling it does neither.
   say "$name's tests, against the installed package"
-  npm test
+  # **Both examples declare it, so there is no special case here.** `minimal`
+  # has no repo-reaching test and its two scripts are identical — the *name* is
+  # the contract, and a fallback to `npm test` would let a new example quietly
+  # run its repo tests against the tarball, which is the thing this gate exists
+  # to notice.
+  npm run test:package
 }
 
 install_example docker

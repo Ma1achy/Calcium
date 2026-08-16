@@ -30,7 +30,7 @@ describe("C10 e2e", () => {
   //
   // **It exists now.** C11 and C12 have their own goldens and C25's are at
   // `test/golden/patch.test.ts`; this is the vocabulary in one frame, which is a
-  // different claim from any of them — that the seventeen render *together*, in both
+  // different claim from any of them — that the eighteen render *together*, in both
   // variants, at all four depths, without one of them throwing on a capability the
   // others tolerate.
   it("T5.1: every block kind renders in both variants at all four depths", () => {
@@ -44,7 +44,20 @@ describe("C10 e2e", () => {
           capabilities: { ...FULL_CAPS, colourDepth: depth },
         });
 
-        expect(kit.kinds, "the whole vocabulary must be present").toHaveLength(17);
+        // **A literal here went stale and this tier is where it hid.** `scroll`
+        // landed, the comment above was swept to *the eighteen* and the number
+        // in the assertion was not — and `npm test` excludes tier 5, so six
+        // green targets said nothing for five commits.
+        //
+        // Derived now, and as a **set equality** rather than a count: the row's
+        // sentence is *the whole vocabulary is present*, and two lists of the
+        // same length can still disagree about which kinds they hold. It cannot
+        // go stale in either direction — a kind registered and absent from the
+        // corpus fails, and so does the converse.
+        expect(
+          [...kit.kinds].sort(),
+          "the whole vocabulary must be present, and it is the corpus's own list",
+        ).toEqual([...ALL_KINDS].sort());
 
         for (const kind of ALL_KINDS) {
           const block = ONE_PER_KIND[kind];

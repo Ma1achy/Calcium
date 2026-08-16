@@ -139,6 +139,18 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
     children: [{ kind: "raw", id: "panel-1-raw", text: "two lines\nof text" }],
   }),
 
+  // A bounded region whose content overflows, so the corpus exercises the
+  // residue row (C04 I49) rather than only the fitting case.
+  scroll: block({
+    kind: "scroll",
+    id: "scroll-1",
+    height: 2,
+    children: [
+      { kind: "raw", id: "scroll-1-a", text: "one" },
+      { kind: "raw", id: "scroll-1-b", text: "two" },
+      { kind: "raw", id: "scroll-1-c", text: "three" },
+    ],
+  }),
   group: block({
     kind: "group",
     id: "group-1",

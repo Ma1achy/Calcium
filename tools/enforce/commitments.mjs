@@ -402,6 +402,101 @@ export function checkOrdering(files, readFile = (f) => readFileSync(f, "utf8")) 
   return violations;
 }
 
+// --- SP7 — a test row's number is unique within its spec --------------------
+//
+// **SP2's argument, applied to the numbers tests actually cite.** SP2 makes
+// invariant ids unique and ordered because "I17 is the cap" locates something
+// only if the numbers do. A test row is cited the same way and by more readers:
+// every test name in this repository opens with one, and a fail-on-revert row
+// names the row it breaks.
+//
+// The rule was missing and the drift was already there — **24 duplicated numbers
+// across 12 specs when this first ran**, including five created in a single
+// session by appending a group of rows to a tier whose numbering had moved on.
+// C01 declares `T3.18c` twice about two different states; C04 declares `T1.16`
+// twice, once about row ids and once about `plot`'s height. Both read as backed.
+//
+// A citation into a duplicated number resolves to whichever a reader finds
+// first, which is A03 §2's failure arriving at the citation rather than at the
+// rule: nothing is missing and nothing dangles, so SP1 and SP3 stay green and
+// the number has simply stopped locating anything.
+//
+// **`x` is exempt and deliberately so.** A spec under construction writes
+// `T3.x` for a row whose number is not yet decided — C26 §8b carries seven —
+// and that is a placeholder rather than a claim about a row.
+
+/**
+ * `- **T4.13** (…)` as a list item: the tier, the number, the letter.
+ *
+ * **Leading whitespace is allowed and the anchor stays**, and the mutation pass
+ * is what separated those two. Anchoring at column zero reads as strict and is
+ * the *under*-matching direction: a tier written as a nested list is skipped
+ * silently and the rule goes quiet on it, which is the failure mode this whole
+ * family exists to prevent. Dropping the anchor entirely is the other one — a
+ * fail-on-revert row naming `- **T4.23**` mid-sentence would read as a second
+ * declaration of it.
+ *
+ * Neither form is in the corpus today: 0 indented rows and 0 mid-line ones,
+ * measured 2026-08-13. So this keeps its shape on asymmetry rather than on odds
+ * — a rule that stops seeing a section costs a silent gap, and the check costs
+ * a character class.
+ */
+const TEST_ROW = /^[ \t]*- \*\*(T\d+\.(?:\d+[a-z]?|x))\*\*/gm;
+
+/** Every test row id a spec declares, in document order, `x` rows excluded. */
+export function testRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  const ids = [];
+  const src = readFile(file);
+  TEST_ROW.lastIndex = 0;
+  let m;
+  while ((m = TEST_ROW.exec(src))) {
+    if (!m[1].endsWith(".x")) ids.push(m[1]);
+  }
+  return ids;
+}
+
+/**
+ * SP7, one violation per spec.
+ *
+ * Per-spec for SP2's reason: a tier that has drifted usually carries a run of
+ * collisions from one edit, and sixteen findings about one append is noise. The
+ * message names every duplicate, because unlike a transposition they are not
+ * consequences of each other and a reader fixes each one separately.
+ */
+export function checkTestRowIds(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+
+  for (const file of files) {
+    const ids = testRowsOf(file, readFile);
+    // The vacuity arm SP2 carries, for the same reason: a spec with no test
+    // rows is not evidence of anything, and the fire-test asserts the corpus
+    // size before asserting it is clean.
+    if (ids.length === 0) continue;
+
+    const seen = new Set();
+    const duplicated = [];
+    for (const id of ids) {
+      if (seen.has(id) && !duplicated.includes(id)) duplicated.push(id);
+      seen.add(id);
+    }
+    if (duplicated.length === 0) continue;
+
+    violations.push({
+      rule: "SP7",
+      file,
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${(file.split("/").pop() ?? "").slice(0, 3)} declares ` +
+        `${duplicated.join(", ")} twice. A test name citing one of these resolves ` +
+        `to whichever row a reader finds first, and every fail-on-revert row that ` +
+        `names it names both — the number has stopped locating anything while ` +
+        `nothing is missing and nothing dangles.`,
+    });
+  }
+
+  return violations;
+}
+
 // --- SP4 — Seam 4 and its owners agree, both directions --------------------
 //
 // **The only artefact several components write to and none owns.** A02 Seam 4
@@ -995,4 +1090,4 @@ export function checkReferences(
 // was green throughout, because the rule *was* implemented and running; the only
 // thing that could see the gap was the suite, and the suite is not what was run.
 // That is A03 §2's own subject reaching the list that enforces it.
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6"];
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7"];

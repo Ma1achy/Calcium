@@ -34,6 +34,7 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   colourDepth: 24,
   unicode: "full",
+  ambiguousWidth: "narrow",
   synchronisedUpdate: true,
   bracketedPaste: true,
   mouse: true,
@@ -74,6 +75,10 @@ export function localContext(over: Partial<LocalContext> = {}): LocalContext {
     ...producerContext(over),
     command: "/probe",
     ask: (opts) => Promise.resolve((opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? ""),
+    // **Empty by default, which is the failed-validation arm** (C22 I66). A
+    // handler tested without saying what was parsed takes the path a malformed
+    // invocation takes, and a test meaning to exercise the other arm says so.
+    args: {},
     ...over,
   });
 }

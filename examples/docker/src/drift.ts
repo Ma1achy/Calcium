@@ -309,7 +309,7 @@ const errorDoc = (command: string, verb: string, text: string): LocalDocument =>
   schema: "tui.view/1",
   command,
   status: "error",
-  error: { message: text, stage: "local" },
+  error: { message: text },
   blocks: [b.notice.error(text)],
   meta: { adapter: "drift" },
 });

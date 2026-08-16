@@ -114,6 +114,15 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
   ["patch", { premise: "no-field", why: "the +/- marker carries the change axis (C04 I35)" }],
   ["tip", { premise: "no-field", why: "text only" }],
   ["raw", { premise: "no-field", why: "opaque by definition; the app owns what it renders" }],
+  [
+    "scroll",
+    {
+      premise: "no-field",
+      why:
+        "a box and a residue row whose meaning is in its numbers, and the children are swept " +
+        "as blocks in their own right",
+    },
+  ],
 ]);
 
 /** Any `tone` anywhere in a block, at any depth. The premise, falsifiable. */
@@ -163,6 +172,7 @@ const MEANING_TONES: ReadonlySet<Tone> = new Set<Tone>([
 const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   colourDepth: 24,
   unicode: "full",
+  ambiguousWidth: "narrow",
   synchronisedUpdate: true,
   bracketedPaste: true,
   mouse: true,

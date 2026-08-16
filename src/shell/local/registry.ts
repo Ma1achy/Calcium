@@ -34,6 +34,22 @@ export type AskOptions = Readonly<{
   /** What the answer will affect — a dry-run, or the matching `ls`. */
   detail?: Block;
   choices: readonly Choice[];
+  /**
+   * Where the question sits; `centred` by default (roadmap entry 16 A6).
+   *
+   * **A choice between placements rather than a `Placement`**, and that is the
+   * shape rather than a simplification. C15's `anchored` carries `row` and
+   * `rows` — the prompt's own extent, which the session computes and a local
+   * handler cannot know — so a field of that type would be public and half
+   * unfillable. The two arms are the decision a caller can actually make; L4
+   * supplies the anchor for the second.
+   *
+   * The width is not derived from this in general (entry 16 A3: the completion
+   * menu declares none and reverse search declares one, both anchored). It is
+   * derived here, by the layer's own owner, which is what A3 says the decision
+   * is.
+   */
+  placement?: "centred" | "anchored";
 }>;
 
 /**
@@ -57,6 +73,26 @@ export type LocalContext = ProducerContext & Readonly<{
    * handle and no path by which it could tell the two apart if there were.
    */
   ask: (opts: AskOptions) => Promise<string>;
+  /**
+   * What C05 parsed out of this invocation (C22 I66, C05 §4).
+   *
+   * **A widening that closes a duplication rather than adding a field.** A
+   * handler receives `argv` with the shell's own switches stripped, so a
+   * `shellOnly` flag is invisible to it and its only other surface is
+   * `command` — the line *as typed*. Reading a flag from there is a second
+   * parser, which is exactly what `ValidationResult.transmitted` exists to
+   * prevent: the walk that knows where a flag ends is C05's, and a copy of
+   * those rules drifts from it.
+   *
+   * `/theme` is the measured case, and it was re-deriving `dark|light` from
+   * `argv[0]` although validation had already parsed **and enum-checked** it.
+   *
+   * **Empty when validation failed**, because a local verb is not gated on it
+   * (C23 I38 gates the app route alone) — a handler that answers a malformed
+   * invocation with its own usage notice is reached with nothing parsed, and
+   * that is the arm the notice exists for.
+   */
+  args: Readonly<Record<string, unknown>>;
 }>;
 
 export type LocalHandler = (

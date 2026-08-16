@@ -21,7 +21,7 @@ import type { ProducerContext } from "../../data/adapters/types.js";
  * What every block-returning builder accepts, and the only declaration of it
  * (§4, I15).
  *
- * The seventeen positional builders take it last; the five that already take a
+ * The eighteen positional builders take it last; the five that already take a
  * spec object spread it in. Two declarations of one options shape is the drift
  * a shared type prevents — the same argument that gives the tree one block-id
  * counter rather than two.

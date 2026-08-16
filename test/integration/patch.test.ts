@@ -126,8 +126,9 @@ describe("C25 integration", () => {
   it("T4.8 (with C10, I12): every slot on a diff background clears its floor", () => {
     // C10's check, asserted from the patch side because C25 is the consumer that
     // made those surfaces text-bearing in the first place.
-    for (const variant of ["dark", "light"] as const) {
-      const tokens = defaultTheme[variant];
+    // Over the shipped set's own entries (C10 §5a.4), so a theme added later
+    // joins this row rather than passing it by.
+    for (const [variant, tokens] of Object.entries(defaultTheme)) {
       for (const [palette, slotName, surface, hex] of diffPairs(tokens)) {
         const value = tokens.palettes[palette]?.slots[slotName] as string;
         expect(ratio(value, hex), `${variant} ${palette}.${slotName} on ${surface}`).toBeGreaterThanOrEqual(

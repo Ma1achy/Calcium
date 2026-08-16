@@ -50,6 +50,8 @@ export type Composed = Readonly<{
 export type ComposeDeps = Readonly<{
   chrome: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
   session: () => SessionSnapshot;
+  /** Copy mode, for the chrome. A frame property, like `size` (C16 §5b). */
+  copyMode: () => boolean;
   now: () => number;
   size: () => TerminalSize;
   /** C17's `displayRows`, already gutter-aware. C22 passes the gutter (I13). */
@@ -69,7 +71,7 @@ export function compose(deps: ComposeDeps): Composed {
   const now = deps.now();
 
   const session = deps.session();
-  const ctx = { session, now, columns: size.columns };
+  const ctx = { session, now, columns: size.columns, copyMode: deps.copyMode() };
 
   // **The prompt is capped at half the terminal** (S01 §3). Pasting two hundred
   // lines is a real thing people do (C17 T5.2), and an uncapped prompt consumes
@@ -152,5 +154,8 @@ export function gutterMatchesPrompt(): boolean {
   // the same entry — and it would do so only on the terminals nobody develops
   // on. Checking the resolved prompt would pass on every machine that has the
   // unicode one, which is every machine this has ever been run on.
-  return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form));
+  // narrow-ok — `glyphs.ts`'s argument exactly: the two forms of one gutter
+  // are compared with each other, and the equality holds under either
+  // convention.
+  return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form)); // narrow-ok
 }

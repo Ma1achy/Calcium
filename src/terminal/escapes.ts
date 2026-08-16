@@ -1,13 +1,25 @@
 /**
  * Every escape-sequence literal in the codebase (C01 I1, A03 SS14, SS15).
  *
- * Shared utility. No functions, no state — a caller that needed logic here
- * would be a caller doing something C01 should be doing.
+ * Shared utility, and **no state** — a caller that needed state here would be a
+ * caller doing something C01 should be doing. It holds functions where a
+ * sequence takes a parameter (`cursorTo`, `sgr`, and the setting below); an
+ * earlier version of this sentence said *no functions* and had been false since
+ * `cursorTo` landed.
  *
- * **Each mode is an enter/leave pair.** A caller cannot reach for half of one,
- * and the inverse is written beside the thing it inverts rather than derived at
- * the call site — which is what makes C01 I6 (release emits the inverse of
- * `held`) a lookup rather than a second implementation that can disagree.
+ * **Three categories, and the difference decides where release lives.**
+ *
+ *   - A **mode** is an enter/leave pair. A caller cannot reach for half of one,
+ *     and the inverse is written beside the thing it inverts rather than derived
+ *     at the call site — which is what makes C01 I6 (release emits the inverse
+ *     of `held`) a lookup rather than a second implementation that can disagree.
+ *   - An **SGR** sequence holds nothing: no inverse to emit at release, never in
+ *     `held`, and MG20 has nothing to say about it. See below.
+ *   - A **setting** has persistent state like a mode and no inverse like an SGR
+ *     sequence. **Its undo is a third value, not the negation of anything**, so
+ *     writing one as a `mode()` would make `held` and I6 false about the same
+ *     bytes: release would emit a *leave* that is really *set to default*, and
+ *     those are different claims (C01 I20).
  *
  * Ownership of the *modes* is separate from ownership of the *digits*: the
  * literals live here, and A03 MG20 asserts which component may import each one.
@@ -46,6 +58,45 @@ export const MOUSE = mode("\x1b[?1002h\x1b[?1006h", "\x1b[?1006l\x1b[?1002l");
  */
 export const SYNC_UPDATE = mode("\x1b[?2026h", "\x1b[?2026l");
 
+// --- settings ---------------------------------------------------------------
+
+/** The three shapes `DECSCUSR` can name (C01 I20, C22 §6f). */
+export type CursorShape = "block" | "underline" | "beam";
+
+/**
+ * A resolved cursor style.
+ *
+ * **Shape and blink are one wire parameter, not two axes**, which is the fact
+ * the walk turned on: `CSI Ps SP q` encodes both, so *make the current shape
+ * steady* is unsayable and every blink transition re-emits the whole style. The
+ * type carries the pair for that reason rather than for convenience.
+ */
+export type CursorStyle = Readonly<{ shape: CursorShape; blink: boolean }>;
+
+/** `DECSCUSR`'s parameter per shape. The digits live here, as SS15 requires. */
+const SHAPE_CODE: Readonly<Record<CursorShape, readonly [steady: number, blinking: number]>> =
+  Object.freeze({
+    block: Object.freeze([2, 1] as const),
+    underline: Object.freeze([4, 3] as const),
+    beam: Object.freeze([6, 5] as const),
+  });
+
+/**
+ * `DECSCUSR` — the cursor's shape, and the file's one **setting**.
+ *
+ * `reset` is `0`, which is the terminal's **configured** default and therefore
+ * the user's own setting — not the negation of any value we wrote, and that is
+ * exactly why this is not a `mode()`. Nothing can un-write a `DECSCUSR`: *emit
+ * nothing* is reachable only before the first emission, so the rule that governs
+ * it is about a transition rather than a value, and C01 holds the record that
+ * makes that expressible (C01 I20, C22 I63).
+ */
+export const CURSOR_SHAPE = Object.freeze({
+  set: (style: CursorStyle): string =>
+    `\x1b[${String(SHAPE_CODE[style.shape][style.blink ? 1 : 0])} q`,
+  reset: "\x1b[0 q",
+});
+
 // --- SGR ------------------------------------------------------------------
 //
 // Not a mode. An SGR sequence styles one run of text and holds nothing: it has
@@ -77,6 +128,8 @@ export type SgrStyle = Readonly<{
   background?: SgrColour;
   bold?: boolean;
   dim?: boolean;
+  /** SGR 3, closed by the one reset like every other attribute (roadmap 50). */
+  italic?: boolean;
   inverse?: boolean;
   underline?: boolean;
 }>;
@@ -129,6 +182,28 @@ export const sgrPattern = (): RegExp => /\x1b\[[0-9;]*m/g;
 export const SGR_RESET = "\x1b[0m";
 
 /**
+ * The sequences that return a colour channel to the **terminal's** default,
+ * which is what a painted background has to survive (C22 I65, C10 I25).
+ *
+ * **Two, and the third is deliberately absent.** `\x1b[0m` resets everything and
+ * `\x1b[49m` restores the default background — Ink writes the second to close a
+ * background run, and a patch row ends with one. `\x1b[39m` restores the default
+ * *foreground* and is not in the set, because a background survives it untouched;
+ * including it would repair a sequence that needs no repair and put a base
+ * declaration into the middle of every styled run in the tree.
+ *
+ * Here rather than in the painter because it is an escape literal, and those live
+ * in one module on the write path (I1, A03 SS14) — the rule caught this on its
+ * first run against the painter's own copy.
+ *
+ * **The blind spot, stated**: a compound sequence carrying `0` or `49` among
+ * other parameters is not matched. Nothing in the tree emits one — `sgr()` never
+ * writes `0`, and Ink writes both closers alone — and that is a measurement
+ * rather than a guarantee.
+ */
+export const toTerminalDefault = (): RegExp => /\x1b\[(?:0|49)m/gu;
+
+/**
  * A style as the sequence that turns it on.
  *
  * **The depth comes from the tag, never from the format** (C10 I24). A hex
@@ -145,6 +220,10 @@ export function sgr(style: SgrStyle): string {
 
   if (style.bold === true) params.push(1);
   if (style.dim === true) params.push(2);
+  // **In numeric order, which is not decoration**: SGR parameters are applied
+  // left to right and a reader diffing two frames reads them as a sequence, so
+  // one stable order is one fewer thing that changes when nothing changed.
+  if (style.italic === true) params.push(3);
   if (style.underline === true) params.push(4);
   if (style.inverse === true) params.push(7);
 

@@ -30,16 +30,16 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 10 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 21 | **5 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 12 fixed** |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 22 | **6 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
-| **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 18 | **14** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader |
+| **8** | [Absence indistinguishable from failure](#8) | 14 | **3 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 30 | **9** | — | 7 closed · **4 open, all four about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
+| **10** | [**A claim carried without a record**](#10) | 14 | **6** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about** |
+| **11** | [A gate that passes without checking](#11) | 33 | **11** | — | 8 closed · **6 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -119,6 +119,7 @@ reach it. **Seven closes is the strongest evidence in this document that a shape
 | **F41** | `Patch.collapsedAfter`, `actions` | open |
 | **F21** | the action model, from a keystroke | open — the dispatch route |
 | **F23** | `view: true` on a local tool | open — accepted, does nothing |
+| **F165** | **`ErrorLike.code`, `.stage`, `.details` — set by three producers, the adapter mapping and the app's own twelve sites; rendered by nothing.** The first thing roadmap 48's residue was read for, and it listed one of the three: the other two were *cleared* by the app naming them, which is the instrument's direction working as described. **The twelve sites were then read, and they split the three**: `stage` is a per-file constant restating the kind of function it sits in, so the framework already knows it (F13's class, group 1); `code` and `details` come off the far side's own envelope and are the one place narrowing costs something | **partly fixed** — `code` is rendered beside the message and all three members are kept. **The removal of `stage` was ruled and the compiler falsified it**: eight framework sites write real runtime values (`parse`, `spawn`, `handoff`, `local`, `transport`), so the axis keeps the field and moves the app's twelve writes. **Fixed** — the twelve are gone, and the app's suite is 308 before and 308 after: fourteen assertions touch `.error` and every one reads `message`, so the field was write-only for its whole life. What moved is the instrument — roadmap 48's residue went 88 → 89 candidates, and the one member that moved is `ErrorLike.stage`, cleared until now by the app's own writes |
 
 **F78 is the sharpest instance yet and it is worse than the others by a specific mechanism.**
 `b.live` throws when neither `fetch` nor `stream` is given, and throws again when both are —
@@ -286,6 +287,7 @@ wrongness and the split is the finding: `DOCKER_TUI_SURFACES.md`'s corrections i
 | **F32** | itself, three passes — `ExposedPorts` is true of a service image and false of a base one |
 | **F44** · **F65** · **F57** | itself — four of eight extents wrong and `40+4+60 = 104`; a tally reading 5 over four rows; a comparison frame varying two axes in the document arguing for frames |
 | **F59** | itself — a README snippet shipped in every tarball that had never been type-checked |
+| **F164** | itself — `src/index.ts`'s header lists `ViewRefresh` among the things a reader *will not find*, and line 245 exports it. The deferral class's fourth instance and the one that tightens its shape: the satisfier is in the **same file**, so proximity is not what makes a deferral expire — being looked at is. Found by a population step, not by reading. **Fixed** |
 
 **A design document written with the specs open got the framework wrong seven times.** Reading
 a spec and checking against it are different acts and only the second is a test — A03 §2's
@@ -326,6 +328,9 @@ Every instance is invisible by construction: a green suite, a plausible frame, n
 | **F15** | an invalid document — no entry, no error, no clue | open, and it is the mechanism |
 | **F64** | `b.logs` has no consumer in this app at all; the surfaces document says it demonstrates tone on log lines and it does not | open — a claim, not a feature |
 | **F67** | **below 16 rows the shell draws nothing, says nothing, and stays alive** | **closed** — the gate existed and neither half ran (C01 I12b, C22 T4.21) |
+| **F167** | **a document that persists and reloads as a *different valid document*** | `NaN` in a plot series validated, `JSON.stringify` wrote it as `null`, and the reloaded document validated too — the second agreement is the defect. Under it, `Series.values` and `Cell.spark` were never element-checked at all, so a string in a numeric array passed with or without a round trip. Four sibling numeric fields already used `isFiniteNumber`. **Fixed** — C04 I46, T2.19, T6.27, T6.28 |
+| **F170** | **the gap had no legal spelling** — C12 I4 renders a non-finite entry as a position with no reading, C04 I46 refuses one, so absence was expressible in the type and in no valid document. The docker ring had been building such a block for a commit and nothing noticed, because a constructed block never reaches the validator. **Fixed** — C04 I46a, C12 I4, T1.16, T2.19 |
+| **F171** | **a ramp step that draws as padding** — `RAMP_BRAILLE` began at `U+2800`, so at `ambiguousWidth: "wide"` every sparkline drew its *minimum* as whitespace, which the right-anchor already uses for *fewer samples than cells*. `cells()` counts it as one and no golden frame renders that arm, so every width and length row passed. **Fixed** — C12 I16, T1.15, a golden frame for the arm |
 
 **F67 is the new instance and the first where the *framework* is the one saying nothing.**
 Measured with the size set on the PTY master before the child draws: 100×12, 100×15 and 30×16
@@ -429,11 +434,16 @@ says a demo of a plot should have a shape.
 | **F130** | the grant's own tests could not see it, because the double was narrower |
 
 
-## 10 · A claim carried without a record — **5, and all five disproved** · new at F80
+## 10 · A claim carried without a record — **6: five findings disproved, one claim caught before it was filed** · new at F80
 
-**This group is the disposition.** Every entry is a finding that was filed, believed, and then
-turned out to be wrong — and a log that quietly dropped them would read as *eighty-four found*
-rather than **seventy-nine found and five disproved.**
+**This group is the disposition.** The first five entries are findings that were filed,
+believed, and then turned out to be wrong — and a log that quietly dropped them would read as
+*eighty-four found* rather than **seventy-nine found and five disproved.**
+
+**F161 is the sixth and it is the group's first arriving from the other end**: the instrument
+was pointed at a claim *before* it became a finding, so what is filed is the disproof rather
+than the belief. That is the group succeeding rather than growing, and it is worth
+distinguishing in the count instead of folding into it.
 
 | | what was claimed | what measuring said |
 |---|---|---|
@@ -442,10 +452,17 @@ rather than **seventy-nine found and five disproved.**
 | **F58** | `?? 0` reports signal-death as clean success | `authoritativeMeta` overwrites `exitCode` on every route: `999` yields **0**, `SIGTERM` yields **143**. The five coercions never reached a document — **retracted, superseded by F58b** |
 | **F66** | docker refuses to remove an image a running container references, and it cannot be forced | `rmi` **untags** without `-f` while the container runs — **retracted**, then the retraction itself amended, because what decides it is whether the tag is the image's *last* reference |
 | **F68** | the completion menu paints no background and the transcript reads through it | every cell of the box is written — measured by diffing two captures row by row, columns 0–81 on all three rows — **withdrawn**, published in two READMEs first |
+| **F161** | a hanging-continuation mark has four consumers, one of which ships | the character is in **no file** in the repository, and none of the four could take it: one already has a `Glyph` slot, one is text inside a `code` block, one has no renderer, one was a homonym — a log *level* named `trace`. **Caught before it was filed** |
+| **F168** | roadmap 44 is C20's persistence one level up, so the shape carries | **the policy carries and the redactor does not.** C20 redacts a *command line* with a tokeniser; a transcript document holds what the far side **printed** — and `inspect.ts:152` puts every container environment variable into a `keyValue` block. A rendered document has no tokens to redact, so finding a secret in one means understanding all seventeen kinds. And a transcript row *mutates* after it is written, which append-only with an index-aligned sidecar assumes it does not. **Caught before a line of it was built**, on a row already corrected once this session |
+| **F166** | roadmap 44 needs a document serialiser and `src/` has none, so 44 is blocked on 34 | a `ViewDocument` is **JSON by construction** — no function, `Map`, `Set` or `Date` anywhere in the block union — and it round-trips byte-identically through `JSON.stringify` and `validateDocument`, which C13 already calls on every append. What is missing is **one export line** and a round-trip row per kind. Three documents restating one unmeasured belief, and a conflation underneath it: 34's *structured export* is a UX item in a six-item bundle, and 44 read it as a codec. **Caught before anything was built on it** |
 
-**Three of the five were disproved by one instrument, and it is worth stating as a number.**
-*Going to find where the claim was written* has now **disproved three findings and produced
-two** — F58b, and F66's replacement reason. Five results from one habit that costs twenty
+**Four of the six were disproved by one instrument, and it is worth stating as a number.**
+*Going to find where the claim was written* has now **disproved three claims and produced
+four** — F58b, F66's replacement reason, F92 and F161. **This line and `CLAUDE.md`'s had
+already drifted apart by one before F161 was added** — F92 was counted there and not here,
+which is two records of one number doing what two records of one fact always do. Corrected in
+both, and the drift is left recorded rather than tidied away: it is the same class the group
+is about, arriving in the group's own summary. Seven results from one habit that costs twenty
 minutes makes it the highest-yield thing in the toolkit, and it is the only instrument that
 checks the *record* rather than an artefact. The frame-read checks output. The mutation pass
 checks tests. The audit checks code. Nothing else asks whether a belief has a source.
@@ -482,10 +499,13 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **11: 5 closed, 6 open**
+## 11 · A gate that passes without checking — **14: 6 closed, 8 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
+| **F169** | **`make roadmap`, for the half of the file that is not a table row** | `roadmap-status.mjs` matches `\| N \| BUILT\|PART\|RULED \| … \|` and resolves the citations in that cell. **Entry bodies are never scanned** — 81 citations, 39 of them with a line — so the target reports 49/49 while resolving 56% of the file's citations, and the one stale citation a census found (`src/shell/confirm.ts:148`, blank) was in the unchecked half. The census also priced the exposure: **143 of 326 prose citations carry a line number**, 73% in the roadmap against 19% in `docs/`. **Open** — widening the resolver needs a basename search for the 50 bare-name body citations, and `src/progress.ts` exists in both trees, which is the resolve-against-the-wrong-file class. Six unresolved citations fixed |
+| **F163** | **the golden suite, for anything the painter decides** | `test/golden/README.md` says *frames*, and not one of the four files is one: all go through `renderToLines`, and **no golden test imports from `src/shell/`**. So the base, the prompt window, the selection wash, the chrome, the frame arithmetic, the cursor sequences and the write-as-a-diff have never appeared in a snapshot — the category built to catch exactly this class of change stops one layer below it. Found by re-measuring roadmap 39's residue, whose stated reason was true and was not the reason. **Open** — roadmap 49, because a golden *frame* is test infrastructure with more consumers than the entry that found it |
+| **F162** | **`make test`, for a test file's own types** | vitest transpiles rather than typechecks, so a type error **inside** a test row is invisible to that row: T4.31 ran, asserted and went green in a file `tsc` refuses. `check` covers it and `afb88c4` published a clean `check` for a commit that does not typecheck — which makes the remedy an ordering one, **`check` last, not first**. **Fixed** |
 | **F2** | a CI job | Calcium was not a publishable package, and the job proved nothing |
 | **F56** | `package.json`'s `bin` | a claim about an executable, accepted by install, pack, `publish --dry-run` and `make proof`. Three consumers existed and **all three reached around the entry point** |
 | **F60** | `make proof` | red on `main` for two merged PRs, because it is the one target CI does not run |
@@ -604,7 +624,7 @@ enforcement rule and sends a reader looking for a violation that does not exist.
 | | the victim shape |
 |---|---|
 | **F69** | a **threshold** — T5.3a asserts a background stream advanced by more than three while sixty keystrokes are processed. On a contended runner it advanced by one. Same commit, red on a branch and green on `main` four minutes later |
-| **F73** | a **timeout** and a **ratio** — six tier-2 source scans timed out at 15 s having taken 24 s; C17 T3.15 read 6.0 against a limit of 3 on a 1 MB paste |
+| **F73** | a **timeout** and a **ratio** — six tier-2 source scans timed out at 15 s having taken 24 s; C17 T3.15 read 6.0 against a limit of 3 on a 1 MB paste. **Read 4.05 again on 2026-08-15**, on a docs-only commit that touched no `src/`, green on an immediate re-run at load average 3.0 — a second measurement of the same row, and the one that makes *not an algorithmic regression* a fact rather than an inference |
 
 **The ratio is the one worth naming**, because it fails in a way that reads as an algorithmic
 regression rather than as a busy machine. So the class is not *slow rows time out*: it is
@@ -707,7 +727,7 @@ a triage is a thing asserted. Specifically:
   yield in this repository is the one this file is most exposed to, because grouping and ranking
   is exactly the operation that lends a claim authority it has not earned.
 - **A finding that was never filed at all.** Not hypothetical. **F81 spent a whole step as a
-  comment** at `src/progress.ts:31`, ending *"filed rather than worked around"* — and it was not
+  comment** at `examples/docker/src/progress.ts:31`, ending *"filed rather than worked around"* — and it was not
   filed. So the strongest group on this list looked like three consumers rather than four, and
   nothing that sorts `FINDINGS.md` could have known. SP5 checks that every citation resolves to
   a finding that exists; **nothing checks whether something that should be a finding is one.**

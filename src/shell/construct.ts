@@ -29,7 +29,7 @@ import { commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
 import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
-import { createManifestStore, parseManifest } from "../data/manifest/index.js";
+import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
 import type { Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
@@ -47,6 +47,7 @@ import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
+import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
@@ -68,7 +69,14 @@ import {
   type TerminalLifecycle,
 } from "../terminal/lifecycle.js";
 import { makeBeforeRelease } from "./shutdown.js";
+import {
+  createTranscriptWriter,
+  loadTranscript,
+  persistPolicy,
+  persists,
+} from "./transcript-persist.js";
 import type { ResolvedConfig } from "./config.js";
+import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
 
 /** Where the chosen variant lives (I40). One value, one file. */
@@ -128,6 +136,15 @@ async function readDocument(
  * list written inside the test — a test carrying its own copy of the order
  * agrees with itself under any permutation of the thing it is checking.
  */
+/**
+ * A paste of this many lines or more becomes a chip (roadmap 30).
+ *
+ * Five, and it is a judgement rather than a measurement: four lines of prompt is
+ * still a prompt and six is a wall. Said to be a judgement so nobody goes
+ * looking for the figure it was derived from.
+ */
+const CHIP_LINES = 5;
+
 export const STEPS = Object.freeze([
   "capabilities",
   "registries",
@@ -161,7 +178,17 @@ export type Step = (typeof STEPS)[number];
  */
 export type FrameQueries = Readonly<{
   copyMode: () => boolean;
+  /**
+   * Leave copy mode (C16 §5b B1).
+   *
+   * **Ships with `copyMode` and with `enterCopyMode`, never after them.** The
+   * `⌃c` rung already calls this, so a producer landing alone gives a mode that
+   * consumes the key and does nothing — entered and not leavable, which is
+   * worse than unreachable. Both stubs were in the tree for the length of C26.
+   */
   exitCopyMode: () => void;
+  /** Enter it. The other half of B1's pair (C16 §5b). */
+  enterCopyMode: () => void;
   entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
@@ -208,8 +235,21 @@ export type Graph = Readonly<{
    * comment warning about the second could not see it.
    */
   liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
+  /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
+  pageBlock: (direction: 1 | -1) => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
+  /** Past the blink threshold since the last key (C22 I64). */
+  cursorIdle: () => boolean;
+  /**
+   * Has `--no-bg` turned the theme's background off (C22 I66, C10 I25)?
+   *
+   * **Read here and written through the pipeline's deps**, which is why only the
+   * reader is on the graph: `/theme`'s handler is the one writer, it is reached
+   * through `PipelineDeps`, and a setter here as well would be a second way to
+   * write one variable with no caller.
+   */
+  suppressBackground: () => boolean;
   capabilities: TerminalCapabilities;
   /**
    * C22 I6a — every component that accumulates a diagnostic, drained at §8
@@ -239,6 +279,7 @@ export type Graph = Readonly<{
    * asked for again.
    */
   rendered: RenderCache;
+  scrollOffsets: ScrollOffsets;
   overlays: ReturnType<typeof createOverlayManager>;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
@@ -432,7 +473,11 @@ export async function constructGraph(
     const parsed = parseManifest(document.value);
     if (!parsed.ok) throw new ConstructionError("registries", parsed.error);
 
-    manifest.load(parsed.value);
+    // **`/theme`'s values, supplied where both facts are held** (C10 I27). The
+    // manifest describes the verb and the config declares the themes, and this
+    // is the one place with each — so the enum, the completion and the usage
+    // text all name the set the session actually holds.
+    manifest.load(withThemeNames(parsed.value, Object.keys(config.theme)));
 
     const completion = createEngine({ now: config.clock, recency: recencyOf });
     // **The framework's six first, then the app's** (I3b). §2 called
@@ -484,6 +529,9 @@ export async function constructGraph(
   // rather than about an object, so the read moved to a free function in that
   // file and neither invariant has to give.
   const size = terminalSize(config.stdout);
+  /** Roadmap 30 — the chip's display number, per session. */
+  let chipCount = 0;
+
   const stores = await (async () => {
     const transcript = createTranscriptStore(
       config.retainPayloads > 0 ? { retainPayloads: config.retainPayloads } : {},
@@ -514,9 +562,21 @@ export async function constructGraph(
     // hold a rendered document nothing can reach, for the life of the session.
     // C14's `HeightCache` takes the same two changes for the same reason.
     const rendered = new RenderCache();
+    // **One subscription for both** (C04 I48). The rendered rows and the offset
+    // that chose them are the same fact about the same entry, and two callbacks
+    // would be two places for a future eviction path to reach one and miss the
+    // other.
+    const scrollOffsets = new ScrollOffsets();
     transcript.subscribe((change) => {
-      if (change.kind === "evict") for (const id of change.ids) rendered.delete(id);
-      else if (change.kind === "clear") rendered.clear();
+      if (change.kind === "evict") {
+        for (const id of change.ids) {
+          rendered.delete(id);
+          scrollOffsets.delete(id);
+        }
+      } else if (change.kind === "clear") {
+        rendered.clear();
+        scrollOffsets.clear();
+      }
     });
 
     const overlays = createOverlayManager({ registry: built.blocks });
@@ -544,6 +604,20 @@ export async function constructGraph(
     // notice is drawn. Only a genuinely unwritable path reaches the catch.
     try {
       await config.fs.mkdir(config.stateDir);
+      // **The directory ignores itself** (I67). `.calcium` sits beside the
+      // project, so a theme preference is committable today and a persisted
+      // transcript is the moment a verb declares one (C13 I20). Writing the
+      // rule here rather than documenting it means it does not depend on the
+      // app author having thought of it, and `*` inside the directory beats
+      // whatever the project's own ignore file says.
+      //
+      // Unconditional rather than written-if-absent: an app that deliberately
+      // un-ignored this directory has done something the framework should not
+      // be helping with, and a read-then-write would be two syscalls to reach
+      // the same place. Failure is silent — the `catch` below is for a
+      // directory that could not be made at all, which is the case worth a
+      // notice.
+      await config.fs.writeFile(`${config.stateDir}/.gitignore`, "*\n").catch(() => undefined);
     } catch {
       transcript.append(
         noticeDoc(
@@ -578,7 +652,11 @@ export async function constructGraph(
     const persisted = await readOrAbsent(config.fs, themePath(config.stateDir));
     if (persisted !== null) {
       const trimmed = persisted.trim();
-      if (trimmed === "dark" || trimmed === "light") themed.value.setVariant(trimmed);
+      // **A membership test against the set, not a comparison to two literals**
+      // (C10 I27). The migration is nothing — `dark` and `light` are names in
+      // the shipped set — and a literal pair here would refuse a legitimate
+      // name the moment a third theme existed.
+      if (themed.value.names.includes(trimmed)) themed.value.setTheme(trimmed);
       else if (trimmed !== "") {
         // Appended here rather than carried out to `start()`: the transcript
         // exists at this point and a warning threaded through the graph is a
@@ -635,7 +713,68 @@ export async function constructGraph(
       );
     }
 
-    return { transcript, viewport, rendered, overlays, history, editor, theme: themed.value };
+    // **Session resume** (C13 I20, roadmap 44). Off unless the app declared a
+    // policy, and the decision is taken here because L4 is the one place that
+    // holds the manifest, the config and the store at once — A02 Seam 4, and
+    // the reason C13 knows nothing about verbs.
+    const policy = persistPolicy(built.manifest.manifest ?? null, config);
+    const persisting = policy.all || policy.declared.size > 0;
+    const transcriptWriter = createTranscriptWriter(
+      config.fs,
+      `${config.stateDir}/transcript.ndjson`,
+    );
+    if (persisting) {
+      const loaded = await loadTranscript(config.fs, `${config.stateDir}/transcript.ndjson`);
+      transcriptWriter.seed(loaded.rows);
+      // Appended in order, so the session opens at the bottom on the newest of
+      // them — 44's ruling, and it falls out of `append` rather than needing a
+      // rule: no scroll offset, no container offset and no focus is restored
+      // because none of them is written.
+      for (const doc of loaded.docs) transcript.append(doc);
+
+      // **A dropped line is said out loud** (F35's class). Silently discarding
+      // part of a resume file is absence indistinguishable from failure: the
+      // session looks like one that had fewer commands in it, and nothing
+      // anywhere says otherwise.
+      if (loaded.discarded > 0) {
+        transcript.append(
+          noticeDoc(
+            "",
+            `${String(loaded.discarded)} line${loaded.discarded === 1 ? "" : "s"} of the ` +
+              `saved transcript could not be read and ${loaded.discarded === 1 ? "was" : "were"} ` +
+              `skipped`,
+            "warn",
+            { origin: "refresh" },
+          ),
+        );
+      }
+
+      // **What is written is decided on `settle`, and on an `append` that is
+      // already settled.** A non-streaming entry is settled the moment it
+      // arrives — `streaming` is what unsettled means (C13 §2) — so both
+      // changes carry an entry that will not move again, and no other change
+      // does. `patch` deliberately writes nothing: a row written before it
+      // stopped changing is the whole of §5b.2.
+      transcript.subscribe((change) => {
+        if (change.kind !== "append" && change.kind !== "settle") return;
+        const entry = transcript.entries.find((e) => e.id === change.id);
+        if (entry === undefined || entry.streaming) return;
+        if (!persists(policy, entry.doc)) return;
+        transcriptWriter.write(entry.doc);
+      });
+    }
+
+    return {
+      transcript,
+      viewport,
+      rendered,
+      scrollOffsets,
+      overlays,
+      history,
+      editor,
+      theme: themed.value,
+      transcriptWriter,
+    };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("stores", cause);
   });
@@ -667,7 +806,7 @@ export async function constructGraph(
       stdin: config.stdin,
       capabilities: detection.capabilities,
       onFatal: deps.onFatal,
-      beforeRelease: makeBeforeRelease(runner, stores.history),
+      beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
     }),
   );
@@ -694,6 +833,19 @@ export async function constructGraph(
   // **The anchor is captured before the cache is dropped** — C14's `resize`
   // does that internally (C14 I8), which is why this hands over one snapshot
   // and does not compute anything from it.
+  /**
+   * Step 11's anchor refresh, reachable from step 8's handler.
+   *
+   * **A forward reference made explicit rather than left implicit.** The resize
+   * subscription is registered at step 8 and the effect table is built at step
+   * 11, so naming `keys` inside the handler is a temporal-dead-zone read that
+   * is safe only because construction is synchronous and no signal can
+   * interleave. That is a true argument and a fragile one — it stops holding
+   * the day any step awaits — and the failure it would produce is a throw
+   * inside a signal handler.
+   */
+  let refreshAnchors: () => void = () => undefined;
+
   at("resize", () => {
     lifecycle.onResize((size) => {
       // **The width, and not the height** (C22 I34). Width is what invalidates
@@ -704,6 +856,13 @@ export async function constructGraph(
       // first. The height passed through is the one C14 already holds, so this
       // call carries no opinion about it.
       stores.viewport.resize({ width: size.columns, height: stores.viewport.scroll.viewportHeight });
+      // **The anchors, before the frame is asked for** (C15 I14, C19 I23). An
+      // anchored layer stores the row it was placed against, and every writer
+      // of that row was a keystroke path — so a resize left an open menu
+      // anchored to the previous region height until the next character. C15
+      // clamps, so nothing faults and no number disagrees; the menu is simply
+      // in the wrong place, which is a frame's finding and not an assertion's.
+      refreshAnchors();
       scheduler.commit("resize");
     });
     // `SIGCONT` re-acquires and says so through `onResume`; C01 sets no
@@ -732,7 +891,9 @@ export async function constructGraph(
    */
   const confirm = createConfirmHost({
     overlays: stores.overlays,
-    capabilities: detection.capabilities,
+    // The same anchor C19's menu takes, read at `ask` time (C15 I17).
+    anchor: deps.frame.promptAnchor,
+    overlayRegion: deps.frame.overlayRegion,
     invalidate: () => void scheduler.commit("input"),
   });
 
@@ -787,6 +948,21 @@ export async function constructGraph(
     redraw: () => void scheduler.commit("input"),
   });
 
+  /**
+   * `--no-bg`, for as long as the invocation that set it is the last `/theme`
+   * (C22 I66).
+   *
+   * **Declared above the pipeline, not beside `lastInputAt`** — the handler's
+   * writer closes over it at step 10, and a `let` executed later would be a
+   * temporal dead zone the first time `/theme` ran. At graph scope for
+   * `lastInputAt`'s reason: the frame reads it and a local
+   * handler writes it. It is **not** a theme override — an override merges into
+   * the tokens, bumps the serial and changes the theme's identity, which is
+   * sticky by construction and would put a paint decision into every cache
+   * keyed on that identity (C10 I25).
+   */
+  let suppressBackground = false;
+
   const pipeline = at("pipeline", () => {
     const p = config.pipeline({
       // A function, not a snapshot: the store freezes a fresh object per write,
@@ -837,6 +1013,9 @@ export async function constructGraph(
         void config.fs.writeFile(themePath(config.stateDir), `${variant}\n`).catch(() => {
           // Best effort. A03 SS33 bans `console.*` and the debug sink is C01's.
         });
+      },
+      setSuppressBackground: (next) => {
+        suppressBackground = next;
       },
       history: stores.history,
       runner,
@@ -909,6 +1088,35 @@ export async function constructGraph(
     return built.blocks.elementsIn(entry.doc.blocks, deps.frame.overlayRegion().width);
   };
 
+  /**
+   * Page the focused container's own window (C04 I48, C26 I18).
+   *
+   * **Here rather than in `keys.ts`**, for `liveElements`'s reason: a page is
+   * the container's height less one row of overlap, and the height is
+   * `measure(block, width)` — a registry call at the frame's width, which is
+   * this file's to make and not the effect table's.
+   *
+   * **Focus does not move**, which is the invariant and not an omission: the
+   * store is nudged and nothing touches `focus`. A focused element outside the
+   * box is the legal state C26 I18 names, and the next `↓` steps from it.
+   */
+  const pageBlock = (direction: 1 | -1): void => {
+    const entryId = stores.transcript.liveId;
+    if (entryId === null) return;
+    const at = focus.current;
+    if (at.at !== "liveBlock" || at.element === null) return;
+
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const block = entry?.doc.blocks.find((b) => b.id === at.element?.blockId);
+    if (block === undefined) return;
+
+    // One row of overlap, which is what lets a reader join two screens — and
+    // a floor of one, so a box of a single row still moves.
+    const height = built.blocks.measure(block, deps.frame.overlayRegion().width);
+    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1));
+    scheduler.commit("input");
+  };
+
   const keys = createKeyEffects({
     editor: stores.editor,
     completion: built.completion,
@@ -923,6 +1131,8 @@ export async function constructGraph(
     documentView,
     releaseView: () => void pipeline.releaseView(),
     focus,
+    // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
+    enterCopyMode: deps.frame.enterCopyMode,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*
     // such walks — the two below and `focusFor` in `session.ts`. Each was a
@@ -938,6 +1148,7 @@ export async function constructGraph(
     // second's stated reason (cheap on arrows, expensive on `enter`) was
     // falsified by this very walk: both call `liveElements()`.
     liveElements,
+    pageBlock,
     liveEntryId: () => stores.transcript.liveId,
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
     onAction: (action, from) => {
@@ -949,6 +1160,17 @@ export async function constructGraph(
     // is the opposite of the case a coalescing window is for.
     redraw: () => void scheduler.commit("completion"),
   });
+  // Step 8's handler reaches the anchors through this, declared above it.
+  refreshAnchors = () => void keys.refreshAnchors();
+
+  /**
+   * When the last input batch landed, for the cursor's blink edge (C22 I64).
+   *
+   * At graph scope rather than inside the input block, because the frame reads
+   * it and the input path writes it — the same reason `promptUnderMenu` is
+   * here rather than recomputed in `session.ts`.
+   */
+  let lastInputAt = config.clock();
 
   /**
    * Is the prompt still answering keys under whatever is on the stack (I51)?
@@ -1002,7 +1224,11 @@ export async function constructGraph(
         // it (C19 I19): suppression is per token, and the next line's first
         // token starts at the same offset the dismissed one did.
         keys.reset();
-        pipeline?.submit(stores.editor.text);
+        // **The one resolution site** (roadmap 30). C23 takes a string, C18
+        // classifies one and C05 describes `argv`, so a chip becomes its content
+        // here and no sentinel reaches the far side. Every other reader sees the
+        // buffer as it is, because three of them read an index alongside it.
+        pipeline?.submit(stores.editor.resolved);
         return true;
       }
 
@@ -1019,7 +1245,30 @@ export async function constructGraph(
       // sequence, and a printable keystroke does not advance it.
       if (e.kind === "paste") {
         built.completion.cancel();
-        stores.editor.insert(e.text, { atomic: true });
+        // Numbered per session and never reset: `[#2]` after `[#1]` was deleted
+        // is a reader seeing that something else was there, which is true.
+        // Resetting would give one prompt two `[#1]`s across two submissions.
+        // **A large paste becomes a chip** (roadmap 30). The threshold is lines
+        // and not bytes, because what makes a paste unreadable in a prompt is
+        // the rows it takes: a 4 KB single line wraps and is still one thing to
+        // read past, while five short lines are five rows of prompt.
+        //
+        // **Line count only, and the kind detection is the named residue.** The
+        // entry wants `[JSON · 47 lines]` — one parse attempt — and that is a
+        // second decision with its own failure mode, a paste that *nearly*
+        // parses. The first version says how big it is and nothing about what it
+        // is, and the label is what a reader sees, so widening it later changes a
+        // string rather than a mechanism.
+        const lines = e.text.split("\n").length;
+        if (lines >= CHIP_LINES) {
+          chipCount += 1;
+          stores.editor.insertChip({
+            label: `[#${String(chipCount)} pasted · ${String(lines)} lines]`,
+            content: e.text,
+          });
+        } else {
+          stores.editor.insert(e.text, { atomic: true });
+        }
         keys.afterEdit();
         return true;
       }
@@ -1141,6 +1390,7 @@ export async function constructGraph(
 
   at("input", () => {
     let wake: Disposable | null = null;
+    let blinkWake: Disposable | null = null;
 
     /**
      * One commit per decoded batch, and no handler commits (I27).
@@ -1160,9 +1410,46 @@ export async function constructGraph(
     const deliver = (events: readonly InputEvent[]): void => {
       if (events.length > 0) {
         for (const e of events) router.dispatch(e);
+        stampInput();
         scheduler.commit("input");
       }
       arm();
+    };
+
+    /**
+     * The cursor's blink edge (C22 I64, §6f).
+     *
+     * **A wake on the driver's own scheduler, never a `setInterval` in
+     * `paint.ts`** — the constraint that survived the expiry of its premise.
+     * *Steady on a keystroke* is free, because a keystroke already composes a
+     * frame (I27); only the **idle edge** has no frame of its own, which is
+     * I31's shape reached through a third timer.
+     *
+     * **Armed only where a declared style blinks.** The spinner arms
+     * unconditionally on the argument that it is cheap, and its wake follows a
+     * *request*; this one would follow every keystroke, so an application
+     * declaring no cursor would pay one composed frame per typing pause for a
+     * resolution that emits nothing.
+     *
+     * **A burst of keys arms one wake, and the mechanism is the disposal rather
+     * than a generation guard.** The spinner's shape was copied here first —
+     * `seq += 1`, `if (mine === seq)` — and the mutation pass found it dead:
+     * `schedule` returns a disposable that calls `clearTimeout`, so a cancelled
+     * wake never fires and the counter can never disagree. **The spinner's own
+     * guard is not dead, and the difference is the reason**: it arms without
+     * cancelling, so the counter is its only mechanism. Copying the shape
+     * without the reason is what produced code that read as careful and
+     * forbade nothing.
+     */
+    const blinks = anyBlinking(config.cursor);
+    const stampInput = (): void => {
+      lastInputAt = config.clock();
+      if (!blinks) return;
+      blinkWake?.[Symbol.dispose]();
+      blinkWake = config.schedule(() => {
+        blinkWake = null;
+        scheduler.commit("input");
+      }, CURSOR_BLINK_MS);
     };
 
     // The three timeouts C16 reports and does not fire: the escape window, the
@@ -1192,7 +1479,17 @@ export async function constructGraph(
      * taking keys.
      */
     promptUnderMenu,
+    suppressBackground: () => suppressBackground,
+    /**
+     * Whether the cursor is past its idle threshold (C22 I64).
+     *
+     * A **paint-time read**, on the same terms as `spinning` and the ghost
+     * (I38, I50): it changes with the clock rather than with the frame, so a
+     * value captured when the key arrived could never become true.
+     */
+    cursorIdle: () => config.clock() - lastInputAt >= CURSOR_BLINK_MS,
     liveElements,
+    pageBlock,
     capabilities: detection.capabilities,
     /**
      * C22 I6a — construction, then the session, then what the session contained.

@@ -79,6 +79,8 @@ function openOverlay(graph: Graph): void {
     placement: { kind: "centred" },
     content: [],
     dismissable: true,
+    // Declared, because a centred layer must be (C15 I20).
+    width: 20,
   });
 }
 
@@ -204,6 +206,16 @@ describe("C22 §3 step 11 — the effect table", () => {
       "layout",
       "displayRows",
       "cursorCell",
+      // The clipboard primitive `copy` is written in terms of, and the
+      // transcript's `y` writes through it — so it *is* reached by a binding,
+      // just not by one at this target. C16 §5a row A4 is why `copyElement`
+      // lives on `liveBlock` and cannot be bound here.
+      "copyText",
+      // Readers of the selection, not operations on it (C17 §5b). `extend` and
+      // `selectAll` are the bound half and are covered above; these two are
+      // what step 3's copy and entry 23's wash will read.
+      "selection",
+      "selected",
       // Diagnostics, and C16's `lastStages` precedent.
       "undoDepth",
       "redoDepth",
@@ -214,6 +226,14 @@ describe("C22 §3 step 11 — the effect table", () => {
       "insert",
       "setText",
       "clear",
+      // **Roadmap 30's two, and each is excluded for its own reason.**
+      // `resolved` is a *read* like `text` — the buffer with chips expanded, for
+      // the submission site — and not an editing operation at all. `insertChip`
+      // is driven by the shell like `insert` above it, and by an event kind this
+      // table does not index: a **paste**, in the same handler, which is why a
+      // scan over key bindings cannot see it.
+      "resolved",
+      "insertChip",
       // Construction rather than an edit — it records no undo unit and
       // `createEditor` is its only caller (C17 §5).
       "seed",
@@ -242,6 +262,7 @@ describe("C22 §3 step 11 — the effect table", () => {
 
     const effects = createKeyEffects({
       editor: spy,
+      pageBlock: graph.pageBlock,
       completion: graph.completion,
       overlays: graph.overlays,
       history: graph.history,
@@ -271,6 +292,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         openFor: null,
       },
       releaseView: () => undefined,
+    enterCopyMode: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
@@ -331,7 +353,18 @@ describe("C22 §3 step 11 — the effect table", () => {
     for (const kind of ["table", "plot", "patch"]) {
       expect(graph.blocks.kinds, `${kind} has no renderer`).toContain(kind);
     }
-    expect(graph.blocks.kinds.length, "and C09's fourteen are still there").toBe(17);
+    // **Fifteen defaults plus these three, and the split moved with `scroll`** --
+    // which is why this was read rather than swept: the sentence said *fourteen*
+    // and the total said 17, and a kind added to C09's defaults changes both
+    // numbers by one in different places.
+    //
+    // **A hand-maintained total, and that is the finding rather than the fix.**
+    // It cannot be derived here: `graph.blocks.kinds` is the registry's own
+    // answer, so comparing it to itself proves nothing, and the union is a type.
+    // C04 T2.10 holds the derivable half -- a literal list checked against
+    // `BlockKind` at compile time, where adding a kind is a type error. This row
+    // is the runtime half and it can only count.
+    expect(graph.blocks.kinds.length, "C09's fifteen and the three registered").toBe(18);
   });
 
   it("T2.15 (C16 I22): ↓ into the live block, ↑ and Esc back out — as one sequence", async () => {
@@ -587,7 +620,7 @@ describe("C22 §3 step 11 — the effect table", () => {
 });
 
 describe("C22 §3 step 12 — the read loop", () => {
-  it("T1.4f (C22 I24): a byte reaches the router only once the terminal is acquired", async () => {
+  it("T1.4q (C22 I24): a byte reaches the router only once the terminal is acquired", async () => {
     const { graph, stdin } = await buildGraph();
 
     stdin.emit("a");
@@ -616,7 +649,12 @@ describe("C22 §3 step 12 — the read loop", () => {
     stdin.emit(`[200~${lines}[201~`);
 
     expect(commit.mock.calls, "two hundred lines are one commit").toEqual([["input"]]);
-    expect(graph.editor.text.split("\n"), "and all of them arrived").toHaveLength(200);
+    // **Two hundred lines are one chip now** (roadmap 30), so the buffer holds a
+    // single sentinel and the content is behind it. The claim this row makes is
+    // *all of them arrived*, and `resolved` is where that is still true —
+    // asserting `text` would now be asserting the chip threshold by accident.
+    expect(graph.editor.text.length, "the buffer holds one grapheme").toBe(1);
+    expect(graph.editor.resolved.split("\n"), "and all of them arrived").toHaveLength(200);
   });
 
   it("T1.4h4 (C22 I46): Esc on a document view releases its parts, and before the dismiss", () => {
@@ -812,6 +850,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     expect(focus.current, "the third element, in the second block").toEqual({
       at: "liveBlock",
       element: { blockId: "b", elementId: "r1" },
+      anchor: null,
       mode: "navigate",
     });
 
@@ -822,6 +861,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     expect(focus.current, "forward, not back to the first block").toEqual({
       at: "liveBlock",
       element: { blockId: "b", elementId: "r2" },
+      anchor: null,
       mode: "navigate",
     });
   });
@@ -848,11 +888,154 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     expect(focus.current, "fell forward into block b, then stepped up").toEqual({
       at: "liveBlock",
       element: { blockId: "a", elementId: "r2" },
+      anchor: null,
       mode: "navigate",
     });
 
     focus.enterLiveBlock({ blockId: "a", elementId: "r1" });
     effects.table["rowUp"]?.();
     expect(focus.current, "and a real first element does leave").toEqual({ at: "prompt" });
+  });
+
+  it("T1.18 (C26 I19, §4c): the ends belong to the entry's sequence, not to a block", () => {
+    // **The row the boundary never had, and its absence is why the asymmetry
+    // read as `table`'s.** The fixture holds two blocks deliberately: with one,
+    // the entry's ends and the block's ends are the same cells and every reading
+    // of *what `↓` does at the edge* agrees.
+    const { effects, focus } = collidingEffects();
+
+    // The head. `↑` at the entry's first element leaves to its neighbouring
+    // scope — the prompt is what is beyond that end.
+    focus.enterLiveBlock({ blockId: "a", elementId: "r1" });
+    effects.table["rowUp"]?.();
+    expect(focus.current, "the head has a neighbour").toEqual({ at: "prompt" });
+
+    // The tail. Nothing is beyond it, so `↓` stops — and this is a *stop*
+    // rather than a trap, because `Esc` is bound at this target.
+    focus.enterLiveBlock({ blockId: "b", elementId: "r2" });
+    effects.table["rowDown"]?.();
+    expect(focus.current, "the tail has none, so focus does not move").toEqual({
+      at: "liveBlock",
+      element: { blockId: "b", elementId: "r2" },
+      anchor: null,
+      mode: "navigate",
+    });
+
+    // **And the seam between the two blocks is not an end at all** — the half
+    // T1.15 carries from the other direction. Asserted here too, because the
+    // ruling is about which cells are ends and a row about the ends that never
+    // looks at a non-end passes for an implementation where every block edge is
+    // one.
+    focus.enterLiveBlock({ blockId: "a", elementId: "r2" });
+    effects.table["rowDown"]?.();
+    expect(focus.current, "steps into the next block").toMatchObject({
+      element: { blockId: "b", elementId: "r1" },
+    });
+  });
+});
+
+describe("C26 §5c — the transcript's selection and semantic copy", () => {
+  /** A live block whose elements carry source text no rendering would produce. */
+  const copyEffects = () => {
+    const focus = createFocusStore();
+    const kill: string[] = [];
+    const effects = createKeyEffects({
+      editor: { copyText: (t: string) => void kill.push(t) },
+      completion: {},
+      overlays: {},
+      history: { entries: [], append: () => undefined, next: () => null },
+      patchView: { open: () => null, move: () => false, pop: () => false },
+      documentView: {
+        open: () => null,
+        fill: () => false,
+        putBlock: () => false,
+        blockAt: () => null,
+        move: () => false,
+        pop: () => false,
+        openFor: null,
+      },
+      releaseView: () => undefined,
+      visibilityChanged: () => undefined,
+      manifest: null,
+      viewport: recordingViewport().viewport,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+      focus,
+      liveElements: () => [
+        { blockId: "a", element: navElement("r1", 0, undefined, "web\t3\trunning") },
+        { blockId: "a", element: navElement("r2", 1, undefined, "api\t1\tstopped") },
+        { blockId: "a", element: navElement("r3", 2, undefined, "db\t2\trunning") },
+      ],
+      liveEntryId: () => "e1",
+      onAction: () => undefined,
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
+    } as unknown as Parameters<typeof createKeyEffects>[0]);
+    return { effects, focus, kill };
+  };
+
+  it("T1.42 (§5c): y copies the element's source, into the one clipboard", () => {
+    const { effects, kill } = copyEffects();
+
+    effects.table["historyNext"]?.(); // ↓ from the prompt, onto the first row
+    effects.table["copyElement"]?.();
+
+    expect(kill, "the declared source, through the editor's clipboard").toEqual([
+      "web\t3\trunning",
+    ]);
+  });
+
+  it("T1.43 (C26 §5c, C17 I21): ⇧↓ extends and y copies the range, newline-joined", () => {
+    const { effects, focus, kill } = copyEffects();
+
+    effects.table["historyNext"]?.();
+    effects.table["extendRowDown"]?.();
+    effects.table["extendRowDown"]?.();
+
+    // **The anchor has not moved**, which is C17 T1.23's assertion one level
+    // up and the defect the shape was built against: an extension that moved
+    // the anchor is right on the first keystroke and wrong on the second.
+    expect(focus.current).toEqual({
+      at: "liveBlock",
+      element: { blockId: "a", elementId: "r3" },
+      anchor: { blockId: "a", elementId: "r1" },
+      mode: "navigate",
+    });
+
+    effects.table["copyElement"]?.();
+    expect(kill).toEqual(["web\t3\trunning\napi\t1\tstopped\ndb\t2\trunning"]);
+  });
+
+  it("T1.44 (§5c): an unshifted motion collapses the range", () => {
+    const { effects, focus, kill } = copyEffects();
+
+    effects.table["historyNext"]?.();
+    effects.table["extendRowDown"]?.();
+    effects.table["rowDown"]?.();
+
+    expect(focus.current, "the anchor is gone").toEqual({
+      at: "liveBlock",
+      element: { blockId: "a", elementId: "r3" },
+      anchor: null,
+      mode: "navigate",
+    });
+
+    effects.table["copyElement"]?.();
+    expect(kill, "one row, not three").toEqual(["db\t2\trunning"]);
+  });
+
+  it("T1.45 (§5c): ⇧↑ stops at the first element rather than leaving the block", () => {
+    // **Unshifted `↑` exits to the prompt** (C26 I13, the reader stepping out).
+    // Extending is a gesture *inside* the block, and one that walked out would
+    // take the selection with it and leave nothing to copy.
+    const { effects, focus } = copyEffects();
+
+    effects.table["historyNext"]?.();
+    effects.table["extendRowUp"]?.();
+
+    expect(focus.current.at, "still in the block").toBe("liveBlock");
   });
 });

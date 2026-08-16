@@ -367,6 +367,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS48 | A second frame composition — a `paint(` call under `src/shell/` outside the unit that owns it. `composeFrame` in `render-frame.ts` is the one, and `session.ts` calls it | `src/shell/`, `render-frame.ts` and `paint.ts` excused | C22 I54, C24 I25, FINDINGS F126 |
 | SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
 | SS49 | `origin: "defect"` outside the one site that means it | `src/` outside `shell/execution.ts` | C23 §5a, I48 · C04 I13 |
+| SS50 | a `cells()` call naming neither the ambiguous-width convention nor `// narrow-ok` | `src/` outside `src/interaction/completion/menu.ts`, `src/interaction/history/layers.ts` and `src/shell/fallback.ts` | C02 I9 · C02 §3 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
@@ -510,8 +511,27 @@ Not build gates — they need fixtures — but they are the checks that catch th
 | CP8 | Every surface at 1-bit carries each distinction by glyph or word | B04 B4.3 |
 | CP9 | Every field at 160 is reachable at 60 | B04 B4.2 |
 | CP10 | Drop orders are identical under ASCII and UTF-8 | B04 B4.4 |
+| CP11 | **The corpus has two axes — one entry per kind and one per state** — matched to their frames by equality | C04 T2.10, T2.100–T2.103 |
 
 **CP6 already caught two defects during specification** — S06's drop table stated by analogy, and S14 and S15 specifying drops below the minimum width. It is three lines of code and it found errors three readings had missed.
+
+**CP11 is the one measured after the fact, and the figure is why it exists.** `ONE_PER_KIND` is a
+`Readonly<Record<BlockKind, Block>>` — **exhaustive over kinds by its type, and holding exactly one
+state of each.** So it answers *does this kind render* and can answer nothing about *which state it
+is in*, which means a new state of an existing kind is invisible to it by construction. **Three
+features shipped that way** and each needed a frame added by hand afterwards: the continuation mark
+(flush left in the prompt's gutter), the gapped series (the two forms of `plot` disagreeing about one
+array), and the wide ramp's lowest step drawing as its own padding (F171). Not three coincidences —
+the corpus had no axis they could be entries on.
+
+**And the property it cannot have is stated with it**, because an unrecorded limit reads as strength:
+nothing can invent an entry for a state nobody wrote down. The equality arm keeps the inventory and
+the frames in step in **both** directions — a fixture with no declared name and a name with no
+fixture each fail — and whether a *new* state belongs is the same judgement `EXPECTED_KINDS` needs
+when a kind is added. What the axis buys is that the judgement costs three lines and the frame comes
+free. Its own mutation pass records the residue one level out: **dropping a capability arm from the
+frames fails nothing**, because obsolete snapshots are reported and not failed, so the variants a
+corpus draws are a literal no assertion reads.
 
 **CP8 is the sweep worth running earliest.** A single colour-only distinction anywhere breaks the 1-bit axis invisibly for everyone whose terminal has colour.
 
@@ -529,8 +549,36 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP4 | A02 Seam 4 and each owner's orchestration table hold the same rows, **both directions** | A02 Seam 4 · C22 §3c · C23 §4 | A02 §Seam 4 |
 | SP5 | Every `Fnn` citation resolves against a finding that exists | FINDINGS · CLAUDE.md §Ask where a settled claim is written down | A03 §7a |
 | SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
+| SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
+
+**SP7 is SP2's argument applied to the numbers tests actually cite, and it was missing for the
+whole build.** SP2 makes invariant ids unique because *"C13 I17 is the cap"* locates something
+only if the numbers do. A test row is cited by more readers than an invariant is — every test name in
+this repository opens with one, and every fail-on-revert row names the row it breaks — and
+nothing checked them.
+
+**Twenty-four duplicated numbers across twelve specs on its first run**, and the way they were
+found is the argument for the rule. Five of them were created in one session, by appending a
+group of rows to a tier whose numbering had moved on, and they were noticed only because a
+sixth row was about to be added by hand. C01 declares `T3.18c` twice, about two different
+states; C04 declares `T1.16` twice, once about row-id uniqueness and once about a plot's
+height; C23 held five. **Every one of them read as backed**: nothing is missing and nothing
+dangles, so SP1 and SP3 stay green while the number has stopped locating anything — A03 §2's
+failure arriving at the *citation* rather than at the rule.
+
+**The remedy keeps the letter's meaning, which SP2 already had to learn.** A lettered row is a
+variant of its base, so a duplicated `T1.3b` becomes the next free letter of `T1.3` rather than
+the next free number of tier 1: a positional renumber invents a relationship that does not
+exist. And the new letter goes *after* the highest, never into a gap, so the letters ascend with
+the document.
+
+**Its blind spot is the placeholder, and it is stated because an unrecorded limit reads as
+strength.** A spec under construction writes `T3.x` for a row whose number is not yet decided —
+C26 §8b carries seven — and a placeholder is not a claim about a row, so `x` rows are excluded
+before the comparison. The cost is real: two rows that both stay `T3.x` are two this rule will
+never separate, and only their landing numbers close that.
 
 **SP2 is a check that existed as a habit rather than a mechanism**, which is the same class as SS3 (§2) approached from the other side: not a rule written down and never built, but a rule performed reliably and never written down. Ordering was verified by ad-hoc script while the specs were written and caught every time. When the habit stopped, the drift resumed — twenty of twenty-five specs, C04 declaring `…17, 22, 23, 24, 25, 26, 27, 28, 19, 29, 18, 20, 20a, 33, 32, 31, 30, 21` — and nothing went red, because nothing was missing and no citation dangled. The list had simply stopped locating anything.
 
@@ -850,6 +898,76 @@ thing that exists**. A reason can be checked by a reader; existence cannot, once
 the entry is what a reader consults instead of the source. The cheapest guard is
 the one that found it: keep the violation list short enough that someone opens
 the file it names.
+
+### The public surface by use — a residue, not a rule
+
+F105 and F160 closed MG24's name-matching as a class: four tightenings measured,
+four refused, because a coherent API reuses its vocabulary across types
+deliberately and narrowing to the public surface selects *for* that population.
+What F160 left is a residue rather than a bug, and it named the shape that could
+work — *a second consumer written from the public surface names every field it
+uses, and the residue is the candidates, by **use** rather than by name.* Both
+consumers exist now. This is that measurement, and it is **reported, never
+gated**, for C24 I11's reason.
+
+**Why the same name-matching is fatal to MG24 and harmless here.** The two use
+opposite directions of one match, and this is the whole argument for building it
+rather than tightening the rule.
+
+MG24's verdict is *unconsumed*, so it needs the **cleared** side to be exact —
+and it is not: a member is cleared the moment any unrelated type anywhere
+declares that name and something reads it. This signal's verdict is *candidate*,
+so it needs the **listed** side to be exact — and it is, because a collision can
+only ever *clear*. Measured on the day it landed: **144 of 226 clearings are
+ambiguous**, and not one of them can put a member into the residue. **The list
+under-reports and cannot over-report**, which is what a set of candidates for a
+read wants and what a gate cannot use.
+
+That property is what row 2 below is decided by, and it is why the row changed
+under the build.
+
+**And the residue has since been shown to move, which the founding claim asserts and the
+landing measurement could not.** `ErrorLike.stage` was *cleared* on the day this landed —
+cleared by `examples/docker` writing it at twelve sites of its own, which F165 then ruled was
+the app authoring a fact only the framework can know. With the twelve writes removed and
+nothing else changed, measured both ways round on the same tree: **88 → 89 candidates, 226 →
+225 clearings**, and the single member that moved is `ErrorLike.stage`. A residue that measures
+use responds to a change in use, and the landing figures above are kept as the measurement they
+were rather than being refreshed — the second measurement is worth more than a current one.
+
+#### The walk — indexed by rule interaction, and a table because none of these is
+event-mediated
+
+Four rules: the **population** is members of the types `src/index.ts` exports;
+a **use** is a textual name in an example's source, tested per keyword as MG24
+tests it; the **two consumers** are different evidence, so a candidate is named
+by neither; the **output** is a residue for reading. Every interaction below
+holds at rest, so this is a classification table and not a trace.
+
+| # | the two rules that meet | the cell | ruling |
+|---|---|---|---|
+| 1 | *a use is a name* × *the output is a residue* | a name several published types carry | the direction above: clearing is ambiguous, listing cannot be. **144 of 226.** Stated as the founding claim rather than as a limitation, because it is why the instrument is sound where the rule is not |
+| 2 | *a use is a name* × *the population* | the keyword decides the test, and it was tuned for `src/` — where deps records are built inline and interfaces are called into | **the walk ruled that the split carried over, and the build falsified it.** `CompletionSource` is declared `export interface` and `examples/docker/src/completion.ts` *supplies* four of its members by object literal — `slots`, `dynamic`, `ttlMs`, `cacheKey` — every one of which the split put in the residue. **That is the residue over-reporting, which row 1 says it cannot do**, so the loose test runs everywhere and the keyword decides nothing here. The correction is row 1's, applied: a wrongly-cleared member only shortens the list |
+| 3 | *two consumers* × *a use is a name* | a member named only in an example's **test** | **13.** A test names a field in order to assert it, which is evidence about the surface and not about use. Neither cleared nor listed — a third bucket, printed |
+| 4 | *the population* × *the output* | a member no app can name without doing something neither app does — writing a custom block kind (`RenderContext`, `Style`, `TerminalCapabilities`), driving a fixture world (`WorldDriver`) | **a candidate is not an unused member.** The residue is read by *what an app would have to do to reach it*, so the read is over strata and not over names. This is the reason it reports and does not gate |
+| 5 | *the population* × *the freeze* | a type withheld from the list for A03 §2's vacuity class and later restored | `ViewRefresh`. Withheld through C22 and C23 because a consumer could declare a refreshing part and never be called; back at `src/index.ts:245` once C23 I32–I35 gave it a driver. **Neither app names any of its three members** — and the file's own header still lists it among the things *a reader will look for and not find*. F164 |
+
+**What the build changed, recorded rather than smoothed over.** Row 2's ruling
+was wrong and row 1's was what corrected it — *the keyword is how the framework
+declares a type, and an app's use is decided by what the type is for*. The walk
+could not have reached it: the interaction is between a rule and **which side of
+a seam a type faces**, and nothing in either artefact shape indexes that. What
+the walk did do is make the correction cheap, because row 1 had already settled
+which direction of error the instrument may take.
+
+**The blind spot, because an unrecorded limit reads as strength.** The residue is
+exact about the claim it makes — *neither example names this member* — and that
+claim is a **proxy** for use with one known gap: a builder can set a field the
+app never names. `b.live` is the measured instance. `examples/docker` uses the
+mechanism `ViewRefresh` declares and reaches it through `b.live`, whose own
+`LiveSpec` carries `staleAfter` where the published type carries `staleAfterMs`.
+So a member in the residue is a **candidate for a read**, and the first question
+the read asks is whether a builder covers it.
 
 ### MG26 — the dev-only entry points stay out of the bundle
 

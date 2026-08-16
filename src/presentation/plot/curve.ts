@@ -41,7 +41,7 @@ export function curveRows(
   range: Range,
   areaWidth: number,
   areaRows: number,
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): readonly string[] {
   const ascii = caps.unicode === "ascii";
   const dots = ascii ? RAMP_DOTS : BRAILLE_DOTS;
@@ -67,5 +67,8 @@ export function curveRows(
     drawLine(grid, column.x, y(column.last), next.x, y(next.first));
   });
 
+  // `rampFor` is only reached on the ASCII branch here, so the ambiguous arm
+  // cannot apply — the braille fold below is what a unicode terminal gets, and
+  // braille is narrow on both kinds.
   return ascii ? foldRamp(grid, rampFor(caps)) : foldBraille(grid);
 }

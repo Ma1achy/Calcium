@@ -1,7 +1,7 @@
 // C09 tier 1 and 3 — cells(), truncate(), wrapCells().
 //
 // The single width implementation (I6). Every kind's measurer resolves width
-// through these three functions, so a defect here is a defect in seventeen
+// through these three functions, so a defect here is a defect in eighteen
 // measurers at once — which is the argument for them being one implementation
 // and the reason this file tests it apart from any block.
 import { describe, expect, it } from "vitest";

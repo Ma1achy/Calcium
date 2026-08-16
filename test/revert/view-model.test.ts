@@ -11,6 +11,7 @@ import {
   applyPatch,
   block,
   deepFreeze,
+  validateBlock,
   validateDocument,
   type MergeRow,
   type Table,
@@ -132,7 +133,7 @@ describe("C04 fail-on-revert", () => {
     expect(r.ok === false && r.error.message).toContain("more than once");
   });
 
-  it("T6.13 (I27): a global seen-set instead of a path-scoped one → T1.17b fails", () => {
+  it("T6.17 (I27): a global seen-set instead of a path-scoped one → T1.17b fails", () => {
     // A subtree legitimately appearing twice is not a cycle. A global set calls
     // the second occurrence one and refuses a legal document — the failure is a
     // false positive, which is why T1.17b asserts the *absence* of a cycle
@@ -225,6 +226,44 @@ describe("C04 fail-on-revert", () => {
 
   it("T6.20 (§3): defaulting a line plot's height → T1.16 fails", () => {
     expect(() => block({ kind: "plot", id: "p", form: "line", series: [] })).toThrow();
+  });
+
+  it("T6.27 (I46): a numeric check that is `typeof number` → T2.19 fails on NaN", () => {
+    // The revert is dropping `Number.isFinite`, which is what every other
+    // numeric field in this validator already carries — `height`, `current`,
+    // `total` and `flex` — and which the numeric *arrays* did not.
+    //
+    // **The state it restores is the one that shipped**, and it is silent in
+    // both directions: `[1, NaN]` validates, persists as `[1, null]`, and the
+    // reloaded document validates too. The row asserts the refusal because that
+    // is the only observable difference; nothing about the rendered plot says
+    // which of the two it is drawing.
+    const plot = (v: unknown): unknown => ({
+      kind: "plot",
+      id: "p",
+      form: "line",
+      height: 4,
+      series: [{ values: [1, v] }],
+    });
+
+    expect(validateBlock(plot(Number.NaN)).ok).toBe(false);
+    expect(validateBlock(plot(Number.POSITIVE_INFINITY)).ok).toBe(false);
+    expect(validateBlock(plot(2)).ok, "the control — a finite value is accepted").toBe(true);
+  });
+
+  it("T6.28 (I46): checking the array and not its elements → T2.19 fails on Cell.spark", () => {
+    // The other half, and the half no round trip would have found: `spark` is
+    // reachable only through a table cell, so a document arriving from a far
+    // side could carry strings there and every check passed.
+    const withSpark = (spark: unknown): unknown => ({
+      kind: "table",
+      id: "t",
+      columns: [{ key: "a", label: "A" }],
+      rows: [{ id: "r1", cells: { a: { text: "x", spark } } }],
+    });
+
+    expect(validateBlock(withSpark(["1", "2"])).ok).toBe(false);
+    expect(validateBlock(withSpark([1, 2])).ok, "the control").toBe(true);
   });
 
   it("T6.1 (I7): a measurer under-counting wrapped lines by one → T2.1 fails at the wrap width", () => {

@@ -1,7 +1,9 @@
 /**
  * C25 — the patch renderer, registered rather than privileged.
  *
- * The seventeenth kind and the last one C09 does not ship. `patchDefinition` goes
+ * The eighteenth kind and still the last one C09 does not ship -- `scroll`
+ * arrived among the defaults, so the ordinal moved and the claim after it did
+ * not. `patchDefinition` goes
  * in through the public `register`, which is what makes three separately built
  * components — C11's `table`, C12's `plot`, this — the evidence that the extension
  * path is a mechanism rather than a claim. Deleting the register call removes the
@@ -49,7 +51,7 @@ function header(block: Patch, layout: PatchLayout, ctx: RenderContext): string {
   // at the label leaves the path floating with no region under it, and the figure
   // in §2 draws the rule across. `clampSpans` in `line()` cuts it back at a narrow
   // width, so the repeat is a ceiling rather than a promise.
-  const trail = Math.max(0, layout.width - cells(lead));
+  const trail = Math.max(0, layout.width - cells(lead, ctx.capabilities.ambiguousWidth));
   const spans: Span[] = [{ text: lead }, { text: rule.repeat(trail) }];
   return line(spans, "context", layout, ctx);
 }

@@ -194,6 +194,123 @@ The payload arrives as `append`'s `opts.payload` and is discarded unread when re
 
 ---
 
+## 5b. Persistence — the walk, and the two rulings it owes
+
+Roadmap 44 is *session resume*, and its row says the transcript is already a store
+with a cap and eviction, so **persisting it is C20's shape one level up**. The
+policy half is right and is worth restating because it is what generalises: one
+chain, failure rewinds rather than drops, and `drain` writes from the last
+*confirmed* write rather than the last issued one.
+
+**Two things the row does not say, and both were measured before anything was
+built.** F166 already corrected a third — the codec claim — by measuring that a
+document is JSON by construction (C04 I46, §5a).
+
+### 5b.1 The classification table — what holds at rest
+
+| # | the two rules that meet | the cell | disposition |
+|---|---|---|---|
+| 1 | *what reaches disk is redacted* (C20 I6) × *a document holds the far side's output* | C20's redactor is a **tokeniser over a command line** — positional rules on flag names, then entropy. A transcript document holds what the far side *printed*, and `examples/docker/src/inspect.ts:152` puts **every container environment variable** into a `keyValue` block | **RULED: the framework never redacts, and persistence is declared per verb** — 5b.4 |
+| 2 | *an entry has `rev`* × *append-only with an index-aligned sidecar* | **a history entry is immutable once appended; a transcript entry is not.** It is patched and settled after it would already have been written, and an index-aligned append-only file assumes a row never changes | **RULED: settled entries only** — 5b.3 |
+| 3 | *an entry may be `live`* × *persistence* | a live entry's document is a snapshot of one poll, and its `fetch` does not survive the process. Restored, it is a panel frozen at a moment with nothing saying so | falls out of 5b.3's recommendation |
+| 4 | *an entry may be `streaming`* × *persistence* | an entry still accepting patches at exit: a half-built document, whose `status` may read `ok` before the verb finished | falls out of 5b.3 |
+| 5 | *the cap is 100,000 **blocks*** (§5) × *C20 compacts to a **row** count* | "keep the last N" is a different arithmetic on each side — C20 counts lines, C13 counts blocks across entries of wildly different size | compaction is by C13's own cap, applied to whole entries |
+
+### 5b.2 The sequence trace — what an event does to a written row
+
+| # | the sequence | what it produces | note |
+|---|---|---|---|
+| 1 | `append` → write → `patch` | the file holds `rev` 0 and memory holds `rev` 1 | the append-only assumption failing on the commonest path |
+| 2 | `append` → write → `settle` | the file holds the pending document, memory holds the final one | §5's *settling is the replacement* — the written row is the one that was never meant to be read |
+| 3 | `append` → write → `evict` | the file holds a row memory has dropped | the cap and the file disagree, and the file is the older of the two |
+| 4 | `append` → exit before the chain confirms | `drain` writes from `confirmed` | C20's policy, carried unchanged — the one row of this trace that needs nothing new |
+| 5 | `clear` → write in flight | `reset` empties both, and the queued write must not land after it | C20's chain already orders this |
+
+### 5b.3 Settled entries only
+
+**Persist settled entries only.** Rows 1, 2 and 3 of the trace are all the same
+defect — a row written before it stopped changing — and settling is precisely the
+moment it stops. An unsettled entry is by definition live or streaming, so table
+rows 3 and 4 disappear with them rather than needing rules of their own. The file
+becomes append-only in fact and not by assumption, and *drain from the last
+confirmed write* keeps its meaning one level up.
+
+What it costs is stated rather than hidden: **a session killed mid-command loses
+that command's output**, and the entry the user most wants back after a crash is
+sometimes exactly that one. The alternative — a rewritable row — buys it at the
+price of the whole index-aligned shape, and the two losses are not comparable:
+**a missing last entry is recovered by running the command again, and a file whose
+rows disagree with memory is not recovered at all.**
+
+### 5b.5 What the build changed: a row on disk needs an identity
+
+**The trace's row 4 said `drain` carries C20's policy unchanged, and the code
+disagreed.** `drain` writes from the last *confirmed* write, so a row the chain
+had already **issued** is written synchronously and written again when the held
+append lands. C20 tolerates exactly this and says so — *the duplicate this may
+produce is collapsed on load* — and what makes that safe there is an entry
+identity the loader can collapse by. A bare document has none.
+
+So a persisted row is an envelope, `{seq, doc}`, and the loader keys by `seq`
+with last-write-wins. **The writer tolerates the duplicate and the reader removes
+it**, which is C20's division rather than a new one.
+
+**And the envelope's key is the file's, not the session's.** A writer seeded with
+documents alone renumbers from 1, so a session resuming rows 5 and 6 appends `seq`
+3 and the next load sorts the newest entry above the two it followed. The seed
+keeps what it read and the counter continues from the highest seen — **found by
+reading the diff**, which is the third finding in this section that neither walk
+artefact reached.
+
+**It was found by a test that could construct `issued > confirmed`, and the
+obvious fixture could not.** Written as *write, then drain*, both counters are
+still zero — `pump` advances `issued` inside the chain, which has not run — so
+drain-from-issued and drain-from-confirmed slice identically and the row passes
+for either. The mutation pass is what said so, and the fixture that replaced it
+holds an append open.
+
+### 5b.4 The framework never redacts, and persistence is declared per verb
+
+**RULED.** Nothing is written unless an app declares a policy, and the declaration
+is per **verb**:
+
+```
+persistence is OFF unless the app declares a policy
+a policy is either  TuiConfig.persist: "all"  or per-verb  ToolDef.persist: true
+an entry is written iff  its verb opts in  AND  the entry has settled (5b.3)
+```
+
+**There is no framework redactor, and the argument for that is the argument
+against one.** C20's works because a command line has tokens; a rendered document
+has eighteen kinds and none, so being right about all of them is the requirement
+and being wrong about one is silent — **a redactor wrong about one kind is worse
+than none, because it is switched on.** A per-app redactor is the same trap with
+the blame moved: it is still a scanner over rendered output, and it still has to be
+right about every kind.
+
+**The verb is the unit because that is where the knowledge is.** `inspect.ts` knows
+`Env` carries secrets and the framework cannot; and this is the *second* instance
+of a principle C05 already states rather than a new one — `ToolDef.handoff` is
+declared on the grounds that *the app author is the only party who can know this*,
+and detection is not available. Same sentence, same field shape, one row down.
+
+**Off by default, because the failure modes are not symmetric.** A missing feature
+is visible the first time someone resumes. **A leaked secret is not visible at all**
+— not in a frame, not in a test, not in a review of the app that caused it.
+
+**And silence is safe but unexplained**, which is why declaring the policy is what
+switches the feature on rather than a flag that turns it off: an app that simply
+never thought about it gets no persistence and no mystery, and an app with nothing
+to hide writes `persist: "all"` on one line.
+
+**One cheap defence lands with it.** `stateDir` defaults to `.calcium` in the
+project directory (`src/shell/config.ts:80`), so a persisted transcript is a file
+that can be committed. The directory is created with a `.gitignore` containing `*`,
+so **it ignores itself regardless of the project's own ignore rules** — one line,
+and it does not depend on the app author having thought of it either.
+
+---
+
 ## 6. Patching
 
 **A settled entry accepts nothing further from the far side.** That is the claim the gate was always making, and stating it as *settled entries reject patches* was the accident: it gated the shell on whether the far side was still talking.
@@ -275,6 +392,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost. The count recurses through nested blocks (`panel.children`, `group.children`, a row's `detail`) and never through rows.
 - **I18** — C13 imports nothing from `terminal/` or `presentation/`.
 - **I19** — Readers take `TranscriptView`, never `TranscriptStore`. The mutators and the §5a payload window are reachable only from L4, so no consumer above can append, clear, or see a debug buffer it was never given.
+- **I20** — **An entry reaches disk only if its verb declared persistence and the entry has settled** (§5b). Both halves are load-bearing and each answers a different failure. *Settled* makes the file append-only **in fact rather than by assumption**: a transcript entry is patched and settled after a history entry would already have been immutable, so a row written earlier is a row that disagrees with memory — and a missing last entry is recovered by running the command again where a divergent file is not recovered at all. *Declared* is because **the framework never redacts and cannot**: C20's redactor works on a tokenised command line, a rendered document has eighteen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. The verb is the unit because that is where the knowledge is — the same ground C05 I19 already gives `handoff`, *the app author is the only party who can know this*. Off by default, since a missing feature is visible on the first resume and **a leaked secret is not visible at all** (F168).
 
 ---
 
@@ -297,6 +415,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 15. Cap overshoot is exposed as `overCap` and acted on by L4, and it is true after every call rather than only after `append` (I15).
 16. An invalid document raises rather than returning; a failed patch returns rather than raising (I8, I10).
 17. Readers get `TranscriptView`; only L4 holds the store, so nothing above can mutate the transcript or read a retained payload (I19).
+18. **Persistence is declared per verb and writes settled entries only**, the framework redacts nothing, and an app that declares nothing persists nothing (I20, §5b).
 
 ---
 
@@ -307,6 +426,27 @@ Six tiers. Every cell of the §7 transition table is covered.
 ### Tier 1 — unit
 
 - **T1.1**: `append` on an empty store → one entry, live, `liveId` set.
+- **T1.28** (I20, §5b.4): an app that declares nothing persists nothing — the default, and the reason declaring the policy is what switches the feature on.
+- **T1.29** (→ C05 I25): `persist: true` opts a verb in; **absent, `false` and unknown are all refusals**, one assertion each, because a check reading `!== false` passes the first alone.
+- **T1.30** (I20): `persist: "all"` is the one-line opt-in and needs no manifest.
+- **T1.31** (I20): a document with `meta.verb: null` — a fault, a stall, the resume warning itself — is never written, and `"all"` does not sweep it up.
+- **T1.32** (I20, → C04 I46): a block carrying a newline is still one row, and the document comes back the one that was written.
+- **T1.33** (I20): a failed write rewinds, the next one catches up, and the cause is warned once.
+- **T1.34** (I20, §5b.5): `drain` writes from the last **confirmed** write. The fixture holds an append open, because *write then drain* leaves both counters at zero and the row passes for either answer — the mutation pass is what said so.
+- **T1.35** (I20, §5b.5): seeding holds the loaded rows; compaction rewrites the file from them, so a count is data loss rather than inefficiency.
+- **T1.36** (I20): a damaged line is dropped, counted and the rest kept — an unparseable row, an invalid document and a row with no `seq`.
+- **T1.37** (I20): an absent file is an empty resume, not an error.
+- **T1.38** (I20, §5b.5): a duplicated row collapses on load, which is what makes `drain` safe.
+- **T1.39** (I20, §5b.5): a resumed session continues the file's sequence rather than restarting it, so the newest entry does not sort to the top.
+
+Tier 4 — integration (the arc, not the mechanism)
+
+- **T4.37** (I20): start · run a declared verb and an undeclared one · stop · start → the declared verb's output is on disk and on the new session's screen, and the undeclared one is in neither. The row that sees a policy resolved before the manifest loads.
+- **T4.38** (I20, §5b.2): three restarts that run nothing leave one entry, not eight — the subscription is registered **after** the resume loop, and nothing else says so.
+- **T4.39** (I20): an app declaring no policy leaves **no file**, not an empty one.
+- **T4.40** (→ C22 I67): the state directory holds a `.gitignore` of `*`.
+- **T4.40a** (I20): the exit path writes an entry still in flight. **The mutation pass asked for this row** — the fake filesystem confirms on the next microtask, so `drain` was decoration in every assertion that existed until a fixture held the append open.
+- **T5.6** (I20, §5b.2): a streaming entry — append, patch, patch, settle — reaches disk **once**, when it settles. The pair tier 4 cannot construct, because the session harness has no adapter declaring `streams: true`. It restates the rule rather than calling the wired one, and the mutation run records that the ruling is covered and the wiring is not.
 - **T1.2** (I3): two appends → ids differ, `seq` increments, order preserved.
 - **T1.3**: appending over a live+settled entry → the previous becomes frozen+settled.
 - **T1.4** (I4): appending over a live+streaming entry → previous becomes frozen and **stays streaming**.

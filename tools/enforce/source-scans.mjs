@@ -640,13 +640,23 @@ export const SCANS = [
   // with no ASCII fallback is visible only under `LANG=C`, only to the users
   // least able to say what they are looking at.
   //
+  // **The token list is a second copy of the union, and it stays one deliberately.**
+  // Adding `continuation` to `Glyph` made this rule fail, which is how the
+  // duplication announced itself — and the obvious fix, deriving the list from
+  // `types.ts`, is the wrong one here. The two failure directions are not
+  // symmetric: a list that has gone stale rejects a legitimate new token loudly,
+  // at the commit that adds it, with the fix one word long. A derivation that
+  // mis-parses the union — and it now carries interleaved doc comments — widens
+  // the rule silently, which is the failure this scan exists to prevent, arriving
+  // through the scan itself. So: literal, and the cost is one word per token.
+  //
   // The pattern matches a glyph position whose literal is *not* a token, so
   // `glyph: "error"` passes and `glyph: "✗"` does not. Scoped to `src/`: the
   // one file that holds the characters writes them as table rows rather than in
   // a glyph position, so it needs no exemption — and an exemption nobody needs
   // is a door left open.
   { id: "SS39", spec: "C04 I6 · C09 §4",
-    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet)["'`])/,
+    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|continuation)["'`])/,
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 
@@ -761,6 +771,44 @@ export const SCANS = [
     pattern: /origin:\s*"defect"/,
     scope: "src/", allow: ["src/shell/execution.ts"],
     why: "`origin: \"defect\"` is the framework reporting a failure it contained (C23 §5a). A second producer is the word widening into `something went wrong`, which is what `refresh` did before SS46" },
+
+  // SS50 — a measurement that has not said which convention it is under.
+  //
+  // **The rule came before the sweep, and that ordering is the point.** Forty
+  // `cells()` calls default to narrow, and finding them by reading is the
+  // seventeen-count sweep's shape: a blind pass over a population nobody can
+  // enumerate. With the rule first, the population is a list that reports
+  // itself and shrinks visibly — which is also what makes the exemptions below
+  // auditable rather than remembered.
+  //
+  // **The annotation is a claim, not a suppression** (SS40's distinction).
+  // `// narrow-ok` asserts that this measurement is right under either
+  // convention — because the text is ASCII, or because the two sides of a
+  // comparison move together. It does not mean "the scan complained".
+  //
+  // **The pattern asks whether the line mentions the capability at all**,
+  // rather than counting arguments. A first version looked for a comma before
+  // the closing paren and fired on `cells(text.replace(sgrPattern(), ""),
+  // ambiguous)` — a correctly threaded call, reported because the first `)`
+  // belonged to a nested call. A line-based rule cannot parse; what it can do is
+  // ask for a word that only appears when the decision has been taken.
+  //
+  // **Three files are allow-listed and each is the same reason**: C19's menu,
+  // C20's history layers and the fallback adapter build display text where no
+  // capability is in scope, and giving them one means widening a builder
+  // signature in a component this change does not otherwise touch. They measure
+  // under the default until those signatures move (roadmap 51). A prefix
+  // allow-list is auditable; marking seven lines with an annotation that means
+  // "not yet" would teach `// narrow-ok` to mean two things.
+  { id: "SS50", spec: "C02 I9 · C02 §3",
+    pattern: /\bcells\((?!.*ambiguous)(?!.*\/\/ *narrow-ok)/i,
+    scope: "src/",
+    allow: [
+      "src/interaction/completion/menu.ts",
+      "src/interaction/history/layers.ts",
+      "src/shell/fallback.ts",
+    ],
+    why: "a display measurement says which ambiguous-width convention it is under, or says why it does not need to (C02 I9)" },
 
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,

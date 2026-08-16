@@ -93,7 +93,7 @@
 // it holds here. What this buys over a hand-list is that a row written in the
 // existing form is checked for free.
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 
 const ROOT = process.cwd();
@@ -328,13 +328,20 @@ if (confirmedOpen !== null && unchecked !== null) {
 // sentence has changed, or whose entry is no longer OPEN, is itself a failure.
 const OPEN_BUILT_WORDS = Object.freeze({
   "3": {
-    phrase: "built with prism-tui as the consumer",
-    why: "instrumental, not an assertion — it says what 3 will be built WITH, and prism-tui does not exist in this tree at all (3 is one of the three unchecked entries)",
+    phrase: "says who validates the design, not who has to exist first",
+    why:
+      "instrumental and now corrective. The old exemption quoted *built with prism-tui as the " +
+      "consumer* and reasoned that prism-tui does not exist in this tree — which was true and " +
+      "was the wrong reason, because it made the entry's gate the consumer's absence. The row " +
+      "now quotes that phrase to rule it is not a gate, and cites `b.plot`'s real caller as " +
+      "counter-evidence. Same shape as 24's `defaultTheme` and 28's `cursorCell`: a built-word " +
+      "naming something that exists in order to say the entry's own subject does not",
   },
-  "15": {
-    phrase: "is built three times",
-    why: "the consequence of a hypothetical — *build one scope alone and the model is built three times* — which is the entry's argument for doing all three at once, not a claim that any of them exists",
-  },
+  // 15's exemption was here and is gone: the entry is BUILT, so the phrase it
+  // covered — *build one scope alone and the model is built three times* — is
+  // no longer a claim about something absent. The arm removed it rather than
+  // anyone remembering, which is the second exemption this month disposed of by
+  // its subject being wired.
 });
 const BUILT_CLAIM = /\b(built|shipped|landed|already exists|is wired)\b/i;
 for (const entry of [...all].sort((a, b) => Number(a) - Number(b))) {
@@ -363,6 +370,86 @@ for (const entry of [...all].sort((a, b) => Number(a) - Number(b))) {
       `something is built is PART at least. A blank row makes no claim and so resolves ` +
       `trivially, which is how entry 7 stayed OPEN through three landed stages`,
   );
+}
+
+// --- 5. a row asserting a file's absence has to be right about it ----------
+//
+// **Check 1 has the wrong sign for this sentence and does not see the row at
+// all.** It resolves a *marked* row's citations, and resolution is the verdict a
+// negative claim denies: a row saying *there is no `X`* passes check 1 hardest on
+// the day it becomes false, because `X` now resolves.
+//
+// **The measured case is entry 3.** `fc5ff14` recorded *there is NO
+// `CALCIUM_PLOT_PRIOR_ART.md` in the repository*; `6611f9f`, the next commit,
+// added `docs/notes/CALCIUM_PLOT_PRIOR_ART.md`. Nine commits and one satisfier-
+// side sweep went past it, and the sweep could not have caught it — 3 was in the
+// unchecked paragraph for naming `prism-tui`, so nothing was resolving its row.
+//
+// This is the strongest form of the shape CLAUDE.md calls *ask where a claim is
+// written down*: the answer *no file at all* is exactly what a negative claim
+// asserts, and it is the one answer nothing re-reads. A positive citation decays
+// visibly — the path stops resolving. A negative one decays by something being
+// created somewhere else entirely, which is the deferral table's own column:
+// **the condition is written where the claim is, and what falsifies it is written
+// somewhere else.**
+//
+// **Its blind spot, stated because an unrecorded limit reads as strength.** It
+// reaches file paths and the phrasings below, and nothing else. A negative claim
+// about a *symbol* is not covered — entry 33's *no queue of any kind in
+// `src/shell/`, the word does not appear* is the uncovered instance in the list
+// today, and it decays the same way. Extending to symbols means matching prose
+// against a grep, which is the citation-resolves-against-the-wrong-thing class the
+// audit argues against automating; the honest version is a needle, and a needle is
+// a token added by the hand that would otherwise fix the row.
+//
+// It runs over **every** row rather than the marked ones, which is a widening and
+// is said so: a negative claim is most at home in an OPEN row, because *nothing is
+// there yet* is what an OPEN row is for.
+//
+// **And it resolves differently from check 1, which the fabricated violation is
+// what found.** Written with `locate`, this check did not fire on the very row it
+// was built for: `locate` knows the repository root and `src/`, the claim named
+// the bare basename `CALCIUM_PLOT_PRIOR_ART.md`, and the file is under
+// `docs/notes/`. **A rule that reported nothing looked exactly like a clean tree** —
+// which is why the violation is fabricated before the rule is believed.
+//
+// The two checks need different resolvers because they carry different claims. *The
+// mechanism lives at this path* is refuted by that path being wrong, so check 1 is
+// right to be strict about where it looks. *It is nowhere in the repository* is
+// refuted by the file being **anywhere**, so a basename is searched for across the
+// tree — and that is the claim's own wording rather than a widening chosen for
+// convenience.
+
+/** Every path under the tree whose basename matches, ignoring the build and the deps. */
+const SKIP = new Set(["node_modules", ".git", "dist", "coverage", ".calcium"]);
+function findAnywhere(basename, dir = ROOT, rel = "") {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP.has(e.name)) continue;
+    const here = rel === "" ? e.name : `${rel}/${e.name}`;
+    if (e.isDirectory()) {
+      const hit = findAnywhere(basename, join(dir, e.name), here);
+      if (hit !== null) return hit;
+    } else if (e.name === basename) {
+      return here;
+    }
+  }
+  return null;
+}
+
+const ABSENT_CLAIM = /\b(?:there is|there's) (?:no|NO) `([\w./-]+\.[A-Za-z]+)`|\bno `([\w./-]+\.[A-Za-z]+)` (?:in|anywhere in) the repos/g;
+for (const entry of [...all].sort((a, b) => Number(a) - Number(b))) {
+  const body = (described.get(entry) ?? "").replace(/\s+/gu, " ");
+  for (const m of body.matchAll(ABSENT_CLAIM)) {
+    const path = m[1] ?? m[2] ?? "";
+    const found = path.includes("/") ? locate(path) : findAnywhere(path);
+    if (found !== null) {
+      fail.push(
+        `entry ${entry} says there is no \`${path}\` and \`${found}\` exists — a negative claim ` +
+          `is falsified by something being created elsewhere, which is the one direction check 1 ` +
+          `cannot look: resolution is what the sentence denies`,
+      );
+    }
+  }
 }
 
 // --- 4. how much of the confirmed-OPEN population a grep sweep can reach ----

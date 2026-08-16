@@ -6,6 +6,7 @@
  * here. A new rôle would need a fallback decided for it (C09 §4); reusing the
  * box-drawing ones needs nothing, and an axis *is* box drawing.
  */
+import type { AmbiguousWidth } from "../text.js";
 import { cells, truncate } from "../text.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import type { Range } from "./scale.js";
@@ -156,9 +157,9 @@ export function yLabels(range: Range, rows: number, format: Plot["yFormat"]): re
 }
 
 /** The widest label, which is the label column's width. */
-export function labelWidth(labels: readonly YLabel[]): number {
+export function labelWidth(labels: readonly YLabel[], ambiguous: AmbiguousWidth = "narrow"): number {
   let widest = 0;
-  for (const label of labels) widest = Math.max(widest, cells(label.text));
+  for (const label of labels) widest = Math.max(widest, cells(label.text, ambiguous));
   return widest;
 }
 
@@ -175,7 +176,7 @@ export function labelWidth(labels: readonly YLabel[]): number {
 export function xLabelRow(
   labels: readonly [string, string, string] | undefined,
   width: number,
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): string {
   const w = Math.max(0, Math.floor(width));
   if (labels === undefined || w === 0) return "";
@@ -188,7 +189,7 @@ export function xLabelRow(
 
   const place = (text: string, ideal: number): void => {
     if (text === "") return;
-    const wide = cells(text);
+    const wide = cells(text, caps.ambiguousWidth);
     const start = Math.max(free, Math.min(ideal, w - wide));
     if (start + wide > w) return; // no room with its gap — dropped, not butted
     [...text].forEach((ch, i) => {
@@ -198,8 +199,8 @@ export function xLabelRow(
   };
 
   place(left ?? "", 0);
-  place(centre ?? "", Math.floor((w - cells(centre ?? "")) / 2));
-  place(right ?? "", w - cells(right ?? ""));
+  place(centre ?? "", Math.floor((w - cells(centre ?? "", caps.ambiguousWidth)) / 2));
+  place(right ?? "", w - cells(right ?? "", caps.ambiguousWidth));
 
   return row.join("").replace(/\s+$/, "");
 }

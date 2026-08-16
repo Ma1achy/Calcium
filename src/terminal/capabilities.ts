@@ -13,6 +13,19 @@
 export type TerminalCapabilities = Readonly<{
   colourDepth: 1 | 4 | 8 | 24;
   unicode: "full" | "bmp" | "ascii";
+  /**
+   * Whether `East_Asian_Width=Ambiguous` glyphs occupy one cell or two (C02 I9).
+   *
+   * **The terminal decides, which is exactly what makes it a capability.** The
+   * same `▁` is one cell under a Western locale and two under a CJK one, so a
+   * measurer that assumes either is right about half the world — and the half it
+   * is wrong about gets a table whose columns stop aligning, because C11 draws a
+   * sparkline into a cell.
+   *
+   * Detected from the locale and overridable, never probed: a query would be
+   * I2's I/O and there is no escape sequence for it anyway.
+   */
+  ambiguousWidth: "narrow" | "wide";
   synchronisedUpdate: boolean;
   bracketedPaste: boolean;
   mouse: boolean;
@@ -51,6 +64,11 @@ export const DEGRADATION: Readonly<
   unicode: Object.freeze({
     behaviour:
       "Box drawing → `+ - |`; sparklines → `.:|#`; braille plots → coarse block plot; badges lose glyphs",
+    owner: "C09 C12",
+  }),
+  ambiguousWidth: Object.freeze({
+    behaviour:
+      "Every East_Asian_Width=Ambiguous glyph is measured and drawn as narrow, which is the Western convention and today's behaviour; where the locale says otherwise the wide arm is used and the ramps that would double in width are replaced by narrow ones",
     owner: "C09 C12",
   }),
   synchronisedUpdate: Object.freeze({
@@ -124,6 +142,35 @@ function detectUnicode(
   return /UTF-?8/i.test(locale) ? "full" : "ascii";
 }
 
+/**
+ * East Asian locales, where the convention is that ambiguous glyphs are wide
+ * (C02 I9, §3).
+ *
+ * **Language subtags, matched at the start**, so `ja_JP.UTF-8`, `zh_CN`, `ko`
+ * and `ja` all count and `jamaica` does not — a substring test would match the
+ * latter, which is the kind of thing a locale list gets wrong quietly.
+ *
+ * **Imperfect on purpose, and the direction of the error is chosen.** A Western
+ * user with a Japanese locale set gets `wide` and sees wider ramps; a CJK user
+ * on a terminal configured for narrow declares the override. Both are visible;
+ * the alternative — defaulting narrow and detecting nothing — is invisible to
+ * exactly the users who need it, which is the whole argument for detecting at
+ * all (§3).
+ */
+const WIDE_AMBIGUOUS_LANGUAGES: readonly string[] = ["ja", "zh", "ko"];
+
+/** §3, and `detectUnicode`'s precedence: first variable *set* wins. */
+function detectAmbiguousWidth(
+  lcAll: string | undefined,
+  lcCtype: string | undefined,
+  lang: string | undefined,
+): TerminalCapabilities["ambiguousWidth"] {
+  const locale = lcAll ?? lcCtype ?? lang;
+  if (locale === undefined) return "narrow";
+  const subtag = locale.toLowerCase().split(/[_.@-]/u)[0] ?? "";
+  return WIDE_AMBIGUOUS_LANGUAGES.includes(subtag) ? "wide" : "narrow";
+}
+
 const SYNCHRONISED_UPDATE_PROGRAMS: readonly string[] = [
   "iterm.app",
   "wezterm",
@@ -160,6 +207,11 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
   return {
     colourDepth: detectColourDepth(term, read(env, "COLORTERM")),
     unicode: detectUnicode(read(env, "LC_ALL"), read(env, "LC_CTYPE"), read(env, "LANG")),
+    ambiguousWidth: detectAmbiguousWidth(
+      read(env, "LC_ALL"),
+      read(env, "LC_CTYPE"),
+      read(env, "LANG"),
+    ),
     synchronisedUpdate: detectSynchronisedUpdate(term, termProgram),
     bracketedPaste: usable,
     mouse: usable && read(env, "TMUX") === undefined,
@@ -186,6 +238,7 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
   Object.freeze({
     colourDepth: oneOf(1, 4, 8, 24),
     unicode: oneOf("full", "bmp", "ascii"),
+    ambiguousWidth: oneOf("narrow", "wide"),
     synchronisedUpdate: isBoolean,
     bracketedPaste: isBoolean,
     mouse: isBoolean,

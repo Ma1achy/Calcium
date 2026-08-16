@@ -117,6 +117,7 @@ export function fakeFs(): FileSystem {
 
 export const FRAME: FrameQueries = {
   copyMode: () => false,
+    enterCopyMode: () => undefined,
   exitCopyMode: () => undefined,
   entryAtRow: () => null,
   region: () => ({ top: 1, height: 20 }),

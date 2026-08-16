@@ -233,7 +233,7 @@ const errorDoc = (command: string, argv: readonly string[], message: string): Lo
   schema: "tui.view/1",
   command,
   status: "error",
-  error: { message, stage: "local" },
+  error: { message },
   blocks: [b.notice.error(message)],
   meta: { adapter: "progress" },
 });

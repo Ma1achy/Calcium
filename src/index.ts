@@ -21,17 +21,20 @@
  * naming their owners: the ruling says they are not public, not that they are
  * finished.
  *
- * **Two things a reader will look for and not find.**
+ * **One thing a reader will look for and not find.**
  *
- *   - `ViewRefresh`, and with it `b.live`. It is the declaration type for C23
- *     §3b's part refresh, and §3b has drivers for two of its three mechanisms.
- *     Exporting the declaration type of a mechanism nothing runs is A03 §2's
- *     vacuity class arriving as an export: a consumer would declare a refreshing
- *     part, type-check, and never be called. It returns with `b.live` (§5) and
- *     not before.
  *   - `b.hunk`, and any diff parser. `Patch` is exported as a block shape and
  *     nothing here turns two texts into hunks — they arrive from a diff tool or
  *     already structured from the far side, and the framework renders them.
+ *
+ * **`ViewRefresh` was the second and is no longer** (F164). It was withheld
+ * through C22 and C23 because the mechanism beneath it had no driver, and the
+ * condition named was the driver rather than a release — C23 I32 to I35 met it,
+ * and it is exported below with the note that says so. This sentence stands
+ * where the excusing one did, because the excusing one outlived its condition by
+ * two components while sitting two hundred lines above the export that falsified
+ * it. **A header is the part of a file nobody re-reads**, so a claim here that
+ * names a symbol is a claim to check by grepping this file, not by reading on.
  *
  * Two sibling entry points carry what must never reach production (I8):
  * `@fmx/calcium/testing` and `@fmx/calcium/fixtures`.
@@ -48,6 +51,15 @@ export type {
   TuiConfig,
   TuiInstance,
 } from "./shell/types.js";
+
+/**
+ * The cursor's shape, for `TuiConfig.cursor` (C22 I63, C01 I20).
+ *
+ * Exported because a consumer that names the type — rather than writing an
+ * object literal at the call site — cannot otherwise, and a config field whose
+ * type is unreachable is a field only an inline literal can fill.
+ */
+export type { CursorShape, CursorStyle } from "./terminal/escapes.js";
 
 /**
  * The local-handler contract (C23 §2, I36).
@@ -252,6 +264,32 @@ export type { BlockDefinition, RenderContext } from "./presentation/blocks/index
  * has to be readable or the fallback is indistinguishable from a mistake.
  */
 export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.js";
+
+/**
+ * A Mermaid diagram as a `code` block (roadmap 9).
+ *
+ * **Published because the app is the caller.** A diagram arrives as text from a
+ * far side and becomes a block on the way in, which is an adapter's or a live
+ * part's decision, not the framework's — so this is a transform an app reaches
+ * for rather than a kind the vocabulary grows. It takes capabilities because
+ * the renderer's ASCII switch is C02 I9's tier (box drawing is ambiguous
+ * throughout), and a `ProducerContext` carries them.
+ */
+export { mermaidCode } from "./presentation/mermaid.js";
+/**
+ * A banner, from a sparse set of variants (roadmap 22).
+ *
+ * **Published for the same reason and by the same argument as `mermaidCode`.**
+ * Art is pre-composed text: nothing about it needs a renderer, so it is a
+ * transform in front rather than a seventeenth kind in the vocabulary — which
+ * is what keeps the freeze from having to carry it.
+ *
+ * It takes capabilities *and a width* because both decide, and the second is
+ * the one the sketch did not have: a `blocks` variant this terminal can draw
+ * and is too narrow for falls to the next rung rather than being truncated.
+ */
+export { art } from "./presentation/art.js";
+export type { ArtSpec, ArtTier } from "./presentation/art.js";
 /**
  * The record a `RenderContext` carries, and what `TuiConfig.capabilities`
  * overrides (C22 I49).

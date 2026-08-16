@@ -771,10 +771,16 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // state of a `--watch` on an idle cluster; reporting it as a failure
       // trains the reader to ignore the one time it is one.
       const quiet = Math.round((now - state.last) / 60_000);
+      // **The mark, and this is the one consumer that is not a `noticeDoc`**
+      // (C09 §4). It qualifies on the same shape: the entry is streaming, so
+      // its command chrome is on screen above, and the notice reports what the
+      // *entry* is doing rather than anything the far side emitted. `muted`
+      // obliges no glyph (C04 I6), so the slot was free.
       const notice = block({
         kind: "notice",
         id: STALL_BLOCK,
         tone: "muted",
+        glyph: "continuation",
         text: `no output for ${String(quiet)}m`,
       });
       // Append the first time and replace after: the row is the entry's one

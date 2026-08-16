@@ -10,7 +10,8 @@
  * to stay acyclic (§2, A03 MG3).
  */
 
-import { ALT_SCREEN, BRACKET_PASTE, CURSOR, MOUSE, cursorTo } from "./escapes.js";
+import { ALT_SCREEN, BRACKET_PASTE, CURSOR, CURSOR_SHAPE, MOUSE, cursorTo } from "./escapes.js";
+import type { CursorStyle } from "./escapes.js";
 import type { TerminalCapabilities } from "./capabilities.js";
 
 export type TerminalSize = Readonly<{ columns: number; rows: number }>;
@@ -47,6 +48,27 @@ export interface TerminalLifecycle {
    */
   cursorSequence(at: Readonly<{ row: number; col: number }> | null): string;
   /**
+   * The cursor's **shape**, as bytes, **or the empty string when it has not
+   * changed** (I20).
+   *
+   * A `setting` rather than a mode: persistent state like one, no inverse like
+   * an SGR sequence, and an undo that is a third value. It is therefore not in
+   * `held`, is restored beside it at `release()`, and its record is marked
+   * **unknown** by `resume()` — a suspended terminal belonged to a child, and
+   * `vim` leaves a bar behind, so the next resolution is emitted whatever it is
+   * rather than compared against a record describing a screen that is gone.
+   *
+   * **Emitted only on change, and that is what the record is for.** The cursor
+   * sequence goes out with every frame (I19), so a shape folded into it is
+   * re-asserted at frame cadence — wasted bytes at best, and at worst a cursor
+   * that never blinks because the terminal restarts its phase each time.
+   *
+   * `null` means *the terminal's configured default*. **Before anything has been
+   * emitted it means emit nothing at all**, which is the only way to leave a
+   * terminal the application never asked to touch alone (C22 §6f table row 2).
+   */
+  cursorShapeSequence(style: CursorStyle | null): string;
+  /**
    * One frozen snapshot per call (I12a) — the only route to a dimension outside
    * a `SIGWINCH`, and the reason SS42 can keep its single-file scope while the
    * frame path needs a width.
@@ -61,6 +83,24 @@ export interface TerminalLifecycle {
    * viewport's dimensions at construction step 5, before anything is acquired.
    */
   size(): TerminalSize;
+  /**
+   * Mouse tracking on or off, while acquired (C22's copy mode).
+   *
+   * **Here because nowhere else may write an escape sequence.** `MOUSE` is a
+   * mode this component takes at `acquire()` and restores at `release()`, and a
+   * second writer of it is precisely the class C01 exists to prevent — the
+   * cursor's sequence takes the same shape for the same reason.
+   *
+   * **A no-op without the capability**, so a caller never has to ask twice: the
+   * mode was never taken, so there is nothing to toggle and `held` stays
+   * truthful. Idempotent, and a no-op while suspended — a child owns the
+   * terminal there, and its modes are not ours to change.
+   *
+   * `mouseEnabled()` in the router is a *capability* question and gains no arm
+   * from this. A capability and a mode are different questions, and one
+   * predicate answering both is how they come to disagree.
+   */
+  setMouseTracking(on: boolean): void;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -92,6 +132,12 @@ export class TerminalStateError extends Error {
 }
 
 export type LifecycleState = "constructed" | "acquired" | "suspended" | "released";
+
+/** Two styles, or two absences, are the same value (I20). */
+function sameStyle(a: CursorStyle | null, b: CursorStyle | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.shape === b.shape && a.blink === b.blink;
+}
 
 /**
  * §3's `held` keys, named rather than counted. Two of them are not escape
@@ -188,6 +234,34 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   const resumeSubscribers = new Set<() => void>();
   const inputSubscribers = new Set<(chunk: Uint8Array) => void>();
   let beforeReleaseRan = false;
+  /**
+   * The last cursor shape put on the wire, or `undefined` for *never emitted*
+   * (I20).
+   *
+   * **Three states and not two**, because *nothing has been emitted* and *the
+   * default has been emitted* are different: only the first may leave the
+   * terminal alone, and it is unreachable once left. `null` is the second.
+   */
+  let shapeEmitted: CursorStyle | null | undefined = undefined;
+  /**
+   * Set by `resume()`: a child owned the terminal and may have changed the
+   * shape (I20).
+   *
+   * **A flag rather than clearing the record, and the mutation pass is what
+   * said so.** The walk's ruling was *`resume()` clears the record*, and
+   * clearing it to `undefined` restores the *leave the terminal alone*
+   * semantics — so a target resolving to `null` after a handoff emits nothing
+   * and `vim`'s bar survives, which is the exact case the ruling was written
+   * for. Clearing was also **dead**: `suspend()` already resets, so every
+   * post-handoff request for a real style emitted either way, and only a
+   * request for `null` distinguishes them.
+   *
+   * The next resolution is therefore emitted **whatever it is**, the reset
+   * included. The cost is stated in C22 §6f.5: a session that declares no style
+   * and performs a handoff emits one reset, where a session that never suspends
+   * emits nothing at all.
+   */
+  let shapeUnknown = false;
 
   // --- raw input delivery (I18) --------------------------------------------
   //
@@ -319,6 +393,26 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     held.add(key);
   }
 
+  /**
+   * Mouse tracking toggled while the shell holds the terminal.
+   *
+   * **`held` is the record and it stays truthful**, which is what makes the
+   * unwind in `release()` correct without a second flag: tracking off means the
+   * mode is not held, so release does not emit a `leave` for something already
+   * left, and re-enabling goes through `take` exactly as acquisition does.
+   */
+  function setMouseTracking(on: boolean): void {
+    if (!capabilities.mouse) return; // I10 — never taken; nothing to toggle.
+    if (state !== "acquired") return; // suspended or released: not ours to change.
+    if (on === held.has("mouse")) return; // idempotent (T3.x, the second call).
+    if (on) {
+      take("mouse");
+      return;
+    }
+    emit(MOUSE.leave);
+    held.delete("mouse");
+  }
+
   // --- the transition guard -------------------------------------------------
 
   function guard(operation: "acquire" | "release" | "suspend" | "resume"): void {
@@ -365,10 +459,24 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
         }
         held.delete(key);
       }
+      // **Beside `held` and not inside it** (I20). A setting has no inverse, so
+      // I6's lookup cannot express it and I8's *release the key while emitting
+      // nothing* is an argument about keys. It emits nothing where nothing was
+      // ever put on the wire, which is what keeps a terminal the application
+      // never touched untouched.
+      try {
+        const reset = releaseShape();
+        if (reset !== "") writer.write(reset);
+      } catch (err) {
+        failures.push(err);
+      }
     } else {
       // I8 — the child owns the screen; writing a reset into it would corrupt
-      // whatever the child is drawing. The keys are dropped without emitting.
+      // whatever the child is drawing. The keys are dropped without emitting,
+      // and the shape's record with them (I20): the same argument reaches it
+      // even though `held` does not.
       for (const key of held) if (key !== "stdout") held.delete(key);
+      shapeEmitted = undefined;
     }
 
     disposeHandlers();
@@ -527,6 +635,37 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   }
 
   /** Releases what is held without touching `state` or the handlers. */
+  /**
+   * I20 — the shape, on change only, with three states rather than two.
+   *
+   * **`undefined` is not `null`.** *Nothing has been emitted* may leave the
+   * terminal alone; *the default has been emitted* is a value we put there. The
+   * first is unreachable once left, which is why the guard below is about a
+   * transition and not about a value: asking for `null` before anything was
+   * emitted writes nothing, and asking for it afterwards writes the reset.
+   */
+  function cursorShapeSequence(style: CursorStyle | null): string {
+    if (shapeUnknown) {
+      // The screen is not what the record says, so nothing may be skipped —
+      // including the reset, which is the only thing that takes a child's
+      // shape back off the screen.
+      shapeUnknown = false;
+      shapeEmitted = style;
+      return style === null ? CURSOR_SHAPE.reset : CURSOR_SHAPE.set(style);
+    }
+    if (style === null && shapeEmitted === undefined) return "";
+    if (shapeEmitted !== undefined && sameStyle(shapeEmitted, style)) return "";
+    shapeEmitted = style;
+    return style === null ? CURSOR_SHAPE.reset : CURSOR_SHAPE.set(style);
+  }
+
+  /** The reset, or nothing where nothing was ever put on the wire (I20). */
+  function releaseShape(): string {
+    if (shapeEmitted === undefined || shapeEmitted === null) return "";
+    shapeEmitted = null;
+    return CURSOR_SHAPE.reset;
+  }
+
   function unwind(): void {
     // Before the sequences, because a child takes the terminal the moment the
     // suspension completes and the ordering is what T4.4b asserts (I18).
@@ -550,11 +689,24 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   function suspend(): void {
     guard("suspend");
     unwind(); // I7 — leaves the alternate screen entirely, does not retain it.
+    // The shape goes back before the child takes the terminal, on the same
+    // terms as `held`: only where something was put on the wire (I20).
+    const reset = releaseShape();
+    if (reset !== "") writer.write(reset);
     state = "suspended";
   }
 
   function resume(): void {
     guard("resume");
+    // **The record is marked unknown rather than cleared** (I20). The child
+    // owned the terminal and may have set a shape of its own — `vim` leaves a
+    // bar behind — so the record describes a screen that no longer exists.
+    // Clearing it to `undefined` was the walk's ruling and it was wrong twice
+    // over: it restores the *leave the terminal alone* arm, so a target
+    // resolving to `null` would emit nothing and the child's bar would stay,
+    // and it was dead anyway because `suspend()` has already reset. This is
+    // C22 I56's *drop the record before the bytes go out*, one component down.
+    shapeUnknown = true;
     state = "constructed";
     acquire();
   }
@@ -580,11 +732,13 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     onInput: (cb) => subscribe(inputSubscribers, cb),
     cursorSequence: (at) =>
       at === null ? CURSOR.enter : `${CURSOR.enter}${cursorTo(at.row, at.col)}${CURSOR.leave}`,
+    cursorShapeSequence,
     // Not gated on state, and that is the one difference from everything above
     // it: C22 needs the viewport's dimensions at construction step 5, before
     // any acquire. There is nothing to be wrong about — reading the size of a
     // terminal nobody has entered is still the size of the terminal.
     size: snapshotSize,
+    setMouseTracking,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).

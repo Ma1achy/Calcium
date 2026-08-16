@@ -15,7 +15,8 @@
  * whichever width a child happens to wrap. A shared function cannot drift.
  */
 
-import type { Block, Group, MeasureFn, Panel } from "./types.js";
+import type { Block, Group, MeasureFn, Panel, Share } from "./types.js";
+import type { ContainerBlock } from "./tree.js";
 
 /**
  * Width 0 is treated as 1 (T3.2). No measurer divides by zero, and no caller
@@ -46,32 +47,65 @@ export const BORDER_INSET = 2;
 /** One cell of gutter between each adjacent pair in a `row` group. */
 export const ROW_GUTTER = 1;
 
+/** A share that names cells rather than a proportion (I44). */
+function isCells(share: Share): share is Readonly<{ cells: number }> {
+  return typeof share === "object";
+}
+
 /** `panel` children, and a table row's `detail` blocks (§3). */
 export function insetWidth(width: number): number {
   return normaliseWidth(normaliseWidth(width) - BORDER_INSET);
 }
 
 /**
- * The width a `group` gives each child (§3).
+ * The width a `group` gives each child, in order (§3, I42).
  *
- * `column` passes `w` through. `row` splits equally —
- * `floor((w - gaps) / n)`, with `n - 1` gutters — and takes the max of the
- * results. There is no weights field: uneven allocation is expressible as
- * nested groups, and a weights field would be a second layout system inside a
- * height rule that has to stay simple enough to hold I7.
+ * `column` passes `w` through to every child. `row` divides it by the declared
+ * weights, and **four rules the equal split made invisible are stated here**
+ * because they are identical under it and differ the moment a weight does:
  *
- * The split can floor to 0 at narrow widths; `normaliseWidth` takes it to 1, so
- * a `row` group still measures rather than dividing by zero (T3.6c).
+ *   - **The gutter comes off the top**, before any share is computed. Taking it
+ *     proportionally makes the separator between a 2 and a 1 narrower than the
+ *     one between two 2s, and a gutter's job is identical between every pair.
+ *   - **The remainder after flooring is unspent**, exactly as it is with no
+ *     weights at all. Spending it — on the leftmost child, as C11 does with a
+ *     table's residual — would make `flex: [1, 1]` differ from no `flex`, and a
+ *     table's residual exists *to be absorbed* where a group has no child that
+ *     claims it.
+ *   - **Absent weights are an equal split**, and the arithmetic below reduces to
+ *     the old `floor((w - gaps) / n)` when every weight is equal. T3.16 asserts
+ *     that against the unweighted path rather than against a number.
+ *   - **The floor of 1 is unchanged.** `normaliseWidth` takes a share of 0 to 1,
+ *     so a `row` group still measures rather than dividing by zero (T3.6c) —
+ *     and weights move C09 §4b's degenerate boundary into ordinary range rather
+ *     than adding a rule: `[50, 1]` reaches the floor at eighty columns with two
+ *     children, where the equal split needs sixty children at a hundred and
+ *     twenty.
  */
-export function groupChildWidth(
-  direction: Group["direction"],
-  width: number,
-  childCount: number,
-): number {
+export function groupChildWidths(block: Group, width: number): readonly number[] {
   const w = normaliseWidth(width);
-  if (direction === "column" || childCount <= 1) return w;
-  const gaps = (childCount - 1) * ROW_GUTTER;
-  return normaliseWidth(Math.floor((w - gaps) / childCount));
+  const n = block.children.length;
+  if (block.direction === "column" || n <= 1) return block.children.map(() => w);
+
+  const gaps = (n - 1) * ROW_GUTTER;
+  const shares = block.flex ?? block.children.map(() => 1);
+
+  // **Fixed first, and what remains is what the weights divide** (I44). Any
+  // other order makes a cell count a suggestion, which is the one thing a cell
+  // count is not — the banner's whale is 40 cells and `40 : 61` gives it 41 at
+  // 105 columns and 47 at 120.
+  const fixed = shares.reduce<number>((sum, share) => sum + (isCells(share) ? share.cells : 0), 0);
+  const budget = w - gaps - fixed;
+  const weights = shares.reduce<number>((sum, share) => sum + (isCells(share) ? 0 : share), 0);
+
+  return block.children.map((_child, i) => {
+    const share = shares[i] ?? 1;
+    if (isCells(share)) return normaliseWidth(share.cells);
+    // A row of fixed children alone divides nothing: `weights` is 0 and there is
+    // no share to compute, so the floor answers rather than an infinity.
+    if (weights === 0) return normaliseWidth(budget);
+    return normaliseWidth(Math.floor((budget * share) / weights));
+  });
 }
 
 /**
@@ -101,10 +135,14 @@ export function placeable(block: Panel | Group, width: number): number {
   }
 
   const w = normaliseWidth(width);
-  const each = groupChildWidth(block.direction, width, block.children.length);
+  // **Left to right, by position and never by size** (I42). Under an equal split
+  // the two are the same rule, because every child costs the same; under weights
+  // they are not, and dropping the smallest or the largest would make the
+  // rendered set depend on a number rather than on the order the author wrote.
+  const widths = groupChildWidths(block, width);
   let used = 0;
   let placed = 0;
-  for (const _child of block.children) {
+  for (const each of widths) {
     const needed = placed === 0 ? each : each + ROW_GUTTER;
     if (used + needed > w) break;
     used += needed;
@@ -115,12 +153,23 @@ export function placeable(block: Panel | Group, width: number): number {
   return Math.max(1, placed);
 }
 
-export function childWidths(block: Panel | Group, width: number): readonly number[] {
+export function childWidths(block: ContainerBlock, width: number): readonly number[] {
   if (block.kind === "panel") {
     return block.children.map(() => insetWidth(width));
   }
-  const each = groupChildWidth(block.direction, width, block.children.length);
-  return block.children.map(() => each);
+  // **A `scroll` takes the full width and insets nothing.** Its box is drawn by
+  // bounding rows, not by a border, so there is no frame to sit inside — and
+  // the residue marker is a row rather than a column (I49).
+  //
+  // This arm is here because the parameter widened to `ContainerBlock` and the
+  // compiler then refused every call site that could hand it a `scroll`. That
+  // is the seventh enumeration of the container kinds and the only one nothing
+  // had to notice by hand: `tree.ts` derived the type, and `tsc` found the
+  // function that answered for two kinds of three.
+  if (block.kind === "scroll") {
+    return block.children.map(() => atLeastOne(width));
+  }
+  return groupChildWidths(block, width);
 }
 
 /**

@@ -82,6 +82,30 @@ synchronised_update = false
 
 ---
 
+### Ambiguous width is detected from the locale and declared over the top
+
+**`East_Asian_Width=Ambiguous` means the terminal decides** — one cell in a Western locale, two
+in a CJK one — so it is a property of where a glyph is drawn, which is what a capability is.
+
+**Detected, imperfectly, from the same variable `unicode` already parses.** The convention that
+makes ambiguous glyphs wide is an East Asian locale, so a language subtag of `ja`, `zh` or `ko`
+gives `wide` and everything else gives `narrow`, under the same POSIX precedence — `LC_ALL`,
+then `LC_CTYPE`, then `LANG`, first one *set* winning.
+
+**Detection is what makes the field a fix rather than a way to fix one.** A declared-only field
+leaves a CJK user with today's broken measurement until they find the setting, because the
+default would be narrow — so the field would ship and change nothing for the people it is for.
+Imperfect detection with a declared override is the shape `TERM_PROGRAM` already has, and I4
+means the override wins unconditionally.
+
+**Session-constant, and that is what keeps it out of every cache.** The record is built once at
+construction and nothing reassigns it (I1); C22's T4.18d already asserts reference identity
+across a theme switch and a delivered resize. A verb that toggled this would invalidate every
+measured height, every rendered block and C14's whole index — **so the refusal is the ruling and
+not an omission**, and it is asserted rather than described.
+
+---
+
 ## 4. Degradation
 
 Every capability has a defined fallback, and each is exercised by a test rather than merely written down.
@@ -100,6 +124,7 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Bracketed paste | `bracketedPaste` | Multi-line paste detected heuristically by inter-keystroke timing; a notice is committed on first use | C17 |
 | Mouse | `mouse` | Every mouse affordance has a keyboard equivalent, so nothing is lost — only convenience | C11 C15 |
 | Image protocol | `imageProtocol` | Nothing renders an image in v1, so its absence costs nothing; blocks that would carry one render their text form. Detected now so Phase 1B does not need a second detection pass | C09 |
+| Ambiguous width | `ambiguousWidth` | Every `East_Asian_Width=Ambiguous` glyph is measured and drawn as **narrow**, which is the Western convention and today's behaviour; where a locale says otherwise the wide arm is used and the ramps and fills that would double in width are replaced by narrow ones | C09 C12 |
 | Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 | L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
@@ -118,6 +143,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 - **I6** — Every capability has a fallback owned by a named component (§4). A capability with no fallback cannot be added.
 - **I7** — `isUsable` depends on `altScreen` alone. No other capability can prevent the shell opening. **The predicate had no caller and the rule had two expressions** — C01 asks `!capabilities.altScreen` inline, which is the refusal that reaches the user, so A03 §9's MG25 allow-listed `isUsable` as *a rule expressed twice, the second unreachable*. C22's gate 3b is now that caller (→ C22 I61), which disposes of the duplicate by consuming it rather than by exempting it: C01's inline test stays, because C01 is a component with its own consumers and must refuse whoever hands it an unusable record.
 - **I8** — Warnings are returned, never emitted. C02 decides what is wrong, never when the user is told.
+- **I9** — **`ambiguousWidth` is detected from the locale, overridable, and constant for the session.** `ja`, `zh` or `ko` as the language subtag of the first *set* variable of `LC_ALL` · `LC_CTYPE` · `LANG` gives `wide`; everything else, including an unset environment, gives `narrow`. **A declared-only field would ship without fixing anything** for the users it exists for, which is why detection is part of the invariant rather than a convenience. **Nothing may change it after construction** — every measured height, every rendered block and C14's index are computed against it, so a mid-session change is a frame that disagrees with the store it was built from (→ C22 I63, T4.18d's argument).
 
 ---
 
@@ -134,6 +160,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 9. `colourDepth` is reported, never interpreted. What a depth *means* for legibility is D29's rule and it is enforced where colour is chosen, not where it is detected — C02 has no view of what any block carries (→ C10 I2, C09 I5).
 10. `bmp` unicode and non-`none` image protocols are detected but unused in v1 (I1).
 11. Warnings about rejected overrides are returned to the caller, never printed (I8).
+12. **`ambiguousWidth` is detected from the locale, overridden by declaration, and constant for the session** — and `cells()` takes it as a parameter rather than reading it, because only L1 measures and L0's data half must not learn about terminals (I9). `cells()` is C09's and takes it as an argument.
 
 ---
 

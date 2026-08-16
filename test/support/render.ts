@@ -27,6 +27,7 @@ export const LIGHT_THEME = themeFor("light");
 export const FULL_CAPS: TerminalCapabilities = Object.freeze({
   colourDepth: 24,
   unicode: "full",
+  ambiguousWidth: "narrow",
   synchronisedUpdate: true,
   bracketedPaste: true,
   mouse: true,

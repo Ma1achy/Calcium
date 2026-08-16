@@ -1096,10 +1096,51 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- consumed, and not from `src/` ----------------------------------------
+  //
+  // **The first entry of a category the header already counted and had no
+  // instance of** — *1 had an out-of-tree consumer*, measured over 280 members
+  // and then not written down anywhere a reader would meet it.
+  "ArtSpec.variants":
+    "roadmap 22 — `art` is a builder an APP calls, on `mermaidCode`'s precedent, " +
+    "so its only consumer is out of tree by construction: `examples/docker/src/" +
+    "banner.ts` declares both variants and reads the chosen one. Wiring it inside " +
+    "`src/` would mean the framework declaring somebody's art, which is the one " +
+    "thing roadmap 22 rules the framework does not do. **This is roadmap 48's " +
+    "subject from the other side**: the rule is scoped to `src/`, and a member " +
+    "whose whole purpose is to be called from outside it cannot satisfy that scope " +
+    "however many consumers it has",
+
+  // --- a field whose consumer is a ruling away ------------------------------
+  "SgrStyle.italic":
+    "roadmap 50 — `Style.italic` and its SGR-3 twin are the *capability*, and the " +
+    "consumer is span-level styling, which the entry's own ORDER puts behind spans " +
+    "in the view model. **The rule is right and firing for the right reason**: " +
+    "nothing sets italic today. It is recorded rather than deleted because entry " +
+    "11's ruling (c) was reversed for exactly this shape — *no consumer* was true " +
+    "of a field nobody could use because it did not exist, which is not an " +
+    "argument, it is the absence of one. The equality arm is the watch: the day a " +
+    "renderer sets it, this entry fails and is removed",
+
   // --- diagnostics: published to be read by a test, never by a component ----
   "LineEditor.killBuffer":
     "diagnostics, and already an explicit exception in C16 T2.14's non-editing list",
   "IdentityLoop.warned": "diagnostics; its own declaration says so and C22 T3.12 reads it",
+
+  // **`LineEditor.selection` was here and is gone**, taken out by the equality
+  // arm the moment roadmap entry 23's wash read it from `shell/session.ts`.
+  // Recorded because the entry's own predictions were wrong twice: it first
+  // named entry 15 step 3 as the consumer, and step 3 landed with MG24 silent,
+  // because `copy()` reads the member *inside the declaring file*. The rule is
+  // right; the predictions were not, and only the arm settled it.
+  //
+  // **And it sat here as a duplicate key for one commit.** Step 3's edit
+  // inserted a corrected block without removing the original, so the object
+  // literal carried two `"LineEditor.selection"` entries and `Object.freeze`
+  // silently kept the last. `make enforce` was green throughout — a duplicate
+  // key violates nothing this file checks — and it surfaced only when the arm
+  // went to remove *the* entry and found two. **An edit script that asserts its
+  // anchor matched still has to assert the old text is gone.**
 
   // **Four more, and comments were the only thing hiding them.** MG24 counted a
   // name inside a comment as a consumer until the day it stopped; these four
@@ -1313,8 +1354,12 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Identity.user": "C22 — the identity record's fields, asserted by the identity tests. `SessionSnapshot` carries it and no component destructures it",
   "Identity.email": "C22 — as `user`",
   "Identity.groups": "C22 — as `user`",
-  "SgrStyle.inverse": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
-  "SgrStyle.underline": "C01 — as `inverse`",
+  // `SgrStyle.inverse` was beside this one until entry 23 wired it: the
+  // selection wash falls back to reverse video where there is no colour, so
+  // `shell/paint.ts` names it and the equality arm took the entry out. **Two
+  // exemptions expired by one change and only one was predicted** — which is
+  // the arm doing the job the prediction could not.
+  "SgrStyle.underline": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
   "FrameSchedulerOptions.windows": "C03 — per-reason coalescing windows, injected by six test files to drive the scheduler deterministically",
   "Finding.subject": "C09 §7 — boundary-conformance report field, asserted by the suite it exists for",
   "Finding.assertion": "C09 §7 — as `subject`",
@@ -1755,6 +1800,129 @@ export function nameExactnessSignal(files, readFile = (f) => readFileSync(f, "ut
     .slice(0, 5)
     .map(([name, o]) => `${name} (${String(o.size)})`);
   return { members: seen.size, exact, shared };
+}
+
+/**
+ * **The public surface by use — roadmap 48, A03 §9.** Reported, never gated.
+ *
+ * F105 and F160 closed MG24's name-matching as a class: four tightenings
+ * measured, four refused. What F160 left is a residue, and it named the shape
+ * that could work — *a second consumer written from the public surface names
+ * every field it uses, and the residue is the candidates, by **use** rather than
+ * by name.* This is that measurement.
+ *
+ * **The same match, in the opposite direction, and that is the whole argument.**
+ * MG24's verdict is *unconsumed*, so it needs the **cleared** side exact — and a
+ * member is cleared the moment any unrelated type anywhere declares the name.
+ * This verdict is *candidate*, so it needs the **listed** side exact — and a
+ * collision can only ever clear. So the residue **under-reports and cannot
+ * over-report**, which is what a set of candidates for a read wants and what a
+ * gate cannot use. `ambiguous` is that figure, printed rather than filed for
+ * F142's reason.
+ *
+ * **The blind spot, stated because an unrecorded limit reads as strength.** The
+ * residue is exact about the claim it makes — *neither example names this
+ * member* — and that claim is a **proxy** for use with one known gap: a builder
+ * can set a field the app never names. `b.live` is the measured instance —
+ * `examples/docker` uses the mechanism `ViewRefresh` declares and reaches it
+ * through a builder whose own `LiveSpec` spells the field differently. So the
+ * first question the read asks of a candidate is whether a builder covers it.
+ *
+ * Two further limits: the population is the types `src/index.ts` exports **as
+ * types**, so a member reachable only through an exported *value* is out of
+ * scope; and a member named only in an example's tests is neither cleared nor
+ * listed, because a test names a field in order to assert it, which is evidence
+ * about the surface rather than about use.
+ */
+export function publicSurfaceUseSignal(
+  files,
+  exampleFiles,
+  readFile = (f) => readFileSync(f, "utf8"),
+) {
+  const strip = (s) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  // The published population — the type names the runtime entry point exports.
+  const entry = files.find((f) => f === "src/index.ts" || f.endsWith("/src/index.ts"));
+  const published = new Set();
+  if (entry !== undefined) {
+    for (const m of strip(readFile(entry)).matchAll(/export\s+type\s*\{([^}]*)\}/g)) {
+      for (const part of m[1].split(",")) {
+        const n = part.trim().split(/\s+as\s+/).pop()?.trim();
+        if (n !== undefined && n !== "") published.add(n);
+      }
+    }
+  }
+
+  const sources = new Map(files.map((f) => [f, readFile(f)]));
+  const members = interfaceMembers(files, (f) => sources.get(f) ?? "").filter((m) =>
+    published.has(m.owner),
+  );
+
+  // A test row names a member to assert it exists; that is the surface, not use.
+  const isTest = (f) => /(^|\/)tests?\//.test(f) || f.endsWith(".test.ts");
+  const joined = (fs) => fs.map((f) => strip(readFile(f))).join("\n");
+  const app = joined(exampleFiles.filter((f) => !isTest(f)));
+  const tests = joined(exampleFiles.filter(isTest));
+
+  // **MG24's looser test, for every member, and the keyword decides nothing
+  // here.** MG24 picks the test by keyword for F94's reason — inside `src/` an
+  // interface is called into and a record is built inline at a call site. That
+  // split was measured against this population and **is false**:
+  // `CompletionSource` is declared `export interface` and `examples/docker`
+  // *builds* four of them by object literal, so under the split `slots`,
+  // `dynamic`, `ttlMs` and `cacheKey` were false candidates — a residue that
+  // over-reports, which is the one thing this signal claims it cannot do.
+  //
+  // The keyword says how the framework **declares** a type, and an app's use is
+  // decided by what the type is *for*: a declaration is supplied, a handle is
+  // called, and the entry point publishes both under both keywords. So the loose
+  // test runs everywhere — justified by the cell above rather than by taste,
+  // since a wrongly-cleared member only ever shortens the list.
+  const uses = (src, { name }) =>
+    new RegExp(`[.?]\\s*${name}\\b|(?:^|[{,(\\s])${name}\\s*:`, "m").test(src);
+
+  const owners = new Map();
+  for (const { owner, name } of members) {
+    if (!owners.has(name)) owners.set(name, new Set());
+    owners.get(name)?.add(owner);
+  }
+
+  const candidates = [];
+  let cleared = 0;
+  let ambiguous = 0;
+  let testOnly = 0;
+  const seen = new Set();
+  for (const m of members) {
+    const key = `${m.owner}.${m.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (uses(app, m)) {
+      cleared += 1;
+      if ((owners.get(m.name)?.size ?? 1) > 1) ambiguous += 1;
+      continue;
+    }
+    if (uses(tests, m)) {
+      testOnly += 1;
+      continue;
+    }
+    candidates.push(key);
+  }
+
+  // Which owners the residue concentrates in is the actionable half: the read is
+  // over strata — *what would an app have to do to reach this* — and an owner is
+  // the closest thing to a stratum the signal can compute.
+  const byOwner = new Map();
+  for (const key of candidates) {
+    const owner = key.slice(0, key.indexOf("."));
+    byOwner.set(owner, (byOwner.get(owner) ?? 0) + 1);
+  }
+  const concentrated = [...byOwner]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([owner, n]) => `${owner} (${String(n)})`);
+
+  return { members: seen.size, candidates, cleared, ambiguous, testOnly, concentrated };
 }
 
 // --- MG25 — a free function with no consumer --------------------------------

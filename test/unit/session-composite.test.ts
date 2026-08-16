@@ -13,12 +13,13 @@
 import { describe, expect, it } from "vitest";
 
 import { compose, type Composed } from "../../src/shell/frame.js";
+import { composeFrame, type FrameResult } from "../../src/shell/render-frame.js";
 import { cursorFor, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager, type Placed } from "../../src/viewport/overlay/index.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { anchored, registry as measurer, rows as contentRows } from "../support/overlay.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
 const SESSION: SessionSnapshot = Object.freeze({
@@ -38,9 +39,28 @@ function frameAt(columns = 40, rows = 12): Composed {
   return compose({
     chrome: { header: () => [], footer: () => [] },
     session: () => SESSION,
+    copyMode: () => false,
     now: () => 1_700_000_000_000,
     size: () => ({ columns, rows }),
     promptRows: () => 1,
+  });
+}
+
+/**
+ * A frame whose prompt *wants* more rows than it gets, so the window is real.
+ *
+ * `frameAt` fixes the want at one, which caps at one and takes the branch that
+ * draws no marker — the branch T1.12e was written in, and the reason it could
+ * stay green through two defects in the marked one (C22 §6e.4).
+ */
+function frameWanting(columns: number, rows: number, wanted: number): Composed {
+  return compose({
+    chrome: { header: () => [], footer: () => [] },
+    session: () => SESSION,
+    copyMode: () => false,
+    now: () => 1_700_000_000_000,
+    size: () => ({ columns, rows }),
+    promptRows: () => wanted,
   });
 }
 
@@ -68,12 +88,64 @@ function deps(
     promptRows: () => [base.repeat(30)],
     overlays,
     promptCursor: () => ({ row: 0, col: 2 }),
+    promptSelection: () => [],
     promptFocused: () => true,
+    suppressBackground: () => false,
   spinning: () => false,
   // C22 I50 — the ghost is a paint-time read like the spinner beside it.
   ghost: () => null,
   };
 }
+
+describe("C22 §6f — the frame carries the cursor's shape (I63)", () => {
+  it("T1.22d (C22 I63, §6f table rows 4 and 5): the shape is in the write, from the target, once", () => {
+    // **The wiring, and it is a separate row because a seam-level test passes
+    // on the day nothing calls the seam.** Every other row about the shape
+    // calls `cursorShapeSequence` directly; the two mutations this one exists
+    // for are at the call site — dropping it from the frame's `write`, and
+    // resolving it from the prompt rather than from `router.target`.
+    const f = frameAt();
+    const emitted: string[] = [];
+    let target = "prompt";
+
+    const compose = (): FrameResult =>
+      composeFrame({
+        composed: () => f,
+        paintDeps: () => deps(() => []),
+        resizeViewport: () => undefined,
+        cursorSequence: () => "",
+        cursorShape: () => {
+          // A stand-in for C01's record: bytes on a change, nothing otherwise.
+          const style = target === "prompt" ? "[6 q" : "[2 q";
+          if (emitted[emitted.length - 1] === style) return "";
+          emitted.push(style);
+          return style;
+        },
+        previous: () => null,
+      });
+
+    const first = compose();
+    if (first.kind !== "frame") throw new Error("unreachable");
+    expect(first.write, "the shape is in the frame's one write").toContain("[6 q");
+
+    // **Once over three frames at the same target**, which is the property no
+    // reading of a single frame can see: every frame is correct and the stream
+    // is not.
+    const second = compose();
+    const third = compose();
+    if (second.kind !== "frame" || third.kind !== "frame") throw new Error("unreachable");
+    expect(second.write, "and not again").not.toContain(" q");
+    expect(third.write).not.toContain(" q");
+    expect(emitted, "one emission across three frames").toEqual(["[6 q"]);
+
+    // And it follows the **target**, not the prompt: a resolution wired to
+    // `promptFocused` answers the position's question, not this one.
+    target = "overlay";
+    const fourth = compose();
+    if (fourth.kind !== "frame") throw new Error("unreachable");
+    expect(fourth.write, "a different target, a different shape").toContain("[2 q");
+  });
+});
 
 describe("C22 §6a — compositing", () => {
   it("T1.12 (C22 I28): the layer region is the viewport region, and the drawer adds its top", () => {
@@ -305,26 +377,171 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
     ).toBeNull();
   });
 
-  it("T1.12e (§6a trace row 8): a cursor above the windowed prompt is hidden, not clamped", () => {
-    // `cursorCell.row` indexes the editor's full layout and the prompt paints
-    // `promptRows` of it, so the untranslated row puts the terminal cursor in
-    // the transcript. Clamping to the window's edge would claim the cursor is
-    // on a row it is not on.
+  it("T1.12e (C22 I62, §6e.4): the window contains the cursor, so windowing never hides it", () => {
+    // **Restated rather than kept green** (§6e.4). This row said *a cursor above
+    // the windowed prompt is hidden, not clamped*, which is about the window's
+    // arithmetic and reads as the cursor's hiding *policy* — and its fixture
+    // made `cap` one, so it exercised only the branch where no marker is drawn.
+    // The branch a real frame reaches is the marked one, and that is where both
+    // shipped defects lived. It stayed green through all of it.
+    //
+    // Under I62 the subject is gone: a window anchored on the cursor contains
+    // it, so there is no row for the prompt's cursor to be hidden *by the
+    // window* on. What survives is that the row is translated — the untranslated
+    // one would put the terminal cursor in the transcript.
     const f = frameAt(40, 12);
     expect(f.promptRows, "a one-row prompt, so the window is one row").toBe(1);
 
     const windowed = (row: number): PaintDeps => ({
       ...deps(() => []),
-      // Four display rows, of which the frame shows the last.
+      // Four display rows and room for one, so every row is a windowed one.
       promptRows: () => ["r0", "r1", "r2", "r3"],
       promptCursor: () => ({ row, col: 4 }),
     });
 
-    expect(cursorFor(f, windowed(3)), "the row on screen").toEqual({
-      row: f.region.top + f.region.height,
-      col: 4,
+    for (const row of [0, 1, 2, 3]) {
+      expect(cursorFor(f, windowed(row)), `row ${String(row)} is on screen`).toEqual({
+        row: f.region.top + f.region.height,
+        col: 4,
+      });
+    }
+
+    // The guard that remains, and it is a different claim: `promptCursor` and
+    // `promptRows` are read separately, so a cursor past the buffer's last row
+    // is refused rather than drawn somewhere plausible.
+    expect(cursorFor(f, windowed(9)), "a cursor the buffer has no row for").toBeNull();
+  });
+
+  it("T1.21 (C22 I62, §6e table row 1): the cursor is never drawn on the elision marker", () => {
+    // **The state the shipped defect needed, and no fixture built it.**
+    // `within = row − first + offset` is 0 for the row immediately above a
+    // marked window, 0 passes `0 ≤ within < cap`, and painted row 0 is the
+    // marker. Measured before the fix at `cap` 4 with six editor rows: the
+    // cursor on editor row 2 landed on the `❯ ⋯` row.
+    //
+    // Asserted against the **painted marker row** rather than against a number,
+    // because every number agreed with every other while it was wrong.
+    const f = frameWanting(40, 9, 6);
+    expect(f.promptRows, "half of nine, floored").toBe(4);
+
+    const rows = ["r0", "r1", "r2", "r3", "r4", "r5"];
+    const at = (row: number): PaintDeps => ({
+      ...deps(() => [], "·", f.region.height),
+      promptRows: () => rows,
+      promptCursor: () => ({ row, col: 3 }),
     });
-    expect(cursorFor(f, windowed(0)), "a row the window elided").toBeNull();
-    expect(cursorFor(f, windowed(2)), "and the one just above it").toBeNull();
+
+    for (const row of [0, 2, 3, 5]) {
+      const cursor = cursorFor(f, at(row));
+      if (cursor === null) throw new Error(`row ${String(row)} was hidden`);
+      const painted = paint(f, at(row))[cursor.row];
+      expect(painted, `row ${String(row)} is not the marker`).not.toContain("⋯");
+    }
+  });
+
+  it("T1.21b (C22 I62, §6e table row 2): a span outside the window does not wash the marker", () => {
+    // **The same fault reaching its second consumer**, which is why one fix
+    // serves both: neither the cursor nor the wash was wrong about its own
+    // rule, and both tested membership in painted coordinates.
+    //
+    // T4.26's *"the marker row is untouched"* cannot construct this — its span
+    // is inside the window, where the marker cannot be washed either way.
+    const f = frameWanting(40, 9, 6);
+    const painted = paint(f, {
+      ...deps(() => [], "·", f.region.height),
+      promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5"],
+      promptCursor: () => ({ row: 5, col: 2 }),
+      // Editor row 2 is one above the window, which shows rows 3, 4 and 5.
+      promptSelection: () => [{ row: 2, from: 0, to: 10 }],
+    });
+
+    const marker = painted.find((l) => l.includes("⋯"));
+    expect(marker, "the marker is drawn").toBeDefined();
+    expect(marker, "and carries no wash").toBe(visible(marker ?? ""));
+  });
+
+  it("T1.21c (C22 I62, §6e.5): a mid-buffer cursor is marked at both ends", () => {
+    // **The bottom marker is what makes the clipped wash honest** (§6e table 4).
+    // Spans are per row, so dropping the rows outside the window clips a wash
+    // exactly — and without a marker below, a wash that continues past the
+    // lower edge reads as one that ended there.
+    // **Nine rows and not six**, because with six there is no middle: `cap` is
+    // four, the head branch takes rows 0–2 and the tail branch rows 3–5, and
+    // the two meet with no gap. A both-ends window needs `n > 2·cap − 2`, which
+    // is the arithmetic the walk's ruling implies and did not state.
+    const f = frameWanting(40, 9, 9);
+    expect(f.promptRows).toBe(4);
+
+    const painted = paint(f, {
+      ...deps(() => [], "·", f.region.height),
+      promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
+      promptCursor: () => ({ row: 4, col: 2 }),
+    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+
+    expect(painted.filter((l) => l.includes("⋯")), "a marker at each end").toHaveLength(2);
+    expect(painted[0]?.includes("⋯"), "above").toBe(true);
+    expect(painted[painted.length - 1]?.includes("⋯"), "and below").toBe(true);
+    expect(painted[1], "with the cursor's own row between them").toContain("r4");
+
+    // **A marker wherever rows are elided, and nowhere else** — the claim the
+    // middle case alone does not carry. At the head only the lower end elides,
+    // and dropping *that* marker leaves the middle case untouched: the first
+    // draft of this row asserted the middle only, and the mutation that removes
+    // the head's bottom marker was caught by something else entirely.
+    const head = paint(f, {
+      ...deps(() => [], "·", f.region.height),
+      promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
+      promptCursor: () => ({ row: 0, col: 2 }),
+    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+
+    expect(head[0], "at the head the first row is the command").toContain("r0");
+    expect(head.filter((l) => l.includes("⋯")), "and one marker, below").toHaveLength(1);
+    expect(head[head.length - 1]?.includes("⋯"), "on the last painted row").toBe(true);
+  });
+
+  it("T1.21e (C22 I62, §6e table row 5): the spinner goes on the cursor's row, not the last", () => {
+    // **The comment's stated reason, made true.** The spinner and the ghost went
+    // into `out[out.length - 1]` *"because that is where the cursor is"* — which
+    // held only while the window was anchored on the buffer's end. With a marker
+    // below, the last painted row **is the marker**, and a spinner would be
+    // drawn on it.
+    //
+    // Mid-buffer, so the two rows differ: nine rows into a cap of four puts a
+    // marker at each end and the cursor on painted row 1.
+    const f = frameWanting(40, 9, 9);
+    const painted = paint(f, {
+      ...deps(() => [], "·", f.region.height),
+      promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
+      promptCursor: () => ({ row: 4, col: 2 }),
+      spinning: () => true,
+    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+
+    const spinner = painted.filter((l) => /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u.test(l));
+    expect(spinner, "one row carries it").toHaveLength(1);
+    expect(spinner[0], "and it is the cursor's row").toContain("r4");
+    expect(painted[painted.length - 1], "never the bottom marker").toContain("⋯");
+    expect(
+      /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u.test(painted[painted.length - 1] ?? ""),
+      "which carries none",
+    ).toBe(false);
+  });
+
+  it("T1.21d (C22 I62, §6e.5): the cursor at the end gives the window it always gave", () => {
+    // **The row that says the common frame did not change**, and the reason
+    // T6.49's revert is invisible without it: with the cursor in the last
+    // window's worth, cursor-following and tail-anchoring are the same window.
+    // It is also the argument for centring over `menuWindow`'s keep-it-last
+    // rule — a prompt wants to see what follows the edit.
+    const f = frameWanting(40, 9, 6);
+    const painted = paint(f, {
+      ...deps(() => [], "·", f.region.height),
+      promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5"],
+      promptCursor: () => ({ row: 5, col: 2 }),
+    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+
+    expect(painted[0], "the marker above").toContain("⋯");
+    expect(painted.filter((l) => l.includes("⋯")), "and only above").toHaveLength(1);
+    expect(painted[1]).toContain("r3");
+    expect(painted[3], "the newest row is still the last").toContain("r5");
   });
 });

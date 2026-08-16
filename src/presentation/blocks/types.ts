@@ -29,6 +29,19 @@ export type RenderContext = Readonly<{
   width: number;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * Scroll offsets by block id, in **rows** (C04 I48).
+   *
+   * **View state, arriving the way focus does** — a record the container looks
+   * itself up in rather than a value threaded down the tree. Rows and not an
+   * element index, so a resize re-interprets it and a reader who scrolled
+   * halfway stays halfway (C04 §3c trace 4).
+   *
+   * Absent is zero. It is clamped where it is read and never corrected where it
+   * is written, because a store fixed up on every patch is one that accumulates
+   * (C23 I47).
+   */
+  scrollOffsets?: Readonly<Record<string, number>>;
   focus: FocusState | null;
   /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer
@@ -143,6 +156,24 @@ export type NavElement = Readonly<{
    * that gives them a consumer.
    */
   activate?: Action;
+  /**
+   * What `y` copies here — the element's **source**, never its rendering (C26 §5c).
+   *
+   * **Declared by the block, and that is the whole of semantic copy.** The
+   * painted cells are a rendering: columns are dropped at narrow widths, values
+   * are truncated with an ellipsis, and a marker column carries a glyph nobody
+   * typed. A copy taken from them is *what is on screen*, which passes every
+   * assertion about what is on screen and is wrong about exactly the thing this
+   * exists for.
+   *
+   * So the declarer supplies it from the data it was given: `tableElements`
+   * joins **every declared column's** `cell.text`, including the ones this width
+   * dropped. That is what a raw terminal cannot offer.
+   *
+   * Optional, because an element may be a place to stand and nothing more —
+   * `activate`'s reason, and the same shape.
+   */
+  copy?: string;
 }>;
 
 export interface BlockDefinition<B extends Block = Block> {

@@ -98,7 +98,7 @@ export function createLogsAdapter(): Adapter {
         schema: "tui.view/1",
         command: ctx.command,
         status: "error",
-        error: { message: "logs was invoked without streaming", stage: "adapter" },
+        error: { message: "logs was invoked without streaming" },
         blocks: [b.notice.error("logs was invoked without streaming — this is a wiring fault")],
         meta: { adapter: "logs", truncated: false },
       };

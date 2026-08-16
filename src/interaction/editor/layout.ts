@@ -27,7 +27,11 @@
  *     editor holds what the user typed.
  */
 
-import { clusterWidth, graphemes } from "./graphemes.js";
+import { graphemes } from "./graphemes.js";
+// Aliased: `walk` has a local `cells` — the positions array — and the two are
+// different subjects. Shadowing them was a compile error rather than a silent
+// one, which is the one direction this collision could have gone well.
+import { cells as widthOf } from "../../presentation/text.js";
 
 export type Gutter = Readonly<{ first: number; cont: number }>;
 
@@ -50,10 +54,27 @@ function usableAt(row: number, width: number, gutter: Gutter): number {
  * `cells[i]` is where the cursor sits when `cursor === i`, so it has one more
  * entry than the buffer has clusters — the end position is a position.
  */
+/**
+ * What a cluster **draws as**, when it is not itself (roadmap 30).
+ *
+ * **The one place *one grapheme, N cells* lands.** A paste chip is a single
+ * sentinel in the buffer — so every grapheme index in C17 is untouched, which is
+ * why the entry stays inside C17 — and it draws as `[JSON · 47 lines]`. The walk
+ * is where those two facts meet, and it is the only place: `layout`,
+ * `displayRows`, `cursorCell` and `selectionSpans` share this function for the
+ * same reason there is one `cells()`, so one seam serves all four.
+ *
+ * **The gutter's class with the circularity absent**: a chip's width is its own
+ * label's, fixed and independent of the terminal width, so it resolves in one
+ * pass rather than needing the width it is computing.
+ */
+export type ClusterText = (cluster: string) => string | undefined;
+
 export function walk(
   text: string,
   width: number,
   gutter: Gutter,
+  drawAs?: ClusterText,
 ): Readonly<{ rows: readonly string[]; cells: readonly Cell[] }> {
   const rows: string[] = [];
   const cells: Cell[] = [];
@@ -84,13 +105,28 @@ export function walk(
 
     for (const cluster of graphemes(line)) {
       const limit = usableAt(at(), width, gutter);
-      const w = clusterWidth(cluster);
+      // **Measured as it is drawn**, which is the invariant the seam exists for:
+      // measuring the sentinel and drawing the label gives a prompt whose wrap
+      // and whose cursor disagree with the frame, and every grapheme-index
+      // assertion passes either way.
+      const shown = drawAs?.(cluster) ?? cluster;
+      // **`cells`, not `clusterWidth`, and the reason is here because the next
+      // person will have the same true thought.** `clusterWidth` measures a
+      // cluster **by its base code point** — correct for a cluster, and wrong
+      // for a *substituted string*: handed `[JSON · 47 lines]` it returns the
+      // width of `[`. It is the natural function to reach for on the line above,
+      // it is right about clusters, and it silently under-counts every label.
+      //
+      // Safe on the unchanged path: `cells()` and `clusterWidth()` are the same
+      // walk — one implementation, so the prompt and every block break at the
+      // same place — and `cells(oneCluster)` is `clusterWidth(oneCluster)`.
+      const w = widthOf(shown);
 
       // Moves whole. A cluster wider than the whole row still goes on one — it
       // overflows rather than being dropped or substituted (I20).
       if (used > 0 && used + w > limit) open();
 
-      row += cluster;
+      row += shown;
       used += w;
 
       // A row that is exactly full ends here, so the position after this
@@ -123,16 +159,87 @@ function cellCount(text: string): number {
   return graphemes(text).length + 1; // graphemes-ok
 }
 
-export function layout(text: string, width: number, gutter: Gutter): readonly string[] {
-  return walk(text, width, gutter).rows;
+export function layout(
+  text: string,
+  width: number,
+  gutter: Gutter,
+  drawAs?: ClusterText,
+): readonly string[] {
+  return walk(text, width, gutter, drawAs).rows;
 }
 
-export function displayRows(text: string, width: number, gutter: Gutter): number {
-  return layout(text, width, gutter).length; // graphemes-ok
+export function displayRows(
+  text: string,
+  width: number,
+  gutter: Gutter,
+  drawAs?: ClusterText,
+): number {
+  return layout(text, width, gutter, drawAs).length; // graphemes-ok
 }
 
-export function cursorCell(text: string, cursor: number, width: number, gutter: Gutter): Cell {
-  const { cells } = walk(text, width, gutter);
+export function cursorCell(
+  text: string,
+  cursor: number,
+  width: number,
+  gutter: Gutter,
+  drawAs?: ClusterText,
+): Cell {
+  const { cells } = walk(text, width, gutter, drawAs);
   const i = Math.min(Math.max(0, cursor), cells.length - 1); // graphemes-ok
   return cells[i] ?? { row: 0, col: gutterAt(0, gutter) };
+}
+
+/**
+ * A run of cells on one display row, `[from, to)` (roadmap entry 23).
+ *
+ * Half-open, like every other range in this component, so an empty run is
+ * `from === to` and cannot be spelled two ways.
+ */
+export type CellSpan = Readonly<{ row: number; from: number; to: number }>;
+
+/**
+ * Which cells a buffer region covers, per display row (C17 I21, I18).
+ *
+ * **The same walk `layout` and `cursorCell` use**, which is what makes this a
+ * consequence of I18 rather than a second measurement beside it. A span
+ * computed by re-wrapping the text here would part company with the drawn rows
+ * at exactly the boundaries this component exists for.
+ *
+ * **A row the region passes *through* is washed to the full width**, and that is
+ * the rule rather than an aesthetic. A wash stopping at the last cluster of an
+ * intermediate row reads as *highlighted*; one running through the padding
+ * reads as *selected*, and the newline or wrap it covers is genuinely part of
+ * the region. Only the last row stops at the head. No assertion about which
+ * characters are in the region distinguishes the two — a frame-read does.
+ *
+ * Geometry is untouched (I17 with C11 I9): this returns cells to style, never
+ * cells to add, so `displayRows` is the same number with a selection and
+ * without one.
+ */
+export function selectionSpans(
+  text: string,
+  from: number,
+  to: number,
+  width: number,
+  gutter: Gutter,
+  drawAs?: ClusterText,
+): readonly CellSpan[] {
+  const lo = Math.min(from, to); // graphemes-ok: two buffer positions, ordered
+  const hi = Math.max(from, to); // graphemes-ok: the same
+  if (lo === hi) return Object.freeze([]);
+
+  const { cells } = walk(text, width, gutter, drawAs);
+  const start = cells[Math.min(lo, cells.length - 1)]; // graphemes-ok: a cell index
+  const end = cells[Math.min(hi, cells.length - 1)]; // graphemes-ok: a cell index
+  if (start === undefined || end === undefined) return Object.freeze([]);
+
+  const out: CellSpan[] = [];
+  for (let row = start.row; row <= end.row; row += 1) {
+    const first = row === start.row ? start.col : gutterAt(row, gutter);
+    // **`width`, not the row's last cluster.** The region continues past this
+    // row, so the wash does too — through the padding and the wrap.
+    const last = row === end.row ? end.col : width;
+    if (last > first) out.push(Object.freeze({ row, from: first, to: last }));
+  }
+  return Object.freeze(out);
 }

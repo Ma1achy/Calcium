@@ -24,6 +24,7 @@
  * adapter contract for a feature neither has a stake in.
  */
 
+import { hasChildren } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import type { LiveSpec } from "./types.js";
 
@@ -47,7 +48,10 @@ export function liveDeclarations(blocks: readonly Block[]): { block: Block; spec
     for (const b of bs) {
       const spec = declarations.get(b);
       if (spec !== undefined) found.push({ block: b, spec });
-      if (b.kind === "panel" || b.kind === "group") walk(b.children);
+      // The condition is C04's (`hasChildren`), not a list: a live panel inside
+      // a `scroll` was reachable, rendered its placeholders and never ticked —
+      // which is the fault this walk's own recursion was added to prevent.
+      if (hasChildren(b)) walk(b.children);
     }
   };
   walk(blocks);

@@ -235,8 +235,15 @@ describe("mutation harness", () => {
     expect(text).toContain("caught");
     expect(text).toContain("SURVIVED");
     expect(text).toContain("ANCHOR MISSED");
+    // **One survivor, not two.** The stale row ran nothing, so counting it here
+    // made the summary contradict the line above it — and `ANCHOR MISSED is not
+    // a survivor` is the rule the summary was breaking. Both still fail the
+    // gate; only the sentence changed.
     expect(text, "a survivor indicts the test or the sentence, not the code").toMatch(
-      /2 survived/,
+      /1 survived/,
+    );
+    expect(text, "and the anchor miss is reported as what it is").toMatch(
+      /1 anchor\(s\) did not match/,
     );
   });
 });

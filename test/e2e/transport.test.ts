@@ -258,13 +258,25 @@ describe("C06 e2e", () => {
       //     resolved immediately, so `/exit` was typed into a session that had
       //     not finished. It now waits for a verb only `/help` puts on screen.
       //
-      // **Neither is credited with the fix, and that is the point of the
-      // note.** Three full runs have been green since — but the first of those
-      // three was green *before* either change landed, so the sample cannot
-      // distinguish the fix from the failure not recurring. Recorded with both
-      // figures rather than closed: a justification the next person checks and
-      // cannot reproduce is one they delete. If it returns, the rejection now
-      // says what the session was doing instead of exiting.
+      // **Neither was credited with the fix, and that was right** — the first
+      // of the three greens that followed predated both changes.
+      //
+      // --- AND THE CAUSE, 2026-08-13, SECOND PASS ---------------------------
+      //
+      // It returned: 2 of 3 runs, same row, same budget. **This time the
+      // rejection carried the frame**, and the frame named it — `▲ help is
+      // still running` under a `/exit` typed while `/help` was in flight.
+      //
+      // The strengthened `/help` wait was wrong in the same way as the weak one
+      // it replaced. `/guide` is in the help table, and it is also in the
+      // *transcript* as the echoed command from the step above, so the
+      // predicate matched the frame already on screen and resolved instantly.
+      // See the comment at that line.
+      //
+      // **A race, which is why it never reproduced alone and always landed at
+      // the outer budget**: nothing inner was waiting on anything. The bounded
+      // `done()` is what made it findable, so that change is credited with the
+      // diagnosis rather than with the fix — which is the honest split.
       const pty = session("no-farside");
       try {
         await pty.waitFor(PROMPT, 15_000);
@@ -282,12 +294,28 @@ describe("C06 e2e", () => {
         await pty.waitForFrame((f) => f.join("").includes("own local verb"), 15_000);
 
         pty.type("/help\r");
-        // **`length > 0` was the predicate here, and it waited for nothing.**
-        // Almost any frame satisfies it — including the one already on screen
-        // from `/guide` — so it resolved before `/help` had been processed and
-        // `/exit` was typed into a session still working. The wait has to name
-        // something only this step produces, which is a verb the help lists.
-        await pty.waitForFrame((f) => f.join("").includes("/guide"), 15_000);
+        // **The third predicate here, and the second was wrong in the same way
+        // as the first** — which is the finding rather than an embarrassment.
+        //
+        // `length > 0` waited for nothing: almost any frame satisfies it. It was
+        // replaced with `/guide`, on the reasoning that only the help table
+        // lists that verb — and the *transcript* lists it too, as the echoed
+        // command `❯ /guide` from the step above. So the strengthened wait
+        // resolved against the frame already on screen exactly as the weak one
+        // had, `/exit` was typed into a session still running `/help`, C23
+        // refused it, and `pty.done()` waited out the outer budget.
+        //
+        // **That is the whole of T5.6's history and it is now measured rather
+        // than suspected.** The row failed 3 of 4 runs before, and 2 of 3 after
+        // — and the rejection this time carried the frame, which showed
+        // `▲ help is still running` under a `/exit` that had been typed too
+        // early. A race, which is why it never reproduced alone and always
+        // landed at the outer budget rather than at an inner one.
+        //
+        // The predicate now names a string **only the help table's body can
+        // produce** — a description, not a verb name, since every verb name is
+        // something a user could have typed and had echoed.
+        await pty.waitForFrame((f) => f.join("").includes("empty the transcript"), 15_000);
 
         // And the shell shuts down cleanly rather than being killed, which is
         // the last thing a standalone build has to do.

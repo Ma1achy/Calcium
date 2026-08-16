@@ -69,8 +69,17 @@ regime:             ## what a source-scan pass costs *here*, beside the recorded
 	@# would teach people to re-run gates, which is the opposite of the point.
 	node tools/scan-cost.mjs
 
-test:               ## tiers 1-4
+test:               ## tiers 1-4, and the examples' own suites
 	npm run test
+	@# **The example suites were in no target at all** — `make check` type-checks
+	@# them and nothing ran them, so `examples/docker`'s 313 rows could go red
+	@# while all seven targets stayed green. That happened: widening
+	@# `Series.values` to carry a gap left four rows asserting `NaN` and the gate
+	@# reported clean. It is F150's finding one level out — an example's `check`
+	@# script that nothing invoked — arriving on the script beside it, which is
+	@# the argument for wiring the *pair* rather than the one that bit.
+	cd examples/docker && npm test
+	cd examples/minimal && npm test --if-present
 
 golden:             ## golden frames, 4 widths x 2 themes x 2 unicode modes
 	npm run golden

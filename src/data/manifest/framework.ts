@@ -49,15 +49,39 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     local: true,
     summary: "switch between the dark and light variants",
     args: [
+      // **No `values` here, and they arrive through `withThemeNames`** (C10
+      // I27). The names are the theme set's keys, which live in `TuiConfig` and
+      // are not knowable at module scope — so a literal pair here would make
+      // `/theme high-contrast` a validation error for a theme the session
+      // holds, with the completion and the usage text going wrong in the same
+      // breath.
+      //
+      // **Absent rather than a default pair**, so a manifest that never met
+      // `withThemeNames` fails loudly: an `enum` with no values rejects every
+      // invocation — *expected one of , got dark* — instead of quietly working
+      // for exactly the two names a fallback would have named.
       Object.freeze({
         name: "variant",
         type: "enum" as const,
         required: true,
-        values: Object.freeze(["dark", "light"]),
-        summary: "which variant to use",
+        summary: "which theme to use",
       }),
     ],
-    flags: [],
+    // **`shellOnly`, and that is what keeps the handler's positional read
+    // correct** (C22 I66, roadmap 39). `argv` for a local verb is
+    // `[verb, ...validation.transmitted]`, so a `shellOnly` flag is stripped
+    // before a handler sees it — declared any other way, `/theme --no-bg light`
+    // is a valid invocation that answers with a usage error. It appears in
+    // `/theme --help` with nothing else written, because `usageBlocks` walks
+    // `tool.flags` flat.
+    flags: [
+      Object.freeze({
+        name: "no-bg",
+        type: "bool" as const,
+        shellOnly: true,
+        summary: "do not paint this theme's background; keep the terminal's",
+      }),
+    ],
   }),
   Object.freeze({
     name: "history",

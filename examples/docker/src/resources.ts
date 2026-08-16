@@ -37,7 +37,7 @@ function failureDoc(result: RawResult, ctx: AdapterContext, adapter: string): Ad
     status: "error",
     // C04 I3 — required when `status` is `error`, and its absence is silent:
     // C13 throws, C23 discards, and the reader gets no entry at all (F35).
-    error: { message, stage: "adapter" },
+    error: { message },
     blocks: [b.notice.error(message)],
     meta: { adapter },
   };

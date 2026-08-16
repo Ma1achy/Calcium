@@ -115,6 +115,68 @@ A single kill buffer, not a ring — a ring's value depends on `Alt-Y` cycling, 
 
 `yank` inserts at the cursor as one atomic edit.
 
+## 5a. Copy writes to the kill buffer — one clipboard, not two
+
+**Ruled here rather than in the copy feature, because the buffer is C17's.**
+
+Selection copy — `y` on a focused element, select-all in the prompt, whatever the
+transcript's selection eventually offers — writes the **kill buffer**. There is not
+a second store beside it.
+
+**The argument is that §5 already calls this a clipboard and rules on it as one.**
+*"It is a clipboard: a paste target that silently rewound when the user undid
+something else would be a worse surprise than the one it prevents."* A second
+clipboard would need that ruling restated, and would leave the reader unable to say
+which store `⌃y` yanks from — two paste targets and one paste key. So `⌃k` then `y`
+then `⌃y` yanks what `y` copied, which is the least surprising sequence and needs no
+new rule.
+
+**Copy is not a kill, so it does not join a kill run** — and the run is over before
+`copy` is reached, which is a correction the mutation pass forced. `copy` used to end
+the run itself, and removing that call failed nothing: every path to a region goes
+through an extending motion or `selectAll`, and §5's *any non-kill operation ends the
+run* already covers both. **A line with nothing to be wrong about reads exactly like
+one that is obeyed**, which is A03 §2's vacuity class in code rather than in prose.
+
+So the rule is stated where it holds: **an extending motion ends the run** (T1.36, and
+the row had to construct a sequence with no `move` in it, because `move` ends the run
+too and every earlier row had one). A copy replaces the buffer outright — two copies in
+a row leave the second, not both.
+
+**Copy is not an undo unit either**, and for §5's reason inverted: a copy changes no
+text, so there is nothing for undo to restore, and the buffer is not undo state in
+either direction.
+
+**The system clipboard is a different axis and is not ruled here.** Whether a copy
+*also* emits OSC 52 is a question about the terminal, answered per capability, and
+it does not change where the text lands inside the process. Naming it as separate is
+the point: folding it in would make "one clipboard" a claim about two things, one of
+which C17 cannot see.
+
+## 5b. Selection — an anchor, a head, and every motion twice
+
+**The model, not a binding.** Select-all is the *degenerate case* of this — the whole buffer as one region — so shipping it alone means shipping an anchor and a region for one key and then generalising them. Roadmap entry 15 step 2.
+
+**Two positions in the buffer's own coordinate system**, which is grapheme indices, the same one `cursor` already uses. The **head is the cursor**: there is not a second position to keep in step with it, because a selection whose head could disagree with the cursor is two records of where the caret is. The anchor is the only new state.
+
+`selection` is `null` when there is no region, and **`anchor === head` is no region rather than an empty one**. That is a consequence of the representation and not a rule beside it: a caret with nowhere to be is the state the editor is in most of the time, and giving it a second spelling would let two of them exist.
+
+### Every motion twice, and the second is the first with the anchor held
+
+Each shifted form is *move, and leave the anchor where it is*. There is no second implementation of any motion — `extend` and `move` compute the same target through the same `#target`, and differ in one line. **A shifted motion that moves the anchor is the defect this shape exists to make impossible**, and it is invisible to every single-motion test: extend once and the region is right whichever end moved. It shows on the second.
+
+**An unshifted motion collapses the region.** So the model is invisible until someone holds Shift, which is what lets it land under every existing test unchanged.
+
+### An edit replaces the region, as one unit
+
+`insert`, `deleteBackward`, `deleteForward` and `yank` remove the region first and record **one** undo unit for the pair. The kind is `structural`: a replacement is not typing that should coalesce with what follows, and it is not a paste that should stand alone for its own reason.
+
+**`killTo` collapses rather than cutting the region**, and that is a decision rather than an omission. A kill is a motion-shaped operation — it names where to cut *to* — so a selection would give it two answers to one question. Copy is the operation that reads a region (§5a), and it is step 3's.
+
+### Selection is not undo state
+
+`undo` and `redo` collapse it, for I16's reason turned around: the kill buffer survives an undo because it is a clipboard, and a *region* does not, because it is a statement about where the caret is and the caret has just moved. Restoring a region over text that has changed under it is the one way this can point at the wrong characters.
+
 ---
 
 ## 6. Undo
@@ -332,6 +394,8 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 - **I18** — `layout`, `displayRows` and `cursorCell` are one walk: `displayRows` is `layout().length` and `cursorCell` indexes the rows `layout` returned. L4 draws those rows rather than wrapping the buffer a second time, which is what makes I3 structural instead of a claim two implementations happen to satisfy.
 - **I19** — A display row exists for every position the cursor can occupy, so the count is a position count and not `ceil(cells / usable)`: a logical line whose last cluster exactly fills a row emits a trailing empty row, per line. T3.8's trailing `\n` is this rule rather than a second one, and `cursorCell` at a wrap boundary reports the following row — the two halves are an off-by-one in opposite directions if either is dropped.
 - **I20** — Rows are produced by walking clusters. A cluster that does not fit moves whole and leaves the cell behind it blank; a cluster wider than `usable` takes a row of its own and **overflows** it. C09 I9 may drop or substitute a glyph a block cannot draw and C17 may not: a block renders someone's data, an editor holds what the user typed.
+- **I21** — **A selection is an anchor plus the cursor**, in the buffer's own grapheme indices, and the cursor **is** the head. `anchor === head` is no selection rather than an empty one, so the caret has one spelling. An extending motion moves the head and never the anchor; an unshifted motion collapses. Both halves are load-bearing and fail differently: a motion that moves the anchor is right on the first keystroke and wrong on the second, and a motion that does not collapse leaves a region nobody can see the end of.
+- **I22** — **An edit over a region replaces it, in one undo unit.** `insert`, `deleteBackward`, `deleteForward` and `yank` remove the region and apply themselves as a single `structural` unit; `killTo` collapses rather than cutting, because a kill already names where to cut to and a region would be a second answer. Selection is not undo state: `undo` and `redo` collapse it, which is I16's rule inverted — a clipboard survives an undo and a statement about where the caret is does not.
 
 ---
 
@@ -356,6 +420,8 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 17. `layout` is exported and L4 draws the rows it returns, so the measurement contract is one walk rather than two implementations that agree today (I18).
 18. The row count counts cursor positions rather than cells, so a line that exactly fills its rows reserves the row its end sits on (I19).
 19. A cluster that cannot fit moves whole and one wider than the row overflows rather than being dropped: an editor never alters what the user typed (I20).
+20. Selection is one anchor plus the cursor, and an extending motion never moves the anchor. The defect that does is right on the first keystroke and wrong on the second (I21).
+21. An edit over a region replaces it in one undo unit; `killTo` collapses rather than cutting; and a region does not survive an undo (I22).
 
 ---
 
@@ -389,6 +455,25 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T1.20** (I15): `insert("a b c")` as one call → one undo unit, not three. The per-character reading splits it and `yank` is the caller that suffers.
 - **T1.21** (I16): two consecutive `killTo("wordLeft")` then one `undo` → **both** words return. Half of them is the kill buffer and the undo stack disagreeing.
 - **T1.22** (I16): kill, `undo`, `yank` → the killed text is inserted; `undo` left the kill buffer alone.
+- **T1.32** (§5a): `⌃k`, then `y` over a region, then `⌃y` → the *copied* text is inserted. One clipboard, asserted as the sequence the ruling was made on rather than as two independent facts about one buffer.
+- **T1.33** (§5a): a copy replaces rather than appending — two in a row leave the second.
+- **T1.34** (§5a): a copy records no undo unit. `undoDepth` is unchanged and one `undo` press undoes the typing before it, rather than the copy.
+- **T1.35** (§5a): a copy with no region is a no-op, not an emptying. The same guard `yank` has, and without it `⌥w` on a bare caret discards what a kill put there.
+- **T1.36** (I16, §5b): an extending motion ends a kill run, **with no `move` between the kill and the copy**. The sequence is the assertion: every earlier row had a `move` in it, which ends the run too, so `extend`'s own call could be removed with nothing failing. The mutation pass is what found that, and it is what took a vacuous line out of `copy`.
+- **T1.37** (I18, entry 23): `selectionSpans` washes a row the region passes **through** to the full width, and the row holding the head to the head. Both in one row, because "every row to the edge" satisfies the first alone and is a different defect.
+- **T1.38** (entry 23): the last row stops at the head — the control for T1.37, and it cannot be folded into it: the defect it catches looks correct on any single-row selection.
+- **T1.39** (entry 23): a region inside one row is that row's cells alone.
+- **T1.40** (entry 23): an empty region has no spans, and the two ends may arrive either way round — asserted both ways, because a caller that sorted them once still passes a forward-only row.
+- **T1.41** (I18): the spans come from the same walk `layout` returns rows from, asserted at a line that exactly fills its row — I19's trailing position, and the boundary a second measurement would part company at.
+- **T1.23** (I21): `⇧→` twice from index 0 → the region is `[0, 2)`. **Two motions, because one passes whichever end moved** — an implementation that moves the anchor gives `[1, 2)` here and a correct-looking `[0, 1)` after one. The mutation this row exists for is the first one written for step 2.
+- **T1.24** (I21): `⇧→`, `⇧→`, then `⇧←` → `[0, 1)`. The head walks back and the anchor has still not moved, which is the same defect asserted through a reversal rather than through a repeat.
+- **T1.25** (I21): `anchor === head` reports `selection === null`, not an empty region. Asserted after `⇧→` then `⇧←`, so the state is reached by moving rather than by never having selected — the two spellings of "no region" are what this forbids.
+- **T1.26** (I21): an unshifted `move` after an extension collapses; `selectAll()` then `charLeft` leaves no region and the cursor where the motion put it.
+- **T1.27** (I21): `selectAll()` on a multi-line buffer selects across the newlines — the degenerate case is `[0, count)` and not the current line, which is what `lineStart`/`lineEnd` would give.
+- **T1.28** (I22): typing over a region replaces it, in **one** undo unit — `undoDepth` rises by one and `undo` restores the whole original text including the region.
+- **T1.29** (I22): `deleteBackward` over a region removes the region and **not** an extra character. The off-by-one is the natural implementation, and a region of one grapheme makes the two indistinguishable — so the row uses three.
+- **T1.30** (I22): `killTo("wordLeft")` with a region open cuts by the motion and collapses, rather than cutting the region. The kill buffer holds the motion's text, which is what says which of the two answers was taken.
+- **T1.31** (I22): a region open, `undo` → no region afterwards. The control is the kill buffer in the same row, which **does** survive — I16 and I22 in opposite directions, asserted together so neither can be satisfied by a rule that collapses everything or nothing.
 
 ### Tier 2 — contract / interface
 

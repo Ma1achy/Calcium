@@ -8,6 +8,7 @@ import {
   ARG_TYPES,
   findTool,
   parseManifest,
+  withThemeNames,
   suggestName,
   validateInvocation,
   type ArgType,
@@ -15,6 +16,7 @@ import {
   type ToolDef,
 } from "../../src/data/manifest/index.js";
 import { fixture, raw, toolNamed } from "../support/manifest.js";
+import { defaultTheme } from "../../src/presentation/theme/index.js";
 
 const SOURCES = [
   "src/data/manifest/index.ts",
@@ -256,6 +258,36 @@ describe("C05 contract", () => {
     expect(checkModuleGraph(SOURCES)).toEqual([]);
   });
 
+  it("T2.22 (C10 I27): `/theme`'s declared values are the theme set's keys", () => {
+    // **The row that would have shipped** (C10 §5a.2 row 4). The type change is
+    // visible in a diff and the enum is not: a module-scope literal makes
+    // `/theme high-contrast` a validation error for a theme the *session holds*,
+    // with completion and usage going wrong in the same breath — and every
+    // existing test asks for one of the two names such a literal already names.
+    const three = { ...defaultTheme, "high-contrast": defaultTheme["dark"]! };
+    const parsed = parseManifest(raw());
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    // Unpatched, the enum has no values at all — which refuses every `/theme`
+    // invocation rather than quietly accepting the two a fallback would name.
+    const bare = findTool(parsed.value, ["theme"])?.tool.args[0]?.values;
+    expect(bare, "a parse knows nothing about themes").toBeUndefined();
+
+    const patched = withThemeNames(parsed.value, Object.keys(three));
+    expect(findTool(patched, ["theme"])?.tool.args[0]?.values).toEqual([
+      "dark",
+      "light",
+      "high-contrast",
+    ]);
+
+    // And the fixture — which is what every harness routes through — carries the
+    // shipped set's keys, so `/theme light` validates in a test session.
+    expect(findTool(fixture(), ["theme"])?.tool.args[0]?.values).toEqual(
+      Object.keys(defaultTheme),
+    );
+  });
+
   it("T2.7: parseManifest accepts its own serialised output", () => {
     // **Serialising emits `appTools`** (§3): what round-trips is what the app
     // wrote, and parse re-derives the framework's six. So the property is
@@ -266,9 +298,19 @@ describe("C05 contract", () => {
     // output then contains rows the parser added, and re-parsing them hits §3's
     // collision check, which cannot tell an app declaring `clear` from a
     // re-parse of output that already contains it.
+    //
+    // **Both sides go through `withThemeNames`, and the asymmetry is the
+    // point** (C10 I27). `/theme`'s `enum` values are the theme set's keys and
+    // are applied *after* the parse, because the manifest describes verbs and
+    // the names are configuration. So a re-parse produces a manifest with no
+    // values, correctly: comparing it to a patched one would be asserting that
+    // parsing knows something it is not given.
     const first = fixture();
     const serialised = { ...first, tools: first.appTools, appTools: undefined };
-    const round = parseManifest(JSON.parse(JSON.stringify(serialised)));
+    const reparsed = parseManifest(JSON.parse(JSON.stringify(serialised)));
+    const round = reparsed.ok
+      ? { ok: true as const, value: withThemeNames(reparsed.value, Object.keys(defaultTheme)) }
+      : reparsed;
 
     expect(round.ok).toBe(true);
     if (!round.ok) return;

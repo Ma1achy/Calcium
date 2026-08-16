@@ -47,11 +47,19 @@ export type Column = Readonly<{
   iLast: number;
 }>;
 
-/** The finite values of a series, with their original positions (I4). */
-export function finiteSamples(values: readonly number[]): readonly Sample[] {
+/**
+ * The finite values of a series, with their original positions (I4).
+ *
+ * **`null` and `NaN` are one case here and not in a document.** A document
+ * spells a gap `null` (C04 I46a); a fixture or an adapter that never met a
+ * validator can still hand over `NaN`, and I2 says no series input throws. One
+ * guard answers both, because `Number.isFinite(null)` is `false` — which is why
+ * widening the type cost this function a signature and no logic.
+ */
+export function finiteSamples(values: readonly (number | null)[]): readonly Sample[] {
   const out: Sample[] = [];
   values.forEach((v, i) => {
-    if (Number.isFinite(v)) out.push({ i, v });
+    if (v !== null && Number.isFinite(v)) out.push({ i, v });
   });
   return out;
 }
@@ -82,7 +90,7 @@ export function seriesRange(
 
   for (const s of series) {
     for (const v of s.values) {
-      if (!Number.isFinite(v)) continue;
+      if (v === null || !Number.isFinite(v)) continue;
       seen = true;
       if (v < min) min = v;
       if (v > max) max = v;

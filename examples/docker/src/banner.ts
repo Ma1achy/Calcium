@@ -23,7 +23,7 @@
  *   been applied, and adding one would produce nine.
  */
 
-import { cells } from "@fmx/calcium";
+import { art, cells } from "@fmx/calcium";
 import type { Block } from "@fmx/calcium";
 
 /** Columns between the whale and the wordmark. Four reads well; two is tight. */
@@ -38,7 +38,8 @@ const WHALE_CELLS = 40;
  * Stored **as written**, and normalised by `pad` below rather than by hand: a
  * constant that is already padded is a constant somebody will re-indent.
  */
-const WHALE = [
+/** The art, exported for the tests that assert the container reproduces it. */
+export const WHALE_ROWS = [
   "                    ##        .",
   "              ## ## ##       ==",
   "           ## ## ## ##      ===",
@@ -56,7 +57,7 @@ const WHALE = [
  * wordmark's baseline on the whale's hull rather than its spout. Eight entries,
  * seven of content.
  */
-const WORDMARK_BLOCKS = [
+export const WORDMARK_ROWS = [
   "",
   " ▄▄▄▄▄                         ▄▄",
   " ██▀▀▀██                       ██",
@@ -100,13 +101,13 @@ const alignBottom = (lines: readonly string[], rows: number): readonly string[] 
 ];
 
 const compose = (right: readonly string[]): readonly string[] => {
-  const rows = Math.max(WHALE.length, right.length);
+  const rows = Math.max(WHALE_ROWS.length, right.length);
   const rightRows = alignBottom(right, rows);
   return Array.from({ length: rows }, (_, i) =>
     // The left column is padded so the right one starts at the same column on
     // every row; the composed row is then right-trimmed, because trailing space
     // costs cells in a measured block and shows in nothing.
-    `${pad(WHALE[i] ?? "", WHALE_CELLS)}${" ".repeat(GAP)}${rightRows[i] ?? ""}`.replace(/\s+$/u, ""),
+    `${pad(WHALE_ROWS[i] ?? "", WHALE_CELLS)}${" ".repeat(GAP)}${rightRows[i] ?? ""}`.replace(/\s+$/u, ""),
   );
 };
 
@@ -127,9 +128,9 @@ const widthOf = (lines: readonly string[]): number =>
 type Variant = Readonly<{ name: string; lines: readonly string[]; blocks: boolean }>;
 
 const VARIANTS: readonly Variant[] = [
-  { name: "wide-blocks", lines: compose(WORDMARK_BLOCKS), blocks: true },
+  { name: "wide-blocks", lines: compose(WORDMARK_ROWS), blocks: true },
   { name: "wide-ascii", lines: compose(WORDMARK_ASCII), blocks: false },
-  { name: "whale", lines: WHALE.map((l) => pad(l, WHALE_CELLS).replace(/\s+$/u, "")), blocks: false },
+  { name: "whale", lines: WHALE_ROWS.map((l) => pad(l, WHALE_CELLS).replace(/\s+$/u, "")), blocks: false },
 ];
 
 /** Exported for the tests and the tier table — the four the document names. */
@@ -163,4 +164,96 @@ export function banner(width: number, blocks: boolean): Block | null {
   const lines = bannerLines(width, blocks);
   if (lines === null || width < FLOOR) return null;
   return { kind: "raw", id: "banner", text: lines.join("\n") } as Block;
+}
+
+/**
+ * The same banner as a **row group**, which is what roadmap 38 exists to make
+ * possible (C04 I44).
+ *
+ * **The whale declares its cells and the wordmark takes what is left.** A
+ * proportion cannot express this — `40 : 61` gives the whale 41 columns at 105
+ * and 47 at 120, so the gap between the two arts widens with the terminal — and
+ * `{cells: 43}` is the whale's 40 plus the 4-column gap this file chose, less
+ * the one cell of gutter the container puts between every pair.
+ *
+ * **What the framework now does that this file did by hand**: padding every
+ * whale row to a uniform width, which `pad` did and the renderer's `fit` does;
+ * and holding the two arts in one block without either of them knowing the
+ * other's width.
+ *
+ * What is still the app's: the **variant choice**, which is this file's own
+ * tiering — and nothing else. The wordmark's leading blank row was here too, and
+ * `align` took it: `Valign`'s own declaration named this banner as its consumer
+ * while this comment said the container had no opinion, **both correct about
+ * their own half and contradicting each other**, with K6 sitting in the suite
+ * proving the equivalence neither was reading.
+ */
+export function bannerRow(width: number, blocks: boolean): Block | null {
+  if (width < FLOOR) return null;
+  const wordmark = wordmarkFor(width, blocks);
+  if (wordmark === null) return null;
+
+  return {
+    kind: "group",
+    id: "banner",
+    direction: "row",
+    children: [
+      { kind: "raw", id: "banner-whale", text: WHALE_ROWS.join("\n") },
+      { kind: "raw", id: "banner-wordmark", text: wordmark.join("\n") },
+    ],
+    flex: [{ cells: WHALE_CELLS + GAP - 1 }, 1],
+    // **The vertical alignment, and it is the container's now** (C04 I45).
+    // K6 proved the equivalence — a bottom-aligned seven-row wordmark draws what
+    // the eight-row one draws — and then nothing acted on it, which is what the
+    // sentence this replaces recorded as *a row group has no opinion*.
+    //
+    // **It also fixes the ASCII arm, which was never right here.** That art is
+    // five rows against the whale's eight and its own declaration says
+    // bottom-aligned; `compose` did that with `alignBottom` and this path did
+    // not, so the row group drew it against the whale's spout. The frame is what
+    // said so — the row count was eight either way.
+    align: ["top", "bottom"],
+  } as Block;
+}
+
+/**
+ * The wordmark the composed variant at this width would use, or `null`.
+ *
+ * **This was the loop `art` is**, written by hand: walk the variants in
+ * preference order, skip one the terminal cannot draw, skip one that does not
+ * fit, take the first that survives. Roadmap 22 landed it in the framework and
+ * this is the call, which is what MG24 asks for — a published member with a
+ * consumer on the other side of the seam rather than a producer alone.
+ *
+ * **The width handed over is the wordmark's own**, which is what keeps the
+ * threshold identical: `compose` pads the whale to `WHALE_CELLS` and adds
+ * `GAP`, so a composed row is exactly those plus the wordmark's widest, and
+ * `art` measuring the wordmark against `width - WHALE_CELLS - GAP` is the same
+ * comparison the composed table made. Measured rather than assumed — the golden
+ * in `DOCKER_TUI_BANNER.md` is asserted against the frame.
+ *
+ * `ambiguousWidth: "narrow"` because **this app has no signal for it**: it
+ * decides `unicode` from `LANG` in `main.ts` and nothing tells it what the
+ * terminal does with ambiguous characters. Stated rather than left implicit —
+ * the block wordmark is ambiguous throughout, so an app that did have the
+ * signal would want to pass it, and `art` would then refuse the blocks variant.
+ */
+function wordmarkFor(width: number, blocks: boolean): readonly string[] | null {
+  const chosen = art(
+    {
+      id: "banner-wordmark",
+      text: "Docker",
+      // **Without the leading blank row**, because the container aligns now.
+      // `WORDMARK_ROWS` keeps it: the hand-composed `banner()` path is asserted
+      // against `DOCKER_TUI_BANNER.md`'s fenced block row for row, and that
+      // document's art genuinely has eight entries with the first blank.
+      variants: { blocks: WORDMARK_ROWS.slice(1).join("\n"), ascii: WORDMARK_ASCII.join("\n") },
+    },
+    { unicode: blocks ? "full" : "ascii", ambiguousWidth: "narrow" },
+    width - WHALE_CELLS - GAP,
+  );
+
+  // The last rung is a `notice`, and beside a whale it is not a wordmark —
+  // this app's floor is its own decision (roadmap 22 §8c), and it is `null`.
+  return chosen.kind === "raw" ? chosen.text.split("\n") : null;
 }

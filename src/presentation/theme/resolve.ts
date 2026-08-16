@@ -17,7 +17,7 @@
 
 import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import { channels, luminance } from "./contrast.js";
+import { channels, floorFor, isHex, luminance, ratio } from "./contrast.js";
 import { MUST_STAY_DISTINCT } from "./four-bit.js";
 import {
   NO_STYLE,
@@ -27,6 +27,8 @@ import {
   type PaletteSpec,
   type ResolvedTheme,
   type Style,
+  type ThemeError,
+  type ThemeTokens,
 } from "./types.js";
 
 type Depth = TerminalCapabilities["colourDepth"];
@@ -390,6 +392,88 @@ function surface(ref: ColourRef, slot: string, theme: ResolvedTheme, depth: Dept
 
   const index = quantisedFor(theme, "surface", theme.tokens.surfaces as Readonly<Record<string, string>>)[slot];
   return index === undefined ? NO_STYLE : styleOf({ kind: "ansi256", index });
+}
+
+/**
+ * The screen's base style — what every cell falls back to (I25, C22 I65).
+ *
+ * **`NO_STYLE` for a theme that inherits**, which is not a degradation but the
+ * declaration: the terminal's own background is what shows, and a translucent
+ * one stays translucent. A painting theme resolves `surface.bg` through the
+ * ordinary ladder, so the base vanishes at 1-bit exactly as every other surface
+ * does (I8) — and at that rung no foreground is coloured either, so the frame is
+ * the terminal's own pair and the failure this closes cannot arise.
+ */
+export function resolveBase(theme: ResolvedTheme, caps: Caps): Style {
+  if (theme.tokens.background !== "surface") return NO_STYLE;
+  return resolveBackground("surface.bg", theme, caps);
+}
+
+/**
+ * The colour an 8-bit terminal would actually paint for a surface, as hex (I26).
+ *
+ * **The floor is measured against what is painted, and at this rung that is not
+ * the token.** `quantiseSet` picks a cube entry, whose RGB the standard fixes —
+ * so the value is knowable, and a floor computed against the author's hex is
+ * once again a floor against a colour nobody paints.
+ *
+ * `null` where the surface has no quantised answer, which `validateTokens` has
+ * already reported as a malformed value.
+ */
+export function quantisedHex(tokens: ThemeTokens, slot: string): string | null {
+  const surfaces = tokens.surfaces as Readonly<Record<string, string>>;
+  const index = quantiseSet(surfaces)[slot];
+  if (index === undefined) return null;
+  return CUBE.find((entry) => entry.index === index)?.hex ?? null;
+}
+
+/**
+ * §4c — the floor recomputed against what an 8-bit terminal actually paints (I26).
+ *
+ * **Only for a theme that paints, and only for `bg`.** A theme that inherits has
+ * no painted value to check against and its floor is the declared assumption, as
+ * before; `bgElev` has no painter at all (I25's scope), so pairing against a
+ * quantised value nobody writes would be the `bgDeep` mistake in a new place.
+ *
+ * **The foreground's own quantisation is a separate question and deliberately not
+ * asked here.** At 8-bit a tone is a cube entry too, so a complete 8-bit floor is
+ * quantised-against-quantised — but that is true whether or not anything is
+ * painted, it predates this entry, and widening the check here would bind every
+ * theme to a constraint this entry did not measure. Recorded in §4c.3.
+ *
+ * Reported at **load**, with both variants, because a theme that fails only on an
+ * 8-bit terminal is a theme that passes on the machine of whoever wrote it.
+ */
+export function validatePaintedFloors(tokens: ThemeTokens): readonly ThemeError[] {
+  if (tokens.background !== "surface") return Object.freeze([]);
+
+  const bg = tokens.surfaces.bg;
+  if (!isHex(bg)) return Object.freeze([]);
+
+  const painted = quantisedHex(tokens, "bg");
+  if (painted === null || painted.toLowerCase() === bg.toLowerCase()) return Object.freeze([]);
+
+  const errors: ThemeError[] = [];
+  for (const [paletteName, palette] of Object.entries(tokens.palettes)) {
+    if (palette.carries !== "meaning") continue;
+
+    for (const [slot, value] of Object.entries(palette.slots)) {
+      if (!isHex(value)) continue;
+
+      const floor = floorFor(slot);
+      const measured = ratio(value, painted);
+      if (measured < floor) {
+        errors.push({
+          path: `palettes.${paletteName}.${slot}`,
+          message:
+            `"${slot}" is ${measured.toFixed(2)} : 1 against the background an 8-bit terminal ` +
+            `paints (${painted}, quantised from ${bg}), below its floor of ${floor} : 1`,
+        });
+      }
+    }
+  }
+
+  return Object.freeze(errors);
 }
 
 /** The ergonomic form. `tone` is the overwhelmingly common case (§2). */

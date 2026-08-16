@@ -144,6 +144,20 @@ export type ToolDef = Readonly<{
    */
   hidden?: boolean;
   /**
+   * The verb's output may be persisted (C05 I25, C13 I20).
+   *
+   * **`handoff`'s shape and `handoff`'s argument one row down**: the app author
+   * is the only party who can know this, and detection is not available. Here
+   * the fact is what the output *contains* — `inspect` renders a container's
+   * whole environment, and no property of a `ViewDocument` distinguishes that
+   * from a list of image tags.
+   *
+   * **Absent means no**, which is the opposite default from every other optional
+   * field here and is deliberate: a missing feature is visible the first time
+   * someone resumes, and a leaked secret is not visible at all.
+   */
+  persist?: boolean;
+  /**
    * The verb takes the terminal — C23 §4's handoff row (C05 I19).
    *
    * **The app author is the only party who can know this.** Detection is not

@@ -183,8 +183,10 @@ export interface FocusStore {
    * C26 §8b.2.
    */
   toPrompt(): void;
-  /** Movement between elements; a no-op at the prompt. */
+  /** Movement between elements; a no-op at the prompt. Collapses a selection. */
   focusRow(element: ElementAddress | null): void;
+  /** The same movement with the anchor held (C26 §5c). */
+  extendRow(element: ElementAddress | null): void;
   /**
    * Enter or leave interaction mode on the focused row (C26 I2, I14).
    *
@@ -210,7 +212,7 @@ export function createFocusStore(): FocusStore {
     enterLiveBlock(element) {
       // Entry is always into navigation. Landing in interaction would give the
       // block every key before the reader has seen where focus went.
-      stored = Object.freeze({ at: "liveBlock", element, mode: "navigate" });
+      stored = Object.freeze({ at: "liveBlock", element, anchor: null, mode: "navigate" });
     },
     toPrompt() {
       stored = AT_PROMPT;
@@ -224,11 +226,40 @@ export function createFocusStore(): FocusStore {
       // escape read from the other end: a mode belongs to the element it was
       // entered on, and carrying it to the next row would make `↓` mean
       // something different depending on how the reader arrived.
-      stored = Object.freeze({ at: "liveBlock", element, mode: "navigate" });
+      //
+      // **And it collapses the selection** (C26 §5c), which is C17 I21's rule
+      // one level up: an unshifted motion drops the region, so the model stays
+      // invisible until someone holds Shift.
+      stored = Object.freeze({ at: "liveBlock", element, anchor: null, mode: "navigate" });
+    },
+
+    /**
+     * `⇧↑`/`⇧↓` — move the head and leave the anchor (C26 §5c).
+     *
+     * The anchor is placed on the **first** extension and never touched again.
+     * A version that moved the anchor instead is right on the first keystroke
+     * and wrong on the second, which is the defect C17 §5b's shape was built
+     * against and it is the same defect here.
+     *
+     * A no-op at the prompt, for `focusRow`'s reason.
+     */
+    extendRow(element) {
+      if (stored.at !== "liveBlock") return;
+      stored = Object.freeze({
+        at: "liveBlock",
+        element,
+        anchor: stored.anchor ?? stored.element,
+        mode: "navigate",
+      });
     },
     setMode(mode) {
       if (stored.at !== "liveBlock") return;
-      stored = Object.freeze({ at: "liveBlock", element: stored.element, mode });
+      stored = Object.freeze({
+        at: "liveBlock",
+        element: stored.element,
+        anchor: stored.anchor,
+        mode,
+      });
     },
   };
 }

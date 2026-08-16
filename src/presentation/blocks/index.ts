@@ -15,6 +15,7 @@ export {
   glyphFor,
   glyphCells,
   spinnerFrames,
+  spinnerIntervalMs,
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
   SUBSTITUTIONS,

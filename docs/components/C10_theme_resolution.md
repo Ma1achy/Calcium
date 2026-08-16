@@ -35,6 +35,7 @@ type PaletteSpec = Readonly<{
 type ThemeTokens = Readonly<{
   name:     string;
   variant:  "dark" | "light";
+  background: "terminal" | "surface";        // §4c — inherit, or paint `surfaces.bg`
   palettes: Readonly<Record<string, PaletteSpec>>;
   surfaces: Readonly<{
     bg: string; bgElev: string; bgDeep: string;
@@ -68,6 +69,7 @@ type Style = Readonly<{
 function resolve(ref: ColourRef, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
 function resolveTone(tone: Tone, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
 function resolveBackground(ref: ColourRef, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
+function resolveBase(theme: ResolvedTheme, caps: TerminalCapabilities): Style;   // §4c
 ```
 
 **`ColourValue` is tagged rather than a bare string**, and the tag is the point. C10 cannot write an escape (that is `terminal/escapes.ts` alone), so it hands out a description of a colour and something downstream turns it into SGR. A bare `"#7faecf"` or `"12"` makes that consumer re-derive the depth by inspecting the format, and the consumer that guesses wrong emits a truecolour sequence to a 16-colour terminal — precisely what T5.2 exists to catch. Naming the depth in the value means the writer switches on a tag it cannot misread.
@@ -245,6 +247,109 @@ Recorded because the prediction and the outcome are worth having side by side. T
 
 ---
 
+
+## 4b. The selection wash — a surface, and the ruling that named the wrong one
+
+**Roadmap entry 23 ruled *selection as a `carries: "meaning"` palette entry, so C10 checks the foreground/background pair against the contrast floor*. The guarantee is right and the mechanism is not.** `resolveBackground` refuses any ref that is not `surface.*` (I21), because a tone painted as a background is a tone nothing measured a floor for in that role — so a palette entry cannot be a wash at all.
+
+That is C23 §8a A4's shape: **an artefact correct about the interaction it found and wrong about a mechanism it assumed existed.** The guarantee it wanted is delivered by the mechanism that does exist, which is §4a's — a foreground slot paired with a background surface, checked at that slot's own floor.
+
+So `surfaces.selection` is a text-bearing surface and `SELECTION_SLOTS` is its pairing. **One slot: `tone.default`.** The prompt's text is `default`; ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is adjacent to a selection and never inside one.
+
+**The measured figures, because they are what would tempt a widening.** On the light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and the fix would look like weakening the check. §4's argument for excluding `bgDeep`, in the mirror: do not validate a slot against a surface that slot never lands on.
+
+Shipped values, measured against `tone.default`'s 4.5 floor: dark `#264057` at **7.25**, light `#c9ddf5` at **8.18**.
+
+**Reverse video is the 1-bit rung and it is the painter's, not the theme's.** `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash alone would fall from a background straight to nothing. `inverse` needs no colour at all and is supported essentially universally, which is what stops the ladder having a hole in the middle. C22 T4.25 is that rung.
+
+---
+
+## 4c. The theme's own background, walked by hand — roadmap entry 39
+
+The entry is **RULED with no code**, so the walk is where the ruling meets the
+tree. It has state *and* structure, so it takes both artefacts: this section is
+the **structural** half — a declaration, a surface, a colour depth and an
+override all hold at rest, with no event between them — and C22 §6g is the
+**event-mediated** half.
+
+**The defect reproduces, and it is narrower than the entry says.** `surfaces.bg`
+has exactly two readers, `textSurfaces` and `validatePalette`, both in
+`contrast.ts`. Nothing paints it and nothing else reads it, in either variant. So
+the floor is not *assumed against a guess* in some loose sense — it is computed
+against a colour **that has no consumer at all**, which is the same claim with a
+mechanism behind it.
+
+### 4c.1 — the classification table: which rule owns a cell
+
+Indexed by rule interaction. Every row is a cell where two correct statements
+overlap; a row governed by one rule would be a restatement of it.
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | **`background: <colour>` beside `surfaces.bg`** | the theme declares what it paints | I19 measures every floor against `surfaces.bg` | **R1 — the declaration is a *choice*, not a colour.** `background: "terminal" \| "surface"`, and what `surface` paints is `surfaces.bg`. A colour here is a second source of truth for the one surface every floor is already measured against, so a theme could paint `#ffffff` and prove its floor against `#fafafa` — **this entry's own defect, entered from the other side.** Precedent one entry back: `AskOptions.placement` is a choice between placements rather than a `Placement`, for the same reason |
+| 2 | paints × depth 8 | painting makes the floor provable | an 8-bit surface is the nearest **cube** entry, not the token's hex | **R2a — provable against a defined table**, and the recomputation is owed. `resolve.ts` uses indices **16–255 only**, whose RGB the standard fixes, so the painted colour is knowable — but it is not the hex, and a floor computed against the hex is once again a colour nobody paints |
+| 3 | paints × depth 4 | as above | a 4-bit surface is a **curated index** (I5), and 0–15 are whatever the emulator's palette says | **R2b — not provable, and painting still fixes the bug.** `surface.bg` is index 15 on light and 0 on dark, so painting puts light's dark foregrounds on the emulator's white: right in every configuration anyone runs, provable in none. **The guarantee drops to best-effort here for a reason that is not the override** |
+| 4 | paints × depth 1 | the light theme paints because it cannot work otherwise | surfaces vanish at 1-bit (I8) — **and so do foregrounds** | **R2c — vacuous, and safe.** Nothing is painted and nothing is coloured, so the frame is the terminal's own pair and the bug cannot arise. Named because §4b puts `inverse` in the middle rung and a reader will look for the analogue: **a wash is a region and reverse video separates it from its surroundings; a background *is* the surroundings, and there is nothing for it to contrast against.** There is no rung to want |
+| 5 | `--no-bg` × a theme declaring `terminal` | the user overrides the theme | the theme already inherits | **R3 — a no-op, and no notice.** The warning names a consequence and a flag that changed nothing has none; a notice here is the framework talking about itself |
+| 6 | `--no-bg` × the floor claim | warn and comply, and state the cost | the floor is provable when painting | **R4 — the statement has four clauses and the override is one of them**, where the entry names it as the whole. Rows 2–4 are the other three, and they are properties of the terminal rather than of anybody's preference. So the honest statement is a **rung table**, not a paint/inherit split |
+| 7 | `--no-bg` × `Overrides` | an override is how a value is changed at runtime | `applyOverrides` merges into `tokens`, bumps the serial, re-validates and changes the theme's identity | **R5 — not an override.** Overrides are sticky by construction and this is per invocation. It is session state read at paint, patching no token — which also keeps it out of the theme identity, so **C22 I58's render cache needs no new axis**: the base is applied at row assembly and never enters a cached block's bytes (C22 §6g R9) |
+| 8 | painting `bg` × `bgElev` | the screen has one background | `bgElev` is the second text-bearing surface (I19) | **R6 — `bg` alone.** `bgElev` has no painter either; the day it gets one is the day a block draws a panel, and painting the distinction now would draw a depth nothing else expresses |
+| 9 | a painted base × **the selection wash** (entry 23) | the wash is a background over its own cells | the base is a background over **every** cell | **R7 — the wash wins for its span and the base resumes after it**, which is a fact about the **reset** and not about the padding (C22 §6g R9). This is the cell the entry's *build them together* note was reaching for, and **it is not where the note pointed** |
+| 10 | a painted base × a diff row's own background | §4a paints the whole row, gutter included | the frame squares every row to the region width | **Confirms.** C25 renders at the region width, so there is no pad after a diff row for the base to land in. One line, because this row was written expecting a defect and is worth keeping as the answer |
+
+**Row 1 is the one that would have shipped**, and nothing downstream could catch
+it: a theme declaring both a background and a `bg` is internally consistent, every
+floor passes, and the screen is painted a colour no floor was measured against.
+
+### 4c.2 — the rulings
+
+- **R1 — `background: "terminal" | "surface"`**, and `surface` paints `surfaces.bg`.
+  One colour for the background, and it is the one the floors already use.
+- **R2 — provability is a rung table, not a binary.** Provable at 24; provable
+  against the 256-cube's defined RGB at 8, which obliges recomputing the floor
+  against the quantised value; best-effort at 4, where the index is the
+  emulator's; vacuous at 1, where nothing is painted and nothing is coloured.
+- **R3 — a no-op override is silent.**
+- **R4 — the override is one clause of four, and the only optional one.** The
+  statement that ships names all four; the entry names this one as the whole.
+- **R5 — `--no-bg` is session state, not an `Overrides` entry**, so the theme's
+  identity and every cache keyed on it are untouched.
+- **R6 — `bg` alone is painted.** `bgElev` waits for a block that draws one.
+- **R7 — the wash composes with the base at the reset**, which is C22's.
+
+### 4c.3 — what the rulings leave behind
+
+- **The light theme's `surface` is a token change and the dark theme's is a
+  decision.** Dark keeps `terminal` and keeps your transparency; that is the
+  entry's ruling and it means **the shipped default paints nothing**, so every
+  test that has ever run has run against the inheriting arm. The painting arm
+  ships with one theme exercising it.
+- **A theme declaring `paint` with a `bg` that fails no floor can still be
+  wrong**, because floors constrain the *pair* and not the absolute. A theme
+  whose `bg` is `#000000` on a terminal the user configured white is legible and
+  jarring, and nothing here has an opinion about that. Named so it is not
+  mistaken for a gap.
+- **The foreground's own quantisation is a separate question, and the code is
+  where it surfaced.** At 8-bit a tone is a cube entry too, so a complete 8-bit
+  floor is quantised-against-quantised — and `validatePaintedFloors` measures the
+  authored foreground against the painted background. That is this entry's claim
+  exactly: painting is what makes the *background* knowable, and the foreground's
+  rung predates it and is unchanged by it. Widening the check here would bind
+  every theme to a constraint nothing in this entry measured, which is §4a's
+  argument in the mirror. Named so the narrowness reads as a decision.
+- **The failing direction only exists for some backgrounds, and the fixture had
+  to be searched for.** Against `#fafafa` the nearest cube entry is *lighter*, so
+  quantisation only improves contrast and the recomputation cannot fail on the
+  shipped light theme. T1.19 searches for a background whose quantised value is
+  darker than its token, because a fixture built on the shipped one would have
+  asserted nothing while passing.
+- **`COLORFGBG` is not read, and the entry's mismatch warning is not built.** The
+  entry offers it as something the declaration *enables*; it is a second feature
+  with its own reader, and folding it in would make this entry's scope the
+  variable one. Recorded as owed, not as done.
+
+---
+
 ## 5. Switching
 
 `/theme` switches variant. The change is **atomic**: the store swaps a resolved theme in one assignment, so no frame is ever half-themed.
@@ -252,6 +357,129 @@ Recorded because the prediction and the outcome are worth having side by side. T
 Switching **does not call C03 directly.** C10 exposes the change; the L4 shell calls `scheduler.invalidate()` afterwards — the same orchestration pattern as `lifecycle.resume()` (A02 §4), keeping L1 unaware of L0-terminal. A repaint is required because every cell's style changes and a diff against the old frame would be meaningless.
 
 Resolution is memoised on `(tone, themeName, colourDepth)`. `resolveTone` is called per styled span and is pure, so the cache is sound and is cleared on switch.
+
+---
+
+## 5a. More than two, walked by hand — roadmap entry 24
+
+**The entry's premise is closed and its text still states it.** *"Two ship and `light` is
+dark-on-dark"* was true until I25: `light` declares `background: "surface"` and paints
+`surfaces.bg`, and the entry's second *thing to get right* — a theme declaring the background
+it assumes — is that invariant. What remains is the additive half, and the type change that
+lets it exist.
+
+### 5a.1 — the fork, and it is a measurement rather than a preference
+
+`ThemeSet` is `{ dark: ThemeTokens; light: ThemeTokens }`, so **which theme** is spelled as
+**which polarity** — and not only there. The literal pair `"dark" | "light"` is written at
+**nine sites**: `ThemeTokens.variant`, `ResolvedTheme.variant`, `setVariant`, `loadTheme`'s
+default, `PipelineDeps.persistTheme`, `HandlerDeps.persistTheme`, `/theme`'s declared `enum`
+values in `framework.ts`, the persisted-file guard in `construct.ts`, and
+`testing/expect-document.ts`. A tenth is in the contrast suite, and §5a.4 is about that one.
+
+**Every reader of `.variant` uses it as a key or as identity, and not one reads it as
+polarity.** Five readers, all in `store.ts`: `identity()` builds the memo key, `resolved()`
+copies it out, `setVariant` compares it to decide a no-op, and `applyOverrides` uses it twice
+to index `tokens`. Outside this component there is no reader in `src/` at all, and none in
+either example. Nothing in the ladder, the floors or `resolveBackground` consults it.
+
+So the fork goes to **a named set**, and the check that would have sent it the other way —
+*does any of the nine use `variant` for something a name cannot do* — comes back empty.
+
+**The stronger form of the argument, and it is the one that survives a re-measurement.** I25
+made the background a declaration, and I26 made the inheriting arm's floor *the declared
+assumption* — which is `surfaces.bg`. So a theme's polarity is **derivable from its own
+tokens**: `luminance(surfaces.bg)` answers it. `variant` is therefore a second record of a
+fact the tokens already carry, and a second record that **nothing checks**: a theme declaring
+`variant: "light"` with `bg: "#000000"` loads today, resolves, and passes every floor. I9
+compares tones *to* `bg` and has no opinion about what `bg` is.
+
+**That is a field whose meaning was absorbed by something else, and nothing noticed** — the
+`bar` class, arriving in a type rather than in a glyph.
+
+### 5a.2 — the classification table: which rule owns a cell
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | **`ThemeSet`'s keys beside `ThemeTokens.variant`** | the set is keyed by variant | each theme declares its own variant | **R1 — the key becomes a name.** `ThemeSet` is `Readonly<Record<string, ThemeTokens>>`, and `high-contrast` is a name rather than a third polarity. The keys were the last place polarity was spelled as a key, which is why nine sites repeat the literal |
+| 2 | `variant` × `surfaces.bg` | a theme declares its polarity | polarity is `luminance(surfaces.bg)` | **R2 — declared and checked, not derived.** Dropping it loses the one thing a token cannot say: a mid-luminance theme's *intent*, which is what a user picking "the dark one" is asking about. Keeping it unchecked is the state measured above. So `validateTokens` gains the pairing, and a theme whose declaration contradicts its own background is rejected at load with both numbers named |
+| 3 | `ResolvedTheme.variant` × the published surface | an app may branch on it | no consumer in this repository reads it | **R3 — it stays published and stays a `"dark" \| "light"`.** The measurement is *no reader here*, which is not *no reader*: this is a published field and an app choosing an image or an ANSI art variant is exactly what it is for. Named so that R1 does not read as permission to delete it |
+| 4 | **the `/theme` enum × a manifest built before the config** | `FRAMEWORK_TOOLS` is a module-scope constant with `values: ["dark", "light"]` | the names come from `TuiConfig.theme` | **R4 — the enum is derived where the manifest is assembled, not where it is declared.** This is the cell that makes R1 more than a type change: C05's row is data and the theme names are config, so the two meet at parse time. A static list would make `/theme high-contrast` a validation error for a theme the session holds — the completion and the usage text going wrong in the same breath |
+| 5 | a persisted preference × a name the set no longer has | the preference is restored at open | a theme can be removed, and older files hold `dark` | **R5 — the guard validates against the set, and `dark`/`light` keep working because they are names in the shipped set.** The migration is *nothing*, which is the fork's dividend: the two literals stay valid as keys of `defaultTheme`. A name that is not in the set takes the existing repair-at-open path — base theme retained, notice committed (C22 I40's precedent, already built) |
+| 6 | two themes of the same polarity | switching invalidates the resolution cache | nothing keys on polarity | **Confirms**, and it is the fork's test: `identity()` is `name/variant#serial` and two dark themes differ in the first component, so the memo is already correct. **The identity string is where a name can now collide** — a theme named `a/b` or one containing `#` produces a key another theme could produce. R6 |
+| 7 | an override × a set of N | overrides land on the active variant only, because a value chosen against a dark ground is not a value for a light one | `applyOverrides` indexes `tokens[current.variant]` | **Confirms, and the reason generalises exactly.** An override is per *theme*, and *per variant* was the two-theme spelling of that. Indexing by name is the same statement |
+| 8 | `TuiConfig.theme` × the widening | an app supplies its own `ThemeSet` | the field is required (I18) | **R7 — the widening is backward-compatible for consumers**, and that is asserted rather than assumed: an app's `{ dark, light }` still satisfies a record keyed by string. So this is freeze-relevant in the *type*, and not a change any consumer has to make |
+| 9 | `--no-bg` × more themes | the flag is per invocation | each theme declares its own background | **Confirms.** The flag reads `deps.theme.current.tokens.background`, which is a per-theme fact already; N themes change nothing about it |
+
+**Row 4 is the one that would have shipped.** The type change is visible in review and the
+enum is not: `/theme high-contrast` would fail validation, `/theme <Tab>` would offer two
+names out of three, and every existing test would pass, because every existing test asks for
+one of the two the literal names.
+
+### 5a.3 — the sequence trace: what a session does across a change of set
+
+| # | Sequence | What happens | What the row is for |
+|---|---|---|---|
+| 1 | a session opens with a persisted `dark` written by the two-theme version | it resolves, because `dark` is a name in the shipped set | **The migration is nothing, and that is a consequence of R1 rather than a coincidence.** Had the fork gone to a family-plus-polarity shape, every persisted file would have been half a key |
+| 2 | a persisted name the set no longer has | base theme retained, notice committed | The path exists and is C20's repair-at-open shape (C22 I40, C22 T1.19b). What changes is the *test*: a literal-pair guard rejects a legitimate name, so the guard moves from a comparison to a membership check |
+| 3 | `/theme` naming a theme that is in the config but not in the manifest's enum | validation fails before the handler runs | **The failure R4 exists to prevent**, and it is silent in a different way from most: the session holds the theme, the config named it, and the shell says the verb does not take it |
+| 4 | `/theme <name>` where the name is already active | `setVariant` is a no-op and a frame is committed anyway | **Confirms, and it is the row this walk got wrong last time** (C22 §6g.3 row 2). The frame comes from the document `/theme` appends, not from the store's guard. Re-stated rather than re-derived |
+| 5 | an override, then a switch, then a switch back | the override is still on the first theme and the second is untouched | Confirms §5a.2 row 7 from the other end: the store keeps *one* patched set, so the override survives a round trip, and it survives it per name rather than per polarity |
+| 6 | a theme added whose `variant` contradicts its `bg` | rejected at load, both variants validated | R2's arm. **At load and not at switch**, for §5's own reason: a session that fails the moment someone types `/theme high-contrast` has validated nothing useful |
+
+### 5a.4 — the coverage set the tests wrote for themselves
+
+`test/contract/theme.test.ts` opens with `const VARIANTS = ["dark", "light"] as const` and
+loops it for **eleven rows**, including T2.3's 4-bit injectivity and T2.4's floors — the two
+the entry names as *already-decided rules every shipped theme passes*.
+
+**It is a literal in the test file rather than the set's own keys**, so a third shipped theme
+is checked by nothing and the suite stays green. That is the same defect as a hand-copied
+inventory beside a `grep`: **a coverage set derived from the test covers exactly what the test
+already knew about.**
+
+**R8 — `VARIANTS` is derived from `defaultTheme`**, the way every other inventory in this tree
+is derived, and the row that asserts the count asserts it against the set rather than against
+a number.
+
+### 5a.5 — the rulings
+
+- **R1 — `ThemeSet` is a named record**, each theme declaring its own polarity.
+- **R2 — `variant` is declared *and* checked** against `luminance(surfaces.bg)`, because it is
+  currently a second record of a derivable fact that nothing validates.
+- **R3 — `ResolvedTheme.variant` stays published**, on the strength of a measurement that says
+  *no reader here* rather than *no reader*.
+- **R4 — `/theme`'s `enum` values are derived where the manifest is assembled.**
+- **R5 — the persisted guard is a membership test**, and the migration is nothing.
+- **R6 — the memo identity is `name/variant#serial` and a name is now arbitrary**, so the
+  separators are a collision surface: either the name is constrained or the key stops being a
+  string join.
+- **R7 — the widening is backward-compatible for consumers**, and a row asserts it.
+- **R8 — the contrast suite's coverage set is derived from the theme set.**
+
+### 5a.6 — what the rulings leave behind
+
+- **Which themes to ship is not ruled here.** The entry names three — a high-contrast set, a
+  solarised or gruvbox-alike, and a neutral low-saturation one — and each is a token catalogue
+  that has to be authored against the floors, which is A01 A.1's work rather than this
+  component's. What this walk delivers is a set that can hold them. **`high-contrast` is the
+  first, and it is the set's first consumer** (A01 A.1): a third *theme* declaring `dark`, so
+  a set keyed by variant could not have held it beside the first.
+- **A theme can promise more than the floor and cannot declare it.** `FLOORS` is a module
+  constant naming the minimum every theme clears, so `high-contrast`'s 7 : 1 is authored, is
+  checked by one test row, and is invisible to `validateTokens` — which will accept a later
+  edit dropping any of its slots to 4.5 and report a theme that passes. **A per-theme floor is
+  a `ThemeTokens` field and a change to `floorFor`'s signature**, which is mechanism this
+  entry did not need and the next theme with a promise will: recorded here so the second
+  instance is where it is argued, rather than the first being widened on its own.
+- **A theme name is a user-facing string with no rules yet.** R6 names the collision; case,
+  spaces and length are unruled, and completion will show whatever is there.
+- **The golden gap is filed separately and deliberately** (F163, roadmap 49). No golden test
+  touches `shell/paint.ts`: `blocks`, `table`, `patch` and `plot` all go through
+  `renderToLines`, so a new theme adds no golden coverage of the painting arm — and neither
+  the base, the chrome, the prompt window nor the cursor sequence has ever appeared in one.
+  **Not this entry's to fix**, because a golden *frame* category has more consumers than a
+  theme.
 
 ---
 
@@ -291,6 +519,10 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I22** — The two diff surfaces are text-bearing, and every `syntax` slot and every gutter tone (`ok`, `error`, `muted`) clears its floor against both in both variants (§4a) — **those twelve slots and no others**, asserted on the pairing rather than on its results, because a widened pairing passes on the tokens as shipped and only costs something later. There is no third or fourth: §4a measured a stronger pair for word-level emphasis and found under ten units of one channel between it and the plain pair, so word-level emphasis is `underline`'s and not a background's. `bgDeep` remains excluded because it carries no text; the criterion is text, not the word "surface".
 - **I23** — A diff background is the third signal and never the only one. At 1-bit it is absent, and the marker and the toned gutter carry the distinction alone (→ C25 I13, → A01 D29).
 - **I24** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
+- **I25** — **A theme's background declaration is a choice and never a colour.** `background: "terminal" | "surface"` — the value names **where the colour comes from**, the terminal or the theme's own surface, rather than naming the act — and what `surface` paints is `surfaces.bg` — the one surface every floor is already measured against (I19). A colour in this field would be a second source of truth for the same thing, so a theme could paint one value and prove its floor against another, which is roadmap 39's own defect arriving from the other side (§4c row 1). `--no-bg` overrides it for one invocation and is **session state, not an `Overrides` entry**: overrides merge into `tokens`, bump the serial and change the theme's identity, and a per-invocation switch that did any of that would be sticky by construction and would put a paint decision into every cache keyed on identity (I11, → C22 I58).
+- **I26** — **The contrast floor's provability is a rung of the degradation ladder, not a property of painting.** It is provable at 24-bit; provable at 8-bit against the 256-cube's defined RGB, which obliges computing it against the **quantised** value rather than the token, because the quantised value is what is painted; **best-effort at 4-bit**, where `surface.bg` is a curated index and 0–15 are whatever the emulator's palette says; and **vacuous at 1-bit**, where no background is painted and no foreground is coloured, so the terminal's own pair is what shows and the failure this addresses cannot occur (I8, §4c rows 2–4). `--no-bg` is the **fourth clause** of that statement and the only optional one; the other three are the terminal's. There is no reverse-video rung: §4b's middle rung distinguishes a region from its surroundings, and a background is the surroundings.
+- **I27** — **A theme set is keyed by name and a theme declares its own polarity.** `ThemeSet` is `Readonly<Record<string, ThemeTokens>>`; `dark` and `light` are names in the shipped set rather than a closed vocabulary, so `high-contrast` is a third theme and not a third variant. The keys carried polarity only because a two-theme set had nowhere else to put it, and I25 is what took that job — a theme now declares the background it assumes, which is the fact the keys were standing in for (§5a.1). **Nothing reads `variant` as polarity**: its five readers are all in `store.ts`, each a key into the set or part of the memo identity, and no consumer in `src/` reads it at all — which is the measurement the fork rests on rather than the argument for it. `ResolvedTheme.variant` stays published, because *no reader here* is not *no reader* and choosing an asset by polarity is what a published field is for. The persisted preference needs no migration, since the two literals remain valid names, and the guard restoring it becomes a membership test against the set (§5a.3 rows 1–2, → C22 I40).
+- **I28** — **`variant` is declared and checked against the theme's own background.** It is otherwise a second record of a derivable fact — `luminance(surfaces.bg)` answers the same question — and one nothing validates: a theme declaring `light` over `bg: "#000000"` loads, resolves and clears every floor today, because I9 compares tones *to* `bg` and has no opinion about what `bg` is (§5a.1). It is kept rather than derived because a token cannot express *intent* for a mid-luminance theme, and a user asking for the dark one is asking about intent. **Two consequences follow the name-keying and both are asserted rather than assumed**: `/theme`'s `enum` values are derived where the manifest is assembled and never declared at module scope, or a theme the session holds becomes a validation error the shell reports as a verb that does not take it; and the memo identity `name/variant#serial` is a string join over a now-arbitrary name, so its separators are a collision surface (§5a.2 rows 4 and 6).
 
 ---
 
@@ -317,6 +549,10 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 19. `Style` has two colour channels and no more. `background` comes only from a `surface` ref through `resolveBackground`, because the floors are measured for surfaces and not for tones in that role (I21).
 20. The two diff surfaces are text-bearing, so the §4 floors extend to them — for the twelve slots that land on them and no others, the background covering the whole row (I22). A second, stronger level was specified, measured and withdrawn; the floors left no room for it, and `underline` is what word-level emphasis has instead (§4a). The `bgDeep` exclusion is the criterion doing its job in the other direction.
 21. A diff background is a third signal that vanishes at 1-bit, where the marker and the toned gutter carry the distinction alone (I23, → A01 D29).
+22. **A theme declares whether it paints, as a choice and not as a colour** — `"terminal" | "surface"`, painting `surfaces.bg` — and the user's `--no-bg` is a per-invocation session flag rather than an override, so no token changes and no cache keyed on theme identity is disturbed (I25, §4c).
+23. **What painting buys the contrast floor is stated per rung of the ladder, not per branch of the declaration**: provable at 24, provable against the cube's defined RGB at 8, best-effort at 4, vacuous at 1 — and the override is one clause of four rather than the whole statement (I26, §4c).
+24. **A theme set is keyed by name, and polarity is a property of a theme rather than of the set** — which is what I25 freed the keys from, and it is measured on `variant`'s five readers rather than argued (I27, §5a).
+25. **`variant` is checked against `luminance(surfaces.bg)`**, and the checks every shipped theme must pass are driven by the set's own keys rather than by a list a test writes for itself (I28, §5a.4).
 
 ---
 
@@ -342,10 +578,19 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.14** (I21): `resolveBackground` on a `surface` ref returns a `Style` whose `background` is set and whose `colour` is absent; `resolve` on the same ref returns the mirror image. The two functions differ in which channel they fill and in nothing else.
 - **T1.15** (I21): `resolveBackground` on a palette ref — `tone.ok`, `syntax.keyword` — returns the empty `Style`. A tone cannot be painted as a background, because no floor was ever measured for it in that role.
 - **T1.16** (I2, I23): at depth 1, `resolveBackground` on both diff surfaces returns the empty `Style`. The degradation that makes I23 lossless.
+- **T1.17** (I25): a theme declaring `surface` resolves its base to `surface.bg` and to nothing else — asserted by changing `bg` and watching the base follow it. The row that fails the day the declaration carries a colour of its own, which is the only way the two can disagree.
+- **T1.18** (I26): the base over all four depths, in one row, because the claim is a ladder and not four claims: the token's hex at 24, a cube index in **16–255** at 8, the theme's own curated index at 4 — asserted against the declared table, not a computed nearest, which is T1.13's argument for this surface — and the empty `Style` at 1.
+- **T1.19** (I26): at 8-bit, the floor recomputed against the **quantised** base rather than the token, for every slot `textSurfaces` pairs with `bg`. Asserted as a recomputation and not as a result: against the shipped tokens both numbers clear, so a row comparing outcomes would agree with the wrong one.
+- **T1.20** (I28): a theme declaring `light` over a dark `bg` is rejected at load, with both the declaration and the measured luminance in the message. **The state that is legal today**, so the row is a new refusal rather than a restatement.
+- **T1.21** (I27): a set of three loads, `names` is every key in declaration order, and switching between two themes of the **same** polarity is a switch — the case a variant-keyed store could not express. An unknown name **throws** and says what the set holds, because a silent no-op reports a change that did not happen.
+- **T1.21a** (I27): a set with no `dark` in it opens on its first key, and an empty set is refused. The literal default would be a name this component requires of every app's set; the empty case is the one failure a token check cannot see, because it is about the collection.
 
 ### Tier 2 — contract / interface
 
 - **T2.1** (I1): `resolveTone` called a thousand times returns identical styles and performs no I/O.
+- **T2.22** (I27): `/theme`'s declared `enum` values equal the theme set's keys, for a set of three. Asserted against the set rather than against a list, because a list here is the defect one layer over (§5a.4).
+- **T2.23** (I28, §5a.4): the contrast suite's coverage set is **derived**, asserted on the source. **A value comparison here is vacuous and the mutation pass proved it**: `["dark", "light"]` equals `Object.keys(defaultTheme)` for exactly as long as the shipped set has two members, so the row passed against the defect it was written for and would have begun failing at the moment it was meant to protect. The limit is stated in the row — it reads one file.
+- **T2.24** (roadmap 24, A01 A.1): `high-contrast` clears **7 : 1** on every `meaning` slot against both grounds, `muted` is named separately because a passing sweep does not say which slot was in question, and the three greys stay ordered — quieter than `dim`, quieter than `default`. **The only thing standing between the name and a claim**, since the framework holds every theme to the minimum and has no way to be told about a promise.
 - **T2.2** (I11): with the cache warm, results are identical to cold results for every key.
 - **T2.3** (I5): for every shipped theme, the 4-bit mapping is injective across `{ok, warn, error, info, accent}` — the tones whose confusion would be misleading rather than merely dull.
 - **T2.4** (I3): every shipped theme passes every contrast floor, on `bg` **and** `bgElev`, recomputing the ratio from the shipped token rather than reading A01 A.1's recorded figure. A theme cannot ship failing its own rule, and the catalogue is an assertion this test upholds rather than a record of what someone intended.
@@ -387,6 +632,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.4** (with C03, L4): a theme switch causes **L4** to call `invalidate()`, producing a full repaint. A spy asserts C10 itself never calls the scheduler (I7).
 - **T4.5** (with C22, → C22 I40): `/theme light` persists and survives a restart. **The persistence is C22's**, not C10's: this component is a pure function over tokens, and a store reaching a disk from L1 is A03 MG23's neighbourhood. The row lives here because the *behaviour* is a theme behaviour, and it is asserted against two real sessions over one `stateDir` (C22 T1.19).
 - **T4.6** (with C22, → C22 I40): a corrupt persisted variant → base theme retained, notice committed, session opens normally. C20's repair-at-open precedent one component up; the notice is the half that stops "absent" and "corrupt" looking the same (C22 T1.19b).
+- **T4.35** (I27, with C23): `/theme high-contrast` on a three-theme session switches, and commits no usage notice. **The handler, the enum and the store on one path**, and the mutation pass is why it is not a store-level row: reading the variant against two literals passes every row that asks for one of those two names, which is every row that existed.
+- **T4.36** (I27, → C22 I40): a persisted `high-contrast` is restored, and a persisted name the set does not hold leaves the opening theme in place. **The only shape that separates a membership test from a literal pair**, since both names a literal knows are in the shipped set.
 
 ### Tier 5 — e2e
 
@@ -417,6 +664,12 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.18** (I22): checking the diff surfaces against `syntax` alone → T2.14b fails, and the gutter is unchecked on the surface it is drawn on.
 - **T6.19** (I21): letting `resolveBackground` accept a palette ref → T1.15 fails, and a tone is painted as a background with no floor measured for it.
 - **T6.20** (I2, I23): emitting a diff background at depth 1 → T1.16 fails, and the one signal a monochrome terminal cannot show becomes the one carrying the meaning.
+- **T6.21** (I25): widening the declaration to `"terminal" | <colour>` and painting that colour → T1.17 fails. **The revert every reader will propose**, because a colour reads as more expressive than a choice; what it buys is a theme that paints one value and proves its floor against another.
+- **T6.22** (I26): computing the 8-bit floor against the token's hex rather than against the quantised base → T1.19 fails. **Nothing else does**: both numbers clear on the shipped tokens, so this is invisible in results and visible only in which value the check was handed — I22's shape, one surface along.
+- **T6.23** (I25): applying `--no-bg` through `applyOverrides` → T1.17's identity assertion fails, the theme's serial moves, and a per-invocation flag becomes sticky in every cache keyed on identity.
+- **T6.24** (I27): declaring `/theme`'s `enum` values at module scope again → T2.22 fails, and a theme the session holds becomes a validation error. **The revert review cannot see**: the type change is visible in a diff and the enum is not, and every existing test asks for one of the two names a literal already has.
+- **T6.25** (I28): dropping the `variant`-against-`bg` pairing → T1.20 passes on a theme that lies about itself, and the field goes back to being a second record nothing checks.
+- **T6.26** (I28, §5a.4): restoring `VARIANTS` as a literal in the contrast suite → T2.23 fails. **Nothing else does**, which is the point: a third theme ships unchecked and eleven rows stay green.
 
 ---
 

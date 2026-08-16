@@ -17,6 +17,7 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
+import { b } from "../../src/shell/builders/index.js";
 
 /** The document used wherever a table needs to be patched. */
 function docWithTable(rows = 10): { document: ViewDocument; table: Table } {
@@ -197,7 +198,7 @@ describe("C04 validation", () => {
     expect(r.ok === false && r.error.join(" ")).not.toContain("cyclic");
   });
 
-  it("T1.16 (§3): a line plot without a height is a construction error", () => {
+  it("T1.19 (§3): a line plot without a height is a construction error", () => {
     expect(() =>
       block({ kind: "plot", id: "p", form: "line", series: [{ values: [1, 2] }] }),
     ).toThrow(BlockShapeError);
@@ -206,6 +207,61 @@ describe("C04 validation", () => {
       () => block({ kind: "plot", id: "p", form: "sparkline", series: [{ values: [1, 2] }] }),
       "a sparkline is always one row and takes no height",
     ).not.toThrow();
+  });
+
+  it("T1.20 (I42): a weight that means two things is a construction error", () => {
+    // **Four values in one row**, because the field's whole risk is a number
+    // that reads as meaningful and means two things. `0` is the one that
+    // matters: *not placed* is what omitting the child says, and *placed at one
+    // cell* is what `1` says, since the floor gives every placed child a column.
+    const two = [b.raw("a"), b.raw("b")];
+
+    for (const flex of [
+      [0, 1],
+      [-1, 1],
+      [Number.NaN, 1],
+      [Number.POSITIVE_INFINITY, 1],
+      // A cell count names columns, so a fraction and a zero are refused on the
+      // same argument: the grid has no reading for either (I44).
+      [{ cells: 0 }, 1],
+      [{ cells: 2.5 }, 1],
+      [{ cells: -3 }, 1],
+    ]) {
+      expect(() => b.group("row", two, { flex }), JSON.stringify(flex)).toThrow(TypeError);
+    }
+
+    // And a length mismatch, which is refused for a different reason: there is
+    // no reading to fall back on, and inferring the third weight would be the
+    // framework choosing a layout.
+    expect(() => b.group("row", two, { flex: [1] })).toThrow(TypeError);
+    expect(() => b.group("row", two, { flex: [1, 1, 1] })).toThrow(TypeError);
+
+    expect(() => b.group("row", two, { flex: [2, 1] }), "and a real pair does not").not.toThrow();
+
+    // **The validator refuses the same block**, because a document can arrive
+    // from a fixture or a far side with no constructor between (§4b) — and it
+    // refuses it on a `column` group too, where layout ignores the field: a
+    // wrong value is wrong wherever the block travels.
+    //
+    // **Asserted on the message rather than on `ok`, and the mutation pass is
+    // why.** The first version handed `validateDocument` a bare `{command,
+    // blocks}`, which is already invalid three ways over — no schema, no status,
+    // no meta — so `ok === false` held whatever `flex` did, and neutering the
+    // check failed nothing. A test that cannot construct the state it claims
+    // agrees with the defect.
+    const withFlex = (flex: readonly number[]): readonly string[] => {
+      const result = validateBlock({
+        kind: "group",
+        id: "g",
+        direction: "column",
+        children: [{ kind: "raw", id: "a", text: "x" }],
+        flex,
+      } as never);
+      return result.ok ? [] : result.error;
+    };
+
+    expect(withFlex([0]).join(" "), "a hand-built block with a zero weight").toContain("flex[0]");
+    expect(withFlex([1]), "and a real weight on a column group is accepted").toEqual([]);
   });
 
   it("T1.16b (I41): an unknown `yFormat` is a construction error, not a silent number", () => {
