@@ -282,6 +282,79 @@ density — or interpolate, which is inventing readings.
 **Rows that do not fit take I8's answer unchanged**: the rows that fit, and the last row of the
 plot area spent on `+N more · names`. The truncation marker *is* that line; there is no field.
 
+## 3c. The encoding rule — and the type is what enforces it
+
+**Both defects this arc were a ramp carried into a geometry it did not fit**: the heatmap took
+the sparkline's height ramp for a density field, and before that `sparkline` took `line`'s
+*filtered before scaling* and applied it to positions. Each was a correct rule from the arm next
+door. Each rendered.
+
+**A ramp is not a lookup table. It encodes a value along an axis**, and this component has four:
+
+```
+position   a dot drawn AT a coordinate       unicode line   — NO vocabulary at all
+height     how full the cell is, bottom-up   sparkline      — the cell IS a column
+density    how much ink the cell carries     heatmap        — a grid cell has no vertical axis
+fill       how much of a RUN is covered      value bar      — the run IS the axis
+```
+
+### `Ramp` does not fit `fill`, and that is the shape rather than an exception
+
+**A ladder maps one value to one glyph; a fill maps one value to a *count* of two glyphs.**
+Forcing one type over both would make `filled`/`empty` a two-step ramp, which is exactly the
+category error this section exists to prevent — a pair indexed like a ladder is a ladder with
+two rungs, and nothing would then stop a renderer indexing it with a normalised value.
+
+So the vocabulary has three shapes and the fourth axis has none:
+
+```
+Ladder   height · density    eight steps, indexed by a normalised value
+Pair     fill                filled · empty · absent, repeated to a count
+—        position            a coordinate needs no vocabulary
+```
+
+**`position` having none is the rule proving itself.** The unicode line reaches for no ramp
+because its axis is the grid; the moment a renderer of a positional form imports one, it is
+drawing a different picture.
+
+### A renderer names an axis, never a ramp
+
+```typescript
+type Encoding = "position" | "height" | "density" | "fill";
+
+ladderFor("density", caps)   // → a Ladder whose `encodes` is "density", by the type
+pairFor(caps)                // → the fill Pair
+```
+
+**The mismatch stops being expressible rather than being checked.** `LADDERS` is a mapped type
+over the axis, so an entry returning a ladder of the wrong axis does not compile — which makes
+the obvious mutation (*`ladderFor("density")` returns a height ramp*) **unspellable in the source
+rather than caught by a test.**
+
+**And a source scan forbids reading a ramp constant outside `ramp.ts`**, because importing
+`RAMP_BRAILLE` directly is the exact move that produced the defect. The scan is what stops the
+next renderer going round the seam.
+
+### `substitutes` is data, because unstated it is D5 again
+
+`RAMP_ASCII` serves **density** for the heatmap — ASCII has only ink, which is the heatmap's own
+axis — and **height** for the ASCII line, where it is a *stand-in*: ink weight for position,
+because ASCII has no vertical sub-cell resolution to offer. Both uses are correct and only one is
+an equivalence.
+
+So a ladder declares every axis it serves and names which of them it substitutes for:
+
+```
+RAMP_ASCII   encodes: ["density", "height"]   substitutes: ["height"]
+```
+
+A rule that permitted only one axis per ladder would refuse a correct thing, and a rule that
+permitted several without marking the stand-in would lose the distinction that cost two defects.
+**The cost of the substitution is stated where it is taken**: at ASCII a line and a filled area
+are hard to tell apart.
+
+---
+
 ## 4. Degenerate series
 
 Every one of these is real, and each has a defined result rather than an exception.
@@ -669,6 +742,7 @@ recast limit, and the golden set above.
 - **I18** — **A heatmap spends width on columns first, then truncates its labels, and never draws an unlabelled matrix.** Row labels are the ordinate: a matrix with no names beside it is a picture of numbers. Where the width cannot spare a cell for a label beside a minimum plot area the block draws a centred notice at its declared height instead — I1 holds, and the reader is told rather than shown something they cannot read. *The line form keeps T3.3's opposite ladder, because a y-label is a scale and a row label is an identity.*
 - **I19** — **The scale legend spans the full row and never truncates its range.** The dropped-column clause goes first and the ramp swatch second; the range is what the legend exists to state, and it is the reason `axes: false` is refused (C04 I50b). A key with no scale beside it is decoration.
 - **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, and an absent value draws a mark.** One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
+- **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density and fill are three encodings and `position` is a fourth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
 
 ---
 
@@ -691,6 +765,7 @@ recast limit, and the golden set above.
 15. **Width goes to columns before labels, and an unlabelled matrix is never drawn** — the opposite ladder from the line form, because a row label is an identity rather than a scale (I18, §3a).
 16. **The legend never truncates the range it exists to state** (I19, §3a).
 17. **A quantity against a scale is the `fill` encoding, drawn as a run whose number may exceed it** (I20, §3b).
+18. **A vocabulary carries its encoding axis and a renderer asks for an axis** — so the mismatch that cost two defects is unspellable rather than reviewable, and a stand-in is declared rather than commented (I21, §3c).
 
 ---
 
@@ -715,6 +790,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.12b** (C04 I41): `fraction` and `percent` on the **same value** produce different labels — `0.84` → `84%` and `1%`. The row a per-arm table cannot express: each arm alone is a restatement of its own rule, and the defect was that two arms meant one thing.
 - **T1.12c** (C04 I41): the two arms produce different `labelWidth`s for one range, so the gutter differs. `yFormat` is geometry; a test that only reads the label text passes against a renderer that measures the wrong set.
 - **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
+- **T1.28** (I21): every ladder's `encodes` matches the axis it is keyed under, and `RAMP_ASCII` declares both of its axes with `height` marked as the substitution — asserted over the table, because the property is of the vocabulary and not of a call.
+- **T1.29** (I21): `ladderFor` returns the axis it is asked for at every capability rung, and the fill pair is not reachable through it.
 - **T1.25** (I20): the fill clamps at `max` and the number does not — `101.2` of `100` fills the run and reads `101.2%`, and that frame differs from `100` of `100`.
 - **T1.26** (I20, C04 I50c): `value: null` draws a mark and not an empty run, and the two are asserted as a *difference* because an empty run is a legible value.
 - **T1.27** (I20): exactly `width` cells at every width including 1, and the run takes the residual after the number.
