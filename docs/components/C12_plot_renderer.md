@@ -35,7 +35,7 @@ const plotDefinition: BlockDefinition<Plot>;   // registered into C09
 
 /** One row of ramp glyphs. For C11's `Cell.spark` — see below. */
 function sparkline(
-  values: readonly number[],
+  values: readonly (number | null)[],   // `null` is a gap (C04 I46a)
   width: number,
   caps: Pick<TerminalCapabilities, "unicode">,
 ): string;
@@ -146,8 +146,13 @@ does not have.** (Its caption reads `63 ticks · 2s each · 1 returned nothing`;
 the ring comment's paraphrase of its own intent, and quoting that as the rendered text would be the same
 compression this section is about — caught one paragraph after writing it.)
 
-So there is **no public-type change here and the freeze argument dissolves**. What there was is a defect: the two
-forms of one block kind disagreed about the same array.
+What there was is a defect: the two forms of one block kind disagreed about the same array.
+
+**This section also concluded that no public-type change was owed, and §6a measured that and found otherwise.**
+The sentence above is right about memory and wrong about a *document*: C04 I46 refuses a non-finite element, and
+`JSON.stringify` writes `NaN` as `null`, so the spelling this section rules on is one no valid document may hold.
+`null` is the gap a document carries — see §6a, which is where the correction and its measurement live rather than
+here, because it was the heatmap's validator arm that turned it up.
 
 ```
 values  [1, 2, 3, NaN, 7, 8, 9]
@@ -216,7 +221,235 @@ Under `unicode: "ascii"`, braille is unavailable.
 | Sparkline | `▁▂▃▄▅▆▇█` | `.:-=+*#@` |
 | Axis rule | `└─│` | `+-\|` |
 
+**And a third arm, which is a width convention rather than a repertoire.** Under
+`ambiguousWidth: "wide"` the block ramp is two cells per glyph — C11 draws a sparkline into a
+table cell, so what breaks is every column after it — and the replacement is the braille density
+ramp `⡀⣀⣄⣤⣦⣶⣷⣿`, narrow under both conventions. **It fills from the bottom and its lowest step
+is one dot rather than none** (I16): the set it replaced began at `U+2800`, which draws as
+whitespace and is what the row's padding already means.
+
 **The cell grid is identical** — same width, same height, same measured rows (C09 §4, 1:1 by cell count). Only vertical resolution changes, from 4 subrows to 8 via the ramp, and horizontal from 2 dots per cell to 1. The plot gets blockier; nothing moves.
+
+---
+
+## 6a. The heatmap walk — the type, the table and the trace, before any code
+
+A matrix has **state and structure**, so it takes both artefacts. A sequence trace finds the
+interactions an event mediates; a classification table finds the ones that hold at rest with no
+event between them. Taking the trace alone because a polling ring looks like a state machine is
+how the structural half goes unexamined — which is C19's measured failure and the reason the
+artefact's shape is a decision rather than a consequence.
+
+**Both premises the walk was handed failed measurement, and in opposite directions.** Neither
+failure was findable from the chart; both came from reading the consumer and the validator.
+
+### The named consumer does not exist
+
+`CALCIUM_PLOT_PRIOR_ART.md`'s instalment names it: *the multi-container ring — `history.ts`
+accumulates a value per tick, and one container's CPU across ticks is one row of a matrix that
+has as many rows as there are containers.* At HEAD:
+
+| | measured |
+|---|---|
+| `createRing` call sites | **one** — `examples/docker/src/container.ts:288` |
+| what it is scoped to | `containerView(id)`, a single container, built inside the call |
+| what the dashboard keeps between ticks | **nothing** — its `render` reads the tick's snapshot alone |
+
+So the matrix has **one row and no mechanism for a second**. `history.ts` is per-container by
+construction, and the surface that sees every container is the one that keeps no history — which
+is gap 1 restated, unfilled, on the other surface.
+
+**This does not sink the heatmap; it re-orders the work.** What it removes is the ranking
+argument: the instalment placed the heatmap first on *a real consumer* plus *a freeze-relevant
+blocker*, and the consumer is proposed rather than existing. **A named consumer is an argument
+only if it can take the thing** — F161's shape, reached from the other side, and the third time
+the record has been checked against the tree and lost.
+
+### And the blocker is real after all, for a reason nobody had stated
+
+The previous commit ruled that `Series.values` already carries absence: `finiteSamples` keeps a
+non-finite value's index, the line breaks across it, and the sparkline draws `?`. That is true
+**in memory** and it is not true of a *document*, which is what the type actually is:
+
+```
+b.plot({ series: [{ values: [1, 2, NaN, 4] }] })   constructs — the constructor checks height and yFormat
+
+validateDocument(…)   blocks[0] (plot): series[0].values[2] is number —
+                      a numeric array holds finite numbers (C04 I46)
+
+JSON.stringify(…)     {"values":[1,2,null,4]}     the gap is already `null` on the wire, and
+                                                   `null` is not a member of `readonly number[]`
+```
+
+**C04 I46 refuses the value C12 I4 uses to mean absence**, and it is right to: `JSON.stringify`
+writes `NaN` as `null`, so a persisted gap reloads as a value the type says cannot be there.
+Both invariants are correct and their overlap is that **absence is expressible in the type and
+inexpressible in a valid, round-trippable document.**
+
+Three passes over one claim, and each was wrong in a different place:
+
+| | claim | verdict |
+|---|---|---|
+| the ring comment, the roadmap, the instalment | *the type has no gap value* | false — `NaN` renders correctly |
+| the previous commit | *the type carries absence, so the freeze argument dissolves* | false at the document boundary |
+| this walk | absence is representable in memory and **not in a document**; `null` is the only spelling JSON carries | measured |
+
+**So the nullable ordinate is owed, and for the reason the instalment did not give.** The
+remedy is one member: `readonly (number | null)[]`, with `null` the gap and `NaN`/`Infinity`
+still refused, because `null` survives a round trip and they do not. **Every consumer already
+agrees** — `Number.isFinite(null)` is `false`, so `finiteSamples`, `seriesRange` and
+`sparkline`'s filter treat it exactly as they treat `NaN` today, and the widening costs them
+nothing.
+
+**It also names a live defect neither document had stated**: the ring pushes `NaN` as of the
+previous commit, so `examples/docker` builds a document `validateDocument` refuses. It renders,
+because a constructed block never reaches the validator (C04 §3's standing reason, arriving as a
+consequence).
+
+### The row that decides the type
+
+**`form: "heatmap"` on `Plot`, with rows as `Series`** — not a block kind of its own. Measured
+rather than preferred:
+
+| what a matrix needs | what already exists |
+|---|---|
+| one range shared across rows — *the only thing that makes it a matrix and not a stack* | `seriesRange` computes over **every** series |
+| a row label that costs no plot row | §5's ruling; `seriesLabelWidth` sizes the column from the row labels, and `gutterSpans` draws them |
+| one strip per row | `stackedRows`, at strip height 1 |
+| a magnitude glyph per cell | `rampFor` — eight steps, and correct under both width conventions |
+| a declared height | `PlotGeometry` unchanged: `plotAreaRows` returns `height` and the row count is data |
+
+And `Plot`'s other fields survive the move rather than becoming dead: `yMin`/`yMax` pin the
+**colour** range, `yFormat` formats the legend, `xLabels` label the time axis.
+
+**Three refusals rather than three ignored members**, which is C04's established idiom in this
+exact type (`form: "line"` without `height` is a construction error, not a default):
+
+- **`tone` on a heatmap row** — magnitude owns the cell, so a per-row tone is a second colour
+  channel fighting the first. This is `Tone` being asked to carry a second axis, which is
+  roadmap 51's finding; refusing is what stops it recurring.
+- **`axes: false` on a heatmap** — see A4. The ramp legend is the only thing that says what a
+  cell *means*, and a heatmap without one is unreadable rather than plain.
+- **a ragged matrix** — see B2.
+
+---
+
+### 6a.1 — The classification table
+
+Structural: two rules that both hold at rest. Every row is a cell where two correct statements
+overlap; a row governed by one rule is a restatement of that rule and finds nothing.
+
+| | the two rules that meet | what the cell is | ruling |
+|---|---|---|---|
+| **A1** | I4 — absence keeps its position and draws a marker · §6 — the ramp's step 0 is the lowest reading | a zero cell beside an absent cell | the marker is `?` as in the sparkline, **and the ramp's lowest step must be visible** — see below |
+| **A2** | T3.3 — labels are dropped before the plot area is starved · a heatmap's row labels **are** its ordinate | a matrix narrower than its labels | the drop order **inverts**: columns go first (oldest), then labels are truncated, and an unlabelled matrix is never rendered |
+| **A3** | §4 — an all-non-finite series is treated as empty · I4 — a gap is a position | one row of a matrix, entirely absent | *treated as empty* is a property of the **block**, not of a row. A stopped container's row is a full-width row of markers; the empty message appears only when every row is absent |
+| **A4** | I3 — a constant range maps to the centre · a heatmap has no y-labels to say what the centre is | one value repeated across every cell | mid-step is right **and insufficient**: the block owes a **legend row** naming the range. Hence `axes: false` refused, and the legend is counted like an axis row — declared, data-independent, I1 safe |
+| **A5** | I1 — height is declared, never derived · I8 — a series that cannot be given a row is named, never dropped | more rows than the declared height | I8's answer, unchanged: the rows that fit, plus a legend naming the rest. **The "truncation marker" is that legend row and not a field** — §5's prose says *sets a truncation marker*, and the mechanism is a `warn`-toned line in `stackedRows`. Checked because a ruling that names an operation must name one that exists |
+| **A6** | §2 — the sparkline normalises over the window it shows · a matrix's cells must be comparable across rows | two rows of different magnitude | one range over the whole matrix. **This is the difference between a heatmap and N stacked sparklines**, and it is `seriesRange`'s existing behaviour rather than a new rule |
+| **A7** | C04 I50a — at most eight series, because the categorical palette distinguishes eight · a heatmap carries **no** per-row colour | a matrix of nine containers | the cap is a rule about **colour**, applied to the one form that has none. It must not bind here — a matrix of eight rows is not a matrix. The limit moves from *series count* to *series count where a per-series colour is drawn* |
+
+**A1's ruling found a shipped defect, and it is in neither form of the block.** `RAMP_BRAILLE`'s
+first step is `U+2800`, BRAILLE PATTERN BLANK — so on a terminal declaring `ambiguousWidth:
+"wide"`, **every sparkline draws its minimum as whitespace**:
+
+```
+sparkline([0, 5], 6, wide)   "    ⠀⣿"     20,20,20,20,2800,28ff
+                                  └────── four pad cells and one lowest reading, indistinguishable
+```
+
+Which is precisely the collision §4 spends a paragraph refusing for the absent case — *one
+character, two meanings* — arriving on the other arm, where a leading blank already means
+*fewer samples than cells*. The measurement also shows the ramp's ink is non-monotone: its
+populations are `0,1,2,3,4,5,6,8`, so the last step is a double jump. **The replacement fills
+from the bottom and every step is visible** — `⡀⣀⣄⣤⣦⣶⣷⣿`, populations `1..8`, all narrow under
+both conventions — which also reads like the block ramp it stands in for rather than like a blob.
+It matters twice over for a heatmap, whose whole subject is magnitude carried by a glyph: an
+idle row must not read as an absent one.
+
+**And the form switch is two-armed at four sites**, so a third member is absorbed in silence:
+
+```
+height.ts:45,51      form === "sparkline" ? 1 : …      a heatmap takes the line arm
+definition.ts:371    form === "sparkline" ? … : …      a heatmap renders as a curve
+construct.ts:88      form === "line" && height === undefined     a heatmap needs no height
+validate.ts:277      form must be "line" or "sparkline"          — the only one that fails closed
+```
+
+Three of four **fail open**, which is the `Set<Glyph>` literal again: a vocabulary widened where
+the consumer does not check exhaustively. The build makes the switch exhaustive, so the fourth
+member is a type error rather than a wrong picture.
+
+---
+
+### 6a.2 — The sequence trace
+
+Event-mediated: two rules that meet because something happened in between.
+
+**B1 — a row arrives after the frame.** A container starts, so the matrix gains a row.
+`plotHeight` reads `PlotGeometry` and cannot see `series`, so the height does not move — I1
+holds by construction, and the new row takes a slot or falls into A5's legend. What the trace
+adds is the half no invariant covers: **which** slot. Ruling — the renderer never sorts; row
+order is the app's, because a matrix whose rows reorder between frames is unreadable even though
+every frame is individually correct. That makes stable ordering the app's obligation, and the
+docker dashboard's is named: key rows by container id, not by docker's output order, which walk
+A3 already records as unstable across the two calls.
+
+**B2 — the ring's window slides under a rendered matrix.** Rings for different containers have
+different lengths: one started ten seconds ago has five samples, one running an hour has `cap`.
+`columnsOf` places a sample at `round((i / span) * (width − 1))` using **that series' own**
+`originalLength` — so a five-sample row is *stretched* across the full width and column `k`
+means a different instant in every row. **A matrix whose columns do not share an ordinate is not
+a matrix**, and nothing in the frame says so: it is arithmetically self-consistent and describes
+a different document than the one it holds.
+
+Ruling: **a ragged matrix is a construction error.** Padding is the alternative and the renderer
+cannot take it — it does not know which end is old, and padding the wrong end is invisible. The
+app pads, because the app knows.
+
+**B3 — a resize changes the cells per value.** The line plot spreads its samples across whatever
+width it gets; the sparkline windows to the last `width` (I13). A heatmap must window: one cell
+*is* one value, so spreading would either draw a value twice — a lie about density — or
+interpolate, which is inventing readings. Ruling: **window like a sparkline, never spread**, and
+the dropped columns are named in the legend rather than vanishing (I8's principle, and the same
+sentence as A5's). Uniform across rows, which is well defined only because B2 refused ragged
+input — the two rulings compose, and neither is sufficient alone.
+
+`capFor` is fixed at view open and cannot follow a resize (F24), so the app's window and the
+block's disagree after one. That is the app's existing limitation and the block's window is the
+one that decides the picture; recorded so it is not rediscovered as a heatmap defect.
+
+---
+
+### What the walk owes the golden set
+
+**Golden has been unchanged by three consecutive behaviour changes** — the continuation mark, the
+gapped series, the chip — and each time a frame had to be added deliberately. That is a corpus
+property with a cause, measured rather than inferred:
+
+```
+test/golden/blocks.test.ts   frames Object.values(ONE_PER_KIND)
+test/support/blocks.ts:24    ONE_PER_KIND: Readonly<Record<BlockKind, Block>>
+```
+
+**The corpus is exhaustive over kinds and holds exactly one state of each.** It answers *does
+this kind render* and can answer nothing about *which state it is in* — so a new state of an
+existing kind is invisible to it by construction, three times out of three. That is the
+suite-indexed-by-inputs failure in the one instrument that exists to catch what assertions
+cannot.
+
+So the heatmap's golden frames are part of its build rather than a pass after it, and the walk
+names them: **absent beside zero** (A1), **an all-absent row** (A3), **a constant matrix** with
+its legend (A4), **more rows than height** (A5), **narrow, where labels survive and columns go**
+(A2), and the three capability arms — ASCII, `ambiguousWidth: "wide"`, and `colourDepth: 1`,
+which for this form is not a degradation at all because the glyph was always the channel.
+
+### What lands now, and what lands with the build
+
+**Now**, because each is a defect or a published type and neither waits on a renderer: the
+nullable ordinate (`Series.values`, `Cell.spark`, C04 I46a, I4's wording), and the braille
+ramp. **With the build**: the form member, the three refusals, the exhaustive switch, A7's
+recast limit, and the golden set above.
 
 ---
 
@@ -225,7 +458,7 @@ Under `unicode: "ascii"`, braille is unavailable.
 - **I1** — Measured height is a function of the block alone, never of the data.
 - **I2** — Rasterisation is pure and total. No series input throws.
 - **I3** — No division by zero on a constant or single-point series.
-- **I4** — Non-finite values never reach the grid, and **their positions survive the filter, in both forms**. A gap is a position with no sample, so the line breaks across it and the sparkline draws its absent marker there — never a shorter row and never a closed gap. *The old wording was `filtered before scaling`, which is true of both forms and constrains only one: `finiteSamples` keeps the index and `sparkline` did not, so the sparkline satisfied the invariant exactly while spanning the gap the line broke across.*
+- **I4** — Non-finite values never reach the grid, and **their positions survive the filter, in both forms**. A gap is a position with no sample, so the line breaks across it and the sparkline draws its absent marker there — never a shorter row and never a closed gap. **A document spells a gap `null`** (C04 I46); `NaN` and `±Infinity` are refused at the boundary and still rendered as gaps here, because I2 says no series input throws and a fixture reaches the renderer without passing a validator. *The old wording was `filtered before scaling`, which is true of both forms and constrains only one: `finiteSamples` keeps the index and `sparkline` did not, so the sparkline satisfied the invariant exactly while spanning the gap the line broke across.*
 - **I5** — Downsampling preserves per-column minima and maxima. *Composition (§3): a column also keeps its first and last sample, because preserving only the extremes leaves I14 nothing to join.*
 - **I6** — At `colourDepth: 1`, multi-series plots stack; series are never distinguished by colour alone.
 - **I7** — Stacked strips sum to exactly `height`; series labels occupy the y-label column and consume no plot rows.
@@ -237,6 +470,7 @@ Under `unicode: "ascii"`, braille is unavailable.
 - **I13** — Sparklines are exactly one row, at every width including 1, **and one cell per position rather than per sample**. A window of eight positions is eight cells whether or not every position has a reading.
 - **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise. *Composition (§3): under downsampling the join runs from a column's last sample to the next column's first, which is what keeps I5's span-fill connected.*
 - **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`.
+- **I16** — **Every step of every ramp is visible, and no ramp's lowest step is the character its padding uses.** Eight steps, monotone in ink. The braille arm shipped with `U+2800` — BRAILLE PATTERN BLANK — as step 0, so a sparkline at `ambiguousWidth: "wide"` drew its minimum as whitespace, which the right-anchor already uses to mean *fewer samples than cells*: one character, two meanings, in the arm nothing renders in a golden frame. *This is a property of the constant, not of a call, so it is asserted over the ramps themselves.*
 
 ---
 
@@ -254,6 +488,7 @@ Under `unicode: "ascii"`, braille is unavailable.
 10. C12 holds no state and registers through the public mechanism (I11, I12).
 11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
 12. Y-labels are placed at the max, mid and min rows and collapse from the middle outward rather than overflowing a short plot (I15).
+13. **Every ramp step is visible and no ramp's lowest step is its padding character**, so a minimum reading never renders as absence (I16, §6).
 
 ---
 
@@ -278,6 +513,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.12b** (C04 I41): `fraction` and `percent` on the **same value** produce different labels — `0.84` → `84%` and `1%`. The row a per-arm table cannot express: each arm alone is a restatement of its own rule, and the defect was that two arms meant one thing.
 - **T1.12c** (C04 I41): the two arms produce different `labelWidth`s for one range, so the gutter differs. `yFormat` is geometry; a test that only reads the label text passes against a renderer that measures the wrong set.
 - **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
+- **T1.15** (I16): every ramp — Unicode, ASCII, braille — has eight steps, each visible, monotone in ink, and **no step equal to the pad character**. Asserted over the constants, because the defect is a property of the set rather than of a call: `sparkline([0, 5], 6, wide)` measured 6 cells and drew its minimum as whitespace, so every width and length row passed against it.
+- **T1.16** (I4, C04 I46): `null` is a gap in both forms — the line breaks across it and the sparkline marks it — and a series carrying `null` **round-trips through JSON unchanged**, which `NaN` does not. The row a fixture of `NaN` cannot express.
 - **T1.14**: pinned `yMin`/`yMax` override the computed range, and out-of-range points clamp to the edge rather than escaping the grid.
 
 ### Tier 2 — contract / interface
@@ -338,6 +575,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.8** (I13): a sparkline occupying two rows at some width → T1.13 fails, and every table row containing one shifts.
 - **T6.9**: dropping Bresenham for point-plotting → T1.4 fails and steep curves become dotted.
 - **T6.10** (I12): making `plot` a privileged built-in → T2.6 fails.
+- **T6.13** (I16): restoring `U+2800` as the braille ramp's first step → T1.15 fails, and every wide-terminal sparkline draws its minimum as padding.
+- **T6.14** (I4, C04 I46): narrowing `Series.values` back to `readonly number[]` → T1.16 fails, and a gap is expressible only as a value the validator refuses and JSON rewrites.
 
 ---
 

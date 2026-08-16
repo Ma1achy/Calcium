@@ -1138,6 +1138,24 @@ because the three alternatives all lie. A heatmap cannot take that route: an abs
 matrix is a position, not a sample that can be omitted, and every library that models one gives
 it a null (`HeatmapValue = string | number | null`).
 
+> **Corrected 2026-08-16 by C12 §6a's walk, and this entry was wrong in both halves.**
+>
+> **The consumer does not exist.** `createRing` has exactly one call site —
+> `examples/docker/src/container.ts:288`, inside `containerView(id)`, one container — and the
+> surface that sees every container keeps nothing between ticks. The matrix has one row and no
+> mechanism for a second. Making it real is a *dashboard* change (per-container rings keyed by
+> id), not a C12 one, and that is now the heatmap's first blocker rather than the type.
+>
+> **The blocker below is right and its reason is not.** `Series.values` carries absence in
+> memory perfectly well: `finiteSamples` keeps a non-finite value's index and the line breaks
+> across it. What it cannot do is carry it in a *document* — C04 I46 refuses a non-finite
+> element, and `JSON.stringify` writes `NaN` as `null` — so the nullable ordinate is owed for a
+> serialisation reason, not for want of a gap value. Two documents said the first thing, one
+> commit said the opposite, and the validator settled it.
+>
+> Left in place rather than rewritten, because the entry's conclusion survived and its argument
+> did not, and that distinction is the point.
+
 **So the heatmap is not a renderer bolted onto C12 — it needs a nullable ordinate**, which is a
 published-type change and therefore freeze-relevant, and which the plot has already paid for
 once in a workaround. That is the strongest argument in this section and it came from reading
