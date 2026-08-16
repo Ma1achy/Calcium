@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 import type { Block, Group, KeyValue, Notice, Plot } from "@fmx/calcium";
 import { parseNdjson } from "../src/ndjson.ts";
 import type { Row } from "../src/ndjson.ts";
-import { axisCaption, capFor, createRing, TICK_MS } from "../src/history.ts";
+import { axisCaption, capFor, createRing, createRingSet, TICK_MS } from "../src/history.ts";
 import {
   containerView,
   cpuBlock,
@@ -61,7 +61,7 @@ describe("gap 1: the ring keeps the history b.live does not", () => {
     // non-finite entry is a position with no reading, `finiteSamples` keeps its
     // index, and C12 I4 breaks the line across it. Dropping it made ninety
     // seconds of ticks render exactly like sixty.
-    expect(ring.values).toEqual([12, Number.NaN, 14]);
+    expect(ring.values).toEqual([12, null, 14]);
     expect(ring.missed).toBe(1);
     // The whole point of counting both: the compression is stated, not warned
     // about. A reader can check this sentence against the plot.
@@ -97,9 +97,9 @@ describe("gap 1: the ring keeps the history b.live does not", () => {
     // draw the container idling and it is not idling, it has stopped. But
     // *nothing* was the other error: it made the absence unrepresentable, so a
     // stopped container's stall was a shorter series rather than a visible gap.
-    // `NaN` is the third answer and it is neither.
+    // `null` is the third answer and it is neither (C04 I46a).
     expect(ring.values).not.toContain(0);
-    expect(ring.values).toEqual([Number.NaN]);
+    expect(ring.values).toEqual([null]);
     expect(ring.values.filter(Number.isFinite), "and still no reading").toEqual([]);
   });
 
@@ -181,7 +181,7 @@ describe("the CPU fold, driven directly", () => {
     expect(ring.missed).toBe(1);
     // A position, not a reading (C12 I4) — the plot draws the gap where the
     // stop happened rather than ending the line one sample early.
-    expect(ring.values).toEqual([Number.NaN]);
+    expect(ring.values).toEqual([null]);
     expect(ring.values.filter(Number.isFinite)).toEqual([]);
   });
 });
@@ -225,7 +225,7 @@ describe("S3's blocks", () => {
     const kinds = body.children.map((c) => c.kind);
     expect(kinds).toEqual(["plot", "notice", "notice"]);
     // The history survives the failure that made it worth looking at.
-    expect((body.children[0] as Plot).series[0]?.values).toEqual([10, 20, Number.NaN]);
+    expect((body.children[0] as Plot).series[0]?.values).toEqual([10, 20, null]);
     // And the caption now has something to report.
     expect((body.children[1] as Notice).text).toContain("1 returned nothing");
     expect((body.children[2] as Notice).text).toContain("No such container");
@@ -352,5 +352,67 @@ describe("S3's document", () => {
     expect(seriesCapOf(wide, 200)).toBe(true);
     expect(seriesCapOf(narrow, 60)).toBe(true);
     expect(capFor(200)).not.toBe(capFor(60));
+  });
+});
+
+describe("the ring set — one row per container, rectangular by construction", () => {
+  const reading = (pairs: readonly (readonly [string, number | null])[]) => new Map(pairs);
+
+  it("R1 (C12 §6a B2): every known container is ticked, present or not", () => {
+    // **A container missing from a snapshot is a gap in its row, not an absent
+    // row.** Dropping it would shorten one row against the others, and a shorter
+    // row is stretched to the common width by `columnsOf` — so column k would
+    // mean a different instant per row while every count still agreed.
+    const set = createRingSet(10);
+    set.tick(reading([["a", 1], ["b", 2]]));
+    set.tick(reading([["a", 3]])); // b vanished
+    set.tick(reading([["a", 5], ["b", 6]]));
+
+    expect(set.ids).toEqual(["a", "b"]);
+    expect(set.ring("a")?.values).toEqual([1, 3, 5]);
+    expect(set.ring("b")?.values, "the gap is where the container was not").toEqual([2, null, 6]);
+    expect(set.ring("b")?.missed, "and it is counted as well as placed").toBe(1);
+  });
+
+  it("R2 (C12 §6a B2): a container first seen at tick N is back-filled with N gaps", () => {
+    // **Back-filled before the tick, not after.** A ring created empty three
+    // ticks in is three samples short of every other row for the rest of the
+    // session — and that renders, at the wrong density, against a shared axis.
+    const set = createRingSet(10);
+    set.tick(reading([["a", 1]]));
+    set.tick(reading([["a", 2]]));
+    set.tick(reading([["a", 3], ["late", 9]]));
+
+    expect(set.ring("late")?.values).toEqual([null, null, 9]);
+    // The property the matrix rests on, asserted as a property rather than by
+    // reading the two rows above: every row is the same length, always.
+    const lengths = new Set(set.ids.map((id) => set.ring(id)?.values.length));
+    expect(lengths, "one length across every row").toEqual(new Set([3]));
+    expect(set.ticks).toBe(3);
+  });
+
+  it("R3: a stopped container keeps its row until the view closes", () => {
+    // A row that disappears renumbers the ordinate under the reader. What a
+    // stopped container looks like on a machine's heatmap is a row of absences,
+    // and that is the honest picture rather than a missing one.
+    const set = createRingSet(10);
+    set.tick(reading([["gone", 4]]));
+    for (let i = 0; i < 3; i += 1) set.tick(reading([]));
+
+    expect(set.ids).toEqual(["gone"]);
+    expect(set.ring("gone")?.values).toEqual([4, null, null, null]);
+    expect(set.ring("gone")?.ticks, "it is still being ticked").toBe(4);
+  });
+
+  it("R4: the cap applies per row, so the matrix stays rectangular as it slides", () => {
+    // The window slides under every row at once, because every row takes exactly
+    // one sample per tick. Without that the cap would trim rows at different
+    // moments and the rectangle would come apart at the oldest end.
+    const set = createRingSet(3);
+    for (let i = 0; i < 5; i += 1) set.tick(reading([["a", i], ["b", i * 10]]));
+
+    expect(set.ring("a")?.values).toEqual([2, 3, 4]);
+    expect(set.ring("b")?.values).toEqual([20, 30, 40]);
+    expect(set.ticks, "the tick count is the session's, not the window's").toBe(5);
   });
 });

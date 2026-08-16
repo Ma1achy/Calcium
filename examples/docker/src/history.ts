@@ -140,6 +140,92 @@ export function createRing(cap: number): Ring {
 }
 
 /**
+ * One ring per container, and the rows stay rectangular by construction.
+ *
+ * **The dashboard is the surface that sees every container and keeps nothing**:
+ * `b.live`'s `render` reads the tick's snapshot alone, which is gap 1 unfilled
+ * on the other surface. `container.ts` fills it for one container; this fills it
+ * for all of them, and one container's CPU across ticks is one row of a matrix
+ * with as many rows as there are containers.
+ *
+ * **Every known container is ticked, present or not** (C12 §6a B2). A container
+ * that vanishes from a snapshot takes a `null` rather than dropping out, and a
+ * container first seen at tick 40 is back-filled with 39 of them — so **column k
+ * is tick k in every row**, which is what makes the set a matrix rather than a
+ * stack of unrelated series.
+ *
+ * That is not tidiness. `columnsOf` places a sample at `round((i / span) * (w −
+ * 1))` using *that series' own* length, so ragged rows would be stretched to a
+ * common width and column k would mean a different instant in every one —
+ * arithmetically self-consistent, and describing a different thing than it
+ * holds. Padding is the only fix and only the app can do it, because only the
+ * app knows which end is old.
+ *
+ * **Nothing is ever forgotten.** A stopped container keeps its row of absences
+ * until the view closes: that is what a heatmap of a machine looks like, and a
+ * row that disappears renumbers the ordinate under the reader.
+ */
+export interface RingSet {
+  /**
+   * One tick's readings, keyed by container id. Absent from the map and present
+   * with a `null` are the same thing here — *no reading* — because they are the
+   * same thing to a reader, and the ring counts both as missed.
+   */
+  tick(readings: ReadonlyMap<string, number | null>): void;
+  /** Ids in first-seen order, which is the order the rows are in. */
+  readonly ids: readonly string[];
+  /** The ring for an id, or `undefined` if it has never been seen. */
+  ring(id: string): Ring | undefined;
+  /** Ticks taken. Every ring has had exactly this many samples pushed. */
+  readonly ticks: number;
+}
+
+export function createRingSet(cap: number): RingSet {
+  const rings = new Map<string, Ring>();
+  const order: string[] = [];
+  let ticks = 0;
+
+  return {
+    tick(readings) {
+      // **New ids are back-filled before the tick, not after.** A ring created
+      // empty at tick 40 would be 39 samples short of every other row for the
+      // rest of the session, and the stretch that produces is invisible in every
+      // number — the row renders, at the wrong density, against a shared axis.
+      for (const id of readings.keys()) {
+        if (rings.has(id)) continue;
+        const fresh = createRing(cap);
+        for (let i = 0; i < ticks; i += 1) {
+          fresh.began();
+          fresh.took(null);
+        }
+        rings.set(id, fresh);
+        order.push(id);
+      }
+
+      // **Every known ring, not every reading.** A container missing from this
+      // snapshot is a container that produced nothing, which is a gap in its row
+      // and not an absence of row.
+      for (const id of order) {
+        const ring = rings.get(id);
+        if (ring === undefined) continue;
+        ring.began();
+        ring.took(readings.get(id) ?? null);
+      }
+      ticks += 1;
+    },
+    get ids() {
+      return order;
+    },
+    ring(id) {
+      return rings.get(id);
+    },
+    get ticks() {
+      return ticks;
+    },
+  };
+}
+
+/**
  * The axis, said in the only units that are true.
  *
  * **Not `-60s ──── now`**, which is what S02's drawing has and what a reader

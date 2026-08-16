@@ -28,6 +28,7 @@ import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone, ViewDocume
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
+import { capFor, createRingSet } from "./history.ts";
 
 import type { LocalContext, ProducerContext } from "@fmx/calcium";
 const run = promisify(execFile);
@@ -418,6 +419,28 @@ export function dashboard(
   const stopped = all.filter((c) => !isLive(c));
 
   /**
+   * **The history the panel does not keep** — gap 1, on the surface that sees
+   * every container rather than the one that sees a single one.
+   *
+   * Built **inside this call** for `container.ts`'s reason (walk A1): at module
+   * scope the buffer outlives the view, and a second `/dashboard` would inherit
+   * the first's history as its own — silently, with every assertion passing.
+   *
+   * Fed from `render`, which is the only place a tick is observable. `fetch`
+   * returns data and `render` turns it into a block; there is no seam between
+   * them, so the fold lives in the one that runs per tick.
+   */
+  const rings = createRingSet(capFor(width));
+  const takeTick = (s: Snapshot): void => {
+    // **Every joined container, not every measured one.** `stats` cannot see a
+    // stopped container at all, so keying off it would drop a row the moment its
+    // container stopped — walk A3's ruling, and the reason a row of absences is
+    // the honest picture rather than a missing row (C12 §6a B1).
+    rings.tick(new Map(join(s).map((c) => [c.id, c.cpu] as const)));
+  };
+  takeTick(snap);
+
+  /**
    * **The banner is chrome and is chosen here**, at document-build time, from a
    * width the app had to read itself and a capability the app had to decide
    * itself (F14, F43).
@@ -445,6 +468,12 @@ export function dashboard(
         fetch: fetchSnapshot,
         render: (data) => {
           const s = data as Snapshot;
+          // **The side effect is here and it is deliberate.** A tick is only
+          // observable at the moment the part re-renders, so the accumulation
+          // hangs off the one function that runs per tick — the same shape
+          // `cpuFold` has, and the same reason: one shared `fetch` between two
+          // parts would stop the ring silently.
+          takeTick(s);
           return livePanelBody(join(s).filter(isLive), unicode);
         },
         // **Without this the first frame says `loading…` for two seconds**, and
