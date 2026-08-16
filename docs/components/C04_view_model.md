@@ -647,6 +647,90 @@ decidable from a document: two chips reading `web` and `db`, toned `ok` and `err
 check and mean nothing without the colour. **Expressibility is C04's to fix; decidability is
 nobody's.** A glyph slot makes D29 satisfiable, never satisfied.
 
+### A label and a quantity — where `keyValue` ends and `table` begins
+
+**The question a workaround asked.** `examples/docker`'s `ioBlock` builds a `keyValue` whose
+`MEM` value is a hand-drawn bar interpolated into a string, one level along from the workaround
+`Cell.bar` closed. Either a `keyValue` row can hold a quantity, or that site is a `table` and
+the bar is a cell.
+
+**Measured before ruling, because the two shapes are told apart by the data and not by the
+picture.**
+
+| | what the rows are | verdict |
+|---|---|---|
+| docker's `ioBlock` | `MEM` a percentage · `NET` and `BLK` byte pairs · `PIDS` a count | four attributes of **one** container |
+| S13's `cluster` panel | `nodes 12 (8 GPU)` · `gpu util 71% ██████░░░` · `pods 342` | some rows carry a bar and some do not |
+| the dashboard's container list | one row per container, every row the same fields | **a table**, and it is already one |
+
+**A column is a claim that its cells are one kind**, which is what `align`, `sortable` and a
+shared `minWidth` all rest on. A column holding a bar, a byte pair and a count has no single
+alignment and nothing to sort by, so expressing either panel as a two-column `table` would be a
+`keyValue` carrying `ColumnDef`'s ceremony to say something the ceremony contradicts.
+
+> **A `keyValue` row may carry a quantity.** It is one label and one value, and the value being
+> a number against a scale rather than a string is not a change of kind.
+
+**Two consumers, which is what makes it a rule rather than a request** — and they were found by
+looking rather than assumed, after three claims of an existing consumer failed the same check
+this session.
+
+### The `keyValue` bar is not `Cell`'s bar, and the frame is what says so
+
+**`Cell.bar` replaces the cell's text and takes the planned width** (I50c). Copying that seam
+here loses information at both measured sites: docker's row reads `████░░░░ 45.2%  1.2GiB /
+4GiB` and S13's `71%  ██████░░░`, and in each the bar sits **beside** a text rather than
+instead of one. So the row keeps `value` and gains the bar next to it.
+
+**And the width is declared rather than residual, which is the finding under the finding.** A
+`keyValue` value column is everything the label leaves — 74 cells at a width of 80 — and
+`valueBar` at that width draws a 68-cell run, which is arithmetically correct and a picture
+nobody wants. Both consumers picked a width by hand (docker 14 cells, S13 nine and twenty) and
+S13 §7 specifies **shortening its bars at 80–99 columns**, so the width is a thing a surface
+says and then a thing that responds to the region.
+
+**It is declared on the row and not on `BarSpec`, because `BarSpec` is shared with `Cell` where
+the column already supplies it.** A width on the spec would give a table cell two sources for
+one number, which is the audit's D6 — one ruling, two behaviours — arriving before the code
+that would have to reconcile them.
+
+> **A `keyValue` row's bar declares the cells it occupies; the value text takes the rest.** In a
+> `table` the column declares it and the spec does not, and the difference is that a column is
+> a width and a `keyValue` value is a remainder.
+
+**Where the number goes is already settled and needs no member.** `valueBar` draws the run and
+then its number, so a row supplies the bar and leaves `value` for the *detail* beside it —
+docker's `1.2GiB / 4GiB`, which is the scale in absolute units. S13's figure prints the number
+to the left of its run, and that is the same information in the order `valueBar` already ruled
+on (C12 §3b); it is not a second placement rule and the type does not gain one.
+
+### What widens `Plot`, and what would be a sibling
+
+**`yFormat` is the precedent and it states the test**: a format that changes a label's width
+changes the gutter, so it changes the plot area — geometry, in a member that reads like
+styling. Applied to the config record's remaining candidates:
+
+| candidate | changes the area? | ruling |
+|---|---|---|
+| **title** | occupies a row above; `height` is declared, so the area loses one | **`Plot`** |
+| **caption** | a row below, same arithmetic | **`Plot`** |
+| **legend position** | a row (top/bottom) or a gutter (left/right); `none` is its absence | **`Plot`** |
+| **tick maxima** | the tick count decides how many y-labels, and their width **is** the gutter | **`Plot`** — and it is the two-pass cycle's input |
+| **x formatter** | `yFormat`'s argument on the other axis: a label's width decides tick density | **`Plot`** |
+| **explicit range** | already built — `yMin` and `yMax` (I29) | **nothing to do**, and stated so a second spelling is not added |
+
+**Every candidate passes, and a test that admits everything constrains nothing** — so the
+falsifier is stated rather than left implied. These fail it: a title's **alignment**, a series'
+**tone**, a bar's **glyph style** (roadmap 51), a heatmap's **colormap**. Each changes what the
+reader sees and no cell of the layout, and each already belongs to C10 or to the block that
+draws it. So the sibling category is real and, over this list, **empty** — the config record is
+geometry throughout, which is the answer rather than a failure to find one.
+
+**None of the five members lands here.** MG24 refuses a published member nothing consumes, and
+five fields with no renderer are five phantoms of exactly the kind this pass was called to stop
+producing. The ruling is taken so that whoever writes the renderer does not re-derive it; the
+members arrive with their first surface.
+
 ### Actions
 
 ```typescript
@@ -1062,6 +1146,7 @@ persisted document rests on.
 - **I50a** — **A plot carries at most eight series, refused at construction** (roadmap 51). The categorical palette distinguishes eight, and the ninth used to reuse the first's colour — `SERIES_TONES[index % 4]`, which said two different series were one thing and, at four, said series three was `ok` and series four `warn` when neither carried a judgement. **D29 inverted**: information that is not there, carried by colour alone. Refused rather than cycled for C04 I47's reason exactly — a reader cannot see that a colour has been reused, so a rendering that lies is worse than a document that will not build. Both gates say it: `b.plot` throws and `validateBlock` reports. **The cap is a property of the declared `form`, not of the number of series** — C12 §6a A7 is where that was forced, and it is a recast rather than an exception. A `heatmap` carries magnitude in the ramp glyph and draws **no per-row colour at any depth**, so the rule has no subject there and does not bind: a matrix of eight rows is not a matrix, and capping one at the size of a palette it never reads would be a colour rule refusing a document about something else. `line` and `sparkline` keep it **unconditionally**, including the 1-bit case where a multi-series plot stacks and distinguishes spatially: construction cannot see the colour depth, and a document that renders honestly only at one depth is not a document this type should accept. That asymmetry is the whole content of the recast — the heatmap is exempt because the palette is never consulted, not because the picture happens to survive.
 - **I50b** — **A `heatmap` refuses a row `tone`, `axes: false`, and a ragged matrix, and requires a `height`.** Three affordances with no meaning for a matrix, refused rather than ignored — because a member that means nothing in one arm is indistinguishable from one that has not been implemented yet, and the reader who finds it cannot tell which. **The ragged case is the one an app hits by accident**: rings of different ages produce rows of different lengths, and the resulting picture is self-consistent and wrong, so the refusal is what makes column `k` mean tick `k` in every row. Both gates say it: `b.plot` throws and `validateBlock` reports. *C12 §6a A4, B1 and B2 carry the arguments; C12 I17 is what the renderer then guarantees.*
 - **I50c** — **A cell carries at most one of `spark` and `bar`, and a `bar` declares a scale it may exceed.** Both fill the planned width and return before truncation, so a cell holding both has two renderings and no rule for which wins. `max` is the scale's top rather than a bound on the value: the fill clamps there and the number does not (C09 I28), because a ceiling that is not knowable — a per-core CPU percentage, a quota that can be over-committed — is the case a bar is reached for. **`value: null` is absent and draws a mark**, never an empty bar, which would read as *zero* (C12 I4's rule, in the one form where an empty run is a legible value).
+- **I51** — **A `keyValue` row may carry a `bar`, which sits *beside* its value and declares the cells it occupies.** Two shipped surfaces draw one — docker's `MEM` and S13's cluster panel — and in both the bar has a text next to it rather than in place of one, so this is not `Cell.bar`'s seam (I50c) with a different owner. The width is on the row because a `keyValue` value column is a **remainder** and a table column is a **width**: `valueBar` given the whole remainder draws a 68-cell run at a terminal width of 80, correct in every count and a picture no surface asked for. It is not on `BarSpec`, which `Cell` shares and where the column already answers — two sources for one number is the audit's D6 before the code exists to have it. **A bar with no room left is the bar, not the text**: below `MIN_RUN` the row is what `valueBar` returns for a cell that narrow, because the quantity is why the row carries a bar at all.
 
 ---
 
@@ -1119,6 +1204,7 @@ persisted document rests on.
 46. **A bounded region says what it is hiding** — both directions, one row, and the row is spent on a property of the block rather than of the view (I49, §3c).
 49. **`null` is a gap in a numeric array** — the one non-number a document may carry in a numeric position, because it is the only spelling of *no reading* that survives the round trip the serialiser already performs (I46a, C12 §6a).
 51. **A quantity against a scale is not progress toward a total** — `Cell.bar` draws the first and `progress` the second, and an app that had only the second hand-wrote the first (I50c, FINDINGS gap 3).
+52. **A label and a quantity is a `keyValue` row, not a two-column table** — a column claims its cells are one kind, and a panel whose rows are a percentage, a byte pair and a count has nothing to align or sort by. The bar sits beside the value and declares its own width, because a `keyValue` value is a remainder where a column is a width (I51).
 48. **A plot carries at most eight series** — the categorical palette's size, refused at construction rather than cycled, because a repeated colour is a segmentation that lies (I50a, roadmap 51).
 50. **A heatmap refuses what has no meaning for a matrix** — a row tone, `axes: false`, and rows of differing length — rather than ignoring it, because an ignored member reads as one not yet implemented (I50b, C12 §6a).
 47. **A copy is not bounded by the box that hides it** — the container's `copy` is its children's sources joined, unchanged by the offset, and a kind with no expressible source contributes nothing rather than its rendering (I50, §3c).
