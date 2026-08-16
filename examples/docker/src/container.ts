@@ -24,7 +24,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
 import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
-import { percent } from "./dashboard.ts";
+import { BUSY, HOT, percent } from "./dashboard.ts";
 
 /**
  * The cells `MEM`'s bar occupies (C04 I51).
@@ -123,6 +123,23 @@ export function cpuBlock(ring: Ring, trouble?: Block, unicode = true): Block {
          * one, which is the finding walk A4 already ruled against for the bar.
          */
         yMin: 0,
+        /**
+         * **The thresholds the table already classifies by, on the axis** (C04
+         * I52). `loadTone` turns 60 and 85 into a cell's tone and glyph, so the
+         * *numbers* were already the app's judgement and the plot was the one
+         * surface that could not show them: a reader watching the curve had no
+         * way to see where busy begins.
+         *
+         * A band rather than two lines because it is one statement, and dashed
+         * rather than toned because at one bit the tone is all that would be
+         * left — F34, and the reason annotations are cheap in a terminal.
+         *
+         * **The ceiling is still unpinned**, so on an eight-core host running at
+         * 780% the band sits low and correctly says so. An annotation outside
+         * the range is dropped rather than clamped, which is why this is safe to
+         * declare unconditionally.
+         */
+        annotations: [{ kind: "band", from: BUSY, to: HOT, tone: "warn" }],
       }),
       b.notice("muted", axisCaption(ring, unicode), undefined, { id: "cpu-axis" }),
       ...(trouble === undefined ? [] : [trouble]),

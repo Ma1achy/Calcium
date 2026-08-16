@@ -28,6 +28,7 @@ import { cells, truncate } from "../text.js";
 import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
 import { labelWidth, niceAxis, ticksFor, xLabelRow, yLabels } from "./axes.js";
+import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { ladderFor } from "./ramp.js";
 import { formatValue } from "./axes.js";
@@ -307,10 +308,20 @@ function overlaidRows(
   const labels =
     layout.labelColumn === 0 ? [] : yLabels(range, layout.areaRows, block.yFormat, block);
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
-  const layers: readonly Layer[] = block.series.map((s, index) => ({
-    glyphRows: curveRows(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
-    ref: refOf(s, index),
-  }));
+  // **Annotations last, and the order is the ruling** (C04 I52). Layers resolve
+  // first-non-blank, so anything appended here is drawn *behind* every series —
+  // a reference line that overwrote a sample would hide the thing it exists to
+  // be compared against.
+  const layers: readonly Layer[] = [
+    ...block.series.map((s, index) => ({
+      glyphRows: curveRows(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
+      ref: refOf(s, index),
+    })),
+    ...(block.annotations ?? []).map((a) => ({
+      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
+      ref: `tone.${a.tone ?? "muted"}` as ColourRef,
+    })),
+  ];
 
   return Array.from({ length: layout.areaRows }, (_, i) =>
     line(

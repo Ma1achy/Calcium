@@ -358,9 +358,10 @@ function plot(
     yMin?: number;
     yMax?: number;
     yFormat?: Plot["yFormat"];
+    annotations?: Plot["annotations"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat } = spec;
+  const { series, height, axes, yMin, yMax, yFormat, annotations } = spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
   // author finds out and the validator is where an untrusted document does.
@@ -381,6 +382,7 @@ function plot(
       ...(yMin === undefined ? {} : { yMin }),
       ...(yMax === undefined ? {} : { yMax }),
       ...(yFormat === undefined ? {} : { yFormat }),
+      ...(annotations === undefined ? {} : { annotations }),
     } as Plot,
     spec,
     true,

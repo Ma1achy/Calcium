@@ -186,6 +186,44 @@ export const STATES: readonly StateFixture[] = Object.freeze([
       ),
   },
   {
+    name: "plot-annotated",
+    of: "plot",
+    why:
+      "an annotation must not read as data, and every way of getting that wrong renders — a " +
+      "solid line is a flat series, a ramp-folded one is heavier than the curve, and a clamped " +
+      "edge names a limit that is somewhere else. None is visible to a count (C12 I23)",
+    rows: (w, caps, theme) =>
+      measurable({ definitions: [plotDefinition], theme, capabilities: caps }).renderToLines(
+        block({
+          kind: "plot",
+          id: "st-ann",
+          form: "line",
+          height: 8,
+          axes: true,
+          yMin: 0,
+          yMax: 100,
+          yFormat: "percent",
+          series: [
+            {
+              values: Array.from({ length: 48 }, (_, i) =>
+                12 + 78 * (0.5 - 0.5 * Math.cos((i / 47) * Math.PI * 2))),
+              label: "CPU %",
+              tone: "ok",
+            },
+          ],
+          annotations: [
+            // The band docker declares, and a line at a ceiling the data crosses.
+            { kind: "band", from: 60, to: 85, tone: "warn" },
+            { kind: "line", value: 95, tone: "error" },
+            // And one off the scale, which must draw nothing rather than a line
+            // at the top saying the limit is there.
+            { kind: "line", value: 400, tone: "error" },
+          ],
+        }),
+        w,
+      ),
+  },
+  {
     name: "kv-value-bar",
     of: "keyValue",
     why:

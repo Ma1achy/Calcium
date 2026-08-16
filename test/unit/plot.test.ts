@@ -30,8 +30,8 @@ import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presenta
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { valueBar } from "../../src/presentation/plot/bar.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
-import { block, type Plot } from "../../src/data/viewmodel/index.js";
-import { DARK_THEME, measurable } from "../support/render.js";
+import { block, validateBlock, type Plot } from "../../src/data/viewmodel/index.js";
+import { DARK_THEME, measurable, visible } from "../support/render.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
 import { cells } from "../../src/presentation/text.js";
 import { lossCurve } from "../support/blocks.js";
@@ -440,6 +440,136 @@ describe("C12 tier 1 — labels", () => {
     const row = xLabelRow(["epoch 0", "epoch 20", "now"], 22, FULL_CAPS);
     expect(row).not.toContain("0epoch");
     expect(row.length).toBeLessThanOrEqual(22);
+  });
+});
+
+describe("C12 I23 — annotations", () => {
+  const kit = (caps = FULL_CAPS): ReturnType<typeof measurable> =>
+    measurable({ definitions: [plotDefinition as never], capabilities: caps });
+
+  const plotWith = (annotations: unknown[]): ReturnType<typeof block> =>
+    block({
+      kind: "plot",
+      id: "ann",
+      form: "line",
+      height: 8,
+      axes: true,
+      yMin: 0,
+      yMax: 100,
+      series: [{ values: [10, 20, 30, 40, 50, 60, 70, 80] }],
+      annotations,
+    } as never);
+
+  it("T1.30 (I23): an annotation is dashed, so it is not a series at any depth", () => {
+    // **The carrier is shape, not tone** (F34). Asserted as a *difference*
+    // between the annotated and unannotated frames rather than against a glyph:
+    // each frame alone is a plausible plot, and the defect this refuses is one
+    // that reads as data.
+    const bare = kit().renderToLines(plotWith([]), 50).map(visible);
+    const lined = kit().renderToLines(plotWith([{ kind: "line", value: 50 }]), 50).map(visible);
+
+    expect(lined).not.toEqual(bare);
+    expect(lined).toHaveLength(bare.length);
+
+    // **The cells the annotation added, not the row it is on.** The first
+    // version matched `/\S\s\S/` against the whole row and the *gutter*
+    // satisfies it — `100% │` is a non-blank, a blank and a non-blank — so a
+    // solid line passed and the mutation was caught by a golden frame instead.
+    // A row is three things; only one of them is the subject.
+    const marks: number[] = [];
+    lined.forEach((row, i) => {
+      [...row].forEach((ch, x) => {
+        if (ch !== ([...(bare[i] ?? "")][x] ?? " ") && ch.trim() !== "") marks.push(x);
+      });
+    });
+    expect(marks.length, "the line is drawn").toBeGreaterThan(2);
+    const gaps = marks.slice(1).map((x, i) => x - (marks[i] ?? 0));
+    expect(
+      gaps.every((g) => g > 1),
+      `a dashed line leaves a cell between its marks — columns ${marks.join(",")}`,
+    ).toBe(true);
+  });
+
+  it("T1.30 (I23): a band is two lines, and it is one statement", () => {
+    const band = kit().renderToLines(plotWith([{ kind: "band", from: 25, to: 75 }]), 50).map(visible);
+    const bare = kit().renderToLines(plotWith([]), 50).map(visible);
+    const changed = band.filter((l, i) => l !== bare[i]);
+    expect(changed, "two edges, and no fill between them").toHaveLength(2);
+
+    // And the same two rows a pair of lines would produce — the band is not a
+    // second mechanism, which is what makes six chart types folds of two kinds.
+    const pair = kit()
+      .renderToLines(plotWith([{ kind: "line", value: 25 }, { kind: "line", value: 75 }]), 50)
+      .map(visible);
+    expect(band).toEqual(pair);
+  });
+
+  it("T1.30 (I23, C04 I29): an edge off the scale is dropped, never clamped", () => {
+    // **The one place an annotation differs from a sample.** C04 I29 clamps data
+    // because pressing it against a ceiling is honest; a claim about *where* a
+    // value sits, moved onto a scale it is outside, says the limit is somewhere
+    // it is not.
+    const bare = kit().renderToLines(plotWith([]), 50).map(visible);
+    const outside = kit().renderToLines(plotWith([{ kind: "line", value: 500 }]), 50).map(visible);
+    expect(outside, "nothing is drawn, and nothing is drawn at the ceiling").toEqual(bare);
+  });
+
+  it("T1.30 (I23): annotations are drawn behind every series", () => {
+    // A reference line that overwrote a sample would hide the thing it exists
+    // to be compared against. Layers resolve first-non-blank, so this is an
+    // assertion about the order they are appended in.
+    const flat = {
+      kind: "plot" as const, id: "dense", form: "line" as const, height: 4, axes: false,
+      yMin: 0, yMax: 1,
+      series: [{ values: Array.from({ length: 60 }, () => 0.5) }],
+    };
+    const withLine = kit()
+      .renderToLines(block({ ...flat, annotations: [{ kind: "line", value: 0.5 }] } as never), 40)
+      .map(visible);
+    const withoutLine = kit().renderToLines(block(flat as never), 40).map(visible);
+    expect(withLine, "a flat series on the annotation's own row wins every cell").toEqual(
+      withoutLine,
+    );
+  });
+
+  it("T1.30 (I23): at ascii the line is cell resolution, and not the ramp fold", () => {
+    // **Read from a frame.** `foldRamp` encodes height — a declared stand-in for
+    // position (I21) — so a one-dot annotation folded by ink weight came out as
+    // `# # # #`, heavier than the curve beside it and indistinguishable from a
+    // flat series.
+    // **The cells the annotation added**, not a whole row — a row carries the
+    // axis rule and the curve, so asserting on it tests those too and the first
+    // version did exactly that.
+    const bare = kit(ASCII_CAPS).renderToLines(plotWith([]), 50).map(visible);
+    const lined = kit(ASCII_CAPS)
+      .renderToLines(plotWith([{ kind: "line", value: 100 }]), 50)
+      .map(visible);
+
+    const added = new Set<string>();
+    lined.forEach((row, i) => {
+      [...row].forEach((ch, x) => {
+        if (ch !== ([...(bare[i] ?? "")][x] ?? " ") && ch.trim() !== "") added.add(ch);
+      });
+    });
+    expect([...added], "a dash, and nothing from the height ramp").toEqual(["-"]);
+  });
+
+  it("T1.30 (C04 I52): a band's edges are finite and ordered, or it is not a document", () => {
+    const bad = (annotations: unknown[]): readonly string[] => {
+      const v = validateBlock(plotWith(annotations));
+      return v.ok ? [] : v.error;
+    };
+    expect(bad([{ kind: "band", from: 85, to: 60 }]).join(" ")).toContain("above");
+    expect(bad([{ kind: "line", value: Number.NaN }]).join(" ")).toContain("finite");
+    expect(bad([{ kind: "band", from: 0, to: 10 }]), "a good one passes").toEqual([]);
+
+    // **And the series check still runs**, which is what the extracted helper is
+    // for: written as a guard at the top of `plot` it returned early for every
+    // plot carrying no annotation — deleting the validation below it.
+    const noAnnotations = block({
+      kind: "plot", id: "p", form: "line", height: 4, series: [{ values: [1, "x"] }],
+    } as never);
+    expect(validateBlock(noAnnotations).ok, "a bad series is still refused").toBe(false);
   });
 });
 

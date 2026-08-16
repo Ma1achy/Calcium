@@ -30,6 +30,10 @@ const EXPECTED_STATES = [
   // place the day it landed — the frame it produced is what made anyone look at
   // the table state's, which had been drawing `█░░░░░░░ …` at `dark-wide` in a
   // committed snapshot since it was written (F176).
+  // The annotation state, and it is not a duplicate of the plot states above:
+  // those are about a *series* being drawn wrongly, this is about something that
+  // is not a series being drawn as one. Every way of getting it wrong renders.
+  "plot-annotated",
   "kv-value-bar",
   "notice-continuation",
   "plot-gapped-line",

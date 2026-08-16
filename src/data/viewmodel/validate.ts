@@ -111,6 +111,49 @@ function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
 }
 
+
+/**
+ * A plot's annotations (I52).
+ *
+ * **A function rather than a guard inside `plot`, and an early `return` is
+ * why.** Written inline it began `if (b["annotations"] === undefined) return;`
+ * at the top of a check that already had a body — which silently skips the
+ * series validation below it for every plot that carries no annotation, meaning
+ * *almost all of them*. The shape reads as a cheap exit and is a deletion.
+ */
+function checkAnnotations(annotations: unknown, e: string[], at: string): void {
+  if (annotations === undefined) return;
+  if (!isArray(annotations)) {
+    e.push(`${at}: "annotations" must be an array (C04 I52)`);
+    return;
+  }
+  for (const a of annotations) {
+      if (!isRecord(a)) continue;
+      // **Every edge finite, because an edge is a *position*.** A `null` sample
+      // is absence and has a spelling (I46a); a `NaN` threshold is a claim about
+      // nowhere, and `rowOf` would place it at the top of the plot — a line
+      // saying *the limit is here* about a value that is not a value.
+      const edges = a["kind"] === "band" ? ["from", "to"] : ["value"];
+      for (const key of edges) {
+        if (!isFiniteNumber(a[key])) {
+          e.push(
+            `${at}: annotation "${key}" must be a finite number (C04 I52) — ` +
+              `an annotation is a claim about where a value sits, and there is no such place`,
+          );
+        }
+      }
+      if (a["kind"] === "band" && isFiniteNumber(a["from"]) && isFiniteNumber(a["to"])) {
+        // **Ordered, because a band is a range and the renderer draws two edges
+        // either way.** Reversed it renders identically, so nothing downstream
+        // can notice — and a document that says `from: 85, to: 60` means
+        // something its author did not check.
+        if (a["from"] > a["to"]) {
+          e.push(`${at}: annotation band "from" (${String(a["from"])}) is above "to" (${String(a["to"])}) (C04 I52)`);
+        }
+      }
+  }
+}
+
 // --- per-kind validation --------------------------------------------------
 
 type KindCheck = (b: Record<string, unknown>, e: string[], at: string) => void;
@@ -314,6 +357,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   logs: (b, e, at) => requireArray(b, "lines", e, at),
   events: (b, e, at) => requireArray(b, "events", e, at),
   plot: (b, e, at) => {
+    checkAnnotations(b["annotations"], e, at);
     requireArray(b, "series", e, at);
     // I46 — the series' own numbers, which nothing checked.
     if (isArray(b["series"])) {

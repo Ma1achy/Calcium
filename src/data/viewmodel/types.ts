@@ -493,6 +493,35 @@ export type Series = Readonly<{
  */
 export type PlotForm = "line" | "sparkline" | "heatmap";
 
+/**
+ * A claim about the ordinate, drawn beside the data (C12 §3e, I52).
+ *
+ * **One feature, and six named chart types collapse into it.** A Q-Q plot is a
+ * scatter plus a reference line; an ROC curve is a line plus a diagonal; a
+ * calibration plot, a residual plot and a Bland–Altman are the same shape again.
+ * None is a renderer, so none is a `PlotForm`.
+ *
+ * **A band is one statement drawn as two lines**, not a fill: a fill would
+ * compete for the cells the curve occupies, and at one bit it would be
+ * indistinguishable from the curve. The survey's own ruling.
+ *
+ * **`tone` is decoration here and never the carrier** (F34). The line is dashed
+ * where a curve is continuous, so the distinction survives one bit and a
+ * colour-blind reader with the tone doing nothing load-bearing.
+ *
+ * **There is no `label`, and it is owed rather than forgotten.** The survey names
+ * one — *a reference line, with a label* — and it has nowhere to go: the gutter
+ * is sized from the y-labels and is a **scale**, so widening it for a string
+ * that is not one changes the plot area for text that is not measured with it;
+ * inside the area a label overwrites the curve it exists to be compared against.
+ * It wants a legend row, which the overlaid form does not have. A member nothing
+ * draws is indistinguishable from one not yet implemented, so the field arrives
+ * with the row that can hold it.
+ */
+export type Annotation =
+  | Readonly<{ kind: "line"; value: number; tone?: Tone }>
+  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone }>;
+
 export type Plot = Readonly<{
   kind: "plot";
   id: string;
@@ -531,6 +560,20 @@ export type Plot = Readonly<{
    */
   yMin?: number;
   yMax?: number;
+  /**
+   * Claims about the ordinate, drawn behind the data (I52, C12 I23).
+   *
+   * **Behind, and the order is the ruling**: an annotation that overwrote a
+   * sample would hide the thing it exists to be compared against. Layers resolve
+   * first-non-blank, so these are appended last.
+   *
+   * **An out-of-range edge is dropped rather than clamped**, which is the one
+   * place this differs from a sample. I29 clamps a sample because pressing data
+   * against the ceiling is honest; an annotation is a claim about *where* a
+   * value sits, and one clamped onto a scale it is outside says the limit is
+   * somewhere it is not.
+   */
+  annotations?: readonly Annotation[];
   emptyMessage?: string;
 }> & Gap;
 

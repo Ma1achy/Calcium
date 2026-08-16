@@ -245,8 +245,8 @@ export const COLUMNS: readonly ColumnDef[] = [
  * `appendAndCommit`, which catches and commits anyway — so a missing glyph here
  * is every busy container producing no entry at all, silently.
  */
-const BUSY = 60;
-const HOT = 85;
+export const BUSY = 60;
+export const HOT = 85;
 
 function loadTone(value: number | null): { tone: Tone; glyph?: Glyph } {
   if (value === null) return { tone: "muted" };
