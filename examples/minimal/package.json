@@ -13,7 +13,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "start": "node main.ts",
-    "test": "vitest run --dir test"
+    "test": "vitest run --dir test",
+    "test:package": "vitest run --dir test --exclude \"**/repo/**\""
   },
   "dependencies": {
     "@fmx/calcium": "file:../.."

@@ -1,3 +1,22 @@
+// **A REPO test, not a package test — and `test/repo/` is what says so.**
+//
+// This file reaches into `../../../../test/support/render.ts` for `measurable`,
+// because comparing the container's rows against the hand-composed banner needs
+// a block rendered to lines, and **the published package has no way to do
+// that**: `@fmx/calcium` exports `createTui` and the builders, and rendering a
+// block outside a session is a capability only the framework's own test support
+// has.
+//
+// So the import is not sloppiness — it is a real gap in the public surface,
+// reached from the one direction that finds those. What it is not is a test of
+// the *package*, and `make proof` copies this example to a temp directory and
+// runs it against the installed tarball, where the path does not exist. The
+// gate was right: it says "the example is testing the repo, not the package",
+// and this file was.
+//
+// `test/repo/` is excluded from `npm run test:package`, which is what proof
+// runs. `npm test` still runs it, so the coverage is not lost — it is labelled.
+
 /**
  * S1's banner. Every row holds a claim from `DOCKER_TUI_BANNER.md`.
  *
@@ -12,11 +31,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cells } from "@fmx/calcium";
 import type { Raw } from "@fmx/calcium";
-import { FLOOR, WHALE_ROWS, WORDMARK_ROWS, banner, bannerLines, bannerRow, variants } from "../src/banner.ts";
-import { measurable } from "../../../test/support/render.ts";
+import { FLOOR, WHALE_ROWS, WORDMARK_ROWS, banner, bannerLines, bannerRow, variants } from "../../src/banner.ts";
+import { measurable } from "../../../../test/support/render.ts";
 import { b, type Block } from "@fmx/calcium";
 
-const DOC = readFileSync(new URL("../DOCKER_TUI_BANNER.md", import.meta.url), "utf8");
+const DOC = readFileSync(new URL("../../DOCKER_TUI_BANNER.md", import.meta.url), "utf8");
 const fenced = [...DOC.matchAll(/```[a-z]*\n([\s\S]*?)```/gu)].map((m) =>
   (m[1] as string).replace(/\n$/u, "").split("\n"),
 );
