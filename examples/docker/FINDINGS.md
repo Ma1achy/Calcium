@@ -8475,3 +8475,84 @@ So the disposition is a habit and a number rather than a gate: **the roadmap's e
 are unverified prose, and a citation there is worth a symbol rather than a line.** The census
 is repeatable in twenty lines and is written down in this finding; what it costs to re-run is
 the argument for not building the ambiguous half of it.
+
+---
+
+## F170 — the gap had no legal spelling, and two correct invariants is why ★★★★
+
+| | |
+|---|---|
+| **Surface** | `Series.values` / `Cell.spark`, on every route a document arrives by |
+| **Reached for** | C12's heatmap walk, reading the validator arm a matrix would need |
+| **Verdict** | **a real Calcium defect**, live for one commit, invisible to the whole suite |
+| **Absorbed by** | nothing; fixed here — C04 I46a, C12 I4, T1.16, T2.19 |
+
+**C12 I4** makes a non-finite entry a gap whose position survives: the line breaks across it,
+the sparkline marks it. **C04 I46** refuses a non-finite element, because `JSON.stringify`
+writes one as `null` and a document that reloads as a *different* document is worse than one
+that is refused. Each is right. Their overlap is that **absence was expressible in the type and
+inexpressible in a valid document.**
+
+```
+b.plot({ series: [{ values: [1, 2, NaN, 4] }] })   constructs — the constructor checks height and yFormat
+validateDocument(…)                               refused (I46)
+JSON.stringify(…)                                 {"values":[1,2,null,4]}   ← already not `readonly number[]`
+```
+
+**The ring had been building one since the previous commit and nothing noticed**, because a
+constructed block never reaches the validator — C04 §3's standing reason for checking in both
+places, arriving as a consequence.
+
+### Three passes over one claim, each wrong somewhere else
+
+| | claim | verdict |
+|---|---|---|
+| `history.ts`, a roadmap entry, a planning note | *the type has no gap value* | false — `NaN` renders correctly |
+| the correction that replaced them | *the type carries absence, so the freeze argument dissolves* | false at the document boundary |
+| this finding | absence is representable in memory and **not in a document**; `null` is the only spelling JSON carries | measured |
+
+**The conclusion the first pass reached was right and its reason was wrong; the second pass got
+the reason right and the conclusion wrong.** What settled it was running the validator, which
+costs a minute — and this is the sixth blind spot's instrument pointed at a claim of my own,
+which is where it had not yet been aimed.
+
+**The remedy is one member and no logic**: `readonly (number | null)[]`, with `NaN` and
+`Infinity` still refused because they round-trip into something else and `null` round-trips
+into itself. Every consumer took it unchanged — `Number.isFinite(null)` is already `false`.
+
+---
+
+## F171 — a ramp step that draws as padding, in the arm no frame renders ★★★
+
+| | |
+|---|---|
+| **Surface** | `sparkline` at `ambiguousWidth: "wide"` — which is what C11 draws into a table cell |
+| **Reached for** | C12's heatmap walk, whose subject is magnitude carried by a glyph |
+| **Verdict** | **a real Calcium defect**, shipped, and every assertion in the suite passed against it |
+| **Absorbed by** | nothing; fixed here — C12 I16, T1.15, a golden frame for the arm |
+
+`RAMP_BRAILLE` began at `U+2800` — BRAILLE PATTERN BLANK. So the **minimum** of every series
+drew as whitespace, which the right-anchor already uses to mean *fewer samples than cells*.
+
+```
+sparkline([0, 5], 6, wide)   "    ⠀⣿"     20,20,20,20,2800,28ff
+                                  └────── four pad cells and one lowest reading
+```
+
+One character, two meanings — which is precisely what C12 §4 spends a paragraph refusing for
+the *absent* case, arriving on the other arm and shipping. The ramp was also non-monotone in
+ink: dot populations `0,1,2,3,4,5,6,8`, so the last step was a double jump.
+
+**Nothing could see it.** `cells()` counts a blank braille cell as one, so every width row
+passed; `toHaveLength` counts it, so every length row passed; and **no golden frame renders the
+wide arm at all.** The only instrument that reaches a glyph nobody can see is a picture, and
+the corpus had none.
+
+### The corpus gap is measured, not inferred
+
+`test/golden/blocks.test.ts` frames `Object.values(ONE_PER_KIND)`, and `ONE_PER_KIND` is a
+`Readonly<Record<BlockKind, Block>>` — **exhaustive over kinds, one state of each**. It answers
+*does this kind render* and can answer nothing about *which state it is in*, so a new state of
+an existing kind is invisible to it by construction. That is why three consecutive behaviour
+changes — the continuation mark, the gapped series, the chip — each left golden green and each
+needed a frame added by hand. Three coincidences with one cause.
