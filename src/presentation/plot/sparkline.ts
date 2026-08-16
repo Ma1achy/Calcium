@@ -18,6 +18,31 @@ import { rampFor, RAMP_STEPS } from "./ramp.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /**
+ * The cell a position with no reading draws (I4, C12 §4).
+ *
+ * **A marker rather than a blank, and the row is right-anchored is why.** A
+ * leading blank already means *fewer samples than cells*; a blank at a gap would
+ * mean *a sample that is missing*. One character, two meanings — and the case is
+ * ordinary rather than exotic, because a stalled fetch is bursty and a gap at
+ * the window's left edge is where it lands. `ratatui` reached the same finding
+ * from the other side and its sentence is the one to keep: **a missing sample is
+ * not a zero.**
+ *
+ * **ASCII in every ramp, and that is a measurement.** It must be one cell under
+ * both width conventions and collide with no step of `▁▂▃▄▅▆▇█`, `.:-=+*#@` or
+ * the braille ramp `rampFor` returns at `wide`. `·` `∅` `⋮` `◌` are all
+ * `East_Asian_Width=Ambiguous`, and `text.ts`'s table deliberately covers only
+ * *the part that is drawn as geometry* — so `cells()` calls them one cell at
+ * `wide` by a documented ruling, and choosing one would be wrong on a CJK
+ * terminal or force a range that table's own test excludes.
+ *
+ * **Absence has no tier because it is not a magnitude.** The same character
+ * whichever ramp is in use, which is also what makes a `spark` column read the
+ * same on both terminals.
+ */
+const ABSENT = "?";
+
+/**
  * The last `width` values as one row of exactly `width` cells (I13).
  *
  * **`width` is the window, and 8 is not a constant.** A01 A.2 says "the last 8
@@ -44,18 +69,29 @@ export function sparkline(
   const w = Math.max(0, Math.floor(width));
   if (w === 0) return "";
 
-  const finite = values.filter((v) => Number.isFinite(v));
-  const window = finite.slice(Math.max(0, finite.length - w)); // cells-ok — a sample count
-  if (window.length === 0) return " ".repeat(w); // cells-ok — a sample count
+  // **The window is of POSITIONS, not of readings** (I4, I13). It was
+  // `values.filter(Number.isFinite)` and then a slice, which is why a gap closed
+  // and the row came back a glyph shorter — `[1,2,3,NaN,7,8,9]` drew six cells
+  // for seven positions, and the extra leading blank is indistinguishable from
+  // the right-anchor padding that means *fewer samples than cells*.
+  //
+  // **The line form never had this**: `finiteSamples` keeps each value's index
+  // precisely so the curve breaks across the gap. So one block kind's two forms
+  // disagreed about the same array, and I4 as written — *filtered before
+  // scaling* — was satisfied by both.
+  const window = values.slice(Math.max(0, values.length - w)); // cells-ok — a position count
+  const readings = window.filter((v) => Number.isFinite(v));
+  if (readings.length === 0) return " ".repeat(w); // cells-ok — a position count
 
   const ramp = [...rampFor(caps)];
-  const min = Math.min(...window);
-  const max = Math.max(...window);
+  const min = Math.min(...readings);
+  const max = Math.max(...readings);
 
   // No division by the range (I3). A constant window has no normalised position,
   // and the middle step is the flat line the plot form draws for the same input.
   const middle = Math.floor((RAMP_STEPS - 1) / 2);
   const glyph = (v: number): string => {
+    if (!Number.isFinite(v)) return ABSENT;
     if (max === min) return ramp[middle] ?? " ";
     const t = (v - min) / (max - min);
     const step = Math.round(t * (RAMP_STEPS - 1));

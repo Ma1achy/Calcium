@@ -45,7 +45,7 @@ const valueOf = (bl: Block, label: string): string =>
 // ── The ring ────────────────────────────────────────────────────────────────
 
 describe("gap 1: the ring keeps the history b.live does not", () => {
-  it("H1 (walk A2): a tick that produced nothing counts as a tick, never as a sample", () => {
+  it("H1 (walk A2, C12 I4): a tick that produced nothing keeps its POSITION, and is never a reading", () => {
     const ring = createRing(10);
     ring.began();
     ring.took(12);
@@ -55,7 +55,13 @@ describe("gap 1: the ring keeps the history b.live does not", () => {
     ring.took(14);
 
     expect(ring.ticks).toBe(3);
-    expect(ring.values).toEqual([12, 14]);
+    // **Was `[12, 14]`, and that was walk A2's expired premise written down as
+    // an assertion.** The walk read `Series.values` as having no gap value and
+    // ruled the sample dropped; the type carried absence the whole time — a
+    // non-finite entry is a position with no reading, `finiteSamples` keeps its
+    // index, and C12 I4 breaks the line across it. Dropping it made ninety
+    // seconds of ticks render exactly like sixty.
+    expect(ring.values).toEqual([12, Number.NaN, 14]);
     expect(ring.missed).toBe(1);
     // The whole point of counting both: the compression is stated, not warned
     // about. A reader can check this sentence against the plot.
@@ -83,13 +89,18 @@ describe("gap 1: the ring keeps the history b.live does not", () => {
     expect(axisCaption(ring)).toContain("1 returned nothing");
   });
 
-  it("H3 (walk A8): a null reading records nothing — absent is not zero", () => {
+  it("H3 (walk A8, C12 I4): absent is not zero — and it is not nothing either", () => {
     const ring = createRing(10);
     ring.began();
     ring.took(null);
-    // Zero would draw the container idling. It is not idling; it has stopped.
+    // **Walk A8's ruling is unchanged and its assertion is not.** Zero would
+    // draw the container idling and it is not idling, it has stopped. But
+    // *nothing* was the other error: it made the absence unrepresentable, so a
+    // stopped container's stall was a shorter series rather than a visible gap.
+    // `NaN` is the third answer and it is neither.
     expect(ring.values).not.toContain(0);
-    expect(ring.values).toEqual([]);
+    expect(ring.values).toEqual([Number.NaN]);
+    expect(ring.values.filter(Number.isFinite), "and still no reading").toEqual([]);
   });
 
   it("H4: a healthy run says so, and says nothing else", () => {
@@ -168,7 +179,10 @@ describe("the CPU fold, driven directly", () => {
     cpuFold(ring)(stopped);
     expect(ring.ticks).toBe(1);
     expect(ring.missed).toBe(1);
-    expect(ring.values).toEqual([]);
+    // A position, not a reading (C12 I4) — the plot draws the gap where the
+    // stop happened rather than ending the line one sample early.
+    expect(ring.values).toEqual([Number.NaN]);
+    expect(ring.values.filter(Number.isFinite)).toEqual([]);
   });
 });
 
@@ -211,7 +225,7 @@ describe("S3's blocks", () => {
     const kinds = body.children.map((c) => c.kind);
     expect(kinds).toEqual(["plot", "notice", "notice"]);
     // The history survives the failure that made it worth looking at.
-    expect((body.children[0] as Plot).series[0]?.values).toEqual([10, 20]);
+    expect((body.children[0] as Plot).series[0]?.values).toEqual([10, 20, Number.NaN]);
     // And the caption now has something to report.
     expect((body.children[1] as Notice).text).toContain("1 returned nothing");
     expect((body.children[2] as Notice).text).toContain("No such container");

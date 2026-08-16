@@ -75,6 +75,32 @@ const CASES: readonly Readonly<{ label: string; block: Plot; mono?: boolean }>[]
     }),
   },
   {
+    // **The gap, in both forms, because that is the claim** (I4). The two
+    // disagreed about this exact array — the line broke across it and the
+    // sparkline closed it and came back a glyph shorter — and no golden frame
+    // held one, so the whole category stayed green while they disagreed. A
+    // leading gap is the case worth having in a picture: it is where a blank
+    // would be indistinguishable from the right-anchor padding.
+    label: "gapped line",
+    block: block({
+      kind: "plot",
+      id: "gap-line",
+      form: "line",
+      height: 5,
+      axes: true,
+      series: [{ values: [1, 2, 3, Number.NaN, 7, 8, 9] }],
+    }),
+  },
+  {
+    label: "gapped sparkline, leading and interior",
+    block: block({
+      kind: "plot",
+      id: "gap-spark",
+      form: "sparkline",
+      series: [{ values: [Number.NaN, 2, 3, Number.NaN, 7, 8, 9] }],
+    }),
+  },
+  {
     label: "empty",
     block: block({
       kind: "plot",

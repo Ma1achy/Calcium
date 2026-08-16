@@ -21,6 +21,7 @@ import { RAMP_ASCII, RAMP_UNICODE } from "../../src/presentation/plot/ramp.js";
 import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
+import { cells } from "../../src/presentation/text.js";
 import { lossCurve } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
@@ -405,10 +406,38 @@ describe("C12 tier 1 — sparklines", () => {
     expect(sparkline([5, 5, 5], 3, FULL_CAPS)).toBe("▄▄▄");
   });
 
-  it("T1.13: non-finite values are filtered and an empty window is blank", () => {
-    expect(sparkline([Number.NaN, 1, 2], 3, FULL_CAPS)).toBe(" ▁█");
+  it("T1.13 (I4, I13): a gap keeps its position and draws the absent marker", () => {
+    // **This row asserted the defect.** It expected `" ▁█"` — a leading blank
+    // where the gap is, which is the same character the right-anchor draws when
+    // there are fewer samples than cells. One character, two meanings, and the
+    // row was the thing saying it was correct.
+    expect(sparkline([Number.NaN, 1, 2], 3, FULL_CAPS)).toBe("?▁█");
+
+    // The interior case, where the old behaviour SHORTENED the row: seven
+    // positions came back as six glyphs, and no assertion here counted them.
+    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS)).toBe("     ▁▂▃?▆▇█");
+
+    // And the two forms agree now, which is the actual claim: the same array
+    // breaks the line and marks the sparkline, rather than breaking one and
+    // closing the other.
+    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS)).toHaveLength(12);
+
+    // All-non-finite stays empty (§4), because the line form renders the empty
+    // message for the same input — a row of markers would be the sparkline
+    // disagreeing with the plot in the other direction.
     expect(sparkline([Number.NaN], 4, FULL_CAPS)).toBe("    ");
     expect(sparkline([], 4, FULL_CAPS)).toBe("    ");
+  });
+
+  it("T1.13b (I4): the marker is the same character in every ramp, because absence is not a magnitude", () => {
+    // A tiered marker would make a `spark` column read differently on two
+    // terminals for the same data — and it would have to be a step of some ramp
+    // to be tiered, which is the collision the ASCII choice avoids.
+    const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    for (const caps of [FULL_CAPS, ASCII_CAPS, WIDE]) {
+      expect(sparkline([1, Number.NaN, 9], 3, caps)).toContain("?");
+      expect(cells(sparkline([1, Number.NaN, 9], 3, caps), caps.ambiguousWidth)).toBe(3);
+    }
   });
 
   it("T1.13: the ASCII ramp is used under `unicode: 'ascii'`", () => {

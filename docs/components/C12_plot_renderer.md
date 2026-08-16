@@ -141,8 +141,10 @@ Every one of these is real, and each has a defined result rather than an excepti
 keeps its index, and I4 rules what the line does with it. That sentence was worth measuring because the opposite
 was written down in three places: `examples/docker/src/history.ts`'s ring comment says *`Series.values` is
 `readonly number[]` and has no gap value, so a tick that produced nothing cannot be drawn*, and a roadmap entry
-and a planning note repeated it. **The ring's whole design — drop the sample, count the gap, caption
-`58 samples · 63 ticks` — is a workaround for a limitation the type does not have.**
+and a planning note repeated it. **The ring's whole design — drop the sample and count it — is a workaround for a limitation the type
+does not have.** (Its caption reads `63 ticks · 2s each · 1 returned nothing`; `58 samples · 63 ticks` is
+the ring comment's paraphrase of its own intent, and quoting that as the rendered text would be the same
+compression this section is about — caught one paragraph after writing it.)
 
 So there is **no public-type change here and the freeze argument dissolves**. What there was is a defect: the two
 forms of one block kind disagreed about the same array.

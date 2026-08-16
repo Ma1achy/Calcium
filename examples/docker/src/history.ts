@@ -8,19 +8,27 @@
  *
  * Every ruling here is S3_WALK.md's.
  *
- * **Ticks and samples are counted separately, and that is the whole design**
- * (walk A2). `Series.values` is `readonly number[]` and has no gap value, so a
- * tick that produced nothing cannot be drawn. The three candidates were: repeat
- * the last sample (a flat run that never happened), push zero (a cliff to idle,
- * when the container is not idle but absent — DASHBOARD_WALK A3), or drop it and
- * let sixty samples spanning ninety seconds render exactly like sixty spanning
- * sixty.
+ * **Ticks and samples were counted separately, and the premise of that design
+ * expired on 2026-08-16.** Walk A2 read *`Series.values` is `readonly number[]`
+ * and has no gap value, so a tick that produced nothing cannot be drawn* — and
+ * the type carried absence the whole time. A non-finite entry **is** a gap:
+ * `finiteSamples` keeps its index and C12 I4 breaks the line across it. The
+ * claim was never measured; it was inferred from the type's signature and then
+ * quoted into a roadmap entry and a planning note as though it had been.
  *
- * The third is right, and it is only honest because the gap is *counted*.
- * `58 samples · 63 ticks` is a statement a reader can check; "the axis is
- * unreliable across a stall" is a disclaimer nobody can act on. The caption
- * reports both numbers, always, so their agreement is as visible as their
- * divergence.
+ * So the fourth candidate — the one the walk did not list because it believed it
+ * impossible — is the right one, and it is the only one that is honest about
+ * both axes: **push the gap.** The three it did list are still wrong for the
+ * reasons it gives: repeating the last sample is a flat run that never happened,
+ * zero is a cliff to idle when the container is absent rather than idle
+ * (DASHBOARD_WALK A3), and dropping it lets sixty samples spanning ninety
+ * seconds render exactly like sixty spanning sixty.
+ *
+ * **`missed` survives and the caption is unchanged**, which is the check that
+ * this is an addition rather than a redesign: the count is a total over the
+ * view's life and the gaps are where they happened, and a reader wants both.
+ * What changed is that *the axis is unreliable across a stall* stopped being a
+ * disclaimer and became something the frame shows.
  *
  * **`began` is separate from `took` for one reason** (walk A2): a fetch that
  * rejects is still a tick, and a tick counted only on success cannot see the
@@ -42,7 +50,10 @@ export interface Ring {
    * (walk A8, DASHBOARD_WALK A3).
    */
   took(value: number | null): void;
-  /** Oldest first, at most `cap` of them. */
+  /**
+   * Oldest first, at most `cap` of them — **one per tick, including the ticks
+   * that produced nothing**, which arrive as `NaN` (C12 I4).
+   */
   readonly values: readonly number[];
   /** Attempts, including the ones that produced nothing. */
   readonly ticks: number;
@@ -92,11 +103,13 @@ export function createRing(cap: number): Ring {
       ticks += 1;
     },
     took(value) {
-      if (value === null) {
-        missed += 1;
-        return;
-      }
-      values.push(value);
+      // **A gap is pushed, not skipped** (C12 I4). `NaN` is the position with no
+      // reading: the line breaks across it and a sparkline draws `?` there,
+      // where dropping it made ninety seconds of ticks render as sixty seconds
+      // of samples. `missed` is still counted, because *where* and *how many*
+      // are different questions and the caption answers the second.
+      if (value === null) missed += 1;
+      values.push(value ?? Number.NaN);
       if (values.length > cap) values.shift();
     },
     get values() {
