@@ -29,9 +29,11 @@ import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
 import { labelWidth, xLabelRow, yLabels } from "./axes.js";
 import { seriesRange, type Range } from "./scale.js";
-import { sparkline } from "./sparkline.js";
+import { densityRampFor } from "./ramp.js";
+import { formatValue } from "./axes.js";
+import { rampRow, sparkline } from "./sparkline.js";
 import { stripHeights } from "./strips.js";
-import type { Plot, Series } from "../../data/viewmodel/index.js";
+import type { Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 
@@ -335,14 +337,19 @@ function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth =
 function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): Layout {
   const areaRows = plotAreaRows(block);
   const base = { areaRows, width };
-  if (block.axes !== true) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
+  // **A heatmap is always gutter-ed**, whatever `axes` says, because the row
+  // labels *are* its ordinate — an unlabelled matrix is a picture of numbers
+  // with no way to tell which row is which. `axes: false` is refused rather than
+  // honoured (C04 I50b), so this reads the form and not the flag.
+  const axed = block.axes === true || block.form === "heatmap";
+  if (!axed) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
 
   // **What the column holds depends on the form.** A stacked plot puts series
   // names there instead of the three y-labels (§5), and sizing the column from the
   // y-labels regardless is what pushed `train │` one cell past the width and left a
   // `…` on the first row of every stacked frame. Two different sets of strings, one
   // column: it has to be measured from whichever set will be drawn.
-  const wanted = stacked
+  const wanted = stacked || block.form === "heatmap"
     ? seriesLabelWidth(block.series)
     : labelWidth(yLabels(range, areaRows, block.yFormat));
   if (width - wanted - AXIS_GUTTER >= MIN_AREA) {
@@ -359,20 +366,140 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
   return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
 }
 
+/** A grid cell is blank where nothing was reported (C12 I17, §3a). */
+const HEATMAP_ABSENT = " ";
+
+/**
+ * The matrix (I17). One cell per position per row, against the range of the
+ * whole matrix — which is the only thing that makes it a matrix rather than a
+ * stack of unrelated sparklines, and the reason the range is computed once here
+ * and passed down rather than per row.
+ */
+function heatmapRows(
+  block: Plot,
+  range: Range,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly string[] {
+  const style = { ramp: densityRampFor(ctx.capabilities), absent: HEATMAP_ABSENT };
+  const out: string[] = [];
+
+  // I8, unchanged: the rows that fit, then a line naming the rest. The marker is
+  // that line and there is no field — a series dropped in silence is the failure
+  // the branch exists to avoid, and a matrix has more rows to drop than a plot.
+  const overflow = block.series.length > layout.areaRows; // cells-ok — a row count
+  const visible = overflow ? Math.max(0, layout.areaRows - 1) : block.series.length; // cells-ok
+
+  for (let i = 0; i < visible; i += 1) {
+    const s = block.series[i];
+    if (s === undefined) continue;
+    out.push(
+      line(
+        [
+          ...gutterSpans(s.label ?? "", layout, ctx),
+          { text: rampRow(s.values, layout.areaWidth, ctx.capabilities, range, style) },
+        ],
+        layout,
+        ctx,
+      ),
+    );
+  }
+
+  if (overflow) {
+    const omitted = block.series.slice(visible).map((s, i) => s.label ?? `row ${String(visible + i + 1)}`); // cells-ok
+    out.push(
+      line(
+        [
+          ...gutterSpans("", layout, ctx),
+          {
+            text: truncate(
+              `+${String(omitted.length)} more · ${omitted.join(" · ")}`, // cells-ok — a row count
+              layout.areaWidth,
+              ctx.capabilities,
+            ),
+            style: tone("warn", ctx.theme, ctx.capabilities),
+          },
+        ],
+        layout,
+        ctx,
+      ),
+    );
+  }
+
+  // Fewer rows than the declared height keeps the height: I1 is about the block,
+  // and a matrix that shrank when a container stopped would move everything below
+  // it at exactly the moment a reader is looking at why.
+  const blanks = Math.max(0, layout.areaRows - out.length); // cells-ok — a row count
+  for (let i = 0; i < blanks; i += 1) out.push(line(gutterSpans("", layout, ctx), layout, ctx));
+  return out;
+}
+
+/**
+ * The heatmap's two rows: x-labels, then the scale legend (§2).
+ *
+ * **Not the line's two rows.** There is no axis rule, because a matrix's cells
+ * bound themselves — and the row it would have taken pays for the legend, which
+ * is the only thing that says what a cell *means*. `axes: false` is refused at
+ * construction for that reason (C04 I50b).
+ */
+function heatmapFurniture(
+  block: Plot,
+  range: Range,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly string[] {
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities);
+  const labelRow =
+    labels === ""
+      ? ""
+      : line([{ text: " ".repeat(layout.gutter) }, { text: labels, style: muted }], layout, ctx);
+
+  // **Dropped columns are named rather than vanishing** (§6a B3, I8's principle).
+  // The window is of the last `areaWidth` positions, and a reader who cannot see
+  // that some are missing reads the visible ones as the whole history.
+  const longest = block.series.reduce((n, s) => Math.max(n, s.values.length), 0); // cells-ok — a position count
+  const dropped = Math.max(0, longest - layout.areaWidth);
+  const scale =
+    `${densityRampFor(ctx.capabilities)}  ${formatValue(range.min, block.yFormat)}`
+    // ASCII, because a legend is framework text and an en dash has no
+    // substitution (C09 I22, SS47). The separator is not carrying meaning here.
+    + ` - ${formatValue(range.max, block.yFormat)}`
+    + (dropped === 0 ? "" : ` · ${String(dropped)} older not shown`); // cells-ok — a position count
+
+  return [
+    labelRow,
+    line(
+      [
+        { text: " ".repeat(layout.gutter) },
+        { text: truncate(scale, layout.areaWidth, ctx.capabilities), style: muted },
+      ],
+      layout,
+      ctx,
+    ),
+  ];
+}
+
 /**
  * The height (I1). `PlotGeometry` is what this reads, so the series is not in
  * scope — see `height.ts`.
  */
 const measure = (block: Plot): number => plotHeight(block);
 
-const render = (block: Plot, ctx: RenderContext): ReactElement => {
-  const width = Math.max(1, Math.floor(ctx.width));
-
-  if (block.form === "sparkline") {
+/**
+ * Form → rows. **A `Record` and not a switch**, for `height.ts`' reason: a
+ * `Record<PlotForm, …>` is checked in both directions, and `form === "sparkline"
+ * ? … : …` absorbed a third member in silence — a heatmap drawn as a curve, at
+ * exactly the right height.
+ */
+const FORM_ROWS: Readonly<
+  Record<PlotForm, (block: Plot, width: number, ctx: RenderContext) => readonly string[]>
+> = {
+  sparkline: (block, width, ctx) => {
     const first = block.series[0];
     const spark = sparkline(first?.values ?? [], width, ctx.capabilities);
     const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 1, width };
-    return rows([
+    return [
       line(
         [
           {
@@ -387,22 +514,40 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
         layout,
         ctx,
       ),
-    ]);
-  }
+    ];
+  },
 
-  // `stacked` is decided before the layout, because it decides what the label
-  // column holds and therefore how wide it is.
-  const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
-  const range = seriesRange(block.series, block);
-  const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked);
-  if (range === null) return rows(emptyRows(block, layout, ctx));
+  line: (block, width, ctx) => {
+    // `stacked` is decided before the layout, because it decides what the label
+    // column holds and therefore how wide it is.
+    const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
+    const range = seriesRange(block.series, block);
+    const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked);
+    if (range === null) return emptyRows(block, layout, ctx);
 
-  const out = [
-    ...(stacked ? stackedRows(block, range, layout, ctx) : overlaidRows(block, range, layout, ctx)),
-  ];
-  if (block.axes === true) out.push(...axisRows(block, layout, ctx));
+    const out = [
+      ...(stacked
+        ? stackedRows(block, range, layout, ctx)
+        : overlaidRows(block, range, layout, ctx)),
+    ];
+    if (block.axes === true) out.push(...axisRows(block, layout, ctx));
+    return out;
+  },
 
-  return rows(out);
+  heatmap: (block, width, ctx) => {
+    const range = seriesRange(block.series, block);
+    const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, false);
+    // **Empty is a property of the block, not of a row** (§6a A3): a matrix every
+    // one of whose rows reported nothing is empty; a *row* that reported nothing
+    // is a row of blanks and keeps its place.
+    if (range === null) return emptyRows(block, layout, ctx);
+    return [...heatmapRows(block, range, layout, ctx), ...heatmapFurniture(block, range, layout, ctx)];
+  },
+};
+
+const render = (block: Plot, ctx: RenderContext): ReactElement => {
+  const width = Math.max(1, Math.floor(ctx.width));
+  return rows([...FORM_ROWS[block.form](block, width, ctx)]);
 };
 
 export const plotDefinition: BlockDefinition<Plot> = {

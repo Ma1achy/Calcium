@@ -418,10 +418,20 @@ export type Series = Readonly<{
  * `form: "line"` without it is a construction error, not a default (§3) — a
  * defaulted height is how C12's central property fails silently.
  */
+/**
+ * The three forms, named so every dispatcher can be exhaustive over them.
+ *
+ * **A union written inline is a union nothing can be checked against.** Every
+ * consumer of `form` was `=== "sparkline" ? … : …`, so a third member fell into
+ * the line arm at three sites and compiled — which is a heatmap rendering as a
+ * curve, silently and at the right height (C12 §6a).
+ */
+export type PlotForm = "line" | "sparkline" | "heatmap";
+
 export type Plot = Readonly<{
   kind: "plot";
   id: string;
-  form: "line" | "sparkline";
+  form: PlotForm;
   series: readonly Series[];
   height?: number;
   axes?: boolean;

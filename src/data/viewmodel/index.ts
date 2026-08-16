@@ -43,6 +43,7 @@ export type {
   PatchResult,
   Pills,
   Plot,
+  PlotForm,
   Progress,
   Raw,
   Result,

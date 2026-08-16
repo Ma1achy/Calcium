@@ -54,6 +54,28 @@ export const RAMP_ASCII = ".:-=+*#@";
 export const RAMP_BRAILLE = "\u2840\u28c0\u28c4\u28e4\u28e6\u28f6\u28f7\u28ff";
 
 /**
+ * Density, for a grid cell — the heatmap's ramp (C12 I17, §3a).
+ *
+ * **Not `RAMP_BRAILLE`, and the difference is what the cell is.** That one fills
+ * bottom-up because a sparkline cell has a vertical axis and the glyph is a
+ * column of it. **A grid cell has no vertical axis**, so a bottom-filled glyph
+ * reads as a bar fragment and a matrix of them reads as rows of tiny bar charts —
+ * which is a picture every count agrees with and no assertion can see.
+ *
+ * Dots spread across the cell instead: populations 1 to 8, monotone in ink,
+ * every step narrow under both width conventions.
+ *
+ * **It starts at one dot rather than none** (I16). The prior art's density set
+ * begins at `U+2800`, and blank is what an absent cell draws in a grid — so a
+ * ramp starting there would make the minimum and absence one picture, which is
+ * the collision I16 exists to refuse, arriving on a third ramp.
+ *
+ * **The same set on an ASCII terminal is `RAMP_ASCII`.** Density has no ASCII
+ * expression beyond increasing ink, which is what that ramp already is.
+ */
+export const RAMP_DENSITY = "\u2804\u2814\u2816\u2836\u2837\u283f\u287f\u28ff";
+
+/**
  * The ramp for these capabilities. Nothing here probes for its own (C09 I3).
  *
  * **ASCII first, because it is the stronger constraint.** A terminal that cannot
@@ -69,3 +91,14 @@ export function rampFor(
 
 /** Ramp steps. Eight, in both modes — see the header. */
 export const RAMP_STEPS = 8;
+
+/**
+ * The heatmap's ramp (I17). ASCII first, for `rampFor`'s reason exactly.
+ *
+ * **The ambiguous question does not arise**, because every braille code point is
+ * narrow — so unlike `rampFor` there is no third arm here, and the density ramp
+ * is correct on both kinds of terminal.
+ */
+export function densityRampFor(caps: Pick<TerminalCapabilities, "unicode">): string {
+  return caps.unicode === "ascii" ? RAMP_ASCII : RAMP_DENSITY;
+}

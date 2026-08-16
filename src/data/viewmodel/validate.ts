@@ -21,6 +21,7 @@ import {
   type BlockKind,
   type DocumentStatus,
   type Glyph,
+  type PlotForm,
   type Result,
   type ViewDocument,
 } from "./types.js";
@@ -279,7 +280,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       // thing. C04 I47's disposal — a construction error rather than a
       // rendering that lies — and the same argument, since a reader cannot see
       // that a colour has been reused.
-      if (b["series"].length > CATEGORY_LIMIT) {
+      // **I50a is a rule about colour, so it binds where colour is drawn**
+      // (C12 §6a A7). A heatmap carries magnitude in the ramp at every depth and
+      // never reads the categorical palette, so a cap at the palette's size
+      // would refuse a document about something else — and eight rows is not a
+      // matrix.
+      if (b["form"] !== "heatmap" && b["series"].length > CATEGORY_LIMIT) {
         e.push(
           `${at}: "series" has ${String(b["series"].length)} entries and the categorical ` +
             `palette distinguishes ${String(CATEGORY_LIMIT)} (C04 I50a) — a ninth series ` +
@@ -287,13 +293,45 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
         );
       }
     }
-    if (b["form"] !== "line" && b["form"] !== "sparkline") {
-      e.push(`${at}: "form" must be "line" or "sparkline"`);
+    const form = b["form"];
+    if (typeof form !== "string" || !PLOT_FORMS.has(form)) {
+      e.push(`${at}: "form" must be one of ${[...PLOT_FORMS].join(", ")}`);
     }
     // §3 — no default. The validator says so as well as the constructor,
     // because a document can arrive from a fixture without passing through one.
-    if (b["form"] === "line" && !isFiniteNumber(b["height"])) {
-      e.push(`${at}: form "line" requires a numeric "height" (C04 §3) — there is no default`);
+    if ((form === "line" || form === "heatmap") && !isFiniteNumber(b["height"])) {
+      e.push(`${at}: form "${form}" requires a numeric "height" (C04 §3) — there is no default`);
+    }
+    // I50b — the heatmap's three refusals, the validator's half. The ragged one
+    // is what an app hits by accident: rows of different lengths render
+    // self-consistently and wrong, because a short row is stretched to the
+    // common width and column k stops meaning one position.
+    if (form === "heatmap" && isArray(b["series"])) {
+      if (b["axes"] === false) {
+        e.push(
+          `${at}: a heatmap cannot set "axes: false" (C04 I50b) — the scale legend is the ` +
+            `only thing that says what a cell means`,
+        );
+      }
+      const lengths = new Set<number>();
+      for (const [i, s] of b["series"].entries()) {
+        if (!isRecord(s)) continue;
+        if (s["tone"] !== undefined) {
+          e.push(
+            `${at}: series[${String(i)}] sets a tone and a heatmap draws none (C04 I50b) — ` +
+              `magnitude owns the cell`,
+          );
+        }
+        if (isArray(s["values"])) lengths.add(s["values"].length);
+      }
+      if (lengths.size > 1) {
+        e.push(
+          `${at}: rows of ${[...lengths].sort((x, y) => x - y).join(", ")} values (C04 I50b) — ` +
+            `a matrix's columns are one ordinate, so a short row is stretched and column k ` +
+            `means a different position in every row. Pad it: the renderer cannot know which ` +
+            `end is old`,
+        );
+      }
     }
     // **C04 I41 — an unknown arm is an error, not a silent numeric fall-through.**
     // It was unvalidated, so a typo rendered plain numbers and said nothing; the
@@ -499,6 +537,20 @@ function requireGlyph(value: unknown, e: string[], at: string): void {
  * about rendering, and this is a rule about what a document may say.
  */
 const CATEGORY_LIMIT = 8;
+
+/**
+ * The forms, as a set the validator can be exhaustive against.
+ *
+ * Built from a `Record<PlotForm, true>` for the reason `GLYPH_MEMBERS` is: a
+ * `Set<PlotForm>` built from a literal type-checks with a member missing, and
+ * that is exactly how the last vocabulary widening shipped a validator that
+ * refused every document using the new member.
+ */
+const PLOT_FORM_MEMBERS = { line: true, sparkline: true, heatmap: true } satisfies Record<
+  PlotForm,
+  true
+>;
+const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 
 /**
  * Children of a container, for the recursive walk. Total on malformed input.

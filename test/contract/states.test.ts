@@ -25,6 +25,7 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
 const EXPECTED_STATES = [
   "notice-continuation",
   "plot-gapped-line",
+  "plot-heatmap",
   "plot-gapped-sparkline",
   "plot-zero-minimum",
   "prompt-paste-chip",

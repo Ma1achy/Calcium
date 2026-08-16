@@ -43,6 +43,62 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 const ABSENT = "?";
 
 /**
+ * The two things a row draws that its caller decides.
+ *
+ * **Both are the same question asked twice — what is a cell of *this* thing?**
+ * A sparkline cell is a column of a vertical axis, so its ramp fills bottom-up
+ * and its absence is a marker, because a blank there is already the padding. A
+ * grid cell has neither: the ramp spreads and absence is blank (C12 I17, §3a).
+ * Passing them rather than branching on a form keeps the two decisions where the
+ * argument for them is.
+ */
+export type RowStyle = Readonly<{ ramp: string | null; absent: string }>;
+
+/**
+ * One row of ramp glyphs against **a range supplied from outside**.
+ *
+ * The shared internal §2 promises: `sparkline` computes a range over its own
+ * window and calls this, and the heatmap passes the range of the whole matrix —
+ * which is the only difference between a matrix and a stack of unrelated
+ * sparklines, and the reason it is a parameter rather than a computation.
+ *
+ * **It does not special-case an empty window, and `sparkline` does.** A series
+ * with no readings is *empty* to a block — the line form draws the empty message
+ * — but a **row** of a matrix with no readings is a container that reported
+ * nothing, which is a row of markers and not a row of blanks (§6a A3). One
+ * function cannot hold both meanings, so the guard stays with the caller that
+ * has one.
+ */
+export function rampRow(
+  values: readonly (number | null)[],
+  width: number,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  range: Readonly<{ min: number; max: number }>,
+  style: RowStyle = { ramp: null, absent: ABSENT },
+): string {
+  const w = Math.max(0, Math.floor(width));
+  if (w === 0) return "";
+
+  const window = values.slice(Math.max(0, values.length - w)); // cells-ok — a position count
+  const ramp = [...(style.ramp ?? rampFor(caps))];
+  const middle = Math.floor((RAMP_STEPS - 1) / 2);
+
+  const glyph = (v: number | null): string => {
+    if (v === null || !Number.isFinite(v)) return style.absent;
+    if (range.max === range.min) return ramp[middle] ?? " ";
+    // Clamped rather than dropped, for `rowOf`'s reason: a pinned range exists
+    // so two plots can be compared, and a value above the ceiling belongs
+    // pressed against it rather than in a hole.
+    const t = (v - range.min) / (range.max - range.min);
+    const step = Math.round((t < 0 ? 0 : t > 1 ? 1 : t) * (RAMP_STEPS - 1));
+    return ramp[step] ?? " ";
+  };
+
+  const drawn = window.map(glyph).join("");
+  return " ".repeat(Math.max(0, w - cells(drawn, caps.ambiguousWidth))) + drawn;
+}
+
+/**
  * The last `width` values as one row of exactly `width` cells (I13).
  *
  * **`width` is the window, and 8 is not a constant.** A01 A.2 says "the last 8
@@ -61,6 +117,7 @@ const ABSENT = "?";
  * as three samples so far, growing rightward, rather than as a stretched curve
  * that will change shape as it fills.
  */
+
 export function sparkline(
   values: readonly (number | null)[],
   width: number,
@@ -86,40 +143,21 @@ export function sparkline(
   const readings = window.filter((v): v is number => v !== null && Number.isFinite(v));
   if (readings.length === 0) return " ".repeat(w); // cells-ok — a position count
 
-  const ramp = [...rampFor(caps)];
-  const min = Math.min(...readings);
-  const max = Math.max(...readings);
-
+  // **Normalised over the window it shows** (§2), which is the one thing the
+  // heatmap does differently: it passes the whole matrix's range instead, and
+  // that is what makes its rows comparable to each other.
+  //
   // No division by the range (I3). A constant window has no normalised position,
-  // and the middle step is the flat line the plot form draws for the same input.
-  const middle = Math.floor((RAMP_STEPS - 1) / 2);
-  const glyph = (v: number | null): string => {
-    if (v === null || !Number.isFinite(v)) return ABSENT;
-    if (max === min) return ramp[middle] ?? " ";
-    const t = (v - min) / (max - min);
-    const step = Math.round(t * (RAMP_STEPS - 1));
-    return ramp[step] ?? " ";
-  };
-
-  const drawn = window.map(glyph).join("");
-  // `cells()` and never `.length` (A03 SS23), and the padding must be measured
-  // the way the measurer measures or a table cell containing one would disagree
-  // with its planned width.
-  //
-  // **The sentence that used to be here said *every ramp glyph is one cell wide
-  // in both modes*, and it is not true of the unicode ramp.** `▁▂▃▄▅▆▇█` are all
-  // `East_Asian_Width=Ambiguous`, which means the **terminal** decides: one cell
-  // in a Western locale, two in a CJK one or under tmux's
-  // `utf8-ambiguous-width double`. `cells()` returns 1 for every one of them and
-  // has no ambiguous handling at all, so on such a terminal the framework's
-  // measurement and the drawn frame disagree by a factor of two — and because
-  // C11 calls this for a **table cell**, what breaks is column alignment for
-  // every row below, not a chart looking odd.
-  //
-  // **Fixed now, and in two places.** `rampFor` returns the braille ramp when
-  // the capability says wide — every glyph of which is narrow — and the padding
-  // below measures with the capability, so the two agree whichever ramp came
-  // back. Measuring alone would not have been enough: it would have padded the
-  // wide ramp correctly to a width no table cell could hold.
-  return " ".repeat(Math.max(0, w - cells(drawn, caps.ambiguousWidth))) + drawn;
+  // and `rampRow` answers the middle step, which is the flat line the plot form
+  // draws for the same input.
+  const drawn = rampRow(window, w, caps, {
+    min: Math.min(...readings),
+    max: Math.max(...readings),
+  });
+  // The padding is `rampRow`'s, measured with `cells()` and never `.length`
+  // (A03 SS23) — the way the measurer measures, or a table cell containing one
+  // would disagree with its planned width. `rampFor` is what makes that agree
+  // on a wide terminal: the block ramp is two cells per glyph there, so the fix
+  // was the glyphs and the measurement together.
+  return drawn;
 }

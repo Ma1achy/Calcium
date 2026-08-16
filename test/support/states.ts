@@ -130,6 +130,35 @@ export const STATES: readonly StateFixture[] = Object.freeze([
       ),
   },
   {
+    name: "plot-heatmap",
+    of: "plot",
+    why:
+      "a matrix that fell into the line arm is the right height, the right width and the wrong " +
+      "picture — the form switch was two-armed at four sites and three of them failed open",
+    rows: (w, caps, theme) =>
+      plot(
+        w,
+        caps,
+        theme,
+        block({
+          kind: "plot",
+          id: "st-heat",
+          form: "heatmap",
+          height: 4,
+          yFormat: "percent",
+          yMin: 0,
+          yMax: 100,
+          xLabels: ["-60 ticks", "", "now"],
+          series: [
+            { values: [2, 9, 24, 61, 88, 97, 74, 30, 11, 4, 2, 3, 8, 19, 44, 70], label: "api" },
+            { values: [40, 41, 39, 42, 40, 38, 41, 43, 40, 39, 41, 40, 42, 41, 39, 40], label: "worker" },
+            { values: [1, 2, 1, 3, 2, 1, 2, null, null, null, null, null, null, null, null, null], label: "cache" },
+            { values: Array.from({ length: 16 }, () => null), label: "db" },
+          ],
+        }),
+      ),
+  },
+  {
     name: "notice-continuation",
     of: "notice",
     why:

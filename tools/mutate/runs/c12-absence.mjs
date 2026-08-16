@@ -34,8 +34,8 @@ const results = runPass({
   run,
   control: {
     file: SPARK,
-    from: "    if (v === null || !Number.isFinite(v)) return ABSENT;",
-    to: "    if (!Number.isFinite(v)) return ramp[0] ?? ABSENT;",
+    from: "    if (v === null || !Number.isFinite(v)) return style.absent;",
+    to: "    if (v === null || !Number.isFinite(v)) return ramp[0] ?? style.absent;",
     why: "a gap drawn as the lowest step is a reading that never happened; a run where this survives cannot see a kill",
   },
   mutations: [
@@ -59,8 +59,8 @@ const results = runPass({
       // where a bursty stall lands. Every length assertion still passes.
       name: "a gap draws a blank, which is what the padding already means",
       file: SPARK,
-      from: '    if (v === null || !Number.isFinite(v)) return ABSENT;',
-      to: '    if (!Number.isFinite(v)) return " ";',
+      from: '    if (v === null || !Number.isFinite(v)) return style.absent;',
+      to: '    if (v === null || !Number.isFinite(v)) return " ";',
       expect: "T1.13",
     },
     {
@@ -79,8 +79,8 @@ const results = runPass({
       // whole row is wrong rather than one cell of it.
       name: "the range is computed over positions, so one gap flattens the row",
       file: SPARK,
-      from: "  const min = Math.min(...readings);\n  const max = Math.max(...readings);",
-      to: "  const min = Math.min(...window);\n  const max = Math.max(...window);",
+      from: "    min: Math.min(...readings),\n    max: Math.max(...readings),",
+      to: "    min: Math.min(...window.map((v) => Number(v))),\n    max: Math.max(...window.map((v) => Number(v))),",
       expect: "T1.13",
     },
     {

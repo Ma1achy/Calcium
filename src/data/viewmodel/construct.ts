@@ -28,6 +28,7 @@ import {
   type Glyph,
   type Notice,
   type Plot,
+  type PlotForm,
   type Tone,
   type ViewDocument,
 } from "./types.js";
@@ -84,11 +85,70 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
  * wrong-sized plots that nobody notices are wrong. `sparkline` is always 1 and
  * must not carry one.
  */
+/**
+ * Which forms declare a height. **A `Record` and not a condition on one member**:
+ * `form === "line"` was the check, so a third member needed no height and got
+ * `?? 1` — a one-row matrix, silently.
+ */
+const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
+  sparkline: false,
+  line: true,
+  // A matrix's row count is data, so its height must come from the block or I1
+  // fails through the data path (C12 §6a B1).
+  heatmap: true,
+};
+
 function checkPlotHeight(plot: Plot): void {
-  if (plot.form === "line" && plot.height === undefined) {
+  if (DECLARES_HEIGHT[plot.form] && plot.height === undefined) {
     throw new BlockShapeError(
-      `plot "${plot.id}": form "line" requires an explicit height (C04 §3, C12) — ` +
+      `plot "${plot.id}": form "${plot.form}" requires an explicit height (C04 §3, C12) — ` +
         `there is no default, because a defaulted height is wrong silently`,
+    );
+  }
+}
+
+/**
+ * A heatmap's three refusals (I50b, C12 §6a).
+ *
+ * **Refused rather than ignored, and that is the ruling.** A member that means
+ * nothing in one arm is indistinguishable from one not yet implemented, and the
+ * reader who finds it cannot tell which.
+ */
+function checkHeatmap(plot: Plot): void {
+  if (plot.form !== "heatmap") return;
+
+  if (plot.axes === false) {
+    throw new BlockShapeError(
+      `plot "${plot.id}": a heatmap cannot set "axes: false" (C04 I50b) — ` +
+        `the scale legend is the only thing that says what a cell means, so a ` +
+        `heatmap without one is unreadable rather than plain`,
+    );
+  }
+
+  const toned = plot.series.findIndex((s) => s.tone !== undefined);
+  if (toned !== -1) {
+    throw new BlockShapeError(
+      `plot "${plot.id}": series[${String(toned)}] sets a tone and a heatmap draws none ` +
+        `(C04 I50b) — magnitude owns the cell, so a per-row tone is a second colour ` +
+        `channel fighting the first`,
+    );
+  }
+
+  // **The one an app hits by accident**: rings of different ages give rows of
+  // different lengths, and the picture that produces is self-consistent and
+  // wrong — the renderer stretches a short row to the common width, so column k
+  // means a different instant in every row. Padding is the fix and only the app
+  // knows which end is old.
+  const first = plot.series[0];
+  if (first === undefined) return;
+  const ragged = plot.series.findIndex((s) => s.values.length !== first.values.length);
+  if (ragged !== -1) {
+    throw new BlockShapeError(
+      `plot "${plot.id}": series[${String(ragged)}] has ` +
+        `${String(plot.series[ragged]?.values.length ?? 0)} values and series[0] has ` +
+        `${String(first.values.length)} (C04 I50b) — a matrix's columns are one ordinate, ` +
+        `so a short row is stretched and column k means a different position in every row. ` +
+        `Pad it: the renderer cannot know which end is old`,
     );
   }
 }
@@ -130,6 +190,7 @@ function checkShape(block: Block): void {
       requireGlyph(block.tone, (block as Notice).glyph, `notice "${block.id}"`);
       break;
     case "plot":
+      checkHeatmap(block);
       checkPlotHeight(block);
       checkPlotFormat(block);
       break;
