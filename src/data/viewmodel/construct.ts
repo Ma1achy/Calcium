@@ -98,6 +98,24 @@ const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
   heatmap: true,
 };
 
+/**
+ * I50c — a cell carries at most one of `spark` and `bar`.
+ *
+ * **Both fill the planned width and return before truncation**, so a cell with
+ * both has two renderings and no rule for which wins. Refused rather than
+ * resolved by declaration order, because a reader cannot see which branch a
+ * renderer took and the picture is plausible either way.
+ */
+function checkCellContent(cell: Cell, where: string): void {
+  if (cell.spark !== undefined && cell.bar !== undefined) {
+    throw new BlockShapeError(
+      `${where}: a cell carries a "spark" and a "bar" (C04 I50c) — both fill the ` +
+        `planned width, so there is no rule for which wins and the frame is ` +
+        `plausible either way`,
+    );
+  }
+}
+
 function checkPlotHeight(plot: Plot): void {
   if (DECLARES_HEIGHT[plot.form] && plot.height === undefined) {
     throw new BlockShapeError(
@@ -198,6 +216,7 @@ function checkShape(block: Block): void {
       for (const row of block.rows) {
         for (const [key, cell] of Object.entries(row.cells)) {
           requireGlyph(cell.tone, cell.glyph, `table "${block.id}" row "${row.id}" cell "${key}"`);
+          checkCellContent(cell, `table "${block.id}" row "${row.id}" cell "${key}"`);
         }
       }
       break;
@@ -336,5 +355,6 @@ export function document(spec: ViewDocument): ViewDocument {
 /** A cell, checked for I6 in isolation — used by C24's `b` when building rows. */
 export function cell(spec: Cell): Cell {
   requireGlyph(spec.tone, spec.glyph, "cell");
+  checkCellContent(spec, "cell");
   return deepFreeze(spec);
 }

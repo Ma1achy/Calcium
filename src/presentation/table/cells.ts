@@ -11,7 +11,7 @@
  */
 import { glyphFor, glyphs } from "../blocks/glyphs.js";
 import { fit, pad, padStart, tone, type Span } from "../blocks/paint.js";
-import { sparkline } from "../plot/index.js";
+import { sparkline, valueBar } from "../plot/index.js";
 import { stripControl, truncate } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
@@ -112,6 +112,21 @@ export function rowSpans(
     if (cell?.spark !== undefined) {
       spans.push({
         text: sparkline(cell.spark, planned.width, ctx.capabilities),
+        style: tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities),
+      });
+      return;
+    }
+
+    // **A `bar` cell is the same seam as `spark`** (C12 §3b, C12 I20): exactly
+    // `planned.width` cells and one row, so it returns before the truncation
+    // below for the same reason — the run is already the width, and truncating
+    // it would shorten the axis rather than the text.
+    //
+    // C04 I50c refuses a cell carrying both, so the order of these two branches
+    // decides nothing.
+    if (cell?.bar !== undefined) {
+      spans.push({
+        text: valueBar(cell.bar, planned.width, ctx.capabilities),
         style: tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities),
       });
       return;

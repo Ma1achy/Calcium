@@ -29,6 +29,7 @@ const EXPECTED_STATES = [
   "plot-gapped-sparkline",
   "plot-zero-minimum",
   "prompt-paste-chip",
+  "table-value-bar",
 ] as const;
 
 describe("the corpus's second axis", () => {

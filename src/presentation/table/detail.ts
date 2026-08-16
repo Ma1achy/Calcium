@@ -13,7 +13,7 @@
  * *aggressively* safe, which is why the drop tables can be as aggressive as they
  * are.
  */
-import { sparkline } from "../plot/index.js";
+import { sparkline, valueBar } from "../plot/index.js";
 import type { Block, ColumnDef, KeyValue, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { PlannedColumns } from "./plan.js";
@@ -88,12 +88,22 @@ export function detailBlocks(
     // approximately true. A renderer probing for its own capabilities is what C09
     // I3 forbids, and threading them into `measure` to avoid a branch here would
     // be that in a longer form.
+    // **A `bar` cell is the same case as `spark`** (C12 §3b): its value is the
+    // quantity, its text is empty by design, and rendering the text alone would
+    // name the field in the expand row and show nothing for it. Same width, same
+    // capability-optional path, and for the same reason — a run and a ramp are
+    // both one cell per glyph, so the placeholder and the rendering occupy the
+    // same eight cells and I1 stays exact.
     const value =
-      cell?.spark === undefined
-        ? (cell?.text ?? "")
-        : caps === undefined
+      cell?.spark !== undefined
+        ? caps === undefined
           ? " ".repeat(SPARK_CELLS)
-          : sparkline(cell.spark, SPARK_CELLS, caps);
+          : sparkline(cell.spark, SPARK_CELLS, caps)
+        : cell?.bar !== undefined
+          ? caps === undefined
+            ? " ".repeat(SPARK_CELLS)
+            : valueBar(cell.bar, SPARK_CELLS, caps)
+          : (cell?.text ?? "");
 
     return cell?.tone === undefined
       ? { label, value }

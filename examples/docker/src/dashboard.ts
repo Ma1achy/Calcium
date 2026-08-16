@@ -281,13 +281,48 @@ export const COLUMNS: readonly ColumnDef[] = [
   b.col("usage", { label: "USAGE", priority: 40, minWidth: 18 }),
 ];
 
+/**
+ * The tone a load takes, and **it stays here on purpose** (C04 I50c, C12 §3b).
+ *
+ * `Cell.bar` draws the run and this decides what the colour means. A framework
+ * that shipped thresholds would ship arbitrary numbers for everyone, and gap 3's
+ * own statement is that the app should not have to *invent numbers to express a
+ * quantity* — not that 60 and 85 are wrong. So the drawing moved and the numbers
+ * did not.
+ *
+ * **`warn` at both levels, and the frame is why.** The first version used the
+ * `error` glyph above 85 and rendered `✗ ████████ 101.2%`, which reads as a
+ * container that has *failed* when the truth is that it is working as hard as it
+ * can. The tone still carries two levels, so amber and red separate the bands
+ * without the mark claiming a failure that has not happened.
+ *
+ * C04 I6 obliges a glyph on `warn` and `error`, and the throw lands inside C23's
+ * `appendAndCommit`, which catches and commits anyway — so a missing glyph here
+ * is every busy container producing no entry at all, silently.
+ */
+const BUSY = 60;
+const HOT = 85;
+
+function loadTone(value: number | null): { tone: Tone; glyph?: Glyph } {
+  if (value === null) return { tone: "muted" };
+  if (value >= HOT) return { tone: "error", glyph: "warn" };
+  if (value >= BUSY) return { tone: "warn", glyph: "warn" };
+  return { tone: "default" };
+}
+
 function rowOf(c: Joined, unicode: boolean): TableRow {
   const { glyph, tone } = stateOf(c.state);
   const absent = unicode ? ALPHABET.full.absent : ALPHABET.ascii.absent;
   return b.row(c.id, {
     name: { text: c.name, glyph, tone },
-    cpu: bar(c.cpu, unicode),
-    mem: bar(c.memPerc, unicode),
+    // **`Cell.bar` draws it now** (C04 I50c). Nine lines of hand-drawn run,
+    // `unicode` threaded from `main.ts` because an adapter has no capabilities
+    // (F43), and a `padEnd` to a width the column already plans — all of it the
+    // framework's, and the app keeps the one decision it is entitled to make.
+    // `text: ""` because a cell's `text` is required and a bar's value is its
+    // quantity — the same shape a `spark` cell has, and the same small friction.
+    cpu: { text: "", bar: { value: c.cpu, max: 100, format: "percent" }, ...loadTone(c.cpu) },
+    mem: { text: "", bar: { value: c.memPerc, max: 100, format: "percent" }, ...loadTone(c.memPerc) },
     usage: c.memText === "" ? { text: absent, tone: "muted" } : { text: c.memText },
   });
 }

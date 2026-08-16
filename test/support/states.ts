@@ -33,10 +33,12 @@
 // What makes it cheap enough to be made: an entry is a name, a reason and a
 // function returning rows. Adding one is three lines and the frame comes free.
 import { block, type BlockKind } from "../../src/data/viewmodel/index.js";
+import { b } from "../../src/shell/builders/index.js";
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { measurable } from "./render.js";
 import { noticeDoc } from "../../src/shell/documents.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
@@ -156,6 +158,31 @@ export const STATES: readonly StateFixture[] = Object.freeze([
             { values: Array.from({ length: 16 }, () => null), label: "db" },
           ],
         }),
+      ),
+  },
+  {
+    name: "table-value-bar",
+    of: "table",
+    why:
+      "the tree hand-wrote nine lines of this rather than bend `b.progress`, and the run is a " +
+      "picture — a fill that clamped its number would draw a busy container like a saturated one",
+    rows: (w, caps, theme) =>
+      measurable({ definitions: [tableDefinition], theme, capabilities: caps }).renderToLines(
+        block({
+          kind: "table",
+          id: "st-bar",
+          columns: [
+            b.col("name", { label: "NAME", priority: 90, minWidth: 8 }),
+            b.col("cpu", { label: "CPU", priority: 80, minWidth: 18 }),
+          ],
+          rows: [
+            { id: "r1", cells: { name: { text: "api" }, cpu: { text: "", bar: { value: 4.2, max: 100, format: "percent" } } } },
+            { id: "r2", cells: { name: { text: "worker" }, cpu: { text: "", bar: { value: 101.2, max: 100, format: "percent" }, tone: "error", glyph: "warn" } } },
+            { id: "r3", cells: { name: { text: "db" }, cpu: { text: "", bar: { value: null, max: 100 }, tone: "muted" } } },
+            { id: "r4", cells: { name: { text: "idle" }, cpu: { text: "", bar: { value: 0, max: 100, format: "percent" } } } },
+          ],
+        }),
+        w,
       ),
   },
   {

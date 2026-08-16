@@ -26,6 +26,7 @@ import {
 } from "../../src/presentation/plot/ramp.js";
 import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
+import { valueBar } from "../../src/presentation/plot/bar.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { DARK_THEME, measurable } from "../support/render.js";
@@ -772,5 +773,83 @@ describe("C12 I17 — the heatmap", () => {
     );
     expect(rows.join("\n")).toContain("+2 more");
     expect(rows.join("\n")).toContain("third");
+  });
+});
+
+describe("C12 I20 — the value bar, the `fill` encoding", () => {
+  const draw = (spec: Parameters<typeof valueBar>[0], width = 20, caps = FULL_CAPS): string =>
+    valueBar(spec, width, caps);
+
+  it("T1.25 (I20, C09 I28): the fill clamps at the scale's top and the number does not", () => {
+    // **One ruling for both fill forms now.** A per-core CPU percentage has no
+    // knowable ceiling, so a bar that stopped at its top would draw a busy
+    // container exactly like a saturated one — asserted as a *difference*,
+    // because each frame alone is plausible and the defect was that they matched.
+    const over = draw({ value: 101.2, max: 100, format: "percent" });
+    const full = draw({ value: 100, max: 100, format: "percent" });
+
+    expect(over).toContain("101%");
+    expect(over).not.toBe(full);
+    expect(cells(over, "narrow"), "and the run still stops at its cells").toBe(20);
+
+    // **A large overshoot, because 101 of 100 does not distinguish the clamp.**
+    // The mutation pass found this: unclamping the fill survived every row here,
+    // since `round(1.012 * run)` is already `run` and the width is held by the
+    // truncation either way. At 500% an unclamped run is 75 cells in a 20-cell
+    // column, so the *number* is what the truncation eats — the reading
+    // disappears and the bar looks merely full.
+    const wild = draw({ value: 500, max: 100, format: "percent" }, 20);
+    expect(cells(wild, "narrow")).toBe(20);
+    expect(wild, "the number survives an overshoot of any size").toContain("500%");
+  });
+
+  it("T1.26 (I20, C04 I50c): an absent value is a mark, not an empty run", () => {
+    // **The one geometry where an empty drawing is a legible value.** A blank
+    // grid cell means nothing was reported; a blank run means zero. So absence
+    // is a mark here and a blank in a heatmap — the same question answered per
+    // geometry, which is the encoding rule applied to absence.
+    const absent = draw({ value: null, max: 100 });
+    const zero = draw({ value: 0, max: 100, format: "percent" });
+
+    expect(absent.trim(), "an em-dash at unicode").toBe("—");
+    expect(absent).not.toBe(zero);
+    expect(zero, "zero draws an empty run and says so").toContain("0%");
+    expect(draw({ value: null, max: 100 }, 20, ASCII_CAPS).trim()).toBe("-");
+  });
+
+  it("T1.27 (I20): exactly `width` cells at every width, and the run takes the residual", () => {
+    for (const width of [1, 4, 8, 20, 80]) {
+      const drawn = draw({ value: 42, max: 100, format: "percent" }, width);
+      expect(cells(drawn, "narrow"), `width ${String(width)}`).toBe(width);
+      expect(drawn).not.toContain("\n");
+    }
+
+    // Below the minimum run the number is the whole cell: a two-cell bar is not
+    // a bar, it is a decoration that looks like data.
+    expect(draw({ value: 42, max: 100, format: "percent" }, 5).trim()).toBe("42%");
+    // And the run grows with the width rather than the number doing so.
+    const narrow = draw({ value: 50, max: 100, format: "percent" }, 12);
+    const wide = draw({ value: 50, max: 100, format: "percent" }, 30);
+    expect([...wide].filter((c) => c === "█").length).toBeGreaterThan(
+      [...narrow].filter((c) => c === "█").length,
+    );
+  });
+
+  it("T1.27 (I20, C12 I3): a scale with no extent has no proportion", () => {
+    // `max === min` is a division by zero one form over, and the honest answer
+    // is an empty run — *zero of nothing* — rather than a full one.
+    const flat = draw({ value: 5, max: 0, min: 0, format: "number" });
+    expect(flat).not.toContain("█");
+    expect(flat).toContain("5");
+  });
+
+  it("T1.27 (I20): the alphabet substitutes, which is the reason this is not the app's", () => {
+    // `examples/docker` threaded a `unicode` flag by hand because an adapter has
+    // no capabilities (F43, F54), and at `LANG=C` its blocks passed through
+    // untouched beside a plot that had correctly degraded.
+    const drawn = draw({ value: 60, max: 100, format: "percent" }, 20, ASCII_CAPS);
+    expect(drawn).toContain("#");
+    expect(drawn).not.toContain("█");
+    expect(cells(drawn, "narrow")).toBe(20);
   });
 });

@@ -44,6 +44,7 @@ export type {
   Pills,
   Plot,
   PlotForm,
+  BarSpec,
   Progress,
   Raw,
   Result,

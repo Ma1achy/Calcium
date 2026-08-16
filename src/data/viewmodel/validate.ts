@@ -251,6 +251,23 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
           // I46 — the second numeric array, and the one no round trip would
           // have surfaced: a sparkline drawn from a cell's own numbers.
           requireFiniteNumbers(cell["spark"], e, `${at} cell "${key}"`, "spark");
+          // I50c — both fill the planned width, so a cell with both has two
+          // renderings and no rule for which wins.
+          if (cell["spark"] !== undefined && cell["bar"] !== undefined) {
+            e.push(
+              `${at} cell "${key}": carries a "spark" and a "bar" (C04 I50c) — both fill ` +
+                `the planned width, so there is no rule for which wins`,
+            );
+          }
+          if (isRecord(cell["bar"])) {
+            const spec = cell["bar"];
+            if (spec["value"] !== null && !isFiniteNumber(spec["value"])) {
+              e.push(`${at} cell "${key}": "bar.value" must be a finite number or null (C04 I50c)`);
+            }
+            if (!isFiniteNumber(spec["max"])) {
+              e.push(`${at} cell "${key}": "bar.max" must be a finite number (C04 I50c)`);
+            }
+          }
         }
       }
 

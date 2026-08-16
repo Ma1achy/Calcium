@@ -248,6 +248,36 @@ export type Cell = Readonly<{
   glyph?: Glyph;
   /** Inline sparkline. `null` is a gap — a position with no reading (I46a). */
   spark?: readonly (number | null)[];
+  /**
+   * A quantity against a scale, drawn as a run (I50c, C12 I20).
+   *
+   * **Not `progress`, and the difference is what the number means.** A `total`
+   * is reached; a scale's top may be exceeded and may not be knowable — a
+   * per-core CPU percentage, a quota that can be over-committed. `examples/docker`
+   * hand-wrote nine lines of this rather than bend `b.progress`, which is the
+   * gap stated by a workaround (FINDINGS gap 3).
+   *
+   * The cell's own `tone` and `glyph` carry the colour, which is why `BarSpec`
+   * has neither: a framework that shipped thresholds would ship arbitrary
+   * numbers for everyone.
+   */
+  bar?: BarSpec;
+}>;
+
+/** A quantity against a scale (I50c, C12 §3b). */
+export type BarSpec = Readonly<{
+  /** `null` is absent, and it draws a mark — never an empty run, which reads as zero. */
+  value: number | null;
+  /** The scale's top. The fill clamps here and the number does not (C09 I28). */
+  max: number;
+  /** The scale's floor. Zero unless a surface says otherwise. */
+  min?: number;
+  /**
+   * The unit the value arrived in — **`yFormat`'s vocabulary, deliberately**.
+   * A bar's number and a plot's y-label ask the same question, and a second
+   * enum would be a second place for I41's `fraction`/`percent` confusion.
+   */
+  format?: Plot["yFormat"];
 }>;
 
 /**

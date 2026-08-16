@@ -12,3 +12,4 @@
  */
 export { plotDefinition } from "./definition.js";
 export { sparkline } from "./sparkline.js";
+export { valueBar } from "./bar.js";

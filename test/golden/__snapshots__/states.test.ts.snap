@@ -20,6 +20,12 @@ worker |                ================
     db |
         -60 ticks                    now
 .:-=+*#@  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       #.............. 4%
+worker    ############# 101%
+db        -                 
+idle      ............... 0%
 ── notice · notice-continuation
   \` queued behind /logs
 ── prompt · prompt-paste-chip
@@ -47,6 +53,12 @@ worker |                                                        ================
     db |
         -60 ticks                                                            now
 .:-=+*#@  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       #.............. 4%
+worker    ############# 101%
+db        -                 
+idle      ............... 0%
 ── notice · notice-continuation
   \` queued behind /logs
 ── prompt · prompt-paste-chip
@@ -73,6 +85,12 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db │
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░░░ 4%
+worker    █████████████ 101%
+db        —                 
+idle      ░░░░░░░░░░░░░░░ 0%
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -100,6 +118,12 @@ worker │                                                        ⠶⠶⠶⠶�
     db │
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░░░ 4%
+worker    █████████████ 101%
+db        —                 
+idle      ░░░░░░░░░░░░░░░ 0%
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -126,6 +150,12 @@ worker |                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db |
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░ …
+worker    ████████ …
+db        —                
+idle      ░░░░░░░░ …
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -153,6 +183,12 @@ worker |                                                        ⠶⠶⠶⠶⠶�
     db |
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░ …
+worker    ████████ …
+db        —                
+idle      ░░░░░░░░ …
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -179,6 +215,12 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db │
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░░░ 4%
+worker    █████████████ 101%
+db        —                 
+idle      ░░░░░░░░░░░░░░░ 0%
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -206,6 +248,12 @@ worker │                                                        ⠶⠶⠶⠶�
     db │
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░░░ 4%
+worker    █████████████ 101%
+db        —                 
+idle      ░░░░░░░░░░░░░░░ 0%
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -232,6 +280,12 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db │
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░░░ 4%
+worker    █████████████ 101%
+db        —                 
+idle      ░░░░░░░░░░░░░░░ 0%
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -259,6 +313,12 @@ worker │                                                        ⠶⠶⠶⠶�
     db │
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░░░ 4%
+worker    █████████████ 101%
+db        —                 
+idle      ░░░░░░░░░░░░░░░ 0%
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip

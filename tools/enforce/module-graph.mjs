@@ -1396,7 +1396,19 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "**F99** — and this one is *semantic* rather than box-drawing, so a theme declaring " +
     "it gets nothing and the absence reads as a theme error rather than a missing renderer",
   "GlyphSet.warning": "**F99** — as `blocked`, semantic",
-  "GlyphSet.bar": "**F99** — as `teeLeft`",
+  // **`GlyphSet.bar` was here and MG24 can no longer see it.** It is still
+  // unconsumed — nothing reads `g.bar`, the `▌`/`|` pair F99 recorded — but
+  // `Cell.bar` landed and MG24 matches published members **by name**, so a read
+  // of `cell.bar` clears an unrelated `GlyphSet.bar`. The rule reported itself
+  // as *no longer unconsumed* and asked for the entry to be deleted, which is
+  // correct about the entry and wrong about the member.
+  //
+  // This is F105/F160's blind spot arriving as a concrete loss rather than a
+  // statistic: the exactness figure says 391 of 1231 members are uniquely named,
+  // and `bar` left that set the day a second one appeared. Recorded here because
+  // deleting the row is how the fact would otherwise disappear — the rule's own
+  // sentence, *an exemption that outlives its reason is how the list stops being
+  // read*, applied to the thing the exemption was about.
   "VerbRatio.derived":
     "**F99** — three of a five-field record are dead while `recorded` and `flagged` are " +
     "read, so the arithmetic producing them runs on every call and is discarded. A " +
