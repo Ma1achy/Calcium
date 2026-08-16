@@ -347,7 +347,7 @@ overlap; a row governed by one rule is a restatement of that rule and finds noth
 | **A4** | I3 — a constant range maps to the centre · a heatmap has no y-labels to say what the centre is | one value repeated across every cell | mid-step is right **and insufficient**: the block owes a **legend row** naming the range. Hence `axes: false` refused, and the legend is counted like an axis row — declared, data-independent, I1 safe |
 | **A5** | I1 — height is declared, never derived · I8 — a series that cannot be given a row is named, never dropped | more rows than the declared height | I8's answer, unchanged: the rows that fit, plus a legend naming the rest. **The "truncation marker" is that legend row and not a field** — §5's prose says *sets a truncation marker*, and the mechanism is a `warn`-toned line in `stackedRows`. Checked because a ruling that names an operation must name one that exists |
 | **A6** | §2 — the sparkline normalises over the window it shows · a matrix's cells must be comparable across rows | two rows of different magnitude | one range over the whole matrix. **This is the difference between a heatmap and N stacked sparklines**, and it is `seriesRange`'s existing behaviour rather than a new rule |
-| **A7** | C04 I50a — at most eight series, because the categorical palette distinguishes eight · a heatmap carries **no** per-row colour | a matrix of nine containers | the cap is a rule about **colour**, applied to the one form that has none. It must not bind here — a matrix of eight rows is not a matrix. The limit moves from *series count* to *series count where a per-series colour is drawn* |
+| **A7** | C04 I50a — at most eight series, because the categorical palette distinguishes eight · a heatmap carries **no** per-row colour | a matrix of nine containers | the cap is a rule about **colour** applied to the one form that has none, so it has no subject here and does not bind. **Recast onto the declared `form`, not onto a series count** — see below |
 
 **A1's ruling found a shipped defect, and it is in neither form of the block.** `RAMP_BRAILLE`'s
 first step is `U+2800`, BRAILLE PATTERN BLANK — so on a terminal declaring `ambiguousWidth:
@@ -367,7 +367,29 @@ both conventions — which also reads like the block ramp it stands in for rathe
 It matters twice over for a heatmap, whose whole subject is magnitude carried by a glyph: an
 idle row must not read as an absent one.
 
-**And the form switch is two-armed at four sites**, so a third member is absorbed in silence:
+**A7's recast, because *the limit is about something else or it is nothing* is the question it
+has to answer.** It is nothing — and the reason has to be *the palette is never consulted*
+rather than *the picture survives*, because those two are not the same argument and only the
+first generalises.
+
+The tempting recast is *series count where a per-series colour is drawn*, and it is wrong in a
+way worth recording: **it makes the cap depend on the colour depth, which construction cannot
+see.** At `colourDepth: 1` a multi-series `line` plot stacks and distinguishes spatially, so by
+that wording nine series would be legal on a monochrome terminal and refused on a colour one —
+a document whose validity depends on the machine reading it. So `line` and `sparkline` keep the
+cap **unconditionally**: a document that renders honestly at only one depth is not one this type
+should accept.
+
+The heatmap is exempt on a stronger footing. It carries magnitude in the ramp glyph at **every**
+depth — the 1-bit rung is not a degradation, because the glyph was always the channel — so the
+categorical palette is never read, and a rule about which colours are distinguishable has
+nothing to say. **The cap moves from the series count to the declared `form`**, which is a
+property a constructor can see and a reader can check.
+
+**And the figure is the argument for bothering**: eight rows is not a matrix. The dashboard's
+own ring set is uncapped by design, and a machine with nine containers is ordinary.
+
+**The form switch is two-armed at four sites**, so a third member is absorbed in silence:
 
 ```
 height.ts:45,51      form === "sparkline" ? 1 : …      a heatmap takes the line arm
