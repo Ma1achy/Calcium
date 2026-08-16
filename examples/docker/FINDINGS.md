@@ -8858,3 +8858,51 @@ Not by a test written for it, and not by reading. `test/contract/plot.test.ts` s
 and the run had to be bisected to find which file, then which corpus entry. **The fuzz corpus is
 the instrument** — `[Number.MIN_VALUE, Number.MIN_VALUE * 2]` is in it for exactly this, and it
 is the same entry that found `decimalsFor`'s `toFixed` RangeError.
+
+---
+
+## F179 — the accessibility theme drew every series in one colour ★★★★
+
+| | |
+|---|---|
+| **Surface** | `tokens-high-contrast.ts`, and every multi-series plot or `pills` block under it |
+| **Reached for** | F172's gate, on its first run |
+| **Verdict** | **shipped, silent, and on the theme where it costs most** |
+| **Absorbed by** | the theme gains `categorical`; C10 I30 is what found it |
+
+The high-contrast theme declares `tone`, `syntax` and `spectrum` and **no `categorical`
+palette**. The framework resolves `categorical.c1`–`c8` for a plot's series and a chip's fill, so
+under that theme `resolve` returned `NO_STYLE` for all eight and every series drew in the default
+foreground.
+
+**One colour, on the theme a reader chooses when they most need to tell things apart.**
+
+### Why nothing saw it
+
+`NO_STYLE` is what a *decoration palette at one bit* also returns, correctly. So the frame under
+high-contrast is byte-identical to a correct frame under a 1-bit terminal, and every assertion
+about widths, heights, glyphs and row counts passes — C12 I50a caps series at eight *because* the
+palette distinguishes eight, and the cap was enforced against a palette that was not there.
+
+**The contrast suite could not reach it either**, and for a reason worth stating: `resolve.ts`
+skips the contrast gate for `carries !== "meaning"`, so a decoration palette is checked by
+nothing. A missing one is checked by nothing twice over.
+
+### The omission was not a ruling
+
+The theme's header is unusually explicit about what it cannot promise — *at 4-bit it is not
+provable at all* — and says nothing about `categorical`. It carries `spectrum`, which is also
+`carries: "decoration"`, so there was no principle refusing decoration here. It was left out.
+
+**The remedy is the dark variant's eight**, and that is a ruling rather than a copy: they are
+Okabe–Ito, chosen for distinguishability under the three common colour-vision deficiencies, which
+is exactly the property this theme exists to maximise. A set solved for luminance alone would be
+worse at the thing being solved for. The ground moves from `#1a1a1a` to `#000000`, which raises
+every ratio rather than lowering it.
+
+### What it says about the instrument
+
+F172 was filed as *a defect that becomes reachable when `continuous` lands*. The gate written for
+that future case found a present one on its first run, in a file nobody was editing. **A rule
+that can fire is worth more than the case it was written for** — and the case it was written for
+has not happened yet.

@@ -213,6 +213,22 @@ export type Glyph =
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
 
+/**
+ * Every tone, as a value — the union is a type and a theme has to be checked
+ * against something at run time (C10 I30, F172).
+ *
+ * **`satisfies Record<Tone, true>` rather than an array**, which is the lesson
+ * `GLYPH_MEMBERS` in `validate.ts` records: a `Set<Tone>` type-checks with a
+ * member missing, because an element type constrains what may go in and says
+ * nothing about what must. A tone added without an entry here stops compiling.
+ */
+const TONE_MEMBERS = {
+  default: true, dim: true, muted: true, ok: true, warn: true,
+  error: true, info: true, accent: true, meta: true, identifier: true,
+} satisfies Record<Tone, true>;
+
+export const TONES: readonly Tone[] = Object.freeze(Object.keys(TONE_MEMBERS) as Tone[]);
+
 export type Action =
   | Readonly<{ kind: "fill"; label: string; command: string }>
   | Readonly<{ kind: "exec"; label: string; command: string }>

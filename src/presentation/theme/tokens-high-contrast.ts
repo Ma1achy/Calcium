@@ -149,6 +149,42 @@ export const HIGH_CONTRAST: ThemeTokens = Object.freeze({
       }),
     }),
 
+    /**
+     * **Absent until F172's gate ran, and every multi-series plot paid for it.**
+     * The framework resolves `categorical.c1`–`c8` for a plot's series and for a
+     * `pills` chip; this theme declared no such palette, so `resolve` returned
+     * `NO_STYLE` and eight series drew in one colour — the default foreground —
+     * on the theme a reader chooses when they most need to tell things apart.
+     * Silent, because a missing palette and a decoration palette collapsed at
+     * one bit are the same value to every caller (C10 I30, FINDINGS F179).
+     *
+     * **The same eight as the dark variant, and that is a ruling rather than a
+     * copy.** They are Okabe–Ito, chosen for distinguishability under the three
+     * common colour-vision deficiencies — which is precisely the property this
+     * theme exists to maximise, and a set solved for luminance alone would be
+     * worse at it. The ground differs by `#1a1a1a` against `#000000`, which
+     * raises every ratio rather than lowering it.
+     *
+     * **Decoration, so no floor applies** (§2, and `resolve.ts` skips the
+     * contrast gate for `carries !== "meaning"`). Stated here rather than
+     * discovered: a categorical slot is never the only carrier — C12 stacks its
+     * series at one bit and C09 pairs a chip with its text — so the exemption is
+     * D29 holding, not a floor being waived.
+     */
+    categorical: Object.freeze({
+      carries: "decoration",
+      monochrome: "foreground",
+      slots: Object.freeze({
+        c1: "#e69f00",
+        c2: "#56b4e9",
+        c3: "#3cbf9a",
+        c4: "#f0e442",
+        c5: "#8fa8ff",
+        c6: "#f07a3c",
+        c7: "#e4a3c4",
+        c8: "#cfcfcf",
+      }),
+    }),
     spectrum: Object.freeze({
       carries: "decoration",
       monochrome: "foreground",

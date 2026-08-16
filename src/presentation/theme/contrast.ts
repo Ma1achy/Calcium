@@ -14,6 +14,7 @@
  */
 
 import type { PaletteSpec, ThemeError, ThemeTokens } from "./types.js";
+import { TONES } from "../../data/viewmodel/index.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -199,6 +200,77 @@ function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
  * Every failure, not the first. A theme with four bad tones should be fixed in
  * one pass, and a validator that stops at the first turns that into four.
  */
+
+/**
+ * Every palette family the framework itself resolves against, and the slots it
+ * asks for (I30, F172).
+ *
+ * **The theme is checked here because a document cannot be.** `resolve` returns
+ * `NO_STYLE` when a palette is missing *and* when a decoration palette collapses
+ * at 1-bit, so *this reference does not exist* and *this reference means nothing
+ * here* are one value to every caller — a span painted in the default
+ * foreground, legible, plausible, and not what the block asked for. Nothing
+ * downstream can tell them apart and nothing downstream should have to: the set
+ * of references **the framework can produce** is closed, so it is checkable once,
+ * against the theme, at the moment the theme is resolved.
+ *
+ * **What it cannot reach, stated because an unrecorded limit reads as strength.**
+ * An *app* writing `continuous.s99` against a family that exists is still
+ * silent — `ColourRef` is `` `${string}.${string}` `` and published. What this
+ * closes is the case F172 was filed for: a family that is not there at all,
+ * which is what the first thing written against a new palette hits.
+ *
+ * **Derived rather than restated where the vocabulary has a value.** `TONES` is
+ * C04's, so a tone added without a theme slot fails here rather than rendering
+ * uncoloured. `syntax` and `categorical` are listed, and
+ * `theme-required.test.ts` holds them to the real vocabularies by equality —
+ * the arm `MARK_EXEMPTIONS` and `RAMP_VOCABULARIES` both have.
+ */
+export const REQUIRED_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  tone: TONES,
+  categorical: Object.freeze(["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"]),
+  syntax: Object.freeze([
+    "keyword", "string", "comment", "number", "key",
+    "type", "function", "operator", "punctuation",
+  ]),
+});
+
+/**
+ * The families and slots a theme must carry (I30).
+ *
+ * **At resolve time, which is where C10 already refuses a palette whose slots
+ * render as one another.** A theme that cannot answer a reference the framework
+ * will make is a theme that paints the wrong thing on every frame, and the
+ * failure it produces without this — an uncoloured span — is indistinguishable
+ * from a correct one at a glance and from a deliberate one at any distance.
+ */
+function validateRequiredSlots(tokens: ThemeTokens): readonly ThemeError[] {
+  const errors: ThemeError[] = [];
+  for (const [family, slots] of Object.entries(REQUIRED_SLOTS)) {
+    const palette = tokens.palettes[family];
+    if (palette === undefined) {
+      errors.push({
+        path: `palettes.${family}`,
+        message:
+          `the framework resolves \`${family}.*\` and this theme declares no such palette ` +
+          `(C10 I30) — every reference to it would return no style, which renders as the ` +
+          `default foreground and is indistinguishable from a block that asked for one`,
+      });
+      continue;
+    }
+    for (const slot of slots) {
+      if (palette.slots[slot] !== undefined) continue;
+      errors.push({
+        path: `palettes.${family}.${slot}`,
+        message:
+          `the framework resolves \`${family}.${slot}\` and this theme has no such slot ` +
+          `(C10 I30) — it would paint as the default foreground, silently`,
+      });
+    }
+  }
+  return Object.freeze(errors);
+}
+
 export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   const errors: ThemeError[] = [];
   const surfaces = Object.entries(tokens.surfaces);
@@ -218,6 +290,7 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
     errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg));
   }
 
+  errors.push(...validateRequiredSlots(tokens));
   errors.push(...validateDiffSurfaces(tokens));
   errors.push(...validateVariant(tokens));
 
