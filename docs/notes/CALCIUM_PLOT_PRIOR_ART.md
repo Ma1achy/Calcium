@@ -1094,3 +1094,70 @@ legend         right, bottom, or inline — granite's `legendPos`, and it is the
 **The drop order matters and should be stated**: at eight rows a plot has the curve, the axis
 and nothing else. **A title that survives while the axis is dropped is the wrong priority**, and
 that is a ruling rather than a layout accident.
+
+
+---
+
+## The planning pass, first instalment — three types with their consumers measured
+
+**This discharges part of the first bullet in the header, and only part.** Three types were
+named by an outside measurement rather than by this survey: they are what
+`simple-ascii-chart` offers that C12 cannot draw, found while vetting it as a dependency and
+refusing it on fit (`DEPENDENCIES.md`). Three of ~40, checked against the tree rather than
+reasoned about — which is the difference between a consumer and a plausible consumer.
+
+**The tree draws exactly one plot today.** `examples/docker/src/container.ts` — a CPU line per
+container, from a ring, `yMin: 0` and no ceiling. That is the whole of the shipped plot
+population, and every claim below is measured against it and against the surfaces around it.
+
+### 1 · A categorical bar chart on axes — a consumer that is already served
+
+*N entities, one magnitude each, on a shared axis.* The consumer is real and named:
+per-container memory in `resources.ts`, image sizes in a `docker images` surface.
+
+**But it is drawn today, and not as a gap.** `Cell.spark` puts a sparkline inside a table cell,
+rendered in two places (`table/cells.ts:114`, `table/detail.ts:96`), so *compare N entities* is a
+table with a magnitude column — numbers a reader can read plus a shape they can scan. **So this
+is a design question, not a missing capability**, and the planning pass owes the comparison
+rather than the build: a bar per category on a shared axis against a column of numbers with a
+spark beside it. **The dependency vetting called it a form the tree cannot draw, and that was
+true about `plot` and misleading about the tree** — which is the compression class, caught here
+rather than after something was built on it.
+
+### 2 · The heatmap — a real consumer, and the blocker is a vocabulary change C12 already routed around
+
+*Entity × time, or entity × entity.* The consumer is the multi-container ring: `history.ts`
+accumulates a value per tick because `b.live` re-renders from the latest fetch alone, and one
+container's CPU across ticks is one row of a matrix that has as many rows as there are
+containers.
+
+**And the blocker is already documented, in the entry that worked around it.** `Series.values`
+is `readonly number[]` **with no gap value**, so a tick that produced nothing cannot be drawn —
+S3_WALK A2 ruled the sample dropped and the gap *counted* (`58 samples · 63 ticks`) precisely
+because the three alternatives all lie. A heatmap cannot take that route: an absent cell in a
+matrix is a position, not a sample that can be omitted, and every library that models one gives
+it a null (`HeatmapValue = string | number | null`).
+
+**So the heatmap is not a renderer bolted onto C12 — it needs a nullable ordinate**, which is a
+published-type change and therefore freeze-relevant, and which the plot has already paid for
+once in a workaround. That is the strongest argument in this section and it came from reading
+the consumer rather than the chart.
+
+### 3 · The candlestick — no consumer, and this is what F21's shape looks like from inside
+
+*OHLC over time.* **Nothing in the tree, in the S-series, or in this survey's named surfaces
+produces open/high/low/close.** The library offers it; that is a fact about the library.
+
+It is already where it belongs in the order above — *later, each with a real consumer first* —
+and it stays there. **Recording it as measured rather than assumed is the point**: a type
+proposed by a survey and a type proposed by a rejected dependency look identical on a list, and
+the second arrived with an implementation, which is exactly the pressure that turns *no consumer*
+into *cheap enough to add*.
+
+### What this leaves owed
+
+Thirty-odd types, the shared config record, the annotation feature, `ambiguousWidth` and the
+categorical palette. **The header's other four bullets are untouched.** One of the three above
+turned out to be served, one turned out to need a public type, and one has no consumer — which
+is a useful ratio to carry into the rest: **a third of a sample of three survived contact with
+the tree.**

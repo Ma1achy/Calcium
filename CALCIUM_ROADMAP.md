@@ -3453,10 +3453,15 @@ PART  25 ghost text ★            drawn since PR #27. What remains: it ghosts o
                                    intact. And ⏎ to re-enter is nearly free. RE-CHECKED
                                    2026-08-15 and unmoved, with the evidence exact rather than
                                    blanket: a successful push touches the transcript on NO
-                                   path. `execution.ts`'s view arm appends only when
-                                   `documentView.open` REFUSES, and its own comment says
-                                   *this is the only path on which a view verb touches it*.
-                                   Symbol: `documentView.open`
+                                   path. THAT SENTENCE EXPIRED 2026-08-16, and by roadmap 33
+                                   rather than by anything done to this entry: a DEFERRED view
+                                   invocation owns an entry before it runs, so `runIntoView`
+                                   settles it — `<verb> opened a view`, muted, carrying the
+                                   continuation mark — and the comment that WAS the evidence is
+                                   the comment that had to change. The entry stands and the
+                                   argument narrows: no patch on pop, no `⏎` to re-enter, and a
+                                   view pushed DIRECTLY still leaves nothing. Symbol:
+                                   `documentView.open`
 PART  27 syntax highlighting ★    a REGRESSION against C09 §4a, not a scoping choice — the spec
                                    promises "highlighted whenever someone registers it" and there
                                    is no someone. 24 mainstream = 180 KB, measured. Phase-1-shaped
@@ -3977,7 +3982,17 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    a snapshot stable across changes to any of them, which is
                                    test infrastructure with more consumers than a theme, and
                                    three defects that reached the tree would have shown at review in one
-                                   (C22 §6e's two, entry 16 step 3's cut choices). F163
+                                   (C22 §6e's two, entry 16 step 3's cut choices). F163.
+                                   THE COUNT CLAIM WENT 2026-08-16 AND THE GAP DID NOT:
+                                   `test/golden/continuation.test.ts` imports `commandRows`,
+                                   `noticeDoc` and `PROMPT_GUTTER`, so a golden frame reaches
+                                   `src/shell/` for the first time — and it covers ONE of the
+                                   eight things above (the chrome rows). The other seven are
+                                   untouched: background base, prompt window, elision markers,
+                                   selection wash, height arithmetic, cursor sequences,
+                                   write-as-a-diff. IT ALSO WENT THE WAY THE ENTRY PREDICTS —
+                                   the frame was written because a mark's PLACEMENT was wrong
+                                   in a way every block-indexed assertion passed
 PART  50 INLINE EMPHASIS          span-level styling, which the vocabulary has NO
          (span-level styling)      REPRESENTATION FOR at any depth: tone attaches to a block,
                                    a Cell, a keyValue row, an events row or a pill and never
@@ -4295,6 +4310,52 @@ its fifth check. **Two moved and neither is a build**: 48's base is 389 of 1220 
 has not moved across three readings, and 49's count held at five golden files with none importing
 from `src/shell/` — through a capability field, a palette and sixteen spinner sets, which is the
 entry demonstrating its own claim.
+
+**The satisfier-side pass, 2026-08-16, and it is the first one where the satisfiers were built
+in the same session.** 30, 33, 50 and 51 landed since the last pass, plus the `⎿` mark. Three
+entries moved and none of them by being worked on — which is the whole argument for running this
+from the satisfier's side rather than the entry's.
+
+**26 — its evidence expired, and by two entries away.** The row read *a successful push touches
+the transcript on NO path*, exact rather than blanket, with `execution.ts`'s own comment as the
+citation. **False at HEAD.** Roadmap 33's queue made a deferred view invocation own an entry
+before it runs, so `runIntoView` now settles it — `${verb} opened a view`, muted, carrying the
+continuation mark — and the comment that was the evidence is the comment that had to change.
+**Disposition: partial.** It does not close 26: there is still no patch on pop, no `⏎` to
+re-enter, and a view pushed *directly* still leaves nothing. What it removes is the entry's
+strongest sentence. The record for a queued push is now two rows, which is a trace of a view in
+the transcript arriving on one path, by another entry's mechanism, for another entry's reason.
+
+**49 — falsified in the same session that re-measured it.** Its evidence held at *five golden
+files and not one imports from `src/shell/`*, re-measured on 2026-08-15 as the entry
+demonstrating its own claim. `test/golden/continuation.test.ts` imports `commandRows`,
+`noticeDoc` and `PROMPT_GUTTER`. **Disposition: partial, and the fraction is the point** — it
+covers **one** of the eight things the entry names (the chrome rows) and none of the other seven:
+the theme's background base, the prompt window, its elision markers, the selection wash, the
+frame's height arithmetic, the cursor sequences, the write-as-a-diff. A frame that reaches
+`src/shell/` at all is what the entry said did not exist, so the count claim goes; the gap does
+not.
+
+**35 — not moved, but its blocker stopped being a design.** The entry says the pending entry is
+blank, that `settle(id, doc)` already replaces the whole document, and that *nothing puts content
+in before it*. What was missing was not the mechanism but the **rendering**: a line that says
+what an entry is doing, under that entry's command, marked as subordinate to it. That is now the
+`⎿` mark and its two consumers, built for the queue and for the stall detector. So 35's remaining
+work is a `noticeDoc(line, …, "muted", …)` at `execution.ts` step 3 and the elapsed-time tier it
+ranks second — **a call, not a shape.** Recorded here rather than in 35, because the satisfier is
+what moved and nothing in 35 would have said so.
+
+**48 — a fifth reading, and the first one where the ratio moved.** 388/1219, then 389/1220, then
+389/1220 again: the entry's subject is that the ratio holds while the base grows. This session
+added nine published members and exactness held at **389 of 1229**, so the ratio fell from 31.9%
+to 31.6% for the first time across four readings. **The two totals do not say which members
+changed**, and that is the fourth instance's own mechanism rather than a gap in this reading:
+adding `AskOptions.placement` took an *existing* exact member out, so a net of zero is consistent
+with several moving in both directions. Worth a sixth reading with the composition rather than
+the totals — which is a measurement the entry does not currently ask for.
+
+**Unmoved and re-checked: 3, 17, 29, 32, 34, 37, 50.** 29 is on its sixth check and 33 already
+recorded why it needs nothing of it.
 
 **And 37 was checked from the other side**: not *is the body right* but *was the row fixed*. It
 was. That is the question F86, F89 and F92 exist to make routine, and it is the first time this
