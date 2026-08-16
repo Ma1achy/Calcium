@@ -355,6 +355,108 @@ are hard to tell apart.
 
 ---
 
+## 3d. Axes — nice numbers, precision, density, and the cycle that did not arrive
+
+**Heckbert's `nicenum`, with 2.5 in the set.** A step is 1, 2, 2.5, 5 or 10 times a power of ten.
+Heckbert's original omits 2.5, and without it a span of 100 over five ticks picks 20 — so
+`0 · 25 · 50 · 75 · 100`, the example everyone reaches for, is unreachable. One more admissible
+step buys the interval a reader of percentages already has in their head.
+
+### Loose labelling, per end — and C04 I29 is the interaction
+
+A bound the **data** supplied snaps outward to a multiple of the step. A bound the **surface**
+declared is used exactly. A pinned axis exists so two plots can be compared, and a pin that
+silently grew would defeat the only thing it is for, so the snap is applied per end rather than
+to the range.
+
+**Its cost is measured, because it is real and it is paid in rows.** Snapping inflates the span,
+and on an eight-row plot that is one or two rows of vertical resolution:
+
+| series | data | snapped | span |
+|---|---|---|---|
+| request rate | 392 … 960 | 250 … 1000 | **+24%** |
+| loss curve | 0.087 … 0.86 | 0 … 1 | **+23%** |
+| gapped line | 1 … 9 | 0 … 10 | **+20%** |
+| cpu, `yMin: 0` | 0 … 87 | 0 … 100 | **+13%** |
+| epochs | 0 … 40 | unchanged | 0% |
+
+**The cost and the tick count are one knob.** The step is about `span / (ticks - 1)` and the snap
+can waste up to a step at each end, so fewer ticks means rounder labels and a looser fit. At eight
+rows the count is three, which is why the inflation is what it is. Recorded rather than tuned
+away: a reader who wants the tight fit back is reversing one ruling, and these are the figures it
+should rest on.
+
+### Precision is one per axis, from the step — and it is the step's own decimals
+
+The step is exact by construction, so *how many places write it back unchanged* has an exact
+answer. `decimalsFor` answers a different question — two significant figures of a magnitude,
+which is right for a lone value — and asked about a step of `5` it says one place, which drew
+`40.0 · 35.0 · 30.0`: a decimal on every label that no tick could ever use.
+
+**And a shared precision has to survive being turned into a string.** `Number(v.toFixed(2))`
+strips the trailing zero, so one precision came out as three — `0.2` beside `0.15` beside `0.1`,
+which is the exact thing sharing prevents. The prose said *the three share one precision* and was
+true about the arithmetic; nothing said what happened to it afterwards (F177).
+
+### Density is a result and the ceiling is a maximum
+
+The ceiling is the **lower** of two bounds: how fine a step is worth asking for (a third of the
+rows) and how many labels this height can seat two rows apart. What survives is decided by the
+abut rule — a tick whose row is within one of a kept tick's is dropped, because two labels
+touching read as one two-line label.
+
+Read from a frame rather than derived: a five-tick ceiling over eight rows put `50%` and `25%` on
+rows 4 and 5, because `rowOf` rounds and eight rows cannot evenly host five ticks. A third of the
+rows alone is too coarse the other way — it drops the midpoint at height five, where the gap rule
+would happily seat it at row 2.
+
+**A declared maximum is not a member of `Plot` yet.** It would be geometry and would widen the
+type correctly (C04, step 3's ruling); no surface has asked, and the ceiling here is derived from
+the height, which is the space the ticks are competing for.
+
+### A step the arithmetic cannot pick is nothing, not a plausible constant
+
+A denormal span underflows twice — half of `Number.MIN_VALUE` is zero, and so is `10 ** -324` —
+so `niceNumber` produced `0`, `Math.floor(min / 0) * 0` is `NaN`, and the axis handed a `NaN`
+range to the rasteriser, where `drawLine` stops on `x === ex` and `NaN` is equal to nothing. Not
+slow: non-terminating.
+
+**The invariant it breaks is two modules away.** I2 says no series input throws or hangs, and
+nothing in a rule-interaction artefact for this function reaches it — the function returns, every
+value it returns is a number, and the state it leaves behind is refused elsewhere. That is the
+walk's own recorded blind spot arriving in the first function written after it was written down.
+
+**And the first guard made it worse by being plausible.** `return 1` terminates, every number is
+finite, and it snaps `5e-324 … 1e-323` to `0 … 1` — the data swamped by three hundred orders of
+magnitude, in a frame no assertion could tell from a correct one (F178).
+
+### The gutter's cycle does not arrive with this step, and the plan said it would
+
+`label width ← tick values ← tick count ← plot width ← gutter width` is the circular dependency
+the two-pass answer exists for. **The y-tick count is chosen against the *height*, and the height
+is declared** — `plotAreaRows(block)`, which no width can change. So label width still does not
+depend on plot width, `layoutFor`'s monotone ladder is still sufficient, and there is no fixed
+point to iterate towards.
+
+**The cycle needs an x-axis that picks its own ticks**, where *available space* is the width.
+`xLabels` is three declared strings, so nothing in the tree has that shape. The prediction was
+reasonable and what decides it is which axis the count is chosen against — measured rather than
+inherited.
+
+### Named and not built, with the reason
+
+**A time axis is a different algorithm, not a different format.** `:00 · :15 · :30`, or midnight,
+or Monday, and the label format follows the span. It cannot be reached by rounding a number
+because the ladder is 60 and 24 and 7 rather than powers of ten — and a time axis ticking every
+23.4 seconds is more visibly wrong than a numeric one, because a reader knows what a clock looks
+like.
+
+**A log axis picks differently again** — decade boundaries, or `1 2 5 10 20 50`. Linear ticks on
+a log axis are unreadable rather than merely ugly.
+
+Neither has a consumer in the tree, and each would be a second `niceAxis` rather than an argument
+to this one. Named so the next reader knows they were weighed.
+
 ## 4. Degenerate series
 
 Every one of these is real, and each has a defined result rather than an exception.
@@ -743,6 +845,7 @@ recast limit, and the golden set above.
 - **I19** — **The scale legend spans the full row and never truncates its range.** The dropped-column clause goes first and the ramp swatch second; the range is what the legend exists to state, and it is the reason `axes: false` is refused (C04 I50b). A key with no scale beside it is decoration.
 - **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, and an absent value draws a mark.** One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
 - **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density and fill are three encodings and `position` is a fourth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
+- **I22** — **An axis picks nice numbers, snaps a derived bound outward, never moves a declared one, and drops a tick that would abut its neighbour.** The step is 1, 2, 2.5, 5 or 10 times a power of ten — 2.5 is in the set because without it `0 · 25 · 50 · 75 · 100` is unreachable. **The snap is per end** (C04 I29): loose labelling exists so the ends read round and a pinned axis exists so two plots can be compared, so a pin that silently grew would defeat what it is for. **Precision is one per axis and comes from the step** — the smallest gap two labels can differ by — and it is the step's *own* decimals rather than two significant figures of it, and a named precision is **kept in the string** rather than trimmed back into three (F177). **The tick count is a result**, bounded below by how fine a step is worth asking for and above by how many labels the height seats two rows apart. **And a step the arithmetic cannot pick is `0`**, never a plausible constant: a denormal span underflows, and `1` there snaps `5e-324 … 1e-323` to `0 … 1`, which terminates and is wrong where nothing downstream can detect it (F178).
 
 ---
 
@@ -759,13 +862,14 @@ recast limit, and the golden set above.
 9. The ASCII fallback keeps the cell grid identical and only loses subcell resolution (I9).
 10. C12 holds no state and registers through the public mechanism (I11, I12).
 11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
-12. Y-labels are placed at the max, mid and min rows and collapse from the middle outward rather than overflowing a short plot (I15).
+12. Y-labels are placed at the rows their values fall on, the ends are kept, and an interior tick that would abut one is dropped rather than overflowing a short plot (I15, I22).
 13. **Every ramp step is visible and no ramp's lowest step is its padding character**, so a minimum reading never renders as absence (I16, §6).
 14. **A heatmap is one cell per position per row against one shared range, magnitude in the ink and absence left blank** (I17, §3a).
 15. **Width goes to columns before labels, and an unlabelled matrix is never drawn** — the opposite ladder from the line form, because a row label is an identity rather than a scale (I18, §3a).
 16. **The legend never truncates the range it exists to state** (I19, §3a).
 17. **A quantity against a scale is the `fill` encoding, drawn as a run whose number may exceed it** (I20, §3b).
 18. **A vocabulary carries its encoding axis and a renderer asks for an axis** — so the mismatch that cost two defects is unspellable rather than reviewable, and a stand-in is declared rather than commented (I21, §3c).
+19. **An axis is nice numbers, one precision from the step, and a density that is a result** — a derived bound snaps outward and a declared one never moves, a tick that would abut its neighbour is dropped, and a step the arithmetic cannot pick is nothing rather than a plausible constant (I22, §3d).
 
 ---
 
