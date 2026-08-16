@@ -189,6 +189,42 @@ that means magnitude — ordered, monotone in luminance, contrast measured per t
 the shape roadmap 51's categorical palette had and the same size of change. Named here so the
 next person finds a blocker rather than a preference.
 
+### Too narrow for its labels
+
+**A2 ruled the drop order and the code inverted it**, so this states the ordering as a ladder
+rather than as a preference. A heatmap's row labels **are** its ordinate: an unlabelled matrix
+is a picture of numbers with no way to tell which row is which, which is the same objection that
+refuses `axes: false`. So the width is spent in this order, and the last rung is not *drop the
+labels*:
+
+```
+1  columns go        the window is of the last positions anyway, so the oldest leave first
+2  labels truncate   into whatever remains after the axis furniture and MIN_AREA
+3  the block says so a declared height with a centred notice, never an unlabelled matrix
+```
+
+Rung 3 is reached when the width cannot spare one cell for a label beside a minimum plot area.
+It keeps the declared height, because I1 is about the block and a plot that changed height at a
+narrow width would move everything below it on a resize.
+
+**The line form is unaffected and keeps T3.3's ladder** — labels first, then furniture, then the
+curve — because a y-label is a *scale* and a row label is an *identity*. A curve with no numbers
+beside it is still that curve; a matrix with no names beside it is not that matrix.
+
+### The legend never truncates its range
+
+**It is the row that justifies refusing `axes: false`, and it was silently losing the thing it
+exists to state.** Placed at the gutter offset, a wide label column left it a fraction of the row
+and the range was the half that got cut.
+
+Two rulings, and the first is what makes the second small:
+
+- **The legend spans the full row.** It is furniture *below* the matrix rather than a cell of it,
+  so aligning it to the plot area was borrowing the wrong reference.
+- **Its parts have a drop order and the range is last**: the dropped-column clause goes first,
+  then the ramp swatch. The swatch is a key to a scale the range names, and a key with no scale
+  beside it is decoration.
+
 ### The rest
 
 **The row order is the app's and the renderer never sorts** (§6a B1). A matrix whose rows
@@ -307,6 +343,17 @@ table cell, so what breaks is every column after it — and the replacement is t
 ramp `⡀⣀⣄⣤⣦⣶⣷⣿`, narrow under both conventions. **It fills from the bottom and its lowest step
 is one dot rather than none** (I16): the set it replaced began at `U+2800`, which draws as
 whitespace and is what the row's padding already means.
+
+**The ASCII ramp encodes height by standing in for it, and that is a substitution rather than an
+equivalence.** `foldRamp` maps a column's topmost inked dot-row to a ramp index — bottom → `.`,
+top → `@` — so what a reader sees is *ink weight* where the braille form gives them *position*.
+It is monotone and legible, and the cost is that at ASCII a line and a filled area are hard to
+tell apart, because a value near a cell's top draws a glyph that fills the whole cell.
+
+Stated because the same substitution unstated is what produced the heatmap's first draft: a ramp
+encodes a value along an axis, and height, density and fill are three different axes. This is the
+one place in C12 where the axis drawn is not the axis meant, and it is deliberate — ASCII has no
+vertical sub-cell resolution to offer.
 
 **The cell grid is identical** — same width, same height, same measured rows (C09 §4, 1:1 by cell count). Only vertical resolution changes, from 4 subrows to 8 via the ramp, and horizontal from 2 dots per cell to 1. The plot gets blockier; nothing moves.
 
@@ -574,6 +621,8 @@ recast limit, and the golden set above.
 - **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`.
 - **I16** — **Every step of every ramp is visible, and no ramp's lowest step is the character its padding uses.** Eight steps, monotone in ink. The braille arm shipped with `U+2800` — BRAILLE PATTERN BLANK — as step 0, so a sparkline at `ambiguousWidth: "wide"` drew its minimum as whitespace, which the right-anchor already uses to mean *fewer samples than cells*: one character, two meanings, in the arm nothing renders in a golden frame. *This is a property of the constant, not of a call, so it is asserted over the ramps themselves.*
 - **I17** — **A heatmap draws one cell per position per row, against a range shared by the whole matrix, with magnitude carried by ink density and an absent cell left blank.** The shared range is what makes it a matrix rather than a stack of unrelated sparklines. **The ramp is `RAMP_DENSITY` and never the sparkline's**: the latter fills bottom-up, which encodes height, and a grid cell has no vertical axis to encode it on. Blank is absence rather than `?` because a grid has no padding for a blank to be confused with, and the lowest step has ink. Rows are drawn in the order the block declares them and the renderer never sorts. **Colour is a second carrier and not a forbidden one** (F34): density survives 1-bit, so a magnitude colour would add rather than carry alone — it is unimplemented for want of a palette that means magnitude, not refused (§3a). *A ragged matrix is refused at construction (C04 I50b).*
+- **I18** — **A heatmap spends width on columns first, then truncates its labels, and never draws an unlabelled matrix.** Row labels are the ordinate: a matrix with no names beside it is a picture of numbers. Where the width cannot spare a cell for a label beside a minimum plot area the block draws a centred notice at its declared height instead — I1 holds, and the reader is told rather than shown something they cannot read. *The line form keeps T3.3's opposite ladder, because a y-label is a scale and a row label is an identity.*
+- **I19** — **The scale legend spans the full row and never truncates its range.** The dropped-column clause goes first and the ramp swatch second; the range is what the legend exists to state, and it is the reason `axes: false` is refused (C04 I50b). A key with no scale beside it is decoration.
 
 ---
 
@@ -593,6 +642,8 @@ recast limit, and the golden set above.
 12. Y-labels are placed at the max, mid and min rows and collapse from the middle outward rather than overflowing a short plot (I15).
 13. **Every ramp step is visible and no ramp's lowest step is its padding character**, so a minimum reading never renders as absence (I16, §6).
 14. **A heatmap is one cell per position per row against one shared range, magnitude in the ink and absence left blank** (I17, §3a).
+15. **Width goes to columns before labels, and an unlabelled matrix is never drawn** — the opposite ladder from the line form, because a row label is an identity rather than a scale (I18, §3a).
+16. **The legend never truncates the range it exists to state** (I19, §3a).
 
 ---
 
@@ -617,6 +668,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.12b** (C04 I41): `fraction` and `percent` on the **same value** produce different labels — `0.84` → `84%` and `1%`. The row a per-arm table cannot express: each arm alone is a restatement of its own rule, and the defect was that two arms meant one thing.
 - **T1.12c** (C04 I41): the two arms produce different `labelWidth`s for one range, so the gutter differs. `yFormat` is geometry; a test that only reads the label text passes against a renderer that measures the wrong set.
 - **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
+- **T1.22** (I18): a heatmap whose labels exceed the width keeps a matrix and truncates the labels; below the rung where one label cell fits, it draws a notice at its declared height and **never a matrix with no names beside it**. Asserted at five widths, because the defect was a state reachable only between two of them.
+- **T1.23** (I19): the legend's range survives a label column wide enough to have truncated it, and the drop order is asserted by rendering a row too narrow for all three parts.
 - **T1.20** (I16, I17): the heatmap's ramp is `RAMP_DENSITY` and not `RAMP_BRAILLE` — asserted as a *difference*, because both are eight narrow braille steps and a frame drawn with the wrong one is a matrix of bar fragments that every count agrees with.
 - **T1.21** (I17): an absent cell is blank and a minimum cell has ink, so the two are distinguishable in a grid — the converse of the sparkline's rule and for the same reason stated from the other side.
 - **T1.17** (I17): **a matrix and a stack of lines with the same data at the same width do not render identically.** The row worth writing first: if they match, the form member is not reaching the renderer, and nothing else about a heatmap distinguishes it from the arm it would otherwise fall into.
@@ -684,6 +737,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.8** (I13): a sparkline occupying two rows at some width → T1.13 fails, and every table row containing one shifts.
 - **T6.9**: dropping Bresenham for point-plotting → T1.4 fails and steep curves become dotted.
 - **T6.10** (I12): making `plot` a privileged built-in → T2.6 fails.
+- **T6.16** (I18): dropping the label column instead of truncating it → T1.22 fails, and a heatmap between two widths becomes a picture of numbers.
 - **T6.15** (I17): dispatching `form` with a two-armed switch again → T1.17 fails, and a heatmap renders as a line, silently and correctly-shaped.
 - **T6.13** (I16): restoring `U+2800` as the braille ramp's first step → T1.15 fails, and every wide-terminal sparkline draws its minimum as padding.
 - **T6.14** (I4, C04 I46): narrowing `Series.values` back to `readonly number[]` → T1.16 fails, and a gap is expressible only as a value the validator refuses and JSON rewrites.

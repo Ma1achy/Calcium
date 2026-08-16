@@ -178,7 +178,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `logs` | lines | **Never wrapped.** Timestamp and level are fixed-width; the **message** takes the residual and truncates. Predictable height is what makes a tail scroll smoothly |
 | `events` | events | Timestamp, type, message on one row; message truncated |
 | `plot` | delegated to C12 | Registered by C12 |
-| `progress` | 1 | Label, bar, percentage; bar takes the residual width |
+| `progress` | 1 | Label, bar, percentage; bar takes the residual width. **The bar is bounded by its cells and the number is not** — see below |
 | `code` | lines, or wrapped lines when `wrap` | Syntax highlighting via the **`syntax` palette** (C10 §2), not tones — eight roles do not fit ten semantic slots. Truncates by default; wraps when `wrap: true` |
 | `comparison` | rows + 1 | Field, a, b, comparator; three equal columns |
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
@@ -262,6 +262,29 @@ The distinction is deliberate and per-kind.
 **Caller's choice** — `code`. A JSON dump truncates harmlessly; a YAML manifest does not, because a truncated manifest is a *different manifest* that someone will read as the real one. Only the producer knows which it is, so `wrap` is a field rather than a policy.
 
 Nothing wraps that a viewport would rather measure cheaply.
+
+
+### The bar clamps and the number does not
+
+**One ruling for two behaviours that disagreed.** `progress` clamped a ratio above 1 to 100%, and
+`examples/docker`'s CPU bar deliberately overflows — `CPUPerc` is per-core-normalised, so 780% is
+an ordinary reading on an eight-core host and a bar that stops at 100 draws a busy container
+identically to a saturated one (DASHBOARD_WALK A4).
+
+That argument is not about docker. **`100/100` and `150/100` drawing identically is the same
+defect wherever it happens**, and a progress bar reporting `100%` on an overshoot says *complete*
+about something that is not.
+
+So the two halves are ruled separately, which is what makes them agree:
+
+```
+the bar     clamped to its own width — it has no cells past the last one
+the number  the true fraction, uncapped:  150 of 100  →  a full bar and `150%`
+```
+
+A `total` of zero has no proportion at all; the bar is empty and the percentage reads `0%`,
+which is a floor rather than a measurement and is recorded here so it is not rediscovered as a
+defect.
 
 ---
 
@@ -607,6 +630,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
 - **I26** — **`measure(window(b, w, from, to).block, w) − skipRows === to − from`, checked generically over every kind that declares `window`.** The form without `skipRows` is the one the seam invites and it is false for any window that costs slack. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
 - **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
+- **I28** — **A progress bar clamps its fill and never its number.** The bar has no cells past its last one; the percentage is the true fraction, so `150` of `100` draws a full bar and reads `150%`. Clamping both makes `100/100` and `150/100` one picture, which is the same objection `examples/docker`'s CPU bar was built around and the reason the two now agree rather than each being defensible about its own quantity. A `total` of zero has no proportion: an empty bar and `0%`, which is a floor and not a measurement.
 
 ---
 
@@ -637,6 +661,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 11. A kind that divides declares `window`; a window is a valid block of the same kind plus a residual offset, and never a list of rows (I25, C25 I18).
 12. The window's height property carries the offset and is checked generically, so an application's own arm is held to it (I26).
 13. A kind that does not divide omits the member rather than branching, which is how `plot` stays atomic permanently (I27, C12 I1).
+14. **A progress bar clamps its fill and never its number**, so an overshoot is visible rather than reported as completion (I28, §4).
 ---
 
 ## 9. Tests
