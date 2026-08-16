@@ -1409,6 +1409,13 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // deleting the row is how the fact would otherwise disappear — the rule's own
   // sentence, *an exemption that outlives its reason is how the list stops being
   // read*, applied to the thing the exemption was about.
+  "Axis.ticks":
+    "**consumed inside its own module, which is where the decision belongs.** `yLabels` reads " +
+    "it to place each label on the row its value falls on; `definition.ts` takes only `range`, " +
+    "because a caller outside the axis has no business knowing where the marks are. MG24 counts " +
+    "names *outside the declaring file* and is right that no other file names it — the answer " +
+    "is that no other file should. It would gain a consumer the day an x-axis picks its own " +
+    "ticks, which is the algorithm this pass named and did not build (C12 \u00a73d)",
   "Ladder.serves":
     "**consumed by the type checker rather than by a statement.** `LADDERS` is a mapped type " +
     "over the axis and `LadderOf<E>` reads `Record<E, true>`, so a ladder under the wrong key " +

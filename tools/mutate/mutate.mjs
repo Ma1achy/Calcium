@@ -32,7 +32,7 @@ export function strip(output) {
 /** Did the run kill anything? Read off the stripped summary, not the exit code:
  * a suite that fails to *start* also exits non-zero and kills nothing. */
 export function killed(output) {
-  return /Tests\s+\d+ failed/.test(strip(output));
+  return /Tests\s+\d+ failed/.test(strip(output)) || timedOut(output);
 }
 
 /** Did the run reach a summary at all — pass *or* fail?
@@ -45,7 +45,27 @@ export function killed(output) {
  * 141 and a buffer cut before the summary. Every mutation after it would have
  * reported a survivor. */
 export function ran(output) {
-  return /Tests\s+\d+ (failed|passed)/.test(strip(output));
+  return /Tests\s+\d+ (failed|passed)/.test(strip(output)) || timedOut(output);
+}
+
+/**
+ * The harness's own vocabulary for *the suite did not return*.
+ *
+ * **A timeout is the strongest possible failure and vitest cannot report it**,
+ * because there is no summary to read: the child was killed before it wrote one.
+ * A run whose mutation restores a non-terminating render — C12's `niceAxis`
+ * handing a `NaN` range to Bresenham, which stops on `x === ex` — produced no
+ * summary and was correctly flagged blind, which is right about the harness and
+ * wrong about the mutation.
+ *
+ * So a run that times out **says so in a line of its own**, and this is the only
+ * marker either predicate accepts besides vitest's. It is not a fabricated
+ * summary: `runPass` asks *did the suite fail*, and a suite that never returned
+ * is the most complete yes available. A run emits it only from its own `catch`
+ * on `e.killed`, never from parsing test output.
+ */
+export function timedOut(output) {
+  return /^TIMED OUT after \d+ms/mu.test(strip(output));
 }
 
 /** A named error rather than a boolean, so a miss cannot be read as a survivor. */

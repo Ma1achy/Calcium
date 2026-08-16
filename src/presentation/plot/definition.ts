@@ -27,7 +27,7 @@ import { clampSpans, paint, padStart, rows, slot, tone, type Span } from "../blo
 import { cells, truncate } from "../text.js";
 import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
-import { labelWidth, xLabelRow, yLabels } from "./axes.js";
+import { labelWidth, niceAxis, ticksFor, xLabelRow, yLabels } from "./axes.js";
 import { seriesRange, type Range } from "./scale.js";
 import { ladderFor } from "./ramp.js";
 import { formatValue } from "./axes.js";
@@ -304,7 +304,8 @@ function overlaidRows(
   // labels there emitted a four-cell label into a zero-cell column, which the row
   // clamp then turned into `0.82 │⢣…`. The narrow case is the one where a label is
   // most obviously wrong and least obviously checked.
-  const labels = layout.labelColumn === 0 ? [] : yLabels(range, layout.areaRows, block.yFormat);
+  const labels =
+    layout.labelColumn === 0 ? [] : yLabels(range, layout.areaRows, block.yFormat, block);
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   const layers: readonly Layer[] = block.series.map((s, index) => ({
     glyphRows: curveRows(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
@@ -351,7 +352,7 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
   // column: it has to be measured from whichever set will be drawn.
   const wanted = stacked || block.form === "heatmap"
     ? seriesLabelWidth(block.series)
-    : labelWidth(yLabels(range, areaRows, block.yFormat));
+    : labelWidth(yLabels(range, areaRows, block.yFormat, block));
   if (width - wanted - AXIS_GUTTER >= MIN_AREA) {
     return {
       ...base,
@@ -542,7 +543,20 @@ const FORM_ROWS: Readonly<
     // `stacked` is decided before the layout, because it decides what the label
     // column holds and therefore how wide it is.
     const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
-    const range = seriesRange(block.series, block);
+    const data = seriesRange(block.series, block);
+    // **Snapped once, here, because the labels and the curve must share it**
+    // (§3d). `yLabels` derives the same axis and the operation is idempotent —
+    // the floor of a multiple of the step is that multiple — but deriving it
+    // twice and drawing against only one of them is a top label reading `100`
+    // above a curve whose ceiling is `87`. Every count agrees and the frame is
+    // a lie, which is this component's whole failure mode.
+    //
+    // A **stacked** plot has no ordinate — the label column holds series names
+    // (§5) — so there is nothing to be nice about and the data range stands.
+    const range =
+      data === null || stacked
+        ? data
+        : niceAxis(data, ticksFor(plotAreaRows(block)), block).range;
     // Never `null` for a line: the third rung is the heatmap's, and this arm
     // still ends at the full-width fallback. Narrowed here rather than widened
     // there, so the one form that can refuse a width is the one that says so.

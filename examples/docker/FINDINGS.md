@@ -8781,3 +8781,80 @@ new frame is what made the old one get looked at.
 `—` is ambiguous too, so the *absent* mark was two cells at that rung. It drops to ASCII `-`
 there: braille has no glyph that reads as *nothing was reported*, and a mark that is right in one
 convention only is what this whole finding is about.
+
+---
+
+## F177 — a shared precision that the string threw away ★★★
+
+| | |
+|---|---|
+| **Surface** | `yLabels` → `formatNumber` — every numeric y-axis |
+| **Reached for** | step 4's nice numbers, which made the precision rule matter more |
+| **Verdict** | **a correct rule with an arithmetic that obeyed it and a string that did not** |
+| **Absorbed by** | `formatNumber` keeps a named precision and trims an unnamed one |
+
+`yLabels` computes one precision for the whole axis and passes it down. `formatNumber` then did
+`Number(v.toFixed(places))` and `String(...)`, which **strips the trailing zero** — so three
+labels formatted to two places came out at three precisions:
+
+```
+computed   0.20  0.15  0.10        one precision, correctly shared
+rendered   0.2   0.15  0.1         three, and the eye compares digit counts first
+```
+
+That is the survey's own counter-example — *`0.10 0.15 0.20`, never `0.1 0.15 0.2`* — shipped.
+
+**The prose was true and described the half that worked.** *The three share one precision, taken
+from the span* is an accurate statement about `places`, and `places` was shared. Nothing said
+what happened to it afterwards, and a reader checking the sentence against the code would have
+agreed with both.
+
+### The discriminator
+
+Whether the caller **named** a precision. `yLabels` does, from the tick step; a lone value does
+not and wants `1284` rather than `1284.00`. Same shape as `formatReadout` beside `formatValue`,
+one finding earlier: an intent the caller states rather than one inferred downstream.
+
+---
+
+## F178 — a nice step of zero, and a hang three modules away ★★★★
+
+| | |
+|---|---|
+| **Surface** | `niceAxis` → `drawLine` |
+| **Reached for** | running the suite after step 4's first draft |
+| **Verdict** | **a non-terminating render**, from a function where every number was finite |
+| **Absorbed by** | `niceNumber` returns `0` for a step it cannot pick; `niceAxis` guards on it |
+
+A denormal span underflows twice over. `span / (wanted - 1)` is half of `Number.MIN_VALUE`,
+which **is zero**, and `10 ** -324` is zero as well — either way `niceNumber` produced `0`, so
+`Math.floor(min / 0) * 0` is `NaN` and the axis handed a `NaN` range to the rasteriser.
+
+**There `drawLine` stops on `x === ex`, and `NaN` is equal to nothing.** The loop does not
+terminate. Not slowly — never.
+
+### Three things about this, and each is a different lesson
+
+**The invariant it breaks lives two modules away.** C12 I2 says no series input throws or hangs.
+Nothing in a rule-interaction table for `niceAxis` reaches it: the function returns, every value
+it returns is a `number`, and the state it leaves behind is refused somewhere else. That is the
+walk's own recorded blind spot — *a decision leaves state, and the rule forbidding that state is
+in a different component* — arriving in the first function written after it was written down.
+
+**The first guard made it worse by being plausible.** `if (rough <= 0) return 1` reads as
+defensive and it is not: a step of `1` against a range of `5e-324 … 1e-323` snaps the axis to
+`0 … 1` and swamps the data by three hundred orders of magnitude. It terminates, every number is
+finite, and the frame is a flat line at the bottom of an empty plot. **A plausible constant is
+worse than no answer**, because no answer is checkable.
+
+**And a float loop counter does not count.** The first bound was `for (let k = first; k <= last;
+k += 1)` over the tick values; at a magnitude of 10³⁰⁰, `k += 1` leaves `k` exactly where it was.
+Bounding it by an integer index is not a tidier way to write the same loop — it is the only one
+that terminates.
+
+### Found by running the suite, which is worth naming
+
+Not by a test written for it, and not by reading. `test/contract/plot.test.ts` stopped reporting
+and the run had to be bisected to find which file, then which corpus entry. **The fuzz corpus is
+the instrument** — `[Number.MIN_VALUE, Number.MIN_VALUE * 2]` is in it for exactly this, and it
+is the same entry that found `decimalsFor`'s `toFixed` RangeError.

@@ -221,6 +221,10 @@ describe("C12 tier 6 — fail-on-revert", () => {
     const area = lines.slice(0, 1);
     const labelled = area.filter((row) => /[0-9]/u.test(visible(row)));
     expect(labelled).toHaveLength(1);
-    expect(visible(area[0] ?? "")).toContain("0.82");
+    // `1`, not the data's `0.82` — the bounds snap outward to a nice number now
+    // (§3d, C04 I29), and the top of a derived range is one of the two ends that
+    // does. The revert this row guards is unaffected: it is about *how many*
+    // labels a one-row area gets, and the answer is still one.
+    expect(visible(area[0] ?? "")).toContain("1");
   });
 });

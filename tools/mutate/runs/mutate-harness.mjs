@@ -43,8 +43,11 @@ const results = runPass({
       // count, so the naive regex reads every kill as a survivor.
       name: "the summary is read without stripping the colours",
       file: FILE,
-      from: "  return /Tests\\s+\\d+ failed/.test(strip(output));",
-      to: "  return /Tests\\s+\\d+ failed/.test(output);",
+      // Re-anchored when `killed` gained the timeout arm: the marker is now an
+      // alternative beside vitest's summary, and stripping still has to happen
+      // before either is read.
+      from: "  return /Tests\\s+\\d+ failed/.test(strip(output)) || timedOut(output);",
+      to: "  return /Tests\\s+\\d+ failed/.test(output) || timedOut(output);",
       expect: "MH1",
     },
     {
@@ -62,8 +65,8 @@ const results = runPass({
       // suite indexed by the failing rows would agree.
       name: "`ran` only recognises a failing summary, so every green run reads as blind",
       file: FILE,
-      from: "  return /Tests\\s+\\d+ (failed|passed)/.test(strip(output));",
-      to: "  return /Tests\\s+\\d+ failed/.test(strip(output));",
+      from: "  return /Tests\\s+\\d+ (failed|passed)/.test(strip(output)) || timedOut(output);",
+      to: "  return /Tests\\s+\\d+ failed/.test(strip(output)) || timedOut(output);",
       expect: "MH6",
     },
     {

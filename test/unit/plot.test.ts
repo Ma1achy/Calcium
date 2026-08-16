@@ -6,7 +6,7 @@
 // and says very little to an assertion; the grid says exactly which columns carry
 // ink.
 import { describe, expect, it } from "vitest";
-import { formatValue, labelWidth, xLabelRow, yLabels } from "../../src/presentation/plot/axes.js";
+import { formatValue, labelWidth, niceAxis, xLabelRow, yLabels } from "../../src/presentation/plot/axes.js";
 import { curveRows } from "../../src/presentation/plot/curve.js";
 import { plotAreaWidth, plotHeight } from "../../src/presentation/plot/height.js";
 import {
@@ -316,13 +316,100 @@ describe("C12 tier 1 — labels", () => {
     expect(labelWidth(asPercent)).toBe(4);
   });
 
-  it("T1.12: the three labels share one precision, taken from the span", () => {
-    // Formatting each on its own magnitude gave `0.86`, `0.4737`, `0.0874` — a
-    // midpoint two cells wider than its siblings, widening the label column for
-    // precision nobody asked for. Found by reading a rendered frame.
-    const labels = yLabels({ min: 0.0874, max: 0.86 }, 5, "number");
-    expect(labels.map((l) => l.text)).toEqual(["0.86", "0.47", "0.09"]);
-    expect(labelWidth(labels)).toBe(4);
+  it("T1.12 (§3d): labels share one precision, and it is the step's own", () => {
+    // **Two rulings, one row.** The precision is shared — formatting each label
+    // on its own magnitude gave `0.86`, `0.4737`, `0.0874`, a midpoint two cells
+    // wider than its siblings — and it now comes from the **step** rather than
+    // the span, which is the smallest gap two adjacent labels can differ by.
+    //
+    // And the shared precision is *kept in the string*: `Number(v.toFixed(2))`
+    // stripped the trailing zero, so one precision came out as three — `0.2`
+    // beside `0.15` beside `0.1`, which is the exact thing sharing prevents
+    // (F177).
+    const labels = yLabels({ min: 0.0874, max: 0.86 }, 8, "number");
+    const texts = labels.map((l) => l.text);
+    expect(texts).toEqual(["1.0", "0.5", "0.0"]);
+    expect(new Set(texts.map((t) => t.split(".")[1]?.length)).size, "one precision").toBe(1);
+    expect(labelWidth(labels), "and the column is narrower for it").toBe(3);
+  });
+
+  it("T1.12 (§3d): a step's decimals are exact, not two significant figures", () => {
+    // `decimalsFor` answers *two significant figures of this magnitude*, which is
+    // right for a lone value and over-answers about a step: a step of 5 came back
+    // as one place, so an integer ladder drew `40.0 · 35.0 · 30.0`. Read from a
+    // frame at height 20 — the common height of 8 has too few rungs to show it.
+    const integers = yLabels({ min: 0, max: 40 }, 20, "number");
+    expect(integers.map((l) => l.text)).toContain("35");
+    expect(integers.map((l) => l.text).some((t) => t.includes(".")), "no spurious decimal").toBe(
+      false,
+    );
+
+    // **The row that separates the step from the span**, which the first version
+    // did not: `decimalsFor(40)` and `stepDecimals(5)` are both zero, so a
+    // mutation swapping them survived sixteen assertions. Here the step is 2.5
+    // over a span of 10 — one place against the span's zero — and reading the
+    // span rounds every quarter-tick to an integer it is not.
+    const quarters = yLabels({ min: 0, max: 10 }, 12, "number").map((l) => l.text);
+    expect(quarters, "a 2.5 step needs the place the span says it does not").toContain("7.5");
+    expect(quarters).toContain("2.5");
+  });
+
+  it("T1.12 (§3d, C04 I29): the bounds snap outward, and a pinned bound never moves", () => {
+    // **The rule interaction this pass exists for.** Loose labelling extends the
+    // range so the ends are round; a pinned axis exists so two plots can be
+    // compared, and one that silently grew would defeat exactly that. So the
+    // snap is per end.
+    const derived = yLabels({ min: 3, max: 87 }, 8, "number");
+    expect(derived[0]?.text, "a derived top snaps up to a nice number").toBe("100");
+
+    const pinnedTop = yLabels({ min: 3, max: 87 }, 8, "number", { yMax: 87 });
+    expect(pinnedTop[0]?.text, "a declared top is the top").toBe("87");
+
+    const pinnedBoth = yLabels({ min: 3, max: 87 }, 8, "number", { yMin: 3, yMax: 87 });
+    expect(pinnedBoth[0]?.text).toBe("87");
+    expect(pinnedBoth[pinnedBoth.length - 1]?.text).toBe("3");
+  });
+
+  it("T1.12 (§3d): a tick that would abut its neighbour is dropped", () => {
+    // The density rule, and it was read from a frame: a five-tick ceiling over
+    // eight rows put `50%` and `25%` on rows 4 and 5, because `rowOf` rounds and
+    // eight rows cannot evenly host five ticks. Two labels touching read as one
+    // two-line label.
+    // **The case that actually abuts, found by sweeping rather than assumed.**
+    // The first version swept `0 … 100` at five heights and never produced two
+    // adjacent rows, so removing the rule failed nothing — sixteen assertions
+    // agreeing about a clause none of them reached. At height 3 a range of
+    // `5 … 63` snaps to `0 … 100` with a step of 50, and the three ticks land on
+    // rows 0, 1 and 2: the midpoint touches both ends.
+    const tight = yLabels({ min: 5, max: 63 }, 3, "number");
+    expect(tight.map((l) => l.row), "the abutting midpoint is dropped").toEqual([0, 2]);
+    expect(tight.map((l) => l.text)).toEqual(["100", "0"]);
+
+    for (const [lo, hi, h] of [
+      [0, 100, 3], [0, 100, 5], [0, 100, 8], [0, 100, 12], [0, 100, 20],
+      [5, 63, 3], [5, 63, 4], [392, 960, 4], [0, 7, 3], [2, 29, 4], [0.087, 0.86, 9],
+    ] as const) {
+      const rows = yLabels({ min: lo, max: hi }, h, "number").map((l) => l.row);
+      const gaps = rows.slice(1).map((r, i) => r - (rows[i] ?? 0));
+      expect(
+        gaps.every((g) => g >= 2),
+        `${String(lo)}..${String(hi)} at height ${String(h)}: rows ${rows.join(",")}`,
+      ).toBe(true);
+    }
+  });
+
+  it("T1.12 (I2, F178): a step that underflows to zero does not poison the range", () => {
+    // **The hang, and it was three modules from its cause.** A denormal span
+    // underflows `10 ** exponent`, so `niceNumber` returns 0, `floor(min / 0) * 0`
+    // is `NaN`, and the rasteriser's `x === ex` stop condition is never true
+    // against `NaN` — `drawLine` runs forever. Every count in `niceAxis` agreed.
+    const axis = niceAxis({ min: 5e-324, max: 1e-323 }, 3, {});
+    expect(Number.isFinite(axis.range.min) && Number.isFinite(axis.range.max)).toBe(true);
+    expect(axis.range, "a step it cannot pick leaves the range alone").toEqual({
+      min: 5e-324,
+      max: 1e-323,
+    });
+    expect(axis.ticks.every((t) => Number.isFinite(t))).toBe(true);
   });
 
   it("T1.12 (I2): a denormal range formats rather than throwing", () => {
