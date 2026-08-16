@@ -63,7 +63,14 @@ The return is exactly `width` cells and exactly one row (I13), so a cell contain
 sparkline                    → 1
 line, axes: false            → height
 line, axes: true             → height + 2      (axis rule, then x-labels)
+heatmap                      → height + 2      (x-labels, then the scale legend)
 ```
+
+**A heatmap's two rows are not the line's two rows**, and the substitution is deliberate: a
+matrix's cells bound themselves, so there is nothing for a rule to delimit, and the row it would
+have taken pays for the legend instead. The legend is not optional furniture — it is the only
+thing that says what a cell *means*, which is why `axes: false` on a heatmap is refused rather
+than honoured (§6a A4).
 
 With `axes: false` there is no y-label column and the plot area is the full `width`. With axes it is `width − yLabelWidth − 2`, where 2 covers a space and the `│`.
 
@@ -118,6 +125,40 @@ between columns  Bresenham from column i's `last`
 With at most one sample per column `first = min = max = last`, and the algorithm degenerates to plain Bresenham between points. That degeneration is what makes this right rather than a compromise: fifty points and fifty thousand take one code path, and there is no density branch to get wrong at the boundary.
 
 Recorded as a composition clause on both invariants rather than as a change to either, because neither was wrong — and see A03 §2 for what that says about the audit that did not find it.
+
+---
+
+## 3a. The heatmap
+
+**One cell per position per row, magnitude in the ramp glyph, one range across the whole
+matrix.** Everything in this section is §6a's walk, implemented; the walk carries the arguments
+and this carries the shape.
+
+```
+              ⡀⣀⣄⣤⣦⣶⣷⣿⣷⣶⣤⣄⡀⣀⣄⣤
+api           ⣤⣦⣶⣷⣿⣷⣶⣤⣄⡀?????⡀⣀
+worker        ⡀⡀⡀⣀⣄⣤⣦⣶⣷⣿⣷⣶⣤⣄⡀⣀
+db            ????????????????
+              -60 ticks         now
+              ⡀⣀⣄⣤⣦⣶⣷⣿  0 – 100%
+```
+
+**The row order is the app's and the renderer never sorts** (§6a B1). A matrix whose rows
+reorder between frames is unreadable even though every frame is individually correct, and the
+renderer has no stable key to sort by that the app does not already have.
+
+**Columns are positions and the window is of the last `areaWidth` of them** (§6a B3, I13's rule).
+A heatmap never spreads: one cell *is* one value, so spreading would draw a value twice — a lie
+about density — or interpolate, which is inventing readings. Dropped columns are named in the
+legend rather than vanishing.
+
+**Rows that do not fit take I8's answer unchanged**: the rows that fit, and the last row of the
+plot area spent on `+N more · names`. That is the same branch `stackedRows` already has, and the
+truncation marker *is* that line — there is no field.
+
+**No colour, at any depth.** Magnitude is the glyph, so D29 is satisfied by construction rather
+than by a fallback, and the 1-bit rung is not a degradation. That is also why C04 I50a's
+eight-series cap does not bind here: the categorical palette is never consulted (§6a A7).
 
 ---
 
@@ -493,6 +534,7 @@ recast limit, and the golden set above.
 - **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise. *Composition (§3): under downsampling the join runs from a column's last sample to the next column's first, which is what keeps I5's span-fill connected.*
 - **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`.
 - **I16** — **Every step of every ramp is visible, and no ramp's lowest step is the character its padding uses.** Eight steps, monotone in ink. The braille arm shipped with `U+2800` — BRAILLE PATTERN BLANK — as step 0, so a sparkline at `ambiguousWidth: "wide"` drew its minimum as whitespace, which the right-anchor already uses to mean *fewer samples than cells*: one character, two meanings, in the arm nothing renders in a golden frame. *This is a property of the constant, not of a call, so it is asserted over the ramps themselves.*
+- **I17** — **A heatmap draws one cell per position per row, against a range shared by the whole matrix, and carries no colour.** The shared range is what makes it a matrix rather than a stack of unrelated sparklines; the glyph is the channel at every colour depth, so nothing is distinguished by colour alone and the 1-bit rung is not a degradation. Rows are drawn in the order the block declares them and the renderer never sorts. *A ragged matrix is refused at construction (C04 I50b), because the renderer cannot know which end of a short row is old — and without that refusal `columnsOf` stretches it to the common width and column k means a different instant in every row.*
 
 ---
 
@@ -511,6 +553,7 @@ recast limit, and the golden set above.
 11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
 12. Y-labels are placed at the max, mid and min rows and collapse from the middle outward rather than overflowing a short plot (I15).
 13. **Every ramp step is visible and no ramp's lowest step is its padding character**, so a minimum reading never renders as absence (I16, §6).
+14. **A heatmap is one cell per position per row against one shared range, with magnitude in the glyph and no colour** (I17, §3a).
 
 ---
 
@@ -535,6 +578,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.12b** (C04 I41): `fraction` and `percent` on the **same value** produce different labels — `0.84` → `84%` and `1%`. The row a per-arm table cannot express: each arm alone is a restatement of its own rule, and the defect was that two arms meant one thing.
 - **T1.12c** (C04 I41): the two arms produce different `labelWidth`s for one range, so the gutter differs. `yFormat` is geometry; a test that only reads the label text passes against a renderer that measures the wrong set.
 - **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
+- **T1.17** (I17): **a matrix and a stack of lines with the same data at the same width do not render identically.** The row worth writing first: if they match, the form member is not reaching the renderer, and nothing else about a heatmap distinguishes it from the arm it would otherwise fall into.
+- **T1.18** (I17): the range is shared across rows — two rows of different magnitude draw different glyphs for the same value, and normalising per row would make every row look alike.
+- **T1.19** (C04 I50b): the three refusals and the height, each with the converse — a heatmap that declares none of them constructs.
 - **T1.15** (I16): every ramp — Unicode, ASCII, braille — has eight steps, each visible, monotone in ink, and **no step equal to the pad character**. Asserted over the constants, because the defect is a property of the set rather than of a call: `sparkline([0, 5], 6, wide)` measured 6 cells and drew its minimum as whitespace, so every width and length row passed against it.
 - **T1.16** (I4, C04 I46): `null` is a gap in both forms — the line breaks across it and the sparkline marks it — and a series carrying `null` **round-trips through JSON unchanged**, which `NaN` does not. The row a fixture of `NaN` cannot express.
 - **T1.14**: pinned `yMin`/`yMax` override the computed range, and out-of-range points clamp to the edge rather than escaping the grid.
@@ -597,6 +643,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.8** (I13): a sparkline occupying two rows at some width → T1.13 fails, and every table row containing one shifts.
 - **T6.9**: dropping Bresenham for point-plotting → T1.4 fails and steep curves become dotted.
 - **T6.10** (I12): making `plot` a privileged built-in → T2.6 fails.
+- **T6.15** (I17): dispatching `form` with a two-armed switch again → T1.17 fails, and a heatmap renders as a line, silently and correctly-shaped.
 - **T6.13** (I16): restoring `U+2800` as the braille ramp's first step → T1.15 fails, and every wide-terminal sparkline draws its minimum as padding.
 - **T6.14** (I4, C04 I46): narrowing `Series.values` back to `readonly number[]` → T1.16 fails, and a gap is expressible only as a value the validator refuses and JSON rewrites.
 

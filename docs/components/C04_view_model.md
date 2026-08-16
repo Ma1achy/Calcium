@@ -136,8 +136,9 @@ type Raw      = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
 
 type Series   = Readonly<{ values: readonly (number | null)[];   // `null` is a gap (I46a, C12 I4)
                            label?: string; tone?: Tone }>;
+type PlotForm = "line" | "sparkline" | "heatmap";
 type Plot     = Readonly<{ kind: "plot"; id: string;
-                           form: "line" | "sparkline";
+                           form: PlotForm;
                            series: readonly Series[];
                            height?: number; axes?: boolean;
                            xLabels?: readonly [string, string, string];
@@ -180,6 +181,14 @@ the event that produces typos, because `percentage` is what a reader guesses.
 **`yMin` and `yMax` pin the vertical range.** C12 §3 says the range is computed over all series "unless the block pins them" and C12 T1.14 tests exactly that, while the shape had no field to pin it with — intent stated in prose that the schema could not carry, the same class as the missing `align` and the missing truncation side. Absent, the range is the data's; present, values outside it clamp to the edge rather than escaping the grid, which is what makes a pinned axis usable for comparing two plots rather than a way to lose points off the top.
 
 Both are optional and independent: pinning only `yMin` at 0 is the common case, because a loss curve that autoscales its floor exaggerates every wobble near zero.
+
+**`form: "heatmap"` is a matrix of rows, and it refuses three things rather than ignoring them** (I50b, C12 §6a). A row is a `Series` because `seriesRange` already computes the one range that makes a matrix a matrix, and §5's label column already holds row labels at no cost in plot rows — but three of `Plot`'s affordances have no meaning for it, and an ignored member is how a type acquires a field that means nothing in one arm and everything in another:
+
+- **`tone` on a row** — magnitude owns the cell, so a per-row tone is a second colour channel fighting the first. That is `Tone` asked to carry a second axis, which is roadmap 51's finding; refusing is what stops it recurring.
+- **`axes: false`** — the scale legend is the only thing that says what a cell means. A heatmap without one is unreadable rather than plain, so the flag that would remove it is an error and not an option.
+- **a ragged matrix** — rows of differing length. The renderer places a sample at `round((i / span) * (w − 1))` using that row's own length, so a short row is stretched to the common width and column `k` means a different instant in every row: arithmetically self-consistent, and describing a different thing than it holds. Padding is the only fix and the renderer cannot do it, because it does not know which end is old. The app does.
+
+`height` is required, exactly as `form: "line"` requires it — a matrix's row count is *data*, and a height derived from it would move every block below whenever a container started.
 
 **`form: "line"` requires `height`.** Omitting it is a construction error, not a default. A plot's height is a layout decision the surface must make, and a magic default produces silently wrong-sized plots that nobody notices are wrong. `height` is optional on the type only because `sparkline` does not take one; the constructor enforces the pairing.
 
@@ -1033,6 +1042,7 @@ persisted document rests on.
 - **I49** — **A scroll whose content cannot fit draws a residue marker, in both directions, and pays a row for it out of its own height.** *N above · M below* rather than silence: a bounded region with a marker is normal and one that silently ends is a defect (F123's class, D40's eviction marker). **`measure` returns `height + 1` exactly where the children measure taller than `height`, and `height` where they do not** — the condition is on `(block, width)` and never on the offset, so the content area does not change size as the reader scrolls and I47's offset-independence survives the marker rather than being weakened by it. The glyph is C09's and never a literal (F6).
 - **I50** — **A container's element `copy` is its children's sources, joined — and the offset does not enter it.** C26 I17 at the level above: the box hiding a child is the rendering, and the rendering is not what is copied, so a copy taken across a scrolled boundary carries the hidden rows in full and is the same text at every offset and every width. A child whose kind cannot express a source contributes **nothing** rather than its painted rows, and `table` is deliberately outside the join because C11 declares a richer `copy` per row (§3c). **A container whose elements carry no `copy` at all is the empty-block class arriving at a keystroke** — `y` filtered everything out and returned early, so the key did nothing and said nothing.
 - **I50a** — **A plot carries at most eight series, refused at construction** (roadmap 51). The categorical palette distinguishes eight, and the ninth used to reuse the first's colour — `SERIES_TONES[index % 4]`, which said two different series were one thing and, at four, said series three was `ok` and series four `warn` when neither carried a judgement. **D29 inverted**: information that is not there, carried by colour alone. Refused rather than cycled for C04 I47's reason exactly — a reader cannot see that a colour has been reused, so a rendering that lies is worse than a document that will not build. Both gates say it: `b.plot` throws and `validateBlock` reports. **The cap is a property of the declared `form`, not of the number of series** — C12 §6a A7 is where that was forced, and it is a recast rather than an exception. A `heatmap` carries magnitude in the ramp glyph and draws **no per-row colour at any depth**, so the rule has no subject there and does not bind: a matrix of eight rows is not a matrix, and capping one at the size of a palette it never reads would be a colour rule refusing a document about something else. `line` and `sparkline` keep it **unconditionally**, including the 1-bit case where a multi-series plot stacks and distinguishes spatially: construction cannot see the colour depth, and a document that renders honestly only at one depth is not a document this type should accept. That asymmetry is the whole content of the recast — the heatmap is exempt because the palette is never consulted, not because the picture happens to survive.
+- **I50b** — **A `heatmap` refuses a row `tone`, `axes: false`, and a ragged matrix, and requires a `height`.** Three affordances with no meaning for a matrix, refused rather than ignored — because a member that means nothing in one arm is indistinguishable from one that has not been implemented yet, and the reader who finds it cannot tell which. **The ragged case is the one an app hits by accident**: rings of different ages produce rows of different lengths, and the resulting picture is self-consistent and wrong, so the refusal is what makes column `k` mean tick `k` in every row. Both gates say it: `b.plot` throws and `validateBlock` reports. *C12 §6a A4, B1 and B2 carry the arguments; C12 I17 is what the renderer then guarantees.*
 
 ---
 
@@ -1090,6 +1100,7 @@ persisted document rests on.
 46. **A bounded region says what it is hiding** — both directions, one row, and the row is spent on a property of the block rather than of the view (I49, §3c).
 49. **`null` is a gap in a numeric array** — the one non-number a document may carry in a numeric position, because it is the only spelling of *no reading* that survives the round trip the serialiser already performs (I46a, C12 §6a).
 48. **A plot carries at most eight series** — the categorical palette's size, refused at construction rather than cycled, because a repeated colour is a segmentation that lies (I50a, roadmap 51).
+50. **A heatmap refuses what has no meaning for a matrix** — a row tone, `axes: false`, and rows of differing length — rather than ignoring it, because an ignored member reads as one not yet implemented (I50b, C12 §6a).
 47. **A copy is not bounded by the box that hides it** — the container's `copy` is its children's sources joined, unchanged by the offset, and a kind with no expressible source contributes nothing rather than its rendering (I50, §3c).
 
 ---
