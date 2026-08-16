@@ -23,6 +23,14 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
  * is the moment the judgement gets made.
  */
 const EXPECTED_STATES = [
+  // **The judgement, made here as the comment above asks.** A `keyValue` bar
+  // beside `table-value-bar` looks like a duplicate and is not: the table
+  // supplies its column's width and the `keyValue` supplies its own inside a
+  // remainder, which is the whole of what C04 I51 rules on. And it earned its
+  // place the day it landed — the frame it produced is what made anyone look at
+  // the table state's, which had been drawing `█░░░░░░░ …` at `dark-wide` in a
+  // committed snapshot since it was written (F176).
+  "kv-value-bar",
   "notice-continuation",
   "plot-gapped-line",
   "plot-heatmap",

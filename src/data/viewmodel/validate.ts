@@ -223,7 +223,36 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "tone", e, at);
     requireGlyph(b["glyph"], e, at);
   },
-  keyValue: (b, e, at) => requireArray(b, "rows", e, at),
+  keyValue: (b, e, at) => {
+    requireArray(b, "rows", e, at);
+    if (!isArray(b["rows"])) return;
+    for (const row of b["rows"]) {
+      if (!isRecord(row) || !isRecord(row["bar"])) continue;
+      const spec = row["bar"];
+      // The same two numbers `Cell.bar` is checked for (I50c), because they are
+      // the same `BarSpec` — a non-finite `value` is a run of `NaN` cells and a
+      // non-finite `max` is a division that produces one.
+      if (spec["value"] !== null && !isFiniteNumber(spec["value"])) {
+        e.push(`${at} row "${String(row["label"])}": "bar.value" must be a finite number or null (C04 I51)`);
+      }
+      if (!isFiniteNumber(spec["max"])) {
+        e.push(`${at} row "${String(row["label"])}": "bar.max" must be a finite number (C04 I51)`);
+      }
+      // **The pairing the type could not carry**, and the gate that does — the
+      // same division I50c makes for a cell holding both a `spark` and a `bar`.
+      // A narrower `bar` member would have broken `b.kv({ s: b.warn("x") })`,
+      // because the tone shorthands return a `Cell` whose `bar` is a plain
+      // `BarSpec`. So `barWidth` is a sibling, and an absent or sub-cell width
+      // is refused here: it is not a narrow bar, it is no bar, and the row would
+      // draw its value as though it had never asked for one.
+      if (!isFiniteNumber(row["barWidth"]) || row["barWidth"] < 1) {
+        e.push(
+          `${at} row "${String(row["label"])}": a "bar" needs a "barWidth" of at least one cell ` +
+            `(C04 I51) — a keyValue value is a remainder, so the bar says how much of it to take`,
+        );
+      }
+    }
+  },
   table: (b, e, at) => {
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);

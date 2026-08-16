@@ -372,7 +372,42 @@ export type Notice = Readonly<{
 export type KeyValue = Readonly<{
   kind: "keyValue";
   id: string;
-  rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[];
+  rows: readonly Readonly<{
+    label: string;
+    value: string;
+    tone?: Tone;
+    /**
+     * A quantity beside the value, not instead of it (I51, C12 §3b).
+     *
+     * **Not `Cell.bar`'s seam**, which replaces the cell's text and takes the
+     * planned width (I50c). Both surfaces that draw one here put a text next to
+     * the run — docker's `MEM` reads `████░░░░ 45.2%  1.2GiB / 4GiB` and S13's
+     * cluster panel `71%  ██████░░░` — so `value` stays and the bar joins it.
+     *
+     * **`width` is on the row because a `keyValue` value is a remainder and a
+     * table column is a width.** Given the whole remainder, `valueBar` draws a
+     * 68-cell run at a terminal width of 80: correct in every count and a
+     * picture no surface asked for. Both consumers chose a width by hand, and
+     * S13 §7 shortens its bars at 80–99 columns.
+     *
+     * It is not a member of `BarSpec`, which `Cell` shares and where the column
+     * already supplies the number — two sources for one width is the audit's D6
+     * before there is any code to reconcile them.
+     *
+     * **A sibling rather than an intersection, and the type could not carry the
+     * pairing.** `bar?: BarSpec & { width }` compiles here and breaks
+     * `b.kv({ state: b.warn("degraded") })` at every call site: the tone
+     * shorthands return a `Cell`, whose `bar` is a plain `BarSpec`, so a
+     * narrower member makes the whole shorthand unassignable to `KeyValueInput`.
+     * Measured — two errors, both that path, and it is documented behaviour
+     * (C24 §4). So `bar` without a `barWidth` is expressible and refused by
+     * `validateBlock`, which is exactly how I50c handles a cell carrying both a
+     * `spark` and a `bar`: same block family, same gate, one precedent.
+     */
+    bar?: BarSpec;
+    /** The cells the bar occupies. Required when `bar` is present (I51). */
+    barWidth?: number;
+  }>[];
 }> & Gap;
 
 export type Table = Readonly<{

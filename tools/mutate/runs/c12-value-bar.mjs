@@ -42,8 +42,8 @@ const results = runPass({
       // and one of them says *saturated* about something that is not.
       name: "THE DEFECT: the number is clamped with the fill",
       file: BAR,
-      from: "  const number = formatValue(spec.value, spec.format);",
-      to: "  const number = formatValue(Math.min(spec.value, spec.max), spec.format);",
+      from: "  const number = formatReadout(spec.value, spec.format);",
+      to: "  const number = formatReadout(Math.min(spec.value, spec.max), spec.format);",
       expect: "T1.25",
     },
     {
@@ -85,8 +85,8 @@ const results = runPass({
       // spot. The mutation still kills, run rather than assumed.
       name: "the alphabet ignores the capability",
       file: RAMP,
-      from: '  return caps.unicode === "ascii"\n',
-      to: "  return false\n",
+      from: '  if (caps.unicode === "ascii") {\n',
+      to: "  if (false) {\n",
       expect: "T1.27",
     },
     {

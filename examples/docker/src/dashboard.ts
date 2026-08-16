@@ -161,34 +161,6 @@ const GLYPH_SLOT = 2;
 const CPU_WIDTH = GLYPH_SLOT + BAR_CELLS + 1 + 6;
 
 /**
- * A bar, drawn from block glyphs rather than from a palette ramp.
- *
- * **Gap 3, absorbed rather than solved.** Load is a continuum and Calcium's
- * palette is tone slots, so the tone is chosen at thresholds — and the thresholds
- * are arbitrary. That is the finding: not that 60 and 85 are wrong numbers, but
- * that the app had to invent numbers at all to express a quantity.
- *
- * Overflows visibly past 100 rather than clamping (walk A4): the bar fills and
- * the number keeps counting, which is the honest rendering of a figure whose
- * ceiling is the core count and is not knowable here.
- */
-/**
- * The bar's two alphabets, and **the choice is the app's because nothing else
- * can make it** (F43, F54).
- *
- * `█ ░ —` are block elements and an em-dash. Capability substitution covers the
- * glyphs C09 picks, **not text an adapter supplies** — so on a terminal
- * declaring `unicode: ascii` these pass through untouched and draw as garbage.
- * S12 measured it: at `LANG=C` the frame kept `░░░░░░░░` beside a plot that had
- * correctly become `.::-==++**##@@` and borders that had correctly become `+--+`.
- *
- * The framework was right about all of that and cannot help here: an adapter is
- * handed `AdapterContext`, which carries `width` and no capabilities, so the
- * flag is computed in `main.ts` from the environment and threaded in by hand.
- * That thread is the price of F43 and it is what makes F43 a finding rather
- * than a preference.
- */
-/**
  * The separator, on the same axis as the alphabet.
  *
  * `·` is U+00B7 — not a block element, and not ASCII either. It was the fourth
@@ -198,50 +170,23 @@ const CPU_WIDTH = GLYPH_SLOT + BAR_CELLS + 1 + 6;
  */
 export const dot = (unicode: boolean): string => (unicode ? "·" : "-");
 
+/** The absent mark, still read by the summary line. */
 const ALPHABET = {
   full: { filled: "█", empty: "░", absent: "—" },
   ascii: { filled: "#", empty: ".", absent: "-" },
 } as const;
 
-export function bar(
-  value: number | null,
-  unicode = true,
-): { text: string; tone: Tone; glyph?: Glyph } {
-  const mark = unicode ? ALPHABET.full : ALPHABET.ascii;
-  if (value === null) return { text: mark.absent.padEnd(CPU_WIDTH - GLYPH_SLOT), tone: "muted" };
-  const filled = Math.min(BAR_CELLS, Math.round((value / 100) * BAR_CELLS));
-  const glyphs = mark.filled.repeat(filled) + mark.empty.repeat(BAR_CELLS - filled);
-  const text = `${glyphs} ${value.toFixed(1)}%`.padEnd(CPU_WIDTH - GLYPH_SLOT);
-
-  // **A toned cell must carry a glyph, and finding that out cost nothing only
-  // because a test constructed a busy container.**
-  //
-  // C04 I6: `warn` and `error` require a non-empty glyph, because colour alone
-  // survives neither 1-bit nor a colour-blind reader. `block()` throws without
-  // one — and the throw lands inside C23's `appendAndCommit`, which catches it,
-  // discards it and commits the frame anyway. So **every container above 60%
-  // CPU would have produced no entry at all**, silently, on exactly the machine
-  // someone opens a dashboard to look at. This machine is idle, so no frame
-  // could ever have shown it.
-  //
-  // This is gap 3 arriving concretely. The app wants colour to encode a
-  // *quantity* and Calcium's tones encode *severity* — which is a coherent
-  // design, and it means a value-coloured bar has to borrow severity marks it
-  // does not quite mean. `▲` at 60% is an overstatement; it is also the only
-  // vocabulary there is.
-  // **`warn` at both levels, and the frame is why.** The first version used the
-  // `error` glyph above 85 and rendered `✗ ████████ 101.2%` — which reads as a
-  // container that has *failed*, when the truth is that it is working as hard as
-  // it can. The vocabulary is severity all the way down (`ok` `warn` `error`
-  // `pending` `working` `cancelled` …) and has no mark for *hot*, so the
-  // quantity has to borrow the nearest severity and `▲` is as close as it gets.
-  //
-  // The tone still carries two levels, so amber and red separate the bands
-  // without the mark claiming a failure that has not happened.
-  if (value >= 85) return { text, tone: "error", glyph: "warn" };
-  if (value >= 60) return { text, tone: "warn", glyph: "warn" };
-  return { text, tone: "ok" };
-}
+/**
+ * **`bar()` lived here and is gone** — C04 I51, F174.
+ *
+ * Nine lines of run-drawing plus its alphabet, which the CPU column stopped
+ * using when `Cell.bar` landed and `ioBlock` stopped using when a `keyValue` row
+ * gained one. It outlived both by a commit because three tests called it
+ * directly, so a function no frame drew went on passing six assertions.
+ *
+ * `BAR_CELLS` and `GLYPH_SLOT` stay: `CPU_WIDTH` is built from them and the
+ * column still declares it.
+ */
 
 /** The longest container name seen on this machine, and the glyph beside it. */
 const NAME_CELLS = 22;

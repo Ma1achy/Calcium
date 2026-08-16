@@ -790,7 +790,8 @@ describe("C12 I20 — the value bar, the `fill` encoding", () => {
     const over = draw({ value: 101.2, max: 100, format: "percent" });
     const full = draw({ value: 100, max: 100, format: "percent" });
 
-    expect(over).toContain("101%");
+    // `101.2%`, not `101%` — a bar's number is a readout and not a tick (F175).
+    expect(over).toContain("101.2%");
     expect(over).not.toBe(full);
     expect(cells(over, "narrow"), "and the run still stops at its cells").toBe(20);
 
@@ -802,7 +803,7 @@ describe("C12 I20 — the value bar, the `fill` encoding", () => {
     // disappears and the bar looks merely full.
     const wild = draw({ value: 500, max: 100, format: "percent" }, 20);
     expect(cells(wild, "narrow")).toBe(20);
-    expect(wild, "the number survives an overshoot of any size").toContain("500%");
+    expect(wild, "the number survives an overshoot of any size").toContain("500.0%");
   });
 
   it("T1.26 (I20, C04 I50c): an absent value is a mark, not an empty run", () => {
@@ -828,7 +829,7 @@ describe("C12 I20 — the value bar, the `fill` encoding", () => {
 
     // Below the minimum run the number is the whole cell: a two-cell bar is not
     // a bar, it is a decoration that looks like data.
-    expect(draw({ value: 42, max: 100, format: "percent" }, 5).trim()).toBe("42%");
+    expect(draw({ value: 42, max: 100, format: "percent" }, 5).trim()).toBe("42.0%");
     // And the run grows with the width rather than the number doing so.
     const narrow = draw({ value: 50, max: 100, format: "percent" }, 12);
     const wide = draw({ value: 50, max: 100, format: "percent" }, 30);

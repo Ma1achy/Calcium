@@ -27,6 +27,36 @@ export type YLabel = Readonly<{ row: number; text: string }>;
  * because an unknown string should quietly become a number, which is what it
  * used to mean and what let a typo render plain values in silence.
  */
+/**
+ * The same value as a **readout** rather than as a tick label (F175).
+ *
+ * **A tick is a mark on a scale and a readout is the answer**, so `100%` is
+ * right on an axis and `45%` throws away the digit a bar exists to show:
+ * `docker stats` sends `45.2%` and the cell drew `45%`. This component's
+ * recurring class a third time, after the two ramps — a rule correct next door,
+ * carried into a geometry it does not fit.
+ *
+ * **A named entry point rather than an optional argument, and the frame is why.**
+ * The first fix made `formatValue` honour its existing `places` for the percent
+ * arms, which reads as the minimal change and is wrong: `yLabels` **already
+ * passes `places`**, so every percent axis in the corpus gained a decimal, the
+ * gutter widened by two cells and every plot lost them. Nothing in the diff of
+ * the function said so; the golden frames did.
+ *
+ * The *enum* stays shared on purpose (C04 I50c) — a bar's number and a y-label
+ * ask the same question about the unit coming in. Precision is not a property
+ * of the unit, which is what the sharing argument never covered.
+ */
+export function formatReadout(v: number, format: Plot["yFormat"]): string {
+  if (!Number.isFinite(v)) return "—";
+  if (format === "percent") return `${v.toFixed(READOUT_PLACES)}%`;
+  if (format === "fraction") return `${(v * 100).toFixed(READOUT_PLACES)}%`;
+  return formatValue(v, format);
+}
+
+/** Decimals in a readout. One — enough for a reading, short of noise. */
+const READOUT_PLACES = 1;
+
 export function formatValue(v: number, format: Plot["yFormat"], places?: number): string {
   if (!Number.isFinite(v)) return "—";
 

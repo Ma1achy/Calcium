@@ -21,7 +21,6 @@ import { parseNdjson } from "../src/ndjson.ts";
 import {
   COLUMNS,
   SHOWN,
-  bar,
   dashboard,
   isLive,
   join,
@@ -97,9 +96,9 @@ describe("walk A: the classification table", () => {
       expect(c.cpu, c.name).toBeNull();
       expect(c.memPerc, c.name).toBeNull();
     }
-    // And it reaches the frame as a dash rather than a bar at zero.
-    expect(bar(null).text.trim()).toBe("—");
-    expect(bar(null).tone).toBe("muted");
+    // **The frame half of this row lives in `test/repo/cpu-cell.test.ts`** —
+    // it asserted `bar(null)`, and `bar()` stopped being drawn a commit before
+    // it stopped existing (F174). A package test cannot render a block.
   });
 
   it("A3b: a stats row with no ps row is dropped, not invented", () => {
@@ -113,13 +112,9 @@ describe("walk A: the classification table", () => {
 
   it("A4: CPU is not clamped at 100, because it is per-core-normalised", () => {
     expect(percent("780.00%")).toBe(780);
-    const hot = bar(780);
-    // The bar fills and the number keeps counting. Clamping renders a busy
-    // container identically to a saturated one.
-    expect(hot.text).toContain("780.0%");
-    expect(hot.tone).toBe("error");
-    // And the value survives to the cell rather than being rounded to the bar.
-    expect(hot.text).not.toContain("100.0%");
+    // The unclamped half is read from the cell in `test/repo/cpu-cell.test.ts`
+    // (F174). What stays here is the parse, which is this package's own.
+    expect(percent("100.00%")).toBe(100);
   });
 
   it("A4b: percent refuses anything that is not a percentage", () => {
@@ -292,28 +287,11 @@ describe("walk C: the nesting boundaries", () => {
     for (const c of COLUMNS) expect(c.maxWidth, c.key).toBeUndefined();
   });
 
-  it("C4: the CPU cell fits a bar, a separator and a three-digit percentage", () => {
-    // **The step-1 defect's shape, and this assertion is deliberately not the
-    // arithmetic.** It renders the widest value walk A4 permits and measures the
-    // string, rather than comparing `minWidth` against the same sum the code
-    // computed — which is how `STATUS` shipped truncating with a green test.
-    // **The first version of this survived its own mutation**, because it
-    // compared `minWidth` against a string this module pads *to* `CPU_WIDTH`.
-    // Both sides came from the same constant, so removing the glyph slot shrank
-    // them together and the assertion stayed true — step 1's `STATUS` test, made
-    // again in the file that documents step 1's `STATUS` test.
-    //
-    // Measured from the parts the cell actually renders instead: a glyph, its
-    // separator, and the text.
-    const hot = bar(999.9);
-    expect(hot.glyph, "a toned bar must carry a glyph — C04 I6").toBeDefined();
-    const GLYPH = cells("▲ ");
-    const col = COLUMNS.find((c) => c.key === "cpu");
-    expect(col?.minWidth).toBeGreaterThanOrEqual(cells(hot.text.trimEnd()) + GLYPH);
-    // And nothing in it is elided.
-    expect(hot.text).not.toContain("…");
-    expect(hot.text).toContain("999.9%");
-  });
+  // **C4 moved to `test/repo/cpu-cell.test.ts`** (F174). It measured
+  // `minWidth` against `bar(999.9).text`, and `bar()` was already drawn by
+  // nothing — so the row asserting the CPU cell is not truncated was asserting
+  // it about a string the cell never held. The replacement reads the frame,
+  // which is what this file's own header asks for.
 });
 
 describe("the live declaration", () => {

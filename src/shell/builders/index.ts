@@ -214,7 +214,13 @@ function kv(
       rows: pairs.map(({ label, value }) =>
         typeof value === "string"
           ? { label, value }
-          : { label, value: value.text, ...(value.tone === undefined ? {} : { tone: value.tone }) },
+          : {
+              label,
+              value: value.text,
+              ...(value.tone === undefined ? {} : { tone: value.tone }),
+              ...(value.bar === undefined ? {} : { bar: value.bar }),
+              ...(value.barWidth === undefined ? {} : { barWidth: value.barWidth }),
+            },
       ),
     } as KeyValue,
     opts,

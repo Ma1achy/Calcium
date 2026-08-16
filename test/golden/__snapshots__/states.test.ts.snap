@@ -22,10 +22,15 @@ worker |                ================
 .:-=+*#@  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       #.............. 4%
-worker    ############# 101%
+api       #............ 4.2%
+worker    ########### 101.2%
 db        -                 
-idle      ............... 0%
+idle      ............. 0.0%
+── keyValue · kv-value-bar
+MEM   ####..... 45.2%  1.2GiB / 4GiB
+CPU   ######## 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   \` queued behind /logs
 ── prompt · prompt-paste-chip
@@ -55,10 +60,15 @@ worker |                                                        ================
 .:-=+*#@  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       #.............. 4%
-worker    ############# 101%
+api       #............ 4.2%
+worker    ########### 101.2%
 db        -                 
-idle      ............... 0%
+idle      ............. 0.0%
+── keyValue · kv-value-bar
+MEM   ####..... 45.2%  1.2GiB / 4GiB
+CPU   ######## 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   \` queued behind /logs
 ── prompt · prompt-paste-chip
@@ -87,10 +97,15 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░░░░░░░░ 4%
-worker    █████████████ 101%
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
 db        —                 
-idle      ░░░░░░░░░░░░░░░ 0%
+idle      ░░░░░░░░░░░░░ 0.0%
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -120,10 +135,15 @@ worker │                                                        ⠶⠶⠶⠶�
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░░░░░░░░ 4%
-worker    █████████████ 101%
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
 db        —                 
-idle      ░░░░░░░░░░░░░░░ 0%
+idle      ░░░░░░░░░░░░░ 0.0%
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -152,10 +172,15 @@ worker |                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░ …
-worker    ████████ …
-db        —                
-idle      ░░░░░░░░ …
+api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
+worker    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%
+db        -                 
+idle      ⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 0.0%
+── keyValue · kv-value-bar
+MEM   ⣿⣿⣿⣿⠄⠄⠄⠄⠄ 45.2%  1.2GiB / 4GiB
+CPU   ⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -185,10 +210,15 @@ worker |                                                        ⠶⠶⠶⠶⠶�
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░ …
-worker    ████████ …
-db        —                
-idle      ░░░░░░░░ …
+api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
+worker    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%
+db        -                 
+idle      ⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 0.0%
+── keyValue · kv-value-bar
+MEM   ⣿⣿⣿⣿⠄⠄⠄⠄⠄ 45.2%  1.2GiB / 4GiB
+CPU   ⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -217,10 +247,15 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░░░░░░░░ 4%
-worker    █████████████ 101%
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
 db        —                 
-idle      ░░░░░░░░░░░░░░░ 0%
+idle      ░░░░░░░░░░░░░ 0.0%
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -250,10 +285,15 @@ worker │                                                        ⠶⠶⠶⠶�
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░░░░░░░░ 4%
-worker    █████████████ 101%
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
 db        —                 
-idle      ░░░░░░░░░░░░░░░ 0%
+idle      ░░░░░░░░░░░░░ 0.0%
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -282,10 +322,15 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░░░░░░░░ 4%
-worker    █████████████ 101%
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
 db        —                 
-idle      ░░░░░░░░░░░░░░░ 0%
+idle      ░░░░░░░░░░░░░ 0.0%
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -315,10 +360,15 @@ worker │                                                        ⠶⠶⠶⠶�
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
 ── table · table-value-bar
 NAME      CPU               
-api       █░░░░░░░░░░░░░░ 4%
-worker    █████████████ 101%
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
 db        —                 
-idle      ░░░░░░░░░░░░░░░ 0%
+idle      ░░░░░░░░░░░░░ 0.0%
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip

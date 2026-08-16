@@ -18,12 +18,13 @@
  */
 import type { BarSpec } from "../../data/viewmodel/index.js";
 import { cells, truncate } from "../text.js";
-import { formatValue } from "./axes.js";
+import { formatReadout } from "./axes.js";
 import { pairFor } from "./ramp.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /** The narrowest run worth drawing. Below it the number is the whole cell. */
 const MIN_RUN = 3;
+
 
 /**
  * One row of exactly `width` cells (I20).
@@ -68,7 +69,12 @@ export function valueBar(
   // zero. The same question, answered per geometry.
   if (spec.value === null || !Number.isFinite(spec.value)) return pad(mark.absent);
 
-  const number = formatValue(spec.value, spec.format);
+  // **A readout, not a tick** (F175). A bar exists to say *how much*, and
+  // `45.2%` rounded to `45%` throws away the digit the reader opened the
+  // surface for. `formatReadout` is a named intent rather than an argument,
+  // because `yLabels` already passes a `places` and the minimal-looking fix
+  // widened every percent axis in the corpus by two cells.
+  const number = formatReadout(spec.value, spec.format);
   const run = w - cells(number, caps.ambiguousWidth) - 1;
   if (run < MIN_RUN) return pad(number);
 

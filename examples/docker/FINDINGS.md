@@ -8665,3 +8665,119 @@ The pattern now reads both quote styles and skips comment lines between `file:` 
 assumed. The MA4 equality arm is what would catch the population moving again, and it is only as
 good as what `anchorsOf` can parse, which is why the figure is recorded in that function's header
 rather than here alone.
+
+---
+
+## F174 — three tests outlived the function they asserted ★★★
+
+| | |
+|---|---|
+| **Surface** | `examples/docker`'s `bar()`, and three rows of `dashboard.test.ts` |
+| **Reached for** | moving `ioBlock`'s `MEM` onto `keyValue`'s new bar (C04 I51) |
+| **Verdict** | **a function no frame drew, passing six assertions**, and hiding a regression |
+| **Absorbed by** | `bar()` deleted; the three rows rewritten against the frame in `test/repo/cpu-cell.test.ts` |
+
+`bar()` drew a run into a string. `Cell.bar` took the dashboard's CPU column off it one commit
+ago and `ioBlock` was the last caller; when that moved, `bar()` had none. **It kept passing
+because the tests called it directly** — the mechanism, never the wiring.
+
+The file's own header says *assertions read the rendered output, never the arithmetic the code
+used*. Three rows in it did not, in the file that documents why.
+
+### What the orphaned rows were hiding
+
+Rewriting them against the frame failed immediately, and the failure was real:
+
+```
+expected '████████████ 780%'  to contain '780.0%'
+expected '███████████ 1000%'  to contain '999.9%'
+```
+
+**The CPU column has been rounding since `Cell.bar` landed.** `docker stats` sends `45.2%` and
+the cell drew `45%`. That is F175, and it was invisible for exactly as long as the rows testing
+it were pointed at a function the cell does not call.
+
+### Why the replacement is a repo test
+
+`@fmx/calcium` publishes `createTui` and the builders and **no block-to-lines renderer**, so the
+package cannot render a block — which is why the rows were written against a function in the
+first place. `test/repo/` is the established answer (see `banner.test.ts`) and it labels the
+reach rather than hiding it.
+
+---
+
+## F175 — a bar's number was formatted as a tick label ★★★
+
+| | |
+|---|---|
+| **Surface** | `valueBar` — every bar in the framework |
+| **Reached for** | F174's rewritten rows, which failed on the first run |
+| **Verdict** | **a real Calcium defect**, and this component's recurring class a third time |
+| **Absorbed by** | `formatReadout`, beside `formatValue` |
+
+`formatValue(v, "percent")` is `${Math.round(v)}%`, which is right for a **tick**: an axis is a
+scale and its marks are round. A bar's number is a **readout** — the answer — and rounding it
+throws away the digit the reader opened the surface for.
+
+**The enum is shared on purpose and the sharing argument never covered precision.** C04 I50c
+puts `BarSpec.format` on `Plot["yFormat"]` because *a bar's number and a plot's y-label ask the
+same question* — about the unit coming in. Precision is not a property of the unit.
+
+**Third instance of one shape in one component**: the heatmap took the sparkline's height ramp,
+`sparkline` took `line`'s *filtered before scaling*, and now the bar took the axis's rounding.
+Each was correct next door, arithmetically sound, and rendered.
+
+### The fix that read as minimal and was wrong
+
+`formatValue` already takes a `places`, so honouring it in the percent arms looks like the
+smallest possible change. **`yLabels` already passes `places`.** Every percent axis in the golden
+corpus gained a decimal, the gutter widened by two cells, and every plot lost them — 224 lines of
+snapshot diff that nothing in the function's own diff predicted.
+
+So the entry point is **named** rather than switched on an optional argument: `formatReadout` for
+a value, `formatValue` for a tick. **An intent inferred from whether an argument is present is an
+intent two callers can disagree about**, and here they already did.
+
+---
+
+## F176 — the `fill` pair had no ambiguous-width arm, and the corpus had recorded it ★★★★
+
+| | |
+|---|---|
+| **Surface** | `pairFor` — every bar, at `ambiguousWidth: "wide"` |
+| **Reached for** | reading the golden diff after adding a `keyValue` bar state |
+| **Verdict** | **a shipped defect, already in a committed snapshot**, unread |
+| **Absorbed by** | a braille arm in `pairFor` |
+
+`█` (U+2588), `░` (U+2591) and `—` (U+2014) are all `East_Asian_Width=Ambiguous`. On a terminal
+that draws ambiguous glyphs wide, a bar occupies **twice its declared cells**, so `truncate` eats
+the end of it — and the end is the number, the one thing a bar exists to say.
+
+```
+dark-wide, before   api       █░░░░░░░ …
+dark-wide, after    api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
+```
+
+**This is precisely what `RAMP_UNICODE` did**, and `ladderFor` swaps braille in for it — every
+code point in U+2800–U+28FF is `Neutral`, narrow under both conventions. `pairFor` was written
+after that fix and did not inherit it: the fourth encoding axis, added last, with the third
+axis's solved problem.
+
+### The part that is about the habit rather than the code
+
+**The golden corpus had it.** `table-value-bar` at `dark-wide` has read `█░░░░░░░ …` since the
+state landed, in a snapshot that was generated, reviewed and committed. **The instrument
+captured the evidence and the reading step was skipped.**
+
+That is a sharper failure than a missing test. Adding the state was the right move and it
+worked; what did not happen is anyone looking at what it produced. `-u` makes a diff, and a diff
+nobody reads is a record, not a check.
+
+**And it is why the `keyValue` state was worth adding even though the table state existed.** The
+new frame is what made the old one get looked at.
+
+### The absent mark, which is the same bug in the arm nobody would check
+
+`—` is ambiguous too, so the *absent* mark was two cells at that rung. It drops to ASCII `-`
+there: braille has no glyph that reads as *nothing was reported*, and a mark that is right in one
+convention only is what this whole finding is about.

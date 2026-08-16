@@ -186,6 +186,42 @@ export const STATES: readonly StateFixture[] = Object.freeze([
       ),
   },
   {
+    name: "kv-value-bar",
+    of: "keyValue",
+    why:
+      "the bar is a declared width inside a column that is a remainder, and every way of getting " +
+      "that wrong renders — a 68-cell run at width 80, a row one cell over, a detail that is a " +
+      "lone ellipsis. None of the three is visible to a count (C04 I51)",
+    rows: (w, caps, theme) =>
+      measurable({ theme, capabilities: caps }).renderToLines(
+        block({
+          kind: "keyValue",
+          id: "st-kv-bar",
+          rows: [
+            {
+              label: "MEM",
+              value: "1.2GiB / 4GiB",
+              bar: { value: 45.2, max: 100, format: "percent" },
+              barWidth: 15,
+            },
+            // The scale exceeded, which is the row `progress` would clamp.
+            {
+              label: "CPU",
+              value: "8 cores",
+              bar: { value: 101.2, max: 100, format: "percent" },
+              barWidth: 15,
+            },
+            // Absent, which draws a mark and never an empty run.
+            { label: "SWAP", value: "unavailable", bar: { value: null, max: 100 }, barWidth: 15 },
+            // And a row with no bar at all, beside them — the shape both
+            // measured consumers actually have.
+            { label: "PIDS", value: "12" },
+          ],
+        }),
+        w,
+      ),
+  },
+  {
     name: "notice-continuation",
     of: "notice",
     why:

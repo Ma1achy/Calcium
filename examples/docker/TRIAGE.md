@@ -39,10 +39,10 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 15 | **3 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 14 | **6** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about** |
-| **11** | [A gate that passes without checking](#11) | 34 | **11** | — | 9 closed · **6 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 35 | **11** | — | 9 closed · **6 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
-| — | [Singles](#singles) | 14 | 1 each | — | see each |
+| — | [Singles](#singles) | 16 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -500,10 +500,11 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **15: 7 closed, 8 open**
+## 11 · A gate that passes without checking — **16: 8 closed, 8 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
+| **F174** | **`dashboard.test.ts`, for the wiring under three of its rows** | `bar()` lost its last caller when `ioBlock` moved onto `keyValue`'s bar, and three rows kept passing six assertions because they called it directly — the mechanism, never the wiring, in a file whose header says *assertions read the rendered output*. What they were hiding is F175. **Fixed** — `bar()` deleted, the rows rewritten against the frame in `test/repo/cpu-cell.test.ts` |
 | **F173** | **`tools/mutate/anchors.mjs`, for a quarter of its own anchors** | `anchorsOf` matched `from: "…"` and nothing else, so **108 of 465 anchors, and 30 of the 54 runs carry one** — every anchor whose source contains a double quote, which is most of the capability ones — were outside its reading. It printed `54 runs · 357 anchors · no drift` while a stale anchor from the previous commit sat in a file it was half-reading. **The count is what a working gate looks like from outside**, F161's shape in the instrument that exists to stop staleness. **Fixed** — a branch per quote style; `c12-ramp` and `c12-value-bar` re-anchored and re-run, four more added to `KNOWN_STALE` |
 | **F169** | **`make roadmap`, for the half of the file that is not a table row** | `roadmap-status.mjs` matches `\| N \| BUILT\|PART\|RULED \| … \|` and resolves the citations in that cell. **Entry bodies are never scanned** — 81 citations, 39 of them with a line — so the target reports 49/49 while resolving 56% of the file's citations, and the one stale citation a census found (`src/shell/confirm.ts:148`, blank) was in the unchecked half. The census also priced the exposure: **143 of 326 prose citations carry a line number**, 73% in the roadmap against 19% in `docs/`. **Open** — widening the resolver needs a basename search for the 50 bare-name body citations, and `src/progress.ts` exists in both trees, which is the resolve-against-the-wrong-file class. Six unresolved citations fixed |
 | **F163** | **the golden suite, for anything the painter decides** | `test/golden/README.md` says *frames*, and not one of the four files is one: all go through `renderToLines`, and **no golden test imports from `src/shell/`**. So the base, the prompt window, the selection wash, the chrome, the frame arithmetic, the cursor sequences and the write-as-a-diff have never appeared in a snapshot — the category built to catch exactly this class of change stops one layer below it. Found by re-measuring roadmap 39's residue, whose stated reason was true and was not the reason. **Open** — roadmap 49, because a golden *frame* is test infrastructure with more consumers than the entry that found it |
@@ -677,6 +678,8 @@ already made — folding it in is cheaper than making a second one.
 | **F19** | `ManifestDocument` accepts the one value construction refuses — **fixed** |
 | **F31** | `yFormat: "percent"` expects a fraction — **real**, and the reason `b.plot` exposes the pin and not the format |
 | **F53** | `exactOptionalPropertyTypes` makes an optional field unsupplyable — **real**, and it rhymes with F58b: both are the type surface fighting the consumer rather than a missing feature |
+| **F175** | a bar's number was formatted as a **tick label** — `Math.round`, right for an axis mark and wrong for a readout, so `45.2%` drew as `45%`. Rhymes with F31 one field over: the `yFormat` enum is shared on purpose and *precision is not a property of the unit*. **Fixed** with `formatReadout`, a named intent rather than an optional argument — the argument version was already passed by `yLabels` and widened every percent axis in the corpus |
+| **F176** | the `fill` pair had **no ambiguous-width arm**, so `█ ░ —` drew at twice their cells and `truncate` ate the bar's number. Exactly what `RAMP_UNICODE` did and what `ladderFor` swaps braille in for; the fourth encoding axis was added last and did not inherit the third's fix. **The golden corpus had recorded it** — `table-value-bar` at `dark-wide` read `█░░░░░░░ …` in a committed snapshot nobody looked at. **Fixed** |
 | **F72** | `ls -p` does not mark a symlinked directory, so the one thing a user wants to do with a directory is the thing it prevents — **fixed** with `ls -1pL`, measured out of a real container's listing |
 
 ---

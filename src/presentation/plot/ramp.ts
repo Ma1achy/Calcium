@@ -210,10 +210,32 @@ export function ladderFor<E extends LadderAxis>(encodes: E, caps: Caps): LadderO
  * `—` is the absent mark: a run of nothing reads as *zero*, which is the one
  * thing absence is not.
  */
-export function pairFor(caps: Pick<TerminalCapabilities, "unicode">): Pair {
-  return caps.unicode === "ascii"
-    ? Object.freeze({ encodes: "fill", filled: "#", empty: ".", absent: "-" } as const)
-    : Object.freeze({ encodes: "fill", filled: "\u2588", empty: "\u2591", absent: "\u2014" } as const);
+export function pairFor(caps: Caps): Pair {
+  if (caps.unicode === "ascii") {
+    return Object.freeze({ encodes: "fill", filled: "#", empty: ".", absent: "-" } as const);
+  }
+  // **The ambiguous-width arm, and `fill` had none** (F176). `\u2588` `\u2591` and `\u2014` are
+  // all `East_Asian_Width=Ambiguous`, so on a terminal that draws them wide a
+  // bar occupies twice its declared cells and `truncate` eats the end of it \u2014
+  // which is the *number*, the one thing a bar exists to say. This is exactly
+  // what `RAMP_UNICODE` did and what `ladderFor` swaps braille in for; the pair
+  // was written after that fix and did not inherit it.
+  //
+  // **The golden corpus had already recorded it.** `table-value-bar` at
+  // `dark-wide` has read `\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591 \u2026` since the state landed, in a snapshot
+  // that was reviewed and committed. The instrument captured the evidence and
+  // the reading step was skipped, which is a finding about the habit rather
+  // than about the code.
+  //
+  // Braille because every code point in U+2800\u2013U+28FF is `Neutral` \u2014 narrow
+  // under both conventions rather than a second guess \u2014 and these two are the
+  // density ladder's own ends, so the track and the fill sit on one scale. The
+  // absent mark drops to ASCII `-`: the em dash is ambiguous too, and there is
+  // no braille glyph that reads as *nothing was reported*.
+  if (caps.ambiguousWidth === "wide") {
+    return Object.freeze({ encodes: "fill", filled: "\u28ff", empty: "\u2804", absent: "-" } as const);
+  }
+  return Object.freeze({ encodes: "fill", filled: "\u2588", empty: "\u2591", absent: "\u2014" } as const);
 }
 
 /**

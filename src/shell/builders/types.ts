@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, ErrorLike, Glyph, Tone } from "../../data/viewmodel/index.js";
+import type { Action, Block, Cell, ErrorLike, Glyph, KeyValue, Tone } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -61,7 +61,20 @@ export type CellInput = string | Cell;
  * literal carrying a `glyph` is a compile error under excess property checking,
  * which is where that mistake should be caught.
  */
-export type KeyValueInput = Readonly<{ text: string; tone?: Tone }>;
+export type KeyValueInput = Readonly<{
+  text: string;
+  tone?: Tone;
+  /**
+   * A quantity beside the text (C04 I51).
+   *
+   * **Reachable from the builder on the day the field lands**, because a member
+   * a document can hold and a builder cannot is the gap `KeyValueRow` was added
+   * for: eleven builders and a whole application went past that one, and MG27
+   * is what found it rather than a reader.
+   */
+  bar?: KeyValue["rows"][number]["bar"];
+  barWidth?: KeyValue["rows"][number]["barWidth"];
+}>;
 
 /**
  * A `b.kv` row, addressed positionally rather than by key (I18, §4).

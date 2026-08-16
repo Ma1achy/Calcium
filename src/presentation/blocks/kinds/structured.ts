@@ -15,6 +15,7 @@ import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
+import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
 
@@ -24,6 +25,9 @@ const KEY_COLUMN_CAP = 20;
 /** Two spaces between columns. One reads as a typo; three wastes a narrow terminal. */
 const COLUMN_GAP = 2;
 
+/** The narrowest detail beside a bar that carries a character as well as an ellipsis. */
+const MIN_DETAIL = 2;
+
 function widest(values: readonly string[], cap: number, ambiguous: AmbiguousWidth = "narrow"): number {
   let widest = 0;
   for (const value of values) widest = Math.max(widest, cells(value, ambiguous));
@@ -31,6 +35,50 @@ function widest(values: readonly string[], cap: number, ambiguous: AmbiguousWidt
 }
 
 // --- keyValue --------------------------------------------------------------
+
+/**
+ * A row's value column — a text, or a bar with the text beside it (C04 I51).
+ *
+ * **The bar takes what it declared and the text takes the rest**, which is the
+ * inverse of `valueBar`'s own rule and is not a contradiction of it: inside the
+ * bar the run is the axis and gives way to its number, while out here the bar is
+ * a declared width in a column that is a remainder. `Cell.bar` needs neither
+ * arm because a table column supplies the width and the cell holds nothing else.
+ *
+ * **Clamped to the column rather than trusted.** A surface declaring twenty
+ * cells in a value column of nine is not a construction error — the same
+ * document is correct at a wider terminal — so the width narrows here and the
+ * bar degrades through `valueBar`'s own rungs.
+ */
+function valueOf(
+  entry: KeyValue["rows"][number],
+  valueWidth: number,
+  ctx: RenderContext,
+): string {
+  // **`barWidth` absent is no bar, and the renderer does not invent one.**
+  // `validateBlock` refuses the pair broken (C04 I51); a renderer that supplied
+  // a default would make the invalid document render, which is the one thing
+  // that keeps a gate from being reached.
+  if (entry.bar === undefined || entry.barWidth === undefined) {
+    return truncate(stripControl(entry.value), valueWidth, ctx.capabilities);
+  }
+
+  const barWidth = Math.min(Math.floor(entry.barWidth), valueWidth);
+  const run = valueBar(entry.bar, barWidth, ctx.capabilities);
+
+  // **The gap belongs to the text, not to the pair.** Added outside the
+  // remainder it would put the row one cell over its width, which is the class
+  // C09 I5 is about: a row the terminal wraps adds a line no measurer counted.
+  // **A one-cell detail is an ellipsis and nothing else** — a mark that says
+  // *there is more* while showing none of it, which is worse than the bar
+  // standing alone. Read from the frame at a width of 24, where the remainder
+  // came to exactly one cell; no arithmetic in this function was wrong.
+  const rest = valueWidth - barWidth - COLUMN_GAP;
+  if (rest < MIN_DETAIL) return run;
+
+  const detail = truncate(stripControl(entry.value), rest, ctx.capabilities);
+  return detail === "" ? run : `${run}${" ".repeat(COLUMN_GAP)}${detail}`;
+}
 
 export const keyValueDefinition: BlockDefinition<KeyValue> = {
   kind: "keyValue",
@@ -54,7 +102,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
           truncate(stripControl(entry.label), keyWidth, ctx.capabilities),
           keyWidth,
         );
-        const value = truncate(stripControl(entry.value), valueWidth, ctx.capabilities);
+        const value = valueOf(entry, valueWidth, ctx);
 
         return paint(
           clampSpans(
