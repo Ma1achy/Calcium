@@ -8556,3 +8556,52 @@ the corpus had none.
 an existing kind is invisible to it by construction. That is why three consecutive behaviour
 changes — the continuation mark, the gapped series, the chip — each left golden green and each
 needed a frame added by hand. Three coincidences with one cause.
+
+---
+
+## F172 — an unknown `ColourRef` resolves to no style, and nothing says so ★★★
+
+| | |
+|---|---|
+| **Surface** | `resolve()` — every painted span in the framework |
+| **Reached for** | entry 3's planning pass, measuring whether a `continuous` palette could be declared |
+| **Verdict** | **a real Calcium defect**, silent, and the empty-block class arriving in the resolver |
+| **Absorbed by** | nothing; filed rather than folded into the plan, because it is a defect today |
+
+```
+resolve("continuous.s3", theme, caps)   →  {}      the family does not exist
+resolve("categorical.c1", theme, MONO)  →  {}      a decoration palette at 1-bit
+```
+
+**One value, two meanings** — `resolve.ts:354` returns `NO_STYLE` when the palette is missing
+*or* the slot is, and `:360` returns the same for a decoration palette at 1-bit, where it is
+correct. So *this reference does not exist* and *this reference resolves to nothing here* are
+indistinguishable to every caller, and the frame that results is a span painted in the default
+foreground: **legible, plausible, and not what the block asked for.**
+
+**It is the empty-block class one layer down.** A `resolve(key)` with no choices was ruled a
+construction error for exactly this reason — a lookup that silently answers *nothing* reads as a
+lookup that answered.
+
+### Why it is filed now rather than found later
+
+Entry 3's colour ruling adds a fourth palette family. **The first thing anyone writes against
+it is `continuous.s3`, and if the family has not landed the cell renders uncoloured and the
+suite stays green** — the defect and the not-yet-built look identical. That is the same trap the
+plan refuses elsewhere: a member that means nothing is indistinguishable from one not yet
+implemented.
+
+**Reachable today, narrowly**: `ColourRef` is `` `${string}.${string}` `` and is published, so an
+app or a framework typo — `tone.okay`, `syntax.keyworrd` — takes this path. Nothing in `src/`
+currently produces one, which is why it has never been seen rather than why it cannot be.
+
+### What it wants, and the shape is already ruled twice
+
+**A missing family or slot should fail where the theme is resolved, not where a span is
+painted.** `ThemeError` exists and `resolveTheme` already reports contrast failures per slot, so
+the seam is built: a reference to a family that does not exist is a theme error, and a
+decoration palette collapsing at 1-bit stays `NO_STYLE` because it is the answer rather than the
+absence of one.
+
+**The cheap half is separable**: `NO_STYLE` for *collapsed* and a distinct sentinel for *missing*
+costs nothing and makes the two cases tellable apart by anything that looks.
