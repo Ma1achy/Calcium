@@ -500,6 +500,32 @@ export type Series = Readonly<{
  * defaulted height is how C12's central property fails silently.
  */
 /**
+ * The colormaps the framework ships, as a closed vocabulary (C10 I31).
+ *
+ * **The names live here and the tables live in L1**, which is the layer rule
+ * doing exactly what it is for. A colormap's *table* is rendering data — 24-bit
+ * triples, quantised per depth — and belongs where the renderer is. Its *name*
+ * is schema: a document carries it, `validateBlock` checks it, and C04 owns what
+ * a document may say. The first draft imported the table into the validator and
+ * MG1 refused it, correctly: a document type cannot depend on how the thing is
+ * drawn.
+ *
+ * **Closed, because an unknown name paints nothing** — and nothing is also what
+ * a correct block paints at one bit, which is F172's collision arriving on a
+ * third surface. A union makes the wrong name a compile error and
+ * `COLORMAP_NAMES` makes it a document error.
+ */
+export type ColormapName = "viridis" | "magma" | "coolwarm" | "twilight";
+
+const COLORMAP_MEMBERS = {
+  viridis: true, magma: true, coolwarm: true, twilight: true,
+} satisfies Record<ColormapName, true>;
+
+export const COLORMAP_NAMES: readonly ColormapName[] = Object.freeze(
+  Object.keys(COLORMAP_MEMBERS) as ColormapName[],
+);
+
+/**
  * The three forms, named so every dispatcher can be exhaustive over them.
  *
  * **A union written inline is a union nothing can be checked against.** Every
@@ -590,6 +616,22 @@ export type Plot = Readonly<{
    * somewhere it is not.
    */
   annotations?: readonly Annotation[];
+  /**
+   * A continuous colormap by name, for a form that encodes magnitude (C10 I31).
+   *
+   * **The second channel, and density stays the carrier.** A heatmap's glyph is
+   * chosen the same way at every depth and colour joins it above 8-bit, so the
+   * 1-bit behaviour is unchanged *by construction* rather than by a fallback —
+   * F34 satisfied throughout instead of at the bottom rung.
+   *
+   * **A name, not a family of slots.** A colormap is a function from a
+   * normalised value to a colour and viridis is viridis on every theme, so it is
+   * framework data rather than theme tokens: a theme chooses which, never what
+   * it contains. An unknown name is refused at construction, because a name that
+   * resolves to nothing renders uncoloured and green — F172's shape, and the one
+   * this type will not reproduce.
+   */
+  colormap?: ColormapName;
   emptyMessage?: string;
 }> & Gap;
 

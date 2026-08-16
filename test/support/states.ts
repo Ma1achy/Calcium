@@ -151,6 +151,13 @@ export const STATES: readonly StateFixture[] = Object.freeze([
           yMin: 0,
           yMax: 100,
           xLabels: ["-60 ticks", "", "now"],
+          // **No `colormap` here, and the absence is the ruling.** This corpus
+          // strips SGR on purpose — *C10's own goldens own colour* — so adding
+          // one changes nothing in the snapshot, and a fixture that cannot
+          // respond to the member it declares is the shape `test/support/
+          // README.md` refuses. The second channel is measured in
+          // `test/contract/colormap.test.ts`, by SGR count at four depths and by
+          // the glyph stream being identical with and without it (C10 I31).
           series: [
             { values: [2, 9, 24, 61, 88, 97, 74, 30, 11, 4, 2, 3, 8, 19, 44, 70], label: "api" },
             { values: [40, 41, 39, 42, 40, 38, 41, 43, 40, 39, 41, 40, 42, 41, 39, 40], label: "worker" },

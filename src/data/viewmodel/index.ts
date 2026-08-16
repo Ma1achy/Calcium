@@ -44,6 +44,7 @@ export type {
   Pills,
   Plot,
   PlotForm,
+  ColormapName,
   Annotation,
   BarSpec,
   Progress,
@@ -60,7 +61,7 @@ export type {
   ViewPatch,
 } from "./types.js";
 
-export { ACTION_KINDS, GLYPH_REQUIRED_TONES, SCHEMA, TONES } from "./types.js";
+export { ACTION_KINDS, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, SCHEMA, TONES } from "./types.js";
 
 export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild } from "./construct.js";
 

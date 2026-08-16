@@ -21,6 +21,7 @@ import {
   type BlockKind,
   type DocumentStatus,
   type Glyph,
+  COLORMAP_NAMES,
   type PlotForm,
   type Result,
   type ViewDocument,
@@ -82,6 +83,7 @@ const ACTION_FIELD: Readonly<Record<Action["kind"], string>> = Object.freeze({
   view: "target",
 });
 
+const COLORMAP_SET: ReadonlySet<string> = new Set<string>(COLORMAP_NAMES);
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
 const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh", "defect"]);
 /** C04 I41 — the arms, named for the unit that arrives, not the unit rendered. */
@@ -358,6 +360,17 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   events: (b, e, at) => requireArray(b, "events", e, at),
   plot: (b, e, at) => {
     checkAnnotations(b["annotations"], e, at);
+    // **An unknown colormap is refused rather than ignored** (C10 I31). A name
+    // that resolves to nothing renders uncoloured and green, which is F172's
+    // shape exactly — and the reason a colormap is chosen by name at all is that
+    // the set is closed and the framework holds it.
+    if (b["colormap"] !== undefined && !COLORMAP_SET.has(String(b["colormap"]))) {
+      e.push(
+        `${at}: "colormap" is "${String(b["colormap"])}", which is not one of ` +
+          `${COLORMAP_NAMES.join(", ")} (C10 I31) — an unknown name paints nothing, ` +
+          `and nothing is what a correct block at one bit also paints`,
+      );
+    }
     requireArray(b, "series", e, at);
     // I46 — the series' own numbers, which nothing checked.
     if (isArray(b["series"])) {

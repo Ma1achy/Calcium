@@ -251,6 +251,20 @@ function quantiseSet(slots: Readonly<Record<string, string>>): Readonly<Record<s
   return Object.freeze(out);
 }
 
+/**
+ * A hex to its nearest 256-cube index (C10 I31).
+ *
+ * **Exported for the colormap and for nothing else.** A palette slot is
+ * quantised through `quantiseSet`, which preserves *rank order across a set* —
+ * the property that keeps eight tones distinct from one another. A colormap has
+ * no set: it is a continuum, and its neighbouring samples are *meant* to be
+ * close, so rank preservation has nothing to hold apart and per-sample nearest
+ * neighbour is the right answer here for the reason it is the wrong one there.
+ */
+export function nearestCubeIndex(hex: string): number {
+  return nearest(toLab(hex)).index;
+}
+
 /** Nearest cube entry satisfying `allowed`, or the nearest overall (I1: total). */
 function nearest(
   lab: readonly [number, number, number],

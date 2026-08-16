@@ -29,6 +29,8 @@ import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
 import { labelWidth, niceAxis, ticksFor, xLabelRow, yLabels } from "./axes.js";
 import { annotationRows } from "./annotate.js";
+import { COLORMAPS, continuousColour, type Colormap } from "../theme/colormap.js";
+import type { ColourValue } from "../theme/types.js";
 import { seriesRange, type Range } from "./scale.js";
 import { ladderFor } from "./ramp.js";
 import { formatValue } from "./axes.js";
@@ -399,6 +401,67 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
 /** A grid cell is blank where nothing was reported (C12 I17, §3a). */
 const HEATMAP_ABSENT = " ";
 
+
+/**
+ * One matrix row's spans — the glyph from the density ramp, the colour from the
+ * colormap (C10 I31, C12 I17).
+ *
+ * **Density stays the carrier and colour joins it**, which is what makes the
+ * 1-bit behaviour unchanged *by construction* rather than by a fallback: the
+ * glyph is chosen the same way at every depth, and `continuousColour` returns
+ * nothing below 8-bit, so the rungs below simply have one channel where the ones
+ * above have two. F34 is satisfied throughout and not at the bottom.
+ *
+ * **Runs are coalesced, and a run may be one cell.** That is the measurement the
+ * plan wanted before ruling colour in: `mergedRow` already emits a span per run,
+ * so a per-cell foreground is expressible and needs no new painting seam.
+ */
+function heatSpans(
+  series: Series,
+  range: Range,
+  layout: Layout,
+  map: Colormap | undefined,
+  style: Readonly<{ ramp: string; absent: string }>,
+  ctx: RenderContext,
+): readonly Span[] {
+  const glyphs = rampRow(series.values, layout.areaWidth, ctx.capabilities, range, style);
+  if (map === undefined) return [{ text: glyphs }];
+
+  // The values the row drew, right-anchored exactly as `rampRow` anchors them,
+  // so cell `k` and reading `k` are the same position. Deriving it twice is how
+  // the colour and the glyph would come to disagree about one cell.
+  const w = Math.max(0, Math.floor(layout.areaWidth));
+  const window = series.values.slice(Math.max(0, series.values.length - w)); // cells-ok — a position count
+  const pad = Math.max(0, w - window.length); // cells-ok — a position count
+
+  const span = range.max - range.min;
+  const colourAt = (index: number): ColourValue | undefined => {
+    const v = window[index - pad];
+    if (v === null || v === undefined || !Number.isFinite(v)) return undefined;
+    return continuousColour(map, span <= 0 ? 0.5 : (v - range.min) / span, ctx.capabilities);
+  };
+
+  const out: Span[] = [];
+  let run = "";
+  let runColour: ColourValue | undefined;
+  const flush = (): void => {
+    if (run === "") return;
+    out.push(runColour === undefined ? { text: run } : { text: run, style: { colour: runColour } });
+    run = "";
+  };
+
+  [...glyphs].forEach((glyph, index) => {
+    const colour = colourAt(index);
+    if (colour !== runColour) {
+      flush();
+      runColour = colour;
+    }
+    run += glyph;
+  });
+  flush();
+  return out;
+}
+
 /**
  * The matrix (I17). One cell per position per row, against the range of the
  * whole matrix — which is the only thing that makes it a matrix rather than a
@@ -412,6 +475,7 @@ function heatmapRows(
   ctx: RenderContext,
 ): readonly string[] {
   const style = { ramp: ladderFor("density", ctx.capabilities).steps, absent: HEATMAP_ABSENT };
+  const map = block.colormap === undefined ? undefined : COLORMAPS[block.colormap];
   const out: string[] = [];
 
   // I8, unchanged: the rows that fit, then a line naming the rest. The marker is
@@ -427,7 +491,7 @@ function heatmapRows(
       line(
         [
           ...gutterSpans(s.label ?? "", layout, ctx),
-          { text: rampRow(s.values, layout.areaWidth, ctx.capabilities, range, style) },
+          ...heatSpans(s, range, layout, map, style, ctx),
         ],
         layout,
         ctx,

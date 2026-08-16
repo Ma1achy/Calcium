@@ -72,8 +72,11 @@ const results = runPass({
       // picture — the comparison a heatmap exists to make, inverted.
       name: "each row normalises over itself",
       file: DEF,
-      from: "        { text: rampRow(s.values, layout.areaWidth, ctx.capabilities, range, style) },",
-      to: "        { text: rampRow(s.values, layout.areaWidth, ctx.capabilities, rowRange(s), style) },",
+      // Re-anchored onto `heatSpans`, where the row's glyphs moved when the
+      // colormap's second channel landed (C10 I31). The subject is unchanged:
+      // the range handed to the row is the matrix's or it is the row's own.
+      from: "  const glyphs = rampRow(series.values, layout.areaWidth, ctx.capabilities, range, style);",
+      to: "  const glyphs = rampRow(series.values, layout.areaWidth, ctx.capabilities, rowRange(series), style);",
       expect: "T1.18",
       also: [
         {
