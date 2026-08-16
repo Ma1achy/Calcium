@@ -114,6 +114,37 @@ const results = runPass({
       expect: "T1.1",
     },
     {
+      // **C12 I18's ladder, put back the way round it was.** Dropping the label
+      // column instead of truncating it gives a matrix with no names beside it —
+      // a picture of numbers, reachable between two ordinary widths, and the
+      // comment above the branch already called it that while the code produced
+      // it.
+      name: "THE LADDER: labels are dropped instead of truncated",
+      file: DEF,
+      from: "    if (room < 1) return null;\n    return { ...base, gutter: room + AXIS_GUTTER, labelColumn: room, areaWidth: MIN_AREA };",
+      to: "    if (room < 1) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };\n    return { ...base, gutter: AXIS_GUTTER, labelColumn: 0, areaWidth: width - AXIS_GUTTER };",
+      expect: "T1.22",
+    },
+    {
+      // **C12 I19, and the half that was wrong**: the legend aligned to the plot
+      // area rather than the row, so a wide label column cut the range and left
+      // the swatch — a key to a scale nobody named.
+      name: "the legend is aligned to the plot area again",
+      file: DEF,
+      from: "    line([{ text: truncate(legend, layout.width, ctx.capabilities), style: muted }], layout, ctx),",
+      to: "    line([{ text: \" \".repeat(layout.gutter) }, { text: truncate(legend, layout.areaWidth, ctx.capabilities), style: muted }], layout, ctx),",
+      expect: "T1.23",
+    },
+    {
+      // The drop order inverted: the swatch kept and the range dropped, which is
+      // the wrong half by the legend's own argument.
+      name: "the legend drops its range before its swatch",
+      file: DEF,
+      from: "  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, range_].find(fits) ?? \"\";",
+      to: "  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, swatch].find(fits) ?? \"\";",
+      expect: "T1.23",
+    },
+    {
       // C04 I50b's ragged refusal, removed. What it lets through is the picture the
       // walk refused: a short row stretched to the common width, so column k
       // means a different instant in every row, self-consistently.

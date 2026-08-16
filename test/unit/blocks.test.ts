@@ -557,3 +557,53 @@ describe("C09 §6 — kinds", () => {
     }
   });
 });
+
+describe("C09 I28 — a progress bar clamps its fill and never its number", () => {
+  // **One ruling where there were two.** `progress` clamped the ratio, and
+  // `examples/docker`'s CPU bar deliberately overflows because `CPUPerc` is
+  // per-core-normalised. The docker argument is not about docker: `100/100` and
+  // `150/100` drawing identically is the same defect wherever it happens, and a
+  // bar reporting `100%` on an overshoot says *complete* about something that
+  // is not.
+  const draw = (current: number, total: number, width = 40): string =>
+    measurable({ theme: DARK_THEME, capabilities: FULL_CAPS })
+      .renderToLines(block({ kind: "progress", id: "p", label: "Build", current, total }), width)
+      .map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""))
+      .join("");
+
+  it("T1.24 (I28): an overshoot fills the bar and keeps counting", () => {
+    expect(draw(150, 100), "the number is the true fraction").toContain("150%");
+    expect(draw(100, 100), "and a complete bar is still 100%").toContain("100%");
+    // The pair that used to be one picture. Asserted as a *difference*, because
+    // each frame alone is plausible and the defect was that they matched.
+    expect(draw(150, 100)).not.toBe(draw(100, 100));
+  });
+
+  it("T1.24 (I28): the bar itself never exceeds its cells", () => {
+    // The half that must clamp: a bar has no cells past its last one, so the
+    // fill saturates while the number does not. Without this the row would run
+    // past the width and the terminal would wrap a line no measurer counted.
+    const drawn = draw(150, 100, 40);
+    expect(cells(drawn, "narrow"), "exactly the width, at any overshoot").toBeLessThanOrEqual(40);
+    expect(draw(1000, 1, 40)).toContain("100000%");
+  });
+
+  it("T1.24 (I28): a negative current is floored, and without the floor it throws", () => {
+    // **The mutation pass found this**: removing the `Math.max(0, …)` survived
+    // every row, because no fixture in the corpus carries a negative `current`.
+    // It is not a cosmetic guard — `bar.on.repeat(filled)` with a negative count
+    // is a `RangeError`, so the block that renders a bar backwards does not
+    // render at all, and C09 I2's *no block input throws* is what it breaks.
+    expect(() => draw(-5, 100)).not.toThrow();
+    expect(draw(-5, 100)).toContain("0%");
+  });
+
+  it("T1.24 (I28): a total of zero has no proportion — an empty bar and 0%", () => {
+    // A floor rather than a measurement, and recorded so it is not rediscovered
+    // as a defect. `current / 0` is what this exists to keep out of the frame.
+    const drawn = draw(5, 0);
+    expect(drawn).toContain("0%");
+    expect(drawn).not.toContain("NaN");
+    expect(drawn).not.toContain("Infinity");
+  });
+});

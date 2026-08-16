@@ -334,7 +334,7 @@ function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth =
  * first, then the **axis furniture**, and the **curve** last. A plot whose label
  * column does not fit is still a plot; a plot with no plot area is a `…`.
  */
-function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): Layout {
+function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): Layout | null {
   const areaRows = plotAreaRows(block);
   const base = { areaRows, width };
   // **A heatmap is always gutter-ed**, whatever `axes` says, because the row
@@ -360,6 +360,24 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
       areaWidth: width - wanted - AXIS_GUTTER,
     };
   }
+
+  // **The heatmap's ladder is the other way up** (I18, §3a). A y-label is a
+  // *scale* and a row label is an *identity*: a curve with no numbers beside it
+  // is still that curve, and a matrix with no names beside it is a picture of
+  // numbers. So the labels shrink rather than going, into whatever is left after
+  // the axis furniture and a minimum plot area.
+  //
+  // The state this replaces was reachable between two ordinary widths, and the
+  // comment three lines above already called it unreadable — the code produced
+  // it anyway.
+  if (block.form === "heatmap") {
+    const room = width - AXIS_GUTTER - MIN_AREA;
+    // Rung 3 is the caller's: with no cell to spare for a label, `null` says so
+    // and `render` draws a notice at the declared height.
+    if (room < 1) return null;
+    return { ...base, gutter: room + AXIS_GUTTER, labelColumn: room, areaWidth: MIN_AREA };
+  }
+
   if (width - AXIS_GUTTER >= MIN_AREA) {
     return { ...base, gutter: AXIS_GUTTER, labelColumn: 0, areaWidth: width - AXIS_GUTTER };
   }
@@ -460,23 +478,26 @@ function heatmapFurniture(
   // that some are missing reads the visible ones as the whole history.
   const longest = block.series.reduce((n, s) => Math.max(n, s.values.length), 0); // cells-ok — a position count
   const dropped = Math.max(0, longest - layout.areaWidth);
-  const scale =
-    `${densityRampFor(ctx.capabilities)}  ${formatValue(range.min, block.yFormat)}`
-    // ASCII, because a legend is framework text and an en dash has no
-    // substitution (C09 I22, SS47). The separator is not carrying meaning here.
-    + ` - ${formatValue(range.max, block.yFormat)}`
-    + (dropped === 0 ? "" : ` · ${String(dropped)} older not shown`); // cells-ok — a position count
+
+  // **The legend spans the row, and its parts drop in order** (I19). It was
+  // placed at the gutter offset — borrowing the plot area's reference for a row
+  // that sits below the matrix rather than inside it — so a wide label column
+  // left it a fraction of the width and cut the *range*, which is the one thing
+  // it exists to state and the reason `axes: false` is refused.
+  //
+  // The range is last to go, then the swatch: a key to a scale nobody named is
+  // decoration. The clause about dropped columns goes first because it is a
+  // caveat about the picture, and the picture is still there without it.
+  const range_ = `${formatValue(range.min, block.yFormat)} - ${formatValue(range.max, block.yFormat)}`;
+  const swatch = densityRampFor(ctx.capabilities);
+  const clause = dropped === 0 ? "" : ` · ${String(dropped)} older not shown`; // cells-ok — a position count
+  const fits = (t: string): boolean => cells(t, ctx.capabilities.ambiguousWidth) <= layout.width;
+
+  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, range_].find(fits) ?? "";
 
   return [
     labelRow,
-    line(
-      [
-        { text: " ".repeat(layout.gutter) },
-        { text: truncate(scale, layout.areaWidth, ctx.capabilities), style: muted },
-      ],
-      layout,
-      ctx,
-    ),
+    line([{ text: truncate(legend, layout.width, ctx.capabilities), style: muted }], layout, ctx),
   ];
 }
 
@@ -522,7 +543,12 @@ const FORM_ROWS: Readonly<
     // column holds and therefore how wide it is.
     const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
     const range = seriesRange(block.series, block);
-    const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked);
+    // Never `null` for a line: the third rung is the heatmap's, and this arm
+    // still ends at the full-width fallback. Narrowed here rather than widened
+    // there, so the one form that can refuse a width is the one that says so.
+    const layout =
+      layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked)
+      ?? { areaRows: plotAreaRows(block), width, gutter: 0, labelColumn: 0, areaWidth: width };
     if (range === null) return emptyRows(block, layout, ctx);
 
     const out = [
@@ -537,6 +563,20 @@ const FORM_ROWS: Readonly<
   heatmap: (block, width, ctx) => {
     const range = seriesRange(block.series, block);
     const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, false);
+    // **Rung 3** (I18): no cell to spare for a label beside a minimum plot area,
+    // so the block says so at its declared height rather than drawing a matrix
+    // nobody can read. I1 holds — a plot that shrank at a narrow width would
+    // move everything below it on a resize.
+    if (layout === null) {
+      const flat: Layout = {
+        areaRows: plotAreaRows(block),
+        width,
+        gutter: 0,
+        labelColumn: 0,
+        areaWidth: width,
+      };
+      return emptyRows({ ...block, emptyMessage: "Too narrow." }, flat, ctx);
+    }
     // **Empty is a property of the block, not of a row** (§6a A3): a matrix every
     // one of whose rows reported nothing is empty; a *row* that reported nothing
     // is a row of blanks and keeps its place.

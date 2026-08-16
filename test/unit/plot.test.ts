@@ -676,6 +676,67 @@ describe("C12 I17 — the heatmap", () => {
     expect(rows[1], "and the minimum is still visible").toContain(RAMP_DENSITY[0]);
   });
 
+  it("T1.22 (C12 I18): width goes to columns first, labels truncate, and an unlabelled matrix is never drawn", () => {
+    // **The state this refuses was reachable between two ordinary widths**, and
+    // the comment above `layoutFor`'s fallback already called it unreadable: the
+    // code produced it anyway. So the row sweeps widths rather than picking one.
+    const long = heat({
+      height: 2,
+      series: [
+        { values: [1, 2, 3, 4, 5, 6], label: "a-very-long-container-name" },
+        { values: [6, 5, 4, 3, 2, 1], label: "another-long-one" },
+      ],
+    });
+
+    for (const width of [40, 30, 24, 12, 8]) {
+      const rows = rowsOf(long, width);
+      const body = rows.slice(0, 2).join("");
+      const named = /[a-z]/u.test(body);
+      const drawn = [...RAMP_DENSITY].some((g) => body.includes(g));
+      // The property, and it is an implication rather than two separate claims:
+      // cells may only appear beside names. A matrix with no names is what A2
+      // refused, and dropping the labels is how the code was producing one.
+      expect(drawn && !named, `unlabelled matrix at ${String(width)}`).toBe(false);
+    }
+
+    // Rung 3: too narrow for one label cell beside a minimum area — a notice at
+    // the declared height, and the height is what I1 makes non-negotiable.
+    const tiny = rowsOf(long, 4);
+    expect(tiny, "the declared height survives the narrowest width").toHaveLength(4);
+    // The prefix, because rung 3 is only reachable below seven cells and a
+    // notice that fits there says almost nothing — which is the honest floor
+    // rather than a defect. What matters is that it is a *notice*: no ramp glyph
+    // appears, so nothing is drawn that a reader would take for data.
+    expect(tiny.join("")).toMatch(/Too/u);
+    for (const g of [...RAMP_DENSITY]) {
+      expect(tiny.join(""), "nothing that reads as a cell").not.toContain(g);
+    }
+  });
+
+  it("T1.23 (C12 I19): the legend keeps its range where it used to lose it", () => {
+    // **The row that justifies refusing `axes: false`, silently losing the thing
+    // it exists to state.** Aligned to the plot area, a 26-cell label column left
+    // it `⠄⠔⠖⠶⠷⠿⡿⣿  1…` — the swatch survived and the range did not, which is
+    // the wrong half by the legend's own argument.
+    const long = heat({
+      height: 2,
+      yFormat: "percent",
+      series: [
+        { values: [1, 2, 3, 4, 5, 6], label: "a-very-long-container-name" },
+        { values: [6, 5, 4, 3, 2, 1], label: "another-long-one" },
+      ],
+    });
+
+    const legendOf = (w: number): string => rowsOf(long, w).slice(-1)[0] ?? "";
+    expect(legendOf(40), "the range, where the old placement cut it").toContain("1% - 6%");
+
+    // The drop order, asserted by narrowing until only one part fits: the swatch
+    // goes and the range stays.
+    const narrow = legendOf(12);
+    expect(narrow, "the range is last to go").toContain("1% - 6%");
+    expect(narrow, "and the swatch is what went").not.toContain(RAMP_DENSITY[0]);
+  });
+
   it("T1.19 (C04 I50b): the three refusals, each with its converse", () => {
     expect(() => heat({ axes: false })).toThrow(/axes/u);
     expect(() => heat({ series: [{ values: [1, 2], tone: "ok" }] })).toThrow(/tone/u);

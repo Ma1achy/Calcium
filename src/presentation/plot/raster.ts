@@ -126,6 +126,22 @@ export function foldBraille(grid: Grid): readonly string[] {
  * cell and is monotone in the value. Taking the lowest instead would draw the
  * curve's underside, and taking a count would draw its density.
  */
+/**
+ * The ASCII arm: a column of dots folded to one glyph per cell (C12 §6).
+ *
+ * **The ramp stands in for height rather than being it, and that is the whole of
+ * what to know here.** The topmost inked dot-row picks the index — bottom → the
+ * ramp's first step, top → its last — so a reader sees *ink weight* where the
+ * braille form gives them *position*. Monotone and legible, and the cost is that
+ * at ASCII a line and a filled area are hard to tell apart: a value near a
+ * cell's top draws a glyph that fills the whole cell.
+ *
+ * **Deliberate, because ASCII has no vertical sub-cell resolution to offer** —
+ * and written here because the same substitution left unstated is what produced
+ * the heatmap's first draft. A ramp encodes a value along an axis, and height,
+ * density and fill are three different axes; this is the one place in C12 where
+ * the axis drawn is not the axis meant.
+ */
 export function foldRamp(grid: Grid, ramp: string): readonly string[] {
   const glyphs = [...ramp];
   const cellsHigh = Math.ceil(grid.dotHeight / RAMP_DOTS.y);

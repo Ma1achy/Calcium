@@ -48,6 +48,22 @@ export const MONO_CAPS: TerminalCapabilities = Object.freeze({
 });
 
 /**
+ * 1-bit **with Unicode** — the rung every 1-bit claim is actually about.
+ *
+ * `MONO_CAPS` is `{colourDepth: 1, unicode: "ascii"}`, so it moves two
+ * capabilities at once and **nothing rendered this one**. C12 I6's stacking and
+ * C12 I17's *the glyph is the channel at every depth* were both measured only
+ * where Unicode had also been removed — a fixture where two things change is a
+ * fixture that cannot say which one the behaviour follows.
+ *
+ * Found by the C12 audit (`docs/notes/CALCIUM_C12_AUDIT.md` §3).
+ */
+export const MONO_UNICODE_CAPS: TerminalCapabilities = Object.freeze({
+  ...MONO_CAPS,
+  unicode: "full",
+});
+
+/**
  * A registry, with extra kinds registered through the public `register`.
  *
  * The parameter is `BlockDefinition<never>[]` so a caller can pass
