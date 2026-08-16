@@ -511,8 +511,27 @@ Not build gates — they need fixtures — but they are the checks that catch th
 | CP8 | Every surface at 1-bit carries each distinction by glyph or word | B04 B4.3 |
 | CP9 | Every field at 160 is reachable at 60 | B04 B4.2 |
 | CP10 | Drop orders are identical under ASCII and UTF-8 | B04 B4.4 |
+| CP11 | **The corpus has two axes — one entry per kind and one per state** — matched to their frames by equality | C04 T2.10, T2.100–T2.103 |
 
 **CP6 already caught two defects during specification** — S06's drop table stated by analogy, and S14 and S15 specifying drops below the minimum width. It is three lines of code and it found errors three readings had missed.
+
+**CP11 is the one measured after the fact, and the figure is why it exists.** `ONE_PER_KIND` is a
+`Readonly<Record<BlockKind, Block>>` — **exhaustive over kinds by its type, and holding exactly one
+state of each.** So it answers *does this kind render* and can answer nothing about *which state it
+is in*, which means a new state of an existing kind is invisible to it by construction. **Three
+features shipped that way** and each needed a frame added by hand afterwards: the continuation mark
+(flush left in the prompt's gutter), the gapped series (the two forms of `plot` disagreeing about one
+array), and the wide ramp's lowest step drawing as its own padding (F171). Not three coincidences —
+the corpus had no axis they could be entries on.
+
+**And the property it cannot have is stated with it**, because an unrecorded limit reads as strength:
+nothing can invent an entry for a state nobody wrote down. The equality arm keeps the inventory and
+the frames in step in **both** directions — a fixture with no declared name and a name with no
+fixture each fail — and whether a *new* state belongs is the same judgement `EXPECTED_KINDS` needs
+when a kind is added. What the axis buys is that the judgement costs three lines and the frame comes
+free. Its own mutation pass records the residue one level out: **dropping a capability arm from the
+frames fails nothing**, because obsolete snapshots are reported and not failed, so the variants a
+corpus draws are a literal no assertion reads.
 
 **CP8 is the sweep worth running earliest.** A single colour-only distinction anywhere breaks the 1-bit axis invisibly for everyone whose terminal has colour.
 

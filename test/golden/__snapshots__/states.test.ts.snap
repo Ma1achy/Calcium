@@ -1,0 +1,157 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden frames — one per state > dark-ascii at 40 1`] = `
+"── plot · plot-gapped-line
+9 |                            .:-=++*#@
+  |                        *#@@
+5 |
+  |          .:-
+1 |.:--=+*#@@
+  +-------------------------------------
+
+── plot · plot-gapped-sparkline
+                                 ?.:?*#@
+── plot · plot-zero-minimum
+                                .:-=+*#@
+── notice · notice-continuation
+  \` queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summa
+rise it"
+`;
+
+exports[`golden frames — one per state > dark-ascii at 80 1`] = `
+"── plot · plot-gapped-line
+9 |                                                          ..::---==+++***##@@
+  |                                                   **##@@@
+5 |
+  |                    ..::--
+1 |..::---===++***##@@@
+  +-----------------------------------------------------------------------------
+
+── plot · plot-gapped-sparkline
+                                                                         ?.:?*#@
+── plot · plot-zero-minimum
+                                                                        .:-=+*#@
+── notice · notice-continuation
+  \` queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summarise it"
+`;
+
+exports[`golden frames — one per state > dark-unicode at 40 1`] = `
+"── plot · plot-gapped-line
+9 │                            ⣀⣀⠤⠤⠔⠒⠒⠊⠉
+  │                        ⠐⠒⠉⠉
+5 │
+  │         ⢀⣀⡠⠄
+1 │⣀⣀⠤⠤⠤⠒⠒⠊⠉⠁
+  └─────────────────────────────────────
+
+── plot · plot-gapped-sparkline
+                                 ?▁▂?▆▇█
+── plot · plot-zero-minimum
+                                ▁▂▃▄▅▆▇█
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summa
+rise it"
+`;
+
+exports[`golden frames — one per state > dark-unicode at 80 1`] = `
+"── plot · plot-gapped-line
+9 │                                                          ⣀⣀⣀⣀⠤⠤⠤⠤⠤⠔⠒⠒⠒⠒⠒⠊⠉⠉⠉
+  │                                                   ⠒⠒⠊⠉⠉⠉⠉
+5 │
+  │                   ⢀⣀⣀⣀⡠⠤⠤
+1 │⣀⣀⣀⡠⠤⠤⠤⠤⠤⠤⠒⠒⠒⠒⠒⠊⠉⠉⠉⠁
+  └─────────────────────────────────────────────────────────────────────────────
+
+── plot · plot-gapped-sparkline
+                                                                         ?▁▂?▆▇█
+── plot · plot-zero-minimum
+                                                                        ▁▂▃▄▅▆▇█
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summarise it"
+`;
+
+exports[`golden frames — one per state > dark-wide at 40 1`] = `
+"── plot · plot-gapped-line
+9 |                            ⣀⣀⠤⠤⠔⠒⠒⠊⠉
+  |                        ⠐⠒⠉⠉
+5 |
+  |         ⢀⣀⡠⠄
+1 |⣀⣀⠤⠤⠤⠒⠒⠊⠉⠁
+  +-------------------------------------
+
+── plot · plot-gapped-sparkline
+                                 ?⡀⣀?⣶⣷⣿
+── plot · plot-zero-minimum
+                                ⡀⣀⣄⣤⣦⣶⣷⣿
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summa
+rise it"
+`;
+
+exports[`golden frames — one per state > dark-wide at 80 1`] = `
+"── plot · plot-gapped-line
+9 |                                                          ⣀⣀⣀⣀⠤⠤⠤⠤⠤⠔⠒⠒⠒⠒⠒⠊⠉⠉⠉
+  |                                                   ⠒⠒⠊⠉⠉⠉⠉
+5 |
+  |                   ⢀⣀⣀⣀⡠⠤⠤
+1 |⣀⣀⣀⡠⠤⠤⠤⠤⠤⠤⠒⠒⠒⠒⠒⠊⠉⠉⠉⠁
+  +-----------------------------------------------------------------------------
+
+── plot · plot-gapped-sparkline
+                                                                         ?⡀⣀?⣶⣷⣿
+── plot · plot-zero-minimum
+                                                                        ⡀⣀⣄⣤⣦⣶⣷⣿
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summarise it"
+`;
+
+exports[`golden frames — one per state > light-unicode at 40 1`] = `
+"── plot · plot-gapped-line
+9 │                            ⣀⣀⠤⠤⠔⠒⠒⠊⠉
+  │                        ⠐⠒⠉⠉
+5 │
+  │         ⢀⣀⡠⠄
+1 │⣀⣀⠤⠤⠤⠒⠒⠊⠉⠁
+  └─────────────────────────────────────
+
+── plot · plot-gapped-sparkline
+                                 ?▁▂?▆▇█
+── plot · plot-zero-minimum
+                                ▁▂▃▄▅▆▇█
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summa
+rise it"
+`;
+
+exports[`golden frames — one per state > light-unicode at 80 1`] = `
+"── plot · plot-gapped-line
+9 │                                                          ⣀⣀⣀⣀⠤⠤⠤⠤⠤⠔⠒⠒⠒⠒⠒⠊⠉⠉⠉
+  │                                                   ⠒⠒⠊⠉⠉⠉⠉
+5 │
+  │                   ⢀⣀⣀⣀⡠⠤⠤
+1 │⣀⣀⣀⡠⠤⠤⠤⠤⠤⠤⠒⠒⠒⠒⠒⠊⠉⠉⠉⠁
+  └─────────────────────────────────────────────────────────────────────────────
+
+── plot · plot-gapped-sparkline
+                                                                         ?▁▂?▆▇█
+── plot · plot-zero-minimum
+                                                                        ▁▂▃▄▅▆▇█
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summarise it"
+`;
