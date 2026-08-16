@@ -457,6 +457,110 @@ a log axis are unreadable rather than merely ugly.
 Neither has a consumer in the tree, and each would be a second `niceAxis` rather than an argument
 to this one. Named so the next reader knows they were weighed.
 
+## 3e. Annotations — one feature, and the one that shares a name and not a mechanism
+
+**Six named chart types collapse into one feature.** A Q-Q plot is a scatter plus a reference
+line; ROC is a line plus a diagonal; calibration, residual and Bland–Altman are the same shape
+again. None is a renderer, so none is a `PlotForm`.
+
+**An annotation is a dashed line in the same raster**, drawn into a `Grid` exactly as a curve is.
+It inherits the width, the fold and the capability choice, so it needs no glyph rôle, no fallback
+decision (C09 §4) and no third encounter with F176's ambiguous-width trap — every box-drawing
+dash is `East_Asian_Width=Ambiguous` and none of them is reachable from here.
+
+**Dashed rather than toned, which is F34 satisfied structurally.** The other carrier is *shape*:
+a reference line is broken where a curve is continuous, at every colour depth including one bit.
+They were always going to be lines and marks, which is the whole argument for annotations being
+cheap in a terminal.
+
+**A band is two lines.** One statement, two edges — the survey's own ruling, and a fill would
+compete for the cells the curve is drawn in and be indistinguishable from it at one bit.
+
+**Behind the data, and the layer order is the ruling.** Layers resolve first-non-blank, so
+annotations are appended last: one that overwrote a sample would hide the thing it exists to be
+compared against.
+
+**An out-of-range edge is dropped, never clamped.** This is the one place an annotation differs
+from a sample. C04 I29 clamps a sample because pressing data against the ceiling is honest; an
+annotation is a **claim about where a value sits**, so a threshold of 85 clamped onto a plot
+whose ceiling is 60 draws a line saying *the limit is here* about somewhere the limit is not.
+
+### Two mechanisms, and the ASCII one is not the raster
+
+Read from a frame. `foldRamp` encodes **height** — how full a cell is — and that is a declared
+stand-in for position (I21). An annotation has no height to encode: it is one dot at one row, and
+folding it by ink weight turned a reference line into `# # # # #`, a row of heavy glyphs
+indistinguishable from a flat series and heavier than the curve beside it.
+
+So at ASCII the line is drawn at **cell resolution directly**, which is all the resolution ASCII
+has, with `-` as the mark. Two mechanisms under one function, stated because the alternative is
+the class this component has now hit four times.
+
+### The dash period came from the frame, not from taste
+
+At braille's 2×4, a period of two dots lights one dot in *every* cell — solid to a reader, which
+is the one thing an annotation must not look like. Two **cells** between marks leaves a clear gap
+at both densities.
+
+### The bar's target marker is a different mechanism, and that is the ruling
+
+The plan named a target marker for the value bar as *a reference line at cell scope*. Measured
+against the general mechanism before building both:
+
+| | the plot's line | the bar's marker |
+|---|---|---|
+| what it is | a row of a 2-D raster | one glyph inside a 1-D run |
+| how it is drawn | dots into a `Grid`, folded | a character substituted into a string |
+| what it spans | the other axis | nothing — there is no other axis |
+| its degradation | the raster's, already decided | a third glyph the pair does not have |
+
+**They share a name and a meaning and not a mechanism**, which is the error this pass has now
+caught four times. A shared *vocabulary* is fine — a value, a kind, a tone — and the renderer is
+per-form, exactly as `BarSpec.format` shares an enum with `Plot.yFormat` while precision is not
+shared (F175).
+
+**And the cell scope has a problem the plot scope does not**: a marker inside a run needs a glyph
+the `fill` pair does not carry, and the obvious candidates — `│`, `┃`, `|` — are box-drawing and
+ambiguous-width, which is F176 arriving on a fourth axis. It is not built, and there is no
+consumer: nothing in the tree declares a bar target.
+
+### What has a consumer, and what is named
+
+**Built** — the horizontal reference line and the band, with `examples/docker`'s CPU plot as the
+measured consumer. `loadTone` has classified at 60 and 85 since the dashboard was written, so the
+numbers were already the app's judgement and the plot was the one surface that could not show
+them.
+
+**Named and not built**, each for a stated reason:
+
+| type | why not |
+|---|---|
+| vertical and diagonal reference lines | no consumer; a diagonal also needs the two axes to share a unit, which nothing in the tree does |
+| point marker | no consumer, and it needs the label mechanism below |
+| region — a highlighted x-range | no consumer; the x-axis is three declared strings (§3d), so there is nothing to place it against |
+| event mark | the same, plus a tick on the x-axis rule, which is furniture rather than raster |
+
+**And there is no `label`, which is owed rather than forgotten.** The survey names one and it has
+nowhere to go: the gutter is sized from the y-labels and is a **scale**, so widening it for a
+string that is not one changes the plot area for text nothing measures with it; inside the area a
+label overwrites the curve it exists to be compared against. It wants a legend row, which the
+overlaid form does not have. A member nothing draws is indistinguishable from one not yet
+implemented, so the field arrives with the row that can hold it.
+
+### The snap cost, taken rather than left
+
+§3d records that loose labelling inflates the span by 13–24% — one or two rows of an eight-row
+plot — and that the cost and the tick count are one knob. **The ruling is to keep it**, and this
+step is what supplies the argument the previous one did not have:
+
+**An annotation is read against the axis.** A band at 60–85 on an axis labelled `0 · 50 · 100` is
+a statement a reader can convert; on an axis labelled `0 · 43 · 87` it is two dashed lines at
+positions nobody can name. The rows the snap costs buy the only thing that makes the rows worth
+anything.
+
+Whoever reverses it is changing both halves — rounder labels and a looser fit are the same knob —
+and the figures are in §3d so that decision rests on numbers rather than on a preference.
+
 ## 4. Degenerate series
 
 Every one of these is real, and each has a defined result rather than an exception.
@@ -846,6 +950,7 @@ recast limit, and the golden set above.
 - **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, and an absent value draws a mark.** One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
 - **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density and fill are three encodings and `position` is a fourth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
 - **I22** — **An axis picks nice numbers, snaps a derived bound outward, never moves a declared one, and drops a tick that would abut its neighbour.** The step is 1, 2, 2.5, 5 or 10 times a power of ten — 2.5 is in the set because without it `0 · 25 · 50 · 75 · 100` is unreachable. **The snap is per end** (C04 I29): loose labelling exists so the ends read round and a pinned axis exists so two plots can be compared, so a pin that silently grew would defeat what it is for. **Precision is one per axis and comes from the step** — the smallest gap two labels can differ by — and it is the step's *own* decimals rather than two significant figures of it, and a named precision is **kept in the string** rather than trimmed back into three (F177). **The tick count is a result**, bounded below by how fine a step is worth asking for and above by how many labels the height seats two rows apart. **And a step the arithmetic cannot pick is `0`**, never a plausible constant: a denormal span underflows, and `1` there snaps `5e-324 … 1e-323` to `0 … 1`, which terminates and is wrong where nothing downstream can detect it (F178).
+- **I23** — **An annotation is a dashed line in the same raster, drawn behind the data, and an edge outside the range is dropped rather than clamped.** Dashed is the carrier and the tone is decoration (F34): a reference line is broken where a curve is continuous, at every colour depth. **A band is two lines** — one statement, two edges — because a fill would compete for the cells the curve occupies. **Behind, and the layer order is the rule**: one that overwrote a sample would hide what it exists to be compared against. **Dropped rather than clamped is the one place this differs from a sample** (C04 I29): data pressed against a ceiling is honest, and a claim about *where a value sits* moved onto a scale it is outside is not. **At ASCII it is not the raster** — `foldRamp` encodes height, and folding a one-dot line by ink weight drew `# # # #`, heavier than the curve; there the line is drawn at cell resolution with `-`, which is narrow under both width conventions where every box-drawing dash is not.
 
 ---
 
@@ -870,6 +975,7 @@ recast limit, and the golden set above.
 17. **A quantity against a scale is the `fill` encoding, drawn as a run whose number may exceed it** (I20, §3b).
 18. **A vocabulary carries its encoding axis and a renderer asks for an axis** — so the mismatch that cost two defects is unspellable rather than reviewable, and a stand-in is declared rather than commented (I21, §3c).
 19. **An axis is nice numbers, one precision from the step, and a density that is a result** — a derived bound snaps outward and a declared one never moves, a tick that would abut its neighbour is dropped, and a step the arithmetic cannot pick is nothing rather than a plausible constant (I22, §3d).
+20. **An annotation is one feature and six named chart types are folds of it** — a dashed line in the data's own raster, behind it, with an out-of-range edge dropped rather than clamped; and the bar's target marker shares its name and not its mechanism (I23, §3e).
 
 ---
 
