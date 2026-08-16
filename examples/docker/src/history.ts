@@ -42,6 +42,9 @@
  * stall it exists to report. So the count is taken when the attempt starts.
  */
 
+import { b } from "@fmx/calcium";
+import type { Block } from "@fmx/calcium";
+
 /** The interval, and the unit the caption is denominated in. */
 export const TICK_MS = 2000;
 
@@ -179,6 +182,63 @@ export interface RingSet {
   /** Ticks taken. Every ring has had exactly this many samples pushed. */
   readonly ticks: number;
 }
+
+/**
+ * The accumulated matrix as a heatmap — the ring set's first renderer (C12 §3a).
+ *
+ * **`createRingSet` has filled a rectangular matrix that nothing drew since it
+ * landed**, which is the shape F21 names: data with no surface. The dashboard
+ * shows *this tick* as a table of bars; the history was accumulating beside it
+ * with no way onto the screen, so a reader could see which container is busy now
+ * and never which one has been.
+ *
+ * **A matrix rather than N sparklines, and the shared range is the difference.**
+ * Every row is scaled against one range, so an idle container and a saturated
+ * one draw differently — which is the comparison the block exists to make. A
+ * stack of independently-scaled rows is the same picture for every container and
+ * says nothing (C12 §6a B1).
+ *
+ * **Rectangular by construction**, which C04 I50b requires: `tick` back-fills a
+ * new id with `null` before the tick it first appears in, so every ring is
+ * exactly `ticks` long whatever order containers started in.
+ *
+ * `null` for *no history yet* rather than an empty matrix: a heatmap of one tick
+ * is a column of single cells, which is honest and not worth a special case, but
+ * a heatmap of *no* ticks has no columns at all.
+ */
+export function historyBlock(
+  set: RingSet,
+  labelFor: (id: string) => string,
+  unicode = true,
+): Block | null {
+  if (set.ticks === 0 || set.ids.length === 0) return null;
+
+  const series = set.ids.map((id) => ({
+    values: [...(set.ring(id)?.values ?? [])],
+    label: labelFor(id),
+  }));
+
+  return b.plot({
+    id: "cpu-history",
+    form: "heatmap",
+    // **`yMin: 0` and no ceiling, the same pair the single-container plot
+    // takes** (F27): a floor because a matrix of 0.2% wobbles otherwise draws
+    // every row at full density, and no ceiling because `CPUPerc` is
+    // per-core-normalised and 780% is an ordinary reading.
+    yMin: 0,
+    yFormat: "percent",
+    height: Math.max(1, Math.min(series.length, HISTORY_ROWS)),
+    xLabels: [`-${String(set.ticks)} ticks`, "", "now"],
+    // **The second channel** (C10 I31). Density stays the carrier and colour
+    // joins it above 8-bit, so what a 1-bit reader sees is what they saw before
+    // the member existed.
+    colormap: "viridis",
+    series,
+  });
+}
+
+/** Rows the history panel will draw before it says how many it did not. */
+const HISTORY_ROWS = 6;
 
 export function createRingSet(cap: number): RingSet {
   const rings = new Map<string, Ring>();

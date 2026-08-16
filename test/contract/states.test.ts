@@ -34,6 +34,7 @@ const EXPECTED_STATES = [
   // those are about a *series* being drawn wrongly, this is about something that
   // is not a series being drawn as one. Every way of getting it wrong renders.
   "plot-annotated",
+  "plot-heatmap-overfull",
   "kv-value-bar",
   "notice-continuation",
   "plot-gapped-line",

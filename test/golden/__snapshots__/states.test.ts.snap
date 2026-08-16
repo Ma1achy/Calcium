@@ -20,6 +20,12 @@ worker |                ================
     db |
         -60 ticks                    now
 .:-=+*#@  0% - 100%
+── plot · plot-heatmap-overfull
+climb |===+++++++++********########@@@@@
+ fall |+++=========--------::::::::.....
+ late |             ..:::---==+++***###@
+       -60 ticks                     now
+.:-=+*#@  0 - 100 · 27 older not shown
 ── table · table-value-bar
 NAME      CPU               
 api       #............ 4.2%
@@ -69,6 +75,12 @@ worker |                                                        ================
     db |
         -60 ticks                                                            now
 .:-=+*#@  0% - 100%
+── plot · plot-heatmap-overfull
+climb |             .....::::::::--------=========+++++++++********########@@@@@
+ fall |             @@@@@########********+++++++++=========--------::::::::.....
+ late |                                                     ..:::---==+++***###@
+       -60 ticks                                                             now
+.:-=+*#@  0 - 100
 ── table · table-value-bar
 NAME      CPU               
 api       #............ 4.2%
@@ -117,6 +129,12 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db │
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb │⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall │⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late │             ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                     now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100 · 27 older not shown
 ── table · table-value-bar
 NAME      CPU               
 api       █░░░░░░░░░░░░ 4.2%
@@ -166,6 +184,12 @@ worker │                                                        ⠶⠶⠶⠶�
     db │
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb │             ⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠖⠖⠖⠖⠖⠖⠖⠖⠶⠶⠶⠶⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall │             ⣿⣿⣿⣿⣿⡿⡿⡿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late │                                                     ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                                                             now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100
 ── table · table-value-bar
 NAME      CPU               
 api       █░░░░░░░░░░░░ 4.2%
@@ -214,6 +238,12 @@ worker |                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db |
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb |⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall |⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late |             ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                     now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100 · 27 older not shown
 ── table · table-value-bar
 NAME      CPU               
 api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
@@ -263,6 +293,12 @@ worker |                                                        ⠶⠶⠶⠶⠶�
     db |
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb |             ⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠖⠖⠖⠖⠖⠖⠖⠖⠶⠶⠶⠶⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall |             ⣿⣿⣿⣿⣿⡿⡿⡿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late |                                                     ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                                                             now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100
 ── table · table-value-bar
 NAME      CPU               
 api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
@@ -311,6 +347,12 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db │
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb │⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall │⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late │             ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                     now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100 · 27 older not shown
 ── table · table-value-bar
 NAME      CPU               
 api       █░░░░░░░░░░░░ 4.2%
@@ -360,6 +402,12 @@ worker │                                                        ⠶⠶⠶⠶�
     db │
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb │             ⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠖⠖⠖⠖⠖⠖⠖⠖⠶⠶⠶⠶⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall │             ⣿⣿⣿⣿⣿⡿⡿⡿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late │                                                     ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                                                             now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100
 ── table · table-value-bar
 NAME      CPU               
 api       █░░░░░░░░░░░░ 4.2%
@@ -408,6 +456,12 @@ worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
     db │
         -60 ticks                    now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb │⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall │⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late │             ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                     now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100 · 27 older not shown
 ── table · table-value-bar
 NAME      CPU               
 api       █░░░░░░░░░░░░ 4.2%
@@ -457,6 +511,12 @@ worker │                                                        ⠶⠶⠶⠶�
     db │
         -60 ticks                                                            now
 ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+── plot · plot-heatmap-overfull
+climb │             ⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠖⠖⠖⠖⠖⠖⠖⠖⠶⠶⠶⠶⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
+ fall │             ⣿⣿⣿⣿⣿⡿⡿⡿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
+ late │                                                     ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                                                             now
+⠄⠔⠖⠶⠷⠿⡿⣿  0 - 100
 ── table · table-value-bar
 NAME      CPU               
 api       █░░░░░░░░░░░░ 4.2%

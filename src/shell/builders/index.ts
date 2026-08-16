@@ -360,9 +360,35 @@ function plot(
     yFormat?: Plot["yFormat"];
     annotations?: Plot["annotations"];
     colormap?: Plot["colormap"];
+    /**
+     * The form, defaulting to `line` (C04 §3, FINDINGS F180).
+     *
+     * **It was hardcoded, and that is why the heatmap had no consumer.**
+     * `PlotForm` has three members; `b.plot` wrote `form: "line"` and `b.spark`
+     * writes `"sparkline"`, so `"heatmap"` was buildable by **nothing** in the
+     * public surface — after a walk, a type, a validator arm, a renderer, three
+     * golden frames and a mutation pass. Every fixture that draws one reaches
+     * past `b` to `block()`.
+     *
+     * MG27 passed it throughout: the rule asks whether a builder's constructed
+     * literal *mentions* the field, and `form: "line"` mentions it. A closed
+     * union with one hardcoded arm satisfies a check about names.
+     */
+    form?: Plot["form"];
+    /**
+     * The three x-labels (C24 §4, F180).
+     *
+     * **`BUILDER_OMISSIONS` excused this as *no surface has wanted one*, and the
+     * history heatmap wants exactly it** — `-N ticks`, nothing, `now`. The
+     * omission's other half, *a caption sentence does not fit it*, is still true
+     * and is why `axisCaption` exists beside the plot rather than inside it. A
+     * reason with two clauses expires one at a time.
+     */
+    xLabels?: Plot["xLabels"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap } = spec;
+  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels } =
+    spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
   // author finds out and the validator is where an untrusted document does.
@@ -376,7 +402,7 @@ function plot(
     {
       kind: "plot",
       id: idOf(spec, "plot"),
-      form: "line",
+      form: form ?? "line",
       series,
       height,
       ...(axes === undefined ? {} : { axes }),
@@ -385,6 +411,7 @@ function plot(
       ...(yFormat === undefined ? {} : { yFormat }),
       ...(annotations === undefined ? {} : { annotations }),
       ...(colormap === undefined ? {} : { colormap }),
+      ...(xLabels === undefined ? {} : { xLabels }),
     } as Plot,
     spec,
     true,

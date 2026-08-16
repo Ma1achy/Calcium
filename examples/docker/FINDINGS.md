@@ -8906,3 +8906,51 @@ F172 was filed as *a defect that becomes reachable when `continuous` lands*. The
 that future case found a present one on its first run, in a file nobody was editing. **A rule
 that can fire is worth more than the case it was written for** — and the case it was written for
 has not happened yet.
+
+---
+
+## F180 — the heatmap was unreachable from the builder, and the rule said it was covered ★★★★
+
+| | |
+|---|---|
+| **Surface** | `b.plot`, and every consumer that would have drawn a matrix |
+| **Reached for** | writing the heatmap's first real consumer |
+| **Verdict** | **a form with a walk, a type, a validator, a renderer, three golden frames and a mutation pass — and no door** |
+| **Absorbed by** | `b.plot` takes `form` and `xLabels`; `plot.xLabels` leaves `BUILDER_OMISSIONS` |
+
+`PlotForm` has three members. `b.plot` wrote `form: "line"`; `b.spark` writes `"sparkline"`.
+**`"heatmap"` was buildable by nothing in the public surface.** Every fixture that draws one
+reaches past `b` into `block()`, which is what a test may do and an application may not.
+
+That is the whole explanation of a fact this session kept restating as a mystery: *the heatmap
+has data and no drawing*. It was not waiting for a consumer. **A consumer could not have been
+written.**
+
+### Why MG27 passed it, which is the part to keep
+
+MG27 asks whether a builder's constructed literal **mentions** each field of the block type.
+`form: "line"` mentions `form`. So a **closed union with one hardcoded arm satisfies a check
+about names** — the rule is about a field being writable, and what was missing is a *value* being
+reachable.
+
+**This is F84's shape one rule along**: a correct check whose subject is narrower than the thing
+it reads as covering. MG27 is right that `form` is wired; it has no opinion about `PlotForm`
+having three members and the door offering one.
+
+### And a second instance in the same edit
+
+`plot.xLabels` sat in `BUILDER_OMISSIONS` reading *a fixed three-tuple, and no surface has wanted
+one; a caption sentence does not fit it*. The history heatmap wants exactly that three-tuple —
+`-N ticks`, nothing, `now`.
+
+**A reason with two clauses expires one at a time**, and the equality arm cannot see it: that arm
+catches an entry that has become *unnecessary*, never one whose *argument* has. Both clauses were
+true when written; one stopped being true when a surface arrived, and nothing was watching the
+difference.
+
+### What it cost
+
+The heatmap shipped complete and unusable. The walk found seven defects before any code; the
+build took a spec section, an invariant, a renderer, a validator arm, three golden variants, nine
+mutations and an audit — and an application could not construct one. **Every instrument was
+pointed at whether it was correct, and none at whether it was reachable.**

@@ -28,7 +28,7 @@ import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone, ViewDocume
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
-import { capFor, createRingSet } from "./history.ts";
+import { capFor, createRingSet, historyBlock } from "./history.ts";
 
 import type { LocalContext, ProducerContext } from "@fmx/calcium";
 const run = promisify(execFile);
@@ -102,6 +102,19 @@ export const percent = (raw: string): number | null => {
  * a *live* one moves a row out from under a reader mid-glance, and the fault
  * would be invisible in every test because the observed order is stable.
  */
+/**
+ * A container's name for the history's row label, or its short id.
+ *
+ * **The id is the fallback rather than the label**, because a row outlives the
+ * container it names: `createRingSet` keeps a ring for every id it has seen, so
+ * a stopped container's row is still drawn and `join` no longer has a name for
+ * it. Dropping the row instead would renumber the ordinate under the reader,
+ * which is the thing the set's own header refuses.
+ */
+function nameOf(live: readonly Joined[], id: string): string {
+  return live.find((c) => c.id === id)?.name ?? id.slice(0, 12);
+}
+
 export function join(snap: Snapshot): Joined[] {
   const byId = new Map(snap.stats.map((s) => [str(s, "Container"), s] as const));
   return snap.containers
@@ -454,7 +467,15 @@ export function dashboard(
           // `cpuFold` has, and the same reason: one shared `fetch` between two
           // parts would stop the ring silently.
           takeTick(s);
-          return livePanelBody(join(s).filter(isLive), unicode);
+          const live = join(s).filter(isLive);
+          // **The history, finally drawn** (C12 §3a). `createRingSet` has been
+          // filling a rectangular matrix since it landed and nothing rendered
+          // it: the table says which container is busy *now*, and the matrix is
+          // the only thing that says which has *been*.
+          const history = historyBlock(rings, (id) => nameOf(live, id), unicode);
+          return history === null
+            ? livePanelBody(live, unicode)
+            : b.group("column", [livePanelBody(live, unicode), history], { id: "live-body" });
         },
         // **Without this the first frame says `loading…` for two seconds**, and
         // the handler is holding a snapshot the whole time. `b.live` returns its

@@ -168,6 +168,42 @@ export const STATES: readonly StateFixture[] = Object.freeze([
       ),
   },
   {
+    name: "plot-heatmap-overfull",
+    of: "plot",
+    why:
+      "every heatmap fixture had as many readings as cells, so the window did nothing and both " +
+      "anchorings agreed — a mutation left-anchoring the colour window survived. `capFor` is " +
+      "`max(24, width - 12)`, so below width 36 the ring is longer than the area with no resize " +
+      "involved: the ordinary case, and the window's only subject (C12 I13, C10 I31)",
+    rows: (w, caps, theme) =>
+      plot(
+        w,
+        caps,
+        theme,
+        block({
+          kind: "plot",
+          id: "st-heat-full",
+          form: "heatmap",
+          height: 3,
+          yMin: 0,
+          yMax: 100,
+          xLabels: ["-60 ticks", "", "now"],
+          // Sixty readings into an area that is never sixty cells at these
+          // widths. The newest are kept, so the right-hand edge is the present —
+          // and a row whose values climb makes that legible in the frame rather
+          // than only in an assertion.
+          series: [
+            { values: Array.from({ length: 60 }, (_, i) => Math.round((i / 59) * 100)), label: "climb" },
+            { values: Array.from({ length: 60 }, (_, i) => Math.round((1 - i / 59) * 100)), label: "fall" },
+            // And one that is shorter than the rest: back-filled to the same
+            // length by `createRingSet`, which is what keeps the matrix
+            // rectangular (C04 I50b).
+            { values: [...Array.from({ length: 40 }, () => null), ...Array.from({ length: 20 }, (_, i) => i * 5)], label: "late" },
+          ],
+        }),
+      ),
+  },
+  {
     name: "table-value-bar",
     of: "table",
     why:

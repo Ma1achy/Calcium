@@ -568,8 +568,14 @@ function checkForbiddenEdges(files, readFile) {
  * reader, and equality comparison is what makes the difference mechanical.
  */
 export const BUILDER_OMISSIONS = Object.freeze({
-  "plot.xLabels":
-    "C24 §4 — a fixed three-tuple, and no surface has wanted one; a caption sentence does not fit it",
+  // **`plot.xLabels` is gone from this list, and a surface is what removed it.**
+  // Its reason had two clauses — *no surface has wanted one* and *a caption
+  // sentence does not fit it* — and the history heatmap wants exactly the fixed
+  // three-tuple: `-N ticks`, nothing, `now`. The second clause is still true and
+  // is why `axisCaption` sits beside the plot rather than in it. **A reason with
+  // two clauses expires one at a time**, and equality comparison cannot see that
+  // — it notices an entry that became unnecessary, never one whose argument did
+  // (FINDINGS F180).
   "plot.emptyMessage":
     "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
   "patch.numberWidth":
