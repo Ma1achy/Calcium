@@ -34,8 +34,24 @@ export const RAMP_ASCII = ".:-=+*#@";
  * is the cost of the arm. The alternative was refusing ambiguous glyphs outright
  * and taking this ramp everywhere — which would have changed the sparkline for
  * every user to fix it for some.
+ *
+ * **It fills from the bottom, and its first step is one dot rather than none**
+ * (I16). The set that shipped began at `U+2800` — BRAILLE PATTERN BLANK — so
+ * every sparkline on a wide terminal drew its *minimum* as whitespace, which the
+ * right-anchor already uses to mean *fewer samples than cells*: one character,
+ * two meanings, in the arm nothing renders in a golden frame. Measured rather
+ * than noticed — `sparkline([0, 5], 6, wide)` came back as four spaces, then
+ * `U+2800` for the zero, then `U+28FF` for the five: five blank cells and one
+ * full one, where the row holds two readings. Every width and length assertion
+ * passed against it, because `cells()` counts the blank as one. Found by C12's
+ * heatmap walk (§6a A1), whose subject is magnitude carried by a glyph: an idle
+ * row must not read as an absent one.
+ *
+ * The old set was also non-monotone in ink — its dot populations ran
+ * `0,1,2,3,4,5,6,8`, so the last step was a double jump. This one runs `1..8`,
+ * which is what an eight-step ramp claims to be.
  */
-export const RAMP_BRAILLE = "\u2800\u2804\u2806\u2816\u2836\u2837\u283f\u28ff";
+export const RAMP_BRAILLE = "\u2840\u28c0\u28c4\u28e4\u28e6\u28f6\u28f7\u28ff";
 
 /**
  * The ramp for these capabilities. Nothing here probes for its own (C09 I3).

@@ -246,7 +246,8 @@ export type Cell = Readonly<{
   text: string;
   tone?: Tone;
   glyph?: Glyph;
-  spark?: readonly number[];
+  /** Inline sparkline. `null` is a gap — a position with no reading (I46a). */
+  spark?: readonly (number | null)[];
 }>;
 
 /**
@@ -391,7 +392,23 @@ export type Events = Readonly<{
 }> & Gap;
 
 export type Series = Readonly<{
-  values: readonly number[];
+  /**
+   * The readings, oldest first. **`null` is a gap** — a position that produced
+   * no reading — and it is the only non-number this array may hold (I46a).
+   *
+   * **Not `NaN`, and the difference is the serialiser.** A gap is representable
+   * in memory as any non-finite value and C12 I4 renders one correctly, so this
+   * looked for a while like a type that already carried absence. It does not
+   * carry it in a *document*: I46 refuses a non-finite element, and
+   * `JSON.stringify` writes `NaN` as `null` regardless — so the persisted form
+   * was already this shape while the declared form forbade it. `null` is the
+   * spelling that survives the round trip, which is the whole of the argument.
+   *
+   * Every consumer took it unchanged: `Number.isFinite(null)` is `false`, so
+   * `finiteSamples`, `seriesRange` and `sparkline`'s filter treat a gap exactly
+   * as they treated a `NaN`.
+   */
+  values: readonly (number | null)[];
   label?: string;
   tone?: Tone;
 }>;

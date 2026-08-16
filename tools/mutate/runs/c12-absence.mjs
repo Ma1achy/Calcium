@@ -34,7 +34,7 @@ const results = runPass({
   run,
   control: {
     file: SPARK,
-    from: "    if (!Number.isFinite(v)) return ABSENT;",
+    from: "    if (v === null || !Number.isFinite(v)) return ABSENT;",
     to: "    if (!Number.isFinite(v)) return ramp[0] ?? ABSENT;",
     why: "a gap drawn as the lowest step is a reading that never happened; a run where this survives cannot see a kill",
   },
@@ -46,9 +46,9 @@ const results = runPass({
       file: SPARK,
       from:
         "  const window = values.slice(Math.max(0, values.length - w)); // cells-ok — a position count\n"
-        + "  const readings = window.filter((v) => Number.isFinite(v));",
+        + "  const readings = window.filter((v): v is number => v !== null && Number.isFinite(v));",
       to:
-        "  const readings = values.filter((v) => Number.isFinite(v));\n"
+        "  const readings = values.filter((v): v is number => v !== null && Number.isFinite(v));\n"
         + "  const window = readings.slice(Math.max(0, readings.length - w)); // cells-ok",
       expect: "T1.13",
     },
@@ -59,7 +59,7 @@ const results = runPass({
       // where a bursty stall lands. Every length assertion still passes.
       name: "a gap draws a blank, which is what the padding already means",
       file: SPARK,
-      from: '    if (!Number.isFinite(v)) return ABSENT;',
+      from: '    if (v === null || !Number.isFinite(v)) return ABSENT;',
       to: '    if (!Number.isFinite(v)) return " ";',
       expect: "T1.13",
     },

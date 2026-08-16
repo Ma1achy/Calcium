@@ -189,9 +189,20 @@ describe("C04 contract", () => {
     // **The wider half, and the one that has nothing to do with round trips**:
     // the elements were never checked at all — `requireArray` established the
     // array and stopped — so an untrusted document could put anything in a
-    // numeric array. `null` is what a round trip produces; a string is what a
-    // far side produces.
-    expect(validateBlock(plotWith([1, null])).ok, "null is what NaN becomes").toBe(false);
+    // numeric array. A string is what a far side produces.
+    //
+    // **`null` moved sides, and the rule did not** (I46a). It used to be refused
+    // as *what NaN becomes*, which made absence unrepresentable in a document
+    // while C12 I4 rendered it — two correct invariants whose overlap was a hole.
+    // What the rule always said is *a numeric array holds what JSON can carry*,
+    // and `null` round-trips into itself where `NaN` round-trips into something
+    // else. That distinction is the whole of the change and it is asserted here
+    // rather than described.
+    expect(validateBlock(plotWith([1, null])).ok, "null is the gap (I46a)").toBe(true);
+    expect(
+      JSON.parse(JSON.stringify([1, null])),
+      "and it survives the trip `NaN` does not",
+    ).toEqual([1, null]);
     expect(validateBlock(plotWith(["12"])).ok, "a numeric string is not a number").toBe(false);
 
     // The second numeric array, which no round trip would have surfaced: a

@@ -62,7 +62,7 @@ const ABSENT = "?";
  * that will change shape as it fills.
  */
 export function sparkline(
-  values: readonly number[],
+  values: readonly (number | null)[],
   width: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): string {
@@ -79,8 +79,11 @@ export function sparkline(
   // precisely so the curve breaks across the gap. So one block kind's two forms
   // disagreed about the same array, and I4 as written — *filtered before
   // scaling* — was satisfied by both.
+  //
+  // **A gap is `null` in a document and may be `NaN` from a fixture** (C04
+  // I46a): one guard answers both, because `Number.isFinite(null)` is `false`.
   const window = values.slice(Math.max(0, values.length - w)); // cells-ok — a position count
-  const readings = window.filter((v) => Number.isFinite(v));
+  const readings = window.filter((v): v is number => v !== null && Number.isFinite(v));
   if (readings.length === 0) return " ".repeat(w); // cells-ok — a position count
 
   const ramp = [...rampFor(caps)];
@@ -90,8 +93,8 @@ export function sparkline(
   // No division by the range (I3). A constant window has no normalised position,
   // and the middle step is the flat line the plot form draws for the same input.
   const middle = Math.floor((RAMP_STEPS - 1) / 2);
-  const glyph = (v: number): string => {
-    if (!Number.isFinite(v)) return ABSENT;
+  const glyph = (v: number | null): string => {
+    if (v === null || !Number.isFinite(v)) return ABSENT;
     if (max === min) return ramp[middle] ?? " ";
     const t = (v - min) / (max - min);
     const step = Math.round(t * (RAMP_STEPS - 1));

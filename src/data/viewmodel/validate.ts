@@ -136,6 +136,19 @@ function requireArray(b: Record<string, unknown>, key: string, e: string[], at: 
  * which is the whole of I46.
  *
  * Absent is legal — `spark` is optional and an absent array is not an empty one.
+ *
+ * **And `null` is legal, because it is the gap** (I46a). This function used to
+ * refuse it, which made absence expressible in the type and inexpressible in a
+ * document: C12 I4 renders a non-finite entry as a position with no reading, and
+ * every such document was refused here. The two invariants were each correct and
+ * their overlap was a hole — found by running the validator over the block
+ * `examples/docker` had been building, rather than by reading either rule.
+ *
+ * **`NaN` and `Infinity` stay refused, and that is the same argument as before,
+ * not a weakened one.** `JSON.stringify` writes them as `null` regardless, so
+ * they round-trip into a *different* value; `null` round-trips into itself. The
+ * rule is unchanged — a numeric array holds what JSON can carry — and the gap
+ * simply has a spelling now.
  */
 function requireFiniteNumbers(
   values: unknown,
@@ -145,15 +158,15 @@ function requireFiniteNumbers(
 ): void {
   if (values === undefined) return;
   if (!isArray(values)) {
-    e.push(`${at}: "${what}" must be an array of finite numbers`);
+    e.push(`${at}: "${what}" must be an array of finite numbers or null`);
     return;
   }
   for (const [i, v] of values.entries()) {
-    if (isFiniteNumber(v)) continue;
+    if (v === null || isFiniteNumber(v)) continue;
     e.push(
-      `${at}: ${what}[${String(i)}] is ${v === null ? "null" : typeof v} — a numeric array holds ` +
-        `finite numbers (C04 I46). JSON writes NaN and Infinity as null, so a value that is ` +
-        `neither survives a round trip as a different one`,
+      `${at}: ${what}[${String(i)}] is ${typeof v} — a numeric array holds finite numbers, ` +
+        `and null for a gap (C04 I46a). JSON writes NaN and Infinity as null, so a value that ` +
+        `is neither survives a round trip as a different one`,
     );
   }
 }

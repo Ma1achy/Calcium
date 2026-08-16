@@ -17,7 +17,12 @@ import {
   foldRamp,
   setDot,
 } from "../../src/presentation/plot/raster.js";
-import { RAMP_ASCII, RAMP_UNICODE } from "../../src/presentation/plot/ramp.js";
+import {
+  RAMP_ASCII,
+  RAMP_BRAILLE,
+  RAMP_STEPS,
+  RAMP_UNICODE,
+} from "../../src/presentation/plot/ramp.js";
 import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
@@ -427,6 +432,67 @@ describe("C12 tier 1 — sparklines", () => {
     // disagreeing with the plot in the other direction.
     expect(sparkline([Number.NaN], 4, FULL_CAPS)).toBe("    ");
     expect(sparkline([], 4, FULL_CAPS)).toBe("    ");
+  });
+
+  it("T1.16 (I4, C04 I46a): `null` is the gap a document carries, and it round-trips where `NaN` does not", () => {
+    // **The two spellings render identically and only one is a legal document.**
+    // `NaN` is what the type could express and `JSON.stringify` writes it as
+    // `null`, so the persisted form was already this shape while the declared
+    // type forbade it — which is why this row asserts the *serialisation* and not
+    // only the glyphs. A row that checked the picture alone passes for both and
+    // says nothing about the one that matters.
+    expect(sparkline([1, 2, 3, null, 7, 8, 9], 12, FULL_CAPS)).toBe("     ▁▂▃?▆▇█");
+    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS), "same picture").toBe(
+      sparkline([1, 2, 3, null, 7, 8, 9], 12, FULL_CAPS),
+    );
+
+    const gapped = [1, null, 3];
+    expect(JSON.parse(JSON.stringify(gapped)), "`null` survives itself").toEqual(gapped);
+    expect(
+      JSON.parse(JSON.stringify([1, Number.NaN, 3])),
+      "and `NaN` arrives back as the value the old type forbade",
+    ).toEqual(gapped);
+
+    // The line form takes it on the same terms — one guard for both, because
+    // `Number.isFinite(null)` is false.
+    expect(finiteSamples([1, null, 3])).toEqual([
+      { i: 0, v: 1 },
+      { i: 2, v: 3 },
+    ]);
+  });
+
+  it("T1.15 (I16): every ramp step is visible, monotone in ink, and never the pad character", () => {
+    // **Asserted over the constants, because the defect is a property of the
+    // set.** `RAMP_BRAILLE` began at `U+2800` — BRAILLE PATTERN BLANK — so a
+    // sparkline on a wide terminal drew its minimum as whitespace, which the
+    // right-anchor already uses for *fewer samples than cells*. Every width and
+    // length assertion in this file passed against it, and `cells()` counted it
+    // as one, which is what left the arm with nothing looking at it.
+    for (const [name, ramp] of [
+      ["unicode", RAMP_UNICODE],
+      ["ascii", RAMP_ASCII],
+      ["braille", RAMP_BRAILLE],
+    ] as const) {
+      const steps = [...ramp];
+      expect(steps, `${name} has eight steps`).toHaveLength(RAMP_STEPS);
+      for (const step of steps) {
+        expect(step.trim(), `${name}: no step is blank`).not.toBe("");
+        expect(cells(step, "narrow"), `${name}: one cell narrow`).toBe(1);
+      }
+      expect(new Set(steps).size, `${name}: no step repeats`).toBe(RAMP_STEPS);
+    }
+
+    // Monotone in ink, which the old set was not either: its dot populations ran
+    // 0,1,2,3,4,5,6,8, so the last step was a double jump.
+    const dots = [...RAMP_BRAILLE].map((c) =>
+      ((c.codePointAt(0) ?? 0) - 0x2800).toString(2).replaceAll("0", "").length,
+    );
+    expect(dots, "one dot to eight, no gaps").toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+
+    // The measured case: the minimum must not be the padding beside it.
+    const drawn = sparkline([0, 5], 6, { ...FULL_CAPS, ambiguousWidth: "wide" });
+    expect(drawn).toHaveLength(6);
+    expect(drawn[4], "the lowest reading, and it is not a space").not.toBe(" ");
   });
 
   it("T1.13b (I4): the marker is the same character in every ramp, because absence is not a magnitude", () => {

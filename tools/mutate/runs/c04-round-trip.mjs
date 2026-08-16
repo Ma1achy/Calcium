@@ -39,8 +39,20 @@ const MUTATIONS = [
     // `null` out, and the validator agreeing at both ends.
     name: "a numeric array element is any number, finite or not",
     file: VALIDATE,
-    from: "    if (isFiniteNumber(v)) continue;",
-    to: '    if (typeof v === "number") continue;',
+    from: "    if (v === null || isFiniteNumber(v)) continue;",
+    to: '    if (v === null || typeof v === "number") continue;',
+    expect: "T2.19",
+  },
+  {
+    // **The gap refused again** (C04 I46a), which is the state this rule was in
+    // until C12's heatmap walk ran the validator over the block the docker ring
+    // builds. It is the mutation that says the widening is load-bearing rather
+    // than cosmetic: with `null` refused, absence is expressible in the type and
+    // in no valid document, and C12 I4 has nothing legal to render.
+    name: "null is refused, so a gap has no legal spelling",
+    file: VALIDATE,
+    from: "    if (v === null || isFiniteNumber(v)) continue;",
+    to: "    if (isFiniteNumber(v)) continue;",
     expect: "T2.19",
   },
   {

@@ -81,6 +81,10 @@ const CASES: readonly Readonly<{ label: string; block: Plot; mono?: boolean }>[]
     // held one, so the whole category stayed green while they disagreed. A
     // leading gap is the case worth having in a picture: it is where a blank
     // would be indistinguishable from the right-anchor padding.
+    //
+    // **`null` and not `NaN`** (C04 I46a): both render identically and only one
+    // is a legal document, so a fixture spelling it the other way is a picture
+    // of a state no document can be in.
     label: "gapped line",
     block: block({
       kind: "plot",
@@ -88,7 +92,7 @@ const CASES: readonly Readonly<{ label: string; block: Plot; mono?: boolean }>[]
       form: "line",
       height: 5,
       axes: true,
-      series: [{ values: [1, 2, 3, Number.NaN, 7, 8, 9] }],
+      series: [{ values: [1, 2, 3, null, 7, 8, 9] }],
     }),
   },
   {
@@ -97,7 +101,7 @@ const CASES: readonly Readonly<{ label: string; block: Plot; mono?: boolean }>[]
       kind: "plot",
       id: "gap-spark",
       form: "sparkline",
-      series: [{ values: [Number.NaN, 2, 3, Number.NaN, 7, 8, 9] }],
+      series: [{ values: [null, 2, 3, null, 7, 8, 9] }],
     }),
   },
   {
@@ -216,5 +220,51 @@ describe("C12 T5.1 — golden frames", () => {
         });
       }
     }
+  }
+});
+
+/**
+ * The wide arm, which had no frame at all.
+ *
+ * **The corpus is indexed by kind and holds one state of each** — `ONE_PER_KIND`
+ * is a `Record<BlockKind, Block>` — so a new *state* of an existing kind is
+ * invisible to it by construction. That is why three consecutive behaviour
+ * changes left golden green and each needed a frame added by hand, and it is the
+ * measured cause rather than three coincidences (C12 §6a).
+ *
+ * `ambiguousWidth: "wide"` is the arm that had nothing looking at it, and it is
+ * where the ramp's first step shipped as `U+2800` — BRAILLE PATTERN BLANK — so a
+ * sparkline drew its *minimum* as whitespace, indistinguishable from the padding
+ * that already means *fewer samples than cells*. Every width and length assertion
+ * passed against it, and `cells()` counted it as one. **Only a picture shows it**,
+ * which is the whole argument for this file.
+ *
+ * The three states side by side: a series whose minimum is zero, a gapped one,
+ * and one with no gap at all — because what has to be legible is the difference
+ * between them.
+ */
+describe("C12 T5.1 (I16) — the wide arm, and the three states a cell can be in", () => {
+  const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+
+  const STATES = [
+    { label: "minimum is zero", values: [0, 1, 2, 3, 4, 5, 6, 7] },
+    { label: "leading and interior gaps", values: [null, 2, 3, null, 7, 8, 9] },
+    { label: "no gap, no zero", values: [3, 5, 4, 8, 6, 9, 7, 10] },
+  ] as const;
+
+  for (const width of [8, 20] as const) {
+    it(`wide at ${String(width)}`, () => {
+      const frame = STATES.map(({ label, values }) => {
+        const kit = measurable({
+          definitions: [plotDefinition],
+          theme: DARK_THEME,
+          capabilities: WIDE,
+        });
+        const b = block({ kind: "plot", id: "w", form: "sparkline", series: [{ values }] });
+        return [`── ${label}`, ...kit.renderToLines(b, width)].join("\n");
+      }).join("\n");
+
+      expect(frame).toMatchSnapshot();
+    });
   }
 });

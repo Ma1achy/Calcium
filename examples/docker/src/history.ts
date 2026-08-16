@@ -16,6 +16,13 @@
  * claim was never measured; it was inferred from the type's signature and then
  * quoted into a roadmap entry and a planning note as though it had been.
  *
+ * **And the correction was half wrong in its turn.** The gap renders, and a
+ * `NaN` gap is not a legal *document*: C04 I46 refuses a non-finite element,
+ * because `JSON.stringify` writes one as `null`. So the walk's conclusion was
+ * right, its reason was wrong, the correction's reason was right and its
+ * conclusion was wrong, and what settled it was running `validateDocument` over
+ * the block this file feeds. The spelling is `null` (C04 I46a).
+ *
  * So the fourth candidate — the one the walk did not list because it believed it
  * impossible — is the right one, and it is the only one that is honest about
  * both axes: **push the gap.** The three it did list are still wrong for the
@@ -52,9 +59,9 @@ export interface Ring {
   took(value: number | null): void;
   /**
    * Oldest first, at most `cap` of them — **one per tick, including the ticks
-   * that produced nothing**, which arrive as `NaN` (C12 I4).
+   * that produced nothing**, which arrive as `null` (C04 I46a, C12 I4).
    */
-  readonly values: readonly number[];
+  readonly values: readonly (number | null)[];
   /** Attempts, including the ones that produced nothing. */
   readonly ticks: number;
   /**
@@ -95,7 +102,7 @@ export interface Ring {
 export const capFor = (width: number): number => Math.max(24, width - 12);
 
 export function createRing(cap: number): Ring {
-  const values: number[] = [];
+  const values: (number | null)[] = [];
   let ticks = 0;
   let missed = 0;
   return {
@@ -103,13 +110,20 @@ export function createRing(cap: number): Ring {
       ticks += 1;
     },
     took(value) {
-      // **A gap is pushed, not skipped** (C12 I4). `NaN` is the position with no
-      // reading: the line breaks across it and a sparkline draws `?` there,
-      // where dropping it made ninety seconds of ticks render as sixty seconds
-      // of samples. `missed` is still counted, because *where* and *how many*
-      // are different questions and the caption answers the second.
+      // **A gap is pushed, not skipped** (C12 I4), and **`null` is its spelling**
+      // (C04 I46a). The position with no reading: the line breaks across it and a
+      // sparkline draws `?` there, where dropping it made ninety seconds of ticks
+      // render as sixty seconds of samples. `missed` is still counted, because
+      // *where* and *how many* are different questions and the caption answers
+      // the second.
+      //
+      // **It was `NaN` for one commit and that document was invalid.** The
+      // validator refuses a non-finite element (I46) because `JSON.stringify`
+      // writes one as `null` — so the persisted form was already this shape while
+      // the declared type forbade it. Nothing here noticed, because a constructed
+      // block never reaches the validator.
       if (value === null) missed += 1;
-      values.push(value ?? Number.NaN);
+      values.push(value);
       if (values.length > cap) values.shift();
     },
     get values() {

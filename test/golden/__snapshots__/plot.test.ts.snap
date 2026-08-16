@@ -1,5 +1,23 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`C12 T5.1 (I16) — the wide arm, and the three states a cell can be in > wide at 8 1`] = `
+"── minimum is zero
+[38;2;230;159;0m⡀⣀⣄⣤⣦⣶⣷⣿[39m
+── leading and interior gaps
+[38;2;230;159;0m ?⡀⣀?⣶⣷⣿[39m
+── no gap, no zero
+[38;2;230;159;0m⡀⣄⣀⣶⣤⣷⣦⣿[39m"
+`;
+
+exports[`C12 T5.1 (I16) — the wide arm, and the three states a cell can be in > wide at 20 1`] = `
+"── minimum is zero
+[38;2;230;159;0m            ⡀⣀⣄⣤⣦⣶⣷⣿[39m
+── leading and interior gaps
+[38;2;230;159;0m             ?⡀⣀?⣶⣷⣿[39m
+── no gap, no zero
+[38;2;230;159;0m            ⡀⣄⣀⣶⣤⣷⣦⣿[39m"
+`;
+
 exports[`C12 T5.1 — golden frames > ascii dark at 80 1`] = `
 "── loss curve · measured 8 · rendered 8
 [38;2;98;98;98m0.82 |[38;2;230;159;0m@*=-.[39m
