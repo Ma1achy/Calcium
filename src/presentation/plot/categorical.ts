@@ -68,6 +68,22 @@ export function barRow(
 }
 
 /**
+ * Marks for stacked layers, most contrasting first.
+ *
+ * Not a ramp: a stack is adjacent bands and the reader is telling them apart,
+ * not reading a magnitude off them, so neighbouring entries want maximum
+ * contrast rather than adjacent steps. ASCII gets its own rungs for the same
+ * reason `pairFor` does — the block elements are all ambiguous-width.
+ */
+function layerMarks(caps: Caps): readonly string[] {
+  if (caps.unicode === "ascii") return Object.freeze(["#", "=", "-", ":", "."]);
+  if (caps.ambiguousWidth === "wide") {
+    return Object.freeze(["\u28ff", "\u2847", "\u28b6", "\u2809", "\u2812"]);
+  }
+  return Object.freeze(["\u2588", "\u2592", "\u2593", "\u2591", "\u2599"]);
+}
+
+/**
  * A stacked bar: values concatenated end-to-end.
  */
 export function stackedBarRow(
@@ -79,22 +95,35 @@ export function stackedBarRow(
   normalised: boolean,
 ): string {
   const w = Math.max(1, Math.floor(width));
-  const mark = pairFor(caps);
+  const ext = extentFor(caps);
   let sum = 0;
   for (const s of series) sum += (s.values[categoryIndex] ?? 0);
-  if (sum === 0) return mark.empty.repeat(w);
+  if (sum === 0) return " ".repeat(w);
 
+  // **Each layer takes its own mark, and colour is the second channel.** Every
+  // segment drew `mark.filled` and the whole row carried one `ColourRef`, so a
+  // stacked bar could not show where one series ended — not by glyph, and not by
+  // tone either. At `colourDepth: 1` that is a solid run saying nothing, which
+  // is C12 I25's subject: two things a reader must tell apart differ by mark,
+  // never by colour alone.
+  //
+  // The ladder is the density one, taken from the top down, because a stack is
+  // read as adjacent bands rather than as a scale — neighbouring layers want
+  // maximum contrast, not adjacent steps.
+  const marks = layerMarks(caps);
   const scale = normalised ? w / sum : (totalMax > 0 ? w / totalMax : 0);
   let used = 0;
   let result = "";
-  for (const s of series) {
-    const v = s.values[categoryIndex] ?? 0;
+  for (let i = 0; i < series.length; i += 1) { // cells-ok — a series count
+    const v = series[i]?.values[categoryIndex] ?? 0;
     const fill = Math.round(v * scale);
     const clamped = Math.min(fill, w - used);
-    result += mark.filled.repeat(clamped);
+    result += (marks[i % marks.length] ?? ext.solid).repeat(clamped); // cells-ok — a ladder length
     used += clamped;
   }
-  result += mark.empty.repeat(Math.max(0, w - used));
+  // Blank, not shaded — the remainder of a stacked bar is the part of the
+  // total nothing accounts for, and shading it makes it look like a layer.
+  result += " ".repeat(Math.max(0, w - used));
   return result.slice(0, w);
 }
 

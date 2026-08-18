@@ -1574,12 +1574,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "should: a renderer names an axis (I21) and the axis picks the vocabulary, so a branch here " +
     "would be the encoding rule inverted. It earns a consumer the day a second extent vocabulary " +
     "exists",
-  "Extent.solid":
-    "**read by `extentRun`, which is the vocabulary's own fold and lives with it** — the same " +
-    "shape as `LADDERS` being reachable only through `ladderFor`. A caller takes the run, not " +
-    "the glyphs: `barRow` asking for `solid` and repeating it itself is exactly the direct-ramp " +
-    "import SS47 forbids one file over, and it is how the eighth-block partials would drift out " +
-    "of step with the ambiguous-width arm",
   "Extent.partials":
     "**as `solid`** — and the one whose direct use would be worst, because the wide arm has one " +
     "partial where the narrow arm has seven. A caller indexing this itself would be correct on a " +

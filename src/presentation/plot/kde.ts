@@ -202,7 +202,7 @@ export function violinRows(
   strokePolyline(mask, [upper[0]!, lower[0]!], false);
   strokePolyline(mask, [upper[w - 1]!, lower[w - 1]!], false);
 
-  const grid: string[][] = mask.map((r) => r.map((m) => glyphForMask(m, corners)));
+  const grid: string[][] = mask.map((r) => r.map((m) => glyphForMask(m, corners, caps)));
 
   // The box, inside the outline it exists to be compared against. A violin
   // without it is a density plot lying on its side.

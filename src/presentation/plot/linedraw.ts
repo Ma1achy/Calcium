@@ -13,6 +13,7 @@
  * the end. Corners, ends, tees and crossings all fall out of the same table
  * rather than being cases.
  */
+import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Series } from "../../data/viewmodel/index.js";
 import { finiteSamples, columnsOf, rowOf, type Range } from "./scale.js";
 
@@ -152,8 +153,28 @@ export function lineDrawRows(
  * table answers all three, and a second copy is how the pie came to be drawn in
  * a vocabulary the line forms had already left behind.
  */
-export function glyphForMask(mask: number, corners: "rounded" | "sharp"): string {
-  const table = corners === "sharp" ? SHARP : ROUNDED;
+/**
+ * ASCII, for `unicode: "ascii"`.
+ *
+ * **Every caller was emitting box-drawing regardless of capability**, which is
+ * C09 I22's subject: a mark the framework draws must have a substitute. The
+ * violin's outline made it visible — an ASCII frame came back full of `╭─╯` —
+ * but the pie's rim and the radar's ring had the same hole and no frame showed
+ * it, because both fall back to other renderers before reaching here.
+ *
+ * A corner is `+` in all four directions: ASCII has no rounded form, and using
+ * `/` and `\\` reads as a slope rather than a join at this resolution.
+ */
+const ASCII: readonly string[] = Object.freeze([
+  " ", "|", "|", "|", "-", "+", "+", "+", "-", "+", "+", "+", "-", "+", "+", "+",
+]);
+
+export function glyphForMask(
+  mask: number,
+  corners: "rounded" | "sharp",
+  caps?: Pick<TerminalCapabilities, "unicode">,
+): string {
+  const table = caps?.unicode === "ascii" ? ASCII : corners === "sharp" ? SHARP : ROUNDED;
   return table[mask & 15] ?? " ";
 }
 

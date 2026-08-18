@@ -8,6 +8,7 @@
 import type { QuartileSummary } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { glyphs } from "../blocks/glyphs.js";
+import { pairFor } from "./ramp.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
@@ -169,6 +170,10 @@ export function boxplotBand(
     outlier: g.dotted,
   };
 
+  // The interquartile run's ink, for the compact arm. `pairFor` is the gauge
+  // vocabulary and this *is* a gauge: a span of the axis that is filled or not.
+  const fill = pairFor(caps).filled;
+
   const at = (v: number): number => {
     const span = max - min;
     const t = span <= 0 ? 0 : (v - min) / span;
@@ -182,13 +187,22 @@ export function boxplotBand(
   // single row taken from the same table keeps the median and the caps; taking
   // a separate renderer is how the two would drift.
   const wanted = n >= 3 ? [0, 1, 2] : n === 2 ? [0, 1] : [1]; // cells-ok — a row count
+  const compact = n < 3; // cells-ok — a row count
   const out: string[] = [];
 
   for (const r of wanted) {
     const row = new Array<string>(w).fill(" ");
     for (let i = xMin + 1; i < xQ1; i += 1) row[i] = T.whisker[r]!;
     for (let i = xQ3 + 1; i < xMax; i += 1) row[i] = T.whisker[r]!;
-    for (let i = xQ1 + 1; i < xQ3; i += 1) row[i] = T.boxEdge[r]!;
+    // **The compact box is filled, and the three-row box is not.** With top and
+    // bottom edges the interquartile range is enclosed and the interior must
+    // stay clear so the median and mean are legible inside it. With one row
+    // there are no edges: a blank interior leaves `┤    │    ├` — two tees, a
+    // rule, and nothing saying where the box begins or that those cells are the
+    // box at all. So the run carries the range, and the median and mean are
+    // punched into it below.
+    const interior = compact && r === 1 ? fill : T.boxEdge[r]!;
+    for (let i = xQ1 + 1; i < xQ3; i += 1) row[i] = interior;
     row[xMin] = T.minCap[r]!;
     row[xMax] = T.maxCap[r]!;
     row[xQ1] = T.boxL[r]!;
