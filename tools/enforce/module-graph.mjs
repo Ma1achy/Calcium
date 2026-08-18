@@ -1568,6 +1568,22 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "no renderer branches on it, because none should — a substitution changes what a reader " +
     "infers, not what the code draws. It gains a consumer the day a legend says *ink weight " +
     "stands in for position here*, and until then MG24 is correct and this row is the answer",
+  "Extent.encodes":
+    "**`Pair.encodes`' row, for the fourth vocabulary** — the tag that makes an `Extent` " +
+    "self-describing beside a `Pair` and a `Ladder`. Nothing branches on it because nothing " +
+    "should: a renderer names an axis (I21) and the axis picks the vocabulary, so a branch here " +
+    "would be the encoding rule inverted. It earns a consumer the day a second extent vocabulary " +
+    "exists",
+  "Extent.solid":
+    "**read by `extentRun`, which is the vocabulary's own fold and lives with it** — the same " +
+    "shape as `LADDERS` being reachable only through `ladderFor`. A caller takes the run, not " +
+    "the glyphs: `barRow` asking for `solid` and repeating it itself is exactly the direct-ramp " +
+    "import SS47 forbids one file over, and it is how the eighth-block partials would drift out " +
+    "of step with the ambiguous-width arm",
+  "Extent.partials":
+    "**as `solid`** — and the one whose direct use would be worst, because the wide arm has one " +
+    "partial where the narrow arm has seven. A caller indexing this itself would be correct on a " +
+    "narrow terminal and off by six steps on a wide one, which is F176's shape",
   "Pair.encodes":
     "**the tag that makes a `Pair` self-describing beside a `Ladder`**, and nothing branches on " +
     "it because there is one pair. Asserted by T1.29 and read by a person; it earns a runtime " +

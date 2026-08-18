@@ -3,16 +3,36 @@
  * group-3 nested-bar forms (flame, icicle, funnel, gantt, waterfall,
  * streamgraph).
  *
- * All are horizontal bars with category labels in the gutter. The bar's
- * fill encoding reuses `pairFor` from `ramp.ts`.
+ * All are horizontal bars with category labels in the gutter.
+ *
+ * **The bar encodes `extent`, not `fill`** (I21). It reused `pairFor` — the
+ * gauge vocabulary — so every bar drew a solid run *and a shaded track out to
+ * the full width*, which reads as a percent-complete meter. The shade carried
+ * nothing: it was not modulated by any value. A comparison bar's only signal is
+ * its length, so the remainder is blank and the tip carries the fraction.
  */
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import { pairFor } from "./ramp.js";
+import { extentFor, extentRun, pairFor } from "./ramp.js";
+import { formatReadout } from "./axes.js";
+import type { Plot } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
 import { glyphs } from "../blocks/glyphs.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+
+/**
+ * Decimals for a bin edge — enough that two adjacent edges differ.
+ *
+ * The same argument as an axis step's precision (C12 I22): a label rounded past
+ * the gap between it and its neighbour prints two identical bounds, and a bin
+ * `[3, 3)` is a statement that no reading can satisfy.
+ */
+function binPlaces(binWidth: number): number {
+  if (!Number.isFinite(binWidth) || binWidth <= 0) return 2;
+  const magnitude = Math.floor(Math.log10(binWidth));
+  return Math.max(0, Math.min(6, 1 - magnitude));
+}
 
 /**
  * One horizontal bar of exactly `width` cells, with an optional value label.
@@ -24,21 +44,27 @@ export function barRow(
   width: number,
   caps: Caps,
   showValue = true,
+  format?: Plot["yFormat"],
 ): string {
   const w = Math.max(1, Math.floor(width));
-  const mark = pairFor(caps);
-  if (value === null || !Number.isFinite(value)) return mark.absent.padEnd(w);
+  const ext = extentFor(caps);
+  if (value === null || !Number.isFinite(value)) return ext.absent.padEnd(w);
 
-  const label = showValue ? ` ${String(Math.round(value * 10) / 10)}` : "";
+  // **`formatReadout`, not a hand-rolled round.** The old line was
+  // `String(Math.round(value * 10) / 10)` — it dropped trailing zeros, ignored
+  // `yFormat` entirely, and rendered a percentage, a byte count and a duration
+  // all as bare numbers. `axes.ts` records this exact class as having happened
+  // three times before; this was the fourth, in the one place a reader reads
+  // the number rather than the picture.
+  const label = showValue ? ` ${formatReadout(value, format)}` : "";
   const labelCells = cells(label, caps.ambiguousWidth);
   const barWidth = Math.max(0, w - labelCells);
 
   const span = max - min;
   const t = span <= 0 ? 0 : (value - min) / span;
-  const fill = Math.round(Math.min(1, Math.max(0, t)) * barWidth);
-
-  const bar = mark.filled.repeat(fill) + mark.empty.repeat(barWidth - fill);
-  return (bar + label).slice(0, w);
+  const run = extentRun(t, barWidth, ext);
+  const pad = " ".repeat(Math.max(0, barWidth - cells(run, caps.ambiguousWidth)));
+  return (run + pad + label).slice(0, w);
 }
 
 /**
@@ -160,9 +186,23 @@ export function binValues(
   const labels: string[] = [];
   const counts = new Array(binCount).fill(0) as number[];
 
+  // **A bin is an interval, and the label said it was a point.** The old line
+  // pushed the rounded *left edge* alone — `0.03` — with no upper bound and no
+  // notation saying it was a range at all, so a histogram's ordinate read as a
+  // list of values rather than as bins. Half-open brackets, per YouPlot: every
+  // bin takes `[lo, hi)` and the last takes `]`, because the last bin is where
+  // the maximum lands and `floor((v - lo) / binWidth)` clamps it there.
+  //
+  // Decimal-aligned by padding the left number, so a column of intervals reads
+  // down its own separator rather than ragged.
+  const places = binPlaces(binWidth);
+  const edges: string[] = [];
+  for (let i = 0; i <= binCount; i++) edges.push((lo + i * binWidth).toFixed(places));
+  const widest = edges.reduce((m, e) => Math.max(m, e.length), 0); // cells-ok — a digit count
   for (let i = 0; i < binCount; i++) {
-    const edge = lo + i * binWidth;
-    labels.push(String(Math.round(edge * 100) / 100));
+    const a = (edges[i] ?? "").padStart(widest);
+    const b = (edges[i + 1] ?? "").padStart(widest);
+    labels.push(`[${a}, ${b}${i === binCount - 1 ? "]" : ")"}`);
   }
 
   for (const v of finite) {

@@ -89,6 +89,24 @@ type Layout = Readonly<{
  * judgement and the app is entitled to make it. What the default may not do is
  * make one by accident.
  */
+/**
+ * A comparison bar's baseline.
+ *
+ * **Zero, not the data's minimum — and the old behaviour said the smallest
+ * category was nothing.** `bar` scaled `(v - dataMin) / (dataMax - dataMin)`,
+ * so the smallest value always mapped to `t = 0` and drew an empty run. The
+ * shipped fixture is `[10, 25, 15, 30, 20]`: `alpha` at 10 rendered as a bar of
+ * length nothing, beside a label reading `10`. Arithmetically consistent, and
+ * it says the wrong thing about the data — which is the class every frame-read
+ * in this component has caught.
+ *
+ * Negative data keeps its own floor: a waterfall's `-40` needs a scale that
+ * reaches it, and clamping to zero there would put the bar off the axis.
+ */
+function baselineFor(dataMin: number): number {
+  return Math.min(0, dataMin);
+}
+
 function refOf(series: Series, index: number): ColourRef {
   if (series.tone !== undefined) return `tone.${series.tone}`;
   return CATEGORY_REFS[index] ?? "categorical.c1"; // cells-ok — a category index
@@ -665,10 +683,33 @@ const FORM_ROWS: Readonly<
         stackedBarRow(block.series, ci++, totalMax, aw, ctx.capabilities, layout === "normalised"),
       );
     }
+    // **`layout: "grouped"` rendered one series and dropped the rest, silently.**
+    // Only "stacked" and "normalised" were handled, so a grouped block fell to
+    // the single-series path below and series 2..n were never drawn — no
+    // notice, no truncation mark, nothing. C12 I8 says series are never dropped
+    // silently; this arm was the one place that did.
+    if (layout === "grouped" && block.series.length > 1) { // cells-ok — a series count
+      // One row per (category, series), in category-major order, so a group's
+      // bars sit together and the gutter names which series each one is.
+      const cats = block.categories ?? [];
+      const base = baselineFor(data.min);
+      const ordered = cats.flatMap((_c, i) => block.series.map((sr) => sr.values[i] ?? null));
+      const grouped = {
+        ...block,
+        categories: cats.flatMap((c) =>
+          block.series.map((sr, k) => `${c} · ${sr.label ?? String(k + 1)}`),
+        ),
+      };
+      let oi = 0;
+      return categoricalForm(grouped, width, ctx, (_label, aw) =>
+        barRow(ordered[oi++] ?? null, base, data.max, aw, ctx.capabilities, true, block.yFormat),
+      );
+    }
     let ri = 0;
+    const base = baselineFor(data.min);
     return categoricalForm(block, width, ctx, (_label, aw) => {
       const v = block.series[0]?.values[ri++] ?? null;
-      return barRow(v, data.min, data.max, aw, ctx.capabilities);
+      return barRow(v, base, data.max, aw, ctx.capabilities, true, block.yFormat);
     });
   },
   histogram: (block, width, ctx) => {
@@ -680,7 +721,7 @@ const FORM_ROWS: Readonly<
     const histBlock = { ...block, categories: labels };
     let ci = 0;
     return categoricalForm(histBlock, width, ctx, (_label, aw) =>
-      barRow(counts[ci++] ?? 0, 0, maxCount, aw, ctx.capabilities),
+      barRow(counts[ci++] ?? 0, 0, maxCount, aw, ctx.capabilities, true),
     );
   },
   boxplot: (block, width, ctx) => {
@@ -777,7 +818,7 @@ const FORM_ROWS: Readonly<
     let ri = 0;
     return categoricalForm(block, width, ctx, (_label, aw) => {
       const v = block.series[0]?.values[ri++] ?? null;
-      return barRow(v, data.min, data.max, aw, ctx.capabilities, false);
+      return barRow(v, baselineFor(data.min), data.max, aw, ctx.capabilities, false);
     });
   },
   icicle: (block, width, ctx) => {
@@ -789,7 +830,7 @@ const FORM_ROWS: Readonly<
     let ri = 0;
     return categoricalForm(flipped, width, ctx, (_label, aw) => {
       const v = flipped.series[0]?.values[ri++] ?? null;
-      return barRow(v, data.min, data.max, aw, ctx.capabilities, false);
+      return barRow(v, baselineFor(data.min), data.max, aw, ctx.capabilities, false);
     });
   },
   funnel: (block, width, ctx) => {

@@ -11,7 +11,7 @@ import { FULL_CAPS, MONO_CAPS, measurable } from "../support/render.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
 import { boxplotRow } from "../../src/presentation/plot/glyph-row.js";
-import { binValues } from "../../src/presentation/plot/categorical.js";
+import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { kde } from "../../src/presentation/plot/kde.js";
 import { waffleRows } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
@@ -182,5 +182,65 @@ describe("step holds value horizontally", () => {
     const stepResult = stepRows(series, range, 20, 5, FULL_CAPS);
     const scatterResult = scatterRows(series, range, 20, 5, FULL_CAPS);
     expect(stepResult.join("\n")).not.toBe(scatterResult.join("\n"));
+  });
+});
+
+/**
+ * The bar is an extent, not a fill (C12 I21, §3f).
+ *
+ * **These two rows exist because a mutation survived.** The golden corpus caught
+ * the shaded remainder and the data-minimum baseline immediately — sixteen and
+ * twelve frames respectively — and did not notice either the value format or the
+ * bin precision, because a snapshot records whatever it is given and both
+ * mutations produced a plausible-looking number. A mutation that fails nothing
+ * is a finding about the tests.
+ */
+describe("C12 §3f — the bar's readout and its bins", () => {
+  it("T1.60 (C12 I21): a bar's value label goes through `yFormat`, not a bare round", () => {
+    // `String(Math.round(v * 10) / 10)` drops the unit and the trailing zero, so
+    // a percentage, a byte count and a duration all render as the same digits.
+    // `axes.ts` records this exact class as having happened three times; the
+    // bar's inline formatter was the fourth, in the one place the reader reads
+    // the number rather than the picture.
+    const caps = { unicode: "full", ambiguousWidth: "narrow" } as const;
+    const pct = barRow(45.2, 0, 100, 40, caps, true, "percent");
+    expect(pct, "a percentage keeps its sign").toContain("45.2%");
+
+    const plain = barRow(45.2, 0, 100, 40, caps, true);
+    expect(plain, "and not a per-cent sign it was not given").not.toContain("%");
+    // **A finding, recorded where it was found.** With no declared format,
+    // `formatReadout` routes to `formatNumber`, whose decimal count is chosen
+    // from the value's *magnitude* — so 45.2 renders as `45`. That is the class
+    // `axes.ts` §32-38 names ("docker stats sends 45.2% and the cell drew 45%")
+    // surviving in the arm with no format to consult. It is out of this
+    // commit's scope and asserted as it stands rather than as it should be, so
+    // that changing it is a deliberate act with a failing row attached.
+    expect(plain, "the undeclared-format arm truncates — see the comment").toContain("45");
+
+    // The old formatter's actual output for this input, so the row names the
+    // change that makes it fail rather than only the assertion.
+    const bytes = barRow(1536, 0, 4096, 40, caps, true, "bytes");
+    expect(bytes, "bytes are a unit, not a count of them").not.toContain(" 1536");
+  });
+
+  it("T1.61 (C12 I21): a bin label is an interval, at a precision its own width earns", () => {
+    // A bare left edge reads as a point value, not a range — and a fixed two
+    // decimals prints `[3.00, 3.00)` for a narrow bin, a statement no reading
+    // can satisfy.
+    const wide = binValues([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], "sturges");
+    for (const l of wide.labels) {
+      expect(l, "an interval is bracketed").toMatch(/^\[.*[)\]]$/u);
+      expect(l, "and has two bounds").toContain(",");
+    }
+    expect(wide.labels[wide.labels.length - 1], "the last bin is closed").toMatch(/\]$/u);
+
+    // A span of 0.001 across several bins needs more than two decimals, or every
+    // label collides with its neighbour.
+    const narrow = binValues(
+      Array.from({ length: 40 }, (_, i) => 1 + i * 0.0001),
+      "sturges",
+    );
+    const bounds = narrow.labels.map((l) => l.split(",")[0]);
+    expect(new Set(bounds).size, "every lower bound is distinct").toBe(bounds.length);
   });
 });

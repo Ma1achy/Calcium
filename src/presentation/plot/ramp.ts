@@ -75,6 +75,87 @@ export type Pair = Readonly<{
   absent: string;
 }>;
 
+/**
+ * The `extent` vocabulary — a run whose *length* is the whole signal.
+ *
+ * **A fourth encoding, and the reason it is not `fill`.** A `Pair` is a gauge:
+ * a lit run against a shaded track, correct when the question is *how much of
+ * this one thing's own ceiling is used* — a CPU cell, a quota. `barRow` reused
+ * it for **comparison** bars, where each row is an independent quantity read
+ * against its neighbours, and the shaded remainder carried no information at
+ * all: every bar filled the full width and read as a percent-complete meter.
+ * That is `ramp.ts`' own recorded defect class — *a vocabulary carried into a
+ * geometry it did not fit* — for the third time.
+ *
+ * Under `extent` the remainder is **blank**, so length is the only signal, and
+ * a partial glyph at the tip buys sub-cell precision the run alone cannot.
+ */
+export type Extent = Readonly<{
+  encodes: "extent";
+  solid: string;
+  /** Fractions of a cell, ascending. Empty where the arm has none. */
+  partials: readonly string[];
+  absent: string;
+}>;
+
+/**
+ * The extent vocabulary for a terminal.
+ *
+ * **The partials are the left-eighths and not the lower-eighths.** `RAMP_UNICODE`
+ * is `▁▂▃▄▅▆▇█` — a *vertical* ramp, which is what a sparkline cell needs
+ * because its axis is height. A horizontal bar's tip needs `▏▎▍▌▋▊▉█`, growing
+ * from the left. The two sets look interchangeable and encode different axes,
+ * which is I21's whole subject.
+ *
+ * **The wide arm has one partial, not seven.** U+2580–U+259F are all
+ * `East_Asian_Width=Ambiguous`, so on a terminal that draws them wide an
+ * eighth-block tip is two cells — `pairFor`'s F176 defect exactly, and this
+ * vocabulary is written after it rather than before, so it inherits the fix
+ * rather than repeating it. Braille is `Neutral` throughout; `⡇` is the left
+ * column filled, which is a half and the only fraction the block can express
+ * horizontally.
+ */
+export function extentFor(caps: Caps): Extent {
+  if (caps.unicode === "ascii") {
+    return Object.freeze({ encodes: "extent", solid: "#", partials: Object.freeze([]), absent: "-" } as const);
+  }
+  if (caps.ambiguousWidth === "wide") {
+    return Object.freeze({
+      encodes: "extent", solid: "\u28ff", partials: Object.freeze(["\u2847"]), absent: "-",
+    } as const);
+  }
+  return Object.freeze({
+    encodes: "extent",
+    solid: "\u2588",
+    partials: Object.freeze(["\u258f", "\u258e", "\u258d", "\u258c", "\u258b", "\u258a", "\u2589"]),
+    absent: "\u2014",
+  } as const);
+}
+
+/**
+ * A run of `value/max` of `width` cells, with a fractional glyph at the tip.
+ *
+ * Returns the run only — **the caller pads**, because what follows a bar differs
+ * by form (a value label, a second bar, nothing) and a vocabulary that padded
+ * would be deciding that.
+ */
+export function extentRun(t: number, width: number, ext: Extent): string {
+  const w = Math.max(0, Math.floor(width));
+  if (w === 0) return "";
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  const exact = clamped * w;
+  const full = Math.min(w, Math.floor(exact));
+  const rest = exact - full;
+  const n = ext.partials.length; // cells-ok — a vocabulary length
+  if (full >= w || n === 0) return ext.solid.repeat(full);
+  // Round to the nearest expressible fraction; index 0 is the thinnest, so a
+  // remainder below half a step draws nothing rather than a misleading sliver.
+  const step = Math.round(rest * (n + 1));
+  if (step === 0) return ext.solid.repeat(full);
+  if (step > n) return ext.solid.repeat(Math.min(w, full + 1));
+  return ext.solid.repeat(full) + ext.partials[step - 1]!;
+}
+
 /** Unicode: the lower-block ramp, one eighth per step. */
 export const RAMP_UNICODE = "▁▂▃▄▅▆▇█";
 
