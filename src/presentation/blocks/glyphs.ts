@@ -39,6 +39,20 @@ export type GlyphSet = Readonly<{
   topRight: string;
   bottomLeft: string;
   bottomRight: string;
+  /**
+   * The box plot band, and the four marks it needs that nothing else did.
+   *
+   * `teeDown`/`teeUp` carry a median where it meets the box's top and bottom
+   * edges; `stubDown`/`stubUp` are a whisker's end cap on a row with no
+   * horizontal run to join. ASCII collapses all four, which is what makes the
+   * figure survive C09 I22 rather than depending on it.
+   */
+  teeDown: string;
+  teeUp: string;
+  stubDown: string;
+  stubUp: string;
+  /** A second centre that must never share the median's glyph (C04 I53). */
+  diamond: string;
   teeLeft: string;
   teeRight: string;
 
@@ -78,6 +92,11 @@ const UNICODE: GlyphSet = Object.freeze({
   topRight: "┐",
   bottomLeft: "└",
   bottomRight: "┘",
+  teeDown: "┬",
+  teeUp: "┴",
+  stubDown: "╷",
+  stubUp: "╵",
+  diamond: "◆",
   teeLeft: "├",
   teeRight: "┤",
 
@@ -103,6 +122,11 @@ const ASCII: GlyphSet = Object.freeze({
   topRight: "+",
   bottomLeft: "+",
   bottomRight: "+",
+  teeDown: "+",
+  teeUp: "+",
+  stubDown: "|",
+  stubUp: "|",
+  diamond: "x",
   teeLeft: "+",
   teeRight: "+",
 

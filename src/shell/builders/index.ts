@@ -394,11 +394,12 @@ function plot(
      */
     xLabels?: Plot["xLabels"];
     plotStyle?: Plot["plotStyle"];
+    plotDetail?: Plot["plotDetail"];
     plotCorners?: Plot["plotCorners"];
     palette?: Plot["palette"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotCorners, palette } =
+  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotDetail, plotCorners, palette } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -424,6 +425,7 @@ function plot(
       ...(colormap === undefined ? {} : { colormap }),
       ...(xLabels === undefined ? {} : { xLabels }),
       ...(plotStyle === undefined ? {} : { plotStyle }),
+      ...(plotDetail === undefined ? {} : { plotDetail }),
       ...(plotCorners === undefined ? {} : { plotCorners }),
       ...(palette === undefined ? {} : { palette }),
     } as Plot,

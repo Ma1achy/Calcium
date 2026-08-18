@@ -307,7 +307,20 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // The user's debug case: density must peak at 1 and at 5, not be flat.
     bimodal: {
       form: "violin", height: 12, axes: true, categories: ["bimodal", "uniform"],
-      series: [s([1, 1, 1, 1, 2, 3, 5, 5, 5, 5]), s([1, 2, 3, 4, 5, 6, 7, 8])],
+      series: [
+        // **Forty points, not ten, and the reason is measured.** The brief's
+        // ten-point sample cannot show two modes at any rule-of-thumb
+        // bandwidth — Silverman puts the normalised floor at 0.57 even with
+        // the corrected constant, so the traced outline is a rectangle.
+        // seaborn would do the same. Two clusters of eighteen with a thin
+        // bridge is a sample that genuinely supports the shape.
+        s([
+          ...Array.from({ length: 18 }, (_, i) => 1 + (i % 3) * 0.15),
+          ...Array.from({ length: 4 }, (_, i) => 2.6 + i * 0.3),
+          ...Array.from({ length: 18 }, (_, i) => 4.7 + (i % 3) * 0.15),
+        ]),
+        s([1, 2, 3, 4, 5, 6, 7, 8]),
+      ],
     },
     compact: {
       form: "violin", height: 6, axes: true, categories: ["A", "B", "C"],

@@ -32,7 +32,7 @@ import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { sparkline } from "./sparkline.js";
 import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
-import { boxplotRow, forestRow, dumbbellRow } from "./glyph-row.js";
+import { boxplotBand, forestRow, dumbbellRow } from "./glyph-row.js";
 import { barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
 import { waffleRows, waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
@@ -42,7 +42,7 @@ import { pieLayers, circleOutline, radarOutlines, radarFrame, radarAsciiRows } f
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
-import type { Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
+import type { QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -103,6 +103,37 @@ type Layout = Readonly<{
  * Negative data keeps its own floor: a waterfall's `-40` needs a scale that
  * reaches it, and clamping to zero there would put the bar off the axis.
  */
+/**
+ * The rows a detail mode may spend inside its band (C12 §3i, I28).
+ *
+ * The mode never *sets* the height — rows-per-band times category count is a
+ * height derived from the data, which is what I1 forbids — so it picks how many
+ * of the rows the caller already declared to use. An explicit `"full"` that does
+ * not fit degrades rather than overflowing its band.
+ */
+function detailRows(block: Plot, available: number, full: number): number {
+  const mode = block.plotDetail ?? "auto";
+  if (mode === "compact") return 1;
+  return available >= full ? full : available;
+}
+
+/**
+ * A five-number summary derived from a series, for a violin with no explicit
+ * quartiles. A violin *is* a box plot that also shows the distribution, so the
+ * box is not optional — the numbers are, and they are computable.
+ */
+function summaryOf(series: Series): QuartileSummary | undefined {
+  const v = series.values.filter((x): x is number => x !== null && Number.isFinite(x));
+  if (v.length === 0) return undefined; // cells-ok — a sample count
+  const sorted = [...v].sort((a, b) => a - b);
+  const at = (f: number): number => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))]!; // cells-ok — a sample count
+  return {
+    min: sorted[0]!, q1: at(0.25), median: at(0.5), q3: at(0.75),
+    max: sorted[sorted.length - 1]!, // cells-ok — a sample count
+    mean: v.reduce((a, b) => a + b, 0) / v.length, // cells-ok — a sample count
+  };
+}
+
 function baselineFor(dataMin: number): number {
   return Math.min(0, dataMin);
 }
@@ -582,7 +613,7 @@ function bandedForm(
   cats: readonly string[],
   width: number,
   ctx: RenderContext,
-  bandBuilder: (series: Series, areaWidth: number, rows: number) => readonly string[],
+  bandBuilder: (series: Series, areaWidth: number, rows: number, index: number) => readonly string[],
 ): readonly string[] {
   const areaRows = plotAreaRows(block);
   const n = cats.length; // cells-ok — a category count
@@ -602,9 +633,12 @@ function bandedForm(
 
   for (let ci = 0; ci < n; ci += 1) {
     const sr = block.series[ci];
-    const band = sr
-      ? bandBuilder(sr, areaWidth, rowsPer)
-      : Array.from({ length: rowsPer }, () => " ".repeat(areaWidth));
+    // **The index, and `boxplot` is why.** `bandedForm` read only
+    // `block.series`, so a form whose data lives in `block.quartiles` could not
+    // use it and had to hand-roll one row per category — which is exactly how
+    // the box plot ended up unable to show a centre. The band is handed its
+    // ordinal and fetches what it needs.
+    const band = bandBuilder(sr ?? { values: [] }, areaWidth, rowsPer, ci);
     const labelRow = Math.floor(rowsPer / 2);
     const styled = slot(refOf(sr ?? { values: [] }, ci), ctx.theme, ctx.capabilities);
 
@@ -732,10 +766,12 @@ const FORM_ROWS: Readonly<
       lo = Math.min(lo, q.min, ...(q.outliers ?? []));
       hi = Math.max(hi, q.max, ...(q.outliers ?? []));
     }
-    let qi = 0;
-    return categoricalForm(block, width, ctx, (_label, aw) => {
-      const q = qs[qi++];
-      return q ? boxplotRow(q, lo, hi, aw, ctx.capabilities) : "";
+    const cats = block.categories ?? qs.map((_q, i) => `series ${String(i + 1)}`);
+    return bandedForm(block, cats, width, ctx, (_sr, aw, rows, i) => {
+      const q = qs[i];
+      return q
+        ? boxplotBand(q, lo, hi, aw, detailRows(block, rows, 3), ctx.capabilities)
+        : Array.from({ length: rows }, () => " ".repeat(aw));
     });
   },
   forest: (block, width, ctx) => {
@@ -904,8 +940,9 @@ const FORM_ROWS: Readonly<
   },
   violin: (block, width, ctx) => {
     const cats = block.categories ?? block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
-    return bandedForm(block, cats, width, ctx, (sr, aw, rows) =>
-      violinRows(sr, aw, rows, ctx.capabilities),
+    const qs = block.quartiles ?? [];
+    return bandedForm(block, cats, width, ctx, (sr, aw, rows, i) =>
+      violinRows(sr, aw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded"),
     );
   },
   ridgeline: (block, width, ctx) => {

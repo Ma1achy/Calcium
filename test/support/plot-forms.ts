@@ -47,7 +47,12 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
     series: [s([1, 1, 2, 2, 2, 3, 3, 4, 5, 5, 5, 5])],
   }),
   boxplot: block({
-    kind: "plot", id: "form-boxplot", form: "boxplot", height: 3, axes: true,
+    // **Nine rows for three categories, because a box plot is three rows each.**
+    // At height 3 the form degrades to its compact spine (C12 I28) and the
+    // golden corpus would be recording the fallback as though it were the
+    // figure — which is how a corpus stops being evidence about the thing it
+    // names.
+    kind: "plot", id: "form-boxplot", form: "boxplot", height: 9, axes: true,
     categories: ["A", "B", "C"],
     series: [],
     quartiles: [
@@ -177,7 +182,7 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
     series: [s([1, 1, 2, 2, 2, 3, 3, 4, 5, 5, 5, 5, 6, 7, 8])],
   }),
   violin: block({
-    kind: "plot", id: "form-violin", form: "violin", height: 3, axes: true,
+    kind: "plot", id: "form-violin", form: "violin", height: 12, axes: true,
     categories: ["A", "B", "C"],
     series: [
       s([1, 1, 2, 3, 3, 3, 4, 5]),

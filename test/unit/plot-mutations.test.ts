@@ -10,7 +10,7 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, MONO_CAPS, measurable } from "../support/render.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
-import { boxplotRow } from "../../src/presentation/plot/glyph-row.js";
+import { boxplotBand } from "../../src/presentation/plot/glyph-row.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { kde } from "../../src/presentation/plot/kde.js";
 import { waffleRows } from "../../src/presentation/plot/waffle.js";
@@ -37,16 +37,34 @@ describe("GROUP 1: scatter does not interpolate", () => {
 });
 
 describe("GROUP 2: box plot median inside the box", () => {
-  it("median is between q1 and q3", () => {
-    const row = boxplotRow(
+  it("median is between q1 and q3, on all three rows", () => {
+    // The box is an **outline** now, so the median is a tee on the edges
+    // (┬ ┴) and a rule on the spine (│) — three glyphs of one figure, which is
+    // what the row-indexed table buys and what one filled row could not say.
+    const band = boxplotBand(
       { min: 1, q1: 3, median: 5, q3: 7, max: 9 },
-      1, 9, 40, FULL_CAPS,
+      1, 9, 40, 3, FULL_CAPS,
     );
-    const q1Pos = row.indexOf("[");
-    const medPos = row.indexOf("│") >= 0 ? row.indexOf("│") : row.indexOf("|");
-    const q3Pos = row.indexOf("]");
-    expect(medPos).toBeGreaterThanOrEqual(q1Pos);
-    expect(medPos).toBeLessThanOrEqual(q3Pos);
+    expect(band.length, "three rows per category").toBe(3);
+
+    const [top, spine, bottom] = band as [string, string, string];
+    expect(top.indexOf("┬"), "median tee on the top edge").toBeGreaterThan(top.indexOf("┌"));
+    expect(top.indexOf("┬")).toBeLessThan(top.indexOf("┐"));
+    expect(bottom.indexOf("┴"), "and on the bottom").toBeGreaterThan(bottom.indexOf("└"));
+    expect(spine.indexOf("│"), "the spine carries the rule").toBeGreaterThan(spine.indexOf("┤"));
+    // All three land in the same column — otherwise it is three drawings.
+    expect(new Set([top.indexOf("┬"), spine.indexOf("│"), bottom.indexOf("┴")]).size).toBe(1);
+  });
+
+  it("the mean is a distinct mark, never the median's glyph (C04 I53)", () => {
+    // Two centres sharing a glyph is D29 with a shape instead of a colour.
+    const band = boxplotBand(
+      { min: 1, q1: 3, median: 5, q3: 7, max: 9, mean: 6 },
+      1, 9, 40, 3, FULL_CAPS,
+    );
+    const spine = band[1]!;
+    expect(spine, "the mean has its own mark").toContain("◆");
+    expect(spine.indexOf("◆")).not.toBe(spine.indexOf("│"));
   });
 });
 

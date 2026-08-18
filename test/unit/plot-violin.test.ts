@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
+import { violinRows } from "../../src/presentation/plot/kde.js";
 
 const kit = () => measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
 
@@ -36,38 +37,45 @@ describe("VF1: violin with bimodal data shows two bulges", () => {
 });
 
 describe("VF2: violin is symmetric about the category axis", () => {
-  it("for each column, fill above centre mirrors fill below", () => {
-    const b = block({
-      kind: "plot", id: "vf2", form: "violin", height: 9, axes: true,
-      categories: ["sym"],
-      series: [{ values: [1, 2, 3, 3, 3, 4, 5] }],
-    });
-    const k = kit();
-    const lines = k.renderToLines(b, 60);
+  it("each column's outline mirrors about the centre, and only the spine does not", () => {
+    // **Against `violinRows` and not the composed frame.** The old row parsed
+    // the rendered block: it found the gutter by `indexOf("│")`, which the
+    // outline itself now emits, and it mirrored across the whole area rather
+    // than within a band. Both were harmless while a violin was a solid slab
+    // and neither is a property of the figure. A test that re-derives the
+    // layout is testing the layout.
+    const rows = violinRows(
+      { values: [1, 2, 3, 3, 3, 4, 5] },
+      40, 9, FULL_CAPS,
+    );
+    expect(rows.length).toBe(9); // cells-ok — a row count
 
-    const areaLines = lines.slice(0, -2);
-    const stripped = areaLines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ""));
-    const gutterEnd = stripped[0]?.indexOf("│") ?? -1;
-    if (gutterEnd < 0) return;
+    const n = rows.length; // cells-ok — a row count
+    const spine = Math.round((n - 1) / 2);
+    const grid = rows.map((r) => [...r]);
 
-    const cols: string[][] = [];
-    for (const row of stripped) {
-      const area = row.slice(gutterEnd + 1);
-      const chars = [...area];
-      for (let c = 0; c < chars.length; c++) { // cells-ok — a column index
-        if (!cols[c]) cols[c] = [];
-        cols[c]!.push(chars[c]!);
+    for (let c = 0; c < 40; c += 1) { // cells-ok — a column index
+      for (let i = 0; i < Math.floor(n / 2); i += 1) {
+        if (i === spine || n - 1 - i === spine) continue;
+        const above = (grid[i]?.[c] ?? " ") !== " ";
+        const below = (grid[n - 1 - i]?.[c] ?? " ") !== " ";
+        expect(above, `column ${String(c)} mirrors at row ${String(i)}`).toBe(below);
       }
     }
+  });
 
-    for (const col of cols) {
-      const n = col.length; // cells-ok — a row count
-      for (let i = 0; i < Math.floor(n / 2); i++) {
-        const above = col[i] !== " ";
-        const below = col[n - 1 - i] !== " ";
-        expect(above).toBe(below);
-      }
-    }
+  it("the spine carries a box the mirror does not (C12 §3i)", () => {
+    // A violin is a box plot that also shows the distribution, so the centre
+    // row is asymmetric on purpose — and asserting that keeps the row above
+    // from being satisfied by an empty figure.
+    const rows = violinRows(
+      { values: [1, 2, 3, 3, 3, 4, 5] },
+      40, 9, FULL_CAPS,
+      { min: 1, q1: 2, median: 3, q3: 4, max: 5, mean: 3.4 },
+    );
+    const spine = rows[Math.round((rows.length - 1) / 2)] ?? "";
+    expect(spine, "the median rule").toContain("│");
+    expect(spine, "the mean, with its own mark").toContain("◆");
   });
 });
 

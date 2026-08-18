@@ -38,6 +38,7 @@ type FigureOpts = {
   xScale?: ScaleType;
   yScale?: ScaleType;
   plotStyle?: "auto" | "braille" | "line";
+  plotDetail?: "auto" | "compact" | "full";
   plotCorners?: "rounded" | "sharp";
   palette?: string;
 };
@@ -222,6 +223,7 @@ export class FigureBuilder {
       ...(this.opts.xScale !== undefined ? { xScale: this.opts.xScale } : {}),
       ...(this.opts.yScale !== undefined ? { yScale: this.opts.yScale } : {}),
       ...(this.opts.plotStyle !== undefined ? { plotStyle: this.opts.plotStyle } : {}),
+      ...(this.opts.plotDetail !== undefined ? { plotDetail: this.opts.plotDetail } : {}),
       ...(this.opts.plotCorners !== undefined ? { plotCorners: this.opts.plotCorners } : {}),
       ...(this.opts.palette !== undefined ? { palette: this.opts.palette } : {}),
       ...(this.xLabels_ !== undefined ? { xLabels: this.xLabels_ } : {}),

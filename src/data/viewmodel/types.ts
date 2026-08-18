@@ -651,6 +651,15 @@ export type Plot = Readonly<{
   segments?: readonly Segment[];
   xScale?: ScaleType;
   yScale?: ScaleType;
+  /**
+   * How much of a band a distribution form spends on itself (C12 §3i, I28).
+   *
+   * Selects a renderer *inside* the declared height and never contributes to
+   * it — rows-per-band times category count would be a height derived from the
+   * data, which I1 forbids. So "auto" is the richest renderer the declared
+   * height affords, and an explicit "full" that does not fit degrades.
+   */
+  plotDetail?: "auto" | "compact" | "full";
   plotStyle?: "auto" | "braille" | "line";
   plotCorners?: "rounded" | "sharp";
   palette?: string;
@@ -665,6 +674,15 @@ export type QuartileSummary = Readonly<{
   q3: number;
   max: number;
   outliers?: readonly number[];
+  /**
+   * The arithmetic mean (I53), drawn with its own mark and never the median's.
+   *
+   * The five-number summary has no place for it, and *where is the centre* has
+   * two answers the moment a distribution is skewed — showing only the median
+   * hides exactly the case a reader is looking for. Optional, because a summary
+   * computed from quantiles alone genuinely does not have one.
+   */
+  mean?: number;
   centre?: number;
   lower?: number;
   upper?: number;
