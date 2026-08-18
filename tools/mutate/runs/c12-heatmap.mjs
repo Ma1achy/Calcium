@@ -19,6 +19,11 @@ const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/plot.test.ts test/contract/view-model.test.ts test/golden/states.test.ts";
 const DEF = "src/presentation/plot/definition.ts";
+// **The heatmap moved out of `definition.ts`.** Rebuilt as a form like every
+// other in `heatmap.ts`, taking its absence marker, its layout ladder and its
+// legend with it — six anchors below follow it rather than being deleted,
+// because every one of them still names a live invariant.
+const HEAT = "src/presentation/plot/heatmap.ts";
 const RAMP = "src/presentation/plot/ramp.ts";
 const HEIGHT = "src/presentation/plot/height.ts";
 
@@ -38,8 +43,8 @@ const results = runPass({
   run,
   control: {
     file: DEF,
-    from: "  heatmap: (block, width, ctx) => {",
-    to: "  heatmap: (block, width, ctx) => {\n    if (block.series.length >= 0) return [];",
+    from: "  heatmap: (block, width, ctx) => heatmapFormRows(block, width, ctx),",
+    to: "  heatmap: (block, width, ctx) => (block.series.length >= 0 ? [] : heatmapFormRows(block, width, ctx)),",
     why: "a heatmap that renders nothing at all — if this survives, no row below is earned",
   },
   mutations: [
@@ -60,7 +65,7 @@ const results = runPass({
       // sixteen `?` shout over the data for the state that means nothing
       // happened.
       name: "an absent cell draws the sparkline's marker",
-      file: DEF,
+      file: HEAT,
       from: 'const HEATMAP_ABSENT = " ";',
       to: 'const HEATMAP_ABSENT = "?";',
       expect: "T1.21",
@@ -71,23 +76,25 @@ const results = runPass({
       // the full ramp, so an idle container and a saturated one draw the same
       // picture — the comparison a heatmap exists to make, inverted.
       name: "each row normalises over itself",
-      file: DEF,
-      // Re-anchored onto `heatSpans`, where the row's glyphs moved when the
-      // colormap's second channel landed (C10 I31). The subject is unchanged:
-      // the range handed to the row is the matrix's or it is the row's own.
-      from: "  const glyphs = rampRow(series.values, layout.areaWidth, ctx.capabilities, range, style);",
-      to: "  const glyphs = rampRow(series.values, layout.areaWidth, ctx.capabilities, rowRange(series), style);",
+      file: HEAT,
+      // Re-anchored twice now: onto `heatSpans` when the colormap's second
+      // channel landed, and onto the *call site* when `heatSpans` stopped
+      // taking a glyph string and started reading one column map for both
+      // channels. The subject has never moved — the range handed to a row is
+      // the matrix's, or it is the row's own and the comparison is gone.
+      from: "...heatSpans(s, range, layout, map, style, ctx, matrixLayout)",
+      to: "...heatSpans(s, rowRange(s), layout, map, style, ctx, matrixLayout)",
       expect: "T1.18",
       also: [
         {
-          file: DEF,
-          from: "/** A grid cell is blank where nothing was reported (C12 I17, §3a). */",
+          file: HEAT,
+          from: "function heatSpans(",
           to:
             "const rowRange = (s) => {\n"
             + "  const r = s.values.filter((v) => v !== null && Number.isFinite(v));\n"
             + "  return r.length === 0 ? { min: 0, max: 0 } : { min: Math.min(...r), max: Math.max(...r) };\n"
             + "};\n"
-            + "/** A grid cell is blank where nothing was reported (C12 I17, §3a). */",
+            + "function heatSpans(",
         },
       ],
     },
@@ -123,8 +130,8 @@ const results = runPass({
       // comment above the branch already called it that while the code produced
       // it.
       name: "THE LADDER: labels are dropped instead of truncated",
-      file: DEF,
-      from: "    if (room < 1) return null;\n    return { ...base, gutter: room + AXIS_GUTTER, labelColumn: room, areaWidth: MIN_AREA };",
+      file: HEAT,
+      from: "  if (room < 1) return null;\n  return { ...base, gutter: room + AXIS_GUTTER, labelColumn: room, areaWidth: MIN_AREA };",
       to: "    if (room < 1) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };\n    return { ...base, gutter: AXIS_GUTTER, labelColumn: 0, areaWidth: width - AXIS_GUTTER };",
       expect: "T1.22",
     },
@@ -133,16 +140,16 @@ const results = runPass({
       // area rather than the row, so a wide label column cut the range and left
       // the swatch — a key to a scale nobody named.
       name: "the legend is aligned to the plot area again",
-      file: DEF,
-      from: "    line([{ text: truncate(legend, layout.width, ctx.capabilities), style: muted }], layout, ctx),",
-      to: "    line([{ text: \" \".repeat(layout.gutter) }, { text: truncate(legend, layout.areaWidth, ctx.capabilities), style: muted }], layout, ctx),",
+      file: HEAT,
+      from: "    linePaint([{ text: truncate(legend, layout.width, ctx.capabilities), style: muted }], layout, ctx),",
+      to: "    linePaint([{ text: \" \".repeat(layout.gutter) }, { text: truncate(legend, layout.areaWidth, ctx.capabilities), style: muted }], layout, ctx),",
       expect: "T1.23",
     },
     {
       // The drop order inverted: the swatch kept and the range dropped, which is
       // the wrong half by the legend's own argument.
       name: "the legend drops its range before its swatch",
-      file: DEF,
+      file: HEAT,
       from: "  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, range_].find(fits) ?? \"\";",
       to: "  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, swatch].find(fits) ?? \"\";",
       expect: "T1.23",

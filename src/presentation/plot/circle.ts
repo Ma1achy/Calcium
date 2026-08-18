@@ -5,47 +5,54 @@
  * making circles appear round.
  */
 import type { Segment, Series } from "../../data/viewmodel/index.js";
-import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { BRAILLE_DOTS, createGrid, setDot, foldBraille } from "./raster.js";
+import { glyphForMask, strokePolyline } from "./linedraw.js";
 
-type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
-function drawCircle(grid: ReturnType<typeof createGrid>, cx: number, cy: number, r: number): void {
-  const steps = Math.max(60, Math.floor(r * 4));
-  for (let i = 0; i < steps; i++) {
-    const angle = (2 * Math.PI * i) / steps;
-    const x = Math.round(cx + r * Math.cos(angle));
-    const y = Math.round(cy + r * Math.sin(angle));
-    setDot(grid, x, y);
-  }
+
+
+
+/**
+ * The circle's centre and radii, **in cells**, computed once.
+ *
+ * **One geometry, two vocabularies.** The outline was measured in cell space
+ * and the fill in dot space, each with its own centre and its own radius, so
+ * the boundary sat beside the interior rather than around it. A braille cell is
+ * 2 dots wide and 4 tall, so the dot-space figures are this one scaled — never
+ * derived a second time.
+ *
+ * The horizontal radius is twice the vertical because a terminal cell is about
+ * twice as tall as it is wide, and a single radius therefore draws an ellipse
+ * standing on end.
+ */
+type CircleGeometry = Readonly<{ cx: number; cy: number; rx: number; ry: number }>;
+
+function geometryFor(w: number, h: number): CircleGeometry {
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2;
+  const ry = Math.max(1, Math.min(Math.floor(cy), Math.floor(cx / 2)));
+  return { cx, cy, rx: ry * 2, ry };
 }
 
-function drawArc(
-  grid: ReturnType<typeof createGrid>,
-  cx: number, cy: number, r: number,
-  startAngle: number, endAngle: number,
-): void {
-  const arcLen = endAngle - startAngle;
-  const steps = Math.max(20, Math.floor(Math.abs(arcLen) * r));
-  for (let i = 0; i <= steps; i++) {
-    const angle = startAngle + (arcLen * i) / steps;
-    const x = Math.round(cx + r * Math.cos(angle));
-    const y = Math.round(cy + r * Math.sin(angle));
-    setDot(grid, x, y);
-  }
+/** The same figure in the braille dot grid: 2 dots per cell across, 4 down. */
+function inDots(g: CircleGeometry): CircleGeometry {
+  return { cx: g.cx * 2 + 0.5, cy: g.cy * 4 + 1.5, rx: g.rx * 2, ry: g.ry * 4 };
 }
 
-function drawRadialLine(
-  grid: ReturnType<typeof createGrid>,
-  cx: number, cy: number, r: number, angle: number,
-): void {
-  const steps = Math.max(10, Math.floor(r));
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const x = Math.round(cx + r * t * Math.cos(angle));
-    const y = Math.round(cy + r * t * Math.sin(angle));
-    setDot(grid, x, y);
+/** Cell-space points tracing an ellipse, deduplicated. */
+function ellipsePoints(g: CircleGeometry, steps: number): (readonly [number, number])[] {
+  const pts: [number, number][] = [];
+  let prev: [number, number] | null = null;
+  for (let i = 0; i < steps; i += 1) {
+    const a = (2 * Math.PI * i) / steps;
+    const px = Math.round(g.cx + g.rx * Math.cos(a));
+    const py = Math.round(g.cy + g.ry * Math.sin(a));
+    if (prev === null || px !== prev[0] || py !== prev[1]) {
+      pts.push([px, py]);
+      prev = [px, py];
+    }
   }
+  return pts;
 }
 
 /**
@@ -78,130 +85,166 @@ export function pieLayers(
   areaRows: number,
 ): readonly PieLayer[] {
   const dots = BRAILLE_DOTS;
-  const emptyGrid = createGrid(areaWidth * dots.x, areaRows * dots.y);
-  const cx = Math.floor(emptyGrid.dotWidth / 2);
-  const cy = Math.floor(emptyGrid.dotHeight / 2);
-  const r = Math.min(cx, cy) - 1;
+  const w = Math.max(0, Math.floor(areaWidth));
+  const h = Math.max(0, Math.floor(areaRows));
+  const blank = (): PieLayer => ({
+    glyphRows: foldBraille(createGrid(Math.max(1, w) * dots.x, Math.max(1, h) * dots.y)),
+    segmentIndex: 0,
+  });
+  if (w === 0 || h === 0) return [blank()];
 
-  if (r < 2) return [{ glyphRows: foldBraille(emptyGrid), segmentIndex: 0 }];
+  const g = geometryFor(w, h);
+  const gd = inDots(g);
+  if (gd.rx < 2) return [blank()];
 
-  const total = segments.reduce((a, s) => a + Math.max(0, s.value), 0);
-  if (total <= 0) return [{ glyphRows: foldBraille(emptyGrid), segmentIndex: 0 }];
+  const total = segments.reduce((a, sg) => a + Math.max(0, sg.value), 0);
+  if (total <= 0) return [blank()];
 
-  const minFrac = minSegmentFraction(r);
+  const minFrac = minSegmentFraction(gd.rx);
   const visible: { label: string; fraction: number; originalIndex: number }[] = [];
   let otherFrac = 0;
 
-  for (let i = 0; i < segments.length; i++) { // cells-ok — a segment count
-    const s = segments[i]!;
-    const frac = s.value / total;
+  for (let i = 0; i < segments.length; i += 1) { // cells-ok — a segment count
+    const sg = segments[i]!;
+    const frac = sg.value / total;
     if (frac < minFrac) { otherFrac += frac; }
-    else { visible.push({ label: s.label, fraction: frac, originalIndex: i }); }
+    else { visible.push({ label: sg.label, fraction: frac, originalIndex: i }); }
   }
   if (otherFrac > 0) visible.push({ label: "other", fraction: otherFrac, originalIndex: segments.length }); // cells-ok — a segment count
 
   const layers: PieLayer[] = [];
-
+  // **The fill only.** The boundary used to be drawn into the same braille grid
+  // as the fill, in the same colour, so a segment's arc and its interior were
+  // one mark and the joins between segments read as noise. The outline is a
+  // separate layer in the cell grid now — `circleOutline`, on this geometry.
   let angle = -Math.PI / 2;
   for (const seg of visible) {
-    const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
+    const grid = createGrid(w * dots.x, h * dots.y);
     const endAngle = angle + seg.fraction * 2 * Math.PI;
-
-    drawArc(grid, cx, cy, r, angle, endAngle);
-    drawRadialLine(grid, cx, cy, r, angle);
-    fillArc(grid, cx, cy, r, angle, endAngle);
-
+    fillArc(grid, gd, angle, endAngle);
     layers.push({ glyphRows: foldBraille(grid), segmentIndex: seg.originalIndex });
     angle = endAngle;
   }
-
   return layers;
 }
 
-function fillArc(
-  grid: ReturnType<typeof createGrid>,
-  cx: number, cy: number, r: number,
-  startAngle: number, endAngle: number,
-): void {
-  const rSq = r * r;
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      if (dx * dx + dy * dy > rSq) continue;
-      const a = Math.atan2(dy, dx);
-      let normA = a;
-      let normStart = startAngle;
-      let normEnd = endAngle;
-      while (normA < normStart) normA += 2 * Math.PI;
-      while (normEnd < normStart) normEnd += 2 * Math.PI;
-      if (normA >= normStart && normA <= normEnd) {
-        setDot(grid, cx + dx, cy + dy);
-      }
-    }
-  }
+/**
+ * The circle's boundary as box-drawing glyphs, in **cell** coordinates.
+ *
+ * Independent of the fill, and that is the point: a crisp outline with a
+ * braille interior is the best either vocabulary can do, and neither can do it
+ * alone. Returns rows of `areaWidth` cells with blanks where the circle does
+ * not pass.
+ */
+export function circleOutline(
+  areaWidth: number,
+  areaRows: number,
+  corners: "rounded" | "sharp",
+): readonly string[] {
+  const w = Math.max(0, Math.floor(areaWidth));
+  const h = Math.max(0, Math.floor(areaRows));
+  if (w === 0 || h === 0) return Array.from({ length: h }, () => "");
+
+  const mask: number[][] = Array.from({ length: h }, () => Array.from({ length: w }, () => 0));
+  const g = geometryFor(w, h);
+  strokePolyline(mask, ellipsePoints(g, Math.max(24, g.rx * 4)), true);
+  return mask.map((row) => row.map((m) => glyphForMask(m, corners)).join(""));
 }
 
 /**
- * Radar chart in braille. Spokes from centre, closed polygon per series.
+ * A radar's spokes and one closed polygon per series, in **cell** coordinates.
  *
- * At ASCII, degrades to a labelled value table.
+ * One grid per series so the caller can colour each independently — the radar
+ * was a single monochrome braille grid, which is why every series in it read as
+ * one shape.
  */
-export function radarRows(
+export function radarOutlines(
   series: readonly Series[],
   categories: readonly string[],
   areaWidth: number,
   areaRows: number,
-  _caps: Caps,
-): readonly string[] {
-  const dots = BRAILLE_DOTS;
-  const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
-  const cx = Math.floor(grid.dotWidth / 2);
-  const cy = Math.floor(grid.dotHeight / 2);
-  const r = Math.min(cx, cy) - 1;
+  corners: "rounded" | "sharp",
+): readonly (readonly string[])[] {
+  const w = Math.max(0, Math.floor(areaWidth));
+  const h = Math.max(0, Math.floor(areaRows));
   const n = categories.length; // cells-ok — a category count
+  if (w === 0 || h === 0 || n === 0) return [];
 
-  if (r < 2 || n === 0) return foldBraille(grid);
+  const g = geometryFor(w, h);
+  const all = series.flatMap((ss) =>
+    ss.values.filter((v): v is number => v !== null && Number.isFinite(v)),
+  );
+  const maxV = Math.max(...all, 1);
+  const render = (mask: number[][]): readonly string[] =>
+    mask.map((row) => row.map((m) => glyphForMask(m, corners)).join(""));
 
-  drawCircle(grid, cx, cy, r);
-
-  for (let i = 0; i < n; i++) {
-    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
-    drawRadialLine(grid, cx, cy, r, angle);
-  }
-
-  for (const s of series) {
-    let prevX = -1, prevY = -1;
-    let firstX = -1, firstY = -1;
-    for (let i = 0; i < n; i++) {
-      const v = s.values[i] ?? 0;
-      const allVals = series.flatMap((ss) => ss.values.filter((vv): vv is number => vv !== null && Number.isFinite(vv)));
-      const maxV = Math.max(...allVals, 1);
-      const t = Number.isFinite(v) && v !== null ? Math.max(0, (v as number) / maxV) : 0;
-      const angle = (2 * Math.PI * i) / n - Math.PI / 2;
-      const px = Math.round(cx + r * t * Math.cos(angle));
-      const py = Math.round(cy + r * t * Math.sin(angle));
-      setDot(grid, px, py);
-      if (prevX >= 0) {
-        const steps = Math.max(10, Math.floor(Math.sqrt((px - prevX) ** 2 + (py - prevY) ** 2)));
-        for (let j = 0; j <= steps; j++) {
-          setDot(grid, Math.round(prevX + (px - prevX) * j / steps), Math.round(prevY + (py - prevY) * j / steps));
-        }
-      } else {
-        firstX = px;
-        firstY = py;
-      }
-      prevX = px;
-      prevY = py;
+  return series.map((sr) => {
+    const mask: number[][] = Array.from({ length: h }, () => Array.from({ length: w }, () => 0));
+    const pts: (readonly [number, number])[] = [];
+    for (let i = 0; i < n; i += 1) {
+      const v = sr.values[i];
+      const t = v !== null && v !== undefined && Number.isFinite(v) ? Math.max(0, v / maxV) : 0;
+      const a = (2 * Math.PI * i) / n - Math.PI / 2;
+      pts.push([
+        Math.round(g.cx + g.rx * t * Math.cos(a)),
+        Math.round(g.cy + g.ry * t * Math.sin(a)),
+      ]);
     }
-    if (firstX >= 0 && prevX >= 0) {
-      const steps = Math.max(10, Math.floor(Math.sqrt((firstX - prevX) ** 2 + (firstY - prevY) ** 2)));
-      for (let j = 0; j <= steps; j++) {
-        setDot(grid, Math.round(prevX + (firstX - prevX) * j / steps), Math.round(prevY + (firstY - prevY) * j / steps));
-      }
-    }
-  }
-
-  return foldBraille(grid);
+    strokePolyline(mask, pts, true);
+    return render(mask);
+  });
 }
+
+/**
+ * The radar's frame — the outer ring and one spoke per category.
+ *
+ * Drawn under the series so a reader can see what a vertex is measured
+ * against; without it a polygon is a shape with no scale behind it.
+ */
+export function radarFrame(
+  categories: readonly string[],
+  areaWidth: number,
+  areaRows: number,
+  corners: "rounded" | "sharp",
+): readonly string[] {
+  const w = Math.max(0, Math.floor(areaWidth));
+  const h = Math.max(0, Math.floor(areaRows));
+  const n = categories.length; // cells-ok — a category count
+  if (w === 0 || h === 0 || n === 0) return Array.from({ length: h }, () => "");
+
+  // **The ring, and deliberately not the spokes.** A spoke is a straight line
+  // at an arbitrary angle, and an axis-aligned stroke draws it as a staircase;
+  // five of them inside a seventeen-by-nine figure filled the interior with
+  // steps and the polygons became unreadable. The ring is what a vertex is
+  // measured against, and it costs one closed curve.
+  const g = geometryFor(w, h);
+  const mask: number[][] = Array.from({ length: h }, () => Array.from({ length: w }, () => 0));
+  strokePolyline(mask, ellipsePoints(g, Math.max(24, g.rx * 4)), true);
+  return mask.map((row) => row.map((m) => glyphForMask(m, corners)).join(""));
+}
+
+function fillArc(
+  grid: ReturnType<typeof createGrid>,
+  g: CircleGeometry,
+  startAngle: number, endAngle: number,
+): void {
+  for (let dy = -g.ry; dy <= g.ry; dy += 1) {
+    for (let dx = -g.rx; dx <= g.rx; dx += 1) {
+      const nx = dx / g.rx;
+      const ny = dy / g.ry;
+      if (nx * nx + ny * ny > 1) continue;
+      // The angle is taken on the *circularised* offsets, or an ellipse's
+      // segments would not be the fractions they were cut as.
+      let a = Math.atan2(ny, nx);
+      let start = startAngle;
+      let end = endAngle;
+      while (a < start) a += 2 * Math.PI;
+      while (end < start) end += 2 * Math.PI;
+      if (a >= start && a <= end) setDot(grid, Math.round(g.cx + dx), Math.round(g.cy + dy));
+    }
+  }
+}
+
 
 /**
  * ASCII radar fallback: a labelled value table.

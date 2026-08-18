@@ -24,7 +24,7 @@ const FG = "#cccccc";
 
 const ESC = /\x1b\[([0-9;]*)m/g;
 
-function parseLine(raw) {
+export function parseLine(raw) {
   const spans = [];
   let colour = FG;
   let pos = 0;
@@ -55,7 +55,7 @@ function parseLine(raw) {
   return spans;
 }
 
-function colour256(n) {
+export function colour256(n) {
   if (n < 16) {
     const basic = [
       "#000000","#800000","#008000","#808000","#000080","#800080","#008080","#c0c0c0",
@@ -93,12 +93,12 @@ const BRAILLE_DOT_MAP = [
   [0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [0, 3], [1, 3],
 ];
 
-function isBraille(ch) {
+export function isBraille(ch) {
   const cp = ch.codePointAt(0);
   return cp !== undefined && cp >= 0x2800 && cp <= 0x28ff;
 }
 
-function brailleDots(ch) {
+export function brailleDots(ch) {
   const bits = ch.codePointAt(0) - 0x2800;
   const dots = [];
   for (let i = 0; i < 8; i++) {
@@ -124,7 +124,7 @@ function renderBrailleCell(x, y, ch, colour, cellW, cellH) {
   }).join("\n");
 }
 
-function ansiToSvg(ansi) {
+export function ansiToSvg(ansi) {
   const lines = ansi.replace(/\n$/, "").split("\n");
   const maxCols = lines.reduce((mx, line) => {
     const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
@@ -181,6 +181,14 @@ function ansiToSvg(ansi) {
 }
 
 // --- main ---
+//
+// Guarded so the pure parts above can be imported by a fixture. The colour
+// parsing and the braille dot map are exactly where a silent wrong answer
+// lives — this renderer shipped once drawing every catalogue frame in the
+// default foreground because `38;2;R;G;B` fell through, and nothing asked.
+const isMain = process.argv[1] !== undefined
+  && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (isMain) {
 
 const txtFiles = readdirSync(CATALOGUE)
   .filter((f) => f.endsWith(".txt"))
@@ -235,3 +243,4 @@ if (contactParts.length > 0) {
 }
 
 console.log(`Done: ${txtFiles.length} PNGs written to docs/catalogue/`);
+}

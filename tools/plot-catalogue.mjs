@@ -23,7 +23,7 @@ const EIGHT = { ...FULL, colourDepth: 8 };
 const ASCII_WIDE = { ...FULL, unicode: "ascii", ambiguousWidth: "wide", colourDepth: 1 };
 const MONO = { ...FULL, colourDepth: 1 };
 
-const CAPS = [
+export const CAPS = [
   { name: "24bit", caps: FULL },
   { name: "8bit", caps: EIGHT },
   { name: "ascii-wide", caps: ASCII_WIDE },
@@ -37,7 +37,7 @@ const s = (vs) => ({ values: vs });
 const sin50 = Array.from({ length: 50 }, (_, i) => Math.sin(i * 0.1) * 50 + 50);
 const sin500 = Array.from({ length: 500 }, (_, i) => Math.sin(i * 0.1) * 50 + 50);
 
-const FORMS = {
+export const FORMS = {
   line: {
     default: { form: "line", height: 8, axes: true, series: [s(sin50)] },
     minimal: { form: "line", height: 3, axes: false, series: [s([1, 3, 2, 5, 4])] },
@@ -67,8 +67,8 @@ const FORMS = {
     empty: { form: "ecdf", height: 5, axes: true, series: [{ values: [] }] },
   },
   heatmap: {
-    default: { form: "heatmap", height: 5, axes: true, series: Array.from({ length: 5 }, (_, r) => ({ values: Array.from({ length: 20 }, (_, c) => Math.sin((r + c) * 0.3) * 50 + 50), label: `row${r}` })) },
-    palette: { form: "heatmap", height: 5, axes: true, colormap: "viridis", series: Array.from({ length: 5 }, (_, r) => ({ values: Array.from({ length: 20 }, (_, c) => Math.sin((r + c) * 0.3) * 50 + 50), label: `row${r}` })) },
+    default: { form: "heatmap", height: 5, axes: true, series: Array.from({ length: 5 }, (_, r) => ({ values: Array.from({ length: 90 }, (_, c) => Math.sin((r + c) * 0.3) * 50 + 50), label: `row${r}` })) },
+    palette: { form: "heatmap", height: 5, axes: true, colormap: "viridis", series: Array.from({ length: 5 }, (_, r) => ({ values: Array.from({ length: 90 }, (_, c) => Math.sin((r + c) * 0.3) * 50 + 50), label: `row${r}` })) },
     empty: { form: "heatmap", height: 3, axes: true, series: [{ values: [], label: "empty" }] },
   },
   bar: {
@@ -114,10 +114,10 @@ const FORMS = {
     default: { form: "density", height: 8, axes: true, series: [s([1, 1, 2, 2, 2, 3, 3, 4, 5, 5, 5, 5, 6, 7, 8, 8, 8, 9, 10])] },
   },
   violin: {
-    default: { form: "violin", height: 3, axes: true, categories: ["A", "B", "C"], series: [s([1, 1, 2, 3, 3, 3, 4, 5]), s([2, 3, 3, 4, 4, 4, 5, 6]), s([1, 2, 2, 2, 3, 4, 5, 5])] },
+    default: { form: "violin", height: 12, axes: true, categories: ["A", "B", "C"], series: [s([1, 1, 2, 3, 3, 3, 4, 5]), s([2, 3, 3, 4, 4, 4, 5, 6]), s([1, 2, 2, 2, 3, 4, 5, 5])] },
   },
   ridgeline: {
-    default: { form: "ridgeline", height: 3, axes: true, series: [{ values: [1, 1, 2, 3, 3, 3, 4, 5], label: "set1" }, { values: [2, 3, 3, 4, 4, 4, 5, 6], label: "set2" }, { values: [1, 2, 2, 2, 3, 4, 5, 5], label: "set3" }] },
+    default: { form: "ridgeline", height: 12, axes: true, series: [{ values: [1, 1, 2, 3, 3, 3, 4, 5], label: "set1" }, { values: [2, 3, 3, 4, 4, 4, 5, 6], label: "set2" }, { values: [1, 2, 2, 2, 3, 4, 5, 5], label: "set3" }] },
   },
   pie: {
     "default-40": { form: "pie", height: 10, series: [], segments: [{ label: "Chrome", value: 65 }, { label: "Firefox", value: 15 }, { label: "Safari", value: 12 }, { label: "Other", value: 8 }] },
@@ -125,7 +125,7 @@ const FORMS = {
     "many-segments": { form: "pie", height: 10, series: [], segments: [{ label: "A", value: 50 }, { label: "B", value: 20 }, { label: "C", value: 10 }, { label: "D", value: 5 }, { label: "E", value: 5 }, { label: "F", value: 3 }, { label: "G", value: 3 }, { label: "H", value: 2 }, { label: "I", value: 1 }, { label: "J", value: 1 }] },
   },
   radar: {
-    default: { form: "radar", height: 10, categories: ["Speed", "Power", "Range", "Defence", "HP"], series: [s([80, 60, 90, 40, 70])] },
+    default: { form: "radar", height: 10, categories: ["Speed", "Power", "Range", "Defence", "HP"], series: [s([80, 60, 90, 40, 70]), s([50, 85, 45, 75, 55])] },
   },
   horizon: {
     "bands-2": { form: "horizon", height: 2, series: [s(sin50)], bands: 2 },
@@ -143,10 +143,26 @@ const FORMS = {
   },
 };
 
-function stripSgr(s) {
+export function stripSgr(s) {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
+/**
+ * One rendered frame, as lines — the part with no filesystem in it.
+ *
+ * Separated so a fixture can ask whether a form renders without writing four
+ * hundred files to do it, and so `n/m rows` counts something observed.
+ */
+export function frameFor(spec, caps, width) {
+  return renderToLines(registry, block({ kind: "plot", id: "cat", ...spec }), width, {
+    theme, capabilities: caps,
+  });
+}
+
+const isMain = process.argv[1] !== undefined
+  && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+
+if (isMain) {
 const outDir = join(import.meta.dirname, "..", "docs", "catalogue");
 mkdirSync(outDir, { recursive: true });
 
@@ -172,3 +188,4 @@ for (const [formName, variants] of Object.entries(FORMS)) {
 }
 
 console.log(`catalogue: ${totalFiles} files written to docs/catalogue/`);
+}

@@ -14,6 +14,10 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/contract/colormap.test.ts test/golden/plot.test.ts";
 const MAP = "src/presentation/theme/colormap.ts";
+// The heatmap left `definition.ts` for its own module, and the 24-bit arm
+// stopped being a ternary when the 256-entry tables landed. Both anchors
+// follow their subject.
+const HEAT = "src/presentation/plot/heatmap.ts";
 const DEF = "src/presentation/plot/definition.ts";
 const VAL = "src/data/viewmodel/validate.ts";
 
@@ -55,8 +59,8 @@ const results = runPass({
       // count agrees; what is lost is the resolution the depth was detected for.
       name: "24-bit quantises to the cube it does not need",
       file: MAP,
-      from: "  return caps.colourDepth >= 24\n    ? { kind: \"rgb\", hex }",
-      to: "  return caps.colourDepth >= 999\n    ? { kind: \"rgb\", hex }",
+      from: "  if (caps.colourDepth >= 24) {",
+      to: "  if (caps.colourDepth >= 999) {",
       expect: "T2.31",
     },
     {
@@ -64,9 +68,13 @@ const results = runPass({
       // colour becomes the only channel and the frame is beautiful at 24-bit and
       // empty at one bit.
       name: "THE F34 FAILURE: colour replaces the density glyph rather than joining it",
-      file: DEF,
-      from: "  const glyphs = rampRow(series.values, layout.areaWidth, ctx.capabilities, range, style);",
-      to: "  const glyphs = \" \".repeat(Math.max(0, Math.floor(layout.areaWidth)));",
+      file: HEAT,
+      // The glyph stopped being a string built ahead of the colour run and
+      // became a per-column read, so the mutation moved with it: blanking the
+      // carrier is now blanking `glyphAt`, and the frame is beautiful at
+      // 24-bit and empty at one bit exactly as before.
+      from: "    run += glyphAt(x);",
+      to: "    run += \" \";",
       expect: "T2.31",
     },
     {
@@ -74,9 +82,9 @@ const results = runPass({
       // `k` drift apart. Both are right-anchored today; anchoring one left is a
       // matrix whose colours and glyphs describe different ticks.
       name: "the colour window is left-anchored where the glyphs are right-anchored",
-      file: DEF,
-      from: "  const window = series.values.slice(Math.max(0, series.values.length - w)); // cells-ok — a position count",
-      to: "  const window = series.values.slice(0, w); // cells-ok — a position count",
+      file: HEAT,
+      from: "  for (let x = 0; x < w; x += 1) out.push(x < pad ? null : start + (x - pad));",
+      to: "  for (let x = 0; x < w; x += 1) out.push(x >= count ? null : x);",
       expect: "T2.31",
     },
     {
@@ -104,8 +112,8 @@ const results = runPass({
       // width and no glyph assertion can see.
       name: "the map runs backwards, so high reads as low",
       file: MAP,
-      from: "  const scaled = clamped * (stops.length - 1);",
-      to: "  const scaled = (1 - clamped) * (stops.length - 1);",
+      from: "  const scaled = clamped * (data.length - 1); // cells-ok — a data length",
+      to: "  const scaled = (1 - clamped) * (data.length - 1); // cells-ok — a data length",
       expect: "T2.31",
     },
   ],

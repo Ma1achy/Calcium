@@ -67,6 +67,12 @@ const COVERED = [
   // them a **control**, which makes its whole run unstartable.
   ["tools/mutate/anchors.mjs", ["npx", "vitest", "run", "test/unit/mutate-anchors.test.ts"]],
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
+  // **Both landed without a fixture and this target was not run**, so the gate
+  // that exists to catch exactly that sat red for three commits. `catalogue-png`
+  // shares the file because the two are one pipeline — frames out, images in —
+  // and splitting the answer across two files is what the header argues against.
+  ["tools/plot-catalogue.mjs", ["npx", "vitest", "run", "test/unit/plot-catalogue.test.ts"]],
+  ["tools/catalogue-png.mjs", null], // same fixture — the catalogue pipeline
   ["examples/docker/tools/screen.py", ["python3", "examples/docker/tools/screen_test.py"]],
   ["examples/docker/tools/beats.py", ["python3", "examples/docker/tools/beats_test.py"]],
   ["examples/docker/tools/capture.py", ["python3", "examples/docker/tools/capture_test.py"]],

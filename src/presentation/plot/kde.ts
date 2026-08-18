@@ -142,3 +142,51 @@ export function violinRows(
 
   return grid.map((row) => row.join(""));
 }
+
+/**
+ * A one-sided density profile, rising from the baseline.
+ *
+ * The violin's shape without the mirror: a ridgeline stacks one profile per
+ * series and lets them overlap, so each band is read against the row below it
+ * rather than about its own centre.
+ */
+export function ridgeRows(
+  series: Series,
+  areaWidth: number,
+  rowsPerSeries: number,
+  caps: Caps,
+): readonly string[] {
+  const blank = (): readonly string[] =>
+    Array.from({ length: Math.max(0, rowsPerSeries) }, () => " ".repeat(areaWidth));
+
+  const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
+  if (finite.length === 0 || rowsPerSeries < 1 || areaWidth < 1) return blank(); // cells-ok — a sample count
+
+  const sorted = [...finite].sort((a, b) => a - b);
+  const lo = sorted[0]!;
+  const hi = sorted[sorted.length - 1]!; // cells-ok — a sample count
+  const pad = (hi - lo) * 0.1 || 1;
+
+  const points: number[] = [];
+  for (let i = 0; i < areaWidth; i += 1) {
+    points.push(lo - pad + ((hi - lo + 2 * pad) * i) / Math.max(1, areaWidth - 1));
+  }
+  const densities = kde(finite, points);
+  const maxD = Math.max(...densities);
+  if (maxD <= 0) return blank();
+
+  const pair = pairFor(caps);
+  const grid: string[][] = Array.from({ length: rowsPerSeries }, () =>
+    Array.from({ length: areaWidth }, () => " "),
+  );
+
+  for (let col = 0; col < areaWidth; col += 1) {
+    const d = densities[col]! / maxD;
+    const extent = Math.max(0, Math.round(d * rowsPerSeries));
+    for (let r = 0; r < extent; r += 1) {
+      grid[rowsPerSeries - 1 - r]![col] = pair.filled;
+    }
+  }
+
+  return grid.map((row) => row.join(""));
+}

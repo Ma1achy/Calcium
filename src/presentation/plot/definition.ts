@@ -36,9 +36,9 @@ import { boxplotRow, forestRow, dumbbellRow } from "./glyph-row.js";
 import { barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
 import { waffleRows, waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
-import { densitySeries, densityRows, violinRows } from "./kde.js";
-import { lineDrawRows } from "./linedraw.js";
-import { pieLayers, radarRows, radarAsciiRows } from "./circle.js";
+import { densitySeries, densityRows, violinRows, ridgeRows } from "./kde.js";
+import { lineDrawRows, type Interpolation } from "./linedraw.js";
+import { pieLayers, circleOutline, radarOutlines, radarFrame, radarAsciiRows } from "./circle.js";
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
@@ -355,14 +355,20 @@ function styleRasteriser(
   block: Plot,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
   base: Rasteriser,
+  interpolation: Interpolation = "linear",
 ): Rasteriser {
   const ps = block.plotStyle ?? "auto";
   if (ps === "braille") return base;
   const useLineDraw = ps === "line" || (ps === "auto" && caps.ambiguousWidth !== "wide");
   if (!useLineDraw) return base;
   const corners = block.plotCorners ?? "rounded";
+  // **The interpolation is passed, not inferred from the base rasteriser.**
+  // Swapping the whole rasteriser is what lost the step's shape: `stepRows`
+  // carried the hold-then-jump and the replacement knew only how to slope, so
+  // `step` and `line` drew the same frame. The form owns the rule, so the form
+  // names it here.
   return (series, range, areaWidth, areaRows, _caps) =>
-    lineDrawRows(series, range, areaWidth, areaRows, corners);
+    lineDrawRows(series, range, areaWidth, areaRows, corners, interpolation);
 }
 
 function overlaidRows(
@@ -543,6 +549,67 @@ function positionalForm(
   return out;
 }
 
+
+/**
+ * One band of rows per series, each drawn by `bandBuilder`.
+ *
+ * **The violin and the ridgeline are one layout and two fills.** Both allocate
+ * a band of rows to a series, label it on the band's middle row, and colour it
+ * from the categorical palette; only what fills the band differs. Written twice,
+ * the ridgeline kept the single-row density curve the violin had already been
+ * fixed away from — a smear where a profile belonged.
+ */
+function bandedForm(
+  block: Plot,
+  cats: readonly string[],
+  width: number,
+  ctx: RenderContext,
+  bandBuilder: (series: Series, areaWidth: number, rows: number) => readonly string[],
+): readonly string[] {
+  const areaRows = plotAreaRows(block);
+  const n = cats.length; // cells-ok — a category count
+  const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (n === 0) return emptyRows(block, fallback, ctx);
+
+  let maxLabel = 0;
+  for (const l of cats) maxLabel = Math.max(maxLabel, cells(l, ctx.capabilities.ambiguousWidth));
+  const axed = block.axes === true;
+  const gutterWidth = axed ? Math.min(maxLabel, Math.floor(width / 3)) + AXIS_GUTTER : 0;
+  const areaWidth = Math.max(1, width - gutterWidth);
+  const labelCol = gutterWidth > 0 ? gutterWidth - AXIS_GUTTER : 0;
+  const layout: Layout = { gutter: gutterWidth, labelColumn: labelCol, areaWidth, areaRows, width };
+
+  const rowsPer = Math.max(1, Math.floor(areaRows / n));
+  const out: string[] = [];
+
+  for (let ci = 0; ci < n; ci += 1) {
+    const sr = block.series[ci];
+    const band = sr
+      ? bandBuilder(sr, areaWidth, rowsPer)
+      : Array.from({ length: rowsPer }, () => " ".repeat(areaWidth));
+    const labelRow = Math.floor(rowsPer / 2);
+    const styled = slot(refOf(sr ?? { values: [] }, ci), ctx.theme, ctx.capabilities);
+
+    for (let r = 0; r < rowsPer && out.length < areaRows; r += 1) { // cells-ok — a row count
+      const label = r === labelRow ? truncate(cats[ci] ?? "", labelCol, ctx.capabilities) : "";
+      out.push(
+        line(
+          [
+            ...gutterSpans(label, layout, ctx),
+            { text: truncate(band[r] ?? " ".repeat(areaWidth), areaWidth, ctx.capabilities), style: styled },
+          ],
+          layout,
+          ctx,
+        ),
+      );
+    }
+  }
+
+  while (out.length < areaRows) out.push(line(gutterSpans("", layout, ctx), layout, ctx)); // cells-ok — a row count
+  if (axed) out.push(...axisRows(block, layout, ctx));
+  return out;
+}
+
 const FORM_ROWS: Readonly<
   Record<PlotForm, (block: Plot, width: number, ctx: RenderContext) => readonly string[]>
 > = {
@@ -571,7 +638,7 @@ const FORM_ROWS: Readonly<
   line: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, curveRows)),
 
   scatter: (block, width, ctx) => positionalForm(block, width, ctx, scatterRows),
-  step: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows)),
+  step: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows, "step")),
   ecdf: (block, width, ctx) => {
     const ecdfBlock = {
       ...block,
@@ -579,7 +646,7 @@ const FORM_ROWS: Readonly<
       yMin: block.yMin ?? 0,
       yMax: block.yMax ?? 1,
     };
-    return positionalForm(ecdfBlock, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows));
+    return positionalForm(ecdfBlock, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows, "step"));
   },
   bar: (block, width, ctx) => {
     const data = seriesRange(block.series, block);
@@ -795,57 +862,16 @@ const FORM_ROWS: Readonly<
     return positionalForm(densityBlock, width, ctx, styleRasteriser(block, ctx.capabilities, densityRows));
   },
   violin: (block, width, ctx) => {
-    const cats = block.categories ?? block.series.map((s, i) => s.label ?? `series ${String(i + 1)}`);
-    const areaRows = plotAreaRows(block);
-    const nCats = cats.length; // cells-ok — a category count
-    if (nCats === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
-
-    let maxLabel = 0;
-    for (const l of cats) maxLabel = Math.max(maxLabel, cells(l, ctx.capabilities.ambiguousWidth));
-    const axed = block.axes === true;
-    const gutterWidth = axed ? Math.min(maxLabel, Math.floor(width / 3)) + AXIS_GUTTER : 0;
-    const areaWidth = Math.max(1, width - gutterWidth);
-    const labelCol = gutterWidth > 0 ? gutterWidth - AXIS_GUTTER : 0;
-    const layout: Layout = { gutter: gutterWidth, labelColumn: labelCol, areaWidth, areaRows, width };
-
-    const rowsPerCat = Math.max(1, Math.floor(areaRows / nCats));
-    const out: string[] = [];
-
-    for (let ci = 0; ci < nCats; ci++) {
-      const s = block.series[ci];
-      const vRows = s
-        ? violinRows(s, areaWidth, rowsPerCat, ctx.capabilities)
-        : Array.from({ length: rowsPerCat }, () => " ".repeat(areaWidth));
-
-      const labelRow = Math.floor(rowsPerCat / 2);
-      const styled = slot(refOf({ values: [] }, ci), ctx.theme, ctx.capabilities);
-
-      for (let r = 0; r < rowsPerCat && out.length < areaRows; r++) { // cells-ok — a row count
-        const label = r === labelRow ? truncate(cats[ci] ?? "", labelCol, ctx.capabilities) : "";
-        const gutter = gutterSpans(label, layout, ctx);
-        out.push(
-          line(
-            [...gutter, { text: truncate(vRows[r] ?? " ".repeat(areaWidth), areaWidth, ctx.capabilities), style: styled }],
-            layout,
-            ctx,
-          ),
-        );
-      }
-    }
-
-    if (axed) out.push(...axisRows(block, layout, ctx));
-    return out;
+    const cats = block.categories ?? block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
+    return bandedForm(block, cats, width, ctx, (sr, aw, rows) =>
+      violinRows(sr, aw, rows, ctx.capabilities),
+    );
   },
   ridgeline: (block, width, ctx) => {
-    const cats = block.series.map((s, i) => s.label ?? `series ${String(i + 1)}`);
-    let ci = 0;
-    return categoricalForm({ ...block, categories: cats }, width, ctx, (_label, aw) => {
-      const s = block.series[ci++];
-      if (!s) return " ".repeat(aw);
-      const { series: ds, range } = densitySeries(s, aw);
-      const rows = densityRows(ds, range, aw, 1, ctx.capabilities);
-      return rows[0] ?? " ".repeat(aw);
-    });
+    const cats = block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
+    return bandedForm(block, cats, width, ctx, (sr, aw, rows) =>
+      ridgeRows(sr, aw, rows, ctx.capabilities),
+    );
   },
   smallmultiples: (block, width, ctx) => {
     const facets = block.facets ?? [];
@@ -871,11 +897,18 @@ const FORM_ROWS: Readonly<
     if (ctx.capabilities.unicode === "ascii") {
       return waffleRows(segs, width, ctx.capabilities).map((r) => line([{ text: r }], layout, ctx));
     }
-    const layers: Layer[] = pieLayers(segs, width, areaRows).map((pl) => ({
+    const fills: Layer[] = pieLayers(segs, width, areaRows).map((pl) => ({
       glyphRows: pl.glyphRows,
       ref: CATEGORY_REFS[pl.segmentIndex % CATEGORY_REFS.length] ?? "categorical.c1", // cells-ok — a segment index
     }));
-    if (layers.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
+    // The boundary first, so it wins the cells it occupies: `mergedRow` resolves
+    // first-non-blank, and a crisp outline over a braille interior is the point.
+    const outline: readonly Layer[] =
+      ctx.capabilities.ambiguousWidth === "wide"
+        ? []
+        : [{ glyphRows: circleOutline(width, areaRows, block.plotCorners ?? "rounded"), ref: "tone.muted" }];
+    const layers: readonly Layer[] = [...outline, ...fills];
+    if (fills.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     const out: string[] = [];
     for (let r = 0; r < areaRows; r++) {
       out.push(line(mergedRow(layers, r, layout, ctx), layout, ctx));
@@ -891,9 +924,23 @@ const FORM_ROWS: Readonly<
         line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
       );
     }
-    return radarRows(block.series, cats, width, areaRows, ctx.capabilities).map((r) =>
-      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
-    );
+    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+    // One layer per series, each carrying its own palette slot — the radar was
+    // a single braille grid, so every series in it was one colour and one shape.
+    const corners = block.plotCorners ?? "rounded";
+    const series: readonly Layer[] = radarOutlines(
+      block.series, cats, width, areaRows, corners,
+    ).map((glyphRows, i) => ({ glyphRows, ref: refOf(block.series[i] ?? { values: [] }, i) }));
+    // The frame last, so a series wins any cell they share (`mergedRow` takes
+    // first-non-blank) — the scale is context, never the reading.
+    const layers: readonly Layer[] = [
+      ...series,
+      { glyphRows: radarFrame(cats, width, areaRows, corners), ref: "tone.muted" },
+    ];
+    if (series.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
+    const out: string[] = [];
+    for (let r = 0; r < areaRows; r += 1) out.push(line(mergedRow(layers, r, layout, ctx), layout, ctx));
+    return out;
   },
   horizon: (block, width, ctx) => {
     const s = block.series[0];

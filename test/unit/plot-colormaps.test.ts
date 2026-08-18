@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { COLORMAPS_WITH_REVERSED, COLORMAPS, COLORMAPS_256, COLORMAP_NAMES } from "../../src/data/colormaps/index.js";
 import { QUALITATIVE_PALETTES } from "../../src/data/colormaps/qualitative/index.js";
-import { sample, continuousColour } from "../../src/presentation/theme/colormap.js";
+import { sample } from "../../src/presentation/theme/colormap.js";
 
 function luminance(r: number, g: number, b: number): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;

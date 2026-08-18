@@ -14,7 +14,6 @@ import type { ColourValue } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { ladderFor } from "./ramp.js";
-import { rampRow } from "./sparkline.js";
 import { cells, truncate } from "../text.js";
 import { seriesRange } from "./scale.js";
 import { formatValue } from "./axes.js";
@@ -25,6 +24,49 @@ import { xLabelRow } from "./axes.js";
 
 const HEATMAP_ABSENT = " ";
 const MIN_AREA = 4;
+
+/** Whether a form's columns are a time window or a fixed set of categories. */
+type MatrixLayout = "window" | "stretch";
+
+/**
+ * Which of the two a form is, as a table rather than a condition.
+ *
+ * Exhaustive over the seven forms this module renders, so a form added to the
+ * family stops compiling until it says which axis its columns are — the check
+ * beside the table is what let `confusion` inherit the ring's right-anchoring
+ * in the first place.
+ */
+const MATRIX_LAYOUT: Readonly<Record<string, MatrixLayout>> = Object.freeze({
+  // Time on the abscissa: readings arrive, newest on the right.
+  heatmap: "window",
+  spectrogram: "window",
+  latency: "window",
+  // Categories on the abscissa: a fixed grid that fills the area.
+  confusion: "stretch",
+  correlation: "stretch",
+  calendar: "stretch",
+  density2d: "stretch",
+});
+
+/**
+ * The map a form draws with when the block names none.
+ *
+ * **Absent is a default, not an absence.** Density carries the value at every
+ * depth and colour joins it above 8-bit (F34), so a heatmap with no `colormap`
+ * was correct and grey — and grey is what every catalogue frame showed. The
+ * kind decides: a correlation runs −1 → 0 → +1 and wants a diverging map, and
+ * reading it in a sequential one is the single most common chart defect there
+ * is. A declared `colormap` still wins.
+ */
+const DEFAULT_COLORMAP: Readonly<Record<string, string>> = Object.freeze({
+  heatmap: "viridis",
+  spectrogram: "viridis",
+  latency: "viridis",
+  confusion: "viridis",
+  calendar: "viridis",
+  density2d: "viridis",
+  correlation: "coolwarm",
+});
 
 type Layout = Readonly<{
   gutter: number;
@@ -73,6 +115,42 @@ function layoutFor(block: Plot, width: number): Layout | null {
   return { ...base, gutter: room + AXIS_GUTTER, labelColumn: room, areaWidth: MIN_AREA };
 }
 
+/**
+ * Which reading each cell column shows, or `null` for a blank.
+ *
+ * **The two axes are not the same axis, and treating them as one is the
+ * defect.** A `heatmap` over a ring is a *time* series — readings arrive and
+ * the newest belongs on the right, so a short series is right-anchored and the
+ * left is blank. A `confusion` matrix's columns are *categories*: three of
+ * them, fixed, and right-anchoring them put a 3×3 matrix in the last three
+ * cells of a seventy-four cell area with the labels stranded at the far left.
+ * Both are heatmaps and only one of them has a window.
+ *
+ * **One map, read by both the glyph and the colour path.** They used to derive
+ * the window separately — a mutation that left-anchored the colours failed
+ * nothing, because every fixture had exactly as many readings as cells. The
+ * duplication is what made that possible, so it is gone rather than guarded.
+ */
+function columnMap(count: number, width: number, layout: MatrixLayout): readonly (number | null)[] {
+  const w = Math.max(0, Math.floor(width));
+  const out: (number | null)[] = [];
+  if (w === 0 || count <= 0) return out;
+
+  if (layout === "stretch") {
+    // Every column belongs to a reading; a reading spans as many columns as it
+    // takes to fill the area, so the matrix is a grid rather than a fringe.
+    for (let x = 0; x < w; x += 1) out.push(Math.min(count - 1, Math.floor((x * count) / w)));
+    return out;
+  }
+
+  // The last `w` readings, right-anchored: fewer readings than cells reads as
+  // "this many so far, growing rightward" rather than as a stretched history.
+  const start = Math.max(0, count - w);
+  const pad = Math.max(0, w - count);
+  for (let x = 0; x < w; x += 1) out.push(x < pad ? null : start + (x - pad));
+  return out;
+}
+
 function heatSpans(
   series: Series,
   range: Range,
@@ -80,18 +158,33 @@ function heatSpans(
   map: Colormap | undefined,
   style: Readonly<{ ramp: string; absent: string }>,
   ctx: RenderContext,
+  matrixLayout: MatrixLayout,
 ): readonly Span[] {
-  const glyphStr = rampRow(series.values, layout.areaWidth, ctx.capabilities, range, style);
-  if (map === undefined) return [{ text: glyphStr }];
-
   const w = Math.max(0, Math.floor(layout.areaWidth));
-  const window = series.values.slice(Math.max(0, series.values.length - w)); // cells-ok — a position count
-  const pad = Math.max(0, w - window.length); // cells-ok — a position count
-
+  const columns = columnMap(series.values.length, w, matrixLayout); // cells-ok — a position count
+  const ramp = [...style.ramp];
+  const steps = ramp.length; // cells-ok — a ramp length
   const span = range.max - range.min;
-  const colourAt = (index: number): ColourValue | undefined => {
-    const v = window[index - pad];
-    if (v === null || v === undefined || !Number.isFinite(v)) return undefined;
+
+  const readingAt = (x: number): number | null => {
+    const i = columns[x];
+    if (i === null || i === undefined) return null;
+    const v = series.values[i];
+    return v === null || v === undefined || !Number.isFinite(v) ? null : v;
+  };
+
+  const glyphAt = (x: number): string => {
+    const v = readingAt(x);
+    if (v === null) return style.absent;
+    if (span <= 0) return ramp[Math.floor((steps - 1) / 2)] ?? style.absent;
+    const t = (v - range.min) / span;
+    return ramp[Math.round((t < 0 ? 0 : t > 1 ? 1 : t) * (steps - 1))] ?? style.absent;
+  };
+
+  const colourAt = (x: number): ColourValue | undefined => {
+    if (map === undefined) return undefined;
+    const v = readingAt(x);
+    if (v === null) return undefined;
     return continuousColour(map, span <= 0 ? 0.5 : (v - range.min) / span, ctx.capabilities);
   };
 
@@ -104,16 +197,21 @@ function heatSpans(
     run = "";
   };
 
-  [...glyphStr].forEach((glyph, index) => {
-    const colour = colourAt(index);
+  for (let x = 0; x < w; x += 1) {
+    const colour = colourAt(x);
     if (colour !== runColour) {
       flush();
       runColour = colour;
     }
-    run += glyph;
-  });
+    run += glyphAt(x);
+  }
   flush();
   return out;
+}
+
+function colormapFor(block: Plot): Colormap | undefined {
+  const named = block.colormap ?? DEFAULT_COLORMAP[block.form];
+  return named === undefined ? undefined : COLORMAPS[named];
 }
 
 function matrixRows(
@@ -123,7 +221,8 @@ function matrixRows(
   ctx: RenderContext,
 ): readonly string[] {
   const style = { ramp: ladderFor("density", ctx.capabilities).steps, absent: HEATMAP_ABSENT };
-  const map = block.colormap === undefined ? undefined : COLORMAPS[block.colormap];
+  const map = colormapFor(block);
+  const matrixLayout = MATRIX_LAYOUT[block.form] ?? "window";
   const out: string[] = [];
 
   const overflow = block.series.length > layout.areaRows; // cells-ok — a row count
@@ -134,7 +233,7 @@ function matrixRows(
     if (s === undefined) continue;
     out.push(
       linePaint(
-        [...gutterSpans(s.label ?? "", layout, ctx), ...heatSpans(s, range, layout, map, style, ctx)],
+        [...gutterSpans(s.label ?? "", layout, ctx), ...heatSpans(s, range, layout, map, style, ctx, matrixLayout)],
         layout,
         ctx,
       ),

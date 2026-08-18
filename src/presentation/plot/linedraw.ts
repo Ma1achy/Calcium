@@ -1,63 +1,65 @@
 /**
  * Box-drawing curve renderer — connected lines using ╭╮╰╯─│ glyphs.
  *
- * Same interface as `curveRows`: takes a series, range, area dimensions,
- * and returns rows of one character per cell. Where braille sets dots in a
- * 2×4 sub-cell grid, this picks one glyph per cell based on entry and exit
- * direction — half the horizontal resolution, but crisp joins.
+ * **A connection mask per cell, not an enter/exit pair.** The first version
+ * wrote one glyph per *sample* column and left every cell between two samples
+ * blank, so a twenty-sample series across seventy-five columns drew twenty
+ * marks and no line. The bug is not a missing fill step — it is the model: a
+ * cell's glyph is a function of which of its four edges the curve crosses, and
+ * a pair of directions cannot say *both* horizontals and a vertical, which is
+ * what a T-junction and a crossing are.
+ *
+ * So each segment contributes edge bits, and the glyph is read off the mask at
+ * the end. Corners, ends, tees and crossings all fall out of the same table
+ * rather than being cases.
  */
 import type { Series } from "../../data/viewmodel/index.js";
 import { finiteSamples, columnsOf, rowOf, type Range } from "./scale.js";
 
-type Dir = "up" | "down" | "left" | "right" | "none";
+/** Where the curve turns between two readings. */
+export type Interpolation = "linear" | "step";
 
-const ROUNDED: Readonly<Record<string, string>> = Object.freeze({
-  "right,right": "─",   // ─
-  "left,left":   "─",   // ─
-  "left,right":  "─",   // ─
-  "right,left":  "─",   // ─
-  "up,up":       "│",   // │
-  "down,down":   "│",   // │
-  "up,down":     "│",   // │
-  "down,up":     "│",   // │
-  "right,down":  "╭",   // ╭
-  "down,right":  "╭",   // ╭  — line enters from above, exits right
-  "left,down":   "╮",   // ╮
-  "down,left":   "╮",   // ╮
-  "right,up":    "╰",   // ╰
-  "up,right":    "╰",   // ╰
-  "left,up":     "╯",   // ╯
-  "up,left":     "╯",   // ╯
-  "none,right":  "╶",   // ╶  line start
-  "none,left":   "╴",   // ╴
-  "left,none":   "╴",   // ╴  line end
-  "right,none":  "╶",   // ╶
-  "none,down":   "│",   // │
-  "none,up":     "│",   // │
-  "down,none":   "│",   // │
-  "up,none":     "│",   // │
-  "none,none":   "─",   // ─  fallback
-});
+/** Edge bits. A cell's glyph is a function of which edges the curve crosses. */
+const UP = 1;
+const DOWN = 2;
+const LEFT = 4;
+const RIGHT = 8;
 
-const SHARP: Readonly<Record<string, string>> = Object.freeze({
-  ...ROUNDED,
-  "right,down":  "┌",   // ┌
-  "down,right":  "┌",   // ┌
-  "left,down":   "┐",   // ┐
-  "down,left":   "┐",   // ┐
-  "right,up":    "└",   // └
-  "up,right":    "└",   // └
-  "left,up":     "┘",   // ┘
-  "up,left":     "┘",   // ┘
-});
+const ROUNDED: readonly string[] = Object.freeze([
+  " ",  //  0  none
+  "│",  //  1  U
+  "│",  //  2  D
+  "│",  //  3  UD
+  "╴",  //  4  L
+  "╯",  //  5  UL
+  "╮",  //  6  DL
+  "┤",  //  7  UDL
+  "╶",  //  8  R
+  "╰",  //  9  UR
+  "╭",  // 10  DR
+  "├",  // 11  UDR
+  "─",  // 12  LR
+  "┴",  // 13  ULR
+  "┬",  // 14  DLR
+  "┼",  // 15  UDLR
+]);
 
-function glyphFor(enter: Dir, exit: Dir, corners: "rounded" | "sharp"): string {
-  const table = corners === "sharp" ? SHARP : ROUNDED;
-  return table[`${enter},${exit}`] ?? "─";
-}
+const SHARP: readonly string[] = Object.freeze([
+  " ", "│", "│", "│", "╴",
+  "┘",  //  5  UL
+  "┐",  //  6  DL
+  "┤", "╶",
+  "└",  //  9  UR
+  "┌",  // 10  DR
+  "├", "─", "┴", "┬", "┼",
+]);
 
 /**
  * Box-drawing curve renderer — one glyph per cell.
+ *
+ * Between two consecutive sample columns the curve runs horizontally at the
+ * first row, turns once, and runs horizontally at the second. Where it turns
+ * is what separates a line from a step, and it is the only difference.
  */
 export function lineDrawRows(
   series: Series,
@@ -65,55 +67,148 @@ export function lineDrawRows(
   areaWidth: number,
   areaRows: number,
   corners: "rounded" | "sharp",
+  interpolation: Interpolation = "linear",
 ): readonly string[] {
-  const grid: string[][] = Array.from({ length: areaRows }, () =>
-    Array.from({ length: areaWidth }, () => " "),
+  const w = Math.max(0, Math.floor(areaWidth));
+  const h = Math.max(0, Math.floor(areaRows));
+  if (w === 0 || h === 0) return Array.from({ length: h }, () => "");
+
+  const mask: number[][] = Array.from({ length: h }, () =>
+    Array.from({ length: w }, () => 0),
   );
 
   const samples = finiteSamples(series.values);
-  const columns = columnsOf(samples, series.values.length, areaWidth); // cells-ok — a sample count
-
+  const columns = columnsOf(samples, series.values.length, w); // cells-ok — a sample count
   const y = (v: number): number => {
-    const row = rowOf(v, range, areaRows);
-    return Math.max(0, Math.min(areaRows - 1, row));
+    const r = rowOf(v, range, h);
+    return r < 0 ? 0 : r >= h ? h - 1 : r;
   };
 
-  for (let ci = 0; ci < columns.length; ci++) { // cells-ok — a column count
+  const addH = (row: number, xa: number, xb: number): void => {
+    if (xb < xa || row < 0 || row >= h) return;
+    for (let x = xa; x <= xb; x += 1) {
+      if (x < 0 || x >= w) continue;
+      if (x > xa) mask[row]![x]! |= LEFT;
+      if (x < xb) mask[row]![x]! |= RIGHT;
+    }
+  };
+
+  const addV = (col: number, ya: number, yb: number): void => {
+    if (col < 0 || col >= w) return;
+    const top = Math.min(ya, yb);
+    const bottom = Math.max(ya, yb);
+    for (let r = top; r <= bottom; r += 1) {
+      if (r < 0 || r >= h) continue;
+      if (r > top) mask[r]![col]! |= UP;
+      if (r < bottom) mask[r]![col]! |= DOWN;
+    }
+  };
+
+  for (let ci = 0; ci < columns.length; ci += 1) { // cells-ok — a column count
     const col = columns[ci]!;
-    const curRow = y(col.last);
+    const rowHere = y(col.last);
+
+    // I5: the column's own vertical extent, so a spike inside one column
+    // survives the fold the same way the braille renderer keeps it.
+    const spanTop = y(col.max);
+    const spanBottom = y(col.min);
+    if (spanTop !== spanBottom) addV(col.x, spanTop, spanBottom);
+
     const next = columns[ci + 1];
-    const prev = columns[ci - 1];
+    if (next === undefined) break;
+    // I4/I14: joined only where the samples are consecutive in the original
+    // series. A filtered non-finite value leaves a hole, and the line breaks.
+    if (next.iFirst !== col.iLast + 1) continue;
 
-    let enter: Dir = "none";
-    let exit: Dir = "none";
+    const rowNext = y(next.first);
+    // **The turn column is the whole difference between the two forms.** A
+    // line slopes, so the staircase is centred under the slope it stands for;
+    // a step holds its value until the next reading arrives and jumps there,
+    // so it turns at that reading's own column (C12 §3).
+    const turn =
+      interpolation === "step" ? next.x : col.x + Math.floor((next.x - col.x) / 2);
 
-    if (prev !== undefined && prev.iLast + 1 === col.iFirst) {
-      const prevRow = y(prev.last);
-      if (prevRow < curRow) enter = "up";
-      else if (prevRow > curRow) enter = "down";
-      else enter = "left";
-    }
-
-    if (next !== undefined && col.iLast + 1 === next.iFirst) {
-      const nextRow = y(next.first);
-      if (nextRow < curRow) exit = "up";
-      else if (nextRow > curRow) exit = "down";
-      else exit = "right";
-    }
-
-    grid[curRow]![col.x] = glyphFor(enter, exit, corners);
-
-    if (next !== undefined && col.iLast + 1 === next.iFirst) {
-      const nextRow = y(next.first);
-      if (curRow !== nextRow) {
-        const vert = glyphFor("up", "down", corners);
-        const step = curRow < nextRow ? 1 : -1;
-        for (let r = curRow + step; r !== nextRow; r += step) {
-          grid[r]![col.x] = vert;
-        }
-      }
-    }
+    addH(rowHere, col.x, turn);
+    if (rowHere !== rowNext) addV(turn, rowHere, rowNext);
+    addH(rowNext, turn, next.x);
   }
 
-  return grid.map((row) => row.join(""));
+  // A lone cell with no edges at all is still a reading, and a blank would say
+  // there was none — give it the horizontal stub the ends already use.
+  for (const col of columns) {
+    const r = y(col.last);
+    if (mask[r]?.[col.x] === 0) mask[r]![col.x] = LEFT | RIGHT;
+  }
+
+  const table = corners === "sharp" ? SHARP : ROUNDED;
+  return mask.map((row) => row.map((m) => table[m] ?? " ").join(""));
+}
+
+/**
+ * The glyph a connection mask resolves to.
+ *
+ * Exported because a circle's outline and a radar's polygon are the same
+ * question as a curve's: which edges of this cell does the stroke cross. One
+ * table answers all three, and a second copy is how the pie came to be drawn in
+ * a vocabulary the line forms had already left behind.
+ */
+export function glyphForMask(mask: number, corners: "rounded" | "sharp"): string {
+  const table = corners === "sharp" ? SHARP : ROUNDED;
+  return table[mask & 15] ?? " ";
+}
+
+/**
+ * Stroke a polyline into a mask grid, in **cell** coordinates.
+ *
+ * Steps are axis-aligned — never diagonal — so every move crosses exactly one
+ * edge and the mask is unambiguous. A diagonal step would have to claim two
+ * edges at once, and the glyph it resolves to would depend on which of the two
+ * the reader took to be the join.
+ */
+export function strokePolyline(
+  mask: number[][],
+  points: readonly (readonly [number, number])[],
+  closed: boolean,
+): void {
+  const h = mask.length; // cells-ok — a row count
+  if (h === 0 || points.length < 2) return; // cells-ok — a point count
+  const w = mask[0]!.length; // cells-ok — a column count
+
+  const inside = (x: number, y: number): boolean => x >= 0 && x < w && y >= 0 && y < h;
+  const link = (x: number, y: number, bit: number): void => {
+    if (inside(x, y)) mask[y]![x]! |= bit;
+  };
+
+  const stepTo = (x0: number, y0: number, x1: number, y1: number): void => {
+    let x = x0;
+    let y = y0;
+    let guard = 0;
+    const limit = (w + h) * 4;
+    while ((x !== x1 || y !== y1) && guard++ < limit) {
+      const dx = x1 - x;
+      const dy = y1 - y;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const s = dx > 0 ? 1 : -1;
+        link(x, y, s > 0 ? RIGHT : LEFT);
+        x += s;
+        link(x, y, s > 0 ? LEFT : RIGHT);
+      } else {
+        const s = dy > 0 ? 1 : -1;
+        link(x, y, s > 0 ? DOWN : UP);
+        y += s;
+        link(x, y, s > 0 ? UP : DOWN);
+      }
+    }
+  };
+
+  for (let i = 0; i + 1 < points.length; i += 1) { // cells-ok — a point count
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    stepTo(a[0], a[1], b[0], b[1]);
+  }
+  if (closed) {
+    const first = points[0]!;
+    const last = points[points.length - 1]!; // cells-ok — a point count
+    stepTo(last[0], last[1], first[0], first[1]);
+  }
 }

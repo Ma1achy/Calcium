@@ -97,7 +97,10 @@ const results = runPass({
       // a reader with no way to see where busy ends.
       name: "a band draws one edge, so the range has no top",
       file: ANN,
-      from: '  return annotation.kind === "band" ? [annotation.from, annotation.to] : [annotation.value];',
+      // `edgesOf` grew arms for `confidence` and `whiskers`; the band arm it
+      // was written against is now the first of four, and the mutation is the
+      // same one — a band reporting a single edge.
+      from: '  if (annotation.kind === "band") return [annotation.from, annotation.to];',
       to: '  return annotation.kind === "band" ? [annotation.from] : [annotation.value];',
       expect: "T1.30",
     },

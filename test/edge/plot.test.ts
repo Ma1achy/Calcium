@@ -229,9 +229,30 @@ describe("C12 tier 3 — no accumulated state", () => {
       expect(registry.renderToLines(b, 48).join("\n")).toBe(lines.join("\n"));
     }
 
-    // Sixty prefixes, sixty distinct frames: the plot is following the data, not
-    // redrawing something it remembered.
-    expect(seen.size).toBeGreaterThan(50);
+    // **Two resolutions, two figures, measured 2026-08-18.** Sixty prefixes give
+    // 60/60 distinct frames in braille and 49/60 in box drawing, on this same
+    // decaying curve — a loss curve flattens, and the default style has five
+    // addressable rows where braille has twenty and one column per cell where
+    // braille has two, so successive prefixes in the tail land on the same
+    // cells. That is resolution, not memory, and the arm below asserts the
+    // stronger figure at the resolution that can express it.
+    //
+    // The claim this row exists for is carried by the in-loop assertion above:
+    // the same prefix rendered twice gives the same frame. `seen.size` is the
+    // weaker proxy, and lowering it to fit the default without saying which
+    // number moved is how a threshold stops meaning anything.
+    expect(seen.size).toBeGreaterThan(45);
+  });
+
+  it("T3.9 (braille): the same growth is fully distinguishable at dot resolution", () => {
+    const registry = m();
+    const full = lossCurve(60);
+    const seen = new Set<string>();
+    for (let n = 1; n <= 60; n += 1) {
+      const b = plot({ id: "grow-braille", plotStyle: "braille", series: [{ values: full.slice(0, n) }] });
+      seen.add(registry.renderToLines(b, 48).join("\n"));
+    }
+    expect(seen.size).toBe(60);
   });
 });
 
