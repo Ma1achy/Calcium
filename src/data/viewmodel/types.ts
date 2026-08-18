@@ -657,6 +657,8 @@ export type Plot = Readonly<{
   segments?: readonly Segment[];
   xScale?: ScaleType;
   yScale?: ScaleType;
+  plotStyle?: "auto" | "braille" | "line";
+  plotCorners?: "rounded" | "sharp";
 }> & Gap;
 
 export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };

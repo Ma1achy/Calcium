@@ -393,9 +393,11 @@ function plot(
      * reason with two clauses expires one at a time.
      */
     xLabels?: Plot["xLabels"];
+    plotStyle?: Plot["plotStyle"];
+    plotCorners?: Plot["plotCorners"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels } =
+  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotCorners } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -420,6 +422,8 @@ function plot(
       ...(annotations === undefined ? {} : { annotations }),
       ...(colormap === undefined ? {} : { colormap }),
       ...(xLabels === undefined ? {} : { xLabels }),
+      ...(plotStyle === undefined ? {} : { plotStyle }),
+      ...(plotCorners === undefined ? {} : { plotCorners }),
     } as Plot,
     spec,
     true,

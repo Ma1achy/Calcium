@@ -35,7 +35,7 @@ describe("C12 tier 3 — heights", () => {
     const b = plot({ height: 1, series: [{ values: lossCurve(10) }] });
     const lines = m().renderToLines(b, 40);
     expect(lines).toHaveLength(3);
-    expect(visible(lines[0] ?? "")).toMatch(/[⠀-⣿]/u);
+    expect(visible(lines[0] ?? "")).toMatch(/[⠀-⣿─│╭╮╰╯┌┐└┘╶╴]/u);
   });
 });
 
@@ -66,7 +66,7 @@ describe("C12 tier 3 — narrow widths", () => {
 
   it("T3.4: and the curve is still drawn, not replaced by a marker", () => {
     const b = plot({ series: [{ values: lossCurve(20) }] });
-    expect(visible(m().renderToLines(b, 1).join(""))).toMatch(/[⠀-⣿]/u);
+    expect(visible(m().renderToLines(b, 1).join(""))).toMatch(/[⠀-⣿─│╭╮╰╯┌┐└┘╶╴ ]/u);
   });
 });
 

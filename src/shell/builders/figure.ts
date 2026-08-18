@@ -37,6 +37,8 @@ type FigureOpts = {
   colormap?: ColormapName;
   xScale?: ScaleType;
   yScale?: ScaleType;
+  plotStyle?: "auto" | "braille" | "line";
+  plotCorners?: "rounded" | "sharp";
 };
 
 type SeriesOpts = {
@@ -218,6 +220,8 @@ export class FigureBuilder {
       ...(this.opts.colormap !== undefined ? { colormap: this.opts.colormap } : {}),
       ...(this.opts.xScale !== undefined ? { xScale: this.opts.xScale } : {}),
       ...(this.opts.yScale !== undefined ? { yScale: this.opts.yScale } : {}),
+      ...(this.opts.plotStyle !== undefined ? { plotStyle: this.opts.plotStyle } : {}),
+      ...(this.opts.plotCorners !== undefined ? { plotCorners: this.opts.plotCorners } : {}),
       ...(this.xLabels_ !== undefined ? { xLabels: this.xLabels_ } : {}),
       ...(this.annotationList.length > 0 ? { annotations: Object.freeze([...this.annotationList]) } : {}),
       ...(this.categories_ !== undefined ? { categories: this.categories_ } : {}),

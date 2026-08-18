@@ -15,7 +15,7 @@ import { binValues } from "../../src/presentation/plot/categorical.js";
 import { kde } from "../../src/presentation/plot/kde.js";
 import { waffleRows } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
-import { pieRows } from "../../src/presentation/plot/circle.js";
+import { pieLayers } from "../../src/presentation/plot/circle.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
 
@@ -118,8 +118,8 @@ describe("GROUP 7: pie merges sub-threshold slices", () => {
       { label: "Tiny2", value: 0.3 },
       { label: "Tiny3", value: 0.2 },
     ];
-    const rows = pieRows(segs, 10, 5, FULL_CAPS);
-    expect(rows.length).toBeGreaterThan(0); // cells-ok — a row count
+    const layers = pieLayers(segs, 10, 5);
+    expect(layers.length).toBeGreaterThan(0); // cells-ok — a layer count
   });
 });
 

@@ -63,9 +63,10 @@ describe("C12 tier 2 — registration", () => {
     expect(lines.join("")).toContain("plot");
   });
 
-  it("T2.6 (I12): registered, it renders braille", () => {
+  it("T2.6 (I12): registered, it renders a curve", () => {
     const m = measurable({ definitions: [plotDefinition] as never });
-    expect(m.renderToLines(plot(lossCurve(10)), 60).join("")).toMatch(/[⠀-⣿]/u);
+    const rendered = m.renderToLines(plot(lossCurve(10)), 60).join("");
+    expect(rendered).toMatch(/[⠀-⣿─│╭╮╰╯┌┐└┘╶╴]/u);
   });
 });
 

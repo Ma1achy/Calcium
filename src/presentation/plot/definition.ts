@@ -37,6 +37,7 @@ import { barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, g
 import { waffleRows, waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
 import { densitySeries, densityRows, violinRows } from "./kde.js";
+import { lineDrawRows } from "./linedraw.js";
 import { pieLayers, radarRows, radarAsciiRows } from "./circle.js";
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
@@ -350,6 +351,20 @@ type Rasteriser = (
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ) => readonly string[];
 
+function styleRasteriser(
+  block: Plot,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  base: Rasteriser,
+): Rasteriser {
+  const ps = block.plotStyle ?? "auto";
+  if (ps === "braille") return base;
+  const useLineDraw = ps === "line" || (ps === "auto" && caps.ambiguousWidth !== "wide");
+  if (!useLineDraw) return base;
+  const corners = block.plotCorners ?? "rounded";
+  return (series, range, areaWidth, areaRows, _caps) =>
+    lineDrawRows(series, range, areaWidth, areaRows, corners);
+}
+
 function overlaidRows(
   block: Plot,
   range: Range,
@@ -553,10 +568,10 @@ const FORM_ROWS: Readonly<
     ];
   },
 
-  line: (block, width, ctx) => positionalForm(block, width, ctx, curveRows),
+  line: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, curveRows)),
 
   scatter: (block, width, ctx) => positionalForm(block, width, ctx, scatterRows),
-  step: (block, width, ctx) => positionalForm(block, width, ctx, stepRows),
+  step: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows)),
   ecdf: (block, width, ctx) => {
     const ecdfBlock = {
       ...block,
@@ -564,7 +579,7 @@ const FORM_ROWS: Readonly<
       yMin: block.yMin ?? 0,
       yMax: block.yMax ?? 1,
     };
-    return positionalForm(ecdfBlock, width, ctx, stepRows);
+    return positionalForm(ecdfBlock, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows));
   },
   bar: (block, width, ctx) => {
     const data = seriesRange(block.series, block);
@@ -764,7 +779,7 @@ const FORM_ROWS: Readonly<
   streamgraph: (block, width, ctx) => {
     const data = seriesRange(block.series, block);
     if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    return positionalForm(block, width, ctx, curveRows);
+    return positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, curveRows));
   },
   calendar: (block, width, ctx) => heatmapFormRows(block, width, ctx),
   correlation: (block, width, ctx) => heatmapFormRows(block, width, ctx),
@@ -777,7 +792,7 @@ const FORM_ROWS: Readonly<
     if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
     const { series: ds, range } = densitySeries(s);
     const densityBlock = { ...block, series: [ds], yMin: range.min, yMax: range.max };
-    return positionalForm(densityBlock, width, ctx, densityRows);
+    return positionalForm(densityBlock, width, ctx, styleRasteriser(block, ctx.capabilities, densityRows));
   },
   violin: (block, width, ctx) => {
     const cats = block.categories ?? block.series.map((s, i) => s.label ?? `series ${String(i + 1)}`);

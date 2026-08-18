@@ -444,6 +444,14 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (format !== undefined && !(isString(format) && Y_FORMATS.has(format))) {
       e.push(`${at}: "yFormat" must be one of ${[...Y_FORMATS].join(", ")} (C04 I41)`);
     }
+    const ps = b["plotStyle"];
+    if (ps !== undefined && ps !== "auto" && ps !== "braille" && ps !== "line") {
+      e.push(`${at}: "plotStyle" must be "auto", "braille", or "line"`);
+    }
+    const pc = b["plotCorners"];
+    if (pc !== undefined && pc !== "rounded" && pc !== "sharp") {
+      e.push(`${at}: "plotCorners" must be "rounded" or "sharp"`);
+    }
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);

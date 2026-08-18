@@ -936,6 +936,8 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
   "src/presentation/plot/curve.ts":
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
+  "src/presentation/plot/linedraw.ts":
+    "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`",
   "src/shell/config.ts":
     "`PROMPT_SUBSTITUTION` is the pair, and `frame.ts` asserts both forms are `PROMPT_GUTTER.first` cells (C22 I52)",
   "src/shell/paint.ts":
