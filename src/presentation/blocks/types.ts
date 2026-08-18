@@ -42,6 +42,7 @@ export type RenderContext = Readonly<{
    * (C23 I47).
    */
   scrollOffsets?: Readonly<Record<string, number>>;
+  cursorPositions?: Readonly<Record<string, number>>;
   focus: FocusState | null;
   /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer

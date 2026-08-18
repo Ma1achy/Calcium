@@ -36,7 +36,10 @@ const DASH_CELLS = 2;
 
 /** The values an annotation marks on the ordinate. A band is its two edges. */
 export function edgesOf(annotation: Annotation): readonly number[] {
-  return annotation.kind === "band" ? [annotation.from, annotation.to] : [annotation.value];
+  if (annotation.kind === "band") return [annotation.from, annotation.to];
+  if (annotation.kind === "confidence") return [...annotation.upper, ...annotation.lower];
+  if (annotation.kind === "whiskers") return annotation.points.flatMap((p) => [p.y - p.err, p.y + p.err]);
+  return [annotation.value];
 }
 
 /** An edge that is on the scale at all — see `annotationRows` for why not clamped. */
@@ -75,6 +78,14 @@ export function annotationRows(
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const h = Math.max(1, Math.floor(areaRows));
+
+  if (annotation.kind === "confidence") {
+    return confidenceRows(annotation.upper, annotation.lower, range, w, h, caps);
+  }
+  if (annotation.kind === "whiskers") {
+    return whiskersRows(annotation.points, range, w, h, caps);
+  }
+
   const edges = edgesOf(annotation).filter((v) => drawn(v, range));
 
   if (caps.unicode === "ascii") {
@@ -87,6 +98,92 @@ export function annotationRows(
   for (const value of edges) {
     const y = rowOf(value, range, grid.dotHeight);
     for (let x = 0; x < grid.dotWidth; x += DASH_CELLS * BRAILLE_DOTS.x) setDot(grid, x, y);
+  }
+  return foldBraille(grid);
+}
+
+function confidenceRows(
+  upper: readonly number[],
+  lower: readonly number[],
+  range: Range,
+  w: number,
+  h: number,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): readonly string[] {
+  if (caps.unicode === "ascii") {
+    const grid: string[][] = Array.from({ length: h }, () => new Array(w).fill(" "));
+    const n = Math.max(upper.length, lower.length); // cells-ok — a sample count
+    for (let i = 0; i < n; i++) {
+      const col = n <= 1 ? Math.floor(w / 2) : Math.round((i / (n - 1)) * (w - 1));
+      if (col < 0 || col >= w) continue;
+      const u = upper[i];
+      const l = lower[i];
+      if (u !== undefined && Number.isFinite(u) && drawn(u, range)) {
+        const row = rowOf(u, range, h);
+        if (row >= 0 && row < h && col % DASH_CELLS === 0) grid[row]![col] = "-";
+      }
+      if (l !== undefined && Number.isFinite(l) && drawn(l, range)) {
+        const row = rowOf(l, range, h);
+        if (row >= 0 && row < h && col % DASH_CELLS === 0) grid[row]![col] = "-";
+      }
+    }
+    return grid.map((r) => r.join(""));
+  }
+
+  const grid = createGrid(w * BRAILLE_DOTS.x, h * BRAILLE_DOTS.y);
+  const n = Math.max(upper.length, lower.length); // cells-ok — a sample count
+  for (let i = 0; i < n; i++) {
+    const dotCol = n <= 1 ? Math.floor(grid.dotWidth / 2) : Math.round((i / (n - 1)) * (grid.dotWidth - 1));
+    if (dotCol < 0 || dotCol >= grid.dotWidth) continue;
+    const u = upper[i];
+    const l = lower[i];
+    if (u !== undefined && Number.isFinite(u) && drawn(u, range) && dotCol % (DASH_CELLS * BRAILLE_DOTS.x) === 0) {
+      setDot(grid, dotCol, rowOf(u, range, grid.dotHeight));
+    }
+    if (l !== undefined && Number.isFinite(l) && drawn(l, range) && dotCol % (DASH_CELLS * BRAILLE_DOTS.x) === 0) {
+      setDot(grid, dotCol, rowOf(l, range, grid.dotHeight));
+    }
+  }
+  return foldBraille(grid);
+}
+
+function whiskersRows(
+  points: readonly Readonly<{ x: number; y: number; err: number }>[],
+  range: Range,
+  w: number,
+  h: number,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): readonly string[] {
+  if (caps.unicode === "ascii") {
+    const grid: string[][] = Array.from({ length: h }, () => new Array(w).fill(" "));
+    const n = points.length; // cells-ok — a point count
+    for (let i = 0; i < n; i++) {
+      const p = points[i]!;
+      const col = n <= 1 ? Math.floor(w / 2) : Math.round((i / (n - 1)) * (w - 1));
+      if (col < 0 || col >= w) continue;
+      const yTop = rowOf(p.y + p.err, range, h);
+      const yBot = rowOf(p.y - p.err, range, h);
+      const top = Math.min(yTop, yBot);
+      const bot = Math.max(yTop, yBot);
+      for (let r = top; r <= bot; r++) {
+        if (r >= 0 && r < h) grid[r]![col] = "|";
+      }
+    }
+    return grid.map((r) => r.join(""));
+  }
+
+  const grid = createGrid(w * BRAILLE_DOTS.x, h * BRAILLE_DOTS.y);
+  for (let i = 0; i < points.length; i++) { // cells-ok — a point count
+    const p = points[i]!;
+    const dotCol = points.length <= 1 // cells-ok — a point count
+      ? Math.floor(grid.dotWidth / 2)
+      : Math.round((i / (points.length - 1)) * (grid.dotWidth - 1)); // cells-ok — a point count
+    if (dotCol < 0 || dotCol >= grid.dotWidth) continue;
+    const yTop = rowOf(p.y + p.err, range, grid.dotHeight);
+    const yBot = rowOf(p.y - p.err, range, grid.dotHeight);
+    const top = Math.min(yTop, yBot);
+    const bot = Math.max(yTop, yBot);
+    for (let r = top; r <= bot; r++) setDot(grid, dotCol, r);
   }
   return foldBraille(grid);
 }

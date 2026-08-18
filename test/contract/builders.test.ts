@@ -173,6 +173,7 @@ describe("C24 §4 — the nineteen builders", () => {
       error: "cell shorthand", dim: "cell shorthand", meta: "cell shorthand",
       fill: "an Action", exec: "an Action", open: "an Action",
       live: "returns a Panel, and its own fixture is `liveParts` — C24 §7",
+      figure: "returns a FigureBuilder chain, not a Block — .build() produces the Block",
     };
     const blockBuilders = Object.keys(b).filter((k) => !Object.hasOwn(NOT_BLOCKS, k));
 

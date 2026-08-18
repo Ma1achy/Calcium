@@ -8,7 +8,7 @@
  */
 import type { AmbiguousWidth } from "../text.js";
 import { cells, truncate } from "../text.js";
-import type { Plot } from "../../data/viewmodel/index.js";
+import type { Plot, ScaleType } from "../../data/viewmodel/index.js";
 import type { Range } from "./scale.js";
 import { rowOf } from "./scale.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -462,4 +462,154 @@ export function xLabelRow(
   place(right ?? "", w - cells(right ?? "", caps.ambiguousWidth));
 
   return row.join("").replace(/\s+$/, "");
+}
+
+// --- log / time / symlog axes -----------------------------------------------
+
+function logBase(scale: ScaleType): number {
+  if (scale === "log") return 10;
+  if (scale === "log2") return 2;
+  if (scale === "ln") return Math.E;
+  if (typeof scale === "object" && "log" in scale) return scale.log;
+  return 10;
+}
+
+/**
+ * Log-scale axis: ticks at powers of the base, with dense subdivision.
+ *
+ * `1 · 2 · 5 · 10 · 20 · 50` for base 10, `1 · 2 · 4 · 8 · 16` for base 2.
+ */
+export function niceLogAxis(
+  range: Range,
+  maxTicks: number,
+  scale: ScaleType,
+): Axis {
+  const base = logBase(scale);
+  if (range.min <= 0 || range.max <= 0 || !Number.isFinite(range.min) || !Number.isFinite(range.max)) {
+    return { range, ticks: [range.min, range.max], step: 0 };
+  }
+
+  const logMin = Math.log(range.min) / Math.log(base);
+  const logMax = Math.log(range.max) / Math.log(base);
+
+  const minPow = Math.floor(logMin);
+  const maxPow = Math.ceil(logMax);
+
+  const ticks: number[] = [];
+  const wanted = Math.max(2, Math.floor(maxTicks));
+
+  const subdivisions = base === 10 ? [1, 2, 5] : base === 2 ? [1] : [1];
+  for (let p = minPow; p <= maxPow && ticks.length < wanted * 2; p++) { // cells-ok — a tick count
+    for (const sub of subdivisions) {
+      const v = sub * Math.pow(base, p);
+      if (v >= range.min && v <= range.max && ticks.length < wanted * 2) { // cells-ok — a tick count
+        ticks.push(v);
+      }
+    }
+  }
+
+  if (ticks.length === 0) ticks.push(range.min, range.max); // cells-ok — a tick count
+
+  while (ticks.length > wanted) ticks.splice(1, 1); // cells-ok — a tick count
+
+  return { range, ticks, step: 0 };
+}
+
+/**
+ * Symlog axis: linear near zero, logarithmic outside.
+ *
+ * The linear threshold defaults to 1.
+ */
+export function niceSymlogAxis(
+  range: Range,
+  maxTicks: number,
+  _scale: ScaleType,
+): Axis {
+  const threshold = 1;
+  const ticks: number[] = [];
+  const wanted = Math.max(2, Math.floor(maxTicks));
+
+  if (range.min < -threshold) {
+    let v = -threshold;
+    while (v >= range.min && ticks.length < wanted) { // cells-ok — a tick count
+      ticks.push(v);
+      v *= 10;
+    }
+    ticks.reverse();
+  }
+
+  const linearStep = threshold / Math.max(1, Math.floor(wanted / 4));
+  for (let v = Math.max(range.min, -threshold); v <= Math.min(range.max, threshold); v += linearStep) {
+    if (ticks.length < wanted * 2) ticks.push(Math.round(v * 1e9) / 1e9); // cells-ok — a tick count
+  }
+
+  if (range.max > threshold) {
+    let v = threshold;
+    while (v <= range.max && ticks.length < wanted * 2) { // cells-ok — a tick count
+      ticks.push(v);
+      v *= 10;
+    }
+  }
+
+  const unique = [...new Set(ticks)].sort((a, b) => a - b);
+  return { range, ticks: unique, step: 0 };
+}
+
+/** Round time intervals: seconds, minutes, hours, days. */
+const TIME_STEPS = [
+  1, 2, 5, 10, 15, 30, 60,
+  120, 300, 600, 900, 1800, 3600,
+  7200, 14400, 21600, 43200, 86400,
+  172800, 604800, 2592000,
+];
+
+/**
+ * Time-scale axis: ticks at round time boundaries.
+ *
+ * Values are assumed to be seconds (Unix timestamps or durations).
+ */
+export function niceTimeAxis(
+  range: Range,
+  maxTicks: number,
+): Axis {
+  const span = range.max - range.min;
+  if (span <= 0 || !Number.isFinite(span)) {
+    return { range, ticks: [range.min], step: 0 };
+  }
+
+  const wanted = Math.max(2, Math.floor(maxTicks));
+  const rough = span / (wanted - 1);
+
+  let step = TIME_STEPS[TIME_STEPS.length - 1]!; // cells-ok — index into constant array
+  for (const s of TIME_STEPS) {
+    if (s >= rough) { step = s; break; }
+  }
+
+  const first = Math.ceil(range.min / step) * step;
+  const ticks: number[] = [];
+  for (let v = first; v <= range.max && ticks.length < wanted * 2; v += step) { // cells-ok — a tick count
+    ticks.push(v);
+  }
+
+  if (ticks.length === 0) ticks.push(range.min); // cells-ok — a tick count
+
+  return { range, ticks, step };
+}
+
+/**
+ * Dispatch to the appropriate axis algorithm for a scale type.
+ */
+export function axisFor(
+  range: Range,
+  maxTicks: number,
+  pin: Pick<Plot, "yMin" | "yMax">,
+  scale?: ScaleType,
+): Axis {
+  if (scale === undefined || scale === "linear") return niceAxis(range, maxTicks, pin);
+  if (scale === "time") return niceTimeAxis(range, maxTicks);
+  if (scale === "symlog") return niceSymlogAxis(range, maxTicks, scale);
+  if (scale === "log" || scale === "log2" || scale === "ln" || (typeof scale === "object" && "log" in scale)) {
+    return niceLogAxis(range, maxTicks, scale);
+  }
+  return niceAxis(range, maxTicks, pin);
 }

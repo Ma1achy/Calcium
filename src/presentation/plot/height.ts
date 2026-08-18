@@ -46,13 +46,24 @@ export function plotAreaRows(plot: PlotGeometry): number {
 }
 
 /** Declared rows per form. A `Record` for `FURNITURE_ROWS`' reason, below. */
+const heightOrOne = (plot: PlotGeometry): number => Math.max(1, Math.floor(plot.height ?? 1));
 const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 1,
-  line: (plot) => Math.max(1, Math.floor(plot.height ?? 1)),
-  // **A matrix's row count is data and must not be its height** (C12 I1, §6a
-  // B1). A container starting mid-stream adds a row; the block does not grow,
-  // and the row that does not fit is named in a legend (I8).
-  heatmap: (plot) => Math.max(1, Math.floor(plot.height ?? 1)),
+  waffle: () => 10,
+  line: heightOrOne,
+  heatmap: heightOrOne,
+  scatter: heightOrOne, step: heightOrOne, ecdf: heightOrOne,
+  bar: heightOrOne, histogram: heightOrOne, boxplot: heightOrOne,
+  forest: heightOrOne, dumbbell: heightOrOne,
+  lollipop: heightOrOne, dotplot: heightOrOne,
+  flame: heightOrOne, icicle: heightOrOne, funnel: heightOrOne,
+  gantt: heightOrOne, waterfall: heightOrOne, streamgraph: heightOrOne,
+  calendar: heightOrOne, correlation: heightOrOne, confusion: heightOrOne,
+  spectrogram: heightOrOne, latency: heightOrOne, density2d: heightOrOne,
+  density: heightOrOne, violin: heightOrOne, ridgeline: heightOrOne,
+  smallmultiples: heightOrOne, pairplot: heightOrOne,
+  pie: heightOrOne, radar: heightOrOne,
+  horizon: heightOrOne,
 };
 
 /**
@@ -71,15 +82,28 @@ const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
  * bound themselves — so the row pays for the scale legend, which is the only
  * thing that says what a cell means.
  */
+const axedFurniture = (plot: PlotGeometry): number => (plot.axes === true ? AXIS_ROWS : 0);
 const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 0,
-  line: (plot) => (plot.axes === true ? AXIS_ROWS : 0),
+  waffle: () => 0,
+  line: axedFurniture,
   heatmap: () => AXIS_ROWS,
+  scatter: axedFurniture, step: axedFurniture, ecdf: axedFurniture,
+  bar: axedFurniture, histogram: axedFurniture, boxplot: axedFurniture,
+  forest: axedFurniture, dumbbell: axedFurniture,
+  lollipop: axedFurniture, dotplot: axedFurniture,
+  flame: axedFurniture, icicle: axedFurniture, funnel: axedFurniture,
+  gantt: axedFurniture, waterfall: axedFurniture, streamgraph: axedFurniture,
+  calendar: () => AXIS_ROWS, correlation: () => AXIS_ROWS, confusion: () => AXIS_ROWS,
+  spectrogram: () => AXIS_ROWS, latency: () => AXIS_ROWS, density2d: () => AXIS_ROWS,
+  density: axedFurniture, violin: axedFurniture, ridgeline: axedFurniture,
+  smallmultiples: axedFurniture, pairplot: axedFurniture,
+  pie: () => 0, radar: axedFurniture,
+  horizon: axedFurniture,
 };
 
 /** The block's measured height (I1). A function of the block alone. */
 export function plotHeight(plot: PlotGeometry): number {
-  if (plot.form === "sparkline") return 1;
   return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot);
 }
 

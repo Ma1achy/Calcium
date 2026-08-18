@@ -492,6 +492,7 @@ export type Series = Readonly<{
   values: readonly (number | null)[];
   label?: string;
   tone?: Tone;
+  marker?: string;
 }>;
 
 /**
@@ -526,14 +527,23 @@ export const COLORMAP_NAMES: readonly ColormapName[] = Object.freeze(
 );
 
 /**
- * The three forms, named so every dispatcher can be exhaustive over them.
+ * Every plot form, named so every dispatcher can be exhaustive over them.
  *
  * **A union written inline is a union nothing can be checked against.** Every
  * consumer of `form` was `=== "sparkline" ? … : …`, so a third member fell into
  * the line arm at three sites and compiled — which is a heatmap rendering as a
  * curve, silently and at the right height (C12 §6a).
  */
-export type PlotForm = "line" | "sparkline" | "heatmap";
+export type PlotForm =
+  | "line" | "sparkline" | "heatmap"
+  | "scatter" | "step" | "ecdf"
+  | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
+  | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph"
+  | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
+  | "density" | "violin" | "ridgeline"
+  | "smallmultiples" | "pairplot"
+  | "pie" | "radar"
+  | "horizon";
 
 /**
  * A claim about the ordinate, drawn beside the data (C12 §3e, I52).
@@ -562,7 +572,9 @@ export type PlotForm = "line" | "sparkline" | "heatmap";
  */
 export type Annotation =
   | Readonly<{ kind: "line"; value: number; tone?: Tone }>
-  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone }>;
+  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone }>
+  | Readonly<{ kind: "confidence"; upper: readonly number[]; lower: readonly number[]; tone?: Tone }>
+  | Readonly<{ kind: "whiskers"; points: readonly Readonly<{ x: number; y: number; err: number }>[]; tone?: Tone }>;
 
 export type Plot = Readonly<{
   kind: "plot";
@@ -633,7 +645,35 @@ export type Plot = Readonly<{
    */
   colormap?: ColormapName;
   emptyMessage?: string;
+  categories?: readonly string[];
+  layout?: "overlap" | "grouped" | "stacked" | "normalised";
+  binning?: "sturges" | "freedman-diaconis" | "scott";
+  quartiles?: readonly QuartileSummary[];
+  offsets?: readonly number[];
+  totals?: readonly boolean[];
+  startDate?: string;
+  bands?: number;
+  facets?: readonly Plot[];
+  segments?: readonly Segment[];
+  xScale?: ScaleType;
+  yScale?: ScaleType;
 }> & Gap;
+
+export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };
+
+export type QuartileSummary = Readonly<{
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  outliers?: readonly number[];
+  centre?: number;
+  lower?: number;
+  upper?: number;
+}>;
+
+export type Segment = Readonly<{ label: string; value: number }>;
 
 export type Progress = Readonly<{
   kind: "progress";

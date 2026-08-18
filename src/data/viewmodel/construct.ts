@@ -92,10 +92,18 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
  */
 const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
   sparkline: false,
+  waffle: false,
   line: true,
-  // A matrix's row count is data, so its height must come from the block or I1
-  // fails through the data path (C12 §6a B1).
   heatmap: true,
+  scatter: true, step: true, ecdf: true,
+  bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
+  lollipop: true, dotplot: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true,
+  calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
+  density: true, violin: true, ridgeline: true,
+  smallmultiples: true, pairplot: true,
+  pie: true, radar: true,
+  horizon: true,
 };
 
 /**

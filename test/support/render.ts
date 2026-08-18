@@ -106,6 +106,7 @@ export function measurable(
      */
     definitions?: readonly BlockDefinition<never>[];
     focus?: RenderOptions["focus"];
+    cursorPositions?: RenderOptions["cursorPositions"];
   }> = {},
 ): Readonly<{
   measure: (block: Block, width: number) => number;
@@ -133,6 +134,7 @@ export function measurable(
     capabilities: options.capabilities ?? FULL_CAPS,
     tick: options.tick ?? 0,
     ...(options.focus === undefined ? {} : { focus: options.focus }),
+    ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
   };
 
   return {

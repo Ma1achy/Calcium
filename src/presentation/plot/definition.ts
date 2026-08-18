@@ -27,18 +27,24 @@ import { clampSpans, paint, padStart, rows, slot, tone, type Span } from "../blo
 import { cells, truncate } from "../text.js";
 import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
-import { labelWidth, niceAxis, ticksFor, xLabelRow, yLabels } from "./axes.js";
+import { labelWidth, ticksFor, xLabelRow, yLabels, axisFor } from "./axes.js";
 import { annotationRows } from "./annotate.js";
-import { COLORMAPS, continuousColour, type Colormap } from "../theme/colormap.js";
-import type { ColourValue } from "../theme/types.js";
 import { seriesRange, type Range } from "./scale.js";
-import { ladderFor } from "./ramp.js";
-import { formatValue } from "./axes.js";
-import { rampRow, sparkline } from "./sparkline.js";
+import { sparkline } from "./sparkline.js";
+import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
+import { boxplotRow, forestRow, dumbbellRow } from "./glyph-row.js";
+import { barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
+import { waffleRows } from "./waffle.js";
+import { heatmapFormRows } from "./heatmap.js";
+import { densitySeries, densityRows, violinRows } from "./kde.js";
+import { pieRows, radarRows, radarAsciiRows } from "./circle.js";
+import { horizonRows } from "./horizon.js";
+import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
 import type { Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
+import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /** The narrowest plot area worth drawing a curve in. Below it, furniture goes. */
 const MIN_AREA = 4;
@@ -215,6 +221,46 @@ function axisRows(block: Plot, layout: Layout, ctx: RenderContext): readonly str
   return [rule, labelled];
 }
 
+function axisRowsWithCursor(
+  block: Plot,
+  cursorIdx: number,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly string[] {
+  const g = glyphs(ctx.capabilities);
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+
+  const corner = layout.gutter === 0 ? "" : g.bottomLeft;
+  const rule = line(
+    [
+      { text: " ".repeat(Math.max(0, layout.gutter - 1)) },
+      { text: corner + g.horizontal.repeat(Math.max(0, layout.areaWidth)), style: muted },
+    ],
+    layout,
+    ctx,
+  );
+
+  const readout = cursorReadout(block, cursorIdx, layout, ctx);
+  return [rule, readout];
+}
+
+function cursorReadout(
+  block: Plot,
+  cursorIdx: number,
+  layout: Layout,
+  ctx: RenderContext,
+): string {
+  const values = block.series.map((s) => {
+    const v = s.values[cursorIdx];
+    const label = s.label ?? "";
+    if (v === null || v === undefined || !Number.isFinite(v)) return `${label}: —`; // cells-ok — label formatting
+    return `${label}: ${String(Math.round(v * 100) / 100)}`;
+  });
+  const readoutText = truncate(values.join("  "), layout.width, ctx.capabilities);
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  return line([{ text: readoutText, style: muted }], layout, ctx);
+}
+
 /**
  * The stacked form (I6, I7). One strip per series, sharing the x-axis, with each
  * series' label in the y-label column beside its strip rather than above it — a
@@ -296,27 +342,27 @@ function stackedRows(
 }
 
 /** The overlaid form: every series in one grid, distinguished by tone. */
+type Rasteriser = (
+  series: Series,
+  range: Range,
+  areaWidth: number,
+  areaRows: number,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+) => readonly string[];
+
 function overlaidRows(
   block: Plot,
   range: Range,
   layout: Layout,
   ctx: RenderContext,
+  rasterise: Rasteriser = curveRows,
 ): readonly string[] {
-  // **`labelColumn`, not `gutter`.** The middle layout keeps the axis and drops
-  // the labels, so it has a gutter of 2 and a label column of 0 — and asking for
-  // labels there emitted a four-cell label into a zero-cell column, which the row
-  // clamp then turned into `0.82 │⢣…`. The narrow case is the one where a label is
-  // most obviously wrong and least obviously checked.
   const labels =
     layout.labelColumn === 0 ? [] : yLabels(range, layout.areaRows, block.yFormat, block);
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
-  // **Annotations last, and the order is the ruling** (C04 I52). Layers resolve
-  // first-non-blank, so anything appended here is drawn *behind* every series —
-  // a reference line that overwrote a sample would hide the thing it exists to
-  // be compared against.
   const layers: readonly Layer[] = [
     ...block.series.map((s, index) => ({
-      glyphRows: curveRows(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
+      glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
       ref: refOf(s, index),
     })),
     ...(block.annotations ?? []).map((a) => ({
@@ -398,185 +444,6 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
   return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
 }
 
-/** A grid cell is blank where nothing was reported (C12 I17, §3a). */
-const HEATMAP_ABSENT = " ";
-
-
-/**
- * One matrix row's spans — the glyph from the density ramp, the colour from the
- * colormap (C10 I31, C12 I17).
- *
- * **Density stays the carrier and colour joins it**, which is what makes the
- * 1-bit behaviour unchanged *by construction* rather than by a fallback: the
- * glyph is chosen the same way at every depth, and `continuousColour` returns
- * nothing below 8-bit, so the rungs below simply have one channel where the ones
- * above have two. F34 is satisfied throughout and not at the bottom.
- *
- * **Runs are coalesced, and a run may be one cell.** That is the measurement the
- * plan wanted before ruling colour in: `mergedRow` already emits a span per run,
- * so a per-cell foreground is expressible and needs no new painting seam.
- */
-function heatSpans(
-  series: Series,
-  range: Range,
-  layout: Layout,
-  map: Colormap | undefined,
-  style: Readonly<{ ramp: string; absent: string }>,
-  ctx: RenderContext,
-): readonly Span[] {
-  const glyphs = rampRow(series.values, layout.areaWidth, ctx.capabilities, range, style);
-  if (map === undefined) return [{ text: glyphs }];
-
-  // The values the row drew, right-anchored exactly as `rampRow` anchors them,
-  // so cell `k` and reading `k` are the same position. Deriving it twice is how
-  // the colour and the glyph would come to disagree about one cell.
-  const w = Math.max(0, Math.floor(layout.areaWidth));
-  const window = series.values.slice(Math.max(0, series.values.length - w)); // cells-ok — a position count
-  const pad = Math.max(0, w - window.length); // cells-ok — a position count
-
-  const span = range.max - range.min;
-  const colourAt = (index: number): ColourValue | undefined => {
-    const v = window[index - pad];
-    if (v === null || v === undefined || !Number.isFinite(v)) return undefined;
-    return continuousColour(map, span <= 0 ? 0.5 : (v - range.min) / span, ctx.capabilities);
-  };
-
-  const out: Span[] = [];
-  let run = "";
-  let runColour: ColourValue | undefined;
-  const flush = (): void => {
-    if (run === "") return;
-    out.push(runColour === undefined ? { text: run } : { text: run, style: { colour: runColour } });
-    run = "";
-  };
-
-  [...glyphs].forEach((glyph, index) => {
-    const colour = colourAt(index);
-    if (colour !== runColour) {
-      flush();
-      runColour = colour;
-    }
-    run += glyph;
-  });
-  flush();
-  return out;
-}
-
-/**
- * The matrix (I17). One cell per position per row, against the range of the
- * whole matrix — which is the only thing that makes it a matrix rather than a
- * stack of unrelated sparklines, and the reason the range is computed once here
- * and passed down rather than per row.
- */
-function heatmapRows(
-  block: Plot,
-  range: Range,
-  layout: Layout,
-  ctx: RenderContext,
-): readonly string[] {
-  const style = { ramp: ladderFor("density", ctx.capabilities).steps, absent: HEATMAP_ABSENT };
-  const map = block.colormap === undefined ? undefined : COLORMAPS[block.colormap];
-  const out: string[] = [];
-
-  // I8, unchanged: the rows that fit, then a line naming the rest. The marker is
-  // that line and there is no field — a series dropped in silence is the failure
-  // the branch exists to avoid, and a matrix has more rows to drop than a plot.
-  const overflow = block.series.length > layout.areaRows; // cells-ok — a row count
-  const visible = overflow ? Math.max(0, layout.areaRows - 1) : block.series.length; // cells-ok
-
-  for (let i = 0; i < visible; i += 1) {
-    const s = block.series[i];
-    if (s === undefined) continue;
-    out.push(
-      line(
-        [
-          ...gutterSpans(s.label ?? "", layout, ctx),
-          ...heatSpans(s, range, layout, map, style, ctx),
-        ],
-        layout,
-        ctx,
-      ),
-    );
-  }
-
-  if (overflow) {
-    const omitted = block.series.slice(visible).map((s, i) => s.label ?? `row ${String(visible + i + 1)}`); // cells-ok
-    out.push(
-      line(
-        [
-          ...gutterSpans("", layout, ctx),
-          {
-            text: truncate(
-              `+${String(omitted.length)} more · ${omitted.join(" · ")}`, // cells-ok — a row count
-              layout.areaWidth,
-              ctx.capabilities,
-            ),
-            style: tone("warn", ctx.theme, ctx.capabilities),
-          },
-        ],
-        layout,
-        ctx,
-      ),
-    );
-  }
-
-  // Fewer rows than the declared height keeps the height: I1 is about the block,
-  // and a matrix that shrank when a container stopped would move everything below
-  // it at exactly the moment a reader is looking at why.
-  const blanks = Math.max(0, layout.areaRows - out.length); // cells-ok — a row count
-  for (let i = 0; i < blanks; i += 1) out.push(line(gutterSpans("", layout, ctx), layout, ctx));
-  return out;
-}
-
-/**
- * The heatmap's two rows: x-labels, then the scale legend (§2).
- *
- * **Not the line's two rows.** There is no axis rule, because a matrix's cells
- * bound themselves — and the row it would have taken pays for the legend, which
- * is the only thing that says what a cell *means*. `axes: false` is refused at
- * construction for that reason (C04 I50b).
- */
-function heatmapFurniture(
-  block: Plot,
-  range: Range,
-  layout: Layout,
-  ctx: RenderContext,
-): readonly string[] {
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
-  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities);
-  const labelRow =
-    labels === ""
-      ? ""
-      : line([{ text: " ".repeat(layout.gutter) }, { text: labels, style: muted }], layout, ctx);
-
-  // **Dropped columns are named rather than vanishing** (§6a B3, I8's principle).
-  // The window is of the last `areaWidth` positions, and a reader who cannot see
-  // that some are missing reads the visible ones as the whole history.
-  const longest = block.series.reduce((n, s) => Math.max(n, s.values.length), 0); // cells-ok — a position count
-  const dropped = Math.max(0, longest - layout.areaWidth);
-
-  // **The legend spans the row, and its parts drop in order** (I19). It was
-  // placed at the gutter offset — borrowing the plot area's reference for a row
-  // that sits below the matrix rather than inside it — so a wide label column
-  // left it a fraction of the width and cut the *range*, which is the one thing
-  // it exists to state and the reason `axes: false` is refused.
-  //
-  // The range is last to go, then the swatch: a key to a scale nobody named is
-  // decoration. The clause about dropped columns goes first because it is a
-  // caveat about the picture, and the picture is still there without it.
-  const range_ = `${formatValue(range.min, block.yFormat)} - ${formatValue(range.max, block.yFormat)}`;
-  const swatch = ladderFor("density", ctx.capabilities).steps;
-  const clause = dropped === 0 ? "" : ` · ${String(dropped)} older not shown`; // cells-ok — a position count
-  const fits = (t: string): boolean => cells(t, ctx.capabilities.ambiguousWidth) <= layout.width;
-
-  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, range_].find(fits) ?? "";
-
-  return [
-    labelRow,
-    line([{ text: truncate(legend, layout.width, ctx.capabilities), style: muted }], layout, ctx),
-  ];
-}
-
 /**
  * The height (I1). `PlotGeometry` is what this reads, so the series is not in
  * scope — see `height.ts`.
@@ -589,6 +456,80 @@ const measure = (block: Plot): number => plotHeight(block);
  * ? … : …` absorbed a third member in silence — a heatmap drawn as a curve, at
  * exactly the right height.
  */
+function categoricalForm(
+  block: Plot,
+  width: number,
+  ctx: RenderContext,
+  rowBuilder: (label: string, areaWidth: number) => string,
+): readonly string[] {
+  const cats = block.categories ?? [];
+  const areaRows = plotAreaRows(block);
+  const labels = cats.slice(0, areaRows);
+
+  let labelWidth = 0;
+  for (const l of labels) labelWidth = Math.max(labelWidth, cells(l, ctx.capabilities.ambiguousWidth));
+  const axed = block.axes === true;
+  const gutterWidth = axed ? Math.min(labelWidth, Math.floor(width / 3)) + AXIS_GUTTER : 0;
+  const areaWidth = Math.max(1, width - gutterWidth);
+  const labelCol = gutterWidth > 0 ? gutterWidth - AXIS_GUTTER : 0;
+  const layout: Layout = { gutter: gutterWidth, labelColumn: labelCol, areaWidth, areaRows, width };
+
+  const out: string[] = [];
+  for (let i = 0; i < areaRows; i++) {
+    const cat = labels[i] ?? "";
+    const label = i < labels.length ? truncate(cat, labelCol, ctx.capabilities) : ""; // cells-ok — a label count
+    const content = i < labels.length ? rowBuilder(cat, areaWidth) : ""; // cells-ok — a label count
+    const gutter = gutterSpans(label, layout, ctx);
+    const styled = slot(
+      refOf(block.series[0] ?? { values: [] }, 0),
+      ctx.theme,
+      ctx.capabilities,
+    );
+    out.push(
+      line(
+        [...gutter, { text: truncate(content, areaWidth, ctx.capabilities), style: styled }],
+        layout,
+        ctx,
+      ),
+    );
+  }
+  if (axed) out.push(...axisRows(block, layout, ctx));
+  return out;
+}
+
+function positionalForm(
+  block: Plot,
+  width: number,
+  ctx: RenderContext,
+  rasterise: Rasteriser,
+): readonly string[] {
+  const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
+  const data = seriesRange(block.series, block);
+  const range =
+    data === null || stacked
+      ? data
+      : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale).range;
+  const layout =
+    layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked)
+    ?? { areaRows: plotAreaRows(block), width, gutter: 0, labelColumn: 0, areaWidth: width };
+  if (range === null) return emptyRows(block, layout, ctx);
+
+  const cursorIdx = ctx.cursorPositions?.[block.id];
+  const out = [
+    ...(stacked
+      ? stackedRows(block, range, layout, ctx)
+      : overlaidRows(block, range, layout, ctx, rasterise)),
+  ];
+  if (block.axes === true) {
+    if (cursorIdx !== undefined && Number.isFinite(cursorIdx)) {
+      out.push(...axisRowsWithCursor(block, cursorIdx, layout, ctx));
+    } else {
+      out.push(...axisRows(block, layout, ctx));
+    }
+  }
+  return out;
+}
+
 const FORM_ROWS: Readonly<
   Record<PlotForm, (block: Plot, width: number, ctx: RenderContext) => readonly string[]>
 > = {
@@ -614,64 +555,320 @@ const FORM_ROWS: Readonly<
     ];
   },
 
-  line: (block, width, ctx) => {
-    // `stacked` is decided before the layout, because it decides what the label
-    // column holds and therefore how wide it is.
-    const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
-    const data = seriesRange(block.series, block);
-    // **Snapped once, here, because the labels and the curve must share it**
-    // (§3d). `yLabels` derives the same axis and the operation is idempotent —
-    // the floor of a multiple of the step is that multiple — but deriving it
-    // twice and drawing against only one of them is a top label reading `100`
-    // above a curve whose ceiling is `87`. Every count agrees and the frame is
-    // a lie, which is this component's whole failure mode.
-    //
-    // A **stacked** plot has no ordinate — the label column holds series names
-    // (§5) — so there is nothing to be nice about and the data range stands.
-    const range =
-      data === null || stacked
-        ? data
-        : niceAxis(data, ticksFor(plotAreaRows(block)), block).range;
-    // Never `null` for a line: the third rung is the heatmap's, and this arm
-    // still ends at the full-width fallback. Narrowed here rather than widened
-    // there, so the one form that can refuse a width is the one that says so.
-    const layout =
-      layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked)
-      ?? { areaRows: plotAreaRows(block), width, gutter: 0, labelColumn: 0, areaWidth: width };
-    if (range === null) return emptyRows(block, layout, ctx);
+  line: (block, width, ctx) => positionalForm(block, width, ctx, curveRows),
 
-    const out = [
-      ...(stacked
-        ? stackedRows(block, range, layout, ctx)
-        : overlaidRows(block, range, layout, ctx)),
-    ];
-    if (block.axes === true) out.push(...axisRows(block, layout, ctx));
+  scatter: (block, width, ctx) => positionalForm(block, width, ctx, scatterRows),
+  step: (block, width, ctx) => positionalForm(block, width, ctx, stepRows),
+  ecdf: (block, width, ctx) => {
+    const ecdfBlock = {
+      ...block,
+      series: block.series.map((s) => ecdfSeries(s)),
+      yMin: block.yMin ?? 0,
+      yMax: block.yMax ?? 1,
+    };
+    return positionalForm(ecdfBlock, width, ctx, stepRows);
+  },
+  bar: (block, width, ctx) => {
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    const layout = block.layout ?? "overlap";
+    if (layout === "stacked" || layout === "normalised") {
+      let totalMax = 0;
+      const cats = block.categories ?? [];
+      for (let i = 0; i < cats.length; i++) { // cells-ok — a category count
+        let sum = 0;
+        for (const s of block.series) sum += (s.values[i] ?? 0);
+        totalMax = Math.max(totalMax, sum);
+      }
+      let ci = 0;
+      return categoricalForm(block, width, ctx, (_label, aw) =>
+        stackedBarRow(block.series, ci++, totalMax, aw, ctx.capabilities, layout === "normalised"),
+      );
+    }
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const v = block.series[0]?.values[ri++] ?? null;
+      return barRow(v, data.min, data.max, aw, ctx.capabilities);
+    });
+  },
+  histogram: (block, width, ctx) => {
+    const s = block.series[0];
+    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    const { labels, counts } = binValues(s.values, block.binning ?? "sturges");
+    if (counts.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx); // cells-ok — a bin count
+    const maxCount = Math.max(...counts);
+    const histBlock = { ...block, categories: labels };
+    let ci = 0;
+    return categoricalForm(histBlock, width, ctx, (_label, aw) =>
+      barRow(counts[ci++] ?? 0, 0, maxCount, aw, ctx.capabilities),
+    );
+  },
+  boxplot: (block, width, ctx) => {
+    const qs = block.quartiles ?? [];
+    if (qs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx); // cells-ok — a quartile count
+    let lo = Infinity, hi = -Infinity;
+    for (const q of qs) {
+      lo = Math.min(lo, q.min, ...(q.outliers ?? []));
+      hi = Math.max(hi, q.max, ...(q.outliers ?? []));
+    }
+    let qi = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const q = qs[qi++];
+      return q ? boxplotRow(q, lo, hi, aw, ctx.capabilities) : "";
+    });
+  },
+  forest: (block, width, ctx) => {
+    const qs = block.quartiles ?? [];
+    if (qs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx); // cells-ok — a quartile count
+    let lo = Infinity, hi = -Infinity;
+    for (const q of qs) {
+      lo = Math.min(lo, q.lower ?? q.min, ...(q.outliers ?? []));
+      hi = Math.max(hi, q.upper ?? q.max, ...(q.outliers ?? []));
+    }
+    let qi = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const q = qs[qi++];
+      return q ? forestRow(q, lo, hi, aw, ctx.capabilities) : "";
+    });
+  },
+  dumbbell: (block, width, ctx) => {
+    const s1 = block.series[0];
+    const s2 = block.series[1];
+    if (!s1 || !s2) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const v1 = s1.values[ri] ?? null;
+      const v2 = s2.values[ri] ?? null;
+      ri++;
+      if (v1 === null || v2 === null) return " ".repeat(aw);
+      return dumbbellRow(v1, v2, data.min, data.max, aw, ctx.capabilities);
+    });
+  },
+  lollipop: (block, width, ctx) => {
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const v = block.series[0]?.values[ri++] ?? null;
+      return lollipopRow(v, data.min, data.max, aw, ctx.capabilities);
+    });
+  },
+  dotplot: (block, width, ctx) => {
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const v = block.series[0]?.values[ri++] ?? null;
+      return dotplotRow(v, data.min, data.max, aw, ctx.capabilities);
+    });
+  },
+  waffle: (block, width, ctx) => {
+    const segs = block.segments ?? [];
+    if (segs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 10, width }, ctx); // cells-ok — a segment count
+    return waffleRows(segs, width, ctx.capabilities).map((r) =>
+      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 10, width }, ctx),
+    );
+  },
+  flame: (block, width, ctx) => {
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const v = block.series[0]?.values[ri++] ?? null;
+      return barRow(v, data.min, data.max, aw, ctx.capabilities, false);
+    });
+  },
+  icicle: (block, width, ctx) => {
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    const cats = [...(block.categories ?? [])].reverse();
+    const vals = [...(block.series[0]?.values ?? [])].reverse();
+    const flipped = { ...block, categories: cats, series: [{ ...block.series[0]!, values: vals }] };
+    let ri = 0;
+    return categoricalForm(flipped, width, ctx, (_label, aw) => {
+      const v = flipped.series[0]?.values[ri++] ?? null;
+      return barRow(v, data.min, data.max, aw, ctx.capabilities, false);
+    });
+  },
+  funnel: (block, width, ctx) => {
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const v = block.series[0]?.values[ri++] ?? null;
+      return funnelRow(v, data.max, aw, ctx.capabilities);
+    });
+  },
+  gantt: (block, width, ctx) => {
+    const offsets = block.offsets ?? [];
+    const s = block.series[0];
+    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < s.values.length; i++) { // cells-ok — a sample count
+      const start = offsets[i] ?? 0;
+      const dur = s.values[i] ?? 0;
+      lo = Math.min(lo, start);
+      hi = Math.max(hi, start + dur);
+    }
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const start = offsets[ri] ?? 0;
+      const v = s.values[ri++] ?? null;
+      return ganttRow(start, v, lo, hi, aw, ctx.capabilities);
+    });
+  },
+  waterfall: (block, width, ctx) => {
+    const s = block.series[0];
+    const totals = block.totals ?? [];
+    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    let cumulative = 0;
+    let lo = 0, hi = 0;
+    for (let i = 0; i < s.values.length; i++) { // cells-ok — a sample count
+      const v = s.values[i] ?? 0;
+      if (totals[i]) { cumulative = v; } else { cumulative += v; }
+      lo = Math.min(lo, cumulative);
+      hi = Math.max(hi, cumulative);
+    }
+    cumulative = 0;
+    let ri = 0;
+    return categoricalForm(block, width, ctx, (_label, aw) => {
+      const v = s.values[ri] ?? null;
+      const isTotal = totals[ri] ?? false;
+      ri++;
+      const baseline = cumulative;
+      if (v !== null) { if (isTotal) { cumulative = v; } else { cumulative += v; } }
+      return waterfallRow(v, baseline, lo, hi, aw, ctx.capabilities, isTotal);
+    });
+  },
+  streamgraph: (block, width, ctx) => {
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    return positionalForm(block, width, ctx, curveRows);
+  },
+  calendar: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  correlation: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  confusion: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  spectrogram: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  latency: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  density2d: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  density: (block, width, ctx) => {
+    const s = block.series[0];
+    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    const { series: ds, range } = densitySeries(s);
+    const densityBlock = { ...block, series: [ds], yMin: range.min, yMax: range.max };
+    return positionalForm(densityBlock, width, ctx, densityRows);
+  },
+  violin: (block, width, ctx) => {
+    const cats = block.categories ?? block.series.map((s, i) => s.label ?? `series ${String(i + 1)}`);
+    const areaRows = plotAreaRows(block);
+    const nCats = cats.length; // cells-ok — a category count
+    if (nCats === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
+
+    let maxLabel = 0;
+    for (const l of cats) maxLabel = Math.max(maxLabel, cells(l, ctx.capabilities.ambiguousWidth));
+    const axed = block.axes === true;
+    const gutterWidth = axed ? Math.min(maxLabel, Math.floor(width / 3)) + AXIS_GUTTER : 0;
+    const areaWidth = Math.max(1, width - gutterWidth);
+    const labelCol = gutterWidth > 0 ? gutterWidth - AXIS_GUTTER : 0;
+    const layout: Layout = { gutter: gutterWidth, labelColumn: labelCol, areaWidth, areaRows, width };
+
+    const rowsPerCat = Math.max(1, Math.floor(areaRows / nCats));
+    const out: string[] = [];
+
+    for (let ci = 0; ci < nCats; ci++) {
+      const s = block.series[ci];
+      const vRows = s
+        ? violinRows(s, areaWidth, rowsPerCat, ctx.capabilities)
+        : Array.from({ length: rowsPerCat }, () => " ".repeat(areaWidth));
+
+      const labelRow = Math.floor(rowsPerCat / 2);
+      const styled = slot(refOf({ values: [] }, ci), ctx.theme, ctx.capabilities);
+
+      for (let r = 0; r < rowsPerCat && out.length < areaRows; r++) { // cells-ok — a row count
+        const label = r === labelRow ? truncate(cats[ci] ?? "", labelCol, ctx.capabilities) : "";
+        const gutter = gutterSpans(label, layout, ctx);
+        out.push(
+          line(
+            [...gutter, { text: truncate(vRows[r] ?? " ".repeat(areaWidth), areaWidth, ctx.capabilities), style: styled }],
+            layout,
+            ctx,
+          ),
+        );
+      }
+    }
+
+    if (axed) out.push(...axisRows(block, layout, ctx));
     return out;
   },
-
-  heatmap: (block, width, ctx) => {
-    const range = seriesRange(block.series, block);
-    const layout = layoutFor(block, range ?? { min: 0, max: 1 }, width, false);
-    // **Rung 3** (I18): no cell to spare for a label beside a minimum plot area,
-    // so the block says so at its declared height rather than drawing a matrix
-    // nobody can read. I1 holds — a plot that shrank at a narrow width would
-    // move everything below it on a resize.
-    if (layout === null) {
-      const flat: Layout = {
-        areaRows: plotAreaRows(block),
-        width,
-        gutter: 0,
-        labelColumn: 0,
-        areaWidth: width,
-      };
-      return emptyRows({ ...block, emptyMessage: "Too narrow." }, flat, ctx);
-    }
-    // **Empty is a property of the block, not of a row** (§6a A3): a matrix every
-    // one of whose rows reported nothing is empty; a *row* that reported nothing
-    // is a row of blanks and keeps its place.
-    if (range === null) return emptyRows(block, layout, ctx);
-    return [...heatmapRows(block, range, layout, ctx), ...heatmapFurniture(block, range, layout, ctx)];
+  ridgeline: (block, width, ctx) => {
+    const cats = block.series.map((s, i) => s.label ?? `series ${String(i + 1)}`);
+    let ci = 0;
+    return categoricalForm({ ...block, categories: cats }, width, ctx, (_label, aw) => {
+      const s = block.series[ci++];
+      if (!s) return " ".repeat(aw);
+      const { series: ds, range } = densitySeries(s, aw);
+      const rows = densityRows(ds, range, aw, 1, ctx.capabilities);
+      return rows[0] ?? " ".repeat(aw);
+    });
   },
+  smallmultiples: (block, width, ctx) => {
+    const facets = block.facets ?? [];
+    const areaRows = plotAreaRows(block);
+    if (facets.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a facet count
+    return smallMultiplesRows(facets, width, ctx, FORM_ROWS).map((r) =>
+      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+    );
+  },
+  pairplot: (block, width, ctx) => {
+    const facets = block.facets ?? [];
+    const areaRows = plotAreaRows(block);
+    if (facets.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a facet count
+    return smallMultiplesRows(facets, width, ctx, FORM_ROWS).map((r) =>
+      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+    );
+  },
+  pie: (block, width, ctx) => {
+    const segs = block.segments ?? [];
+    const areaRows = plotAreaRows(block);
+    if (segs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a segment count
+    if (ctx.capabilities.unicode === "ascii") {
+      return waffleRows(segs, width, ctx.capabilities).map((r) =>
+        line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+      );
+    }
+    return pieRows(segs, width, areaRows, ctx.capabilities).map((r) =>
+      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+    );
+  },
+  radar: (block, width, ctx) => {
+    const cats = block.categories ?? [];
+    const areaRows = plotAreaRows(block);
+    if (cats.length === 0 || block.series.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a category count
+    if (ctx.capabilities.unicode === "ascii") {
+      return radarAsciiRows(block.series, cats, width).map((r) =>
+        line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+      );
+    }
+    return radarRows(block.series, cats, width, areaRows, ctx.capabilities).map((r) =>
+      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+    );
+  },
+  horizon: (block, width, ctx) => {
+    const s = block.series[0];
+    const areaRows = plotAreaRows(block);
+    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
+    const data = seriesRange(block.series, block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
+    const bands = block.bands ?? 3;
+    return horizonRows(s, data, bands, width, areaRows, ctx.capabilities).map((r) =>
+      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+    );
+  },
+
+  heatmap: (block, width, ctx) => heatmapFormRows(block, width, ctx),
 };
 
 const render = (block: Plot, ctx: RenderContext): ReactElement => {

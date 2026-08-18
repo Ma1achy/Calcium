@@ -649,10 +649,18 @@ const CATEGORY_LIMIT = 8;
  * that is exactly how the last vocabulary widening shipped a validator that
  * refused every document using the new member.
  */
-const PLOT_FORM_MEMBERS = { line: true, sparkline: true, heatmap: true } satisfies Record<
-  PlotForm,
-  true
->;
+const PLOT_FORM_MEMBERS = {
+  line: true, sparkline: true, heatmap: true,
+  scatter: true, step: true, ecdf: true,
+  bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
+  lollipop: true, dotplot: true, waffle: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true,
+  calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
+  density: true, violin: true, ridgeline: true,
+  smallmultiples: true, pairplot: true,
+  pie: true, radar: true,
+  horizon: true,
+} satisfies Record<PlotForm, true>;
 const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 
 /**

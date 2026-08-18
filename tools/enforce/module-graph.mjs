@@ -583,6 +583,20 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "describes the block it came from rather than the slice it shows, and a hand-built patch " +
     "that set it would be asserting a gutter its own lines do not justify. `windowPatch` is " +
     "the one writer, and a builder exposing it would offer a consumer the drift (F134)",
+
+  // --- plot forms: fields whose builders are being built (step 11) ----------
+  "plot.categories": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.layout": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.binning": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.quartiles": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.offsets": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.totals": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.startDate": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.bands": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.facets": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.segments": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.xScale": "step 0 scaffolding — builder shorthand lands in step 11",
+  "plot.yScale": "step 0 scaffolding — builder shorthand lands in step 11",
 });
 
 /** `Kind.field` for every block field, and whether a builder mentions it. */
@@ -1469,7 +1483,8 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "VerbRatio.flagged": "C08 — as `recorded`",
   "CompletionResult.superseded": "C19 — the token-of-validity outcome; asserted at three tiers and never branched on by a component, which is C19 I13's whole point",
   "EngineOptions.onSourceError": "C19 — the injected error sink; supplied by tests and defaulted in the engine",
-  "Graph.log": "C22 — the construction log, read by `tools/` and by seven test files. A component reading it would be a second record of construction order",
+  // **`Graph.log` was here and is gone** — the equality arm removed it the day
+  // it stopped being unconsumed.
   "Identity.user": "C22 — the identity record's fields, asserted by the identity tests. `SessionSnapshot` carries it and no component destructures it",
   "Identity.email": "C22 — as `user`",
   "Identity.groups": "C22 — as `user`",
@@ -1508,9 +1523,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // app.** Gaps, not exemptions — listed so the suite is readable rather than
   // red, and the citation is what makes the entry expire: the equality arm fires
   // the day any of them gains a consumer. FINDINGS F99.
-  "GlyphSet.teeLeft": "**F99** — a declared glyph slot with no drawer. Box-drawing",
-  "GlyphSet.teeRight": "**F99** — as `teeLeft`",
-  "GlyphSet.hollow": "**F99** — as `teeLeft`",
   "GlyphSet.blocked":
     "**F99** — and this one is *semantic* rather than box-drawing, so a theme declaring " +
     "it gets nothing and the absence reads as a theme error rather than a missing renderer",
@@ -1578,6 +1590,7 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Failure.actual":
     "**F99** — the measured value beside `expected`, which *is* read. A failure report " +
     "naming what was expected and not what happened is the half that makes it actionable",
+
 });
 
 /**

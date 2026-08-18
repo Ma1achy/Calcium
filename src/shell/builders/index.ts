@@ -84,6 +84,7 @@ import type {
   StepInput,
 } from "./types.js";
 import { rememberLive } from "./live.js";
+import { FigureBuilder } from "./figure.js";
 
 // --- the two shared decisions ---------------------------------------------
 
@@ -807,6 +808,8 @@ export const b = {
   plot,
   spark,
   progress,
+  figure: (opts?: { title?: string; height?: number; axes?: boolean; yFormat?: Plot["yFormat"]; yMin?: number; yMax?: number }) =>
+    new FigureBuilder(opts),
   code,
   comparison,
   patch,
