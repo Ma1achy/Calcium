@@ -743,6 +743,49 @@ five fields with no renderer are five phantoms of exactly the kind this pass was
 producing. The ruling is taken so that whoever writes the renderer does not re-derive it; the
 members arrive with their first surface.
 
+**`legend` has now arrived, and this is the note that says so.** C12 §3g builds the row and
+the gutter, so the condition this paragraph names is met for one of the five. It is recorded
+here rather than only there because a deferral states its blocker where the deferral is and the
+thing that satisfies it gets written somewhere else — which is how `Annotation.label` (I52) sat
+owed while the gutter it was waiting for stayed unbuilt and unwatched. **The other four —
+title, caption, tick maxima, x formatter — are still owed on the same terms**, and naming them
+again is cheaper than rediscovering the ruling.
+
+**The legend's ruling above needs one correction, and measuring it is why.** The table reads
+*a row (top/bottom) or a gutter (left/right)* as though the two were the same kind of cost.
+They are not: a row must be declared before the data is visible because C12 I1 forbids a height
+derived from series, and a gutter may size itself to its content because the y-label gutter
+already does. That asymmetry decides which placement can turn itself on, and the table as
+written would have had a renderer discover it.
+
+### The eight forms that were missing, and the one that shares a name with a block
+
+Eight chart types the survey names and the union never carried. Each is a fold of machinery
+that already exists rather than a new rasterisation, which is the test for whether it belongs
+in `PlotForm` at all:
+
+| form | it is | built from |
+|---|---|---|
+| `stackedarea` | cumulative bands from zero | the stacking fold, new |
+| `slope` | two value columns joined by lines — ranking change | the box-drawing polyline |
+| `bubble` | scatter with a size channel | the braille canvas plus a fourth encoding axis |
+| `autocorrelation` | lag bars with a confidence band | `barRow` plus §3e's band |
+| `timeline` | event marks on a time axis | the glyph-row family |
+| `bullet` | a bar with a target marker and qualitative bands | `barRow` plus §3e's marker |
+| `utilisation` | one cell per unit, shaded by load | the matrix family |
+| `treemap` | nested rectangles | `hierarchy`, below |
+
+**`streamgraph` is not new and was not a streamgraph.** It dispatched to the same renderer as
+`line`, differing only by an empty-data guard: nothing stacked, no baseline offset, no fill. It
+is **one rule change from `stackedarea`** — same fold, the offset centred rather than anchored
+at zero — which is why the two land together and why neither is a separate rasteriser.
+
+**`progress` is not a `PlotForm` and must not become one.** `kind: "progress"` is a C09 block
+and `fill` is its encoding (C12 I20): a bar against a declared total, where an empty run legibly
+reads as *zero*. A plot form is a **comparison** across positions or categories. The two share
+a word and no axis, and §3b's own test — *does it change the plot area* — is not the question
+that separates them; *what does the number mean* is.
+
 ### Actions
 
 ```typescript
@@ -1160,6 +1203,9 @@ persisted document rests on.
 - **I50c** — **A cell carries at most one of `spark` and `bar`, and a `bar` declares a scale it may exceed.** Both fill the planned width and return before truncation, so a cell holding both has two renderings and no rule for which wins. `max` is the scale's top rather than a bound on the value: the fill clamps there and the number does not (C09 I28), because a ceiling that is not knowable — a per-core CPU percentage, a quota that can be over-committed — is the case a bar is reached for. **`value: null` is absent and draws a mark**, never an empty bar, which would read as *zero* (C12 I4's rule, in the one form where an empty run is a legible value).
 - **I51** — **A `keyValue` row may carry a `bar`, which sits *beside* its value and declares the cells it occupies.** Two shipped surfaces draw one — docker's `MEM` and S13's cluster panel — and in both the bar has a text next to it rather than in place of one, so this is not `Cell.bar`'s seam (I50c) with a different owner. The width is on the row because a `keyValue` value column is a **remainder** and a table column is a **width**: `valueBar` given the whole remainder draws a 68-cell run at a terminal width of 80, correct in every count and a picture no surface asked for. It is not on `BarSpec`, which `Cell` shares and where the column already answers — two sources for one number is the audit's D6 before the code exists to have it. **A bar with no room left is the bar, not the text**: below `MIN_RUN` the row is what `valueBar` returns for a cell that narrow, because the quantity is why the row carries a bar at all. **`barWidth` is a sibling of `bar` rather than a member of it, and the pairing is `validateBlock`'s** — the intersection the ruling wanted breaks every `b.kv` call taking a tone shorthand, since those return a `Cell` whose `bar` is a plain `BarSpec`. Type-legal and validator-refused is what I50c already does for a cell holding both a `spark` and a `bar`.
 - **I52** — **A `Plot` may carry annotations: claims about the ordinate, drawn behind the data, with an out-of-range edge dropped rather than clamped.** Two kinds, `line` and `band`, and the six named chart types the survey lists are folds of them rather than forms — a Q-Q plot is a scatter and a reference line, ROC is a line and a diagonal. **A band is one statement with two edges**, not a fill, because a fill competes for the cells the curve occupies and is indistinguishable from it at one bit. **`tone` is decoration and never the carrier** (F34): C12 draws the line dashed where a curve is continuous, so the distinction survives one bit and a colour-blind reader. **Dropped rather than clamped is the one place this differs from a sample** — I29 clamps data because pressing it against a ceiling is honest, and an annotation is a claim about *where* a value sits, so one moved onto a scale it is outside says the limit is somewhere it is not. **There is no `label` and it is owed**: the gutter is a scale and widening it for a string that is not one changes the plot area, while a label inside the area overwrites the curve it exists to be compared against. It arrives with the legend row that can hold it (C12 §3e, I23).
+- **I53** — **A `QuartileSummary` may carry a `mean`, and it is not the median.** The five-number summary has no place for it and a boxplot that cannot show one answers a question nobody asked — *where is the centre* has two answers whenever a distribution is skewed, and showing only the median hides exactly the case the reader is looking for. Optional, because a summary computed from quantiles alone genuinely does not have it, and **drawn with its own mark** rather than the median's: two centres sharing a glyph is D29's failure with a shape instead of a colour. *C12 §3i is what renders it; a violin is a boxplot that also shows the distribution, so it draws the same overlay.*
+- **I54** — **A `Plot` may carry a `hierarchy`: a nested structure with a value per node, for the three forms whose subject is containment.** `flame`, `icicle` and `treemap` cannot be built from `series` plus `categories` — a call stack is depth and offset, a treemap is area and nesting, and neither is a list of labelled magnitudes. The two that already existed proved it: `flame` and `icicle` both dispatched to `barRow` with labels suppressed, so they were a bar chart and a reversed bar chart, correct in every count and about nothing. **One field for three forms rather than three shapes**, because the thing they disagree about is layout and the thing they share is the tree.
+- **I55** — **A style field is a literal union, and where its values are generated the union is generated beside them.** `colormap` is `ColormapName`, 142 members generated with the tables; `palette` shipped next to it as a bare `string`, so `palette: "tab-10"` compiles and fails at render — the exact shape I50's colormap clause refuses, one field along. **A name that resolves to nothing renders uncoloured**, which is F172's shape and the one this type will not reproduce twice. `plotFrame`, `legend`, `plotDetail` and `matrixAnchor` are unions for the same reason, and `matrixAnchor` additionally keys its table by `PlotForm` rather than `string`, so a new matrix form cannot silently inherit a default nobody chose for it.
 
 ---
 
@@ -1222,6 +1268,9 @@ persisted document rests on.
 48. **A plot carries at most eight series** — the categorical palette's size, refused at construction rather than cycled, because a repeated colour is a segmentation that lies (I50a, roadmap 51).
 50. **A heatmap refuses what has no meaning for a matrix** — a row tone, `axes: false`, and rows of differing length — rather than ignoring it, because an ignored member reads as one not yet implemented (I50b, C12 §6a).
 47. **A copy is not bounded by the box that hides it** — the container's `copy` is its children's sources joined, unchanged by the offset, and a kind with no expressible source contributes nothing rather than its rendering (I50, §3c).
+54. Eight forms the survey named and the union never carried, each a fold of existing machinery (I54 for the three that are not).
+55. `QuartileSummary.mean`, drawn with its own mark so two centres never share a glyph (I53).
+56. Every style field is a literal union, generated alongside its data where the values are generated (I55).
 
 ---
 

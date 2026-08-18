@@ -924,6 +924,147 @@ nullable ordinate (`Series.values`, `Cell.spark`, C04 I46a, I4's wording), and t
 ramp. **With the build**: the form member, the three refusals, the exhaustive switch, A7's
 recast limit, and the golden set above.
 
+## 3f. Furniture — one compositor, and four gutters is the reason
+
+**The gutter is written four times.** `gutterSpans` (definition.ts), a near-identical copy
+in `heatmap.ts`, and inline label-width loops in `categoricalForm` and `bandedForm`. Each was
+reasonable when written: a form's author found the existing one did not quite fit and wrote
+theirs. That is how the duplication arrived and it is how it would return.
+
+**The defect it produced is not aesthetic.** `labelWidth` and `padStart` both default their
+measurement to `ambiguousWidth: "narrow"`. Two of the four copies pass the real capability;
+the positional one never does. So on a terminal reporting `"wide"`, a y-label containing an
+ambiguous-width character — the em-dash `formatValue` returns for a non-finite value — measures
+one cell and draws two, and that row's `│` sits one column right of every other row's. **The
+axis is not straight, and the cause is that four things measure and only two were told what
+they were measuring against.**
+
+`furniture.ts` owns it. A form supplies its area rows and, sparsely, its gutter labels; the
+compositor measures, pads, and appends the bottom furniture. **It asserts that the rows it
+returns equal `plotHeight(block)`** — turning a per-form convention that four call sites each
+had to get right into one checked invariant (I24).
+
+### `plotFrame` — the references disagree, so it is a field
+
+| value | shape | after |
+|---|---|---|
+| `"box"` *(default)* | closed border, tick marks on both axes | UnicodePlots `:solid`, plotext |
+| `"corners"` | four corner marks, blank edges | UnicodePlots `:corners` |
+| `"grid"` | closed border plus dashed gridlines at each tick | kitty.r |
+| `"rule"` | left `│` and bottom `└───` only | what shipped before this |
+
+**`axes: false` still suppresses all of it.** `plotFrame` picks the shape when there is
+furniture; it does not decide whether there is any. Two fields, two questions — a single
+enum spelling `"none"` would make `axes: false, plotFrame: "box"` expressible and meaningless.
+
+**Gridlines draw behind the data.** `mergedRow` resolves first-non-blank, so the grid layer is
+appended last for the reason an annotation is (§3e): a rule that overwrote a sample would hide
+what it exists to be measured against.
+
+**`"corners"` has no edge for a tick to sit on**, which is a rule interaction and not an
+omission — the tick row is suppressed there rather than drawn against nothing.
+
+---
+
+## 3g. The legend — and the two axes are not symmetric
+
+C04 §3b already ruled that legend position belongs on `Plot`, and deferred it: *the members
+arrive with their first surface.* This is that surface. C04 I52 defers `Annotation.label` to
+the same place — *it arrives with the legend row that can hold it* — so one row closes two
+conditions that were written down and then watched by nothing.
+
+| value | shape | costs |
+|---|---|---|
+| `"right"` *(default)* | one entry per line down the right side | **width** |
+| `"left"` | the same, outside the y-label gutter | **width** |
+| `"above"` | a row between the title and the frame | **a declared row** |
+| `"below"` | a row under the x-labels | **a declared row** |
+
+**The asymmetry is forced by I1 and is the whole content of the default.** `plotHeight` is
+computable from the block's geometry alone, with `series` structurally unreachable. A
+horizontal legend costs a **row**, so its cost must be declared before the data is visible —
+it is a fixed one row and it never turns itself on. A vertical legend costs **width**, which is
+already data-dependent because `layoutFor` sizes the gutter from the y-range, so it can size
+itself to the longest label and auto-enable when it is needed without the height invariant
+noticing. **`"right"` is the default because it is the only placement that can.**
+
+**Auto-enabled only where colour is the sole identifier** — where `mergedRow` composites more
+than one layer into shared cells with no adjacent label: the positional family, `pie`,
+`radar`, `waffle`, **and `bar`/`histogram` under `layout: "stacked" | "normalised"`**.
+
+That last one is why this is a table and not a sentence. *Categorical forms name each row in
+the gutter, so they never need a legend* reads as correct, is correct for eleven of twelve
+members, and `stackedBarRow` composites series into one row with no per-series label anywhere.
+**A row governed by one rule restates that rule and finds nothing.**
+
+**Skipped entirely at `colourDepth: 1`**, where the positional family already falls back to
+`stackedRows` and its per-series row labels. A swatch with no colour in it is worse than no
+swatch — it is a legend that has stopped being one and still occupies the row.
+
+**Horizontal placements truncate with a count**, reusing I8's existing wording: the entries
+that fit, plus how many did not. **Vertical placements cap at a third of the width**, matching
+`categoricalForm`'s existing bound, because T3.3's ladder holds — labels are dropped before the
+plot area is starved.
+
+---
+
+## 3h. Colour is never the only channel — the rule I6 states and four forms break
+
+I6 says series are never distinguished by colour alone, and it is scoped to *multi-series
+plots*, which is why four forms satisfy it and are unreadable without colour anyway:
+
+| form | every category draws | at 1-bit |
+|---|---|---|
+| `pie` | the same braille glyph | one undifferentiated blob |
+| `waffle` | one `pairFor` pair for all segments | one solid block |
+| `bar`, stacked | one `mark.filled` for every layer | no visible segment boundary |
+| `radar` | the same stroke glyph per series | two polygons, indistinguishable |
+
+**None of these is a multi-series plot in I6's sense** — a pie has *segments*, a stacked bar has
+*layers* — so the invariant was true throughout and the pictures were still colour-only. I25
+restates it over the thing that actually matters: **two things a reader must tell apart differ
+by mark, not only by tone.**
+
+`CATEGORY_MARKS` is a ladder of eight, matching the palette's cap, reached by `markOf(index,
+caps)` beside the existing `refOf(series, index)`. **Not the shade ramp** — `░ ▒ ▓` encode a
+value along an axis (§3c), and spending them on category identity is exactly the vocabulary
+mismatch `ramp.ts` was written about. **The marks are named slots**, never literals at a call
+site, for §3c's reason and SS47's.
+
+**The gate is a sweep over `ONE_PER_FORM`, not an assertion per form**: render every member at
+`colourDepth: 1` with two or more categories, strip SGR, and require at least as many distinct
+glyphs as categories. A new form that ships colour-only fails on its first run without anyone
+remembering this section exists.
+
+---
+
+## 3i. `plotDetail` — the mode fits the height, and never sets it
+
+A boxplot at one row per category cannot show a mean; at three it is the reference figure. A
+violin needs five before an outline and its box overlay are both legible. Both wants are real
+and neither should cost the caller arithmetic.
+
+| form | `"compact"` | `"full"` |
+|---|---|---|
+| `boxplot` | 1 row — whiskers, box, median, mean | 3 rows |
+| `violin` | 2 rows — mirrored outline | 5+ rows, with the box overlaid |
+| `ridgeline` | 1 row per series | 3+ rows per series, overlapping |
+
+**`plotDetail` selects a renderer inside the declared height; it never contributes to it.**
+That is forced, not chosen: rows-per-band times category count derives height from the data,
+which is precisely what I1 forbids. `bandedForm` keeps dividing the declared area by the
+category count and the mode picks which renderer fits the quotient.
+
+**So `"auto"` means the richest form the declared height affords** — and a caller who wrote
+`height: 12` for four categories gets full boxplots without having asked for them.
+
+**An explicit `"full"` under an insufficient budget degrades to compact and says so.** Silently
+drawing three rows into a one-row band is the class this component keeps having; the
+interaction is three-way — declared height, mode, category count — and belongs in the
+classification table as its own rows.
+
+---
+
 ---
 
 ## 7. Invariants
@@ -951,6 +1092,11 @@ recast limit, and the golden set above.
 - **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density and fill are three encodings and `position` is a fourth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
 - **I22** — **An axis picks nice numbers, snaps a derived bound outward, never moves a declared one, and drops a tick that would abut its neighbour.** The step is 1, 2, 2.5, 5 or 10 times a power of ten — 2.5 is in the set because without it `0 · 25 · 50 · 75 · 100` is unreachable. **The snap is per end** (C04 I29): loose labelling exists so the ends read round and a pinned axis exists so two plots can be compared, so a pin that silently grew would defeat what it is for. **Precision is one per axis and comes from the step** — the smallest gap two labels can differ by — and it is the step's *own* decimals rather than two significant figures of it, and a named precision is **kept in the string** rather than trimmed back into three (F177). **The tick count is a result**, bounded below by how fine a step is worth asking for and above by how many labels the height seats two rows apart. **And a step the arithmetic cannot pick is `0`**, never a plausible constant: a denormal span underflows, and `1` there snaps `5e-324 … 1e-323` to `0 … 1`, which terminates and is wrong where nothing downstream can detect it (F178).
 - **I23** — **An annotation is a dashed line in the same raster, drawn behind the data, and an edge outside the range is dropped rather than clamped.** Dashed is the carrier and the tone is decoration (F34): a reference line is broken where a curve is continuous, at every colour depth. **A band is two lines** — one statement, two edges — because a fill would compete for the cells the curve occupies. **Behind, and the layer order is the rule**: one that overwrote a sample would hide what it exists to be compared against. **Dropped rather than clamped is the one place this differs from a sample** (C04 I29): data pressed against a ceiling is honest, and a claim about *where a value sits* moved onto a scale it is outside is not. **At ASCII it is not the raster** — `foldRamp` encodes height, and folding a one-dot line by ink weight drew `# # # #`, heavier than the curve; there the line is drawn at cell resolution with `-`, which is narrow under both width conventions where every box-drawing dash is not.
+- **I24** — **One compositor owns the gutter, the frame and the legend, and it asserts its own row count.** Four independent gutter implementations is what produced a y-axis that is not straight: `labelWidth` and `padStart` default to `ambiguousWidth: "narrow"` and only two of the four passed the real capability, so one row's `│` sits a column right of the others wherever an ambiguous-width label appears. **The assertion is the point rather than the deduplication** — `area.rows + furniture === plotHeight(block)` was a convention four call sites each had to honour and is now one checked equality (I1's other half, at render time rather than at measure time).
+- **I25** — **Two things a reader must tell apart differ by mark, never by tone alone.** I6 says this of multi-series plots and is satisfied by `pie`, `waffle`, stacked `bar` and `radar`, none of which is one — a pie has segments, a stacked bar has layers — and all four of which drew a single glyph for every category. **The marks are a ladder of eight and not the shade ramp**: `░ ▒ ▓` encode magnitude along an axis (I21), and spending them on identity is the vocabulary mismatch that cost two defects already. *Asserted as a sweep over every form at `colourDepth: 1`, because a rule remembered per form is a rule that lapses on the thirty-fifth.*
+- **I26** — **`plotFrame` chooses the shape of the furniture and `axes` chooses whether there is any.** Two fields because they answer two questions, and a single enum spelling `"none"` would make `axes: false, plotFrame: "box"` expressible and meaningless. Gridlines are appended last and resolve behind the data, for I23's reason exactly. **`"corners"` suppresses the tick row** rather than drawing ticks against an edge that is not there.
+- **I27** — **A legend costs width or a row, and only the width-costing placements may enable themselves.** A row must declare its cost before the data is visible (I1); width is already data-dependent through the gutter, so it may not. That is why `"right"` is the default and `"above"`/`"below"` are opt-in — not a preference. **Skipped entirely at `colourDepth: 1`**, where a swatch carries nothing and still takes the row.
+- **I28** — **`plotDetail` selects a renderer inside the declared height and never contributes to it**, because rows-per-band times category count is a height derived from data (I1). `"auto"` is the richest renderer the quotient affords; an explicit `"full"` that does not fit degrades to `"compact"` and reports rather than overflowing its band.
 
 ---
 
@@ -976,6 +1122,11 @@ recast limit, and the golden set above.
 18. **A vocabulary carries its encoding axis and a renderer asks for an axis** — so the mismatch that cost two defects is unspellable rather than reviewable, and a stand-in is declared rather than commented (I21, §3c).
 19. **An axis is nice numbers, one precision from the step, and a density that is a result** — a derived bound snaps outward and a declared one never moves, a tick that would abut its neighbour is dropped, and a step the arithmetic cannot pick is nothing rather than a plausible constant (I22, §3d).
 20. **An annotation is one feature and six named chart types are folds of it** — a dashed line in the data's own raster, behind it, with an out-of-range edge dropped rather than clamped; and the bar's target marker shares its name and not its mechanism (I23, §3e).
+21. One compositor owns the gutter, frame and legend, and asserts its row count against `plotHeight` (I24).
+22. `plotFrame` ships four shapes — box, corners, grid, rule — with `axes` still deciding whether furniture exists at all (I26).
+23. A legend in four placements, auto-enabling only where it costs width rather than a declared row (I27).
+24. Category identity survives colour loss, asserted as a sweep over every form rather than per form (I25).
+25. `plotDetail` picks a renderer inside the declared height and degrades rather than overflowing (I28).
 
 ---
 
