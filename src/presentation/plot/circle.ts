@@ -64,45 +64,80 @@ function minSegmentFraction(radius: number): number {
  * At ASCII, degrades to a textual fallback (the waffle handles that at the
  * FORM_ROWS level).
  */
-export function pieRows(
+export type PieLayer = Readonly<{ glyphRows: readonly string[]; segmentIndex: number }>;
+
+/**
+ * Per-segment braille layers for coloured rendering.
+ *
+ * Each segment gets its own grid with its arc fill + the shared outline.
+ * The caller assigns colours per layer.
+ */
+export function pieLayers(
   segments: readonly Segment[],
   areaWidth: number,
   areaRows: number,
-  _caps: Caps,
-): readonly string[] {
+): readonly PieLayer[] {
   const dots = BRAILLE_DOTS;
-  const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
-  const cx = Math.floor(grid.dotWidth / 2);
-  const cy = Math.floor(grid.dotHeight / 2);
+  const emptyGrid = createGrid(areaWidth * dots.x, areaRows * dots.y);
+  const cx = Math.floor(emptyGrid.dotWidth / 2);
+  const cy = Math.floor(emptyGrid.dotHeight / 2);
   const r = Math.min(cx, cy) - 1;
 
-  if (r < 2) return foldBraille(grid);
+  if (r < 2) return [{ glyphRows: foldBraille(emptyGrid), segmentIndex: 0 }];
 
   const total = segments.reduce((a, s) => a + Math.max(0, s.value), 0);
-  if (total <= 0) return foldBraille(grid);
+  if (total <= 0) return [{ glyphRows: foldBraille(emptyGrid), segmentIndex: 0 }];
 
   const minFrac = minSegmentFraction(r);
-  const visible: { label: string; fraction: number }[] = [];
+  const visible: { label: string; fraction: number; originalIndex: number }[] = [];
   let otherFrac = 0;
 
-  for (const s of segments) {
+  for (let i = 0; i < segments.length; i++) { // cells-ok — a segment count
+    const s = segments[i]!;
     const frac = s.value / total;
     if (frac < minFrac) { otherFrac += frac; }
-    else { visible.push({ label: s.label, fraction: frac }); }
+    else { visible.push({ label: s.label, fraction: frac, originalIndex: i }); }
   }
-  if (otherFrac > 0) visible.push({ label: "other", fraction: otherFrac });
+  if (otherFrac > 0) visible.push({ label: "other", fraction: otherFrac, originalIndex: segments.length }); // cells-ok — a segment count
 
-  drawCircle(grid, cx, cy, r);
+  const layers: PieLayer[] = [];
 
   let angle = -Math.PI / 2;
   for (const seg of visible) {
-    drawRadialLine(grid, cx, cy, r, angle);
+    const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
     const endAngle = angle + seg.fraction * 2 * Math.PI;
+
     drawArc(grid, cx, cy, r, angle, endAngle);
+    drawRadialLine(grid, cx, cy, r, angle);
+    fillArc(grid, cx, cy, r, angle, endAngle);
+
+    layers.push({ glyphRows: foldBraille(grid), segmentIndex: seg.originalIndex });
     angle = endAngle;
   }
 
-  return foldBraille(grid);
+  return layers;
+}
+
+function fillArc(
+  grid: ReturnType<typeof createGrid>,
+  cx: number, cy: number, r: number,
+  startAngle: number, endAngle: number,
+): void {
+  const rSq = r * r;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > rSq) continue;
+      const a = Math.atan2(dy, dx);
+      let normA = a;
+      let normStart = startAngle;
+      let normEnd = endAngle;
+      while (normA < normStart) normA += 2 * Math.PI;
+      while (normEnd < normStart) normEnd += 2 * Math.PI;
+      if (normA >= normStart && normA <= normEnd) {
+        setDot(grid, cx + dx, cy + dy);
+      }
+    }
+  }
 }
 
 /**

@@ -34,10 +34,10 @@ import { sparkline } from "./sparkline.js";
 import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
 import { boxplotRow, forestRow, dumbbellRow } from "./glyph-row.js";
 import { barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
-import { waffleRows } from "./waffle.js";
+import { waffleRows, waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
 import { densitySeries, densityRows, violinRows } from "./kde.js";
-import { pieRows, radarRows, radarAsciiRows } from "./circle.js";
+import { pieLayers, radarRows, radarAsciiRows } from "./circle.js";
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
@@ -460,7 +460,7 @@ function categoricalForm(
   block: Plot,
   width: number,
   ctx: RenderContext,
-  rowBuilder: (label: string, areaWidth: number) => string,
+  rowBuilder: (label: string, areaWidth: number, categoryIndex: number) => string,
 ): readonly string[] {
   const cats = block.categories ?? [];
   const areaRows = plotAreaRows(block);
@@ -478,13 +478,11 @@ function categoricalForm(
   for (let i = 0; i < areaRows; i++) {
     const cat = labels[i] ?? "";
     const label = i < labels.length ? truncate(cat, labelCol, ctx.capabilities) : ""; // cells-ok — a label count
-    const content = i < labels.length ? rowBuilder(cat, areaWidth) : ""; // cells-ok — a label count
+    const content = i < labels.length ? rowBuilder(cat, areaWidth, i) : ""; // cells-ok — a label count
     const gutter = gutterSpans(label, layout, ctx);
-    const styled = slot(
-      refOf(block.series[0] ?? { values: [] }, 0),
-      ctx.theme,
-      ctx.capabilities,
-    );
+    const s = block.series[i] ?? block.series[0];
+    const ref = s?.tone !== undefined ? `tone.${s.tone}` as ColourRef : (CATEGORY_REFS[i % CATEGORY_REFS.length] ?? "categorical.c1"); // cells-ok — a category index
+    const styled = slot(ref, ctx.theme, ctx.capabilities);
     out.push(
       line(
         [...gutter, { text: truncate(content, areaWidth, ctx.capabilities), style: styled }],
@@ -666,10 +664,30 @@ const FORM_ROWS: Readonly<
   },
   waffle: (block, width, ctx) => {
     const segs = block.segments ?? [];
-    if (segs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 10, width }, ctx); // cells-ok — a segment count
-    return waffleRows(segs, width, ctx.capabilities).map((r) =>
-      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 10, width }, ctx),
-    );
+    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 10, width };
+    if (segs.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a segment count
+    const cellRows = waffleCells(segs, width, ctx.capabilities);
+    return cellRows.map((row) => {
+      const spans: Span[] = [];
+      let run = "";
+      let runIdx = -1;
+      const flush = (): void => {
+        if (run === "") return;
+        if (runIdx >= 0) {
+          const ref = CATEGORY_REFS[runIdx % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a segment index
+          spans.push({ text: run, style: slot(ref, ctx.theme, ctx.capabilities) });
+        } else {
+          spans.push({ text: run });
+        }
+        run = "";
+      };
+      for (const cell of row) {
+        if (cell.segmentIndex !== runIdx) { flush(); runIdx = cell.segmentIndex; }
+        run += cell.mark;
+      }
+      flush();
+      return line(spans, layout, ctx);
+    });
   },
   flame: (block, width, ctx) => {
     const data = seriesRange(block.series, block);
@@ -833,15 +851,21 @@ const FORM_ROWS: Readonly<
   pie: (block, width, ctx) => {
     const segs = block.segments ?? [];
     const areaRows = plotAreaRows(block);
-    if (segs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a segment count
+    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+    if (segs.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a segment count
     if (ctx.capabilities.unicode === "ascii") {
-      return waffleRows(segs, width, ctx.capabilities).map((r) =>
-        line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
-      );
+      return waffleRows(segs, width, ctx.capabilities).map((r) => line([{ text: r }], layout, ctx));
     }
-    return pieRows(segs, width, areaRows, ctx.capabilities).map((r) =>
-      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
-    );
+    const layers: Layer[] = pieLayers(segs, width, areaRows).map((pl) => ({
+      glyphRows: pl.glyphRows,
+      ref: CATEGORY_REFS[pl.segmentIndex % CATEGORY_REFS.length] ?? "categorical.c1", // cells-ok — a segment index
+    }));
+    if (layers.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
+    const out: string[] = [];
+    for (let r = 0; r < areaRows; r++) {
+      out.push(line(mergedRow(layers, r, layout, ctx), layout, ctx));
+    }
+    return out;
   },
   radar: (block, width, ctx) => {
     const cats = block.categories ?? [];

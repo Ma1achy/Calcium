@@ -7,27 +7,36 @@ import type { Segment } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { pairFor } from "./ramp.js";
 
-type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
+
+export type WaffleCell = Readonly<{ mark: string; segmentIndex: number }>;
 
 /**
  * 10 rows of exactly `width` cells. Each cell represents 1% of the total.
  *
- * Segments fill left-to-right, top-to-bottom. The grid is always 10 rows;
- * `width` determines column count (clamped to 10 for a square waffle when
- * wider, but we use all available width and repeat segments proportionally).
+ * Segments fill left-to-right, top-to-bottom.
  */
 export function waffleRows(
   segments: readonly Segment[],
   width: number,
   caps: Caps,
 ): readonly string[] {
+  return waffleCells(segments, width, caps).map((row) => row.map((c) => c.mark).join(""));
+}
+
+/**
+ * Per-cell segment info for coloured rendering.
+ */
+export function waffleCells(
+  segments: readonly Segment[],
+  width: number,
+  caps: Pick<Caps, "unicode" | "ambiguousWidth" | "colourDepth">,
+): readonly (readonly WaffleCell[])[] {
   const w = Math.max(1, Math.floor(width));
   const cols = Math.min(w, 10);
   const gridSize = 100;
 
-  const mark = pairFor(caps);
-  const filled = mark.filled;
-  const empty = mark.empty;
+  const pair = pairFor(caps);
 
   const sum = segments.reduce((a, s) => a + s.value, 0);
   const scale = sum > 0 ? gridSize / sum : 0;
@@ -41,15 +50,19 @@ export function waffleRows(
     }
   });
 
-  const rows: string[] = [];
+  const rows: WaffleCell[][] = [];
   for (let r = 0; r < 10; r++) {
-    let row = "";
+    const row: WaffleCell[] = [];
     for (let c = 0; c < cols; c++) {
-      const cell = grid[r * 10 + c];
-      row += cell !== undefined && cell >= 0 ? filled : empty;
+      const cell = grid[r * 10 + c]!;
+      row.push(cell >= 0
+        ? { mark: pair.filled, segmentIndex: cell }
+        : { mark: pair.empty, segmentIndex: -1 });
     }
-    const pad = " ".repeat(Math.max(0, w - cols));
-    rows.push(row + pad);
+    for (let c = cols; c < w; c++) {
+      row.push({ mark: " ", segmentIndex: -1 });
+    }
+    rows.push(row);
   }
   return rows;
 }
