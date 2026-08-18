@@ -197,33 +197,45 @@ export function violinRows(
     upper.push([x, edge(x, -1)]);
     lower.push([x, edge(x, 1)]);
   }
+  // **No end caps.** Closing the ring drew a vertical wall at each extreme, so
+  // the figure was a capped blob rather than a shape that tapers into the axis.
+  // A violin's tails go to nothing and meet the centre line; they are not
+  // stopped by a bar.
   strokePolyline(mask, upper, false);
   strokePolyline(mask, lower, false);
-  strokePolyline(mask, [upper[0]!, lower[0]!], false);
-  strokePolyline(mask, [upper[w - 1]!, lower[w - 1]!], false);
 
-  const grid: string[][] = mask.map((r) => r.map((m) => glyphForMask(m, corners, caps)));
+  const spineRow = Math.round(mid);
+  const gl = glyphs(caps);
 
-  // The box, inside the outline it exists to be compared against. A violin
-  // without it is a density plot lying on its side.
+  // **The spine is a full-width rule, drawn before the outline.** Two defects
+  // shared one cause: the summary marks sat on a row with nothing under them
+  // wherever the body was narrow, so a median or a mean in a tail appeared to
+  // float outside the shape. And an outline cell carrying a single edge bit
+  // renders as a stub — `╴` — rather than joining its neighbour, so a fast
+  // density change left visible gaps. A rule across the whole area gives every
+  // mark something to sit on and closes the joins along the centre.
+  const grid: string[][] = mask.map((r, y) =>
+    r.map((m) => {
+      const g = glyphForMask(m, corners, caps);
+      return g === " " && y === spineRow ? gl.horizontal : g;
+    }),
+  );
+
+  // The box, on the spine. A violin is a box plot that also shows the
+  // distribution, so this is not decoration — it is the other half of the form.
   if (quartiles !== undefined) {
     const span = hi - lo + 2 * pad;
     const at = (v: number): number =>
       Math.max(0, Math.min(w - 1, Math.round(((v - (lo - pad)) / (span || 1)) * (w - 1))));
-    const spine = Math.round(mid);
-    const g = glyphs(caps);
     const put = (x: number, ch: string): void => {
-      if (x >= 0 && x < w && grid[spine]?.[x] === " ") grid[spine]![x] = ch;
+      if (x >= 0 && x < w) grid[spineRow]![x] = ch;
     };
-    for (let x = at(quartiles.q1); x <= at(quartiles.q3); x += 1) put(x, g.horizontal);
-    put(at(quartiles.q1), g.teeLeft);
-    put(at(quartiles.q3), g.teeRight);
-    grid[spine]![at(quartiles.median)] = g.vertical;
+    put(at(quartiles.q1), gl.vertical);
+    put(at(quartiles.q3), gl.vertical);
+    put(at(quartiles.median), gl.teeDown);
     if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
       const xm = at(quartiles.mean);
-      if (xm !== at(quartiles.median) && xm >= 0 && xm < w) {
-        grid[spine]![xm] = caps.unicode === "ascii" ? "x" : "\u25c6";
-      }
+      if (xm !== at(quartiles.median)) put(xm, gl.diamond);
     }
   }
 
