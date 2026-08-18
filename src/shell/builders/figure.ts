@@ -39,6 +39,7 @@ type FigureOpts = {
   yScale?: ScaleType;
   plotStyle?: "auto" | "braille" | "line";
   plotCorners?: "rounded" | "sharp";
+  palette?: string;
 };
 
 type SeriesOpts = {
@@ -222,6 +223,7 @@ export class FigureBuilder {
       ...(this.opts.yScale !== undefined ? { yScale: this.opts.yScale } : {}),
       ...(this.opts.plotStyle !== undefined ? { plotStyle: this.opts.plotStyle } : {}),
       ...(this.opts.plotCorners !== undefined ? { plotCorners: this.opts.plotCorners } : {}),
+      ...(this.opts.palette !== undefined ? { palette: this.opts.palette } : {}),
       ...(this.xLabels_ !== undefined ? { xLabels: this.xLabels_ } : {}),
       ...(this.annotationList.length > 0 ? { annotations: Object.freeze([...this.annotationList]) } : {}),
       ...(this.categories_ !== undefined ? { categories: this.categories_ } : {}),

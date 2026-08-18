@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
-import { FULL_CAPS, ASCII_CAPS, MONO_CAPS, measurable } from "../support/render.js";
+import { FULL_CAPS, measurable } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });

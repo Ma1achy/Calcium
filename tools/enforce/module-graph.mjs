@@ -1540,13 +1540,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // deleting the row is how the fact would otherwise disappear — the rule's own
   // sentence, *an exemption that outlives its reason is how the list stops being
   // read*, applied to the thing the exemption was about.
-  "Colormap.stops":
-    "**read inside its own module, and that is the shape rather than an oversight.** `sample` " +
-    "is the only reader and it is the only reader there should be: a colormap is a *function* " +
-    "from a normalised value to a colour, and a consumer reaching past `sample` into the table " +
-    "is a consumer doing its own interpolation. MG24 counts names outside the declaring file " +
-    "and is right that none does — the answer is that none should. It gains an outside reader " +
-    "the day a legend draws the ramp itself, which needs a row to draw it in (C10 I31)",
   // **`Colormap.kind` is deliberately not here**, and the staleness arm is what
   // said so: MG24 matches member names across `src/` without regard to owner
   // (F136), and `kind` is on nearly every block type, so a `Colormap.kind` entry

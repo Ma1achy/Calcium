@@ -516,15 +516,9 @@ export type Series = Readonly<{
  * third surface. A union makes the wrong name a compile error and
  * `COLORMAP_NAMES` makes it a document error.
  */
-export type ColormapName = "viridis" | "magma" | "coolwarm" | "twilight";
-
-const COLORMAP_MEMBERS = {
-  viridis: true, magma: true, coolwarm: true, twilight: true,
-} satisfies Record<ColormapName, true>;
-
-export const COLORMAP_NAMES: readonly ColormapName[] = Object.freeze(
-  Object.keys(COLORMAP_MEMBERS) as ColormapName[],
-);
+import type { ColormapName as ColormapName_ } from "../colormaps/index.js";
+export type ColormapName = ColormapName_;
+export { COLORMAP_MEMBERS, COLORMAP_NAMES } from "../colormaps/index.js";
 
 /**
  * Every plot form, named so every dispatcher can be exhaustive over them.
@@ -659,6 +653,7 @@ export type Plot = Readonly<{
   yScale?: ScaleType;
   plotStyle?: "auto" | "braille" | "line";
   plotCorners?: "rounded" | "sharp";
+  palette?: string;
 }> & Gap;
 
 export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };

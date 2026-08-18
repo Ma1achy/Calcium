@@ -261,10 +261,6 @@ function quantiseSet(slots: Readonly<Record<string, string>>): Readonly<Record<s
  * close, so rank preservation has nothing to hold apart and per-sample nearest
  * neighbour is the right answer here for the reason it is the wrong one there.
  */
-export function nearestCubeIndex(hex: string): number {
-  return nearest(toLab(hex)).index;
-}
-
 /** Nearest cube entry satisfying `allowed`, or the nearest overall (I1: total). */
 function nearest(
   lab: readonly [number, number, number],

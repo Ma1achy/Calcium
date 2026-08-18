@@ -4,171 +4,69 @@
  * **A colormap is framework data, not theme tokens, and that is the first
  * ruling.** The plan called for a fourth *palette family*; measured against the
  * shape, it is not one. A `PaletteSpec` is `slots: Record<string, hex>` — a
- * closed set of named rôles a theme authors — and a colormap is a **function**
+ * closed set of named roles a theme authors — and a colormap is a **function**
  * from a normalised value to a colour, sampled at whatever resolution the
  * consumer needs. Writing it as slots means 256 entries per map per theme, and
  * it would say something false: **viridis is viridis on every theme.** A theme
  * chooses which map, never what it contains.
  *
- * That has a consequence worth stating: F172's scenario — *writing
- * `continuous.s3` before the family exists renders uncoloured and green* —
- * **cannot arise**, because `ColourRef` never reaches here. There is no family
- * to be missing.
- *
- * ## Three kinds, because the kind is a property of the data
- *
- * ```
- * sequential   low → high            viridis · magma
- * diverging    low ← MID → high      blue-white-red
- * cyclic       wraps at both ends    twilight
- * ```
- *
- * Using a sequential map for diverging data hides the sign — a correlation
- * matrix in viridis makes −0.9 and +0.1 look adjacent — so **a `diverging` map
- * used without a midpoint is a construction error**, not a default of zero.
+ * **256 entries per map, taken from matplotlib.** The old 9-stop approximations
+ * are replaced by exact tables. At 24-bit the lookup is direct with linear
+ * interpolation between adjacent entries. At 8-bit a precomputed ANSI 256 index
+ * per entry avoids the per-cell CIELAB distance calculation.
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { ColourValue } from "./types.js";
-import type { ColormapName } from "../../data/viewmodel/index.js";
-import { nearestCubeIndex } from "./resolve.js";
+import {
+  COLORMAPS_WITH_REVERSED,
+  COLORMAPS_256,
+  type ColormapEntry,
+} from "../../data/colormaps/index.js";
 
-export type ColormapKind = "sequential" | "diverging" | "cyclic";
+export type ColormapKind = "sequential" | "diverging" | "cyclic" | "miscellaneous";
 
-export type Colormap = Readonly<{
-  name: string;
-  kind: ColormapKind;
-  /** Stops in order, sampled evenly across `[0, 1]`. */
-  stops: readonly string[];
-}>;
+export type Colormap = ColormapEntry;
 
-/**
- * The tables, sampled at ninths.
- *
- * **Sampled, and said so rather than claimed exact.** matplotlib distributes
- * viridis as 256 triples; these are its values at ninths with linear sRGB
- * interpolation between them, which is a *near* viridis and not byte-identical
- * to that table. Stating the resolution is the whole of the honesty here: a
- * table called `viridis` that nobody can reproduce is worse than one that says
- * how it was made.
- *
- * **Why it is enough, measured rather than asserted**: colour reaches a terminal
- * at 24-bit or through the 256-cube, and `colormap.test.ts` measures the
- * interpolation's disagreement with the anchors against the cube's own step. At
- * 8-bit the approximation is below the quantisation floor and cannot be seen; at
- * 24-bit it is visible and is a different shade of the same map, which is a cost
- * this records rather than hides.
- */
-const VIRIDIS: Colormap = Object.freeze({
-  name: "viridis",
-  kind: "sequential",
-  stops: Object.freeze([
-    "#440154", "#472d7b", "#3b528b", "#2c728e", "#21918c",
-    "#28ae80", "#5ec962", "#addc30", "#fde725",
-  ]),
-});
-
-const MAGMA: Colormap = Object.freeze({
-  name: "magma",
-  kind: "sequential",
-  stops: Object.freeze([
-    "#000004", "#180f3d", "#440f76", "#721f81", "#9e2f7f",
-    "#cd4071", "#f1605d", "#fd9668", "#fecf92",
-  ]),
-});
+export const COLORMAPS: Readonly<Record<string, Colormap>> = COLORMAPS_WITH_REVERSED;
 
 /**
- * Blue–white–red, and the white is the midpoint rather than a stop like any
- * other: it is the value the data's zero maps to, and a diverging map read
- * without one is a sequential map with a light patch in it.
- */
-const COOLWARM: Colormap = Object.freeze({
-  name: "coolwarm",
-  kind: "diverging",
-  stops: Object.freeze([
-    "#3b4cc0", "#6788ee", "#9abbff", "#c9d7f0", "#edd1c2",
-    "#f7a889", "#e26952", "#b40426", "#8b0000",
-  ]),
-});
-
-/** Twilight — light at both ends, so a phase of 0 and 2π read alike. */
-const TWILIGHT: Colormap = Object.freeze({
-  name: "twilight",
-  kind: "cyclic",
-  stops: Object.freeze([
-    "#e2d9e2", "#9ebeda", "#5a86ad", "#40518f", "#372a50",
-    "#4a3055", "#7c4a6f", "#b5748a", "#e2d9e2",
-  ]),
-});
-
-/**
- * The tables, keyed by C04's vocabulary.
+ * Sample the map at `t`, clamped into `[0, 1]`.
  *
- * `Record<ColormapName, …>` rather than `Record<string, …>`: a name added to the
- * schema without a table here stops compiling, which is the direction the
- * mistake must not fall — a document that validates and paints nothing is F172.
- */
-export const COLORMAPS: Readonly<Record<ColormapName, Colormap>> = Object.freeze({
-  viridis: VIRIDIS,
-  magma: MAGMA,
-  coolwarm: COOLWARM,
-  twilight: TWILIGHT,
-});
-
-function channel(hex: string, at: number): number {
-  return Number.parseInt(hex.slice(at, at + 2), 16);
-}
-
-function mix(a: string, b: string, t: number): string {
-  const of = (at: number): string =>
-    Math.round(channel(a, at) + (channel(b, at) - channel(a, at)) * t)
-      .toString(16)
-      .padStart(2, "0");
-  return `#${of(1)}${of(3)}${of(5)}`;
-}
-
-/**
- * The colour at `t`, clamped into `[0, 1]`.
- *
- * **Clamped rather than wrapped, including for `cyclic`.** A cyclic map's ends
- * meet, which is a statement about the *colours* — that a phase of 0 and 2π read
- * alike — and not permission to fold an out-of-range value back into the scale.
- * A value above the ceiling is out of range in every kind, and the caller's
- * range is what decides where the wrap is.
+ * Direct lookup into the 256-entry table with linear interpolation between
+ * adjacent entries. At the ends, clamps rather than wraps.
  */
 export function sample(map: Colormap, t: number): string {
-  const stops = map.stops;
-  const first = stops[0] ?? "#000000";
-  if (!Number.isFinite(t) || stops.length === 0) return first;
+  const data = map.data;
+  if (data.length === 0) return "#000000"; // cells-ok — a data length
+  if (!Number.isFinite(t)) return rgbHex(data[0]!);
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
-  const scaled = clamped * (stops.length - 1);
+  const scaled = clamped * (data.length - 1); // cells-ok — a data length
   const low = Math.floor(scaled);
-  const high = Math.min(stops.length - 1, low + 1);
-  return mix(stops[low] ?? first, stops[high] ?? first, scaled - low);
+  const high = Math.min(data.length - 1, low + 1); // cells-ok — a data length
+  const frac = scaled - low;
+  const lo = data[low]!;
+  const hi = data[high]!;
+  const r = Math.round(lo[0] + (hi[0] - lo[0]) * frac);
+  const g = Math.round(lo[1] + (hi[1] - lo[1]) * frac);
+  const b = Math.round(lo[2] + (hi[2] - lo[2]) * frac);
+  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+}
+
+function hex2(n: number): string {
+  return n.toString(16).padStart(2, "0");
+}
+
+function rgbHex(c: readonly [number, number, number]): string {
+  return `#${hex2(c[0])}${hex2(c[1])}${hex2(c[2])}`;
 }
 
 /**
  * The depth below which a continuous map says **nothing** (I31).
- *
- * **Not *six levels* — nothing, and it rests on an invariant already ruled.**
- * I26 records that at 4-bit `0–15 are whatever the emulator's palette says`. A
- * sequential map's entire content is an **ordering**, and an ordering built from
- * indices whose luminances are unknown is not an ordering — it is sixteen
- * colours in an arbitrary sequence wearing viridis's name.
- *
- * So this is not a coarse rung, it is a **vacuous** one, and it declares itself
- * the way the heatmap's 1-bit rung does. That also makes 1-bit unchanged **by
- * construction** rather than by a fallback: colour is already gone one rung
- * above it, and density — which has eight steps at every depth — was the carrier
- * throughout (F34).
  */
 const CONTINUOUS_FLOOR = 8;
 
 /**
  * A continuous colour for a normalised value, or `undefined` for *no colour*.
- *
- * `undefined` rather than a default is the point: a caller that receives it
- * paints no foreground and the glyph carries the value alone, which is what it
- * was already doing.
  */
 export function continuousColour(
   map: Colormap,
@@ -176,11 +74,22 @@ export function continuousColour(
   caps: Pick<TerminalCapabilities, "colourDepth">,
 ): ColourValue | undefined {
   if (caps.colourDepth < CONTINUOUS_FLOOR) return undefined;
+  if (caps.colourDepth >= 24) {
+    const hex = sample(map, t);
+    return { kind: "rgb", hex };
+  }
+  // 8-bit: use precomputed ANSI 256 index
+  const lut = COLORMAPS_256[map.name];
+  if (lut !== undefined) {
+    const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+    const index = Math.round(clamped * (lut.length - 1)); // cells-ok — a LUT length
+    return { kind: "ansi256", index: lut[index] ?? 16 };
+  }
+  // Fallback: sample and convert
   const hex = sample(map, t);
-  // 24-bit takes the sample; 8-bit takes the cube entry nearest it, per sample
-  // rather than per set — see `nearestCubeIndex` for why that inverts a palette's
-  // rule rather than contradicting it.
-  return caps.colourDepth >= 24
-    ? { kind: "rgb", hex }
-    : { kind: "ansi256", index: nearestCubeIndex(hex) };
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { kind: "ansi256", index: 16 + 36 * Math.round(r / 255 * 5) + 6 * Math.round(g / 255 * 5) + Math.round(b / 255 * 5) };
 }
+
