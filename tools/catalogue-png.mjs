@@ -12,6 +12,11 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
+import { defaultTheme, loadTheme } from "../src/presentation/theme/index.js";
+
+const loadedTheme = loadTheme(defaultTheme, "dark");
+if (!loadedTheme.ok) throw new Error("theme failed to load");
+const THEME = loadedTheme.value.current.tokens;
 
 const CATALOGUE = join(import.meta.dirname, "..", "docs", "catalogue");
 
@@ -19,25 +24,57 @@ const FONT_SIZE = 14;
 const CELL_W = 8.41;
 const CELL_H = 18;
 const PAD = 6;
-const BG = "#1a1a2e";
-const FG = "#cccccc";
+const GAP = 10;
+/**
+ * **The page colours come from the theme, and the reason is a defect.**
+ * These were `#1a1a2e` and `#cccccc` — an indigo and a grey that appear in no
+ * theme, no capability set, and none of the 560 generated frames. Every
+ * catalogue PNG anyone reviewed was drawn on a blue field this file invented,
+ * and the question "why is the background blue" had no answer in the data.
+ *
+ * The dark theme declares `background: "terminal"` — it paints nothing and
+ * inherits. A PNG has no terminal to inherit from, so `surfaces.bg` is the
+ * honest stand-in for the surface such a terminal would have, and
+ * `tone.default` is what an unstyled cell resolves to.
+ */
+const BG = THEME.surfaces.bg;
+const FG = THEME.palettes.tone.slots.default ?? "#d4d4d4";
 
 const ESC = /\x1b\[([0-9;]*)m/g;
+
+/** The sheet canvas fill, as sharp wants it — same source as every panel's. */
+export function sheetBg() {
+  const h = BG.replace("#", "");
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+    alpha: 1,
+  };
+}
 
 export function parseLine(raw) {
   const spans = [];
   let colour = FG;
+  let background = null;
   let pos = 0;
   for (const m of raw.matchAll(ESC)) {
     if (m.index > pos) {
-      spans.push({ text: raw.slice(pos, m.index), colour });
+      spans.push({ text: raw.slice(pos, m.index), colour, background });
     }
     pos = m.index + m[0].length;
     const params = m[1].split(";").map(Number);
     if (params[0] === 0) {
       colour = FG;
+      background = null;
     } else if (params[0] === 39) {
       colour = FG;
+    } else if (params[0] === 49) {
+      background = null;
+    } else if (params[0] === 48 && params[1] === 2 && params.length >= 5) {
+      background = `rgb(${params[2]},${params[3]},${params[4]})`;
+    } else if (params[0] === 48 && params[1] === 5 && params.length >= 3) {
+      background = colour256(params[2]);
     } else if (params[0] === 38 && params[1] === 2 && params.length >= 5) {
       colour = `rgb(${params[2]},${params[3]},${params[4]})`;
     } else if (params[0] === 38 && params[1] === 5 && params.length >= 3) {
@@ -50,7 +87,7 @@ export function parseLine(raw) {
     }
   }
   if (pos < raw.length) {
-    spans.push({ text: raw.slice(pos), colour });
+    spans.push({ text: raw.slice(pos), colour, background });
   }
   return spans;
 }
@@ -145,6 +182,25 @@ export function ansiToSvg(ansi) {
     let col = 0;
     const y = PAD + (row + 1) * CELL_H - 4;
 
+    // Background runs first, so a glyph is never painted over by its own cell's
+    // fill. Nothing in the framework emits these today — plots resolve no
+    // background at all — but a swallowed code is how this renderer already
+    // shipped drawing every frame in the default foreground.
+    {
+      let bgCol = 0;
+      for (const span of spans) {
+        const n = [...span.text].length;
+        if (span.background !== null && n > 0) {
+          const x = PAD + bgCol * CELL_W;
+          parts.push(
+            `<rect x="${x.toFixed(1)}" y="${(PAD + row * CELL_H).toFixed(1)}" ` +
+            `width="${(n * CELL_W).toFixed(1)}" height="${CELL_H}" fill="${span.background}"/>`,
+          );
+        }
+        bgCol += n;
+      }
+    }
+
     for (const span of spans) {
       if (span.text.length === 0) continue;
       // Split into braille and non-braille runs
@@ -207,7 +263,11 @@ for (const file of txtFiles) {
 
   await sharp(Buffer.from(svg), { density: 144 }).png().toFile(pngPath);
 
-  if (file.includes("-default-") && file.endsWith("-24bit.txt")) {
+  // **Every 24-bit frame, not the ones whose variant happens to be called
+  // "default".** That filter silently excluded `histogram` and `horizon`
+  // entirely — neither has a variant by that name — so the sheet showed 24 of
+  // 34 forms and read as complete.
+  if (file.endsWith("-24bit.txt")) {
     const buf = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
     contactParts.push({ name: file, buf });
   }
@@ -222,18 +282,26 @@ if (contactParts.length > 0) {
     }),
   );
 
-  const maxW = Math.max(...images.map((i) => i.w));
-  const totalH = images.reduce((sum, i) => sum + i.h, 0);
-
+  // Masonry: each panel goes in the currently-shortest column. Panel heights
+  // vary by an order of magnitude (a sparkline is 1 row, a violin is 18), so a
+  // fixed grid is mostly whitespace and a single column is 300 panels tall.
+  const COLS = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(images.length / 3))));
+  const colW = Math.max(...images.map((i) => i.w)) + GAP;
+  const colH = new Array(COLS).fill(0);
   const composites = [];
-  let y = 0;
   for (const { buf, h } of images) {
-    composites.push({ input: buf, left: 0, top: y });
-    y += h;
+    let c = 0;
+    for (let i = 1; i < COLS; i++) if (colH[i] < colH[c]) c = i;
+    composites.push({ input: buf, left: c * colW, top: colH[c] });
+    colH[c] += h + GAP;
   }
+  const maxW = COLS * colW;
+  const totalH = Math.max(...colH);
 
   await sharp({
-    create: { width: maxW, height: totalH, channels: 4, background: { r: 26, g: 26, b: 46, alpha: 1 } },
+    // Was a second, independent `{r:26,g:26,b:46}` — the same invented indigo
+    // written twice, so fixing one would have left the other.
+    create: { width: maxW, height: totalH, channels: 4, background: sheetBg() },
   })
     .composite(composites)
     .png()

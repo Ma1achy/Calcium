@@ -13,7 +13,9 @@ import { describe, expect, it } from "vitest";
 import { CAPS, FORMS, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { brailleDots, colour256, isBraille, parseLine } from "../../tools/catalogue-png.mjs";
+import { brailleDots, colour256, isBraille, parseLine, sheetBg } from "../../tools/catalogue-png.mjs";
+import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
+import { ALL_FORMS } from "../support/plot-forms.js";
 
 const forms = FORMS as Record<string, Record<string, Record<string, unknown>>>;
 const caps = CAPS as readonly { name: string; caps: Record<string, unknown> }[];
@@ -21,6 +23,7 @@ const frame = frameFor as (s: unknown, c: unknown, w: number) => readonly string
 const strip = stripSgr as (s: string) => string;
 const spans = parseLine as (s: string) => readonly { text: string; colour: string }[];
 const dots = brailleDots as (ch: string) => readonly (readonly [number, number])[];
+const pageBg = sheetBg as () => { r: number; g: number; b: number; alpha: number };
 
 describe("plot-catalogue — the corpus renders", () => {
   it("PC1: the corpus is non-empty, and so is every frame in it", () => {
@@ -61,6 +64,55 @@ describe("catalogue-png — the parser that failed silently", () => {
   it("PC4: the 256-colour cube maps to its own corners", () => {
     expect(colour256(16)).toBe("rgb(0,0,0)");
     expect(colour256(231)).toBe("rgb(255,255,255)");
+  });
+
+  it("PC6: every PlotForm has a catalogue entry, and every entry renders", () => {
+    // **The gap this closes was a quarter of the component.** `FORMS` used to be
+    // an untyped literal in a `.mjs`, and eight forms — flame, icicle, calendar,
+    // spectrogram, latency, density2d, smallmultiples, pairplot — had no frame at
+    // all, so every visual review of "the catalogue" was reading 26 of 34 forms
+    // and could not tell. PC1 could not see it: it asserts `> 20` forms, and 26
+    // is more than 20.
+    //
+    // The `Record<PlotForm, …>` in catalogue-forms.ts makes a *missing* form a
+    // compile error. This row is the other direction — that the entry actually
+    // draws something — and it is the half a type cannot check.
+    const catalogued = Object.keys(CATALOGUE_FORMS);
+    expect([...catalogued].sort()).toEqual([...ALL_FORMS].sort());
+
+    const barren: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const rows = frame(spec, caps[0]!.caps, 80);
+        const ink = rows.map((r) => strip(r).trim()).join("");
+        if (variant.includes("empty")) continue;
+        if (ink.length === 0) barren.push(`${form}/${variant}`);
+      }
+    }
+    expect(barren, "catalogued but rendering nothing").toEqual([]);
+  });
+
+  it("PC7: the page background comes from the theme, not from this file", () => {
+    // **`#1a1a2e`.** An indigo that appears in no theme, no capability set and
+    // none of the generated frames — invented here, written twice, and the
+    // answer to "why is the background blue" for as long as anyone asked.
+    // The dark theme's surface is #1a1a1a. The two differ only in the blue
+    // channel, which is exactly why nobody spotted it as wrong rather than dim.
+    const bg = pageBg();
+    expect({ r: bg.r, g: bg.g, b: bg.b }).toEqual({ r: 0x1a, g: 0x1a, b: 0x1a });
+    expect(bg.b, "the invented indigo's blue channel").not.toBe(0x2e);
+  });
+
+  it("PC8: a background SGR is parsed rather than swallowed", () => {
+    // The parser tracked foreground only, so `48;…` fell through its if/else
+    // chain as a no-op — the same shape as the `38;2` defect this file was
+    // written for, one code along.
+    const runs = parseLine("\x1b[48;2;10;20;30mAB\x1b[49mCD") as readonly {
+      text: string; colour: string; background: string | null;
+    }[];
+    expect(runs.map((r) => r.text).join("")).toBe("ABCD");
+    expect(runs.find((r) => r.text === "AB")?.background).toBe("rgb(10,20,30)");
+    expect(runs.find((r) => r.text === "CD")?.background).toBe(null);
   });
 
   it("PC5: braille dots land where the codepoint says", () => {
