@@ -329,6 +329,27 @@ function summaryOf(series: Series): QuartileSummary | undefined {
 /** A summary with nothing in it — what a band with no samples falls back to. */
 const EMPTY_SUMMARY: QuartileSummary = Object.freeze({ min: 0, q1: 0, median: 0, q3: 0, max: 0 });
 
+/**
+ * The cells every bar in a chart keeps for its number (C12 I20, §3b).
+ *
+ * **One allowance for the chart, because per row it inverts**: at `max: 100`
+ * in 40 cells, 99 drew 37 and 100 drew 36 — a larger value, a shorter bar.
+ * The widest label is what every run is then scaled against, so two equal
+ * values draw equal runs whatever their neighbours are.
+ */
+function labelAllowance(
+  values: readonly (number | null)[],
+  format: Plot["yFormat"],
+  caps: RenderContext["capabilities"],
+): number {
+  let widest = 0;
+  for (const v of values) {
+    if (v === null || !Number.isFinite(v)) continue;
+    widest = Math.max(widest, cells(` ${formatReadout(v, format)}`, caps.ambiguousWidth)); // cells-ok — a label width
+  }
+  return widest;
+}
+
 function baselineFor(dataMin: number): number {
   return Math.min(0, dataMin);
 }
@@ -1642,7 +1663,8 @@ const FORM_ROWS: Readonly<
       const perSeries = block.series.length; // cells-ok — a series count
       return categoricalForm(
         grouped, width, ctx,
-        (_label, aw) => barRow(ordered[oi++] ?? null, base, data.max, aw, ctx.capabilities, true, block.yFormat),
+        (_label, aw) => barRow(ordered[oi++] ?? null, base, data.max, aw, ctx.capabilities, true, block.yFormat,
+          labelAllowance(ordered, block.yFormat, ctx.capabilities)),
         // Rows run category-major, so row `r` is series `r % n` — which is what
         // the legend names, and what slot `r` did not.
         (r) => slotOf(r % perSeries), // cells-ok — a series index
@@ -1653,14 +1675,15 @@ const FORM_ROWS: Readonly<
     // the eighths fill from the cell's bottom rather than its left.
     if (block.orientation === "vertical") {
       return categoricalColumnForm(block, width, ctx, (i, cw, rows, lo, hi) =>
-        barColumn(block.series[0]?.values[i] ?? null, lo, hi, cw, rows, ctx.capabilities),
+        barColumn(block.series[0]?.values[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat),
       );
     }
     let ri = 0;
     const base = baselineFor(data.min);
+    const allow = labelAllowance(block.series[0]?.values ?? [], block.yFormat, ctx.capabilities);
     return categoricalForm(block, width, ctx, (_label, aw) => {
       const v = block.series[0]?.values[ri++] ?? null;
-      return barRow(v, base, data.max, aw, ctx.capabilities, true, block.yFormat);
+      return barRow(v, base, data.max, aw, ctx.capabilities, true, block.yFormat, allow);
     });
   },
   histogram: (block, width, ctx) => {
@@ -1680,12 +1703,13 @@ const FORM_ROWS: Readonly<
       // bottom axis names.
       const edged = { ...histBlock, categories: edges.slice(0, counts.length).map((e) => e.trim()) }; // cells-ok — a bin count
       return categoricalColumnForm(edged, width, ctx, (i, cw, rows, lo, hi) =>
-        barColumn(counts[i] ?? 0, lo, hi, cw, rows, ctx.capabilities),
+        barColumn(counts[i] ?? 0, lo, hi, cw, rows, ctx.capabilities, true),
       );
     }
     let ci = 0;
+    const histAllow = labelAllowance(counts, undefined, ctx.capabilities);
     return categoricalForm(histBlock, width, ctx, (_label, aw) =>
-      barRow(counts[ci++] ?? 0, 0, maxCount, aw, ctx.capabilities, true),
+      barRow(counts[ci++] ?? 0, 0, maxCount, aw, ctx.capabilities, true, undefined, histAllow),
     );
   },
   boxplot: (block, width, ctx) => {

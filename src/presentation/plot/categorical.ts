@@ -48,6 +48,18 @@ export function barRow(
   caps: Caps,
   showValue = true,
   format?: Plot["yFormat"],
+  /**
+   * The cells to keep for the number, for **every** row of this chart.
+   *
+   * **Taken per row it inverts** (C12 I20, §3b). At `max: 100` in 40 cells, 99
+   * drew 37 and 100 drew 36 — a larger value, a shorter bar — because `100` is
+   * a column wider than `99` and each run was scaled against what its own label
+   * left. Every count in both rows was right.
+   *
+   * Absent, the row falls back to its own label's width, which is what a lone
+   * `barRow` outside a chart can know.
+   */
+  allowance?: number,
 ): string {
   const w = Math.max(1, Math.floor(width));
   const ext = extentFor(caps);
@@ -60,14 +72,18 @@ export function barRow(
   // three times before; this was the fourth, in the one place a reader reads
   // the number rather than the picture.
   const label = showValue ? ` ${formatReadout(value, format)}` : "";
-  const labelCells = cells(label, caps.ambiguousWidth);
+  const own = cells(label, caps.ambiguousWidth);
+  const labelCells = showValue ? Math.max(own, allowance ?? own) : 0; // cells-ok — a label width
   const barWidth = Math.max(0, w - labelCells);
 
   const span = max - min;
   const t = span <= 0 ? 0 : (value - min) / span;
   const run = extentRun(t, barWidth, ext);
   const pad = " ".repeat(Math.max(0, barWidth - cells(run, caps.ambiguousWidth)));
-  return (run + pad + label).slice(0, w);
+  // Right-aligned in the allowance, so the numbers line up under each other and
+  // every run starts and ends on the same scale.
+  const gap = " ".repeat(Math.max(0, labelCells - own)); // cells-ok — a label width
+  return (run + pad + gap + label).slice(0, w);
 }
 
 /**
@@ -93,6 +109,8 @@ export function barColumn(
   width: number,
   rows: number,
   caps: Caps,
+  showValue = false,
+  format?: Plot["yFormat"],
 ): readonly string[] {
   const w = Math.max(1, Math.floor(width));
   const h = Math.max(1, Math.floor(rows));
@@ -118,6 +136,25 @@ export function barColumn(
     else if (fromBottom === whole && part > 0) out.push((steps[part - 1] ?? top).repeat(w)); // cells-ok — a ladder index
     else out.push(blank);
   }
+  if (!showValue) return out;
+
+  // **The number above the run, and dropped rather than shrunk** (C12 I20,
+  // §3b). The horizontal arm takes the label out of the row's width because
+  // there the run *is* the axis; here the column is read against the value
+  // scale in the gutter, so a bar shortened to fit its number would draw a
+  // value its own axis contradicts.
+  const text = formatReadout(value, format);
+  const wide = cells(text, caps.ambiguousWidth); // cells-ok — a label width
+  // Wider than its column would truncate — a different number — or spill into
+  // the neighbouring band and label the wrong bar.
+  if (wide > w) return out; // cells-ok — a label width
+  // The topmost inked row, or the baseline where nothing is inked: a bar of no
+  // height has its top where the ink would have started.
+  const inked = part > 0 ? whole + 1 : whole; // cells-ok — a row count
+  const at = h - 1 - inked; // cells-ok — a row index
+  if (at < 0) return out; // cells-ok — a row index
+  const left = Math.floor((w - wide) / 2); // cells-ok — a column position
+  out[at] = " ".repeat(left) + text + " ".repeat(w - left - wide);
   return out;
 }
 

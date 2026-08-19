@@ -38,8 +38,15 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
     series: [s([3, 1, 4, 1, 5, 9, 2, 6])],
   }),
   bar: block({
+    // **The values cross two digit boundaries, and that is the fixture rather
+    // than the data** (C12 I20, §3b). They were `[10, 25, 15, 30]` — four
+    // two-digit numbers — so every bar reserved the same width for its label
+    // whatever the rule was, and the corpus could not tell *one allowance for
+    // the chart* from *each row against its own*. Landing that fix moved eight
+    // vertical frames and not one horizontal frame, out of 292; 8 and 100 are
+    // what make it visible.
     kind: "plot", id: "form-bar", form: "bar", height: 4, axes: true,
-    series: [s([10, 25, 15, 30])],
+    series: [s([8, 25, 15, 100])],
     categories: ["alpha", "beta", "gamma", "delta"],
   }),
   histogram: block({

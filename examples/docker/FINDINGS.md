@@ -9433,3 +9433,63 @@ braille path has had since it was written and the box-drawing path never had.
 `PC14` asserts the shape of the output — one element per glyph, each at its own column — rather
 than the presence of an attribute, for the reason above. `PC10` and the `xOf` helper had to be
 rewritten with it: they searched for a `<text>` holding a whole word, and there are no longer any.
+
+---
+
+## F188 — a larger value drawing a shorter bar, from a rule that is correct per row ★★★★
+
+| | |
+|---|---|
+| **Surface** | every horizontal bar and histogram — any chart whose values cross a digit boundary |
+| **Reached for** | building the vertical arm's value labels, and reading §3b's rule before extending it |
+| **Verdict** | **the number's allowance was the row's, and the run is scaled against what is left of the row** |
+| **Absorbed by** | C12 I20 and §3b — one allowance for the chart, and the standing number goes above the run |
+
+§3b says *the number takes the width it needs and the run takes the residual: the run **is** the
+axis, so it is the part that may shrink.* Correct, and applied per row it inverts. Measured at
+`max: 100` in 40 cells:
+
+```
+ 99   ████████████████████████████████████▋ 99      37 cells
+100   ████████████████████████████████████ 100      36 cells
+```
+
+**Every count in both rows is right.** `100` is one column wider than `99`, so its run was scaled
+against 36 cells where its neighbour had 37 — and the picture says the smaller value is bigger, in
+the one place a reader is comparing lengths rather than reading numbers.
+
+The allowance is the widest label in the chart now. The rule is unchanged — the run is still what
+shrinks — and it shrinks once for all rows instead of per row against a different residual.
+
+### The transpose does not hold, which is the half that was asked for
+
+Horizontally the run **is** the axis: the row's own width is the scale, so the label may take part
+of it and the picture stays true. Vertically it is not — a column's height is read against the
+value scale in the **gutter**, so shortening a bar to make room for its number would draw a value
+its own axis contradicts.
+
+So the standing number goes in the row **above** the bar's top, centred on its column, and is
+**dropped** rather than made to fit: when the top is row 0, and when the number is wider than its
+column, because a truncated number is a different number and one that spills labels the
+neighbouring bar. **Dropping is per bar, so the tallest bar is the one that loses its number** —
+which is right rather than unfortunate, its height being what the axis already says most clearly.
+
+### The corpus could not see either half, and the second time it is the fixture
+
+`ONE_PER_FORM.bar` was `[10, 25, 15, 30]` — **four two-digit numbers**, so every bar reserved the
+same width whatever the rule was, and *one allowance for the chart* and *each row against its own*
+render identically. Landing the fix moved **eight vertical frames and not one horizontal frame**,
+out of 292. `[8, 25, 15, 100]` is what makes it visible, and twelve frames move.
+
+This is F185's shape a step along: there the corpus could not reach the rung, here it could not
+reach the *shape of the data*. **A fixture whose values are all one width tests a width rule
+against itself and agrees.**
+
+### And the mutation pass found the same gap inside the new tests
+
+Six mutations, five killed at once. **The partial top cell survived** — the clause that puts the
+number above a bar whose top cell is a half-step rather than on it — because BV3's fixture was 50
+of 100 in ten rows, which is *exactly five whole cells*. With `part` zero, counting the partial
+cell and not counting it give the same answer. 53 of 100 is five cells and two eighths, and the
+row is anchored there now, with the partial cell shown to be partial before anything is asserted
+about the row above it.
