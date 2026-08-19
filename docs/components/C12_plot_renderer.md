@@ -931,7 +931,27 @@ cannot take it — it does not know which end is old, and padding the wrong end 
 app pads, because the app knows.
 
 **B3 — a resize changes the cells per value.** The line plot spreads its samples across whatever
-width it gets; the sparkline windows to the last `width` (I13). A heatmap must window: one cell
+width it gets; the sparkline windows to the last `width` (I13).
+
+**And the padding goes on the right, which is a separate ruling that read as the same one.** The
+window is of the *last* `width` positions either way — that is not in question, and stretching is
+still refused for the reason below. What was never argued is which end the blank goes when there are
+fewer positions than cells. It padded on the left, and T1.13's comment justified it as *"three
+samples so far, growing rightward — not a stretched curve that changes shape as it fills."* Every
+clause of that is true, and none of it distinguishes left from right: **it argues against
+stretching, which both anchors avoid.**
+
+Measured against what it claims: right-anchored, three samples in eight cells draw `␣␣␣␣␣▁▅█`, and a
+fourth arrival gives `␣␣␣␣▁▅█▇` — every glyph already on screen has moved one cell left. Left-
+anchored they do not move at all, which is what *growing rightward* describes. So the sentence was
+attached to the anchor that fails it. Once the row is full the two are identical, and that is why
+nothing caught it: the case where they differ is the one before a feed has filled its row, and it is
+also the case a catalogue frame shows.
+
+Ruling: **pad on the right.** A sparkline of 50 points in 80 cells now reads as a series with room
+left rather than as a clipped one — the reported symptom — and I13's *one cell per position* is
+untouched.
+ A heatmap must window: one cell
 *is* one value, so spreading would either draw a value twice — a lie about density — or
 interpolate, which is inventing readings. Ruling: **window like a sparkline, never spread**, and
 the dropped columns are named in the legend rather than vanishing (I8's principle, and the same
@@ -1463,7 +1483,7 @@ classification table as its own rows.
 - **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 3` with (the frame's lid, the axis rule, the x-labels), by `width` cells. The matrix family keeps `height + 2`: it has no lid.
 - **I11** — C12 owns no state; every render is a pure function of block, width and context.
 - **I12** — C12 registers through C09's public `register`; it is not privileged.
-- **I13** — Sparklines are exactly one row, at every width including 1, **and one cell per position rather than per sample**. A window of eight positions is eight cells whether or not every position has a reading.
+- **I13** — Sparklines are exactly one row, at every width including 1, **and one cell per position rather than per sample**. A window of eight positions is eight cells whether or not every position has a reading. **Fewer positions than cells pad on the right**, so a row fills from the left and only begins to scroll once it is full (§B3).
 - **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise. *Composition (§3): under downsampling the join runs from a column's last sample to the next column's first, which is what keeps I5's span-fill connected.*
 - **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`. **A labelled row carries a tick on the border and an unlabelled one does not** — one rule rather than a flag per form, and the same rule a categorical axis, a band and a matrix row each resolve correctly under. **The tick values follow `yScale`**, because `yLabels` dispatches through `axisFor` rather than reaching for the linear arm.
 - **I16** — **Every step of every ramp is visible, and no ramp's lowest step is the character its padding uses.** Eight steps, monotone in ink. The braille arm shipped with `U+2800` — BRAILLE PATTERN BLANK — as step 0, so a sparkline at `ambiguousWidth: "wide"` drew its minimum as whitespace, which the right-anchor already uses to mean *fewer samples than cells*: one character, two meanings, in the arm nothing renders in a golden frame. *This is a property of the constant, not of a call, so it is asserted over the ramps themselves.*
