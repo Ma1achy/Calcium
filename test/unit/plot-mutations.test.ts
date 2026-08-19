@@ -16,6 +16,9 @@ import { kde } from "../../src/presentation/plot/kde.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
+import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
+import type { RenderContext } from "../../src/presentation/blocks/types.js";
+import { displayCells } from "../../src/presentation/text.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
 
@@ -112,19 +115,103 @@ describe("GROUP 5: KDE bandwidth does not smooth two peaks into one", () => {
   });
 });
 
-describe("GROUP 6: facets share a scale", () => {
-  it("smallmultiples renders facets side by side", () => {
+describe("GROUP 6: facets compose rows another renderer has already painted", () => {
+  // **The row this replaced asserted `lines.length > 0`.** That is true of a
+  // frame containing nothing, and the frame did contain nothing: at width 40
+  // the golden corpus held an empty box with no facets in it, through review
+  // and commit. A count of rows says nothing about what is in them.
+  //
+  // Everything here uses a **styled** child, because a plain one passes under
+  // both the right reading and the wrong one — `padEnd` pads correctly when
+  // there is nothing invisible to miscount, which is what made the defect
+  // survive. The control at the end is that case, stated so the difference
+  // between the two is the subject rather than an accident of the fixture.
+  const ESC = String.fromCharCode(27);
+  const styled = (text: string): string => `${ESC}[38;5;241m${text}${ESC}[0m`;
+  type FormRenderer = (b: Plot, w: number, c: RenderContext) => readonly string[];
+  const probe = (fill: string, short = 0) => ({
+    line: (_b: Plot, w: number) => [styled(fill.repeat(Math.max(0, w - short)))],
+  }) as unknown as Readonly<Record<string, FormRenderer>>;
+  const four = [{ form: "line" }, { form: "line" }, { form: "line" },
+    { form: "line" }] as unknown as readonly Plot[];
+  const ctx = { capabilities: FULL_CAPS } as never;
+
+  it("T1.31 (C12 I10): a styled facet row is measured in display cells, not code units", () => {
+    // One colour run is fourteen bytes and no columns. `padEnd` saw a 29-byte
+    // string as wider than its 26-cell column and padded nothing; `slice(0, 80)`
+    // then cut at eighty *bytes*, which was forty visible cells, and the cut
+    // landed inside an escape so every later facet was gone.
+    const rows = smallMultiplesRows(four, 80, ctx, probe("A"));
+    expect(rows.length).toBe(1); // cells-ok — a row count
+    expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
+    // All four facets survive, which is the half `slice` destroyed.
+    expect(rows[0]!.match(/A+/g)?.length).toBe(4); // cells-ok — a facet count
+  });
+
+  it("T1.32 (C12 I10): a facet short of its column is padded, not pulled leftwards", () => {
+    // The other half, and it needs a facet that does not fill its width —
+    // otherwise `fitStyled` returns early and the padding path is never taken.
+    const rows = smallMultiplesRows(four, 80, ctx, probe("B", 6));
+    expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
+    const runs = rows[0]!.match(/B+/g) ?? [];
+    expect(runs.length).toBe(4); // cells-ok — a facet count
+    // Each run starts at its own column: 6 blanks between consecutive runs.
+    expect(new Set(runs.map((r) => r.length)).size).toBe(1); // cells-ok — a set size
+  });
+
+  it("T1.33: the escapes reach the frame intact, with no literal residue", () => {
+    // The failure that replaced the first one, and the reason this is an
+    // end-to-end row rather than another unit. Composing correctly made every
+    // row exactly `width` cells, which unmasked a second defect one layer down:
+    // the facet arm passed the painted row back through `line`, whose
+    // `clampSpans` measures with `cells()` — and `cells()` counts a painted
+    // row's escape bytes as visible. It measured about 120 cells in an 80-cell
+    // row, truncated, and `stripControl` took the ESC and left `[38;2;98;98;98m`
+    // on screen as text. **The first defect was masking the second**: the old
+    // `slice` had already cut the row to 80 code units, so the clamp saw a row
+    // it thought fitted and passed it through untouched.
     const smBlock = block({
       kind: "plot", id: "m6", form: "smallmultiples", height: 5, axes: true,
-      series: [{ values: [1, 2, 3] }],
+      series: [],
       facets: [
         { kind: "plot", id: "f1", form: "line", height: 5, axes: true, series: [{ values: [1, 3, 2] }] } as Plot,
         { kind: "plot", id: "f2", form: "line", height: 5, axes: true, series: [{ values: [3, 1, 4] }] } as Plot,
       ],
     });
-    const k = kit();
-    const lines = k.renderToLines(smBlock, 80);
+    const lines = kit().renderToLines(smBlock, 80);
     expect(lines.length).toBeGreaterThan(0); // cells-ok — a row count
+    for (const row of lines) {
+      // An escape whose ESC has been eaten: the body survives as printable text.
+      expect(row.replace(new RegExp(`${ESC}\\[[0-9;]*m`, "g"), ""))
+        .not.toMatch(/\[[0-9;]*m/);
+    }
+    // And the facets are actually drawn — the assertion the old row lacked.
+    const ink = lines.filter((r) => /[─│┌┐└┘┤╭╮╰╯]/.test(r));
+    expect(ink.length).toBeGreaterThan(2); // cells-ok — a row count
+  });
+
+  it("T1.34 (C12 I10): the remainder is distributed, so the composition is the full width", () => {
+    // `floor(80 / 3)` is 26 and three of those is 78, so the old arithmetic left
+    // two columns permanently blank at the right edge — legal under I10, which
+    // forbids only *exceeding* the width (C12 I10), and a ragged edge in every faceted
+    // frame at a width the facet count does not divide.
+    expect(facetWidths(80, 3)).toEqual([27, 27, 26]);
+    expect(facetWidths(80, 4)).toEqual([20, 20, 20, 20]);
+    expect(facetWidths(80, 3).reduce((a, b) => a + b, 0)).toBe(80); // cells-ok — a cell count
+    expect(facetWidths(5, 0)).toEqual([]);
+  });
+
+  it("T1.35: the control — an unstyled facet composes correctly under either reading", () => {
+    // **Why every row above uses a styled child.** `padEnd` and `slice` are
+    // correct when there is nothing invisible to miscount, so this passes
+    // against the defect too. It is here to say that the fixture, not the
+    // assertion, is what makes the rows above able to fail.
+    const plain = {
+      line: (_b: Plot, w: number) => ["C".repeat(w)],
+    } as unknown as Readonly<Record<string, FormRenderer>>;
+    const rows = smallMultiplesRows(four, 80, ctx, plain);
+    expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
+    expect(rows[0]!.padEnd(80).slice(0, 80).length).toBe(80); // cells-ok — a cell count
   });
 });
 

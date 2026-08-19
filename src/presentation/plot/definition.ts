@@ -969,17 +969,29 @@ const FORM_ROWS: Readonly<
     const facets = block.facets ?? [];
     const areaRows = plotAreaRows(block);
     if (facets.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a facet count
-    return smallMultiplesRows(facets, width, ctx, FORM_ROWS).map((r) =>
-      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
-    );
+    // **Returned as composed, not re-painted.** `line` clamps with `clampSpans`,
+    // which measures span text using `cells()` — and `cells()` counts a painted
+    // row's escape bytes as visible, by its own documentation. An 80-cell row
+    // carrying colour measured about 120, was truncated, and `stripControl` took
+    // the ESC and left the rest on screen as literal text. Facets are the one
+    // place in C12 that composes rows another renderer has already styled, so
+    // the span pipeline is the wrong pipeline; `smallMultiplesRows` fits each
+    // column in display cells and guarantees the width itself.
+    return smallMultiplesRows(facets, width, ctx, FORM_ROWS);
   },
   pairplot: (block, width, ctx) => {
     const facets = block.facets ?? [];
     const areaRows = plotAreaRows(block);
     if (facets.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a facet count
-    return smallMultiplesRows(facets, width, ctx, FORM_ROWS).map((r) =>
-      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
-    );
+    // **Returned as composed, not re-painted.** `line` clamps with `clampSpans`,
+    // which measures span text using `cells()` — and `cells()` counts a painted
+    // row's escape bytes as visible, by its own documentation. An 80-cell row
+    // carrying colour measured about 120, was truncated, and `stripControl` took
+    // the ESC and left the rest on screen as literal text. Facets are the one
+    // place in C12 that composes rows another renderer has already styled, so
+    // the span pipeline is the wrong pipeline; `smallMultiplesRows` fits each
+    // column in display cells and guarantees the width itself.
+    return smallMultiplesRows(facets, width, ctx, FORM_ROWS);
   },
   pie: (block, width, ctx) => {
     const segs = block.segments ?? [];

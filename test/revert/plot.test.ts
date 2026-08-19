@@ -15,7 +15,8 @@ import { stripHeights } from "../../src/presentation/plot/strips.js";
 import { lossCurve, plotOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { yLabels } from "../../src/presentation/plot/axes.js";
-import { cells } from "../../src/presentation/text.js";
+import { cells, displayCells } from "../../src/presentation/text.js";
+import { smallMultiplesRows } from "../../src/presentation/plot/facet.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { block, type Plot, type Series } from "../../src/data/viewmodel/index.js";
 
@@ -244,6 +245,54 @@ describe("C12 tier 6 — fail-on-revert", () => {
     const range = { min: 1, max: 1000 };
     expect(yLabels(range, 9, undefined, {}, "log").map((l) => l.text)).toContain("200");
     expect(yLabels(range, 9, undefined, {}).map((l) => l.text)).toContain("750");
+  });
+
+  it("T6.19 (C12 I10): measuring a facet column in code units → T1.31 fails, and later facets vanish", () => {
+    // The revert: `cell.padEnd(facetWidth)` and `row.slice(0, width)`, which is
+    // what this did. Facets are the one place in C12 that composes rows another
+    // renderer has already **painted**, and both operations count UTF-16 code
+    // units — a colour run is fourteen bytes and no columns. `padEnd` saw a
+    // 29-byte string as wider than its 26-cell column and padded nothing;
+    // `slice` cut at eighty bytes, which was forty visible cells, inside an
+    // escape. The catalogue drew one facet of four and the top border of the
+    // others, which is the shape of that cut rather than of a missing renderer.
+    const ESC = String.fromCharCode(27);
+    const styled = `${ESC}[38;5;241m${"A".repeat(20)}${ESC}[0m`;
+    // The measurement the reverted code would take, beside the true one.
+    expect(styled.length).toBeGreaterThan(20); // cells-ok — a length in code units
+    expect(displayCells(styled)).toBe(20); // cells-ok — a cell count
+    const four = [{ form: "line" }, { form: "line" }, { form: "line" },
+      { form: "line" }] as unknown as readonly Plot[];
+    const rows = smallMultiplesRows(four, 80, { capabilities: FULL_CAPS } as never, {
+      line: (_b: Plot, w: number) => [`${ESC}[38;5;241m${"A".repeat(w)}${ESC}[0m`],
+    } as never);
+    expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
+  });
+
+  it("T6.20 (C12 I10): re-painting a composed facet row → T1.33 fails, and escapes print as text", () => {
+    // The revert: wrapping the composed row as `line([{ text: r }], …)` in the
+    // two facet arms. `clampSpans` measures span text with `cells()`, which
+    // counts a painted row's escape bytes as visible — its own documentation
+    // says so — so an 80-cell row measured about 120, was truncated, and
+    // `stripControl` took the ESC and left the body on screen as literal text.
+    //
+    // **This was invisible until the row above was fixed.** The old `slice` had
+    // already cut the row to 80 code units, so the clamp saw a row it believed
+    // fitted and passed it through untouched. One defect masking another, and
+    // the correct fix to the first is what exposed the second.
+    const b = block({
+      kind: "plot", id: "revert-facet", form: "smallmultiples", height: 5, axes: true,
+      series: [],
+      facets: [
+        { kind: "plot", id: "f1", form: "line", height: 5, axes: true, series: [{ values: [1, 3, 2] }] } as Plot,
+        { kind: "plot", id: "f2", form: "line", height: 5, axes: true, series: [{ values: [3, 1, 4] }] } as Plot,
+      ],
+    }) as Plot;
+    const ESC = String.fromCharCode(27);
+    const k = measurable({ definitions: [plotDefinition] as never, capabilities: FULL_CAPS });
+    for (const row of k.renderToLines(b, 80)) {
+      expect(row.replace(new RegExp(`${ESC}\\[[0-9;]*m`, "g"), "")).not.toMatch(/\[[0-9;]*m/);
+    }
   });
 
   it("T6.13 (I15): three unconditional y-labels → T3.2 renders outside its rows", () => {
