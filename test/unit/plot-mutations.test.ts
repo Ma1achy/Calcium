@@ -13,7 +13,7 @@ import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/s
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
-import { extentFor, extentRun, ladderFor } from "../../src/presentation/plot/ramp.js";
+import { extentFor, extentRun, ladderFor, pairFor } from "../../src/presentation/plot/ramp.js";
 import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
@@ -276,6 +276,77 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     const areaRows = rows.slice(1, -2);
     expect(ink(areaRows[areaRows.length - 1] ?? ""), "the floor row is the fullest")
       .toBeGreaterThanOrEqual(ink(areaRows[0] ?? "")); // cells-ok — a cell count
+  });
+
+  it("T1.89 (C12 I34, C04 I56): the rung is the form's, and below a density there is only the box", () => {
+    // **Two ladders, not one with two floors** — the first version wrote the four
+    // rungs as a single table and gave each form an index into it, which made a
+    // boxplot's `"full"` the third rung of a *density* ladder. A boxplot with
+    // three rows drew one, because the rungs between were densities it cannot
+    // draw and the walk stopped at the first.
+    const q = { min: 0, q1: 2, median: 4, q3: 6, max: 8 };
+    const box = (detail: Plot["plotDetail"], height: number): readonly string[] =>
+      plain(block({
+        kind: "plot", id: "b", form: "boxplot", height, axes: false,
+        categories: ["A"], quartiles: [q], series: [],
+        ...(detail === undefined ? {} : { plotDetail: detail }),
+      }) as Plot);
+    const inked = (rows: readonly string[]): number => rows.filter((r) => r.trim() !== "").length; // cells-ok — a row count
+
+    expect(inked(box("full", 3)), "a boxplot's full rung is three rows").toBe(3); // cells-ok — a row count
+    expect(inked(box("compact", 3)), "and its floor is one, in the same band").toBe(1); // cells-ok — a row count
+    expect(inked(box(undefined, 3)), "auto reaches the full rung — no density to doubt").toBe(3); // cells-ok — a row count
+
+    // **`"auto"` reads what there is to draw and `"full"` does not.** A density
+    // rung resolves five levels, so a band with fewer than five finite samples
+    // cannot distinguish them — what it draws is a broad flat shape that reads
+    // as *this distribution is uniform*, which is a statement about the sample
+    // count. The number is the rung's own level count, not a taste.
+    const violin = (detail: Plot["plotDetail"], values: readonly number[]): readonly string[] =>
+      plain(block({
+        kind: "plot", id: "v", form: "violin", height: 6, axes: false,
+        categories: ["A"], series: [{ values: [...values] }],
+        ...(detail === undefined ? {} : { plotDetail: detail }),
+      }) as Plot);
+    const many = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const few = [1, 5, 9];
+
+    // **Asserted on the figure and not on its shape.** The first version asked
+    // whether the outline had corners, which is a property of the *density* and
+    // not of the rung: three samples spread wide give a broad flat estimate that
+    // draws no corners on either rung, so the row read `full` as having fallen
+    // to the box. The structural difference is the IQR fill — `boxplotBand`'s
+    // compact arm inks the interquartile run because a one-row box has no edges
+    // to enclose it, and no violin rung draws that glyph at all.
+    const boxed = (rows: readonly string[]): boolean =>
+      rows.some((r) => r.includes(pairFor(FULL_CAPS).filled));
+    expect(boxed(violin(undefined, many)), "ten samples: auto draws the density").toBe(false);
+    expect(boxed(violin(undefined, few)), "three samples: auto falls to the box").toBe(true);
+    expect(boxed(violin("full", few)), "and `full` draws the density anyway, having asked").toBe(false);
+
+    // **The column floor, which construction cannot reach.** `validateBlock`
+    // takes a block and no width, so a vertical violin too narrow to hold a
+    // density is refused nowhere — C12 draws the box instead, on I18's ladder.
+    // Three bands in 12 cells is four columns each and the floor is three; in 8
+    // it is two, and two is four dot-columns split between density and box.
+    const vertical = (w: number): readonly string[] =>
+      plain(block({
+        kind: "plot", id: "vv", form: "violin", height: 8, axes: false,
+        orientation: "vertical", categories: ["A", "B", "C"],
+        series: [{ values: many }, { values: many }, { values: many }],
+      }) as Plot, FULL_CAPS, w);
+    //
+    // **Discriminated by the renderer's glyph source, not by the figure's
+    // shape.** `boxplotColumn` builds its corners from named slots and always
+    // draws `┌`; `violinColumn` builds its outline through `glyphForMask` with
+    // the block's `plotCorners`, which defaults to rounded — so at the default
+    // the two cannot draw the same corner. Asking about `█` instead does not
+    // work here and that is the second proxy this row has cost: the compact
+    // *row* box inks its interquartile run, and the compact *column* box only
+    // does so at one cell wide.
+    const sharpCorner = (rows: readonly string[]): boolean => rows.some((r) => r.includes("\u250c"));
+    expect(sharpCorner(vertical(12)), "four columns a band: every band clears the floor").toBe(false); // cells-ok — a width
+    expect(sharpCorner(vertical(8)), "the band left with two columns falls to the box").toBe(true); // cells-ok — a width
   });
 
   it("T1.88 (C12 I21): the extent grows the way its vocabulary says, and the tip follows", () => {

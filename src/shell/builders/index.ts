@@ -415,6 +415,24 @@ function plot(
         `(C04 I50a) — a ninth would repeat a colour, which reads as two series being one`,
     );
   }
+  // **The same refusal again** (C04 I56), and the same reason: an author finds
+  // out here, an untrusted document finds out in the validator. Rows only — a
+  // width is not a thing a constructor can see either.
+  if ((form === "boxplot" || form === "violin") && orientation !== "vertical") {
+    // `b.plot` exposes no `categories`, so a band is a series here — which is
+    // what a violin's bands are anyway.
+    const bands = series.length; // cells-ok — a band count
+    const rows = Math.max(1, Math.floor(height ?? 1)); // cells-ok — a row count
+    const need = form === "violin" ? 2 : 1; // cells-ok — a row count
+    if (bands > 0 && Math.floor(rows / bands) < need) {
+      throw new TypeError(
+        `b.plot: ${String(bands)} bands in ${String(rows)} rows is ` +
+          `${String(Math.floor(rows / bands))} per band and a "${form}" needs ${String(need)} ` +
+          `(C04 I56) — below that the density flattens to a bar and the figure states a ` +
+          `property of the height rather than of the data`,
+      );
+    }
+  }
   return finish<Plot>(
     {
       kind: "plot",

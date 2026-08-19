@@ -436,6 +436,32 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
         );
       }
     }
+    // **I56 — the row floor, and only the row floor.** A `boxplot` needs one row
+    // per band and a `violin` two, because a violin with no density is a box
+    // plot. Below that the density flattens and the figure states a property of
+    // the *room* rather than of the data, with nothing on screen to tell those
+    // apart.
+    //
+    // **The column floor is not checkable here and that is structural**: this
+    // function takes a block and no width, and a terminal's width is handed down
+    // from `terminal/lifecycle.ts`. So the rows-per-band are computable from a
+    // declared `height` and the columns-per-band are not, and C12 enforces the
+    // other axis by drawing the box rather than by refusing (C12 I34, I18).
+    if ((form === "boxplot" || form === "violin") && b["orientation"] !== "vertical") {
+      const bands = isArray(b["categories"])
+        ? b["categories"].length
+        : isArray(b["series"]) ? b["series"].length : 0; // cells-ok — a band count
+      const rows = isFiniteNumber(b["height"]) ? Math.max(1, Math.floor(b["height"])) : 0; // cells-ok — a row count
+      const need = form === "violin" ? 2 : 1; // cells-ok — a row count
+      const per = bands === 0 ? need : Math.floor(rows / bands); // cells-ok — a row count
+      if (bands > 0 && per < need) {
+        e.push(
+          `${at}: ${String(bands)} bands in ${String(rows)} rows is ${String(per)} per band and a ` +
+            `"${form}" needs ${String(need)} (C04 I56) — below that the density flattens to a bar ` +
+            `and the figure says the distribution is uniform, which is a statement about the height`,
+        );
+      }
+    }
     // **C04 I41 — an unknown arm is an error, not a silent numeric fall-through.**
     // It was unvalidated, so a typo rendered plain numbers and said nothing; the
     // `fraction`/`percent` rename is exactly the event that produces one, because

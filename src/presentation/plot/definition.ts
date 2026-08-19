@@ -158,10 +158,144 @@ type Layer = Readonly<{ glyphRows: readonly string[]; ref: ColourRef }>;
  * of the rows the caller already declared to use. An explicit `"full"` that does
  * not fit degrades rather than overflowing its band.
  */
-function detailRows(block: Plot, available: number, full: number): number {
+export type Rung = "box1" | "box3" | "rain" | "raindrop" | "violin";
+
+/**
+ * The rungs each distribution form climbs, smallest budget first (C12 I34).
+ *
+ * **Two ladders and not one, which the first version got wrong.** Writing the
+ * four rungs of the brief as a single table and giving each form a floor into it
+ * makes a boxplot's `"full"` the *third* rung of a density ladder — so a boxplot
+ * with three rows drew one, because the rungs between were densities it cannot
+ * draw and the loop stopped at the first. The visible half was the row count.
+ * The invisible half was that the sample check underneath it was reading
+ * `series` for a form whose data is `quartiles`, and fixing only the ladder
+ * would have left that reading the wrong field with nothing depending on it.
+ *
+ * A boxplot's two rungs are the same figure at two sizes; a violin's three each
+ * add something. They share a budget axis and nothing else.
+ *
+ * **Rows horizontally and columns vertically, and the two are not equal**,
+ * because a terminal cell is about twice as tall as it is wide: four dot-columns
+ * is what three cells buy sideways and one cell buys downward.
+ */
+type RungSpec = Readonly<{
+  rung: Rung;
+  /**
+   * The **minimum** budget the rung needs, not the size it draws — and the
+   * distinction cost a frame. `rungRows` clamped a violin to its rung's five
+   * rows in a band of six, so the top rung shrank the figure it was chosen for.
+   */
+  rows: number;
+  columns: number;
+  density: boolean;
+  /**
+   * Whether the figure grows into the whole band or is exactly its budget.
+   *
+   * A box is one row or three and pads the rest; a raincloud is a density row
+   * over a box row. **The mirrored violin is the only rung that scales**, which
+   * is what makes it the top one: more rows buy it more outline, where more rows
+   * buy the others nothing.
+   */
+  scales: boolean;
+}>;
+
+const RUNGS: Readonly<Record<"boxplot" | "violin", readonly RungSpec[]>> = Object.freeze({
+  boxplot: Object.freeze([
+    Object.freeze({ rung: "box1" as const, rows: 1, columns: 1, density: false, scales: false }),
+    Object.freeze({ rung: "box3" as const, rows: 3, columns: 3, density: false, scales: false }),
+  ]),
+  // **A violin's floor is the raincloud rather than the box**, because a violin
+  // with no density is a box plot and the field said `violin` (C04 I56).
+  //
+  // **`rain` and `raindrop` scale today because their figures do not exist
+  // yet.** The rung is *chosen* correctly — a four-row band affords `raindrop`
+  // and not the mirrored violin — and `violinRows` is what draws all three
+  // until `rainRows` and the jittered strip land, two commits along in this
+  // plan. Clamping them to their own budgets now would shrink a figure into
+  // three rows of a four-row band to make room for a density that is not
+  // drawn, which is a worse frame for two commits and a golden diff nobody
+  // would accept on its own. **The blocker is a symbol: grep `rainRows`.**
+  violin: Object.freeze([
+    Object.freeze({ rung: "rain" as const, rows: 2, columns: 3, density: true, scales: true }),
+    Object.freeze({ rung: "raindrop" as const, rows: 3, columns: 4, density: true, scales: true }),
+    Object.freeze({ rung: "violin" as const, rows: 5, columns: 5, density: true, scales: true }),
+  ]),
+});
+
+/**
+ * The samples a density rung needs before it is drawing an estimate rather than
+ * an artefact.
+ *
+ * **Derived rather than chosen: it is the level count the rung draws.** Both
+ * arms resolve a density into five levels — four dot-rows plus empty going up,
+ * four dot-columns plus empty going sideways — and a band with fewer finite
+ * samples than that cannot distinguish them. What it draws instead is a broad
+ * flat shape, which reads as *this distribution is uniform* and is a statement
+ * about the sample count.
+ */
+const DENSITY_SAMPLES = 5;
+
+/**
+ * Which rung to draw (C12 §3i, I34).
+ *
+ * **`"auto"` and `"full"` were the same value.** The old `detailRows` read
+ * `if (compact) return 1` and then returned one expression for both of the
+ * others, so three names carried two behaviours and every assertion about
+ * `"full"` was satisfied by the `"auto"` branch — A03 §2's vacuity class in a
+ * field rather than in a rule. With a ladder they can differ, and the difference
+ * makes the names true: `"auto"` is the one that reads what there is to draw.
+ *
+ * **The floor is clamped rather than thrown.** I2 says no series input throws,
+ * and the row floor is already refused at construction (C04 I56) — so arriving
+ * here below it means the width was too narrow, which is the axis construction
+ * cannot see. I18's ladder applies: draw the figure that fits.
+ */
+function rungFor(
+  block: Plot,
+  form: "boxplot" | "violin",
+  budget: number,
+  axis: "rows" | "columns",
+  samples: number,
+): RungSpec {
+  const ladder = RUNGS[form];
   const mode = block.plotDetail ?? "auto";
-  if (mode === "compact") return 1;
-  return available >= full ? full : available;
+  const floor = ladder[0]!;
+
+  // **Below the floor the answer is the box, in either of two ways.** The width
+  // could not hold the floor — the axis construction cannot see (C04 I56) — or
+  // `"auto"` looked at the samples and found too few to estimate with. Both land
+  // on the same figure because there is only one honest figure below a density:
+  // the five-number summary, which needs no estimate.
+  if (budget < floor[axis]) return BOX1;
+  // Only `"auto"` asks what there is to draw, and only a density can be wrong
+  // about it — a boxplot's rungs are one figure at two sizes.
+  if (mode === "auto" && floor.density && samples < DENSITY_SAMPLES) return BOX1;
+  if (mode === "compact") return floor;
+
+  let best = floor;
+  for (const spec of ladder) {
+    if (budget < spec[axis]) break;
+    best = spec;
+  }
+  return best;
+}
+
+/** The figure below every density: the five-number summary, which needs no estimate. */
+const BOX1: RungSpec = RUNGS.boxplot[0]!;
+
+/** The rows a rung spends of the band it was given, never more than the band has. */
+function rungRows(spec: RungSpec, available: number): number {
+  return spec.scales
+    ? Math.max(1, available) // cells-ok — a row count
+    : Math.max(1, Math.min(available, spec.rows)); // cells-ok — a row count
+}
+
+/** How many finite samples a band has — what `"auto"` reads for a density rung. */
+function finiteCount(series: Series | undefined): number {
+  return series === undefined
+    ? 0 // cells-ok — a sample count
+    : series.values.filter((v) => v !== null && Number.isFinite(v)).length; // cells-ok — a sample count
 }
 
 /**
@@ -180,6 +314,9 @@ function summaryOf(series: Series): QuartileSummary | undefined {
     mean: v.reduce((a, b) => a + b, 0) / v.length, // cells-ok — a sample count
   };
 }
+
+/** A summary with nothing in it — what a band with no samples falls back to. */
+const EMPTY_SUMMARY: QuartileSummary = Object.freeze({ min: 0, q1: 0, median: 0, q3: 0, max: 0 });
 
 function baselineFor(dataMin: number): number {
   return Math.min(0, dataMin);
@@ -1327,7 +1464,7 @@ const FORM_ROWS: Readonly<
     return bandedForm(block, cats, width, ctx, (_sr, aw, rows, i) => {
       const q = qs[i];
       return q
-        ? boxplotBand(q, lo, hi, aw, detailRows(block, rows, 3), ctx.capabilities)
+        ? boxplotBand(q, lo, hi, aw, rungRows(rungFor(block, "boxplot", rows, "rows", 0), rows), ctx.capabilities)
         : Array.from({ length: rows }, () => " ".repeat(aw));
     });
   },
@@ -1608,14 +1745,32 @@ const FORM_ROWS: Readonly<
       // by scaling every band to itself.
       return categoricalColumnForm({ ...block, categories: cats }, width, ctx, (i, cw, rows) => {
         const sr = block.series[i];
-        return sr
-          ? violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared)
-          : Array.from({ length: rows }, () => " ".repeat(cw));
+        if (sr === undefined) return Array.from({ length: rows }, () => " ".repeat(cw));
+        // **The column floor is enforced here rather than refused**, because
+        // construction cannot see a width (C04 I56, I18's ladder): below three
+        // columns a violin is four dot-columns split between density and box, so
+        // the honest figure is the box.
+        const rung = rungFor(block, "violin", cw, "columns", finiteCount(sr));
+        return !rung.density
+          ? boxplotColumn(qs[i] ?? summaryOf(sr) ?? EMPTY_SUMMARY, shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities)
+          : violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
       });
     }
-    return bandedForm(block, cats, width, ctx, (sr, aw, rows, i) =>
-      violinRows(sr, aw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared),
-    );
+    // **The violin routes through the same chooser as the boxplot**, which is
+    // what makes `"compact"` mean *the form's floor* rather than one row for
+    // everything: a violin's floor is the raincloud, because a violin with no
+    // density is a box plot and the field said `violin`.
+    return bandedForm(block, cats, width, ctx, (sr, aw, rows, i) => {
+      const rung = rungFor(block, "violin", rows, "rows", finiteCount(sr));
+      const spent = rungRows(rung, rows);
+      if (!rung.density) {
+        const q = qs[i] ?? summaryOf(sr);
+        return q === undefined
+          ? Array.from({ length: rows }, () => " ".repeat(aw))
+          : boxplotBand(q, shared?.min ?? 0, shared?.max ?? 1, aw, spent, ctx.capabilities);
+      }
+      return violinRows(sr, aw, spent, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
+    });
   },
   ridgeline: (block, width, ctx) => {
     // **Not `bandedForm`, and that is the form rather than a refactor.** A band

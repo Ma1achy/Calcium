@@ -144,4 +144,36 @@ describe("roadmap 51 — the categorical palette", () => {
     // everything.
     expect(() => b.plot({ series: seriesOf(8), height: 8 }), "eight is legal").not.toThrow();
   });
+
+  it("T2.71 (C04 I56): the row floor is refused at both gates, and only the row floor", () => {
+    // **A violin's floor is two rows per band** — a violin with no density is a
+    // box plot, and the field said `violin`. Below it the estimate flattens and
+    // the figure states a property of the *height*, which nothing on screen
+    // distinguishes from a uniform distribution.
+    const violin = (height: number, bands: number): unknown => ({
+      kind: "plot", id: "v", form: "violin", height,
+      series: Array.from({ length: bands }, () => ({ values: [1, 2, 3, 4, 5] })),
+    });
+    expect(validateBlock(violin(3, 3)).ok, "one row per band").toBe(false);
+    const refused = validateBlock(violin(3, 3));
+    expect(refused.ok ? "" : refused.error.join(" ")).toMatch(/needs 2 \(C04 I56\)/u);
+    expect(validateBlock(violin(6, 3)).ok, "two rows per band is the floor, not below it").toBe(true);
+
+    expect(
+      () => b.plot({ form: "violin", height: 3, series: seriesOf(3).map((x) => ({ values: [...x.values] })) }),
+      "the builder",
+    ).toThrow(/needs 2 \(C04 I56\)/u);
+
+    // **The column floor is absent here and that is the ruling, not a gap.**
+    // `validateBlock` takes a block and no width, and a width is handed down
+    // from `terminal/lifecycle.ts` — so a vertical violin cannot be refused for
+    // being too narrow however few columns it will get, and C12 draws the box
+    // instead (C12 I34, I18). A row asserting the refusal fires would be
+    // asserting something this layer cannot know.
+    const vertical = {
+      kind: "plot", id: "v2", form: "violin", height: 3, orientation: "vertical",
+      series: Array.from({ length: 3 }, () => ({ values: [1, 2, 3, 4, 5] })),
+    };
+    expect(validateBlock(vertical).ok, "vertical is not judged on rows").toBe(true);
+  });
 });
