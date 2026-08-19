@@ -5,8 +5,9 @@ import { COLORMAPS, continuousColour, sample } from "../../src/presentation/them
 import { COLORMAP_NAMES, block, validateBlock } from "../../src/data/viewmodel/index.js";
 import { DEFAULT_FLOOR, ratio, textSurfaces } from "../../src/presentation/theme/contrast.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
-import { FULL_CAPS, MONO_CAPS, measurable } from "../support/render.js";
+import { FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { RAMP_DENSITY } from "../../src/presentation/plot/ramp.js";
 
 function rgbHex(c: readonly [number, number, number]): string {
   return `#${c[0].toString(16).padStart(2, "0")}${c[1].toString(16).padStart(2, "0")}${c[2].toString(16).padStart(2, "0")}`;
@@ -92,9 +93,17 @@ describe("C10 I31 — a colormap is data, a channel, and vacuous below 8-bit", (
     // (C12 §3f), and every matrix row is labelled — so a search for `│` alone
     // found nothing and the window silently became the last character.
     const area = line.slice(Math.max(line.lastIndexOf("│"), line.lastIndexOf("┤")));
-    const cells = [...area.matchAll(/38;2;(\d+);(\d+);(\d+)m(.)/gu)]
-      .map((m) => ({ rgb: [Number(m[1]), Number(m[2]), Number(m[3])] as const, glyph: m[4] ?? "" }))
-      .filter((c) => c.glyph.trim() !== "");
+    // **The background channel, since C12 I29.** A matrix cell is a painted blank
+    // and the colour is the reading; this used to read `38;2;…m` followed by a
+    // ramp glyph, and the glyph became a space. What the row claims — that the
+    // colour window tracks the data window on the same anchor — is unchanged,
+    // and reading `48` is reading it where it now lives.
+    //
+    // The old filter dropped blank cells to skip the absent ones. It is gone
+    // because it is no longer needed and would now drop *everything*: an absent
+    // cell emits no background at all, so every match is a present reading.
+    const cells = [...area.matchAll(/48;2;(\d+);(\d+);(\d+)m/gu)]
+      .map((m) => ({ rgb: [Number(m[1]), Number(m[2]), Number(m[3])] as const }));
     expect(cells.length, "the matrix is painted").toBeGreaterThan(4); // cells-ok — a cell count
 
     const last = cells[cells.length - 1]; // cells-ok — a cell count
@@ -103,6 +112,44 @@ describe("C10 I31 — a colormap is data, a channel, and vacuous below 8-bit", (
     expect(first).toBeDefined();
     expect(last!.rgb[0], "the newest reading is the top of the map").toBeGreaterThan(first!.rgb[0]);
     expect(last!.rgb[2], "and not its blue end").toBeLessThan(first!.rgb[2]);
+  });
+
+  it("T2.31 (C10 I31): below the floor the ramp carries it, and nothing is painted", () => {
+    // **C10 I31's observable half, and it was not asserted anywhere in this
+    // file.** The rule is that a continuous map below 8-bit is an ordering over
+    // sixteen indices whose luminances the terminal never reports, so
+    // `continuousColour` declines — and what makes that safe rather than blank
+    // is C12 I29's ladder handing the cell back to the density ramp.
+    //
+    // Found by mutation: blanking the cell unconditionally survived this suite
+    // entirely. The row that caught it lives in `plot.test.ts`, outside this
+    // run's command, so the pass reported a survivor for a defect that *is*
+    // caught — which is a finding about where the assertion lives, not about
+    // whether it exists. It belongs here, because it is this component's claim.
+    const values = Array.from({ length: 60 }, (_, i) => i);
+    const heat = block({
+      kind: "plot", id: "h", form: "heatmap", height: 1, yMin: 0, yMax: 59,
+      colormap: "viridis", series: [{ values, label: "r" }],
+    } as never);
+
+    // **The matrix rows only.** Written against the whole frame this passed
+    // under the mutation it was written for: below the floor the *legend* is the
+    // density swatch, so a search over the joined frame finds ramp glyphs in the
+    // furniture whether or not a single cell drew one. `height: 1`, so the
+    // matrix is the first row and the last two are the x-labels and the legend.
+    const rowsOf = (caps: typeof FULL_CAPS): readonly string[] =>
+      measurable({ definitions: [plotDefinition as never], capabilities: caps }).renderToLines(heat, 30);
+    const cellsIn = (rows: readonly string[]): string => rows.slice(0, -2).join("");
+
+    const mono = cellsIn(rowsOf(MONO_UNICODE_CAPS));
+    expect(mono, "nothing is painted below the floor").not.toMatch(/48;2;/u);
+    expect([...RAMP_DENSITY].some((g) => mono.includes(g)), "and the ramp is what carries it").toBe(true);
+
+    // The fixture responds: the same block at 24-bit paints, and the cells stop
+    // carrying a ramp glyph at all.
+    const full = cellsIn(rowsOf(FULL_CAPS));
+    expect(full, "the same fixture paints above the floor").toMatch(/48;2;/u);
+    expect([...RAMP_DENSITY].some((g) => full.includes(g)), "and its cells are blank").toBe(false);
   });
 
   it("T2.31 (C10 I31): an unknown name is refused, because paints-nothing is a valid frame", () => {

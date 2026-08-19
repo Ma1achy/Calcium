@@ -141,8 +141,11 @@ const results = runPass({
       // the swatch — a key to a scale nobody named.
       name: "the legend is aligned to the plot area again",
       file: HEAT,
-      from: "    linePaint([{ text: truncate(legend, layout.width, ctx.capabilities), style: muted }], layout, ctx),",
-      to: "    linePaint([{ text: \" \".repeat(layout.gutter) }, { text: truncate(legend, layout.areaWidth, ctx.capabilities), style: muted }], layout, ctx),",
+      // Re-anchored: C12 I29 made the legend a run of spans rather than one
+      // truncated string, so aligning it to the plot area is now prepending the
+      // gutter — `clampSpans` cuts the tail, which is the upper bound.
+      from: "  return [labelRow, linePaint(legend, layout, ctx)];",
+      to: "  return [labelRow, linePaint([{ text: \" \".repeat(layout.gutter) }, ...legend], layout, ctx)];",
       expect: "T1.23",
     },
     {
@@ -150,8 +153,11 @@ const results = runPass({
       // the wrong half by the legend's own argument.
       name: "the legend drops its range before its swatch",
       file: HEAT,
-      from: "  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, range_].find(fits) ?? \"\";",
-      to: "  const legend = [`${swatch}  ${range_}${clause}`, `${swatch}  ${range_}`, swatch].find(fits) ?? \"\";",
+      // Re-anchored to the rung table C12 I29 replaced the string ladder with.
+      // The last rung is what survives at the narrowest width, so putting the
+      // swatch there is the same inversion: a key to a scale nobody named.
+      from: "    [muteds(`${lo} - ${hi}`)],",
+      to: "    [...bar()],",
       expect: "T1.23",
     },
     {

@@ -36,7 +36,7 @@ import { DARK_THEME, measurable, visible } from "../support/render.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
 import { cells } from "../../src/presentation/text.js";
 import { lossCurve } from "../support/blocks.js";
-import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, FULL_CAPS, MONO_UNICODE_CAPS } from "../support/render.js";
 
 /**
  * The dot columns a folded row set inks, so a gap is a fact rather than a look.
@@ -833,6 +833,11 @@ describe("C12 I17 — the heatmap", () => {
       ...over,
     } as Plot);
 
+  /** The rows as the terminal receives them — styling intact. */
+  const styledRowsOf = (b: Plot, width = 40, caps = FULL_CAPS): readonly string[] =>
+    measurable({ definitions: [plotDefinition], theme: DARK_THEME, capabilities: caps })
+      .renderToLines(b, width);
+
   const rowsOf = (b: Plot, width = 40, caps = FULL_CAPS): readonly string[] =>
     measurable({ definitions: [plotDefinition], theme: DARK_THEME, capabilities: caps })
       .renderToLines(b, width)
@@ -857,11 +862,20 @@ describe("C12 I17 — the heatmap", () => {
 
     expect(rowsOf(heat()).join("\n")).not.toBe(rowsOf(asLine).join("\n"));
 
-    // And the difference is the one that matters, not incidental furniture: a
-    // heatmap's cells come from the density ramp, which the line form never
-    // draws at all.
+    // And the difference is the one that matters, not incidental furniture —
+    // **stated at both rungs, because C12 I29 moved which channel carries it.**
+    // Above 8-bit a cell is a painted blank and the background is the reading;
+    // below it, the density ramp takes over. Asserting the ramp alone was true
+    // until painting landed and then failed while I17 held perfectly.
+    const painted = measurable({ definitions: [plotDefinition], theme: DARK_THEME, capabilities: FULL_CAPS })
+      .renderToLines(heat(), 40);
+    expect(painted.some((r) => /\u001b\[48;/u.test(r)), "the matrix paints its cells").toBe(true);
+
     const density = [...RAMP_DENSITY];
-    expect(rowsOf(heat()).some((r) => density.some((g) => r.includes(g)))).toBe(true);
+    expect(
+      rowsOf(heat(), 40, MONO_UNICODE_CAPS).some((r) => density.some((g) => r.includes(g))),
+      "and falls back to the ramp where colour cannot carry it",
+    ).toBe(true);
   });
 
   it("T1.18 (I17): the range is shared across rows, so equal values draw equal glyphs", () => {
@@ -869,15 +883,28 @@ describe("C12 I17 — the heatmap", () => {
     // per row, both rows below would span the full ramp and the picture would say
     // the two containers are equally busy — which is the comparison a heatmap
     // exists to make, inverted.
-    const rows = rowsOf(
-      heat({
-        series: [
-          { values: [0, 0, 0, 0], label: "idle" },
-          { values: [100, 100, 100, 100], label: "busy" },
-        ],
-        height: 2,
-      }),
-    );
+    const spec = heat({
+      series: [
+        { values: [0, 0, 0, 0], label: "idle" },
+        { values: [100, 100, 100, 100], label: "busy" },
+      ],
+      height: 2,
+    });
+
+    // **The shared range is the claim, and the ramp is only how it used to be
+    // read.** C12 I29 made the cell a painted blank above 8-bit, so the floor
+    // stopped being `RAMP_DENSITY[0]` and this row failed against a renderer
+    // that was answering it correctly. Both rungs now, floor and ceiling on
+    // each, which is the property rather than the channel.
+    const painted = measurable({ definitions: [plotDefinition], theme: DARK_THEME, capabilities: FULL_CAPS })
+      .renderToLines(spec, 40);
+    const bg = (row: string): readonly string[] => [...row.matchAll(/\u001b\[48;[0-9;]*m/gu)].map((m) => m[0]);
+    expect(new Set(bg(painted[0] ?? "")).size, "one colour across an all-equal row").toBe(1); // cells-ok — a set size
+    expect(new Set(bg(painted[1] ?? "")).size, "and one across the other").toBe(1); // cells-ok — a set size
+    expect(bg(painted[0] ?? "")[0], "the two rows are not the same colour")
+      .not.toBe(bg(painted[1] ?? "")[0]);
+
+    const rows = rowsOf(spec, 40, MONO_UNICODE_CAPS);
     const idle = rows[0] ?? "";
     const busy = rows[1] ?? "";
     expect(idle.trimEnd()).not.toBe(busy.trimEnd());
@@ -904,26 +931,62 @@ describe("C12 I17 — the heatmap", () => {
     }
   });
 
-  it("T1.21 (I17): an absent cell is blank and the minimum has ink", () => {
+  it("T1.21 (I17, C12 I29): an absent cell and the minimum are distinguishable at every rung", () => {
     // The converse of the sparkline's rule, from the other side: `?` is right
     // where a blank is already the padding, and a grid has no padding.
-    const rows = rowsOf(
-      heat({
-        series: [
-          { values: [null, null, null, null], label: "stopped" },
-          { values: [1, 2, 3, 4], label: "running" },
-        ],
-        height: 2,
-      }),
-    );
-    expect(rows[0], "a stopped row is quiet").not.toContain("?");
-    // Blank *cells* — the label and the axis bar are furniture and stay. What
-    // has to be true is that nothing was drawn in the grid, and that a reader
-    // can still see which row reported nothing.
-    // The tick, not the plain border: the row is labelled, and §3f's rule is
-    // that a labelled row carries one wherever it is reached.
-    expect(rows[0]).toMatch(/^stopped\s+┤\s*$/u);
-    expect(rows[1], "and the minimum is still visible").toContain(RAMP_DENSITY[0]);
+    //
+    // **This row used to assert the ramp glyph, which is the mechanism rather
+    // than the property**, and C12 I29 moved the mechanism: above 8-bit a cell is
+    // a painted blank and the *background* is the reading. The minimum stopped
+    // having a glyph and the row failed while the invariant it names held
+    // perfectly. So it now asks the question I17 actually poses — can a reader
+    // tell *nothing happened* from *the least that happened* — at both rungs of
+    // the ladder, which is stronger than what it replaced.
+    const spec = heat({
+      series: [
+        { values: [null, null, null, null], label: "stopped" },
+        { values: [1, 2, 3, 4], label: "running" },
+      ],
+      height: 2,
+    });
+
+    const plain = rowsOf(spec);
+    expect(plain[0], "a stopped row is quiet").not.toContain("?");
+    // Blank *cells* — the label and the axis bar are furniture and stay. The
+    // tick, not the plain border: the row is labelled, and §3f's rule is that a
+    // labelled row carries one wherever it is reached.
+    expect(plain[0]).toMatch(/^stopped\s+┤\s*$/u);
+
+    // Rung 1 — colour leads. The minimum is a painted **blank**, so the carrier
+    // is a background sequence, and the absent row has none.
+    const painted = styledRowsOf(spec, 40, FULL_CAPS);
+    expect(painted[1], "the minimum is painted").toMatch(/\u001b\[48;/u);
+    expect(painted[0], "and nothing paints an absent row").not.toMatch(/\u001b\[48;/u);
+
+    // **And the cell is blank, which is the half a background check misses.**
+    // A renderer that painted the background *and* kept the density glyph
+    // satisfies every assertion above and is exactly the dithered speckle C12 I29
+    // exists to end — a foreground glyph occupies its cell whatever colour goes
+    // behind it. Found by mutation: swapping the space back for the glyph killed
+    // nothing until this row existed.
+    const grid = (rowsOf(spec, 40, FULL_CAPS)[1] ?? "").split("┤")[1] ?? "";
+    expect(grid.trim(), "a painted cell carries no glyph").toBe("");
+
+    // Rung 3 — no colour to lead with, so the density ramp carries it again.
+    // Without this the row would pass against a renderer that painted at every
+    // depth and left a 1-bit terminal with an empty grid.
+    const mono = rowsOf(spec, 40, MONO_UNICODE_CAPS);
+    expect(mono[1], "and the ramp carries it where colour cannot").toContain(RAMP_DENSITY[0]);
+    expect(mono[0]).toMatch(/^stopped\s+┤\s*$/u);
+
+    // **The legend descends the same ladder as the cell**, and it has to be
+    // asserted separately: the rung is chosen from whether `continuousColour`
+    // answers, not from whether a colormap is *named*, and the block names one
+    // at every depth. Asking the wrong question drew eight blank cells where the
+    // swatch belongs — a legend with a hole in it, the same width as a correct
+    // one. Another mutation survivor before this row.
+    expect(mono.slice(-1)[0] ?? "", "the swatch returns where the bar cannot")
+      .toContain(RAMP_DENSITY[0]);
   });
 
   it("T1.22 (C12 I18): width goes to columns first, labels truncate, and an unlabelled matrix is never drawn", () => {
@@ -978,13 +1041,28 @@ describe("C12 I17 — the heatmap", () => {
     });
 
     const legendOf = (w: number): string => rowsOf(long, w).slice(-1)[0] ?? "";
-    expect(legendOf(40), "the range, where the old placement cut it").toContain("1% - 6%");
 
-    // The drop order, asserted by narrowing until only one part fits: the swatch
-    // goes and the range stays.
+    // **Both bounds, not the dash.** C12 I29 made the swatch a colour bar and
+    // granite's shape brackets it — `1% ▮▮▮▮▮▮▮▮ 6%` — so the bounds now sit at
+    // the two ends they name rather than trailing the swatch together. What I19
+    // claims is that the *range* survives, and that is what is asserted.
+    const wide = legendOf(40);
+    expect(wide, "the lower bound, where the old placement cut it").toContain("1%");
+    expect(wide, "and the upper").toContain("6%");
+
+    // The drop order, asserted by narrowing until only one rung fits: the
+    // swatch goes and the range stays, in whichever form still fits.
     const narrow = legendOf(12);
     expect(narrow, "the range is last to go").toContain("1% - 6%");
     expect(narrow, "and the swatch is what went").not.toContain(RAMP_DENSITY[0]);
+    // **From the styled rows, because `rowsOf` strips SGR** — asserted against
+    // the plain text this could not fail, which is an absence assertion that
+    // asserts nothing. The painted bar has to be looked for where it would be.
+    const narrowStyled = styledRowsOf(long, 12).slice(-1)[0] ?? "";
+    expect(narrowStyled, "including its painted form").not.toMatch(/\u001b\[48;/u);
+    // And the fixture responds: at a width that fits, the bar *is* painted.
+    expect(styledRowsOf(long, 40).slice(-1)[0] ?? "", "the fixture can show a bar at all")
+      .toMatch(/\u001b\[48;/u);
   });
 
   it("T1.19 (C04 I50b): the three refusals, each with its converse", () => {

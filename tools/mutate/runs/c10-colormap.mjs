@@ -69,11 +69,18 @@ const results = runPass({
       // empty at one bit.
       name: "THE F34 FAILURE: colour replaces the density glyph rather than joining it",
       file: HEAT,
-      // The glyph stopped being a string built ahead of the colour run and
-      // became a per-column read, so the mutation moved with it: blanking the
-      // carrier is now blanking `glyphAt`, and the frame is beautiful at
-      // 24-bit and empty at one bit exactly as before.
-      from: "    run += glyphAt(x);",
+      // **The ruling inverted and the concern did not**, which is why this row
+      // is re-anchored rather than deleted. C12 I29 made colour the carrier above
+      // 8-bit deliberately — a foreground glyph occupies its cell whatever
+      // colour goes behind it, and the old arrangement rendered as speckle. So
+      // "colour replaces the glyph" is now the *shipped* behaviour at 24-bit.
+      //
+      // What F34 still forbids is colour being the carrier where there is no
+      // colour, and C12 I29's own ladder is what answers it: `colourAt` returns
+      // nothing below 8-bit (C10 I31) and the ramp takes back over. Blanking the
+      // cell unconditionally removes that fallback — beautiful at 24-bit, empty
+      // at one bit, exactly the frame this row has always described.
+      from: "    run += colour === undefined ? glyphAt(x) : \" \";",
       to: "    run += \" \";",
       expect: "T2.31",
     },
