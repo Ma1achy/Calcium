@@ -622,7 +622,32 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         s(Array.from({ length: 60 }, (_v, i) => 18 + 34 * ((i + 0.5) / 60) ** 3)),
       ],
     },
-    // The vertical arm of the same rung — the cloud as a run of dot-columns
+    // The third rung: cloud, box and the raw samples as a jittered strip. Sixty
+    // is deliberate and coprime to nothing — but the *frame* is what this
+    // fixture is for, and the rung is reached by declaring three rows a band
+    // rather than by naming it (C12 §3i, I34).
+    raindrop: {
+      form: "violin", height: 9, axes: true, categories: ["tight", "wide", "skewed"],
+      series: [
+        s(Array.from({ length: 60 }, (_v, i) => 30 + 4 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4))),
+        s(Array.from({ length: 60 }, (_v, i) => 30 + 15 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4))),
+        s(Array.from({ length: 60 }, (_v, i) => 18 + 34 * ((i + 0.5) / 60) ** 3)),
+      ],
+    },
+    // **The vertical arm, and eighteen bands is the fixture responding.** A
+    // vertical raindrop is reachable at exactly four columns a band — three is
+    // the raincloud and five is the mirrored violin, which scales from there —
+    // so three categories at 80 cells gives each of them twenty-five and lands
+    // on the top rung. The first draft of this fixture did, and drew a violin
+    // under the name `raindrop`. Eighteen bands of seventy-five is four.
+    "raindrop-vertical": {
+      form: "violin", height: 14, axes: true, orientation: "vertical",
+      categories: Array.from({ length: 18 }, (_v, h) => String(h + 6).padStart(2, "0")),
+      series: Array.from({ length: 18 }, (_v, h) =>
+        s(Array.from({ length: 30 }, (_w, i) =>
+          40 + Math.sin(h * 0.6) * 14 + Math.sin(i * 0.9 + h) * (5 + Math.abs(Math.cos(h)) * 7)))),
+    },
+    // The vertical arm of the raincloud — the cloud as a run of dot-columns
     // rather than a ladder step, three columns a band (C12 §3i, I21).
     "compact-vertical": {
       form: "violin", height: 14, axes: true, orientation: "vertical", plotDetail: "compact",

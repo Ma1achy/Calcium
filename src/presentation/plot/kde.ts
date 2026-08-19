@@ -8,6 +8,7 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { curveRows } from "./curve.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
 import { boxplotBand, boxplotColumn } from "./glyph-row.js";
+import { stripColumn, stripRow } from "./strip.js";
 import { cells } from "../text.js";
 import { glyphForMask, strokePolyline } from "./linedraw.js";
 import { glyphs } from "../blocks/glyphs.js";
@@ -229,6 +230,8 @@ export function rainRows(
   max: number,
   areaWidth: number,
   caps: Caps,
+  seriesIndex: number,
+  rain: boolean,
   adjust?: number,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
@@ -236,9 +239,16 @@ export function rainRows(
   // The box is `boxplotBand`'s compact arm and not a second drawing of one —
   // the rung ladder is one figure gaining parts, not four figures.
   const box = quartiles === undefined ? blank : boxplotBand(quartiles, min, max, w, 1, caps)[0] ?? blank;
+  // **The rain falls below the box, which is where the form's name comes from**
+  // (Allen et al. 2019): the cloud above, the summary between, the raw readings
+  // beneath. The third rung is the only part of the figure that is the data —
+  // an estimate and five numbers between them cannot say how many readings
+  // there were or that two of them coincide.
+  const rows = (cloud: string): readonly string[] =>
+    rain ? [cloud, box, stripRow(series.values, min, max, w, caps, seriesIndex)] : [cloud, box];
 
   const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
-  if (finite.length === 0) return [blank, box]; // cells-ok — a sample count
+  if (finite.length === 0) return rows(blank); // cells-ok — a sample count
 
   const sorted = [...finite].sort((a, b) => a - b);
   // **`boxplotBand`'s own mapping, inverted.** Its `at(v)` is
@@ -250,7 +260,7 @@ export function rainRows(
   const bw = scaledBandwidth(finite, adjust);
   const densities = kde(finite, points, bw);
   const maxD = Math.max(...densities);
-  if (maxD <= 0) return [blank, box];
+  if (maxD <= 0) return rows(blank);
   const support = supported(points, sorted, bw ?? silvermanBandwidth(finite));
 
   // **The axis, not a ramp** (I21). A cloud cell is a column of a vertical
@@ -262,7 +272,7 @@ export function rainRows(
     if (i < support.first || i > support.last) return " ";
     return ladder[Math.round((densities[i]! / maxD) * top)] ?? " ";
   });
-  return [cloud.join(""), box];
+  return rows(cloud.join(""));
 }
 
 export function violinColumn(
@@ -394,6 +404,9 @@ export function violinColumn(
  */
 const CLOUD_CELLS = 4;
 
+/** The cells a vertical strip jitters across — two dot columns each. */
+const STRIP_CELLS = 2;
+
 export function rainColumns(
   series: Series,
   quartiles: QuartileSummary | undefined,
@@ -402,6 +415,8 @@ export function rainColumns(
   colWidth: number,
   rows: number,
   caps: Caps,
+  seriesIndex: number,
+  rain: boolean,
   adjust?: number,
 ): readonly string[] {
   const slot = Math.max(1, Math.floor(colWidth));
@@ -427,7 +442,16 @@ export function rainColumns(
   // partial resolves `2n + 1` levels, and the height ladder resolves eight, so
   // four is where the vertical arm reads the same number of levels the
   // horizontal arm does.
-  const w = Math.min(slot >= 5 ? Math.max(3, Math.round(slot * 0.6)) : slot, CLOUD_CELLS + 1); // cells-ok — a column width
+  //
+  // **The strip is the rightmost column or two**, transposing the horizontal
+  // arm's cloud-box-rain from top-to-bottom into left-to-right. Two is where it
+  // stops for the cloud's reason one paragraph up: jitter across more cells is
+  // spread, not signal, and a wide speckle stops reading as a column of
+  // readings.
+  const w = Math.min(
+    slot >= 5 ? Math.max(3, Math.round(slot * 0.6)) : slot,
+    CLOUD_CELLS + 1 + (rain ? STRIP_CELLS : 0),
+  ); // cells-ok — a column width
   const padL = Math.floor((slot - w) / 2); // cells-ok — a column width
   const padR = slot - w - padL; // cells-ok — a column width
   // **The compact vertical box is one column wide**, which `boxplotColumn`
@@ -436,11 +460,20 @@ export function rainColumns(
   const box = quartiles === undefined
     ? Array.from({ length: n }, () => " ")
     : boxplotColumn(quartiles, min, max, 1, n, caps); // cells-ok — a column budget
-  const cloudW = w - 1; // cells-ok — a column count
+  // **The cloud is served first and that is the budget's own split.** Four
+  // columns is two of cloud, one of box, one of rain — five levels of density
+  // and two of jitter — so a strip taking its ceiling before the cloud has its
+  // floor leaves one column of cloud at exactly the width the ladder was
+  // written for. The frame showed it as a raindrop with three levels.
+  const stripW = rain ? Math.min(STRIP_CELLS, Math.max(1, w - 1 - CLOUD_CELLS)) : 0; // cells-ok — a column width
+  const cloudW = w - 1 - stripW; // cells-ok — a column count
+  const rainCells = stripW === 0
+    ? Array.from({ length: n }, () => "")
+    : stripColumn(series.values, min, max, stripW, n, caps, seriesIndex);
   const beside = (r: number, run: string): string =>
     " ".repeat(padL) +
     " ".repeat(Math.max(0, cloudW - cells(run, caps.ambiguousWidth))) +
-    run + (box[r] ?? " ") + " ".repeat(padR);
+    run + (box[r] ?? " ") + (rainCells[r] ?? "") + " ".repeat(padR);
   const blank = (): readonly string[] => Array.from({ length: n }, (_v, r) => beside(r, ""));
 
   if (cloudW < 1) return boxplotColumn(quartiles ?? { min, q1: min, median: min, q3: min, max }, min, max, slot, n, caps); // cells-ok — a column count

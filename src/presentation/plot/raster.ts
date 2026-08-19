@@ -166,3 +166,42 @@ export function foldRamp(grid: Grid, ramp: string): readonly string[] {
 
   return out;
 }
+
+/**
+ * A dot grid to cells of **presence** — one mark where anything is lit.
+ *
+ * **The third fold, and it exists because the other two both encode a
+ * magnitude.** `foldBraille` puts the dots' arrangement in the glyph;
+ * `foldRamp` puts the topmost dot's *height* in it. A jittered strip has
+ * neither to say: its dots are raw samples, and their sub-cell position is
+ * spread rather than signal (C12 §3i, I21). Folded through `foldRamp` an ASCII
+ * strip would draw `.` `:` `-` `=` by where a sample happened to land inside its
+ * cell — a magnitude the data does not have, which is the vocabulary mismatch
+ * I21 exists to refuse, arriving on a fourth form.
+ *
+ * Sized on `RAMP_DOTS` because presence is what the ASCII arm needs and ASCII is
+ * one dot column per cell. The unicode arm folds braille and never reaches here.
+ */
+export function foldPresence(grid: Grid, mark: string): readonly string[] {
+  const cellsHigh = Math.ceil(grid.dotHeight / RAMP_DOTS.y);
+  const out: string[] = [];
+
+  for (let cy = 0; cy < cellsHigh; cy += 1) {
+    let line = "";
+    for (let cx = 0; cx < grid.dotWidth; cx += 1) {
+      let lit = false;
+      for (let dy = 0; dy < RAMP_DOTS.y; dy += 1) {
+        const y = cy * RAMP_DOTS.y + dy;
+        if (y >= grid.dotHeight) break;
+        if (grid.dots[y * grid.dotWidth + cx] === 1) {
+          lit = true;
+          break;
+        }
+      }
+      line += lit ? mark : " ";
+    }
+    out.push(line);
+  }
+
+  return out;
+}

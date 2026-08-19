@@ -18,6 +18,7 @@ import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
 import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
+import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
@@ -389,7 +390,7 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     const skewed = Array.from({ length: 60 }, (_v, i) => 18 + 34 * ((i + 0.5) / 60) ** 3);
 
     const rain = (values: readonly number[]): { peak: number; median: number } => {
-      const rows = rainRows({ values: [...values] }, summary(values), LO, HI, W, FULL_CAPS); // cells-ok — a column budget
+      const rows = rainRows({ values: [...values] }, summary(values), LO, HI, W, FULL_CAPS, 0, false); // cells-ok — a column budget
       return { peak: peakOf(rows[0] ?? ""), median: [...(rows[1] ?? "")].indexOf(glyphs(FULL_CAPS).vertical) }; // cells-ok — a column index
     };
 
@@ -414,7 +415,7 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     // somewhere else at all, which is the premise the mutation trades on: if a
     // tenth of this axis were worth nothing, T6.24 would fail nothing.
     const pad = (HI - LO) * 0.1;
-    const moved = peakOf(rainRows({ values: symmetric }, summary(symmetric), LO - pad, HI + pad, W, FULL_CAPS)[0] ?? ""); // cells-ok — a column budget
+    const moved = peakOf(rainRows({ values: symmetric }, summary(symmetric), LO - pad, HI + pad, W, FULL_CAPS, 0, false)[0] ?? ""); // cells-ok — a column budget
     expect(moved, "a tenth of this axis is worth columns").not.toBe(sym.peak); // cells-ok — a column index
   });
 
@@ -436,7 +437,7 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     const tight = Array.from({ length: 60 }, (_v, i) => 40 + 3 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4));
     // A wide axis the sample occupies a sliver of, so the cut has somewhere to
     // bite. Pinned by hand rather than taken from the data.
-    const cloud = [...(rainRows({ values: tight }, summary(tight), 0, 100, 61, FULL_CAPS)[0] ?? "")]; // cells-ok — a column budget
+    const cloud = [...(rainRows({ values: tight }, summary(tight), 0, 100, 61, FULL_CAPS, 0, false)[0] ?? "")]; // cells-ok — a column budget
 
     const ladder = [...ladderFor("height", FULL_CAPS).steps];
     const drawn = cloud.filter((c) => c !== " ");
@@ -458,6 +459,127 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     expect(cloud[hi], "and so is its high edge").toBe(ladder[0]);
   });
 
+  it("T1.97 (C12 I34): one chart draws one figure, and the remainder decides only the width", () => {
+    // **`categoricalColumnForm` distributes its remainder a cell at a time**, so
+    // eighteen bands over seventy-five cells is four each and three of them
+    // five. A rung ladder keyed on each band's own width then drew three
+    // mirrored violins among fifteen rainclouds — and a reader takes that as a
+    // property of those three categories rather than of the division.
+    //
+    // Every width sums, every band is the richest figure its own width affords,
+    // and nothing in it is arithmetically wrong. Reading the frame is what found
+    // it and is the only thing that could.
+    const N = 18; // cells-ok — a category count, chosen so 75 does not divide by it
+    const bands = Array.from({ length: N }, (_v, h) =>
+      ({ values: Array.from({ length: 30 }, (_w, i) => 40 + Math.sin(h * 0.6) * 14 + Math.sin(i * 0.9 + h) * 6) }));
+    const rows = plain(block({
+      kind: "plot", id: "u", form: "violin", height: 14, axes: true, orientation: "vertical",
+      categories: Array.from({ length: N }, (_v, h) => String(h)),
+      series: bands,
+    }) as Plot, FULL_CAPS, 80); // cells-ok — a frame width
+
+    // **Asserted over the set of figures, because the defect is that the set has
+    // two members.** A raincloud's cloud is braille; a mirrored violin's outline
+    // comes from `glyphForMask`, whose rounded table is the block's default —
+    // so the two rungs cannot share a glyph and a frame carrying both is a frame
+    // carrying the defect.
+    //
+    // **`glyphs().topLeft` is the plot's own border and not the violin**, which
+    // is the proxy this row cost: `┌` is drawn on every frame that has a frame,
+    // so the first form of the assertion failed against correct output. The
+    // rounded corners belong to `linedraw.ts` and appear in no furniture.
+    const outline = new Set(["\u256d", "\u256e", "\u2570", "\u256f"]);
+    const body = rows.join("");
+    expect([...body].some((c) => c >= "\u2800" && c <= "\u28ff"), "the rung drawn is the raincloud")
+      .toBe(true);
+    expect([...body].some((c) => outline.has(c)), "and no band drew the mirrored outline")
+      .toBe(false);
+
+    // **The fixture responds**: the widths really are ragged, so a per-band
+    // ladder had somewhere to differ. Three of eighteen are a cell wider, and a
+    // frame where they were not would pass this row against either rule.
+    const area = 80 - 3 - 1 - 1; // cells-ok — a frame width less its gutter and borders
+    expect(area % N, "the band count does not divide the area").not.toBe(0); // cells-ok — a column count
+  });
+
+  it("T1.95 (C12 I11, I34): the jitter is decorrelated from the index it is drawn from", () => {
+    // **`i % 4` is deterministic and it is not a jitter.** It satisfies I11
+    // exactly — same block, same picture — and draws a sawtooth: consecutive
+    // samples march down the dot rows in lockstep, so **sorted data draws
+    // diagonal stripes**, which is a pattern in the renderer read as a pattern
+    // in the measurements. Distribution data arrives sorted often enough that
+    // this is the ordinary case rather than the adversarial one.
+    const N = 400, P = 4; // cells-ok — a sample count and a position count
+    const seq = Array.from({ length: N }, (_v, i) => jitterOf(0, i, P)); // cells-ok — a position index
+
+    // Every position is reached, or the strip is thinner than it claims.
+    expect(new Set(seq).size, "all four dot rows are used").toBe(P); // cells-ok — a position count
+
+    // And it is not the sawtooth. A third is a floor with room to spare: a
+    // uniform hash disagrees with `i % 4` on three quarters of the indices, and
+    // the sawtooth itself disagrees on none.
+    const sawtooth = seq.filter((v, i) => v === i % P).length; // cells-ok — a sample count
+    expect(sawtooth / N, "not `i % positions`").toBeLessThan(0.5);
+
+    // **The band's index is an input**, so two bands of one distribution do not
+    // draw the same speckle — which would read as a coincidence in the data.
+    const other = Array.from({ length: N }, (_v, i) => jitterOf(1, i, P)); // cells-ok — a position index
+    const same = seq.filter((v, i) => v === other[i]).length; // cells-ok — a sample count
+    expect(same / N, "a second band is a different speckle").toBeLessThan(0.5);
+
+    // Bounded, which nothing else here checks and a `%` on a negative would
+    // break: a 32-bit avalanche folded with `%` must never leave the range.
+    for (const v of [...seq, ...other]) {
+      expect(v, "inside the positions").toBeGreaterThanOrEqual(0); // cells-ok — a position index
+      expect(v, "inside the positions").toBeLessThan(P); // cells-ok — a position count
+    }
+  });
+
+  it("T1.96 (C12 I21, I34): the strip reads the box's axis at twice its resolution", () => {
+    // **The sub-cell win is real and it is on one axis only.** A braille cell is
+    // two dots wide and four tall, so a horizontal strip resolves two value
+    // positions per cell where the cloud and the box resolve one — and four
+    // jitter positions down, which is the spread rather than the signal.
+    const W = 20; // cells-ok — a column budget
+    const at = (values: readonly number[]): string => stripRow(values, 0, 100, W, FULL_CAPS, 0); // cells-ok — a column budget
+
+    // The ends land on the ends, on the same axis the box uses.
+    expect([...at([0])].findIndex((c) => c !== " "), "the minimum is in column 0").toBe(0); // cells-ok — a column index
+    expect([...at([100])].findIndex((c) => c !== " "), "and the maximum in the last").toBe(W - 1); // cells-ok — a column index
+
+    // **Two values half a cell apart resolve into one cell's two dot columns.**
+    // The value axis is `2W` dots wide, so index 0 and index 1 share cell 0 and
+    // differ within it — a distinction the box cannot make at any width it is
+    // given, and the reason the strip is worth its row.
+    const one = 100 / (2 * W - 1); // cells-ok — a dot budget
+    const cell = [...at([0, one])][0] ?? " ";
+    const mask = (cell.codePointAt(0) ?? 0x2800) - 0x2800;
+    expect(mask & 0x47, "a dot in the cell's left column").toBeGreaterThan(0);
+    expect(mask & 0xb8, "and one in its right").toBeGreaterThan(0);
+
+    // **The vertical strip inverts with its box, and a flipped one is
+    // plausible.** Row 0 is the top, so `max` belongs on the first row and `min`
+    // on the last — the same inversion `boxplotColumn` applies. Drawn without
+    // it, every sample sits beside the wrong part of the box and the figure
+    // reads as a distribution that is upside down about nothing in particular.
+    const only = (values: readonly number[], rows: number): readonly number[] =>
+      stripColumn(values, 0, 100, 1, rows, FULL_CAPS, 0) // cells-ok — a column budget
+        .flatMap((r, i) => (r.trim() === "" ? [] : [i])); // cells-ok — a row index
+    expect(only([100], 8), "the maximum is on the top row").toEqual([0]); // cells-ok — a row budget
+    expect(only([0], 8), "and the minimum on the last").toEqual([7]); // cells-ok — a row index
+
+    // **ASCII draws a rug and nothing from a ramp** (C12 I21). No sub-cell
+    // position to spend, and folding through the ramp would draw `. : - =` by
+    // where a sample landed inside its cell — a magnitude the data has not got.
+    const rug = stripRow([0, 50, 100], 0, 100, W, ASCII_CAPS, 0); // cells-ok — a column budget
+    const ramp = new Set([...ladderFor("height", ASCII_CAPS).steps]);
+    for (const c of rug) {
+      if (c === " ") continue;
+      expect(c, "the rug's mark is not a ramp step").toBe(glyphs(ASCII_CAPS).dotted);
+      expect(ramp.has(c) && c !== glyphs(ASCII_CAPS).dotted, "and no ramp glyph appears").toBe(false);
+    }
+  });
+
   it("T1.93 (C12 I21, I34): the vertical cloud is a run that grows away from the box", () => {
     // **A run, not a ladder** — the band is thin in *width*, so the resolution
     // is the run's length across cells rather than a step inside one, and which
@@ -472,7 +594,7 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     // shortfall.
     const values = Array.from({ length: 60 }, (_v, i) => 40 + 6 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4));
     const COL = 4, ROWS = 15; // cells-ok — a column budget and a row budget
-    const rows = rainColumns({ values }, summary(values), 0, 100, COL, ROWS, FULL_CAPS);
+    const rows = rainColumns({ values }, summary(values), 0, 100, COL, ROWS, FULL_CAPS, 0, false);
 
     expect(rows.length, "one row per row").toBe(ROWS); // cells-ok — a row count
     for (const r of rows) expect(cells(r, "narrow"), "and each is the slot wide").toBe(COL); // cells-ok — a column count
@@ -528,7 +650,7 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     // eleven columns either one alone leaves the same gap, so a row written
     // there passes against a tree missing either.
     const span = (slot: number): { lo: number; hi: number } => {
-      const drawn = rainColumns({ values }, summary(values), 0, 100, slot, ROWS, FULL_CAPS); // cells-ok — a column budget
+      const drawn = rainColumns({ values }, summary(values), 0, 100, slot, ROWS, FULL_CAPS, 0, false); // cells-ok — a column budget
       let lo = slot, hi = -1; // cells-ok — a column index
       for (const row of drawn) {
         for (const [i, c] of [...row].entries()) {
@@ -564,6 +686,23 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     const floor = span(3); // cells-ok — a column budget
     expect(floor.lo, "the budget's own width has no gap to give").toBe(0); // cells-ok — a column index
     expect(floor.hi, "and uses all three").toBe(2); // cells-ok — a column index
+
+    // **The raindrop's split at its own budget: two of cloud, one of box, one
+    // of rain.** Served strip-first the cloud gets one column at exactly the
+    // width the ladder was written for — three levels of density where the
+    // budget promises five — and every column is still accounted for. The box
+    // is where the split shows: it is the only part of the figure drawn from
+    // named glyphs rather than braille, so its column is readable off the row.
+    const drop = rainColumns({ values }, summary(values), 0, 100, 4, ROWS, FULL_CAPS, 0, true); // cells-ok — a column budget
+    const braille = (c: string): boolean => c >= "\u2800" && c <= "\u28ff";
+    const boxAt: number[] = []; // cells-ok — a column index
+    for (const row of drop) {
+      for (const [i, c] of [...row].entries()) {
+        if (c !== " " && !braille(c)) boxAt.push(i); // cells-ok — a column index
+      }
+    }
+    expect(boxAt.length, "the box is drawn").toBeGreaterThan(0); // cells-ok — a cell count
+    expect(new Set(boxAt), "and it is the third column of four").toEqual(new Set([2])); // cells-ok — a column index
   });
 
   it("T1.94 (C12 I34): the renderer reaches the raincloud, not only the function", () => {

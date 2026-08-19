@@ -295,6 +295,49 @@ describe("C12 tier 6 — fail-on-revert", () => {
     }
   });
 
+  it("T6.28 (I11, I34): a jittered strip that moves between two renders of one block", () => {
+    // **The revert is a counter, and the reason it is a revert rather than a
+    // taste.** C12 owns no state and every render is a pure function of block,
+    // width and context — so a strip placed from `Math.random`, a clock or a
+    // module-level counter is a picture of the renderer. It would fail nothing
+    // else: every count agrees, both frames are plausible, and the difference
+    // only exists between two renders nobody puts side by side.
+    //
+    // **Sixty-one samples, and sixty is what made this row pass against the
+    // defect it names.** A module counter running 1…60 and then 61…120 gives
+    // the same `% 4` in both renders when the count is a multiple of four — the
+    // phase resets exactly, the two frames are byte-identical, and a counter is
+    // indistinguishable from a hash. Measured, not reasoned: the mutation
+    // survived. A count coprime to the jitter's positions is the fixture
+    // responding to the thing under test.
+    const N = 61; // cells-ok — a sample count, deliberately not a multiple of 4
+    expect(N % 4, "the count must not reset the counter's phase").not.toBe(0); // cells-ok — a position count
+    const values = Array.from({ length: N }, (_v, i) => 30 + 6 * Math.tan((((i + 0.5) / N) - 0.5) * 2.4));
+    const drop = block({
+      kind: "plot", id: "rd", form: "violin", height: 3, axes: false,
+      categories: ["A"], series: [{ values }],
+    }) as Plot;
+
+    const kit = measurable({ definitions: [plotDefinition] as never, capabilities: FULL_CAPS });
+    const first = kit.renderToLines(drop, 40); // cells-ok — a frame width
+    const second = kit.renderToLines(drop, 40); // cells-ok — a frame width
+    expect(second).toEqual(first);
+
+    // **A second kit, because one kit could be memoising.** The claim is that
+    // the *renderer* is pure, not that a cache is warm — and a per-instance
+    // counter would survive the first assertion by being reset with the kit.
+    const other = measurable({ definitions: [plotDefinition] as never, capabilities: FULL_CAPS });
+    expect(other.renderToLines(drop, 40)).toEqual(first); // cells-ok — a frame width
+
+    // The fixture responds: the strip is drawn and it is not a rug. `⠁ ⠈ ⠉` are
+    // the braille cells whose dots all sit in the top row, so a strip with no
+    // jitter draws nothing else — and this row would pass against one.
+    const strip = visible(first[2] ?? "");
+    expect(strip.trim().length, "the strip is drawn").toBeGreaterThan(0); // cells-ok — a cell count
+    const flat = new Set(["\u2801", "\u2808", "\u2809", " "]);
+    expect([...strip].some((c) => !flat.has(c)), "and it is jittered, not a rug").toBe(true);
+  });
+
   it("T6.13 (I15): three unconditional y-labels → T3.2 renders outside its rows", () => {
     // Not in §9's list, and it belongs there: §3 made three labels unconditional
     // while T3.2 renders `height: 1` with axes, so the section contradicted its own

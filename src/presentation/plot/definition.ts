@@ -208,15 +208,12 @@ const RUNGS: Readonly<Record<"boxplot" | "violin", readonly RungSpec[]>> = Objec
   // **A violin's floor is the raincloud rather than the box**, because a violin
   // with no density is a box plot and the field said `violin` (C04 I56).
   //
-  // **`raindrop` scales today because its figure does not exist yet.** The rung
-  // is *chosen* correctly — a four-row band affords it and not the mirrored
-  // violin — and `violinRows` draws it until the jittered strip lands, one
-  // commit along in this plan. Clamping it now would shrink a figure into three
-  // rows of a four-row band to make room for a strip that is not drawn, which is
-  // a worse frame for one commit. **The blocker is a symbol: grep `rainStrip`.**
+  // **Three rungs and only the last scales**, which is what makes it the last:
+  // more rows buy the mirrored outline more shape, and buy the other two
+  // nothing — a raincloud is a cloud, a box and a strip whatever it is given.
   violin: Object.freeze([
     Object.freeze({ rung: "rain" as const, rows: 2, columns: 3, density: true, scales: false }),
-    Object.freeze({ rung: "raindrop" as const, rows: 3, columns: 4, density: true, scales: true }),
+    Object.freeze({ rung: "raindrop" as const, rows: 3, columns: 4, density: true, scales: false }),
     Object.freeze({ rung: "violin" as const, rows: 5, columns: 5, density: true, scales: true }),
   ]),
 });
@@ -921,7 +918,21 @@ function categoricalColumnForm(
   block: Plot,
   width: number,
   ctx: RenderContext,
-  columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number) => readonly string[],
+  /**
+   * `narrowest` is the width of the **thinnest** band, not this one's.
+   *
+   * **A figure chosen from a band's own width makes the chart a function of the
+   * remainder distribution.** Eighteen bands over seventy-five cells is four
+   * each with three left over, so three of them are five wide — and a rung
+   * ladder keyed on the band's own width drew three mirrored violins among
+   * fifteen rainclouds, which a reader takes as a property of those three
+   * categories. Found by reading the frame; every width sums, every band is the
+   * figure its width affords, and nothing about it is arithmetically wrong.
+   *
+   * The *drawing* still uses the band's own `colWidth` — a five-column band
+   * draws its raincloud five wide. Only the choice of figure is the chart's.
+   */
+  columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number, narrowest: number) => readonly string[],
 ): readonly string[] {
   const cats = block.categories ?? [];
   const n = cats.length; // cells-ok — a category count
@@ -944,7 +955,7 @@ function categoricalColumnForm(
   const extra = layout.areaWidth - base * n; // cells-ok — a column width
   const widths = Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0)); // cells-ok — a column width
 
-  const columns = widths.map((cw, i) => columnBuilder(i, cw, areaRows, range.min, range.max));
+  const columns = widths.map((cw, i) => columnBuilder(i, cw, areaRows, range.min, range.max, base));
 
   // The value scale in the gutter, placed exactly as `overlaidRows` places it —
   // one implementation of *which row carries which label*, and the scale and the
@@ -1755,19 +1766,21 @@ const FORM_ROWS: Readonly<
       // once and each column is a distribution on that same scale — which is the
       // comparison a violin plot exists to make and the horizontal arm gives up
       // by scaling every band to itself.
-      return categoricalColumnForm({ ...block, categories: cats }, width, ctx, (i, cw, rows) => {
+      return categoricalColumnForm({ ...block, categories: cats }, width, ctx, (i, cw, rows, _lo, _hi, narrowest) => {
         const sr = block.series[i];
         if (sr === undefined) return Array.from({ length: rows }, () => " ".repeat(cw));
         // **The column floor is enforced here rather than refused**, because
         // construction cannot see a width (C04 I56, I18's ladder): below three
         // columns a violin is four dot-columns split between density and box, so
         // the honest figure is the box.
-        const rung = rungFor(block, "violin", cw, "columns", finiteCount(sr));
+        // **The narrowest band and not this one** — one chart draws one figure,
+        // and the remainder is what decides which bands are a cell wider.
+        const rung = rungFor(block, "violin", narrowest, "columns", finiteCount(sr));
         if (!rung.density) {
           return boxplotColumn(qs[i] ?? summaryOf(sr) ?? EMPTY_SUMMARY, shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities);
         }
-        if (rung.rung === "rain") {
-          return rainColumns(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities, block.bandwidth);
+        if (rung.rung === "rain" || rung.rung === "raindrop") {
+          return rainColumns(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth);
         }
         return violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
       });
@@ -1788,8 +1801,8 @@ const FORM_ROWS: Readonly<
       // **The rung, not the row count**, because two rungs can be handed the
       // same budget: `"compact"` takes the floor at any height, so a raincloud
       // and a mirrored violin both arrive here with rows to spare.
-      if (rung.rung === "rain") {
-        return rainRows(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw, ctx.capabilities, block.bandwidth);
+      if (rung.rung === "rain" || rung.rung === "raindrop") {
+        return rainRows(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw, ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth);
       }
       return violinRows(sr, aw, spent, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
     });
