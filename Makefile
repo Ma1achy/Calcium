@@ -105,3 +105,18 @@ clean:
 
 help:
 	@grep -E '^[a-z-]+:.*?##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "};{printf "  \033[36m%-10s\033[0m %s\n",$$1,$$2}'
+
+# **`refdiff` is a gate, not a setup note.** The standing rule is that no plot
+# form counts as done until it has been put beside two references — a terminal
+# implementation and matplotlib — and a rule remembered per form lapses on the
+# thirty-fifth. This automates the half that can be: matplotlib rendered to
+# braille on the same cell grid, so the comparison is a text diff rather than
+# two pictures. Kept out of `all` because it needs a second container.
+refdiff:            ## every form beside its braille-rendered matplotlib twin
+	mkdir -p .refdiff
+	docker exec calcium-dev npx tsx tools/refdiff/export-fixtures.ts .refdiff
+	docker build -q -t calcium-refdiff -f tools/refdiff/Dockerfile tools/refdiff
+	cp tools/refdiff/reference.py .refdiff/
+	docker run --rm -e RD_COLS=64 -e RD_ROWS=16 -v "$(PWD)/.refdiff:/work" \
+	  calcium-refdiff python /work/reference.py
+	docker exec calcium-dev npx tsx tools/refdiff/pair.mjs

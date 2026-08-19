@@ -16,3 +16,5 @@ __pycache__/
 # session's history was committed from this exact path once.
 ~/
 docs/catalogue/
+.refdiff/
+docs/refdiff/*.txt

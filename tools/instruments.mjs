@@ -73,6 +73,16 @@ const COVERED = [
   // and splitting the answer across two files is what the header argues against.
   ["tools/plot-catalogue.mjs", ["npx", "vitest", "run", "test/unit/plot-catalogue.test.ts"]],
   ["tools/catalogue-png.mjs", null], // same fixture — the catalogue pipeline
+  // Covered by that same fixture all along — `plot-catalogue.test.ts` imports
+  // `CATALOGUE_FORMS` and compares it against `ALL_FORMS` by equality. It was
+  // simply not *seen*, being a `.ts`. See the note on `SUFFIX`.
+  ["tools/catalogue-forms.ts", null],
+  // **The equality comparison paid out a third time.** `tools/refdiff/` landed
+  // as two files and `make instruments` went 24 found / 22 with a fixture,
+  // naming both — on the day they landed, not the day someone noticed.
+  ["tools/refdiff/pair.mjs", ["npx", "vitest", "run", "test/unit/refdiff.test.ts"]],
+  ["tools/refdiff/reference.py", null], // same fixture — the two halves of one grid
+  ["tools/refdiff/export-fixtures.ts", null], // same fixture — our half and the grid
   ["examples/docker/tools/screen.py", ["python3", "examples/docker/tools/screen_test.py"]],
   ["examples/docker/tools/beats.py", ["python3", "examples/docker/tools/beats_test.py"]],
   ["examples/docker/tools/capture.py", ["python3", "examples/docker/tools/capture_test.py"]],
@@ -103,7 +113,14 @@ const NOT_INSTRUMENTS = {
   "examples/docker/tools/__pycache__": "not a file",
 };
 
-const SUFFIX = /\.(mjs|py|sh)$/;
+// **`.ts` was missing, and the omission has a history worth keeping.**
+// `tools/catalogue-forms.ts` was moved out of a `.mjs` *precisely* to get it
+// type-checked, after an untyped literal drifted and left eight plot forms in
+// no rendered frame at all. That move took it out of this inventory — the
+// remedy for one gate opened a hole in another, and the hole is the same shape:
+// a file outside the checked set. Found when `tools/refdiff/export-fixtures.ts`
+// landed and could not be listed as covered because it was not seen as present.
+const SUFFIX = /\.(mjs|py|sh|ts)$/;
 
 /** Every instrument file under the two tool directories. */
 function inventory() {
