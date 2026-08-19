@@ -62,6 +62,8 @@ export type Layout = Readonly<{
   areaRows: number;
   width: number;
   frame?: boolean;
+  /** Which of I26's four shapes the furniture takes. `"box"` when absent. */
+  style?: FrameStyle;
   /**
    * Cells held back for a vertical legend, outside `width`.
    *
@@ -105,7 +107,11 @@ export function gutterSpans(label: string, layout: Layout, ctx: RenderContext): 
   if (layout.gutter === 0) return [];
   const g = glyphs(ctx.capabilities);
   const muted = tone("muted", ctx.theme, ctx.capabilities);
-  const edge = label === "" ? g.vertical : g.teeRight;
+  // `"corners"` has no side edges either — the label still sits where it does in
+  // every other style, so the column the data starts in never moves with the
+  // style. That is what makes these four interchangeable at a glance.
+  const bare = (layout.style ?? "box") === "corners";
+  const edge = bare ? " " : label === "" ? g.vertical : g.teeRight;
   return [
     { text: padStart(label, layout.labelColumn, ctx.capabilities.ambiguousWidth), style: muted },
     { text: ` ${edge}`, style: muted },
@@ -115,7 +121,15 @@ export function gutterSpans(label: string, layout: Layout, ctx: RenderContext): 
 /** The frame's right edge, on an area row. Nothing when the layout has none. */
 export function rightBorder(layout: Layout, ctx: RenderContext): readonly Span[] {
   if (layout.frame !== true) return [];
-  return [{ text: glyphs(ctx.capabilities).vertical, style: tone("muted", ctx.theme, ctx.capabilities) }];
+  const style = layout.style ?? "box";
+  // `"rule"` has a left rule and a bottom rule and no right one — it is what
+  // shipped before `plotFrame` existed. The *column* is still spent, so the plot
+  // area is the same width in all four styles.
+  const bare = style === "corners" || style === "rule";
+  return [{
+    text: bare ? " " : glyphs(ctx.capabilities).vertical,
+    style: tone("muted", ctx.theme, ctx.capabilities),
+  }];
 }
 
 /**
@@ -172,16 +186,56 @@ export function bandLayout(
  * still emitted, because `plotHeight` counted it and a width cannot change a
  * declared height (I1).
  */
+/**
+ * The four furniture shapes (C12 I26).
+ *
+ * **All four ship because the references disagree**, which is what makes this a
+ * style field rather than a decision taken for the caller: UnicodePlots offers
+ * `:solid` and `:corners`, plotext draws a closed box, kitty.r draws gridlines.
+ * Each is a glyph choice over the same geometry — the rows and the columns are
+ * identical in all four — so the cost is one table rather than four renderers.
+ *
+ * `"corners"` **suppresses the tick row's ticks** rather than drawing them
+ * against an edge that is not there, which is I26's own clause and the one place
+ * the styles are not interchangeable.
+ */
+export type FrameStyle = NonNullable<Plot["plotFrame"]>;
+
+/** One edge's glyphs: the two corners and the run between them. */
+type EdgeGlyphs = Readonly<{ left: string; run: string; right: string }>;
+
+function topGlyphs(style: FrameStyle, g: ReturnType<typeof glyphs>): EdgeGlyphs | null {
+  switch (style) {
+    case "box":
+    case "grid":
+      return { left: g.topLeft, run: g.horizontal, right: g.topRight };
+    case "corners":
+      // The corner marks alone — the run is blank, so the shape is stated by
+      // four glyphs and the reader's eye closes it.
+      return { left: g.topLeft, run: " ", right: g.topRight };
+    case "rule":
+      // What shipped before `plotFrame` existed: a left rule and a bottom rule,
+      // and no lid at all.
+      return null;
+  }
+}
+
 export function frameTop(layout: Layout, ctx: RenderContext): string {
   const g = glyphs(ctx.capabilities);
   const muted = tone("muted", ctx.theme, ctx.capabilities);
-  const run = g.horizontal.repeat(Math.max(0, layout.areaWidth));
+  const edge = topGlyphs(layout.style ?? "box", g);
+  // **The row is still emitted when the style draws nothing in it**, because
+  // `plotHeight` counted it and a style cannot change a block's height — that is
+  // C12 I1, and a `"rule"` plot one row shorter than a `"box"` one would move
+  // everything below it on a field the caller thought was cosmetic.
+  if (edge === null) return "";
+  const run = edge.run.repeat(Math.max(0, layout.areaWidth));
   if (layout.gutter === 0) return line([{ text: run, style: muted }], layout, ctx);
   return line(
     [
       { text: " ".repeat(Math.max(0, layout.gutter - 1)) },
       {
-        text: g.topLeft + run + (layout.frame === true ? g.topRight : ""),
+        text: edge.left + run + (layout.frame === true ? edge.right : ""),
         style: muted,
       },
     ],
@@ -207,9 +261,14 @@ export function frameBottom(
 ): string {
   const g = glyphs(ctx.capabilities);
   const muted = tone("muted", ctx.theme, ctx.capabilities);
-  const at = new Set(tickColumns);
+  const style = layout.style ?? "box";
+  // **`"corners"` draws no ticks**, which is I26's own clause: a tick is a mark
+  // *on* an edge, and there is no edge here for it to sit on. Every other style
+  // has one.
+  const at = style === "corners" ? new Set<number>() : new Set(tickColumns);
+  const between = style === "corners" ? " " : g.horizontal;
   const run = Array.from({ length: Math.max(0, layout.areaWidth) }, (_, x) =>
-    at.has(x) ? g.teeDown : g.horizontal,
+    at.has(x) ? g.teeDown : between,
   ).join("");
   if (layout.gutter === 0) return line([{ text: run, style: muted }], layout, ctx);
   return line(
@@ -223,6 +282,33 @@ export function frameBottom(
     layout,
     ctx,
   );
+}
+
+/**
+ * The gridline row for `"grid"` — a dashed rule under the data (C12 I26).
+ *
+ * **Resolved *behind* the data**, which is C12 I23's rule and the reason this
+ * returns a row to be merged rather than spans to be appended: a curve must win
+ * its cell. A gridline drawn over a series is a series with a hole in it, and at
+ * one cell per sample the hole is the sample.
+ */
+export function gridRow(
+  layout: Layout,
+  tickColumns: readonly number[],
+  ctx: RenderContext,
+  labelled = false,
+): string {
+  if ((layout.style ?? "box") !== "grid") return " ".repeat(Math.max(0, layout.areaWidth));
+  const g = glyphs(ctx.capabilities);
+  const at = new Set(tickColumns);
+  // **Both axes, and a labelled row is the whole horizontal half.** A gridline
+  // exists to carry the eye from a mark to a value, so it belongs exactly where
+  // there is a value written — which is the rows the gutter labels and the
+  // columns the bottom rule ticks. A grid drawn on some other spacing is a
+  // texture.
+  return Array.from({ length: Math.max(0, layout.areaWidth) }, (_, x) =>
+    at.has(x) ? g.dashedVertical : labelled ? g.dashedHorizontal : " ",
+  ).join("");
 }
 
 /** The x-labels, offset to the plot area. Empty when the block declares none. */

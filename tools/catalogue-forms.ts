@@ -91,6 +91,20 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "line", height: 8, axes: true, legend: "below",
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
     },
+    // C12 I26 — all four shapes, same geometry, same rows.
+    "frame-corners": {
+      form: "line", height: 8, axes: true, plotFrame: "corners", legend: false,
+      series: [s(sin50, "alpha")],
+    },
+    "frame-grid": {
+      form: "line", height: 8, axes: true, plotFrame: "grid", legend: false,
+      xLabels: ["epoch 0", "epoch 20", "now"],
+      series: [s(sin50, "alpha")],
+    },
+    "frame-rule": {
+      form: "line", height: 8, axes: true, plotFrame: "rule", legend: false,
+      series: [s(sin50, "alpha")],
+    },
     "legend-off": {
       form: "line", height: 8, axes: true, legend: false,
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],

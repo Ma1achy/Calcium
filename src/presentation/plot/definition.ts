@@ -27,7 +27,8 @@ import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
-import { labelWidth, ticksFor, yLabels, axisFor } from "./axes.js";
+import { gridRow } from "./furniture.js";
+import { labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
 import {
   areaText,
   bandLayout,
@@ -169,6 +170,45 @@ function markedSpans(
       ? { text: piece.text }
       : { text: piece.text, style: slot(refFor(piece.index), ctx.theme, ctx.capabilities) },
   );
+}
+
+/**
+ * Gridlines under a row of data spans (C12 I26, C12 I23).
+ *
+ * **Behind, never over.** A gridline drawn on top of a series is a series with a
+ * hole in it, and at one cell per sample the hole *is* the sample. So the grid
+ * supplies only the cells the data left blank — which is `mergedRow`'s own
+ * first-non-blank rule, one layer further down.
+ */
+function behind(
+  grid: string,
+  spans: readonly Span[],
+  ctx: RenderContext,
+): readonly Span[] {
+  if (grid.trim() === "") return spans;
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const out: Span[] = [];
+  let x = 0; // cells-ok — a column index
+  for (const span of spans) {
+    let run = "";
+    for (const ch of span.text) {
+      // **U+2800 is a blank too**, and it is the one a braille raster emits — a
+      // check for `" "` alone found no empty cells in a dot-grid row and the
+      // gridlines never appeared, on a style whose whole difference is that they
+      // do. The braille blank is a printing character that looks empty, which is
+      // the same trap the ink mask in `refdiff` had to be told about.
+      const empty = ch === " " || ch === "\u2800";
+      run += empty ? (grid[x] ?? " ") : ch; // cells-ok — a column index
+      x += 1; // cells-ok — a column index
+    }
+    // A run that was entirely blank now carries only gridline, so it takes the
+    // muted style rather than the layer's colour.
+    const wasBlank = span.text.replace(/[ \u2800]/gu, "") === "";
+    out.push(wasBlank && run.trim() !== ""
+      ? { text: run, style: muted }
+      : span.style === undefined ? { text: run } : { text: run, style: span.style });
+  }
+  return out;
 }
 
 /**
@@ -474,6 +514,9 @@ function overlaidRows(
       ? []
       : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale);
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
+  // `"grid"` draws its lines where there is a value written — the rows the
+  // gutter labels and the columns the bottom rule ticks (C12 I26).
+  const gridTicks = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities).tickColumns;
   const layers: readonly Layer[] = [
     ...block.series.map((s, index) => ({
       glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
@@ -489,7 +532,7 @@ function overlaidRows(
     line(
       [
         ...gutterSpans(byRow.get(i) ?? "", layout, ctx),
-        ...mergedRow(layers, i, layout, ctx),
+        ...behind(gridRow(layout, gridTicks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
         ...rightBorder(layout, ctx),
       ],
       layout,
@@ -533,7 +576,11 @@ function usableWidth(block: Plot, width: number, ctx: RenderContext): number {
 /** A layout, with what the legend held back recorded on it. */
 function reserving(layout: Layout, block: Plot, width: number, ctx: RenderContext): Layout {
   const reserved = reservedFor(block, width, ctx);
-  return reserved === 0 ? layout : { ...layout, reserved }; // cells-ok — a cell width
+  // The frame's shape rides along, because every layout is built by one of two
+  // functions and neither takes the block — threading it here is one place
+  // rather than nine.
+  const styled = block.plotFrame === undefined ? layout : { ...layout, style: block.plotFrame };
+  return reserved === 0 ? styled : { ...styled, reserved }; // cells-ok — a cell width
 }
 
 /**
@@ -830,11 +877,12 @@ function stackedForm(
       : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale);
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
 
+  const ticks = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities).tickColumns;
   const area = Array.from({ length: layout.areaRows }, (_, i) =>
     line(
       [
         ...gutterSpans(byRow.get(i) ?? "", layout, ctx),
-        ...mergedRow(layers, i, layout, ctx),
+        ...behind(gridRow(layout, ticks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
         ...rightBorder(layout, ctx),
       ],
       layout,

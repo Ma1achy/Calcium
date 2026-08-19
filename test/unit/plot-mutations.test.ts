@@ -989,6 +989,86 @@ describe("GROUP 6l: `palette` had one legal value, so it is gone", () => {
   });
 });
 
+describe("GROUP 6m: four frame shapes over one geometry", () => {
+  const mk = (plotFrame?: "box" | "corners" | "grid" | "rule"): Plot => block({
+    kind: "plot", id: "f", form: "line", height: 6, axes: true, legend: false,
+    xLabels: ["a", "b", "c"], series: [{ values: [1, 5, 2, 6, 3] }],
+    ...(plotFrame === undefined ? {} : { plotFrame }),
+  } as Plot);
+  const plain = (b: Plot): readonly string[] =>
+    measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS })
+      .renderToLines(b, 40).map((r) => r.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"), ""));
+
+  it("T1.82 (C12 I26): all four are distinct, and none changes the height", () => {
+    // **The geometry is identical in all four** — same rows, same columns, same
+    // plot area — which is what makes this a glyph table rather than four
+    // renderers. A style that cost a row would move everything below the plot on
+    // a field the caller thought was cosmetic (C12 I1).
+    const styles = ["box", "corners", "grid", "rule"] as const;
+    const frames = styles.map((st) => plain(mk(st)).join("\n"));
+    expect(new Set(frames).size, "four distinct frames").toBe(4); // cells-ok — a set size
+    // **The type already says this and says it better.** `plotFrame` is not in
+    // `PlotGeometry`, so `plotHeight` structurally cannot see it — writing the
+    // assertion is a compile error, which is the guarantee rather than a test of
+    // it. What is left to check is that the *rendered* row count agrees, since a
+    // style emitting one row fewer would still be a form drawing off its own
+    // declared height.
+    expect(new Set(frames.map((f) => f.split("\n").length)).size, "and one row count").toBe(1); // cells-ok — a set size
+    // The default is `box`.
+    expect(plain(mk()).join("\n")).toBe(frames[0]);
+  });
+
+  it("T1.83 (C12 I26): `corners` draws no ticks, because there is no edge to put one on", () => {
+    // I26's own clause, and the one place the four are not interchangeable: a
+    // tick is a mark *on* an edge.
+    const corners = plain(mk("corners"));
+    const box = plain(mk("box"));
+    const rule = (rows: readonly string[]): string => rows[rows.length - 2] ?? "";
+    expect(rule(box), "the box's rule carries ticks").toContain("┬");
+    expect(rule(corners), "the corners' does not").not.toContain("┬");
+    expect(corners[0], "and the lid is four marks").toMatch(/┌\s+┐/u);
+  });
+
+  it("T1.84 (C12 I26): `grid` draws where a value is written, and the data wins its cell", () => {
+    // A gridline carries the eye from a mark to a value, so it belongs where
+    // there *is* a value — the rows the gutter labels and the columns the rule
+    // ticks. Anywhere else it is a texture.
+    //
+    // **And behind, never over.** A gridline on top of a series is a series with
+    // a hole in it, and at one cell per sample the hole is the sample.
+    const g = glyphs(FULL_CAPS);
+    const rows = plain(mk("grid"));
+    const labelled = rows.find((r) => /^\s*\d+\s*┤/u.test(r)) ?? "";
+    expect(labelled, "a labelled row carries a horizontal rule").toContain(g.dashedHorizontal);
+    expect(rows.join(""), "and the tick columns a vertical one").toContain(g.dashedVertical);
+    const unlabelled = rows.find((r) => /^\s+│/u.test(r)) ?? "";
+    expect(unlabelled, "an unlabelled row carries no horizontal rule").not.toContain(g.dashedHorizontal);
+    // **The curve survives on a gridline row**, which is the claim. Asserting
+    // that no gridline glyph sits *beside* a curve glyph does not say it: drawn
+    // over, the labelled row is gridline end to end and there is no curve left
+    // to be adjacent to. The mutation passed that and fails this.
+    // **The plot area only.** The frame's own right border is a `│`, so a test
+    // looking for a curve glyph anywhere in the row is satisfied by the border
+    // — and under the mutation every area cell is gridline while the border
+    // still stands. Second version of this row for that reason.
+    const areaOf = (r: string): string => {
+      const from = Math.max(r.indexOf("┤"), r.indexOf("│"));
+      return from < 0 ? "" : r.slice(from + 1, r.lastIndexOf("│"));
+    };
+    const curveOn = rows.filter((r) => r.includes(g.dashedHorizontal) && /[─╭╮╰╯]/u.test(areaOf(r)));
+    expect(curveOn.length, "a labelled row carries both the rule and the curve")
+      .toBeGreaterThan(0); // cells-ok — a row count
+  });
+
+  it("T1.85 (C12 I26): `rule` has no lid and no right border, and still spends the row", () => {
+    const rows = plain(mk("rule"));
+    expect(rows[0]!.trim(), "the lid row is blank").toBe("");
+    expect(rows.length, "and still there").toBe(plain(mk("box")).length); // cells-ok — a row count
+    const body = rows.find((r) => r.includes("│")) ?? "";
+    expect(body.trimEnd().endsWith("│"), "no right border").toBe(false);
+  });
+});
+
 describe("GROUP 7: pie merges sub-threshold slices", () => {
   it("at small radius, tiny segments merge into other", () => {
     const segs = [

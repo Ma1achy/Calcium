@@ -401,9 +401,10 @@ function plot(
     hierarchy?: Plot["hierarchy"];
     matrixAnchor?: Plot["matrixAnchor"];
     legend?: Plot["legend"];
+    plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend } =
+  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -436,6 +437,7 @@ function plot(
       ...(hierarchy === undefined ? {} : { hierarchy }),
       ...(matrixAnchor === undefined ? {} : { matrixAnchor }),
       ...(legend === undefined ? {} : { legend }),
+      ...(plotFrame === undefined ? {} : { plotFrame }),
     } as Plot,
     spec,
     true,

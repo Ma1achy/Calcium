@@ -44,6 +44,8 @@ export type GlyphSet = Readonly<{
    * is the same statement with the alphabet it has.
    */
   dashedVertical: string;
+  /** Its transpose — a broken horizontal rule, for a gridline at a labelled row. */
+  dashedHorizontal: string;
   topLeft: string;
   topRight: string;
   bottomLeft: string;
@@ -106,6 +108,7 @@ const UNICODE: GlyphSet = Object.freeze({
   horizontal: "─",
   vertical: "│",
   dashedVertical: "┊",
+  dashedHorizontal: "┄",
   topLeft: "┌",
   topRight: "┐",
   bottomLeft: "└",
@@ -139,6 +142,7 @@ const ASCII: GlyphSet = Object.freeze({
   horizontal: "-",
   vertical: "|",
   dashedVertical: ":",
+  dashedHorizontal: "-",
   topLeft: "+",
   topRight: "+",
   bottomLeft: "+",

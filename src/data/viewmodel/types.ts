@@ -724,6 +724,19 @@ export type Plot = Readonly<{
    * that can turn itself on.
    */
   legend?: "above" | "below" | "left" | "right" | false;
+  /**
+   * The shape of the furniture, where `axes` says whether there is any
+   * (C12 §3f, C12 I26).
+   *
+   * **Two fields because they answer two questions.** A single enum spelling
+   * `"none"` would make `axes: false, plotFrame: "box"` expressible and
+   * meaningless.
+   *
+   * The references disagree with each other — UnicodePlots ships `:solid` and
+   * `:corners`, plotext draws a closed box, kitty.r draws gridlines — so this is
+   * a style field rather than a choice the framework makes for the caller.
+   */
+  plotFrame?: "box" | "corners" | "grid" | "rule";
 }> & Gap;
 
 export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };
