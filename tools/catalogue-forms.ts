@@ -300,8 +300,16 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
   violin: {
     default: {
       form: "violin", height: 18, axes: true, categories: ["A", "B", "C"],
+      // **Thirty samples, not eight, and the fixture was the third cause.**
+      // Eight points cannot show a violin at any bandwidth or in any rendering
+      // mode — seaborn draws something near-flat from them too — so the old
+      // fixture could not verify a taper, a `bw_adjust`, or a compact form
+      // even once those exist. A fixture must be able to respond to the thing
+      // under test before it is asserted against.
       series: [
-        s([1, 1, 2, 3, 3, 3, 4, 5]), s([2, 3, 3, 4, 4, 4, 5, 6]), s([1, 2, 2, 2, 3, 4, 5, 5]),
+        s(Array.from({ length: 30 }, (_, i) => 3 + Math.sin(i * 0.7) * 1.4)),
+        s(Array.from({ length: 30 }, (_, i) => 4 + Math.sin(i * 0.5) * 1.1)),
+        s(Array.from({ length: 30 }, (_, i) => 3 + Math.cos(i * 0.9) * 1.6)),
       ],
     },
     // The user's debug case: density must peak at 1 and at 5, not be flat.
