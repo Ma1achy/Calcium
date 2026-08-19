@@ -31,11 +31,13 @@
  * sample.
  */
 import { glyphs } from "../blocks/glyphs.js";
-import { clampSpans, pad, padStart, paint, tone, type Span } from "../blocks/paint.js";
+import { clampSpans, pad, padStart, paint, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, truncate, type AmbiguousWidth } from "../text.js";
 import { xAxis } from "./axes.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import type { Plot } from "../../data/viewmodel/index.js";
+import type { ColourRef } from "../theme/index.js";
+import { CATEGORY_REFS, SHARES_CELLS, markOf } from "./marks.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -60,6 +62,16 @@ export type Layout = Readonly<{
   areaRows: number;
   width: number;
   frame?: boolean;
+  /**
+   * Cells held back for a vertical legend, outside `width`.
+   *
+   * **The layout records what it reserved, because two places otherwise
+   * re-derive it and disagree.** `width` here is already the narrowed row, so a
+   * compositor subtracting the legend again takes it twice — which drew the
+   * frame's border past where the plot area ended and under the legend. The
+   * number is small and the bug it prevents is not.
+   */
+  reserved?: number;
 }>;
 
 /**
@@ -266,4 +278,153 @@ export function composeRows(
   const out = [...top, ...area, ...bottom];
   while (out.length < declared) out.push(""); // cells-ok — a row count
   return out.length > declared ? out.slice(0, declared) : out; // cells-ok — a row count
+}
+
+/** One legend entry: a swatch, and what it names. */
+export type LegendEntry = Readonly<{ mark: string; label: string; ref: ColourRef }>;
+
+/**
+ * Whether this block gets a legend, and where (C12 §3g, C12 I27).
+ *
+ * **`"right"` is the default because it is the only placement that can turn
+ * itself on.** A vertical legend costs *width*, which is already data-dependent
+ * through the gutter, so it may size itself to the longest label and appear
+ * where a form needs one. A horizontal legend costs a *declared row*, and C12 I1
+ * requires the row count to be known before the data is — so it is a fixed row
+ * and only ever appears because the caller named it.
+ *
+ * Auto-enabled where a legend is **load-bearing**: where more than one thing is
+ * drawn into shared cells with no adjacent label, which is exactly
+ * `SHARES_CELLS`. A form that names each row in its gutter already tells the
+ * reader what it needs, and a legend there is a second copy of the same list.
+ */
+export function legendPlacement(
+  block: Plot,
+  caps?: Pick<TerminalCapabilities, "colourDepth">,
+): "above" | "below" | "left" | "right" | null {
+  if (block.legend === false) return null;
+  if (block.legend !== undefined) return block.legend;
+  const count = (block.segments?.length ?? 0) || block.series.length; // cells-ok — a series count
+  if (!SHARES_CELLS[block.form] || count <= 1) return null; // cells-ok — a series count
+  // **Not where the form has already labelled its own rows.** Below the colour
+  // floor `positionalForm` stops overlaying and stacks into labelled strips, so
+  // an auto-enabled legend there is a second copy of the gutter — and worse than
+  // redundant, because the strips are not drawn with `markOf` and the swatch
+  // then names a mark that appears nowhere. An explicit `legend:` still draws.
+  if (caps !== undefined && caps.colourDepth === 1 && POSITIONAL_STACKS[block.form]) return null;
+  return "right";
+}
+
+/**
+ * Forms that give each series its own labelled strip below the colour floor.
+ *
+ * `positionalForm`'s 1-bit fallback, listed rather than inferred: *the
+ * positional family* is not a set this file can compute, and a form joining it
+ * later must say so here or keep a legend it does not need.
+ */
+const POSITIONAL_STACKS: Readonly<Record<string, boolean>> = Object.freeze({
+  line: true, scatter: true, step: true, ecdf: true, density: true,
+  streamgraph: true, stackedarea: true, slope: true, bubble: true,
+});
+
+/**
+ * The entries, in the palette's order so slot *i* is one thing in both channels.
+ *
+ * **The swatch descends the same ladder as the figure** (C12 I29): `markOf` is
+ * uniform where colour separates the categories and a distinct mark where it
+ * does not, so a 1-bit legend shows the marks the figure is actually drawn with.
+ * Skipping the legend at one bit — which an earlier draft of §3g said to do — is
+ * the same error one layer up: it means little where colour leads and it is the
+ * *only* thing that means anything where colour does not.
+ */
+export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendEntry[] {
+  const segs = block.segments;
+  const source = segs !== undefined && segs.length > 0 // cells-ok — a segment count
+    ? segs.map((sg) => sg.label)
+    : block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
+  return source.map((label, i) => ({
+    mark: markOf(i, ctx.capabilities),
+    label,
+    ref: CATEGORY_REFS[i % CATEGORY_REFS.length] ?? "categorical.c1", // cells-ok — a palette size
+  }));
+}
+
+/** `swatch label`, measured in cells. */
+function entryText(e: LegendEntry): string {
+  return `${e.mark} ${e.label}`;
+}
+
+/**
+ * The width a vertical legend wants, capped at a third of the row.
+ *
+ * **Capped, because the plot area is what the reader came for.** A twenty-cell
+ * legend on a forty-column plot leaves nothing to draw in, and T3.3's ladder
+ * already rules that labels are dropped before the area is starved. A third is
+ * `categoricalForm`'s existing cap, so the two agree.
+ */
+export function legendWidth(entries: readonly LegendEntry[], width: number, ctx: RenderContext): number {
+  if (entries.length === 0) return 0; // cells-ok — an entry count
+  const ambiguous = ctx.capabilities.ambiguousWidth;
+  const longest = entries.reduce((m, e) => Math.max(m, cells(entryText(e), ambiguous)), 0);
+  return Math.min(longest + 1, Math.floor(width / 3)); // cells-ok — a cell count
+}
+
+/**
+ * A vertical legend's spans for one row, or nothing past its last entry.
+ *
+ * Truncated rather than wrapped: a legend entry running onto a second line
+ * misaligns every entry below it against its own swatch, and the swatch is what
+ * the row is for.
+ */
+export function legendColumn(
+  entries: readonly LegendEntry[],
+  row: number,
+  columnWidth: number,
+  ctx: RenderContext,
+): readonly Span[] {
+  if (columnWidth <= 0) return []; // cells-ok — a cell width
+  const e = entries[row];
+  if (e === undefined) return [{ text: " ".repeat(columnWidth) }];
+  const ambiguous = ctx.capabilities.ambiguousWidth;
+  const text = truncate(` ${entryText(e)}`, columnWidth, ctx.capabilities);
+  const pad = Math.max(0, columnWidth - cells(text, ambiguous)); // cells-ok — a cell count
+  return [
+    { text, style: slot(e.ref, ctx.theme, ctx.capabilities) },
+    ...(pad > 0 ? [{ text: " ".repeat(pad) }] : []),
+  ];
+}
+
+/**
+ * A horizontal legend — one row, the entries that fit, then a count of the rest.
+ *
+ * **One row and never two** (C12 I27): a second would make `plotHeight` depend on
+ * how many series arrived. The overflow is C12 I8's existing pattern — *the ones
+ * that fit, plus a count* — and it is safe because `CATEGORY_LIMIT` refuses a
+ * ninth series at construction, so the count is small when it appears at all.
+ */
+export function legendRow(
+  entries: readonly LegendEntry[],
+  width: number,
+  ctx: RenderContext,
+): string {
+  if (entries.length === 0) return ""; // cells-ok — an entry count
+  const ambiguous = ctx.capabilities.ambiguousWidth;
+  const spans: Span[] = [];
+  let used = 0; // cells-ok — a cell count
+  let shown = 0; // cells-ok — an entry count
+  for (const e of entries) {
+    const text = `${shown === 0 ? "" : "  "}${entryText(e)}`; // cells-ok — an entry count
+    const w = cells(text, ambiguous);
+    // Leave room for the notice, or the count itself gets truncated away.
+    const reserve = shown < entries.length - 1 ? 6 : 0; // cells-ok — a cell count
+    if (used + w + reserve > width) break;
+    spans.push({ text, style: slot(e.ref, ctx.theme, ctx.capabilities) });
+    used += w;
+    shown += 1; // cells-ok — an entry count
+  }
+  const rest = entries.length - shown; // cells-ok — an entry count
+  if (rest > 0) {
+    spans.push({ text: ` +${String(rest)}`, style: tone("muted", ctx.theme, ctx.capabilities) });
+  }
+  return paint(clampSpans(spans, width, ctx.capabilities));
 }

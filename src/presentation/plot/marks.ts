@@ -24,10 +24,31 @@
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { PlotForm } from "../../data/viewmodel/index.js";
+import type { ColourRef } from "../theme/index.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
 /** Choosing the ladder needs the alphabet; choosing *within* it needs the depth. */
 type Alphabet = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+
+/**
+ * The categorical palette's slots, in order (C10, roadmap 51).
+ *
+ * **Here beside `markOf` because they are two halves of one ladder** — category
+ * *i* is `CATEGORY_REFS[i]` and `markOf(i)` together, and a reader comparing a
+ * legend to a figure is comparing the same slot in both channels. It lived in
+ * `definition.ts` while the legend, which needs it, lives in `furniture.ts`, and
+ * `definition.ts` imports `furniture.ts`.
+ */
+export const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
+  "categorical.c1",
+  "categorical.c2",
+  "categorical.c3",
+  "categorical.c4",
+  "categorical.c5",
+  "categorical.c6",
+  "categorical.c7",
+  "categorical.c8",
+]);
 
 /** The depth at or above which the categorical palette separates its entries. */
 const CATEGORY_COLOUR_FLOOR = 4;

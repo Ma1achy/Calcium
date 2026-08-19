@@ -709,6 +709,21 @@ export type Plot = Readonly<{
    * to anchor to.
    */
   matrixAnchor?: "stretch" | "window" | "left";
+  /**
+   * Where the legend goes, or `false` for none (C12 §3g, C12 I27).
+   *
+   * **The two axes behave differently, and it is a constraint rather than
+   * taste.** `"left"` and `"right"` cost **width**, which is already
+   * data-dependent — the gutter sizes itself from the y-range — so they may size
+   * themselves to the longest label and turn themselves on where a form needs
+   * one. `"above"` and `"below"` cost a **declared row**, and C12 I1 requires the
+   * row count to be known before the data is, so they are a fixed one row and
+   * never auto-enable.
+   *
+   * That asymmetry is why `"right"` is the default: it is the only placement
+   * that can turn itself on.
+   */
+  legend?: "above" | "below" | "left" | "right" | false;
   palette?: string;
 }> & Gap;
 

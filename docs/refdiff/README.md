@@ -29,26 +29,26 @@ change is the signal.
 | ridgeline | 64x16 | 39.3% | — |
 | boxplot | 64x16 | 35.6% | — |
 | funnel | 64x16 | 32.4% | — |
+| line | 64x16 | 27.1% | — |
 | pie | 64x16 | 27.1% | — |
 | lollipop | 64x16 | 26.8% | — |
 | gantt | 64x16 | 26.3% | — |
+| streamgraph | 64x16 | 25.8% | — |
 | radar | 64x16 | 25.5% | — |
+| stackedarea | 64x16 | 23.5% | — |
 | autocorrelation | 64x16 | 23.4% | — |
 | sparkline | 64x1 | 21.9% | — |
+| slope | 64x16 | 19.3% | 7.7% |
 | timeline | 64x16 | 18.8% | — |
 | forest | 64x16 | 17.9% | — |
 | violin | 64x16 | 16.1% | 1.0% |
 | horizon | 64x16 | 14.6% | — |
 | density | 64x16 | 13.7% | — |
-| streamgraph | 64x16 | 12.6% | — |
-| slope | 64x16 | 12.1% | 8.9% |
 | dumbbell | 64x16 | 9.7% | — |
 | ecdf | 64x16 | 9.4% | — |
-| bubble | 64x16 | 6.7% | — |
-| stackedarea | 64x16 | 6.6% | — |
+| bubble | 64x16 | 9.0% | — |
 | scatter | 64x16 | 4.5% | — |
 | step | 64x16 | 4.0% | — |
-| line | 64x16 | 3.8% | — |
 | dotplot | 64x16 | 1.9% | — |
 | heatmap | — | — | *C04 I50b — no `axes: false`; lifts with furniture.ts `AreaContent`* |
 | flame | — | — | *no reference renderer — see reference.py SKIPPED* |

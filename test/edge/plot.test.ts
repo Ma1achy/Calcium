@@ -168,8 +168,16 @@ describe("C12 tier 3 — stacking and legends", () => {
     const colour = measurable({ definitions: [plotDefinition] as never, capabilities: ASCII_CAPS });
     const rendered = colour.renderToLines(b, 48).map(visible).join("\n");
 
-    // Overlaid, so no series label appears in the gutter — the y-labels do.
-    expect(rendered).not.toContain("train");
+    // **In the gutter, not anywhere in the frame** (C12 §3g). The row asserted
+    // that `train` appeared nowhere, which was true until the block gained a
+    // legend — and the legend naming the series is the *point* of it. What
+    // distinguishes overlaid from stacked is where the name is: stacked puts it
+    // in the gutter beside its own strip, overlaid puts it in a legend beside
+    // the whole plot.
+    const gutters = rendered.split("\n").map((r) => r.split(/[|+]/u)[0] ?? "");
+    expect(gutters.join(""), "no series names in the gutter").not.toContain("train");
+    // And both series are drawn into the *same* rows, which is what overlaying
+    // is — stacked, each would have a strip of its own.
     expect(colour.measure(b, 48)).toBe(11);
   });
 

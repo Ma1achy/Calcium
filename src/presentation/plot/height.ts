@@ -17,7 +17,21 @@
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /** The fields a height depends on. Deliberately not `Plot`. */
-export type PlotGeometry = Pick<Plot, "form" | "height" | "axes">;
+export type PlotGeometry = Pick<Plot, "form" | "height" | "axes" | "legend">;
+
+/**
+ * The rows a legend costs — one for a horizontal placement, none otherwise.
+ *
+ * **`series` stays unreachable, which is the whole reason the field is split
+ * this way** (C12 I27). A horizontal legend's cost must be known before the data
+ * is, so it is a fixed row and never auto-enables; a vertical one costs width,
+ * which is already data-dependent through the gutter, and is therefore allowed
+ * to size itself. A legend that grew a second row for a ninth series would make
+ * `plotHeight` a function of the series, which is the one thing C12 I1 forbids.
+ */
+export function legendRows(plot: PlotGeometry): number {
+  return plot.legend === "above" || plot.legend === "below" ? 1 : 0; // cells-ok — a row count
+}
 
 /** The rows an axed plot spends below the plot area: the rule, then x-labels. */
 export const AXIS_ROWS = 2;
@@ -138,7 +152,10 @@ const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>>
 
 /** The block's measured height (I1). A function of the block alone. */
 export function plotHeight(plot: PlotGeometry): number {
-  return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot);
+  // **The legend's row is added here rather than per form**, because every form
+  // pays it the same way and a table of thirty-six entries each adding the same
+  // term is thirty-six chances to forget one.
+  return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot) + legendRows(plot);
 }
 
 /**

@@ -22,8 +22,9 @@
  */
 import type { AmbiguousWidth } from "../text.js";
 import type { ReactElement } from "react";
-import { rows, slot, tone, type Span } from "../blocks/paint.js";
-import { cells, truncate } from "../text.js";
+import { paint, rows, slot, tone, type Span } from "../blocks/paint.js";
+import { cells, fitStyled, truncate } from "../text.js";
+import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
 import { labelWidth, ticksFor, yLabels, axisFor } from "./axes.js";
@@ -32,6 +33,11 @@ import {
   bandLayout,
   composeRows,
   frameBottom,
+  legendColumn,
+  legendEntries,
+  legendPlacement,
+  legendRow,
+  legendWidth,
   frameTop,
   furnitureFor,
   gutterSpans,
@@ -43,7 +49,7 @@ import {
 import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
-import { markOf } from "./marks.js";
+import { CATEGORY_REFS, markOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
@@ -65,17 +71,7 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 /** The narrowest plot area worth drawing a curve in. Below it, furniture goes. */
 const MIN_AREA = 4;
 
-/** The categorical palette's slots, in order (C10, roadmap 51). */
-const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
-  "categorical.c1",
-  "categorical.c2",
-  "categorical.c3",
-  "categorical.c4",
-  "categorical.c5",
-  "categorical.c6",
-  "categorical.c7",
-  "categorical.c8",
-]);
+
 
 /** A rasterised series and the colour it carries. */
 type Layer = Readonly<{ glyphRows: readonly string[]; ref: ColourRef }>;
@@ -262,9 +258,55 @@ function axed(
   layout: Layout,
   ctx: RenderContext,
 ): readonly string[] {
-  if (block.axes !== true) return composeRows(plotHeight(block), [], area, []);
-  const furniture = furnitureFor(block, layout, ctx);
-  return composeRows(plotHeight(block), [furniture.top], area, [...furniture.bottom]);
+  const placement = legendPlacement(block, ctx.capabilities);
+  const entries = placement === null ? [] : legendEntries(block, ctx);
+  // **The vertical legend is composited onto the rows, not appended to them.**
+  // It costs width, so the rows were laid out narrower and the column goes in
+  // the space that was left — appending would push each row past its own width
+  // and `clampSpans` would cut whatever was at the end of it.
+  //
+  // **Joined as strings, never re-painted** — the facet defect, reproduced here
+  // and recognised because it is written down. `line` clamps with `clampSpans`,
+  // which measures span text using `cells()`, and `cells()` counts a painted
+  // row's escape bytes as visible: the row measured about twice its width, was
+  // truncated, and `stripControl` took the ESC and left `[38;2;98;98;98m` on
+  // screen as text. Both halves are already at their own width, so concatenation
+  // is the whole operation.
+  const amb = ctx.capabilities.ambiguousWidth;
+  // **From the layout, not recomputed.** `layout.width` is already the narrowed
+  // row, so deriving the column here subtracts the legend a second time — which
+  // drew the border past the plot area and under the legend.
+  const colWidth = layout.reserved ?? 0; // cells-ok — a cell width
+  const withColumn = (rows: readonly string[]): readonly string[] =>
+    placement !== "left" && placement !== "right"
+      ? rows
+      : rows.map((r, i) => {
+          const col = paint(legendColumn(entries, i, colWidth, ctx));
+          const body = fitStyled(r, layout.width, SGR_RESET, amb);
+          return placement === "right" ? body + col : col + body;
+        });
+
+  // **The frame's own rows shift with a left legend too.** They are not area
+  // content, so `withColumn` does not reach them — and the first version left
+  // the border drawn at column 0 while every row it was supposed to enclose
+  // started eight cells in. A blank column, because the entries are already on
+  // the area rows beside them.
+  const indent = (r: string): string =>
+    placement === "left" && r !== "" ? " ".repeat(colWidth) + r : r; // cells-ok — a cell width
+
+  const horizontal = placement === "above" || placement === "below"
+    ? [legendRow(entries, layout.width, ctx)]
+    : [];
+  const top = block.axes === true ? [indent(furnitureFor(block, layout, ctx).top)] : [];
+  const bottom = block.axes === true
+    ? furnitureFor(block, layout, ctx).bottom.map(indent)
+    : [];
+  return composeRows(
+    plotHeight(block),
+    placement === "above" ? [...horizontal, ...top] : top,
+    withColumn(area),
+    placement === "below" ? [...bottom, ...horizontal] : bottom,
+  );
 }
 
 /**
@@ -471,6 +513,31 @@ function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth):
 }
 
 /**
+ * The width the plot area may use — the row's, less a vertical legend's column.
+ *
+ * **Reserved before the rows are laid out, not taken from them afterwards.** A
+ * legend composited onto finished rows either pushes them past their own width,
+ * where `clampSpans` cuts whatever was at the end, or overwrites the data it is
+ * supposed to be explaining. Both look like the legend working until you read a
+ * frame whose curve reaches the right edge.
+ */
+function reservedFor(block: Plot, width: number, ctx: RenderContext): number {
+  const placement = legendPlacement(block, ctx.capabilities);
+  if (placement !== "left" && placement !== "right") return 0; // cells-ok — a cell width
+  return Math.min(width - 1, legendWidth(legendEntries(block, ctx), width, ctx)); // cells-ok — a cell width
+}
+
+function usableWidth(block: Plot, width: number, ctx: RenderContext): number {
+  return Math.max(1, width - reservedFor(block, width, ctx)); // cells-ok — a cell width
+}
+
+/** A layout, with what the legend held back recorded on it. */
+function reserving(layout: Layout, block: Plot, width: number, ctx: RenderContext): Layout {
+  const reserved = reservedFor(block, width, ctx);
+  return reserved === 0 ? layout : { ...layout, reserved }; // cells-ok — a cell width
+}
+
+/**
  * The layout, and where T3.3's ordering lives.
  *
  * Three things want the width, and they lose it in this order: the **labels**
@@ -568,7 +635,7 @@ function categoricalForm(
   const areaRows = plotAreaRows(block);
   const labels = cats.slice(0, areaRows);
   const axedBlock = block.axes === true;
-  const layout = bandLayout(labels, width, axedBlock, areaRows, ctx.capabilities);
+  const layout = reserving(bandLayout(labels, usableWidth(block, width, ctx), axedBlock, areaRows, ctx.capabilities), block, width, ctx);
 
   const out: string[] = [];
   for (let i = 0; i < areaRows; i++) {
@@ -630,7 +697,7 @@ function categoricalColumnForm(
   // `barRow` takes, and the reason `[10, 25, 15]` used to draw nothing at 10.
   const zeroed = { min: baselineFor(data.min), max: data.max };
   const range = axisFor(zeroed, ticksFor(areaRows), block, block.yScale).range;
-  const layout = layoutFor(block, range, width, false, ctx.capabilities) ?? fallback;
+  const layout = reserving(layoutFor(block, range, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
 
   // Columns divide the area, remainder distributed left to right — the same
   // arithmetic `facetWidths` uses, and for the same reason: `floor(w / n)` times
@@ -747,7 +814,7 @@ function stackedForm(
   // label column and the label column decides the width the bands are cut to.
   const rough = stackRange(stackBands(block.series, Math.max(1, width), centred));
   const range = axisFor(rough, ticksFor(areaRows), block, block.yScale).range;
-  const layout = layoutFor(block, range, width, false, ctx.capabilities) ?? fallback;
+  const layout = reserving(layoutFor(block, range, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
 
   const bands = stackBands(block.series, layout.areaWidth, centred);
   const layers: readonly Layer[] = bands.map((band, i) => ({
@@ -925,9 +992,12 @@ function positionalForm(
     data === null || stacked
       ? data
       : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale).range;
-  const layout =
-    layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked, ctx.capabilities)
-    ?? { areaRows: plotAreaRows(block), width, gutter: 0, labelColumn: 0, areaWidth: width };
+  const usable = usableWidth(block, width, ctx);
+  const layout = reserving(
+    layoutFor(block, range ?? { min: 0, max: 1 }, usable, stacked, ctx.capabilities)
+      ?? { areaRows: plotAreaRows(block), width: usable, gutter: 0, labelColumn: 0, areaWidth: usable },
+    block, width, ctx,
+  );
   if (range === null) return emptyRows(block, layout, ctx);
 
   const cursorIdx = ctx.cursorPositions?.[block.id];
@@ -962,7 +1032,7 @@ function bandedForm(
   const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
   if (n === 0) return emptyRows(block, fallback, ctx);
 
-  const layout = bandLayout(cats, width, block.axes === true, areaRows, ctx.capabilities);
+  const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities), block, width, ctx);
   const areaWidth = layout.areaWidth;
 
   const rowsPer = Math.max(1, Math.floor(areaRows / n));
@@ -1440,7 +1510,7 @@ const FORM_ROWS: Readonly<
     const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
     if (block.series.length === 0) return emptyRows(block, fallback, ctx); // cells-ok — a series count
 
-    const layout = bandLayout(cats, width, block.axes === true, areaRows, ctx.capabilities);
+    const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities), block, width, ctx);
     const { rows, baselines } = ridgelineArea(block.series, layout.areaWidth, areaRows, ctx.capabilities, block.bandwidth);
     const labelAt = new Map(baselines.map((r, i) => [r, cats[i] ?? ""]));
 

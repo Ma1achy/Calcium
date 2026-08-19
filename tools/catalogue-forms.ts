@@ -74,6 +74,27 @@ const PIE_SEGMENTS = [
 
 export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.freeze({
   line: {
+    // C12 §3g — all four placements, and the default that turns itself on.
+    "legend-right": {
+      form: "line", height: 8, axes: true,
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
+    },
+    "legend-left": {
+      form: "line", height: 8, axes: true, legend: "left",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
+    },
+    "legend-above": {
+      form: "line", height: 8, axes: true, legend: "above",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
+    },
+    "legend-below": {
+      form: "line", height: 8, axes: true, legend: "below",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
+    },
+    "legend-off": {
+      form: "line", height: 8, axes: true, legend: false,
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
+    },
     default: { form: "line", height: 8, axes: true, series: [s(sin50)] },
     minimal: { form: "line", height: 3, axes: false, series: [s([1, 3, 2, 5, 4])] },
     dense: { form: "line", height: 8, axes: true, series: [s(sin500)] },

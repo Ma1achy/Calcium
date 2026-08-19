@@ -103,9 +103,17 @@ describe("C12 tier 4 — with C10", () => {
     const mono = measurable({ definitions: [plotDefinition] as never, capabilities: MONO_CAPS });
 
     expect(mono.measure(two, 60)).toBe(colour.measure(two, 60));
-    // The form changes: stacked strips carry each series' label in the gutter.
-    expect(mono.renderToLines(two, 60).map(visible).join("\n")).toContain("series 1");
-    expect(colour.renderToLines(two, 60).map(visible).join("\n")).not.toContain("series 1");
+    // **The form changes and the *place* of the name changes with it.** Stacked
+    // strips carry each series' label in the gutter; overlaid, the same name is
+    // in a legend. Asserting the name is absent with colour was true until the
+    // legend landed, and the legend naming the series is what it is for — so the
+    // row now says where, which is the distinction it was reaching for.
+    const gutterOf = (rows: readonly string[]): string =>
+      rows.map((r) => r.split(/[│|┤+]/u)[0] ?? "").join("");
+    expect(gutterOf(mono.renderToLines(two, 60).map(visible)), "stacked names its strips")
+      .toContain("series 1");
+    expect(gutterOf(colour.renderToLines(two, 60).map(visible)), "overlaid does not")
+      .not.toContain("series 1");
   });
 });
 

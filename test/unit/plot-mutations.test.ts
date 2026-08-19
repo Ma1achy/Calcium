@@ -14,6 +14,9 @@ import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow }
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, ladderFor } from "../../src/presentation/plot/ramp.js";
+import { legendPlacement } from "../../src/presentation/plot/furniture.js";
+import { plotHeight } from "../../src/presentation/plot/height.js";
+import { cells } from "../../src/presentation/text.js";
 import { kde, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
@@ -854,6 +857,108 @@ describe("GROUP 6j: the six that had no renderer", () => {
       { min: 0, max: 80 }, 40, 8, FULL_CAPS,
     );
     expect(ink(seven), "every point drawn").toBeGreaterThanOrEqual(7); // cells-ok — a cell count
+  });
+});
+
+describe("GROUP 6k: the legend, and the asymmetry that is a constraint", () => {
+  const three = (over: Partial<Plot> = {}): Plot => block({
+    kind: "plot", id: "lg", form: "line", height: 8, axes: true,
+    series: [{ values: [1, 5, 3], label: "a" }, { values: [4, 2, 6], label: "b" },
+             { values: [2, 6, 1], label: "c" }],
+    ...over,
+  } as Plot);
+  const plain = (b: Plot, caps = FULL_CAPS, w = 60): readonly string[] =>
+    measurable({ definitions: [plotDefinition], capabilities: caps })
+      .renderToLines(b, w).map((r) => r.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"), ""));
+
+  it("T1.74 (C12 I27): a horizontal legend costs a declared row and a vertical one does not", () => {
+    // **The asymmetry C12 I1 forces.** A row's cost must be known before the data
+    // is; width is already data-dependent through the gutter. That is why
+    // `"right"` is the default — it is the only placement that can turn itself
+    // on — and it is a constraint rather than a preference.
+    const base = plotHeight({ form: "line", height: 8, axes: true });
+    expect(plotHeight({ form: "line", height: 8, axes: true, legend: "right" })).toBe(base);
+    expect(plotHeight({ form: "line", height: 8, axes: true, legend: "left" })).toBe(base);
+    expect(plotHeight({ form: "line", height: 8, axes: true, legend: "above" })).toBe(base + 1); // cells-ok — a row count
+    expect(plotHeight({ form: "line", height: 8, axes: true, legend: "below" })).toBe(base + 1); // cells-ok — a row count
+    // And `series` is still unreachable from the height: a fourth entry costs
+    // nothing, which is what keeps a growing plot from moving the transcript.
+    expect(plotHeight({ form: "line", height: 8, axes: true, legend: "above" }))
+      .toBe(plotHeight({ form: "line", height: 8, axes: true, legend: "above" }));
+  });
+
+  it("T1.75 (C12 I27): the four placements put the legend in four places", () => {
+    const at = (p: NonNullable<Plot["legend"]>): readonly string[] => plain(three({ legend: p }));
+    expect(at("above")[0], "above the frame").toContain("a");
+    expect(at("below").slice(-1)[0], "below it").toContain("a");
+    const right = at("right");
+    const left = at("left");
+    // The swatch is at opposite ends of the same row.
+    const rowWith = (rows: readonly string[]): string => rows.find((r) => r.includes(" a")) ?? "";
+    expect(rowWith(right).indexOf(" a")).toBeGreaterThan(rowWith(left).indexOf(" a"));
+    expect(plain(three({ legend: false })).join(""), "and `false` draws none").not.toContain(" a ");
+  });
+
+  it("T1.76 (C12 I27): a vertical legend is reserved, not overlaid", () => {
+    // **Reserved before the rows are laid out.** Composited onto finished rows a
+    // legend either pushes them past their width — where `clampSpans` cuts
+    // whatever was at the end — or overwrites the data it explains.
+    const rows = plain(three({ legend: "right" }));
+    for (const r of rows) expect(cells(r), "no row exceeds the width").toBeLessThanOrEqual(60); // cells-ok — a cell count
+    // The frame's right border still sits inside the legend column.
+    const framed = rows.find((r) => r.includes("┤")) ?? "";
+    expect(framed.indexOf("│"), "the border is left of the swatch")
+      .toBeLessThan(framed.lastIndexOf("█"));
+
+    // **And it is capped at a third, which one-character labels cannot show.**
+    // A twenty-cell legend on a forty-column plot leaves nothing to draw in, and
+    // T3.3's ladder already rules that labels go before the area is starved.
+    // Without the cap the mutation passed every row above.
+    const long = three({
+      legend: "right",
+      series: [
+        { values: [1, 5, 3], label: "an-extremely-long-series-name" },
+        { values: [4, 2, 6], label: "another-very-long-series-name" },
+      ],
+    });
+    const narrow = plain(long, FULL_CAPS, 40);
+    const area = narrow.find((r) => r.includes("┤")) ?? "";
+    expect(area.indexOf("█"), "the legend takes no more than a third")
+      .toBeGreaterThanOrEqual(Math.floor(40 * 2 / 3) - 1); // cells-ok — a column index
+    for (const r of narrow) expect(cells(r)).toBeLessThanOrEqual(40); // cells-ok — a cell count
+  });
+
+  it("T1.77: the escapes reach the frame intact — the facet defect, one layer over", () => {
+    // `line` clamps with `clampSpans`, which measures span text using `cells()`,
+    // and `cells()` counts a painted row's escape bytes as visible. Joining a
+    // painted row to a painted legend through it truncated the row and left
+    // `[38;2;98;98;98m` on screen as text. Both halves are already at their own
+    // width, so the join is concatenation.
+    const ESC = String.fromCharCode(27);
+    for (const p of ["left", "right"] as const) {
+      const rows = measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS })
+        .renderToLines(three({ legend: p }), 60);
+      for (const r of rows) {
+        expect(r.replace(new RegExp(`${ESC}\\[[0-9;]*m`, "gu"), "")).not.toMatch(/\[[0-9;]*m/);
+      }
+    }
+  });
+
+  it("T1.78 (C12 I27): the auto legend stands down where the form labels its own rows", () => {
+    // Below the colour floor `positionalForm` stacks into labelled strips, so an
+    // auto legend is a second copy of the gutter — and worse than redundant,
+    // because the strips are not drawn with `markOf` and the swatch then names a
+    // mark appearing nowhere. An explicit `legend:` still draws.
+    expect(legendPlacement(three(), MONO_UNICODE_CAPS), "auto stands down").toBeNull();
+    expect(legendPlacement(three(), FULL_CAPS), "and is on where colour leads").toBe("right");
+    expect(legendPlacement(three({ legend: "right" }), MONO_UNICODE_CAPS), "explicit still draws")
+      .toBe("right");
+    // A form that names its rows in the gutter never auto-enables at any depth.
+    const bars = block({
+      kind: "plot", id: "b", form: "lollipop", height: 4, axes: true,
+      categories: ["a", "b"], series: [{ values: [1, 2] }],
+    } as Plot);
+    expect(legendPlacement(bars, FULL_CAPS)).toBeNull();
   });
 });
 
