@@ -18,6 +18,8 @@ import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
+import { bandRows, stackBands } from "../../src/presentation/plot/stack.js";
+import { categoryMarks } from "../../src/presentation/plot/marks.js";
 import type { RenderContext } from "../../src/presentation/blocks/types.js";
 import { displayCells } from "../../src/presentation/text.js";
 
@@ -340,6 +342,77 @@ describe("GROUP 6c: the box plot stood up", () => {
     expect(col).toContain("◆");
     const noMean = boxplotColumn({ min: 1, q1: 3, median: 5, q3: 7, max: 9 }, 1, 9, 11, 11, FULL_CAPS).join("");
     expect(noMean, "and draws none where there is none").not.toContain("◆");
+  });
+});
+
+describe("GROUP 6d: one fold, two origins", () => {
+  const S = [
+    { values: [1, 3, 2, 5, 4], label: "a" },
+    { values: [2, 1, 4, 3, 5], label: "b" },
+    { values: [3, 2, 1, 2, 3], label: "c" },
+  ];
+
+  it("T1.44: bands never cross, because each floor is the one below it's ceiling", () => {
+    // **The property is structural, not a fact about the data.** A renderer
+    // computing each band's bounds independently produces crossings for the same
+    // input and no count notices — a stream graph whose bands cross is not a
+    // stream graph with a defect, it is a line chart.
+    for (const centred of [false, true]) {
+      const bands = stackBands(S, 5, centred);
+      for (let i = 1; i < bands.length; i += 1) { // cells-ok — a band count
+        expect(bands[i]!.lower, `band ${String(i)} sits on band ${String(i - 1)}`)
+          .toEqual(bands[i - 1]!.upper);
+      }
+      for (const b of bands) {
+        for (const [x, lo] of b.lower.entries()) expect(b.upper[x]!).toBeGreaterThanOrEqual(lo);
+      }
+    }
+  });
+
+  it("T1.45: the origin is the only difference — zero, or minus half the total", () => {
+    const flat = stackBands(S, 5, false);
+    const centred = stackBands(S, 5, true);
+    expect(flat[0]!.lower, "stacked area starts at zero").toEqual([0, 0, 0, 0, 0]);
+    // Centred, the first band starts half a column's total below zero, and the
+    // whole stack is the flat one shifted by exactly that.
+    for (let x = 0; x < 5; x += 1) { // cells-ok — a column count
+      const total = flat[flat.length - 1]!.upper[x]!;
+      expect(centred[0]!.lower[x]).toBeCloseTo(-total / 2, 10);
+      for (const [i, b] of centred.entries()) {
+        expect(b.upper[x]!).toBeCloseTo(flat[i]!.upper[x]! - total / 2, 10);
+      }
+    }
+  });
+
+  it("T1.46 (C12 I8): a band thinner than a cell still draws, rather than vanishing", () => {
+    // A series present in the legend and absent from the figure is I8's silent
+    // drop wearing a rounding error.
+    const thin = stackBands([{ values: [100, 100] }, { values: [0.01, 0.01] }], 4, false);
+    const rows = bandRows(thin[1]!, 0, 100.01, 4, 6, "#");
+    expect(rows.join(""), "the sliver has ink").toContain("#");
+  });
+
+  it("T1.47: a stacked area is not a line chart, which is what it used to be", () => {
+    // `streamgraph` shipped as byte-for-byte the `line` handler. The row that
+    // catches that is the same shape as T1.17's for the heatmap: if these match,
+    // the form member is not reaching a renderer of its own.
+    const kitFull = kit();
+    const mk = (form: "stackedarea" | "streamgraph" | "line"): Plot =>
+      block({ kind: "plot", id: "sa", form, height: 7, axes: true, series: S } as Plot);
+    const asLine = kitFull.renderToLines(mk("line"), 40).join("\n");
+    expect(kitFull.renderToLines(mk("stackedarea"), 40).join("\n")).not.toBe(asLine);
+    expect(kitFull.renderToLines(mk("streamgraph"), 40).join("\n")).not.toBe(asLine);
+    // And the two are not each other: same fold, different origin.
+    expect(kitFull.renderToLines(mk("stackedarea"), 40).join("\n"))
+      .not.toBe(kitFull.renderToLines(mk("streamgraph"), 40).join("\n"));
+  });
+
+  it("T1.48 (C12 I25): at one bit the bands differ by mark", () => {
+    const b = block({ kind: "plot", id: "sa", form: "stackedarea", height: 7, axes: true, series: S } as Plot);
+    const rows = kit(MONO_UNICODE_CAPS).renderToLines(b, 40)
+      .map((r) => r.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"), ""));
+    const marks = new Set([...rows.join("")].filter((c) => categoryMarks(MONO_UNICODE_CAPS).includes(c)));
+    expect(marks.size, "three bands, three marks").toBeGreaterThanOrEqual(3); // cells-ok — a mark count
   });
 });
 

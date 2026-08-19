@@ -126,6 +126,10 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
     kind: "plot", id: "form-streamgraph", form: "streamgraph", height: 5, axes: true,
     series: [s([1, 3, 2, 5, 4]), s([2, 1, 4, 3, 5])],
   }),
+  stackedarea: block({
+    kind: "plot", id: "form-stackedarea", form: "stackedarea", height: 5, axes: true,
+    series: [s([1, 3, 2, 5, 4]), s([2, 1, 4, 3, 5])],
+  }),
   calendar: block({
     kind: "plot", id: "form-calendar", form: "calendar", height: 4, axes: true,
     series: [

@@ -42,6 +42,8 @@ import {
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
+import { bandRows, stackBands, stackRange } from "./stack.js";
+import { markOf } from "./marks.js";
 import { sparkline } from "./sparkline.js";
 import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
 import { boxplotBand, boxplotColumn, forestRow, dumbbellRow } from "./glyph-row.js";
@@ -715,6 +717,66 @@ function columnLabels(
   return { row, ticks };
 }
 
+/**
+ * The stacking fold, rendered — `stackedarea` from zero and `streamgraph` centred.
+ *
+ * **The bands are composed as layers and merged**, which is what gives each its
+ * own `ColourRef` through `mergedRow`; drawn into one grid they would share a
+ * colour and the stack would be one shape. `markOf` supplies the glyph, so at
+ * 1-bit the bands differ by mark and above the colour floor they share one and
+ * differ by tone — I25 and I29, unchanged, reached the same way every other form
+ * reaches them.
+ *
+ * The axis covers the *stacked* range rather than the series' own: a stream
+ * graph's extent is the sum of its bands, and scaling to the tallest single
+ * series would draw the stack off the top of its own frame.
+ */
+function stackedForm(
+  block: Plot,
+  width: number,
+  ctx: RenderContext,
+  centred: boolean,
+): readonly string[] {
+  const areaRows = plotAreaRows(block);
+  const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (block.series.length === 0) return emptyRows(block, fallback, ctx); // cells-ok — a series count
+
+  // A first pass at the full width to size the gutter, then the real one at the
+  // area width the gutter leaves. Two passes because the range decides the
+  // label column and the label column decides the width the bands are cut to.
+  const rough = stackRange(stackBands(block.series, Math.max(1, width), centred));
+  const range = axisFor(rough, ticksFor(areaRows), block, block.yScale).range;
+  const layout = layoutFor(block, range, width, false, ctx.capabilities) ?? fallback;
+
+  const bands = stackBands(block.series, layout.areaWidth, centred);
+  const layers: readonly Layer[] = bands.map((band, i) => ({
+    glyphRows: bandRows(
+      band, range.min, range.max, layout.areaWidth, layout.areaRows,
+      markOf(i, ctx.capabilities),
+    ),
+    ref: refOf(block.series[i]!, i),
+  }));
+
+  const labels =
+    layout.labelColumn === 0
+      ? []
+      : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale);
+  const byRow = new Map(labels.map((l) => [l.row, l.text]));
+
+  const area = Array.from({ length: layout.areaRows }, (_, i) =>
+    line(
+      [
+        ...gutterSpans(byRow.get(i) ?? "", layout, ctx),
+        ...mergedRow(layers, i, layout, ctx),
+        ...rightBorder(layout, ctx),
+      ],
+      layout,
+      ctx,
+    ),
+  );
+  return axed(block, area, layout, ctx);
+}
+
 function positionalForm(
   block: Plot,
   width: number,
@@ -1094,11 +1156,13 @@ const FORM_ROWS: Readonly<
       return waterfallRow(v, baseline, lo, hi, aw, ctx.capabilities, isTotal);
     });
   },
-  streamgraph: (block, width, ctx) => {
-    const data = seriesRange(block.series, block);
-    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    return positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, curveRows));
-  },
+  // **One fold, two origins** (C04 §8, the stacking fold). `streamgraph` was
+  // byte-for-byte the `line` handler — nothing stacked, no baseline offset, no
+  // area fill — so two crossing outlines were drawn where a stream of
+  // never-crossing bands belongs. That is not a stream graph with a rendering
+  // defect; it is a line chart under an alias.
+  stackedarea: (block, width, ctx) => stackedForm(block, width, ctx, false),
+  streamgraph: (block, width, ctx) => stackedForm(block, width, ctx, true),
   calendar: (block, width, ctx) => heatmapFormRows(block, width, ctx),
   correlation: (block, width, ctx) => heatmapFormRows(block, width, ctx),
   confusion: (block, width, ctx) => heatmapFormRows(block, width, ctx),

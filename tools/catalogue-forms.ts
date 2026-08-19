@@ -264,8 +264,36 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       series: [s([100, -40, -25, -10, 25])], totals: [false, false, false, false, true],
     },
   },
-  streamgraph: {
+  stackedarea: {
+    // **The fold's first origin: zero.** Three series that must never cross —
+    // each band's floor is the one below it's ceiling, which is structural
+    // rather than a property of the data.
     default: {
+      form: "stackedarea", height: 10, axes: true,
+      series: [
+        s(Array.from({ length: 60 }, (_, i) => 20 + Math.sin(i * 0.18) * 12), "api"),
+        s(Array.from({ length: 60 }, (_, i) => 14 + Math.cos(i * 0.11) * 9), "worker"),
+        s(Array.from({ length: 60 }, (_, i) => 9 + Math.sin(i * 0.27 + 1) * 6), "cron"),
+      ],
+    },
+  },
+  streamgraph: {
+    // **The old fixture could not show the form.** Two series summing to a
+    // constant 100 give a stream of uniform thickness — every band correct and
+    // the figure saying nothing, because a stream graph's subject is how the
+    // *total* swells and shrinks. A fixture must be able to respond to the thing
+    // under test.
+    default: {
+      form: "streamgraph", height: 10, axes: true,
+      series: [
+        s(Array.from({ length: 60 }, (_, i) => 6 + Math.max(0, Math.sin(i * 0.16)) * 26), "search"),
+        s(Array.from({ length: 60 }, (_, i) => 10 + Math.max(0, Math.sin(i * 0.09 + 2)) * 18), "social"),
+        s(Array.from({ length: 60 }, (_, i) => 4 + Math.max(0, Math.cos(i * 0.21)) * 12), "direct"),
+      ],
+    },
+    flat: {
+      // Kept, because a constant total is a real shape and the one the old
+      // default drew by accident — a stream graph of a fixed-size market.
       form: "streamgraph", height: 8, axes: true,
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],
     },

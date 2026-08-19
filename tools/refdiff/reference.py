@@ -282,6 +282,30 @@ def r_horizon(a, s):
     v = vals(s); a.fill_between(range(len(v)), v, lw=0)
 
 
+def stack_series(spec):
+    """Every series as an equal-length list, which `stackplot` requires."""
+    ss = [v for v in series(spec) if v]
+    if not ss:
+        return []
+    n = min(len(v) for v in ss)
+    return [v[:n] for v in ss]
+
+
+def r_stackedarea(a, s):
+    ss = stack_series(s)
+    if ss:
+        a.stackplot(range(len(ss[0])), *ss, lw=0)
+
+
+def r_streamgraph(a, s):
+    # **matplotlib's own name for the centred origin.** `baseline="wiggle"` is
+    # the stream graph, and it being one argument away from `stackplot` is the
+    # same statement the renderer makes: one fold, two origins.
+    ss = stack_series(s)
+    if ss:
+        a.stackplot(range(len(ss[0])), *ss, baseline="wiggle", lw=0)
+
+
 def r_slope(a, s):
     for v in series(s):
         a.plot([0, 1], [v[0], v[-1]], "-o", ms=3, lw=1)
@@ -289,7 +313,8 @@ def r_slope(a, s):
 
 RENDERERS = {
     "line": r_line, "sparkline": r_line, "scatter": r_scatter, "step": r_step,
-    "ecdf": r_ecdf, "density": r_density, "streamgraph": r_area,
+    "ecdf": r_ecdf, "density": r_density,
+    "streamgraph": r_streamgraph, "stackedarea": r_stackedarea,
     "bar": r_bar, "histogram": r_hist, "lollipop": r_lollipop,
     "dotplot": r_dotplot, "funnel": r_funnel, "gantt": r_gantt,
     "waterfall": r_waterfall, "flame": r_bar, "icicle": r_bar,

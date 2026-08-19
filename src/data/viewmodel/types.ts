@@ -532,7 +532,7 @@ export type PlotForm =
   | "line" | "sparkline" | "heatmap"
   | "scatter" | "step" | "ecdf"
   | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
-  | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph"
+  | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
   | "density" | "violin" | "ridgeline"
   | "smallmultiples" | "pairplot"
