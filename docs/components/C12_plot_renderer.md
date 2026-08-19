@@ -1499,6 +1499,59 @@ different bins.
 
 ---
 
+## 3w. Three styling forks, and which arms a form has
+
+`plotStyle` was a union every form shared and two forms read, with `candlestick` refused on a
+form that cannot draw it by a clause naming that style. **The clause was right and the shape was
+a special case**: every style is a style some forms have an arm for and others do not, and a
+second one would want a second clause.
+
+`STYLE_ARMS` is that shape as data — `Record<PlotForm, readonly PlotStyle[]>`, total, so the
+thirty-fifth form declares its arms or does not compile — and the refusal is one rule over it.
+`candlestick` on a `bar` is refused by the record rather than by a sentence about candlesticks.
+
+`plotFill?: "none" | "solid"` joins `plotFrame` / `plotCorners` / `plotDetail` / `plotMarks`:
+a union in the same family, for the same reason those are.
+
+### The table
+
+| the fork | what changes | what does not |
+|---|---|---|
+| violin `plotStyle: "braille"` | the outline is strokes in the **dot grid** — 2×4 per cell, which is where the smoothness comes from | **the geometry.** I39's odd extent, §3i's rungs and the budgets are the figure's, not the vocabulary's |
+| violin `plotFill: "solid"` | the dots between the two edges are set | the box and the summary marks, which stay cell-resolution and composite **over** the fill |
+| pie `plotStyle: "solid"` | wedges are `█` at cell resolution — coarser, and with no inter-dot gaps at all | the wedge arithmetic, the legend, the minimum-fraction rule |
+| radar `plotStyle: "line"` | polygons are strokes through `glyphForMask` — `╭─╮` at cell resolution | the rings, the spokes, the vertex marks' *purpose*; a corner is one glyph there rather than a 2×2 block |
+
+### Two rulings the table does not carry
+
+**A fill is the braille arm's and the line arm refuses it.** A box-drawing outline has no
+interior vocabulary: filling `╭──╮` means putting `█` inside it, which is a *third* figure — an
+outline in one alphabet around a body in another — rather than the same figure filled. Refused at
+construction, both gates, rather than ignored, because an ignored member reads as one not yet
+implemented.
+
+**A solid pie degrades to braille at `colourDepth: 1`, and it degrades rather than refusing.**
+The hatch ladder is the one-bit identity channel — `CATEGORY_PATTERNS` exists because a wedge with
+no colour needs a mark — and a block glyph has no hatch to carry, so a solid pie at one bit is an
+undifferentiated disc. **Degrade and not refuse** is I18's precedent exactly: where the capability
+cannot spare what a figure needs, the honest answer is the thing that fits, not an error the
+caller could not have avoided. A caller who asked for `solid` on a colour terminal has asked for
+nothing wrong.
+
+### What the line-drawn radar costs, stated where a reader meets it
+
+I40 unions the dots where two layers ink one cell, **and the union is braille's alone** — a
+`glyphForMask` corner and a braille polygon cannot be OR-ed, so the first-wins rule stands there.
+The braille radar therefore draws both polygons where they cross and **the line-drawn one does
+not**: the nearer layer keeps the cell and the further loses it.
+
+That is the same trade the pie made in the other direction — a solid pie has no seams and a
+braille pie has no gaps — and it is why both are shipped rather than one being chosen. *Neither
+is better; they fail differently, and a reader who knows which failure they are looking at can
+pick.*
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -2542,6 +2595,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I40** — **Where two layers ink one cell the merge is per dot, and the colour is the first layer's.** `mergedRow` resolved the whole cell to the first layer that inked it, and every figure that composites — a pie's wedges, a radar's polygons over its frame — is folded to braille *before* it arrives, so the second layer's dots were dropped. *A pie's disc is fully covered by construction and `pie-default-40` had seven cells flanked by a full cell on each side that were not themselves full; the radar had it twice, its polygons eating each other and its frame drawn only in the cells nothing else wanted — which reads as dashed strokes and is not, because `dashFor` is solid at any depth above one bit.* A braille cell is `U+2800 + bits`, so the union is `0x2800 | (bitsA | bitsB)`; where any candidate is **not** braille the first-wins rule stands, because a letter and a polygon cannot share a cell. **The colour remains one layer's and that is a limit of the span model, not an oversight** — two wedges meeting in a cell draw both sets of dots in the first wedge's colour, so what the union removes is the gap and not the boundary's exactness, and saying *the gaps are fixed* would imply a per-dot colour a `Span` cannot carry. **The priority order stays the ref's** rather than becoming the densest layer's, because that order is a ruling — labels over polygons over frame — and a dot count would overturn it wherever the frame was denser (§3u).
 - **I41** — **The positional family's x axis is nice numbers over a declared domain, and the sample index is what it falls back to.** `Plot` gains `xMin` / `xMax` / `xFormat` mirroring the y axis — the same `axisFor`, the same precision, the same formatter — and absent them the domain is `[0, n − 1]`, which is what the data has when nothing else was said. *Measured: `ax.plot(y)` over 24 samples ticks 0 5 10 15 20.* **The row it draws in was already reserved**: `axes: true` adds `AXIS_ROWS + FRAME_ROWS` to the declared height rather than taking it, and with no `xLabels` the third of those rows rendered as `""` — so every axed positional plot had been spending a row on an x-label row it never filled, and filling it costs nothing against I1. **`xLabels` wins where both are present**, because a caption is the caller's words and a scale is inferred, and overriding the first with the second is the wrong direction. A label that cannot keep its one-cell gap is dropped **with its tick**, `plotFrame: "corners"` draws the labels and no ticks — a tick is a mark on an edge and there is no edge, where a label is still a reading — and a log or time scale is labelled through `axisFor` or the two halves of one axis disagree. **The form owns the index-to-column mapping** (I37): a candlestick's ticks come from its own pitch, and the curve's rule would place them between candles at every width where the two separate (§3d.1).
 - **I42** — **A histogram bins every series on one shared edge set, and `layout: "overlap"` cannot mean *draw the first one*.** Binned on its own extent each series fills the width, so two distributions of different spreads draw the same picture and the comparison is gone — I35's argument one form along, and the reference's answer: `ax.hist([a, b], bins=8)` returns one edge array over the union and a count array per dataset. **The strategy's inputs are the union's too**, because the edges are: a bin *count* chosen from one series' `n` and spread belongs to edges that are not that series'. *The default layout dropped every series after the first and the legend named them all, so the picture asserted a series it did not draw — I8's rule, in the arm beside the one whose comment records being fixed for it.* **There is no overlapping picture a bar can draw** — two runs superimposed in one row of cells is one run — so `overlap` with more than one series means **grouped**, for the bar and the histogram alike, which is also what `ax.hist([a, b])` draws. Binned, a histogram *is* a bar chart of counts, so all four layouts arrive from the bar rather than being invented. **The vertical arm needed the `refFor` its transpose already had**, or N×S column bands draw in one colour under a legend naming S; and a series with no finite values keeps its bands, because dropping it renumbers the groups and the bin a reader is looking at holds different series in different bins (§3v).
+- **I43** — **Which styles a form has an arm for is a total record, and a fill is the braille arm's.** `plotStyle` was a shared union with `candlestick` refused on the wrong form by a clause naming that style — right, and a special case: every style is one some forms draw and others do not, and a second would want a second clause. `STYLE_ARMS` is `Record<PlotForm, readonly PlotStyle[]>`, total, and the refusal is one rule over it. **A braille violin changes the vocabulary and not the geometry** — the outline strokes the dot grid at 2×4 a cell, which is where the smoothness comes from, while I39's odd extent and §3i's rungs stay the figure's; the box and the summary marks remain cell-resolution and composite over the fill. **`plotFill` is refused on the line arm** rather than ignored, because a box-drawing outline has no interior vocabulary and putting `█` inside `╭──╮` is a third figure rather than the same one filled. **A solid pie degrades to braille at one bit and does not refuse** — the hatch ladder is that depth's identity channel and a block glyph has no hatch, so I18's precedent applies: where the capability cannot spare what a figure needs the honest answer is the thing that fits, not an error the caller could not have avoided. **And the line-drawn radar loses what the braille one keeps**: I40's union is braille's alone, so two `glyphForMask` polygons crossing fall back to first-wins and the further one loses the cell. *The same trade the pie makes in the other direction — a solid pie has no seams and a braille pie has no gaps — which is why both ship rather than one being chosen* (§3w).
 
 ## 8. Commitments
 
@@ -2581,6 +2635,7 @@ orientation — and belongs in the classification table as its own rows.
 34. **A cell two layers ink carries both layers' dots** — unioned where the vocabulary allows it, first-wins where it does not, and coloured by the priority order either way (I40, §3u).
 35. **The positional family has an x axis** — nice numbers over a declared domain, the sample index where none is declared, in the row `axes: true` was already reserving; the caller's captions win it where they exist, and the form owns which column a tick lands on (I41, §3d.1).
 36. **A histogram is every series binned on one edge set** — the union's, with the strategy's inputs taken from the union too, drawn through the bar's four layouts, and `overlap` meaning grouped because there is no overlapping picture and I8 forbids the alternative (I42, §3v).
+37. **A form declares which styles it has an arm for** — a total record, one refusal over it, a braille violin that changes vocabulary and not geometry, a fill the line arm refuses, and a solid pie that degrades at one bit rather than refusing (I43, §3w).
 
 ---
 
