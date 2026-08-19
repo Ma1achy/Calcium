@@ -1293,7 +1293,21 @@ function bandedForm(
     // the box plot ended up unable to show a centre. The band is handed its
     // ordinal and fetches what it needs.
     const band = bandBuilder(sr ?? { values: [] }, areaWidth, rowsPer, ci);
-    const labelRow = Math.floor(rowsPer / 2);
+    // **The figure is centred in its band and the label follows it** (I28).
+    // Drawn from row 0 with the name at `⌊rowsPer ÷ 2⌋`, a rung spending fewer
+    // rows than its band put the name two rows below the figure — pointing at
+    // blank space, with the box it named above it and unlabelled. Two correct
+    // placements that never meet: a renderer starts at its first row, and a
+    // band's name belongs at its centre. Every count was right, which is why
+    // reading the frame is what found it.
+    //
+    // **The figure's middle row, not its geometric centre.** A box's middle row
+    // is its spine and a raincloud's is its box — the *last* of its two — so
+    // taking `⌊rows ÷ 2⌋` of the figure lands on both where centring the label
+    // would put a raincloud's name on its density. Zero wherever the figure
+    // fills its band, which is every scaling rung and every other form.
+    const offset = Math.max(0, Math.floor((rowsPer - band.length) / 2)); // cells-ok — a row count
+    const labelRow = offset + Math.floor(band.length / 2); // cells-ok — a row count
     const styled = slot(refOf(sr ?? { values: [] }, ci), ctx.theme, ctx.capabilities);
 
     for (let r = 0; r < rowsPer && out.length < areaRows; r += 1) { // cells-ok — a row count
@@ -1302,7 +1316,7 @@ function bandedForm(
         line(
           [
             ...gutterSpans(label, layout, ctx),
-            { text: areaText(band[r] ?? " ".repeat(areaWidth), layout, ctx), style: styled },
+            { text: areaText(band[r - offset] ?? " ".repeat(areaWidth), layout, ctx), style: styled },
             ...rightBorder(layout, ctx),
           ],
           layout,

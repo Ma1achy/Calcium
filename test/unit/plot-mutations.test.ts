@@ -349,6 +349,60 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     expect(sharpCorner(vertical(8)), "the band left with two columns falls to the box").toBe(true); // cells-ok — a width
   });
 
+  it("T1.90 (C12 I28): a rung shorter than its band takes its name with it", () => {
+    // **Two correct placements that never met.** A figure is drawn from its
+    // band's first row because that is where a renderer starts; a band's name
+    // sits at the band's centre because that is where a name belongs. At three
+    // categories in twelve rows a compact box drew on row 0 of each four-row
+    // band and its name landed on row 2 — pointing at blank space, the box it
+    // named two rows above and unlabelled.
+    //
+    // Every count was right: the row total, the label's column, the figure. No
+    // assertion about either half could see it, and reading the frame is what
+    // did.
+    const q = { min: 0, q1: 2, median: 4, q3: 6, max: 8 };
+    const banded = (detail: Plot["plotDetail"], height: number): readonly string[] =>
+      plain(block({
+        kind: "plot", id: "bl", form: "boxplot", height, axes: true,
+        categories: ["A", "B", "C"], quartiles: [q, q, q], series: [],
+        ...(detail === undefined ? {} : { plotDetail: detail }),
+      }) as Plot, FULL_CAPS, 60); // cells-ok — a frame width
+
+    // **Found by the label rather than asserted at an index**, because an
+    // off-by-one in the offset satisfies an index assertion written against the
+    // same expression. The question is whether the *figure* is on the row the
+    // name is on, so the row is located by its name and then read.
+    //
+    // **`teeLeft` and it took two goes, both of them the same class.** The
+    // median is `│` — and `│` is the plot's right border, on every row of the
+    // frame. Its minimum cap is `┤` — and `┤` is the gutter's axis tick, on
+    // every *named* row by construction. Both read as *the figure is here* and
+    // both are furniture. `├` is drawn by `boxplotBand`'s spine row and by
+    // nothing else in the frame, at either rung.
+    const named = (r: string): boolean => /^[ABC]\s/u.test(r);
+    const spine = glyphs(FULL_CAPS).teeLeft;
+
+    for (const [what, rows] of [
+      ["compact, one row in four", banded("compact", 12)], // cells-ok — a row count
+      ["auto, three rows in five", banded(undefined, 15)], // cells-ok — a row count
+    ] as const) {
+      // **Asserted as set equality and not as containment**, because *every
+      // named row has a spine* is satisfied by a frame where the spines are
+      // elsewhere too, and *every spine is named* by one where a band lost its
+      // name. The claim is that they are the same rows.
+      expect(rows.filter(named).length, `${what}: three names`).toBe(3); // cells-ok — a category count
+      const spines = rows.filter((r) => r.includes(spine));
+      expect(spines.length, `${what}: one spine a band`).toBe(3); // cells-ok — a category count
+      expect(spines.every(named), `${what}: and every spine is on its name's row`).toBe(true);
+    }
+
+    // The fixture responds: a name on a blank row is what the defect looked
+    // like, and it is reachable here — the bands are four and five rows deep
+    // against figures of one and three, so there are blank rows to land on.
+    expect(banded("compact", 12).filter((r) => /^\s+│\s+│$/u.test(r)).length, "blank band rows exist")
+      .toBeGreaterThan(0); // cells-ok — a row count
+  });
+
   it("T1.88 (C12 I21): the extent grows the way its vocabulary says, and the tip follows", () => {
     // **This was very nearly a third ladder axis.** A vertical raincloud's
     // density is a run of dot-columns, and reaching for `ladderFor` there is the

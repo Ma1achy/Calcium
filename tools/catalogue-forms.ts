@@ -230,6 +230,23 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ],
       series: [],
     },
+    // **A rung with room to spare, which no fixture had** (C12 I28, T1.90).
+    // `compact` above is four categories in four rows and `default` is four in
+    // twelve — one row per band and three per band, and in both the figure
+    // exactly fills what it is given. So the whole corpus was blind to the case
+    // where it does not, and a category's name sat two rows below the box it
+    // named through every visual review the component has had. Three in twelve
+    // is four rows a band against a one-row figure, which is the case.
+    roomy: {
+      form: "boxplot", height: 12, axes: true, plotDetail: "compact",
+      categories: ["A", "B", "C"],
+      quartiles: [
+        { min: 1, q1: 3, median: 5, q3: 7, max: 9, mean: 5.5 },
+        { min: 2, q1: 4, median: 6, q3: 8, max: 10, outliers: [12] },
+        { min: 0, q1: 2, median: 4, q3: 6, max: 8 },
+      ],
+      series: [],
+    },
   },
   forest: {
     // **The fixture set `q1`/`q3` on every entry**, which is why the box drew
