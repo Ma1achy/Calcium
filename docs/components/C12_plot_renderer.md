@@ -1202,6 +1202,93 @@ it must.
 
 ---
 
+## 3t. Colour indexes the series, never the row
+
+§3h partitions the forms by whether a category needs a *mark*, and settles it with an argument
+about the gutter: **a legend is load-bearing exactly where the gutter is not.** The same argument
+answers the colour channel and was never carried to it. Every categorical form handed its rows
+the palette in order, so a histogram's eight bins drew eight colours — one variable, one
+distribution, eight identities claimed by a channel that had nothing to name.
+
+**The rule it was following is in one code comment and no file.** *"A plain bar is one series
+across N categories and the category **is** what a colour can name"* sits above
+`categoricalForm`'s `refFor` parameter, written while fixing the grouped bar, and grepping
+`docs/`, `src/`, `test/` and `tools/` for it returns that line and nothing else. It was true
+about the defect it was written for — a grouped bar's row is a *(category, series)* pair, and
+slot *r* named the row — and generalised from there on its own.
+
+### Measured against the references, eleven renderings
+
+`make refdiff`'s container already holds matplotlib 3.9.2 and seaborn 0.13.2, so this is a
+measurement and not a recollection:
+
+| rendering | distinct colours |
+|---|---|
+| `ax.bar`, five categories · `ax.barh`, four | 1 |
+| `ax.hist`, eight bins | 1 |
+| `ax.broken_barh`, four rows · `ax.eventplot`, three tracks | 1 |
+| `ax.acorr`, nine lags | 1 |
+| `ax.violinplot` · `ax.boxplot`, three bands | 1 |
+| `sns.barplot` · `histplot` · `countplot` · `stripplot` | 1 |
+| `sns.boxplot` · `violinplot`, three bands | 1 |
+| two `ax.scatter` calls | **2** |
+| `sns.boxplot(hue=x)`, three levels | **3** |
+
+The cycle advances **per series**, and only per series. seaborn's `hue=` is the same statement
+from the other side: mapping a variable to colour is something a caller asks for, and mapping the
+*category axis* to it — `hue=x`, where `x` is already the x axis — is available, explicit, and
+redundant by construction.
+
+So the palette indexes the series. A form with one series draws one colour whatever its row
+count, in `slotOf(0)` — **the slot a single-series line, scatter or sparkline already takes**, so
+a bar and a curve of the same data are the same colour rather than accidentally different ones.
+
+### `SHARES_CELLS` is not the switch, and it reads exactly as though it is
+
+The obvious move is to reuse §3h's partition — cells shared, colour separates; own row, the
+gutter separates — and it does not survive being checked. `SHARES_CELLS` is `true` for `bar` and
+`histogram`, and its own comment says why: *layers inside one bar*. Stacking is a property of a
+**render** and that record is indexed by **form**, so a plain bar and a stacked one share one
+entry and want opposite answers from it.
+
+The switch that does work is already in the code and is not a new concept: **who owns the span.**
+A row builder returning a `BandRow` declares owners and `ownedSpans` colours each run by its
+owner — a stacked bar's layers, a ridgeline's overlapping curves. A builder returning a plain
+string has no interior identities at all, so the only thing its colour could name is the row, and
+the gutter has named it already.
+
+### The classification table
+
+Indexed by rule interaction — row identity × series count × span ownership — because a row
+governed by one of the three restates that one and finds nothing:
+
+| the row is | series | owners | what colour could name | before | ruling |
+|---|---|---|---|---|---|
+| a category, one series | 1 | — | nothing | `slotOf(row)` | `slotOf(0)` |
+| a category, n series across it | n | — | the series — but the row is one span | `slotOf(row)` | `slotOf(0)`; the glyph pair separates the ends |
+| a category, layers within it | n | yes | the layer | per owner | unchanged |
+| a *(category, series)* pair | n | — | the series | `refFor(r mod n)` | unchanged |
+| **a series** | n | — | the series | `slotOf(row)` | **its own `refFor`** |
+| a series, curves overlapping | n | yes | the series | per owner | unchanged |
+| a band whose data is `quartiles` | 0 | — | nothing | `slotOf(band)` | `slotOf(0)` |
+| a column, one series | 1 | — | nothing | `slotOf(col)` | `slotOf(0)` |
+| a segment in one figure | — | legend | the segment | `categoryRef(i)` | unchanged |
+
+**Two rows are cells where two rules overlap, and they are the whole reason for the table.** A
+grouped bar's row is both a category and a series — already handled, by a fix, recorded in the
+comment that then made the general claim look settled. A timeline's row is *also* both: it
+carries a track name in the gutter like a category and holds exactly one series like a curve.
+**It is the only form this correction breaks, it breaks silently** — three tracks in one colour,
+every count in the frame right — and the old default was accidentally correct there. It states
+its own `refFor` now, on the seam the grouped bar already uses.
+
+**The other cell the table exposes is under-coloured rather than over.** A dumbbell's row holds
+two series and draws in one span, so `before` and `after` are separated by `●` against `○` alone
+where the reference gives them two colours. That is a `BandRow` with two owners and it is not
+built here — named so it is a known gap and not a silence.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -2194,6 +2281,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I35** — **A categorical distribution form scales every band to one value axis, and the caller's pin is what that axis is.** Scaled to its own extent each band fills its own width, so a tight distribution and a wide one draw the same shape and the comparison the form exists to make is gone — with every count in the figure agreeing. *Three instances, because the fix is per call site: `ridgelineArea` had it and the two violin arms each computed their own bounds.* Where there is no pin the axis is the union, which `seriesRange` already computes — the same argument §6a A6 makes for a matrix, one form along. **And the cut is what keeps a shared axis readable**: a kernel estimate is defined everywhere, so across a shared axis it draws flat tails to the frame's edge unless it is stopped two bandwidths past the data (§3q).
 - **I36** — **`candlestick` is a curve style and not a form, its data is a typed field, and the readout is part of it.** Everything a line plot has is unchanged — axis, grid, annotations, legend, crosshair — and what differs is what one column draws, so it sits in `plotStyle` beside `braille` and `line` with `form` still `line` or `step`. **Bullish and bearish are two categories, so §3b binds**: hollow-versus-filled carries direction at **every** depth and colour reinforces it — because I25's sweep is indexed by `PlotForm` and a style is invisible to it, and because the frame-read this repository schedules strips colour. **There is no sub-cell win, and the section records that the mechanism was looked for** — a body floats between open and close so both ends fall inside a cell, Unicode's vertical eighths ladder upward only, and the one vocabulary that resolves both ends is the one that cannot draw a hollow body. Cell resolution, as every reference implementation draws it; what is exact here is the aggregation. **The width is a stated layout rule** — `clamp(⌊areaWidth ÷ n⌋ − 1, 1, 5)` with the gap taken before the body, the wick left of centre at an even width by `boxplotColumn`'s existing rounding — and **more bars than columns aggregate rather than sample**: open of the first, high of the maxima, low of the minima, close of the last, which is exact where every other downsampling in this component approximates. **The vocabulary is not swapped to braille** — a bar's length *is* its value so doubling the glyph doubles the datum, while a candle's glyph carries direction and its column carries the time — **and the wide arm is `glyphs()`' ASCII set, so the column count does not change.** Two swaps were both called *the wide arm*, and drawing the consequence from the wrong one would have set a layout floor of one cell that `wide` cannot reach. **The readout is load-bearing rather than a convenience**, because a doji and an overlay line both draw `─` in one cell and only the four values tell them apart (§3r, §6b B5).
 - **I37** — **The cursor's column is marked twice, and the mapping from index to column is the form's.** A readout names values and a reader cannot use them without knowing which mark they describe — which is what §6b B5's ruling about the doji rests on. **A dashed vertical behind the data** through the same path the gridlines take, so it never overwrites a sample; **and a mark on the bottom rule**, because the dashed line is invisible in exactly the case that motivates it, a dense column with ink in every row. *The index is into the data and not the area* — `cursorReadout` has always read `values[cursorIdx]` — so a candlestick inverts through its own pitch and its buckets. **Measured: the two mappings agree at the dense end and separate at the sparse one**, because a candle is left-aligned at a fixed pitch where a curve spreads across the width — four bars in forty-four columns put the last candle at column 20 and the curve's rule at 43. **C12 owns what a cursor draws and not who moves one**: nothing in `src/` writes `cursorPositions`, and §10's Phase 2 row is about that writer (§3s).
+- **I38** — **Colour indexes the series and never the row.** A form with one series draws one colour whatever its category count, in the slot a single-series curve already takes, so a bar and a line of the same data agree rather than differing by accident. *The palette cycling per row claimed an identity per bin — a histogram's eight bins are one distribution and drew eight colours, a correlogram's nine lags one statistic and nine — and the claim it followed lived in a code comment and no file, true about the grouped bar it was written for and generalised on its own.* **The switch is span ownership and not `SHARES_CELLS`**, which is indexed by form and so answers for a plain bar and a stacked one at once: a builder returning owners has interior identities and each run takes its owner's slot; a builder returning a string has none, and the row's identity is in the gutter already. **A form whose rows are series says so** — the timeline is the single cell where the old default was accidentally right, three tracks in one colour is what the correction costs there, and every count in that frame would still be correct. Measured against eleven reference renderings: the cycle advances per series and only per series, and mapping the category axis to colour is `hue=x` — available, explicit, and redundant by construction (§3t).
 
 ## 8. Commitments
 
@@ -2228,6 +2316,7 @@ orientation — and belongs in the classification table as its own rows.
 31. **A cursor is marked where it points**, behind the data and on the rule, through a mapping the form owns — a readout whose column is unknown is a set of numbers about nothing in particular (I37).
 30. **`candlestick` is a curve style over the positional machinery**, with its own typed data, a stated candle width, exact OHLC aggregation, and a readout that is load-bearing because a doji and an overlay line share a glyph (I36).
 28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
+32. **Colour indexes the series, never the row** — one series is one colour whatever its category count, a row's interior identities are coloured by their owner, and a form whose rows *are* series declares it (I38, §3t).
 
 ---
 
