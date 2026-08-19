@@ -1138,6 +1138,59 @@ it must.
 
 ---
 
+## 3j. `orientation` — the axis a categorical form runs along
+
+`bar`, `histogram`, `boxplot` and `violin` are drawn horizontally and matplotlib
+draws all four the other way. Both are right, for different reasons, and the field
+is the answer rather than a preference.
+
+**Horizontal is the default because a terminal cell is not square.** A cell is
+about one wide by two tall, and a category's name is *text* — so a horizontal bar
+writes its label beside itself at full length, and a vertical one gets whatever
+fits under a column two or three cells wide. Every terminal plotting library
+defaults this way and no desktop one does; the cell is the whole of the
+difference.
+
+**Vertical is what ordered categories want.** A histogram's bins and a month of
+daily readings have a direction, and a horizontal bar chart runs its category axis
+top-to-bottom, which is not where time goes. `binValues`' half-open intervals are
+unreadable stacked vertically and read naturally along the bottom.
+
+### The vocabulary flips with the axis, and that is the part to get right
+
+`ramp.ts` names four vocabularies and two of them are the *same eighths on
+different axes*:
+
+| axis | partials | why |
+|---|---|---|
+| horizontal | `▏▎▍▌▋▊▉` — **left** eighths | a bar's tip advances rightwards, so the partial cell fills from the left |
+| vertical | `▁▂▃▄▅▆▇` — **lower** eighths, `RAMP_UNICODE` | a column's tip advances upwards, so it fills from the bottom |
+
+**These look interchangeable and encode different axes**, which is the mismatch
+`ramp.ts`' header was written about and which has now cost this component three
+defects. The vertical arm reaches its ramp through `ladderFor("height", caps)`,
+which is the door — a renderer names the axis it draws and never a vocabulary
+(I21, SS51). `extentFor` stays the horizontal one.
+
+**The wide arm is not the narrow arm's mirror.** U+2580–U+259F are all
+`East_Asian_Width=Ambiguous`, so neither eighths set survives a wide terminal, and
+both fall back to a single solid step. That is a rung, not an oversight: a
+vertical bar on a wide terminal is quantised to whole cells and says so by being
+blocky rather than by being wrong.
+
+### What is not orientable, and why it is a shorter list than it looks
+
+`heatmap` and its family have two real axes already; `pie` and `radar` have none;
+`gantt` and `waterfall` are horizontal *by construction* — a gantt's bar is a time
+interval and time is the long axis. `lollipop`, `dotplot`, `funnel`, `dumbbell`
+and `forest` are orientable in principle and are not built here, because each is a
+glyph-row form whose vertical arm is a separate renderer and none was asked for.
+**Requesting an orientation a form does not have is a construction error**, not a
+silent fallback — C04 refuses it, for I8's reason: a plot that quietly ignores a
+field is a plot the caller believes is showing something else.
+
+---
+
 ## 3i. `plotDetail` — the mode fits the height, and never sets it
 
 A boxplot at one row per category cannot show a mean; at three it is the reference figure. A
@@ -1198,6 +1251,7 @@ classification table as its own rows.
 - **I27** — **A legend costs width or a row, and only the width-costing placements may enable themselves.** A row must declare its cost before the data is visible (I1); width is already data-dependent through the gutter, so it may not. That is why `"right"` is the default and `"above"`/`"below"` are opt-in — not a preference. **Skipped entirely at `colourDepth: 1`**, where a swatch carries nothing and still takes the row.
 - **I28** — **`plotDetail` selects a renderer inside the declared height and never contributes to it**, because rows-per-band times category count is a height derived from data (I1). `"auto"` is the richest renderer the quotient affords; an explicit `"full"` that does not fit degrades to `"compact"` and reports rather than overflowing its band.
 - **I29** — **Colour carries magnitude where there is colour; the glyph is the fallback, never the lead.** A form that encodes magnitude paints the cell — a background-coloured space — at any depth that separates its values, and reaches for the density ramp only below it.
+- **I30** — **`orientation` chooses the axis, and the eighths vocabulary follows it.** Horizontal is the default because a cell is one wide by two tall and a category's name is text — a horizontal bar writes its label beside itself, a vertical one gets a column two cells wide to write it under. The partials are **left** eighths horizontally and **lower** eighths vertically; they look interchangeable, encode different axes, and the vertical arm reaches its through `ladderFor("height")` rather than naming a constant (I21). Both are ambiguous-width, so a wide terminal quantises to whole cells on either axis. A form with no second axis refuses the field at construction rather than ignoring it.
 
 **"Separates its values" is a real threshold and it is 8-bit, not 1-bit.** C10 I31 already ruled that a continuous map below 8-bit says *nothing* — an ordering over sixteen indices whose luminances the terminal never reports, so a ramp across them is an ordering that is not one — and `continuousColour` returns `undefined` there rather than guessing. **So the ladder has four rungs, not two, and the middle one is the rung most terminals actually report**: at 24- and 8-bit colour carries and the cell is painted; **at 4-bit colour exists and cannot carry, so density does**; at 1-bit there is nothing else. The mechanism is already built — the caller falls back because the map declines — and naming the rung is what stops someone reading *any depth with colour* as *any depth at all*.
 
