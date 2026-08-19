@@ -170,3 +170,35 @@ export function plotAreaWidth(width: number, yLabelWidth: number, axes: boolean)
   if (!axes) return Math.max(1, Math.floor(width));
   return Math.max(1, Math.floor(width) - yLabelWidth - AXIS_GUTTER - FRAME_RIGHT);
 }
+
+/**
+ * A declared height from the region a producer was given (roadmap 38).
+ *
+ * **The deferral's blocker expired and nothing noticed.** Roadmap 38 blocked
+ * `height: "fill"` on *the producer cannot see the height — that is F37*, and
+ * `ProducerContext.height` was granted by phase 1: non-null exactly when the
+ * document is bound by a region, which is exactly the case the entry named. The
+ * condition was written where the deferral is and the thing that met it was
+ * written somewhere else, which is that pattern's whole shape.
+ *
+ * **It does not weaken C12 I1, and that is why it lives here rather than in the
+ * type.** The *producer* resolves the number before the block is constructed, so
+ * `measure` still sees a declared height and `series` is still structurally
+ * unreachable from `plotHeight`. I1 forbids the renderer deriving height from
+ * data — not the number being chosen late.
+ *
+ * `region` is `null` for a transcript entry, which is windowed by rows and bound
+ * by nothing; the fallback is the caller's own, because *how tall should this be
+ * when nothing says* is a question about the surface and not about plots.
+ *
+ * `reserve` is what the surface spends around the plot — a title, a metrics row.
+ * Floored at 1, because a plot with no rows is not a smaller plot.
+ */
+export function fillHeight(
+  region: number | null,
+  fallback: number,
+  reserve = 0,
+): number {
+  if (region === null || !Number.isFinite(region)) return Math.max(1, Math.floor(fallback)); // cells-ok — a row count
+  return Math.max(1, Math.floor(region) - Math.max(0, Math.floor(reserve))); // cells-ok — a row count
+}

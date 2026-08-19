@@ -10,6 +10,7 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { FULL_CAPS, ASCII_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 import { SHARES_CELLS, categoryMarks, markOf } from "../../src/presentation/plot/marks.js";
+import { displayCells } from "../../src/presentation/text.js";
 import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
 import { block as blockOf, validateBlock } from "../../src/data/viewmodel/index.js";
 
@@ -187,6 +188,60 @@ describe("P4b: at one bit, cell-sharing categories differ by mark (C12 I25)", ()
     expect(at(1).size, "and a ladder where it cannot").toBe(4); // cells-ok — a set size
     expect(at(24, true).size, "`plotMarks: always` overrides in one direction").toBe(4); // cells-ok — a set size
   });
+});
+
+describe("P8: reflow — every form across the widths a terminal actually is", () => {
+  // **Width is the axis that wraps, and a wrapped row scrolls the alternate
+  // screen** — the one failure the application can no longer see. `P4` sweeps
+  // four widths to check the height; this sweeps twenty-six.
+  //
+  // **The two halves are not equally live, and saying so is the point.** Mutated:
+  //
+  // | mutation | caught |
+  // |---|---|
+  // | `composeRows` returns one row short | **58 rows** |
+  // | `line` clamps to `width + 1` | no |
+  // | `bandLayout`'s gutter cap removed | no |
+  // | `plotAreaWidth` wrong above 100 | no |
+  //
+  // The height assertion is this sweep's real subject. **The width assertion
+  // cannot fail here**, because `renderToLines` clamps every row to the frame's
+  // width after C12 has run — a plot emitting an over-wide row is corrected
+  // downstream and arrives at exactly `width` however wrong it was. It is kept
+  // as a cheap regression on *that* clamp, and recorded as such: an unrecorded
+  // limit reads as strength, and T2.3 makes the same assertion with the same
+  // guard above it.
+  //
+  // What the width half would need to be live is C12's own rows before the
+  // pipeline, which `FORM_ROWS` does not publish. A frame read is what finds a
+  // wrong area width today, and four of this round's defects came from one.
+  //
+  // The step is 7 rather than 1 so it costs a second: the arithmetic defects it
+  // can see do not hide between 61 and 62.
+  const WIDTHS = Array.from({ length: 26 }, (_, i) => 20 + i * 7); // cells-ok — a cell width
+
+  for (const form of ALL_FORMS) {
+    it(form, () => {
+      const b = ONE_PER_FORM[form];
+      const k = kit();
+      const declared = k.measure(b, 80);
+      let checked = 0;
+      for (const width of WIDTHS) {
+        const rows = k.renderToLines(b, width);
+        for (const [i, row] of rows.entries()) {
+          // Guarded downstream — see the table above. A regression on the
+          // pipeline's clamp, not on C12's.
+          expect(displayCells(row), `${form} w${String(width)} row ${String(i)}`)
+            .toBeLessThanOrEqual(width); // cells-ok — a cell width
+        }
+        // **The height is a function of the block, not the width** (C12 I1) — so
+        // a plot that reflows is a plot that keeps its place in the transcript.
+        expect(rows.length, `${form} w${String(width)}: rows`).toBe(declared); // cells-ok — a row count
+        checked += 1;
+      }
+      expect(checked).toBe(WIDTHS.length); // cells-ok — a width count
+    });
+  }
 });
 
 describe("P5: render is pure", () => {

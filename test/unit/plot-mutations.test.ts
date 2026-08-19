@@ -19,6 +19,8 @@ import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
 import { kde, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
+import { squareColumns } from "../../src/presentation/plot/aspect.js";
+import { fillHeight } from "../../src/presentation/plot/height.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
@@ -1066,6 +1068,37 @@ describe("GROUP 6m: four frame shapes over one geometry", () => {
     expect(rows.length, "and still there").toBe(plain(mk("box")).length); // cells-ok — a row count
     const body = rows.find((r) => r.includes("│")) ?? "";
     expect(body.trimEnd().endsWith("│"), "no right border").toBe(false);
+  });
+});
+
+describe("GROUP 6n: a cell is not square, and one file used to know it", () => {
+  it("T1.86: a waffle spends two columns per row so the mosaic reads square", () => {
+    // `circle.ts` compensated (`rx = 2·ry`, which is why our pie is round where
+    // granite's is an ellipse) and `waffle.ts` did not, so its 10×10 grid
+    // rendered ten wide and twenty tall — a tall rectangle where a mosaic
+    // belongs. Same terminal geometry, two answers, one file aware of it.
+    const cells = waffleCells(
+      [{ label: "a", value: 60 }, { label: "b", value: 40 }], 40, FULL_CAPS,
+    );
+    expect(cells.length, "ten rows").toBe(10); // cells-ok — a row count
+    const inked = (cells[0] ?? []).filter((c) => c.segmentIndex >= 0).length; // cells-ok — a cell count
+    expect(inked, "and twenty columns of ink").toBe(squareColumns(10)); // cells-ok — a column count
+    expect(squareColumns(10), "which is twice the rows").toBe(20); // cells-ok — a column count
+  });
+
+  it("T1.87 (roadmap 38): `fillHeight` takes the region, and a transcript has none", () => {
+    // **The deferral's blocker expired and nothing noticed.** Roadmap 38 blocked
+    // this on *the producer cannot see the height*, and `ProducerContext.height`
+    // was granted by phase 1 — non-null exactly when the document is bound by a
+    // region, which is the case the entry named.
+    expect(fillHeight(20, 8), "the region, less nothing reserved").toBe(20); // cells-ok — a row count
+    expect(fillHeight(20, 8, 6), "less what the surface spends").toBe(14); // cells-ok — a row count
+    // `null` is a transcript entry — windowed by rows, bound by nothing — and
+    // the fallback is the caller's, because *how tall when nothing says* is a
+    // question about the surface rather than about plots.
+    expect(fillHeight(null, 8), "no region, the caller's own answer").toBe(8); // cells-ok — a row count
+    // A plot with no rows is not a smaller plot.
+    expect(fillHeight(4, 8, 99)).toBe(1); // cells-ok — a row count
   });
 });
 

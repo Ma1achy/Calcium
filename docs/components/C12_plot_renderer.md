@@ -1138,6 +1138,55 @@ it must.
 
 ---
 
+## 3p. Aspect, reflow, and a deferral whose blocker expired
+
+**A cell is about one column wide and two rows tall, and exactly one file knew
+it.** `circle.ts` compensated — `rx = 2·ry`, which is why our pie is round where
+granite's is an ellipse — and `waffle.ts` did not, so its 10×10 grid rendered ten
+wide and twenty tall: a tall rectangle where a mosaic belongs. Same terminal
+geometry, two answers, one file aware of it. `aspect.ts` is the one place now.
+
+Not a capability, deliberately: the ratio is a property of monospace text rather
+than of a terminal's declared features, no escape sequence reports it, and a font
+where it did not hold would break every box-drawing figure long before it broke a
+waffle.
+
+### `height: "fill"` — the condition was met and nothing was watching
+
+Roadmap 38 blocked it on *the producer cannot see the height — that is F37*, and
+`ProducerContext.height` was granted by phase 1: non-null **exactly** when the
+document is bound by a region, which is the case the entry names. The condition
+was written where the deferral is and the thing that met it was written somewhere
+else, which is that pattern's whole shape and its third instance here.
+
+**It does not weaken I1**, and that is why `fillHeight` is a helper rather than a
+`Plot` field. The *producer* resolves the number before the block is constructed,
+so `measure` still sees a declared height and `series` stays structurally
+unreachable from `plotHeight`. I1 forbids the renderer deriving height from data,
+not the number being chosen late.
+
+### What the reflow sweep can and cannot see
+
+`P8` renders every form at twenty-six widths and asserts two things. Only one of
+them is live, and the difference is worth stating because an unrecorded limit
+reads as strength:
+
+| mutation | caught |
+|---|---|
+| `composeRows` returns one row short | **58 rows** |
+| `line` clamps to `width + 1` | no |
+| the gutter's ⅓ cap removed | no |
+| `plotAreaWidth` wrong above 100 | no |
+
+**The width assertion cannot fail there**, because `renderToLines` clamps every
+row to the frame's width *after* C12 has run: a plot emitting an over-wide row is
+corrected downstream and arrives at exactly `width` however wrong it was. T2.3
+makes the same assertion with the same guard above it. What would make it live is
+C12's own rows before the pipeline, which `FORM_ROWS` does not publish — and a
+frame read is what finds a wrong area width today.
+
+---
+
 ## 3o. `matrixAnchor` — where a matrix puts a row shorter than its width
 
 **The reported defect, and the code read back**: *AXES | MASSIVE GAP OF NOTHING

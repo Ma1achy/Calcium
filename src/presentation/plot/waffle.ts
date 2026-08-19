@@ -6,6 +6,10 @@
 import type { Segment } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { pairFor } from "./ramp.js";
+import { squareColumns } from "./aspect.js";
+
+/** Ten rows of ten, one square per percent. */
+const WAFFLE_ROWS = 10;
 import { markOf } from "./marks.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
@@ -21,8 +25,13 @@ export function waffleCells(
   caps: Pick<Caps, "unicode" | "ambiguousWidth" | "colourDepth">,
 ): readonly (readonly WaffleCell[])[] {
   const w = Math.max(1, Math.floor(width));
-  const cols = Math.min(w, 10);
+  // **Twice as many columns as rows, because a cell is not square.** Ten cells
+  // by ten rows renders ten wide and twenty tall — a tall rectangle where a
+  // mosaic belongs, and the one file that knew about cell aspect was
+  // `circle.ts`. Each square of the waffle is `CELL_ASPECT` cells wide.
+  const cols = Math.min(w, squareColumns(WAFFLE_ROWS));
   const gridSize = 100;
+  const perSquare = Math.max(1, Math.floor(cols / WAFFLE_ROWS)); // cells-ok — a cell width
 
   const pair = pairFor(caps);
 
@@ -39,10 +48,10 @@ export function waffleCells(
   });
 
   const rows: WaffleCell[][] = [];
-  for (let r = 0; r < 10; r++) {
+  for (let r = 0; r < WAFFLE_ROWS; r++) {
     const row: WaffleCell[] = [];
     for (let c = 0; c < cols; c++) {
-      const cell = grid[r * 10 + c]!;
+      const cell = grid[r * WAFFLE_ROWS + Math.floor(c / perSquare)]!; // cells-ok — a square index
       // **The segment's own mark, not one fill for all of them** (C12 I25).
       // Every cell drew `pair.filled`, so a three-segment waffle was one solid
       // block the moment colour went — and it was the single genuine failure of
