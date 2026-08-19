@@ -849,9 +849,9 @@ cannot reach. A trace here would have one row per input and find nothing.
 | **B2** | `plotStyle` selects a `Rasteriser` · a `Rasteriser` takes a `Series` | a candlestick rasteriser | dispatched in the **form** arm before `styleRasteriser`, so the type never describes a function that ignores its first argument |
 | **B3** | the y-axis is `seriesRange` over the series · a candle's extremes are `low` and `high` | the axis of a chart with both | the union. `low`/`high` bound the candles and the overlays bound themselves; a pin still wins |
 | **B4** | §3b — two categories separated by colour, then by mark · I25 — by mark or by name, never by tone alone | the legend | it names the candles **and** each overlay series, with `▯ rising` and `┃ falling` as two entries. Direction is the mark at **every** depth, so I25 holds on the mark disjunct rather than resting on the legend |
-| **B13** | the body spans open→close · the wick spans low→high | a bar whose body is shorter than one cell | `┿` — the fifth mark, and the row that gives it a job. At cell resolution the body wins where the two overlap, so without this a cell holding a short body and wick beyond it on both sides draws as body and the wick vanishes at exactly the bar it matters for |
+| **B13** | the body spans open→close · the wick spans low→high | a wick that reaches no row beyond the body | `┿` — the fifth mark, and the row that gives it a job. At cell resolution the body wins the overlap, so without this the wick vanishes at exactly the bar it matters for. **Bounded by the frame, not by this row**: `┿` is affordable only where some other cell of that candle still carries the body — another column, or an interior row. Its first form ruled it for a body shorter than a cell, and 120 bars in 44 columns then drew a chart of nothing but `┿`, with not one candle saying which way it went |
 | **B14** | I25's sweep is indexed by `PlotForm` · `candlestick` is a **style**, so its form is `line` | the guard over the one form that has a style | it runs, it passes, and it renders `ONE_PER_FORM["line"]` — a document with no `ohlc`. **A rule table is exhaustive over the axis it is indexed by**, and a style is an axis `SHARES_CELLS` does not have. So the vocabulary carries direction by mark at every depth rather than relying on a sweep that cannot reach it |
-| **B15** | `candleWidth` is clamped to 1…5 · `areaWidth` need not divide by `n` | 70 columns and 9 candles | the remainder is spread a cell at a time by `categoricalColumnForm`'s existing arithmetic, never given to the last candle. A chart whose right-hand candle is four cells wider than its neighbours reads as a datum |
+| **B15** | `candleWidth` is clamped to 1…5 · `areaWidth` need not divide by `n` | 70 columns and 9 candles | **the pitch is uniform and the leftover is blank on the right**, which is §3r's left-alignment and not a second rule. This row first said *spread the remainder a cell at a time*, borrowing `categoricalColumnForm`'s arithmetic — and four bars in forty-four columns came out one every eleven cells, a layout asserting that four samples span the window. The concern was right (a candle wider than its neighbours reads as a datum) and the remedy was the wrong half: uniformity answers it, distribution does not |
 | **B5** | a doji draws `─` · an overlay line through that column draws `─` | one cell, two sources | **not a defect and it needs no glyph change**: both statements are true of that cell. The readout disambiguates, which is what makes §3r's readout load-bearing rather than a convenience |
 | **B6** | the crosshair reads a column · `ohlc` is shorter than the cursor's index | the readout past the data | `—` for each of the four, exactly as a null series value reads. A candlestick has four values to be absent rather than one |
 | **B7** | `candleWidth` is clamped to 1…5 · the wick is centred | an even candle width | left of centre, `⌊(w − 1) ÷ 2⌋` — the rounding `boxplotColumn` already uses, so the component has one rule and not two that agree |
@@ -868,6 +868,13 @@ check in the component asks about `series`, and a plain-candles block is legal w
 brief, once §3r's three claims had been checked. B14 is the one worth keeping: it is not about
 this component's rules meeting each other but about a *guard* whose index has no column for what
 was added, which no row of a table indexed by the same thing could have surfaced.
+
+**And B13 and B15 were both overturned by the first frames**, which is the walk's own limit
+arriving on schedule. Each row named a real interaction and each prescribed a remedy that reads
+as correct on the page: *`┿` where the body is under a cell*, *spread the remainder*. Rendered,
+one produced a chart with no direction in it and the other a chart claiming four bars span the
+window. **A walk rules the shape and the implementation is the first thing that can disprove
+it** — the finding survives in both rows and only the remedy had to change.
 
 **B5 is the row that makes a later commitment load-bearing.** Nothing about it changes a glyph;
 what it changes is that the readout stops being optional.
@@ -1319,10 +1326,21 @@ three columns with the wick centred, and `⌊areaWidth ÷ n⌋` makes the answer
 terminal — so the rule is stated rather than derived:
 
 ```
-candleWidth = clamp(⌊areaWidth ÷ n⌋, 1, 5)
+candleWidth = clamp(⌊areaWidth ÷ n⌋ − 1, 1, 5)         the gap is taken first
+pitch       = min(⌊areaWidth ÷ n⌋, candleWidth + 1)    uniform, leftover on the right
 the wick is centred, so an odd width — at an even one the wick sits left of centre
-a gap column between candles when the budget allows
 ```
+
+**The gap comes out of the slot before the body does, and the first frame is what settled it.**
+At `⌊areaWidth ÷ n⌋` exactly, adjacent candles touch — and two rising candles side by side draw
+`▯▯▯▯▯▯`, which is one six-cell body and not two three-cell ones. Every count in that frame
+agreed and the figure said something false, which is `boxplotColumn`'s recorded reason for
+narrowing to three fifths arriving on the form next door.
+
+**The pitch is uniform and the leftover sits on the right**, which is the left-alignment ruling
+below rather than a second rule. Distributing the remainder a cell at a time — what
+`categoricalColumnForm` does — put four bars one every eleven cells across a forty-four column
+area, a layout that says the four samples span the window.
 
 **The wick's placement at an even width has to be said**, because *centred* has no answer
 there and both roundings look deliberate. Left of centre, which is `⌊(w − 1) ÷ 2⌋` and the same
@@ -2180,8 +2198,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.96** (I21, I34): the strip reads the box's axis and resolves twice its detail — the minimum inks column 0, the maximum the last, and two values half a cell apart resolve into one cell's two dot columns, which is a distinction the box cannot make at any width. The vertical arm inverts with its box: `max` on row 0, `min` on the last. And the ASCII arm draws only its rug mark — never a ramp step, which would encode a magnitude from where a sample landed inside its cell.
 - **CS1** (I36): a candlestick block with `ohlc` and `series: []` renders candles — not the empty message. **The first row, because it is the one that would have been got wrong**: every emptiness check in the component asks about `series`.
 - **CS2** (I36): a body spans open→close and a wick low→high in the same column, at the four capability sets — and the bullish and bearish bodies differ by *mark* at **every** depth, not by tone alone (I25). **Asserted on the colour-stripped rows**, which is both what makes it a mark assertion and what the catalogue's `.plain` frames show.
-- **CS9** (I36, §6b B13): a bar whose body is shorter than one cell draws `┿` in that cell and not the body glyph — the wick is still there on both sides of it, and body-wins-the-overlap would have swallowed it at exactly the bar the mark exists for.
-- **CS3** (I36): `candleWidth` is `clamp(⌊areaWidth ÷ n⌋, 1, 5)`, the wick is centred at an odd width and left of centre at an even one, and a gap column appears when the budget allows. Asserted at a width where the clamp binds and at one where it does not.
+- **CS9** (I36, §6b B13): a wick reaching no row beyond the body draws `┿` in the body's end cell rather than the body glyph — **and every candle still carries its direction in some cell**, asserted over a frame dense enough that the body is one row and one column, which is the case that produced a chart of nothing but `┿`.
+- **CS3** (I36): `candleWidth` is `clamp(⌊areaWidth ÷ n⌋ − 1, 1, 5)` and the pitch is `min(⌊areaWidth ÷ n⌋, candleWidth + 1)`, the wick is centred at an odd width and left of centre at an even one, and **two adjacent candles never touch above the one-cell budget**. Asserted at a width where the clamp binds and at one where it does not, and at the budget where the gap is unaffordable.
 - **CS4** (I36): more bars than columns aggregate — open of the first, high of the maxima, low of the minima, close of the last. **Asserted against a series whose extreme falls on a bar that sampling would drop**, since an aggregation that happens to agree with sampling tests nothing.
 - **CS5** (C04 I57): `plotStyle: "candlestick"` with no `ohlc` is refused at construction, by both gates.
 - **CS6** (C04 I57): `plotStyle: "candlestick"` on a form that is not `line` or `step` is refused, by both gates.
