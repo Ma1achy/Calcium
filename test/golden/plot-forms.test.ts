@@ -52,6 +52,90 @@ const VERTICAL = [
   }],
 ] as const;
 
+/**
+ * The candlestick, which is a **style** and not a form (C12 I36, §3r).
+ *
+ * **Its own corpus for the reason `VERTICAL` has one**: `ONE_PER_FORM` is one
+ * block per `PlotForm`, and a style changes what the same form draws. A
+ * candlestick is `form: "line"`, so every frame the form corpus holds for
+ * `line` is a document without any candles in it — which is also why I25's
+ * sweep cannot see this style (§6b B14).
+ *
+ * **Four capability sets and both ambiguous widths**, where every other form
+ * needs the four. CS8 is the reason and the assertion is that the two *agree*:
+ * `glyphs()` returns the ASCII set at `wide`, so the column count does not
+ * change and only the glyphs do. The section said *half as many candles* before
+ * that was measured.
+ */
+const CANDLE_BARS = (() => {
+  const out: { open: number; high: number; low: number; close: number }[] = [];
+  let last = 100;
+  for (let i = 0; i < 14; i += 1) {
+    const d = [3, -2, 5, -1, -4, 6, 2, -3, 1, 4, -5, 2, 0, 3][i]!;
+    const open = last;
+    const close = last + d;
+    out.push({ open, close, high: Math.max(open, close) + 2, low: Math.min(open, close) - 2 });
+    last = close;
+  }
+  return out;
+})();
+
+const STYLES = [
+  // Plain candles: `series: []`, which is §6b B1 — the shape that rendered
+  // "No data." and is why that row is first.
+  ["candlestick", { height: 12, plotStyle: "candlestick", series: [], ohlc: CANDLE_BARS }],
+  // With an overlay drawn over them on the shared axis, and a legend naming
+  // all three (§6b B3, B4).
+  ["candlestick-overlay", {
+    height: 12, plotStyle: "candlestick", ohlc: CANDLE_BARS, legend: "right",
+    series: [{
+      label: "ma3",
+      values: CANDLE_BARS.map((_b, i, a) =>
+        a.slice(Math.max(0, i - 2), i + 1).reduce((t, x) => t + x.close, 0) / Math.min(i + 1, 3)),
+    }],
+  }],
+  // Dense enough that every candle is one cell — the frame that produced a
+  // chart of nothing but `┿` before B13 was bounded.
+  ["candlestick-dense", {
+    height: 10, plotStyle: "candlestick", series: [],
+    ohlc: Array.from({ length: 120 }, (_v, i) => {
+      const open = 100 + i * 0.4 + Math.sin(i * 0.7) * 6;
+      const close = open + [3, -2, 5, -1, -4, 6, 2, -3][i % 8]!;
+      return { open, close, high: Math.max(open, close) + 2, low: Math.min(open, close) - 2 };
+    }),
+  }],
+] as const;
+
+const CANDLE_MODES = [
+  { name: "24bit-narrow", capabilities: FULL_CAPS },
+  { name: "24bit-wide", capabilities: { ...FULL_CAPS, ambiguousWidth: "wide" as const } },
+  { name: "1bit", capabilities: { ...MONO_CAPS, ambiguousWidth: "narrow" as const } },
+  { name: "ascii", capabilities: { ...MONO_CAPS, ambiguousWidth: "wide" as const } },
+] as const;
+
+describe("golden frames — the candlestick style", () => {
+  for (const [name, spec] of STYLES) {
+    for (const mode of CANDLE_MODES) {
+      for (const width of WIDTHS) {
+        it(`${name} · ${mode.name} · ${String(width)}`, () => {
+          const b = block({ kind: "plot", id: name, form: "line", axes: true, ...spec } as never);
+          const kit = measurable({
+            definitions: [plotDefinition],
+            theme: DARK_THEME,
+            capabilities: mode.capabilities,
+          });
+          const lines = kit.renderToLines(b, width);
+          const frame = [
+            `── ${name} · ${mode.name} · measured ${String(kit.measure(b, width))} · rendered ${String(lines.length)}`, // cells-ok
+            ...lines,
+          ].join("\n");
+          expect(frame).toMatchSnapshot();
+        });
+      }
+    }
+  }
+});
+
 describe("golden frames — the vertical arm", () => {
   for (const [form, spec] of VERTICAL) {
     for (const mode of MODES) {

@@ -168,18 +168,21 @@ export function hasBars(bars: readonly OHLC[] | undefined): boolean {
 }
 
 /**
- * The two layers a candlestick draws — rising, and falling.
+ * The three layers a candlestick draws — rising, falling, and flat.
  *
- * **Two layers rather than one, because a `Layer` carries one `ColourRef`** and
- * a candlestick has two categories. A column is rising or falling and never
- * both, so the layers are disjoint and the first-non-blank merge composes them
- * without a rule about which wins.
+ * **A layer per tone, because a `Layer` carries one `ColourRef`.** A column is
+ * exactly one of the three, so the layers are disjoint and the first-non-blank
+ * merge composes them without a rule about which wins.
  *
- * A doji is neither, and it goes in the rising layer with the neutral mark —
- * `─`, which an overlay line through the same column also draws. That collision
- * is not a defect and needs no glyph change: both statements are true of the
- * cell, and the readout is what tells a reader which it is looking at
- * (§6b B5, CS7).
+ * **Three and not two, which the first golden frame is what settled.** A doji
+ * went in the rising layer — it is neither, and the mark `─` says so — and the
+ * frame drew it **green**, because that layer carries `tone.ok`. Every count
+ * agreed and the colour said *up* about a bar that did not move. A flat bar
+ * reads flat: its own layer, muted.
+ *
+ * The `─` an overlay line through the same column also draws is a different
+ * matter and needs no glyph change: both statements are true of that cell, and
+ * the readout is what tells a reader which it is looking at (§6b B5, CS7).
  */
 export function candleRows(
   bars: readonly OHLC[],
@@ -187,15 +190,19 @@ export function candleRows(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
-): Readonly<{ rising: readonly string[]; falling: readonly string[] }> {
+): Readonly<{ rising: readonly string[]; falling: readonly string[]; flat: readonly string[] }> {
   const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
   const rows = Math.max(1, Math.floor(areaRows)); // cells-ok — a row count
   const blank = () => Array.from({ length: rows }, () => new Array<string>(w).fill(" "));
   const up = blank();
   const down = blank();
-  if (bars.length === 0) { // cells-ok — a bar count
-    return { rising: up.map((r) => r.join("")), falling: down.map((r) => r.join("")) };
-  }
+  const level = blank();
+  const joined = (): Readonly<{ rising: readonly string[]; falling: readonly string[]; flat: readonly string[] }> => ({
+    rising: up.map((r) => r.join("")),
+    falling: down.map((r) => r.join("")),
+    flat: level.map((r) => r.join("")),
+  });
+  if (bars.length === 0) return joined(); // cells-ok — a bar count
 
   const g = glyphs(caps);
   const drawn = aggregate(bars, w);
@@ -217,11 +224,10 @@ export function candleRows(
     const rHigh = rowOf(bar.high, range, rows); // cells-ok — a row index
     const rLow = rowOf(bar.low, range, rows); // cells-ok — a row index
 
+    const flat = bar.close === bar.open;
     const rising = bar.close > bar.open;
-    const grid = bar.close === bar.open ? up : rising ? up : down;
-    const body = bar.close === bar.open
-      ? g.horizontal
-      : rising ? g.candleHollow : g.candleFilled;
+    const grid = flat ? level : rising ? up : down;
+    const body = flat ? g.horizontal : rising ? g.candleHollow : g.candleFilled;
 
     // The wick first, so the body overwrites it where they share a cell — and
     // `candleCross` is what says so where the overwrite would hide it.
@@ -260,5 +266,5 @@ export function candleRows(
     }
   }
 
-  return { rising: up.map((r) => r.join("")), falling: down.map((r) => r.join("")) };
+  return joined();
 }

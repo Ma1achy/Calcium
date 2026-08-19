@@ -820,6 +820,9 @@ function overlaidRows(
  * categories.** A column is rising or falling and never both, so the layers are
  * disjoint and the merge composes them with no rule about which wins.
  *
+ * **Three, because a doji is neither** — see `candleRows`. It is `tone.muted`,
+ * and it was `tone.ok` until a frame was read with colour on.
+ *
  * **`tone.ok` and `tone.error` rather than the categorical palette**, which is
  * the one place a judgement tone is the right answer and not roadmap 51's
  * defect. That defect was *unrelated* quantities cycled through judgement
@@ -835,12 +838,16 @@ function candleLayers(
   ctx: RenderContext,
 ): readonly Layer[] {
   if (!hasBars(bars)) return [];
-  const { rising, falling } = candleRows(
+  const { rising, falling, flat } = candleRows(
     bars ?? [], range, layout.areaWidth, layout.areaRows, ctx.capabilities,
   );
   return [
     { glyphRows: rising, ref: "tone.ok" },
     { glyphRows: falling, ref: "tone.error" },
+    // **A doji is neither, so it is muted rather than green.** It rode in the
+    // rising layer until a golden frame was read with colour on and drew a bar
+    // that did not move in the up tone (§3r).
+    { glyphRows: flat, ref: "tone.muted" },
   ];
 }
 

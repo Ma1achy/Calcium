@@ -36,6 +36,43 @@ export const UNISOLABLE: ReadonlyMap<string, string> = new Map([
 export const COLS = 64;
 export const ROWS = 16;
 
+/**
+ * Variants compared beyond the first of each form — **and the reason this list
+ * exists is that there was none** (FINDINGS F183).
+ *
+ * Both halves took `Object.values(variants)[0]`, so the comparison ran over one
+ * variant per form: **42 of 100**. The Makefile calls it *every form beside its
+ * twin* and at the form level that is true, which is how the limit stayed
+ * unwritten while the header records two others carefully. It became load-
+ * bearing when a *style* arrived: a candlestick is `form: "line"`, so it can
+ * only ever be a variant, and adding it without this would have been a fixture
+ * nothing rendered.
+ *
+ * Named rather than everything, because a comparison is only worth running
+ * where a reference exists — `reference.py`'s `RENDERERS` is the other half of
+ * this list and `SKIPPED` says why the rest are absent.
+ */
+export const EXTRA_VARIANTS: readonly string[] = ["line.candlestick"];
+
+/** `form` for a form's first variant, `form.variant` for the named extras. */
+export function comparedKeys(): readonly string[] {
+  const keys: string[] = [];
+  for (const form of Object.keys(CATALOGUE_FORMS)) {
+    if (UNISOLABLE.has(form)) continue;
+    keys.push(form);
+  }
+  return [...keys, ...EXTRA_VARIANTS];
+}
+
+/** The spec a compared key names. */
+export function specFor(key: string): PlotSpec | undefined {
+  const dot = key.indexOf(".");
+  const form = dot < 0 ? key : key.slice(0, dot);
+  const variants = (CATALOGUE_FORMS as Record<string, Record<string, PlotSpec>>)[form];
+  if (variants === undefined) return undefined;
+  return dot < 0 ? Object.values(variants)[0] : variants[key.slice(dot + 1)];
+}
+
 const caps = (CAPS as readonly { name: string; caps: unknown }[])
   .find((c) => c.name === "24bit")!.caps;
 const frame = frameFor as (s: unknown, c: unknown, w: number) => readonly string[];
@@ -69,11 +106,12 @@ if (isMain) {
 
   const ours: Record<string, readonly string[]> = {};
   const grid: Record<string, number> = {};
-  for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
-    if (UNISOLABLE.has(form)) continue;
-    const rows = calciumMask(Object.values(variants)[0]!);
-    ours[form] = rows;
-    grid[form] = rows.length;
+  for (const key of comparedKeys()) {
+    const spec = specFor(key);
+    if (spec === undefined) throw new Error(`EXTRA_VARIANTS names ${key}, which no fixture holds`);
+    const rows = calciumMask(spec);
+    ours[key] = rows;
+    grid[key] = rows.length;
   }
 
   writeFileSync(join(out, "fixtures.json"), `${JSON.stringify(CATALOGUE_FORMS, null, 1)}\n`);

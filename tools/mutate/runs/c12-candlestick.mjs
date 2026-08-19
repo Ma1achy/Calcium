@@ -39,8 +39,8 @@ const results = runPass({
   run,
   control: {
     file: CANDLES,
-    from: "      : rising ? g.candleHollow : g.candleFilled;",
-    to: "      : g.candleHollow;",
+    from: "    const body = flat ? g.horizontal : rising ? g.candleHollow : g.candleFilled;",
+    to: "    const body = g.candleHollow;",
     why: "CS2 asserts both marks appear at every depth; one glyph for both directions cannot satisfy it, so a run where this survives cannot see a kill",
   },
   mutations: [
@@ -235,8 +235,18 @@ const results = runPass({
       // The doji goes in a direction's layer, so a flat bar acquires one.
       name: "a doji is drawn as a rising body",
       file: CANDLES,
-      from: "    const body = bar.close === bar.open\n      ? g.horizontal",
-      to: "    const body = false\n      ? g.horizontal",
+      from: "    const body = flat ? g.horizontal : rising ? g.candleHollow : g.candleFilled;",
+      to: "    const body = rising || flat ? g.candleHollow : g.candleFilled;",
+      expect: "CS-B5",
+    },
+    {
+      // **The green doji**, which a golden frame read with colour on is what
+      // found. Every count agreed and the tone said *up* about a bar that did
+      // not move.
+      name: "a doji rides in the rising layer",
+      file: CANDLES,
+      from: "    const grid = flat ? level : rising ? up : down;",
+      to: "    const grid = rising || flat ? up : down;",
       expect: "CS-B5",
     },
   ],

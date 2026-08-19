@@ -9081,3 +9081,56 @@ shortest round-tripping representation, capped at six. `1284` stays `1284`, `0.0
 Reading the frame of my own change. The readout was correct against its spec's example on the
 `percent` arm and wrong on the default one, and only the two side by side say so.
 
+---
+
+## F183 — the reference comparison read one variant per form, and said so nowhere ★★★
+
+| | |
+|---|---|
+| **Surface** | `make refdiff`, and every catalogue variant that is not a form's first |
+| **Reached for** | adding a candlestick fixture, which can only ever be a variant |
+| **Verdict** | **42 of 100 variants compared, in an instrument whose header records two other limits carefully** |
+| **Absorbed by** | `EXTRA_VARIANTS`, keys of `form` or `form.variant`, and the count printed in the generated README |
+
+Both halves independently took the first variant of each form — `Object.values(variants)[0]` in
+`export-fixtures.ts`, `next(iter(variants.items()))` in `reference.py`. Measured:
+
+```
+forms                 42
+catalogue variants   100
+compared              42        line.legend-right, violin.bimodal-sharp, …
+never compared        58
+```
+
+The Makefile calls it *every form beside its braille-rendered matplotlib twin*, and **at the form
+level that is true**, which is exactly why it stayed unwritten. `reference.py`'s header records
+two limits with care — the braille grid, and that a form absent from `RENDERERS` is reported
+rather than dropped — and it is silent about this one, so the instrument reads as covering the
+catalogue.
+
+### What it was hiding, and what made it load-bearing
+
+The raincloud ladder is four variants of `violin`; `violin` compares `bimodal-sharp`. So the
+whole of `plotDetail`'s ladder — the rungs, the strip, both vertical arms — has never been
+compared against anything, and a green refdiff run said nothing about it either way.
+
+It became load-bearing when a **style** arrived. A candlestick is `form: "line"`, so it cannot be
+a form's first variant without displacing `line`'s. **Adding the fixture without fixing this
+would have been a fixture nothing rendered** — the same shape as an anchor that does not match,
+which the mutation harness already distinguishes from a survivor and this one did not.
+
+### The fix, and the half of it worth keeping
+
+Keys are now `form` or `form.variant`, and **our side declares which** — `ours.json`'s grid keys
+are the authority the reference iterates. That is not a new rule: the header already states it
+for the *row count*, having learned it from `sparkline` rendering one row against sixteen. The
+same sentence covers which fixtures, and did not.
+
+The generated README now prints *N of 100*, so the residue is a number a reader sees rather than
+an absence they would have to go looking for.
+
+### The instrument
+
+Asking what a new fixture would actually be compared against, before adding it. The comparison
+would have run green with the candlestick in the tree and never rendered it.
+

@@ -27,7 +27,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CATALOGUE_FORMS } from "../catalogue-forms.js";
-import { UNISOLABLE } from "./export-fixtures.js";
+import { EXTRA_VARIANTS, UNISOLABLE } from "./export-fixtures.js";
 
 const root = join(import.meta.dirname, "..", "..");
 const work = join(root, ".refdiff");
@@ -122,8 +122,10 @@ if (isMain) {
   mkdirSync(outDir, { recursive: true });
   const report = [];
   let compared = 0, missing = 0;
-  for (const form of Object.keys(CATALOGUE_FORMS)) {
-    const why = UNISOLABLE.get(form);
+  // **Keyed by `form` or `form.variant`**, because a *style* can only ever be a
+  // variant and both halves used to take the first of each form (F183).
+  for (const form of [...Object.keys(CATALOGUE_FORMS), ...EXTRA_VARIANTS]) {
+    const why = UNISOLABLE.get(form.split(".")[0]);
     if (why !== undefined) { missing++; report.push({ form, skipped: why }); continue; }
     const ours = OURS[form];
     const theirs = referenceRows(form);
@@ -164,6 +166,12 @@ if (isMain) {
     "than no number, because the next person tunes the form to it.", "",
     "Neither is pass/fail. They are a ranking, and a form that moves *up* after a",
     "change is the signal.", "",
+    "**One variant per form, plus the named extras** — the first of each, which is",
+    "what both halves independently took before F183 and is why a *style* was",
+    `uncomparable: a candlestick is \`form: "line"\`. The extras are \`EXTRA_VARIANTS\``,
+    "in `export-fixtures.ts`. So this table ranks",
+    `**${String(Object.keys(CATALOGUE_FORMS).length + EXTRA_VARIANTS.length)} of ${String(Object.values(CATALOGUE_FORMS).reduce((n, v) => n + Object.keys(v).length, 0))} catalogue variants**, and the rest are unread rather than passing —`,
+    "adding one means adding a reference renderer beside it.", "",
     "| form | grid | ink | extent |", "|---|---|---|---|"];
   for (const r of report) {
     if (r.skipped !== undefined) { lines.push(`| ${r.form} | — | — | *${r.skipped}* |`); continue; }

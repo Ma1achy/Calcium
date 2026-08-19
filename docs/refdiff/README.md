@@ -19,6 +19,13 @@ than no number, because the next person tunes the form to it.
 Neither is pass/fail. They are a ranking, and a form that moves *up* after a
 change is the signal.
 
+**One variant per form, plus the named extras** — the first of each, which is
+what both halves independently took before F183 and is why a *style* was
+uncomparable: a candlestick is `form: "line"`. The extras are `EXTRA_VARIANTS`
+in `export-fixtures.ts`. So this table ranks
+**43 of 103 catalogue variants**, and the rest are unread rather than passing —
+adding one means adding a reference renderer beside it.
+
 | form | grid | ink | extent |
 |---|---|---|---|
 | waffle | 64x10 | 59.4% | — *fewer than two bands — ours 1, theirs 0* |
@@ -44,6 +51,7 @@ change is the signal.
 | violin | 64x16 | 16.1% | 1.0% |
 | horizon | 64x16 | 14.6% | — *13 bands vs 9* |
 | density | 64x16 | 13.7% | — *fewer than two bands — ours 2, theirs 1* |
+| line.candlestick | 64x16 | 12.9% | — *fewer than two bands — ours 1, theirs 3* |
 | dumbbell | 64x16 | 9.7% | — *fewer than two bands — ours 1, theirs 1* |
 | ecdf | 64x16 | 9.4% | — *fewer than two bands — ours 1, theirs 2* |
 | bubble | 64x16 | 9.0% | — *fewer than two bands — ours 1, theirs 1* |

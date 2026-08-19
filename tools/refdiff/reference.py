@@ -253,6 +253,32 @@ def r_dumbbell(a, s):
     a.invert_yaxis()
 
 
+def r_candlestick(a, s):
+    """What mplfinance draws, in six lines: wicks as vlines, bodies as bars.
+
+    **Both directions filled, which the mask is why.** The braille half is a
+    coverage mask — a cell is inked or not — so a hollow body would diff against
+    ours as an outline against a solid and report a difference the measure
+    cannot mean. Hollow-versus-filled is the colour-substitute question (C12
+    §3r) and it is invisible here by construction.
+
+    `set_xlim(0, n)` rather than matplotlib's default padding, so bar *i* lands
+    on the same column ours does: our candles sit at `i x pitch` from the left
+    edge, and a padded axis puts matplotlib's half a pitch to the right of every
+    one of them.
+    """
+    bars = s.get("ohlc", [])
+    if not bars:
+        return
+    n = len(bars)
+    span = max(b["high"] for b in bars) - min(b["low"] for b in bars)
+    for i, b in enumerate(bars):
+        a.vlines(i, b["low"], b["high"], lw=1)
+        lo, hi = min(b["open"], b["close"]), max(b["open"], b["close"])
+        a.bar(i, max(hi - lo, span * 0.01), bottom=lo, width=0.7, lw=0)
+    a.set_xlim(0, n)
+
+
 def r_matrix(a, s): a.imshow(grid(s), aspect="auto", interpolation="nearest")
 
 
@@ -369,6 +395,9 @@ RENDERERS = {
     "slope": r_slope, "bubble": r_bubble, "autocorrelation": r_autocorrelation,
     "timeline": r_timeline, "bullet": r_bullet,
     "pie": r_pie, "radar": r_radar, "waffle": r_waffle, "horizon": r_horizon,
+    # Keyed by `form.variant` where a *style* is the subject: a candlestick is
+    # `form: "line"`, so it can only ever be a variant (F183).
+    "line.candlestick": r_candlestick,
 }
 
 # Stated, not silently dropped. A form absent from a comparison reads as one
@@ -407,27 +436,44 @@ def capture(fn, spec, rows):
     return text, None
 
 
+def spec_for(key):
+    """The fixture a compared key names — `form`, or `form.variant`."""
+    form, _, variant = key.partition(".")
+    variants = F.get(form)
+    if variants is None:
+        return None
+    return next(iter(variants.values())) if variant == "" else variants.get(variant)
+
+
 def main():
     ok = fail = 0
-    for form, variants in F.items():
-        name, spec = next(iter(variants.items()))
-        if form in SKIPPED:
-            print(f"  skip {form}: {SKIPPED[form]}")
+    # **Our side declares what is compared**, which is the same rule the header
+    # already states for the row count: `ours.json`'s grid keys are the
+    # authority. Before F183 both halves independently took the first variant of
+    # each form, so a *style* — which can only be a variant — was uncomparable.
+    for key in GRID:
+        form = key.partition(".")[0]
+        spec = spec_for(key)
+        if spec is None:
+            print(f"  skip {key}: no fixture")
             continue
-        rows = GRID.get(form)
+        if form in SKIPPED:
+            print(f"  skip {key}: {SKIPPED[form]}")
+            continue
+        rows = GRID.get(key)
         if rows is None:
             continue                      # excluded on our side, with a reason
-        fn = RENDERERS.get(form)
+        fn = RENDERERS.get(key) or RENDERERS.get(form)
         if fn is None:
-            print(f"  MISS {form}: no reference renderer")
+            print(f"  MISS {key}: no reference renderer")
             fail += 1
             continue
         text, err = capture(fn, spec, rows)
         if text is None:
-            print(f"  FAIL {form}/{name}: {err}")
+            print(f"  FAIL {key}: {err}")
             fail += 1
             continue
-        with open(f"{OUT}/{form}.txt", "w") as fh:
+        with open(f"{OUT}/{key}.txt", "w") as fh:
             fh.write(text)
         ok += 1
     print(f"reference: {ok} rendered, {fail} failed, {len(SKIPPED)} skipped")

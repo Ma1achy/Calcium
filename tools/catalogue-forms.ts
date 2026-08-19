@@ -21,7 +21,7 @@
  * fixture over-fills its width (90 readings into ~72 cells) and therefore cannot
  * show the right-anchoring blank fringe, which is the defect actually reported.
  */
-import type { Plot, PlotForm, Series } from "../src/data/viewmodel/index.js";
+import type { OHLC, Plot, PlotForm, Series } from "../src/data/viewmodel/index.js";
 
 /** A plot with its identity removed — the catalogue supplies `kind` and `id`. */
 export type PlotSpec = Omit<Plot, "kind" | "id">;
@@ -31,6 +31,36 @@ export type FormVariants = Readonly<Record<string, PlotSpec>>;
 
 const s = (values: readonly number[], label?: string): Series =>
   label === undefined ? { values } : { values, label };
+
+/**
+ * A walk of OHLC bars — deterministic, and it contains a doji on purpose.
+ *
+ * **The catalogue must be byte-identical across runs**, so the steps come from a
+ * fixed cycle rather than from a clock or a seed drawn at call time. Index 12's
+ * step is zero, which is the flat bar: the mark that drew green until a golden
+ * frame was read with colour on.
+ */
+function candles(n: number): readonly OHLC[] {
+  const steps = [3, -2, 5, -1, -4, 6, 2, -3, 1, 4, -5, 2, 0, 3, -6, 4];
+  const out: OHLC[] = [];
+  let last = 100;
+  for (let i = 0; i < n; i += 1) {
+    const open = last;
+    const close = last + (steps[i % steps.length] ?? 1);
+    out.push({ open, close, high: Math.max(open, close) + 2, low: Math.min(open, close) - 2 });
+    last = close;
+  }
+  return out;
+}
+
+/** A trailing mean, for the overlay a candlestick's `series` is for. */
+function movingAverage(values: readonly number[], window: number): readonly number[] {
+  return values.map((_v, i, all) => {
+    const from = Math.max(0, i - window + 1);
+    const slice = all.slice(from, i + 1);
+    return slice.reduce((t, x) => t + x, 0) / slice.length;
+  });
+}
 
 /** Fixed-seed mulberry32 — the catalogue must be byte-identical across runs. */
 function prng(seed: number): () => number {
@@ -120,6 +150,33 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     "multi-series": {
       form: "line", height: 8, axes: true,
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
+    },
+    // **The candlestick lives under `line` because it is a style** (C12 I36).
+    // `CATALOGUE_FORMS` is keyed by `PlotForm` and a candlestick *is*
+    // `form: "line"`, which is the same reason I25's sweep cannot see it: the
+    // form is the index and the style is not (§6b B14).
+    // **Thirty-two bars because the comparison grid is 64 cells.** At `axes:
+    // false` the area is 64, so `⌊64 ÷ 32⌋ = 2` gives a pitch of two and the
+    // candles tile it exactly — a fixture that left the right third blank would
+    // diff its own layout against matplotlib's full-bleed axes and report the
+    // gap as error, which is the defect the extent measure was invented for one
+    // form along.
+    candlestick: {
+      form: "line", height: 12, axes: true, plotStyle: "candlestick",
+      series: [], ohlc: candles(32),
+    },
+    // Plain candles are `series: []`; a non-empty `series` is the overlay, and
+    // the legend names all three (§6b B1, B4).
+    "candlestick-overlay": {
+      form: "line", height: 12, axes: true, plotStyle: "candlestick", legend: "right",
+      ohlc: candles(24),
+      series: [s(movingAverage(candles(24).map((b) => b.close), 3), "ma3")],
+    },
+    // Dense enough that every candle is one cell — the regime that drew a chart
+    // of nothing but `┿` before §6b B13 was bounded by the frame.
+    "candlestick-dense": {
+      form: "line", height: 10, axes: true, plotStyle: "candlestick",
+      series: [], ohlc: candles(160),
     },
   },
   sparkline: {

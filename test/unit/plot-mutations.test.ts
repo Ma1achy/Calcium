@@ -2236,7 +2236,19 @@ describe("C12 §3r — the candlestick", () => {
     // which is what makes it load-bearing rather than a convenience.
     const doji = [{ open: 100, high: 104, low: 96, close: 100 }];
     const rows = candleRows(doji, { min: 90, max: 110 }, 7, 9, FULL_CAPS);
-    expect(ink(rows.rising), "the doji is the flat mark").toContain(glyphs(FULL_CAPS).horizontal);
-    expect(ink(rows.falling), "a doji is in neither direction's layer").toBe(" ".repeat(7 * 9));
+    expect(ink(rows.flat), "the doji is the flat mark").toContain(glyphs(FULL_CAPS).horizontal);
+
+    // **In neither direction's layer, which is a claim about the tone.** It rode
+    // in the rising layer and a golden frame read with colour on drew a bar that
+    // did not move in the up tone — every count agreeing and the colour saying
+    // *up*. Asserted on both layers, since only one of the two was ever wrong.
+    expect(ink(rows.rising), "not the rising layer").toBe(" ".repeat(7 * 9));
+    expect(ink(rows.falling), "not the falling layer").toBe(" ".repeat(7 * 9));
+
+    // And a rising bar is still in the rising layer, or the row passes against
+    // a renderer that puts everything in `flat`.
+    const up = candleRows([{ open: 100, high: 104, low: 96, close: 103 }], { min: 90, max: 110 }, 7, 9, FULL_CAPS);
+    expect(ink(up.rising)).toContain(glyphs(FULL_CAPS).candleHollow);
+    expect(ink(up.flat), "and nothing is flat").toBe(" ".repeat(7 * 9));
   });
 });
