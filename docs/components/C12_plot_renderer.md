@@ -835,6 +835,35 @@ exact type (`form: "line"` without `height` is a construction error, not a defau
 
 ---
 
+### 6b — The candlestick walk
+
+**A classification table and no sequence trace, and the shape is a decision rather than a
+consequence.** C12 owns no state and every render is a pure function of block, width and
+context (I11), so there is no event that can put two rules in contact: every interaction here
+holds at rest, which is the structural kind C18's table finds and a trace indexed by events
+cannot reach. A trace here would have one row per input and find nothing.
+
+| | the two rules that meet | what the cell is | ruling |
+|---|---|---|---|
+| **B1** | emptiness asks `hasSamples(block.series)` · plain candles is `series: []` plus a full `ohlc` | a correct candlestick block | **"No data."** — a frame internally consistent, passing every width and row assertion, and about nothing. Both `hasSamples` and `seriesRange` widen to see `ohlc`; `series: []` being legal is exactly what hides it |
+| **B2** | `plotStyle` selects a `Rasteriser` · a `Rasteriser` takes a `Series` | a candlestick rasteriser | dispatched in the **form** arm before `styleRasteriser`, so the type never describes a function that ignores its first argument |
+| **B3** | the y-axis is `seriesRange` over the series · a candle's extremes are `low` and `high` | the axis of a chart with both | the union. `low`/`high` bound the candles and the overlays bound themselves; a pin still wins |
+| **B4** | §3b — two categories separated by colour, then by mark · I25 — by mark or by name, never by tone alone | the legend | it names the candles **and** each overlay series. Direction is the mark at 1-bit and the legend says which is which |
+| **B5** | a doji draws `─` · an overlay line through that column draws `─` | one cell, two sources | **not a defect and it needs no glyph change**: both statements are true of that cell. The readout disambiguates, which is what makes §3r's readout load-bearing rather than a convenience |
+| **B6** | the crosshair reads a column · `ohlc` is shorter than the cursor's index | the readout past the data | `—` for each of the four, exactly as a null series value reads. A candlestick has four values to be absent rather than one |
+| **B7** | `candleWidth` is clamped to 1…5 · the wick is centred | an even candle width | left of centre, `⌊(w − 1) ÷ 2⌋` — the rounding `boxplotColumn` already uses, so the component has one rule and not two that agree |
+| **B8** | the vocabulary is ambiguous-width · `candleWidth` is counted in cells | a wide terminal | half as many candles, measured with `cells()`. The vocabulary is **not** swapped to braille, unlike every other in this component, and §3r states why: a candle is positioned where a bar is measured |
+| **B9** | `plotStyle: "candlestick"` · a form that is not `line` or `step` | `form: "pie", plotStyle: "candlestick"` | refused at construction (C04 I57). An ignored member reads as one not yet implemented, which is C04's established idiom in this type |
+| **B10** | `plotStyle: "candlestick"` · no `ohlc` | a style with nothing to draw | refused at construction, and the throw leaves nothing behind because it happens before any render state exists |
+| **B11** | an `OHLC` is four numbers · a candle's geometry is `low ≤ min(open, close)` and `high ≥ max(open, close)` | `{open: 5, high: 3, low: 6, close: 4}` | refused. It is not a candle that renders oddly, it is not a candle |
+| **B12** | more bars than columns · downsampling picks or averages | five hundred bars in seventy columns | **aggregate**: open of the first, high of the maxima, low of the minima, close of the last. Exact rather than approximate, and the one downsampling in this component that loses nothing |
+
+**B1 is the row that would have been got wrong**, and it is why it is first: every emptiness
+check in the component asks about `series`, and a plain-candles block is legal with none.
+
+**B5 is the row that makes a later commitment load-bearing.** Nothing about it changes a glyph;
+what it changes is that the readout stops being optional.
+
 ### 6a.1 — The classification table
 
 Structural: two rules that both hold at rest. Every row is a cell where two correct statements
@@ -1155,6 +1184,148 @@ a *different chart*, not a degraded one, and it is the reason a per-series dash 
 correctness. `plotMarks: "always"` is the field for wanting dashes anyway — on a colour terminal,
 for a colour-blind reader, or on paper — and it widens what a form may do without narrowing what
 it must.
+
+---
+
+## 3q. One value axis across the bands, and the record it never had
+
+**This section is written because three code comments cite it and it did not exist.** The
+ruling is real, it was a defect three times, and its only record was the comments naming a
+section number — which is the sixth blind spot arriving on a *section* rather than on a claim:
+a citation reads as a source, and going to find it turns up nothing. `make enforce` resolves
+`C12 I34` and does not resolve `C12 §3q`.
+
+**A categorical distribution form scales every band to one axis, and the caller's pin is what
+that axis is.** Scaled to its own extent, a tight distribution and a wide one draw the *same*
+shape — the figure fills its band either way — and comparing the categories is the whole of
+what a violin, a raincloud or a ridgeline is for. Three violins of very different spread came
+out as three identical shapes, and every count in them agreed.
+
+```
+own extent          shared axis
+ ╭────────╮          ╭╮
+╭╯        ╰╮        ╭╯╰╮            the same two distributions, and only the
+╰╮        ╭╯        ╰╮╭╯            second says one is four times the other
+ ╰────────╯          ╰╯
+ ╭────────╮        ╭──────────╮
+╭╯        ╰╮      ╭╯          ╰╮
+```
+
+**Three instances, and they were three because the fix is per call site.** `ridgelineArea`
+composes the whole area and had it; `violinRows` and `violinColumn` each computed their own
+`lo`/`hi` from their own band, and each had to be given the shared range separately. A rule
+that has to be applied N times is applied N−1 times eventually, which is why it is here rather
+than only in the code that got it right.
+
+**Where the caller has no pin the axis is the union of the bands**, which `seriesRange`
+already computes over every series — the same function and the same argument the heatmap makes
+in §6a A6, one form along: one range over the whole thing is what makes it a comparison rather
+than a stack of unrelated figures.
+
+**The cut is what keeps a shared axis readable.** A kernel estimate is defined everywhere, so
+across a shared axis it returns a near-zero density far outside its own data and draws a pair
+of flat lines to the frame's edge — three violins with infinite tails. seaborn's `cut` stops
+the estimate two bandwidths past the extreme datapoints, and the spine still runs the full
+width because it is the axis and the marks sit on it.
+
+---
+
+## 3r. `plotStyle: "candlestick"` — a curve style, not a thirty-third form
+
+A candlestick shares everything a line plot has: the value axis, the grid, the axes, the
+annotations, the legend, the crosshair. What differs is **what one column draws**. So it
+belongs beside `braille` and `line` in `plotStyle`, and `form` stays `line` or `step`.
+
+**Its data is not a series and gets its own field**, on the precedent `quartiles` and
+`hierarchy` set (C04 I53 and C04 I54): four series in a declared order is a convention nothing checks,
+and the first caller to pass them in the wrong order gets a chart that renders. That is C04
+I57.
+
+```
+│   wick only            ┃   body, bullish        ▓   body, bearish
+┿   body and wick        ─   doji, open = close
+```
+
+### Bullish and bearish are two categories, so §3b binds
+
+Colour leads — green and red by convention, but through the palette and never as a literal —
+and where colour is gone the **mark** carries it. Hollow for bullish and filled for bearish is
+what print charts did before colour, so the fallback is the older convention rather than a new
+invention.
+
+| | body, bullish | body, bearish | wick |
+|---|---|---|---|
+| 24-bit / 8-bit | `┃` in the up tone | `┃` in the down tone | `│` |
+| 1-bit | `▯` hollow | `┃` filled | `│` |
+| ASCII | `=` | `#` | `\|` |
+
+### The sub-cell win is vertical, and being imprecise about that is how it would be overclaimed
+
+A body spans open→close **down** the column, so at braille resolution it resolves to a quarter
+of a cell — that is the axis where this beats a reference implementation drawing whole cells.
+**Across** the column a body is whole cells in every implementation, because a candle's width
+carries no data. There is no horizontal sub-cell resolution to spend and claiming the win on
+both axes would be claiming it where nothing is spent.
+
+### The candle's width is a layout rule, not a glyph
+
+One column per sample reads as a barcode. plotext reads as a chart because a candle is two or
+three columns with the wick centred, and `⌊areaWidth ÷ n⌋` makes the answer vary with the
+terminal — so the rule is stated rather than derived:
+
+```
+candleWidth = clamp(⌊areaWidth ÷ n⌋, 1, 5)
+the wick is centred, so an odd width — at an even one the wick sits left of centre
+a gap column between candles when the budget allows
+```
+
+**The wick's placement at an even width has to be said**, because *centred* has no answer
+there and both roundings look deliberate. Left of centre, which is `⌊(w − 1) ÷ 2⌋` and the same
+rounding `boxplotColumn` already uses for its spine — one rounding rule in the component
+rather than two that agree by accident.
+
+`categoricalColumnForm` already distributes a remainder across columns, which is the same
+arithmetic `facetWidths` uses, so the gap is spent from that budget rather than computed twice.
+
+### Fewer candles than columns, and more
+
+**Fewer: left-aligned, padded right**, which is I13's ruling and not a new one — a series three
+samples in reads as *three samples so far, growing rightward*, rather than as a chart that will
+change shape as it fills. Time runs left to right and the right-hand end has not happened yet.
+
+**More: the candles aggregate rather than being sampled**, and this is the one place a
+candlestick has an answer a line plot does not. Downsampling a curve picks or averages;
+downsampling OHLC is exact — `open` of the first, `high` of the maxima, `low` of the minima,
+`close` of the last. The aggregate **is** the true candle of that period, so a five-hundred-bar
+series in seventy columns is not an approximation of the chart, it is the chart at a coarser
+period. Dropping bars instead would lose exactly the extremes the form exists to show.
+
+### The whole chart's column count changes with the width convention, and the vocabulary does not
+
+`┃` `▯` `│` `─` `┿` are all `East_Asian_Width=Ambiguous` — measured, one cell narrow and two
+wide — where the ASCII arm's `=` `#` `|` are one cell always. **So a wide terminal fits half as
+many candles**, and that is a different chart rather than a differently-drawn one.
+
+**Every other vocabulary in this component swaps to braille at `wide` and this one does not**,
+which needs its reason stated or it reads as the omission `pairFor` already was (F176). A
+bar's length **is** its value, so doubling every glyph doubles the value: `ladderFor`,
+`pairFor`, `extentFor` and `markOf` all swap because the datum is in the run. **A candle's
+glyph carries open, close and direction; its *column* carries the time.** Doubling the glyph
+halves how many candles fit and changes nothing about what any one of them says — which is
+what a narrower terminal does anyway, and the aggregation rule above already answers it.
+
+The cost is that the arithmetic must be in cells rather than glyphs, measured with `cells()`
+like everything else (A03 SS23), and that **the golden frames carry both ambiguous widths for
+this style specifically** where every other form needs only the four capability sets.
+
+### The readout is what disambiguates the doji, so it is load-bearing
+
+At the crosshair a candlestick reads `O 12.4  H 13.1  L 12.0  C 12.9`, then each overlay
+series after it. That is not a convenience: a doji draws `─`, and a moving average crossing
+that column draws `─` too, so one glyph has two sources. **Not a defect** — a candle whose open
+equals its close *is* flat, and so is the line through it — and the only thing that tells a
+reader which is which is the readout. `cursorReadout` is therefore part of the style rather
+than furniture beside it.
 
 ---
 
@@ -1870,6 +2041,8 @@ orientation — and belongs in the classification table as its own rows.
 ---
 - **I33** — **The stub always points toward the whisker, and both box-plot glyph tables fall out of that one rule.** `├`/`┤` horizontally and `┬`/`┴` vertically, swapping roles between the caps and the box edges — which reads as arbitrary and is not, because a cap's whisker leaves inward and a box edge's whisker leaves outward. *The rule was implemented in both arms and written down in neither, and the vertical arm was built by re-deriving it from the horizontal one; a table without its rule is a table the next arm re-derives.* **The compact box is filled where the three-row box is hollow**: with a lid and a floor the interior must stay clear for the median and the mean, and with one row there are no edges, so `┤    │    ├` says nothing about where the box is. **A mean landing on the median draws `◈`** rather than nothing — suppressing it left one band with no mean mark beside two that had one, so *they coincide* read as *it is missing*.
 - **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; **its density is sampled on the box's axis and not on the violin's**, which pads by a tenth at each end, or the cloud's mode sits a tenth of the width from the median below it with every count agreeing — and the tail is stopped by the cut that already stops the violin's outline rather than by a second mechanism. **Blank means outside the support and the ladder's first step means an estimate near zero** (I16), which is the one place those two can collide; **and the vertical figure narrows to three fifths of its slot at five columns or more, by the rule `boxplotColumn` already applies, and is capped at five cells on top of that** — drawn to the full slot a band's cloud ran into the next band's box and three distributions read as one field; drawn to three fifths of a wide one it was fourteen solid cells a row, because a run is the magnitude axis and lengthening it is the same move as adding steps to the ladder. Four cells of cloud resolve `2n + 1` = nine levels against the height ladder's eight, which is the derivation. Every count was right in both; 3 rows / 4 columns adds the raw samples as a jittered strip — **the only part of the figure that is the data**, and the part that carries the sub-cell win: two value positions per cell against the cloud's one horizontally, four down a cell vertically, with the remaining dot axis spent on jitter. ASCII draws a rug instead and that is I21 — there is no sub-cell position to spend, and folding through the ramp would draw a magnitude the data has not got; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **The rung is chosen once for the chart, from its narrowest band** — a vertical arm distributes its remainder a cell at a time, so a ladder keyed on each band's own width drew three mirrored violins among fifteen rainclouds and a reader reads that as a property of three categories. The drawing still takes each band's own width. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a *hash* of the sample's identity and not merely a pure function** — no clock, no `Math.random`, no module counter, because I11 says every render is a pure function of block, width and context and a strip that moves between two renders of one block is a picture of the renderer; **and not `index % positions` either**, which satisfies I11 exactly and draws a sawtooth, so sorted data comes out in diagonal stripes that are a pattern in the renderer read as a pattern in the measurements. The band's index is an input so two bands of one distribution do not draw the same speckle. *The counter is invisible when the sample count is a multiple of the jitter's positions — the phase resets and both frames are byte-identical — so the fixture asserts its count is coprime to them.*
+- **I35** — **A categorical distribution form scales every band to one value axis, and the caller's pin is what that axis is.** Scaled to its own extent each band fills its own width, so a tight distribution and a wide one draw the same shape and the comparison the form exists to make is gone — with every count in the figure agreeing. *Three instances, because the fix is per call site: `ridgelineArea` had it and the two violin arms each computed their own bounds.* Where there is no pin the axis is the union, which `seriesRange` already computes — the same argument §6a A6 makes for a matrix, one form along. **And the cut is what keeps a shared axis readable**: a kernel estimate is defined everywhere, so across a shared axis it draws flat tails to the frame's edge unless it is stopped two bandwidths past the data (§3q).
+- **I36** — **`candlestick` is a curve style and not a form, its data is a typed field, and the readout is part of it.** Everything a line plot has is unchanged — axis, grid, annotations, legend, crosshair — and what differs is what one column draws, so it sits in `plotStyle` beside `braille` and `line` with `form` still `line` or `step`. **Bullish and bearish are two categories, so §3b binds**: colour leads through the palette, and hollow-versus-filled carries it once colour is gone, which is what print did before colour rather than a new invention. **The sub-cell win is vertical only** — a body spans open→close down the column and resolves to a quarter cell; across the column it is whole cells in every implementation, because a candle's width carries no data. **The width is a stated layout rule** — `clamp(⌊areaWidth ÷ n⌋, 1, 5)`, the wick left of centre at an even width by `boxplotColumn`'s existing rounding — and **more bars than columns aggregate rather than sample**: open of the first, high of the maxima, low of the minima, close of the last, which is exact where every other downsampling in this component approximates. **The vocabulary stays ambiguous-width where every other one in this component swaps to braille**, and the reason is the distinction: a bar's length *is* its value so doubling the glyph doubles the datum, while a candle's glyph carries direction and its column carries the time — so a wide terminal fits half as many candles and says the same thing about each. **The readout is load-bearing rather than a convenience**, because a doji and an overlay line both draw `─` in one cell and only the four values tell them apart (§3r, §6b B5).
 
 ## 8. Commitments
 
@@ -1900,6 +2073,8 @@ orientation — and belongs in the classification table as its own rows.
 25. `plotDetail` picks a renderer inside the declared height and degrades rather than overflowing (I28).
 26. Magnitude is carried by colour where there is colour and by the glyph ramp where there is not, which is one rule with two arms rather than two rules (I29, I25).
 27. **One rule generates both box-plot glyph tables** — the stub points toward the whisker — and the compact box is filled because it has no edges to enclose it (I33).
+29. **One value axis across a distribution form's bands** — scaled to its own extent every band draws the same shape, and the comparison is what the form is for (I35).
+30. **`candlestick` is a curve style over the positional machinery**, with its own typed data, a stated candle width, exact OHLC aggregation, and a readout that is load-bearing because a doji and an overlay line share a glyph (I36).
 28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
 
 ---
@@ -1948,6 +2123,15 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.68** (I33): a compact box is filled between Q1 and Q3 and a three-row box is hollow there, and a mean landing on the median draws `◈`.
 - **T1.69** (I34): `plotDetail: "auto"` picks the richest rung the declared height affords — 1, 2, 3 and 5 rows give the box, the raincloud, the jittered raincloud and the mirrored violin — and `"compact"` gives the *form's* lowest rung, which is 1 for a boxplot and 2 for a violin.
 - **T1.96** (I21, I34): the strip reads the box's axis and resolves twice its detail — the minimum inks column 0, the maximum the last, and two values half a cell apart resolve into one cell's two dot columns, which is a distinction the box cannot make at any width. The vertical arm inverts with its box: `max` on row 0, `min` on the last. And the ASCII arm draws only its rug mark — never a ramp step, which would encode a magnitude from where a sample landed inside its cell.
+- **CS1** (I36): a candlestick block with `ohlc` and `series: []` renders candles — not the empty message. **The first row, because it is the one that would have been got wrong**: every emptiness check in the component asks about `series`.
+- **CS2** (I36): a body spans open→close and a wick low→high in the same column, at the four capability sets — and the bullish and bearish bodies differ by *mark* at 1-bit, not by tone alone (I25).
+- **CS3** (I36): `candleWidth` is `clamp(⌊areaWidth ÷ n⌋, 1, 5)`, the wick is centred at an odd width and left of centre at an even one, and a gap column appears when the budget allows. Asserted at a width where the clamp binds and at one where it does not.
+- **CS4** (I36): more bars than columns aggregate — open of the first, high of the maxima, low of the minima, close of the last. **Asserted against a series whose extreme falls on a bar that sampling would drop**, since an aggregation that happens to agree with sampling tests nothing.
+- **CS5** (C04 I57): `plotStyle: "candlestick"` with no `ohlc` is refused at construction, by both gates.
+- **CS6** (C04 I57): `plotStyle: "candlestick"` on a form that is not `line` or `step` is refused, by both gates.
+- **CS7** (I36): the readout at the crosshair carries all four values and then each overlay series, formatted through `yFormat` rather than a hand-rolled rounding — and a cursor past the end of `ohlc` reads four dashes.
+- **CS8** (I36): a wide terminal fits half as many candles, and the frame is still exactly its declared width — the vocabulary is ambiguous and the arithmetic is in cells.
+- **T1.98** (I35): three distributions of very different spread in one block draw three different widths, and the same three scaled to their own extents draw the same shape. **The fixture responds first**: the spreads differ by a factor that a shared axis must show and an unshared one cannot.
 - **T1.97** (I34): eighteen bands in a vertical violin at a width their count does not divide — every band draws the same rung, and the three bands a cell wider draw that rung wider rather than a different one. Asserted over the *set* of figures in the frame rather than on any band, because the defect is that the set has two members.
 - **T1.95** (I11, I34): the jitter is decorrelated from the index it is drawn from — every position is reached, fewer than half the indices agree with `index % positions`, and a second band is a different speckle. **The sawtooth is the row's subject**: it is deterministic, satisfies I11, and draws diagonal stripes through sorted data.
 - **T1.93** (I21, I34): the vertical cloud is a run that grows toward the box — ink in the cloud is a suffix, the fractional tip sits at the run's end *away* from the box, and no cell carries the rightward vocabulary's partial. **Three assertions because the caller right-aligns either way**: a reversed vocabulary draws the same run in the same cells with its tip on the other end, which is a dot-column of daylight against the box and invisible to an alignment check. The fixture is shown to produce a fractional tip first, since a cloud that saturates every row it touches is a full run in both directions. Plus the two width rules, **each asserted at the slot where only it bites**: the cap at twenty-one columns, where three fifths would give thirteen; the narrowing at six, where the cap alone leaves five of six and no gap; and the budget's own three, where the figure takes the slot whole. At eleven either rule alone is sufficient, so a row written there passes against a tree missing either — which is what the first form of this row did.
@@ -2026,6 +2210,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 - **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
+- **T6.31** (I36): dispatching candlestick through `styleRasteriser` → CS1 fails, and the `Rasteriser` type describes a function that ignores the argument it is keyed on.
+- **T6.30** (I35): computing each band's bounds from its own samples → T1.98 fails, and three distributions of different spread draw one shape with every count agreeing.
 - **T6.29** (I34): choosing the rung from each band's own width rather than from the narrowest → T1.97 fails, and a chart whose band count does not divide its width draws two different figures with the boundary set by the remainder.
 - **T6.28** (I11, I34): placing the strip from a module-level counter → T6.28's own row fails, and a block renders differently the second time. **The fixture is the finding here**: at sixty samples and four positions the counter's phase resets between renders and the two frames are byte-identical, so the row passed against the defect it names until the count was made coprime.
 - **T6.28a** (I34): the strip taking its two-column ceiling before the cloud has its two-column floor → T1.93 fails, and the raindrop draws three levels of density at the width whose budget promises five.
