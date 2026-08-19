@@ -1,6 +1,6 @@
 /**
  * SA1–SA8: the three styling forks and the record that governs them
- * (C12 I43, C04 I59, §3w).
+ * (C12 I43, C04 I59, C12 §3w).
  *
  * **What each fork does *not* change is the load-bearing half**, so most of
  * these rows assert something staying still.

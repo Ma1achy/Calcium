@@ -569,6 +569,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP5 | Every `Fnn` citation resolves against a finding that exists | FINDINGS · CLAUDE.md §Ask where a settled claim is written down | A03 §7a |
 | SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
 | SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
+| SP8 | Every `§` reference resolves against the document that owns it — **reported, not gated** | `src/`, `test/`, `tools/`, `docs/` outside `notes/` | A02 §1 · A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
 

@@ -831,9 +831,11 @@ export const REFERENCE_EXCEPTIONS = {
 //   declares a document with almost no sections and reports its own corpus as
 //   dangling. `### 4-bit:` is why the delimiter must be a dot or whitespace and
 //   never a hyphen — otherwise a heading about colour depth declares a §4.
-// - `§262` is a citation and `262` is not a section. It is reported, which is
-//   right: the text reads as a stray digit inside `A03 §2`, and a rule that
+// - A stray digit — `262` written where a section id belongs — is reported,
+//   which is right: the text reads as a slip inside `A03 §2`, and a rule that
 //   quietly took the longest prefix that resolves would have hidden it.
+//   *Written without the section mark here on purpose: this file is scanned
+//   like any other, and prose quoting a broken citation is a broken citation.*
 
 /** A section id a document declares — `3`, `3a`, `6a.1`. */
 const SECTION_HEADING = /^#{2,4}\s+(\d+[a-z]?(?:\.\d+)?)\.?\s/u;
@@ -1281,4 +1283,4 @@ export function checkReferences(
 // was green throughout, because the rule *was* implemented and running; the only
 // thing that could see the gap was the suite, and the suite is not what was run.
 // That is A03 §2's own subject reaching the list that enforces it.
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7"];
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8"];

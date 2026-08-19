@@ -9715,3 +9715,64 @@ thresholds chosen to be safely true.
 the same session for an unrelated reason: the frame started following the style, so *the figure
 contains box glyphs* stopped distinguishing anything. **An assertion can be sharpened out from
 under itself by a neighbouring fix**, and nothing but the pass would have said so.
+
+---
+
+## F196 — SP8 was implemented, reported, and invisible to the suite that checks rules ★★★
+
+| | |
+|---|---|
+| **Surface** | `SPEC_RULES`, A03's rule table, and `enforce-commitments.test.ts` |
+| **Reached for** | finishing the section-citation rule, three commits after it landed |
+| **Verdict** | **the rule ran on every build and no gate knew it existed** |
+| **Absorbed by** | registration in all three, with the ungated state written as a test that expires |
+
+SP8 resolves `§` the way SP3 resolves `Inn`. It shipped reporting **120 dangling citations across
+58 targets**, deliberately not gated — and it was in neither `SPEC_RULES`, nor A03's table, nor
+the fabrication suite.
+
+**That is F146 exactly, and the suite was green for the opposite reason.** F146 records SP6
+implemented and inventoried while `SPEC_RULES` never learned it existed, so `make test` was red for
+two commits while `npm run enforce` stayed green and correct. Here nothing was red: A03 commitment
+14's equality is `implemented` against `covered`, and both sides are built from `SPEC_RULES` — so a
+rule missing from that list is missing from *both* and the equality holds over a set that does not
+contain it. **A check comparing two derived sets cannot see a member absent from the source of
+both.**
+
+### The ungated state is now a test that expires
+
+SP3 shipped with its two findings already fixed; this arrived with 120, and a gate that fails on a
+hundred pre-existing citations is switched off rather than fixed. So the residue is asserted to be
+**non-empty**:
+
+```
+expect(v.violations.length,
+  "when this reaches zero, move SP8 into the gated list in enforce/index.mjs")
+  .toBeGreaterThan(0);
+```
+
+Which reads backwards and is the point. **A deferral that names a condition and is watched by
+nothing** is the class CLAUDE.md records three instances of — a code comment, a roadmap row, a
+chain of citations — and each was found by someone reading the *satisfier*, never by anything
+watching the condition. This is the condition, watched: the day the last citation is closed, the
+row goes red and says what to do about it.
+
+### What the residue is, measured rather than estimated
+
+```
+4655 section citations resolved
+  95 resolve to no section, across 58 targets
+ 139 name no document at all
+```
+
+Four were this session's own and are closed: two `§3w` written bare in C04-owned files when the
+section is C12's, one `A03 §262` where `A03 §2` was meant, and one in SP8's own source — prose
+*about* a broken citation, which scans as a broken citation, so it is written without the mark now.
+
+**The rest are other authors' and need judgement rather than a sweep.** The largest are `C22 §3b`
+(7), `C09 §4b` (5) and `C23 §13a` (5) — sections that were cited into existence and never written,
+which is `C12 §3q`'s shape and what the rule exists for. And a stray-digit class — `C22 §141`,
+`C09 §485`, `C15 §183`, `C07 §85` — where a line number or a rule id was written with a section
+mark; each needs its author's intent, and guessing would resolve a citation against the wrong
+thing, which is the one failure `docs/COMMITMENT_INVARIANT_AUDIT.md` argues no mechanism should
+automate.

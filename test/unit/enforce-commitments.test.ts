@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { checkFindings, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
+  checkSectionReferences,
   checkCommitments,
   checkOrdering,
   checkTestRowIds,
@@ -803,6 +804,51 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     const unkeyed = checkTriageInventory(io(ledger, triage.replace("**F142**", "F142")));
 
     expect(unkeyed.length, "a removed key fails completeness and the sum").toBe(2);
+  });
+
+  it("SP8: the real tree is read, and its residue is a worklist rather than a gate", () => {
+    // **SP8 is reported and not gated, and this row is what makes that expire.**
+    // SP3 shipped with its two findings already fixed; this one arrived with 120
+    // dangling across 58 targets, and a gate that fails on a hundred
+    // pre-existing citations is switched off rather than fixed (F146's shape
+    // from the other side).
+    //
+    // So the residue is asserted to be **non-empty**, which reads backwards and
+    // is the point: the day someone closes the last one this row goes red and
+    // says *now gate it*. A deferral that names a condition and is watched by
+    // nothing is the class CLAUDE.md records three instances of; this is the
+    // condition, watched.
+    const v = checkSectionReferences(referenceFiles());
+    // The counter, for SP5's reason exactly: a rule reporting zero over a corpus
+    // it cannot read looks exactly like one reporting zero over a clean corpus,
+    // and this rule's whole subject is a pointer that resolves to nothing.
+    expect(v.resolved, "sections resolved — the rule saw its subject").toBeGreaterThan(3000);
+    expect(
+      v.violations.length,
+      "when this reaches zero, move SP8 into the gated list in enforce/index.mjs",
+    ).toBeGreaterThan(0);
+  });
+
+  it("SP8 fires: a citation to a section that was never written", () => {
+    // The defect the rule exists for, and the one it found on its first run:
+    // `C12 §3q` was pointed at by three source comments and had never been
+    // written. A citation reads as a source.
+    const v = checkSectionReferences(
+      ["docs/architecture/A01_fabricated.md"],
+      () => "The rule is stated in C12 §9z, which does not exist.",
+    );
+    expect(v.violations.map((x) => x.message).join(" ")).toContain("no such section");
+  });
+
+  it("SP8 fires: a bare § in a file no document owns", () => {
+    // The other half — a pointer with nothing before it saying which document
+    // owns it. Unresolvable rather than wrong, and it reads the same to a
+    // reader either way.
+    const v = checkSectionReferences(
+      ["examples/docker/NOTES.md"],
+      () => "See §4b for the ordering.",
+    );
+    expect(v.violations.map((x) => x.message).join(" ")).toContain("bare §4b");
   });
 
   it("SP5: the real tree is clean, and the rule actually read it", () => {

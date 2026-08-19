@@ -821,7 +821,7 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   scatter: ["braille", "line"], ecdf: ["braille", "line"], density: ["braille", "line"],
   slope: ["braille", "line"], bubble: ["braille", "line"],
   stackedarea: ["braille", "line"], streamgraph: ["braille", "line"],
-  // **The three forks §3w adds.** A violin's outline can be strokes in the dot
+  // **The three forks C12 §3w adds.** A violin's outline can be strokes in the dot
   // grid; a pie's wedges can be block glyphs; a radar's polygons can be
   // box-drawing.
   violin: ["braille", "line"],
