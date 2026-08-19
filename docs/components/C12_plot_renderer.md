@@ -207,6 +207,52 @@ statement is that the app should not have to *invent numbers to express a quanti
 
 ---
 
+### The number's allowance is the chart's, not the row's
+
+*The number takes the width it needs and the run takes the residual* is right and was applied per
+row, which inverts. Measured at `max: 100` in 40 cells:
+
+```
+ 99   ████████████████████████████████████▋ 99      37 cells
+100   ████████████████████████████████████ 100      36 cells
+```
+
+**A larger value drawing a shorter bar**, because `100` is one column wider than `99` and each
+run was scaled against what its own label left. Every count in both rows is correct and the
+picture is wrong — the class this component keeps finding, in the one place a reader compares
+lengths.
+
+So the allowance is **the widest label in the chart** and every run is scaled against one width.
+The rule is unchanged — the run is still the part that shrinks — and what changes is that it
+shrinks once for all rows rather than per row against a different residual. *A chart whose values
+are all one digit spends one column; the moment one value needs two, every bar loses the same
+column and the comparison survives.*
+
+### Standing the number up — and the two arms cannot answer alike
+
+Horizontally the run **is** the axis: the row's own width is the scale, so the label may take
+part of it and the picture stays true. Vertically it is not. A column's height is read against the
+value scale in the **gutter**, with labelled ticks beside it, so shortening a bar to make room for
+its number would draw a value the axis it is measured by contradicts.
+
+So the vertical arm cannot shrink and it does not: **the number goes in the row above the bar's
+top, centred on its column, and it is dropped rather than made to fit.**
+
+| the case | what happens | why not the other thing |
+|---|---|---|
+| the bar's top is row 0 | **dropped** | there is no row above it, and taking one from the bar would misdraw the value |
+| the number is wider than the column | **dropped** | a truncated number is a different number, and one that spills labels the *neighbouring* bar |
+| the bar has zero height | drawn on the bottom row | its top is the baseline — the number sits where the ink would have started |
+| the value is absent | nothing, as the column draws nothing | I20's `absent` mark is the row form's; a blank column has no run to mark |
+
+**Dropping is per bar and not per chart**, which is the row a reader would not predict: the tallest
+bar in a chart is the one most likely to lose its number, and that is correct rather than
+unfortunate — its height is already the thing the axis says most clearly, and the bars that keep
+their numbers are the ones a reader is squinting at.
+
+---
+
+
 ## 3a. The heatmap
 
 **One cell per position per row, magnitude in the ink of the cell, one range across the whole
@@ -2370,7 +2416,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I17** — **A heatmap draws one cell per position per row, against a range shared by the whole matrix, with magnitude carried by ink density and an absent cell left blank.** The shared range is what makes it a matrix rather than a stack of unrelated sparklines. **The ramp is `RAMP_DENSITY` and never the sparkline's**: the latter fills bottom-up, which encodes height, and a grid cell has no vertical axis to encode it on. Blank is absence rather than `?` because a grid has no padding for a blank to be confused with, and the lowest step has ink. Rows are drawn in the order the block declares them and the renderer never sorts. **Colour carries magnitude where there is colour, and the glyph is what stands in where there is not** — which is the inverse of what this clause used to say, and the correction is a measured one. It read *density survives 1-bit, so a magnitude colour would add rather than carry alone*, which made ink density the permanent carrier and colour an optional garnish. Rendered, that is a field of dithered speckle: a matrix drawn in foreground glyphs on unpainted cells reads as noise, and no palette applied over it fixes that, because the glyph is still the thing occupying the cell. **A heatmap with colour available paints the cell** — a background-coloured space, no glyph — and reads as the continuous field it is. Granite is the reference and the difference is not subtle. The density ramp is then exactly what the name says: the **fallback**, reached when `colourDepth` cannot separate the values, and the reason the 1-bit picture is unchanged is that it is the only picture that still needs the ramp. *A ragged matrix is refused at construction (C04 I50b).*
 - **I18** — **A heatmap spends width on columns first, then truncates its labels, and never draws an unlabelled matrix.** Row labels are the ordinate: a matrix with no names beside it is a picture of numbers. Where the width cannot spare a cell for a label beside a minimum plot area the block draws a centred notice at its declared height instead — I1 holds, and the reader is told rather than shown something they cannot read. *The line form keeps T3.3's opposite ladder, because a y-label is a scale and a row label is an identity.*
 - **I19** — **The scale legend spans the full row and never truncates its range.** The dropped-column clause goes first and the ramp swatch second; the range is what the legend exists to state, and it is the reason `axes: false` is refused (C04 I50b). A key with no scale beside it is decoration.
-- **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, and an absent value draws a mark.** One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
+- **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, an absent value draws a mark, and the number's allowance belongs to the chart rather than to the row.** *Taken per row it inverts: at `max: 100` in 40 cells, 99 draws 37 and **100 draws 36** — a larger value, a shorter bar — because `100` is a column wider than `99` and each run was scaled against what its own label left. Every count in both rows was right.* **And the two arms cannot answer alike, which the transpose hides**: horizontally the run *is* the axis, so the label may take part of the row's width; vertically the column is read against the value scale in the gutter, so shrinking it would draw a value its own axis contradicts. The vertical arm writes the number in the row **above** the bar's top, centred on its column, and **drops** it — when the top is row 0, because there is no row above it, and when the number is wider than the column, because a truncated number is a different number and one that spills labels the neighbouring bar. *Dropping is per bar: the tallest bar is the one most likely to lose its number, which is right — its height is what the axis already says most clearly (§3b).* One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
 - **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density and fill are three encodings and `position` is a fourth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **`extent` is the fifth and it has a direction**, which is not a new axis and was very nearly written as one: a vertical raincloud's density is a run of dot-columns, which is `extent` mirrored, and not a ladder of a third axis called `column`. **A ladder is per-cell and an extent is per-run**, and which a density needs is decided by the dimension its band is thin in rather than by the axis its values lie along (§3i). The mismatch that would follow from getting that wrong is a five-step scale drawn on a three-step axis — arithmetically monotone, right in its row count, and wrong about how much of each cell a level fills. **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
 - **I22** — **An axis picks nice numbers, snaps a derived bound outward, never moves a declared one, and drops a tick that would abut its neighbour.** The step is 1, 2, 2.5, 5 or 10 times a power of ten — 2.5 is in the set because without it `0 · 25 · 50 · 75 · 100` is unreachable. **The snap is per end** (C04 I29): loose labelling exists so the ends read round and a pinned axis exists so two plots can be compared, so a pin that silently grew would defeat what it is for. **Precision is one per axis and comes from the step** — the smallest gap two labels can differ by — and it is the step's *own* decimals rather than two significant figures of it, and a named precision is **kept in the string** rather than trimmed back into three (F177). **The tick count is a result**, bounded below by how fine a step is worth asking for and above by how many labels the height seats two rows apart. **And a step the arithmetic cannot pick is `0`**, never a plausible constant: a denormal span underflows, and `1` there snaps `5e-324 … 1e-323` to `0 … 1`, which terminates and is wrong where nothing downstream can detect it (F178).
 - **I23** — **An annotation is a dashed line in the same raster, drawn behind the data, and an edge outside the range is dropped rather than clamped.** Dashed is the carrier and the tone is decoration (F34): a reference line is broken where a curve is continuous, at every colour depth. **A band is two lines** — one statement, two edges — because a fill would compete for the cells the curve occupies. **Behind, and the layer order is the rule**: one that overwrote a sample would hide what it exists to be compared against. **Dropped rather than clamped is the one place this differs from a sample** (C04 I29): data pressed against a ceiling is honest, and a claim about *where a value sits* moved onto a scale it is outside is not. **At ASCII it is not the raster** — `foldRamp` encodes height, and folding a one-dot line by ink weight drew `# # # #`, heavier than the curve; there the line is drawn at cell resolution with `-`, which is narrow under both width conventions where every box-drawing dash is not.
@@ -2420,7 +2466,7 @@ orientation — and belongs in the classification table as its own rows.
 14. **A heatmap is one cell per position per row against one shared range, magnitude in the ink and absence left blank** (I17, §3a).
 15. **Width goes to columns before labels, and an unlabelled matrix is never drawn** — the opposite ladder from the line form, because a row label is an identity rather than a scale (I18, §3a).
 16. **The legend never truncates the range it exists to state** (I19, §3a).
-17. **A quantity against a scale is the `fill` encoding, drawn as a run whose number may exceed it** (I20, §3b).
+17. **A quantity against a scale is the `fill` encoding, drawn as a run whose number may exceed it** — with one label allowance for the whole chart, and the number above the bar rather than beside it where the run cannot shrink (I20, §3b).
 18. **A vocabulary carries its encoding axis and a renderer asks for an axis** — so the mismatch that cost two defects is unspellable rather than reviewable, and a stand-in is declared rather than commented (I21, §3c).
 19. **An axis is nice numbers, one precision from the step, and a density that is a result** — a derived bound snaps outward and a declared one never moves, a tick that would abut its neighbour is dropped, and a step the arithmetic cannot pick is nothing rather than a plausible constant (I22, §3d).
 20. **An annotation is one feature and six named chart types are folds of it** — a dashed line in the data's own raster, behind it, with an out-of-range edge dropped rather than clamped; and the bar's target marker shares its name and not its mechanism (I23, §3e).
