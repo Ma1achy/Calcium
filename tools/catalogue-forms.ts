@@ -417,11 +417,17 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   ridgeline: {
+    // **Eight samples could not show the form**, the violin's problem a second
+    // time: Silverman on eight points gives a near-flat density, so three curves
+    // drew as three low mounds and the shift between them — what a joyplot is
+    // read for — had nothing to be visible against.
     default: {
-      form: "ridgeline", height: 12, axes: true,
+      form: "ridgeline", height: 14, axes: true,
       series: [
-        s([1, 1, 2, 3, 3, 3, 4, 5], "set1"), s([2, 3, 3, 4, 4, 4, 5, 6], "set2"),
-        s([1, 2, 2, 2, 3, 4, 5, 5], "set3"),
+        s(Array.from({ length: 60 }, (_, i) => 8 + Math.sin(i * 0.7) * 3 + prng(11)() * 2), "jan"),
+        s(Array.from({ length: 60 }, (_, i) => 13 + Math.sin(i * 0.5) * 3.5 + prng(12)() * 2), "apr"),
+        s(Array.from({ length: 60 }, (_, i) => 21 + Math.cos(i * 0.6) * 4 + prng(13)() * 2), "jul"),
+        s(Array.from({ length: 60 }, (_, i) => 15 + Math.sin(i * 0.9) * 3 + prng(14)() * 2), "oct"),
       ],
     },
   },

@@ -50,7 +50,7 @@ import { boxplotBand, boxplotColumn, forestRow, dumbbellRow } from "./glyph-row.
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
-import { densitySeries, densityRows, violinColumn, violinRows, ridgeRows } from "./kde.js";
+import { densitySeries, densityRows, violinColumn, violinRows, ridgelineArea } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
 import { horizonRows } from "./horizon.js";
@@ -1206,10 +1206,34 @@ const FORM_ROWS: Readonly<
     );
   },
   ridgeline: (block, width, ctx) => {
+    // **Not `bandedForm`, and that is the form rather than a refactor.** A band
+    // per series is a stack of small area charts; a ridgeline's curves rise into
+    // the band above and are read against their neighbours, which is the only
+    // reason to prefer it over facets. The area is composed whole so the curves
+    // can overlap, and the labels sit on each curve's own baseline.
     const cats = block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
-    return bandedForm(block, cats, width, ctx, (sr, aw, rows) =>
-      ridgeRows(sr, aw, rows, ctx.capabilities),
-    );
+    const areaRows = plotAreaRows(block);
+    const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+    if (block.series.length === 0) return emptyRows(block, fallback, ctx); // cells-ok — a series count
+
+    const layout = bandLayout(cats, width, block.axes === true, areaRows, ctx.capabilities);
+    const { rows, baselines } = ridgelineArea(block.series, layout.areaWidth, areaRows, ctx.capabilities);
+    const labelAt = new Map(baselines.map((r, i) => [r, cats[i] ?? ""]));
+
+    const out = rows.map((content, r) => {
+      const label = truncate(labelAt.get(r) ?? "", layout.labelColumn, ctx.capabilities);
+      const ref = CATEGORY_REFS[baselines.indexOf(r) % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a series index
+      return line(
+        [
+          ...gutterSpans(label, layout, ctx),
+          { text: areaText(content, layout, ctx), style: slot(ref, ctx.theme, ctx.capabilities) },
+          ...rightBorder(layout, ctx),
+        ],
+        layout,
+        ctx,
+      );
+    });
+    return axed(block, out, layout, ctx);
   },
   smallmultiples: (block, width, ctx) => {
     const facets = block.facets ?? [];

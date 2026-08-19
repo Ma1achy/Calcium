@@ -14,7 +14,7 @@ import { boxplotBand, boxplotColumn, forestRow } from "../../src/presentation/pl
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, ladderFor } from "../../src/presentation/plot/ramp.js";
-import { kde } from "../../src/presentation/plot/kde.js";
+import { kde, ridgelineArea } from "../../src/presentation/plot/kde.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
@@ -520,6 +520,97 @@ describe("GROUP 6f: the forest draws its interval", () => {
     expect(away, "visible where nothing covers it").toContain(g.dashedVertical);
     const over = forestRow(Q, -2, 2, 41, FULL_CAPS, [0]);
     expect(over, "and hidden where the interval crosses it").not.toContain(g.dashedVertical);
+  });
+});
+
+describe("GROUP 6g: the ridgeline overlaps", () => {
+  const shifted = [
+    { values: Array.from({ length: 40 }, (_, i) => 5 + Math.sin(i) * 1.5), label: "a" },
+    { values: Array.from({ length: 40 }, (_, i) => 12 + Math.sin(i) * 1.5), label: "b" },
+    { values: Array.from({ length: 40 }, (_, i) => 20 + Math.sin(i) * 1.5), label: "c" },
+  ];
+
+  /** The column where a band's curve reaches highest — its mode. */
+  const peakColumn = (rows: readonly string[], from: number, to: number): number => {
+    let best = -1, bestRow = Number.POSITIVE_INFINITY;
+    for (let r = to; r <= from; r += 1) { // cells-ok — a row index
+      const row = rows[r] ?? "";
+      for (const [x, c] of [...row].entries()) { // cells-ok — a column index
+        if (c !== " " && r < bestRow) { bestRow = r; best = x; }
+      }
+    }
+    return best;
+  };
+
+  it("T1.57: the curves share one x-axis, so the shift between them is visible", () => {
+    // **What a joyplot is read for.** Sampled over its own range each
+    // distribution fills the width, so three centred at 5, 12 and 20 draw as
+    // three identical humps and the figure says they are the same.
+    //
+    // **The statistic is each band's mode, and two easier ones do not work.**
+    // A row's first inked cell reads the *baseline*, which a curve touches at
+    // both extremes where the density is nil. And a band's centre of mass is
+    // confounded by occlusion — the far curves are mostly cleared, so their
+    // remaining ink is wherever the near one did not cover, which moves with the
+    // shift rather than with the distribution. Both were tried; both asserted
+    // the wrong thing about a correct frame.
+    const { rows, baselines } = ridgelineArea(shifted, 60, 12, FULL_CAPS);
+    const near = peakColumn(rows, baselines[0]!, baselines[1]! + 1);
+    const far = peakColumn(rows, baselines[2]!, 0);
+    expect(near, "the near curve peaks left").toBeGreaterThanOrEqual(0); // cells-ok — a column index
+    expect(near, "and the far one right of it").toBeLessThan(far);
+
+    // The control: three *identical* distributions have no shift, so their modes
+    // land in the same column. Without it the row above passes against any
+    // renderer that spreads ink unevenly.
+    const same = shifted.map((sr) => ({ ...sr, values: shifted[0]!.values }));
+    const flat = ridgelineArea(same, 60, 12, FULL_CAPS);
+    const fNear = peakColumn(flat.rows, flat.baselines[0]!, flat.baselines[1]! + 1);
+    const fFar = peakColumn(flat.rows, flat.baselines[2]!, 0);
+    expect(Math.abs(fFar - fNear), "identical inputs peak together").toBeLessThan(far - near);
+  });
+
+  it("T1.58: a curve reaches past the next baseline, which a band cannot", () => {
+    // A band per series is a stack of small area charts — the one arrangement
+    // this form exists not to be. With `OVERLAP` at 2.2 a curve must reach
+    // *above* its neighbour's baseline; at 1.0 it stops on it.
+    //
+    // **Only the first series carries data, and that is what makes the row able
+    // to fail.** A curve's outline runs along its own baseline across the whole
+    // width wherever the density is nil, so with four populated series every
+    // column has ink at every baseline row and *the topmost ink anywhere* is the
+    // furthest curve's baseline rather than the near curve's peak. Two earlier
+    // versions measured that instead and passed against the mutation.
+    //
+    // **Four bands, not two**: at two the spacing is 5.5 rows and `round(5.5)`
+    // is 6, so one band's worth already clears the neighbour by a rounding
+    // artefact. At four the spacing is 2.75 — 3 rows without the overlap, 6 with
+    // — and the readings land either side of the next baseline.
+    const one = [
+      { values: Array.from({ length: 60 }, () => 10), label: "front" },
+      { values: [], label: "b" }, { values: [], label: "c" }, { values: [], label: "back" },
+    ];
+    const { rows, baselines } = ridgelineArea(one, 60, 12, FULL_CAPS);
+    const topAt = rows.findIndex((r) => r.includes("─"));
+    expect(topAt, "the front curve reaches above the next baseline").toBeLessThan(baselines[1]!); // cells-ok — a row index
+  });
+
+  it("T1.59: a near curve occludes the one behind it", () => {
+    // Occlusion is a joyplot's only depth cue — the curves are the same colour
+    // and thickness, and the sole thing saying which is in front is that it
+    // interrupts the other. **Exactly two, not at most two**: painted
+    // front-to-back the near curve is drawn first and the far one's body then
+    // clears it, so the column keeps one outline instead of two. `≤ 2` is
+    // satisfied by both and let that mutation live.
+    const both = [
+      { values: Array.from({ length: 60 }, () => 10), label: "front" },
+      { values: Array.from({ length: 60 }, () => 10), label: "back" },
+    ];
+    const { rows, baselines } = ridgelineArea(both, 40, 12, FULL_CAPS);
+    const col = peakColumn(rows, baselines[0]!, 0);
+    const inked = rows.filter((r) => (r[col] ?? " ") !== " ").length; // cells-ok — a cell count
+    expect(inked, "both outlines survive in the shared column").toBe(2); // cells-ok — a cell count
+    expect(baselines[0]).toBeGreaterThan(baselines[1]!); // cells-ok — a row index
   });
 });
 

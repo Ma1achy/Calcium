@@ -24,8 +24,8 @@ change is the signal.
 | bar | 64x16 | 51.2% | — |
 | histogram | 64x16 | 46.0% | — |
 | waffle | 64x10 | 43.8% | — |
-| ridgeline | 64x16 | 41.3% | — |
 | waterfall | 64x16 | 40.8% | — |
+| ridgeline | 64x16 | 39.3% | — |
 | boxplot | 64x16 | 35.6% | — |
 | icicle | 64x16 | 34.2% | 49.0% |
 | funnel | 64x16 | 32.4% | — |

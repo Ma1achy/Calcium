@@ -366,49 +366,105 @@ export function violinRows(
 }
 
 /**
- * A one-sided density profile, rising from the baseline.
+ * The joyplot: curves that rise **into** the band above (C12 §3l).
  *
- * The violin's shape without the mirror: a ridgeline stacks one profile per
- * series and lets them overlap, so each band is read against the row below it
- * rather than about its own centre.
+ * ```
+ *      ╭─╮
+ *   ╭──╯ ╰──╮        each curve overlaps the one behind it
+ *  ╭╯╭─╮    ╰╮
+ * ─╯╭╯ ╰──╮ ╭╯
+ *  ╭╯     ╰─╯
+ * ─╯
+ * ```
+ *
+ * **The overlap is the form.** Drawn into disjoint bands — one series per slot,
+ * nothing crossing — a ridgeline is a stack of small area charts, and Joy
+ * Division's cover is famous for the one thing that arrangement removes. The
+ * point is that a tall distribution reaches past its own row and is read against
+ * its neighbours; without it there is no reason to prefer this over facets.
+ *
+ * **Drawn back to front, so the nearer curve occludes.** A joyplot's depth cue is
+ * occlusion and nothing else: the curves are the same colour and the same
+ * thickness, and the only thing saying which is in front is that it interrupts
+ * the other. Painting front-to-back would leave the far curves drawn over the
+ * near ones and the stack would read inside out.
+ *
+ * The baselines are evenly spaced over the area and each curve is allowed
+ * `OVERLAP` times that spacing — 2.2 is what `ggridges` defaults to and what
+ * reads as a ridge rather than as a stack.
  */
-export function ridgeRows(
-  series: Series,
+const OVERLAP = 2.2;
+
+export function ridgelineArea(
+  seriesList: readonly Series[],
   areaWidth: number,
-  rowsPerSeries: number,
+  areaRows: number,
   caps: Caps,
-): readonly string[] {
-  const blank = (): readonly string[] =>
-    Array.from({ length: Math.max(0, rowsPerSeries) }, () => " ".repeat(areaWidth));
+): { readonly rows: readonly string[]; readonly baselines: readonly number[] } {
+  const w = Math.max(1, Math.floor(areaWidth));
+  const h = Math.max(1, Math.floor(areaRows));
+  const n = seriesList.length; // cells-ok — a series count
+  const blank = Array.from({ length: h }, () => " ".repeat(w));
+  if (n === 0) return { rows: blank, baselines: [] }; // cells-ok — a series count
 
-  const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
-  if (finite.length === 0 || rowsPerSeries < 1 || areaWidth < 1) return blank(); // cells-ok — a sample count
+  // Baselines from the bottom up, evenly spaced. The last one sits on the floor
+  // so the front curve has the whole area beneath it.
+  const step = n === 1 ? 0 : (h - 1) / n; // cells-ok — a row count
+  const baseline = (i: number): number => Math.round(h - 1 - i * step); // cells-ok — a row index
+  const curveRowsFor = Math.max(1, Math.round(step * OVERLAP)); // cells-ok — a row count
 
-  const sorted = [...finite].sort((a, b) => a - b);
-  const lo = sorted[0]!;
-  const hi = sorted[sorted.length - 1]!; // cells-ok — a sample count
+  const gl = glyphs(caps);
+  const grid: string[][] = Array.from({ length: h }, () => new Array<string>(w).fill(" "));
+
+  // **One x-axis for every curve, which is the comparison the form makes.**
+  // Sampled over its own range each distribution fills the width and the *shift*
+  // between them — the thing a ridgeline is read for — disappears entirely: three
+  // distributions centred at 2, 4 and 9 would draw as three identical humps.
+  const all = seriesList.flatMap((sr) =>
+    sr.values.filter((v): v is number => v !== null && Number.isFinite(v)));
+  if (all.length === 0) return { rows: blank, baselines: [] }; // cells-ok — a sample count
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
   const pad = (hi - lo) * 0.1 || 1;
+  const points = Array.from({ length: w }, (_, x) =>
+    lo - pad + ((hi - lo + 2 * pad) * x) / Math.max(1, w - 1));
 
-  const points: number[] = [];
-  for (let i = 0; i < areaWidth; i += 1) {
-    points.push(lo - pad + ((hi - lo + 2 * pad) * i) / Math.max(1, areaWidth - 1));
-  }
-  const densities = kde(finite, points);
-  const maxD = Math.max(...densities);
-  if (maxD <= 0) return blank();
+  // **And one density scale, for the same reason.** Normalised per curve, a
+  // series of ten samples and one of a thousand draw the same height, so the
+  // figure says the distributions are equally concentrated when they are not.
+  const perSeries = seriesList.map((sr) => {
+    const finite = sr.values.filter((v): v is number => v !== null && Number.isFinite(v));
+    return finite.length === 0 ? [] : kde(finite, points); // cells-ok — a sample count
+  });
+  const maxD = Math.max(0, ...perSeries.flat());
+  if (maxD <= 0) return { rows: blank, baselines: [] };
 
-  const pair = pairFor(caps);
-  const grid: string[][] = Array.from({ length: rowsPerSeries }, () =>
-    Array.from({ length: areaWidth }, () => " "),
-  );
+  // Back to front: the highest baseline is the furthest away.
+  for (let i = n - 1; i >= 0; i -= 1) { // cells-ok — a series index
+    const densities = perSeries[i]!;
+    if (densities.length === 0) continue; // cells-ok — a sample count
 
-  for (let col = 0; col < areaWidth; col += 1) {
-    const d = densities[col]! / maxD;
-    const extent = Math.max(0, Math.round(d * rowsPerSeries));
-    for (let r = 0; r < extent; r += 1) {
-      grid[rowsPerSeries - 1 - r]![col] = pair.filled;
+    const base = baseline(i);
+    // **The near curve clears what is behind it before drawing.** Occlusion
+    // needs the cells *under* the outline blanked as well as the outline drawn —
+    // otherwise a far curve shows through a near one's body and the two read as
+    // crossing rather than as one in front.
+    for (let x = 0; x < w; x += 1) {
+      const top = base - Math.round((densities[x]! / maxD) * curveRowsFor); // cells-ok — a row index
+      for (let r = Math.max(0, top); r <= base && r < h; r += 1) grid[r]![x] = " "; // cells-ok — a row index
+    }
+    for (let x = 0; x < w; x += 1) {
+      const top = Math.max(0, base - Math.round((densities[x]! / maxD) * curveRowsFor)); // cells-ok — a row index
+      if (top <= base && base < h) grid[top]![x] = gl.horizontal; // cells-ok — a row index
     }
   }
-
-  return grid.map((row) => row.join(""));
+  return { rows: grid.map((r) => r.join("")), baselines: Array.from({ length: n }, (_, i) => baseline(i)) };
 }
+
+// **`ridgeRows` is gone, and its epitaph is the finding.** It drew one series
+// into a band of its own — a stack of small area charts — and the ridgeline arm
+// called it once per band through `bandedForm`. That arrangement removes the one
+// thing the form is for: curves rising into the band above, read against their
+// neighbours. `ridgelineArea` composes the whole area instead, because overlap
+// cannot be expressed one band at a time.
+

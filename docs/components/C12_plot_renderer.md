@@ -1138,6 +1138,37 @@ it must.
 
 ---
 
+## 3l. The ridgeline overlaps, or it is a stack of area charts
+
+`ridgeline` gave each series a band of its own through `bandedForm` — one series
+per slot, nothing crossing. That arrangement removes the only reason to prefer
+this form over facets: **a tall distribution reaches past its own row and is read
+against its neighbours.** Joy Division's cover is famous for exactly the thing a
+band-per-series layout takes out.
+
+Three rules, and each of them was being broken by the band version:
+
+- **The curves overlap.** Baselines are evenly spaced and each curve is allowed
+  `2.2` times that spacing, which is `ggridges`' default and reads as a ridge
+  rather than as a stack.
+- **They share one x-axis.** Sampled over its own range each distribution fills
+  the width, so three centred at 5, 12 and 20 draw as three identical humps and
+  the figure says they are the same. The *shift* is the subject.
+- **And one density scale**, for the same reason: normalised per curve, ten
+  samples and a thousand draw the same height.
+
+**Painted back to front, because occlusion is the only depth cue.** The curves
+are one colour and one thickness; the sole thing saying which is nearer is that
+it interrupts the other. A near curve therefore *clears* the cells under its
+outline before drawing — an outline alone lets the far curve show through the
+near one's body, and the two read as crossing.
+
+`ridgeRows` is deleted rather than kept beside this. Overlap cannot be expressed
+one band at a time, so a per-band renderer is not a simpler version of this — it
+is a different form.
+
+---
+
 ## 3k. The forest plot draws its interval, and the box was drawing over it
 
 `forestRow` builds the figure correctly — a thin line from `lower` to `upper`,
@@ -1303,6 +1334,7 @@ classification table as its own rows.
 - **I29** — **Colour carries magnitude where there is colour; the glyph is the fallback, never the lead.** A form that encodes magnitude paints the cell — a background-coloured space — at any depth that separates its values, and reaches for the density ramp only below it.
 - **I30** — **`orientation` chooses the axis, and the eighths vocabulary follows it.** Horizontal is the default because a cell is one wide by two tall and a category's name is text — a horizontal bar writes its label beside itself, a vertical one gets a column two cells wide to write it under. The partials are **left** eighths horizontally and **lower** eighths vertically; they look interchangeable, encode different axes, and the vertical arm reaches its through `ladderFor("height")` rather than naming a constant (I21). Both eighths sets are ambiguous-width, and the escapes are asymmetric: the vertical arm keeps seven partials on a wide terminal because braille fills bottom-up, and the horizontal arm has one because braille has no left-filling series. A form with no second axis refuses the field at construction rather than ignoring it.
 - **I31** — **A forest plot draws its interval, and nothing draws over it.** The ends of a confidence interval are the two numbers the reader came for; a box plot's body over them replaces the statistic rather than decorating it, and the two figures look alike enough that no count notices. `weight` sizes the estimate because *which study carried the result* is the plot's subject, and `pooled` is a field rather than a convention about the last row. The null reference is an `Annotation` (C04 §3e), which already means a claim about the ordinate drawn beside the data.
+- **I32** — **A ridgeline's curves overlap, share one x-axis and one density scale, and are painted back to front.** Each alone is what makes the form readable and each was absent: a band per series is a stack of area charts, a per-curve range hides the shift the plot is read for, a per-curve density hides how concentrated each is, and occlusion is the only cue saying which curve is nearer — so the near one clears the cells beneath its outline rather than merely drawing over them.
 
 **"Separates its values" is a real threshold and it is 8-bit, not 1-bit.** C10 I31 already ruled that a continuous map below 8-bit says *nothing* — an ordering over sixteen indices whose luminances the terminal never reports, so a ramp across them is an ordering that is not one — and `continuousColour` returns `undefined` there rather than guessing. **So the ladder has four rungs, not two, and the middle one is the rung most terminals actually report**: at 24- and 8-bit colour carries and the cell is painted; **at 4-bit colour exists and cannot carry, so density does**; at 1-bit there is nothing else. The mechanism is already built — the caller falls back because the map declines — and naming the rung is what stops someone reading *any depth with colour* as *any depth at all*.
 
