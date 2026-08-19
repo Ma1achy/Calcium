@@ -56,13 +56,15 @@ import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
-import { waffleCells } from "./waffle.js";
+import { pairFor } from "./ramp.js";
+import { squareColumns } from "./aspect.js";
+import { WAFFLE_ROWS, waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
 import { glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, hasBars } from "./candles.js";
 import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
-import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
+import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
@@ -1704,8 +1706,41 @@ const FORM_ROWS: Readonly<
     const segs = block.segments ?? [];
     const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: 10, width };
     if (segs.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a segment count
-    const cellRows = waffleCells(segs, width, ctx.capabilities);
-    return cellRows.map((row) => {
+    // **A legend, because a mosaic of colour is nothing without its key**
+    // (C12 I25, §3g). The pie has one and the waffle did not — the same data,
+    // the same segments, and one of the two shipped a block of coloured squares
+    // with no way to know which was which. It reads worse than the pie does,
+    // because a waffle's whole subject is the proportion each colour holds.
+    //
+    // **`segmentLegend` rather than a second builder**: the pie's is capped at a
+    // third of the width, drops labels before starving the figure and truncates
+    // with a count, and a waffle wants all three. Two builders for one job is
+    // the drift a shared one cannot have.
+    const total = segs.reduce((a, sg) => a + Math.max(0, sg.value), 0);
+    const legend = segmentLegend(
+      segs.map((sg, i) => ({
+        swatch: pairFor(ctx.capabilities).filled,
+        label: sg.label,
+        value: total > 0 ? `${String(Math.round((Math.max(0, sg.value) / total) * 100))}%` : "",
+        index: i, // cells-ok — a segment index
+      })),
+      WAFFLE_ROWS,
+      Math.floor(width / 3), // cells-ok — a cell width
+      ctx.capabilities,
+    );
+    // **The gap is reserved too, which the first frame is what said.** A waffle
+    // row is padded to the width it is given, so the legend begins exactly
+    // where the mosaic's padding ends — and reserving only `legend.width` left
+    // its own two-cell gap hanging past the frame, truncating every percentage
+    // to `…`. The figure and the key are one row; the budget has to hold both.
+    const reserved = legend.width === 0 ? 0 : legend.width + LEGEND_GAP; // cells-ok — a cell width
+    // **The mosaic takes its natural width, not the leftover.** `waffleCells`
+    // pads to whatever it is handed, so handing it the remainder put the key
+    // forty-five blank cells from the squares it names. A waffle is ten rows of
+    // squares and its width follows from that; the legend belongs beside it.
+    const mosaic = Math.min(Math.max(1, width - reserved), squareColumns(WAFFLE_ROWS)); // cells-ok — a cell width
+    const cellRows = waffleCells(segs, mosaic, ctx.capabilities);
+    return cellRows.map((row, r) => {
       const spans: Span[] = [];
       let run = "";
       let runIdx = -1;
@@ -1724,7 +1759,11 @@ const FORM_ROWS: Readonly<
         run += cell.mark;
       }
       flush();
-      return line(spans, layout, ctx);
+      return line(
+        [...spans, ...markedSpans(legend.lines[r] ?? [], (i) => slotOf(i), ctx)],
+        layout,
+        ctx,
+      );
     });
   },
   // **The tree, where these were a bar chart and a reversed bar chart** (C04 I54).

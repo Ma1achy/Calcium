@@ -26,6 +26,20 @@ const DOWN = 2;
 const LEFT = 4;
 const RIGHT = 8;
 
+/**
+ * The two horizontal edges, published for a caller composing a **rule** into a
+ * mask rather than a polyline (C12 §3i).
+ *
+ * A violin's spine is a full-width horizontal line across one row, and it has
+ * to be in the mask rather than painted behind it: a tail returning to the axis
+ * ends on that row with one bit set, and a fill that only touches blank cells
+ * leaves it a stub — `╴` — a half-cell clear of the rule it belongs to.
+ */
+export const LINE_LEFT = LEFT;
+export const LINE_RIGHT = RIGHT;
+export const LINE_UP = UP;
+export const LINE_DOWN = DOWN;
+
 const ROUNDED: readonly string[] = Object.freeze([
   " ",  //  0  none
   "│",  //  1  U

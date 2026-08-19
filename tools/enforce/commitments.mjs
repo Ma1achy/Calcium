@@ -29,6 +29,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
 const COMPONENTS = "docs/components";
+const ARCHITECTURE = "docs/architecture";
+const SURFACES = "docs/surfaces";
 
 /** `- **I5** — …` and `- **I20a** — …`. */
 const INVARIANT = /^-\s+\*\*(I\d+[a-z]?)\*\*/gm;
@@ -804,6 +806,179 @@ export const REFERENCE_EXCEPTIONS = {
  * cite ids that did not exist when it was written is worse than a pointer nobody
  * should follow.
  */
+// --- SP8 — every section reference resolves --------------------------------
+//
+// **SP3 does this for invariants and nothing did it for sections.** `C12 §3q`
+// was cited by three source comments against a section that had never been
+// written: the ruling behind it was real and had been a defect three times, and
+// its only record was a number three files pointed at. `make enforce` resolved
+// `C12 I34` and had no opinion about `C12 §3q`, so a citation read as a source
+// and going to find it turned up nothing.
+//
+// **That is the sixth blind spot arriving on an *address* rather than a claim.**
+// CLAUDE.md's instrument asks where a settled claim is written down; this is the
+// mechanical half, for the one kind of pointer a machine can follow.
+//
+// The boundary is SP3's, and for the same reason: this proves a reference
+// resolves against its owner, not that the owner is the intended one. A bare
+// `§4` in a file about C09 resolves against C09's §4 whether or not C09 §4 is
+// what the sentence meant.
+//
+// **Two failure modes it is built around, both measured on the first run.**
+//
+// - A heading is not always `## 3a.`: the corpus writes `## 3. Title`,
+//   `### 6b — Title` and `### 6a.1 — Title`, and a regex for one of the three
+//   declares a document with almost no sections and reports its own corpus as
+//   dangling. `### 4-bit:` is why the delimiter must be a dot or whitespace and
+//   never a hyphen — otherwise a heading about colour depth declares a §4.
+// - `§262` is a citation and `262` is not a section. It is reported, which is
+//   right: the text reads as a stray digit inside `A03 §2`, and a rule that
+//   quietly took the longest prefix that resolves would have hidden it.
+
+/** A section id a document declares — `3`, `3a`, `6a.1`. */
+const SECTION_HEADING = /^#{2,4}\s+(\d+[a-z]?(?:\.\d+)?)\.?\s/u;
+
+/** `§3a`, `§6a.1` — and `§ 3a`, which the corpus writes in prose. */
+const SECTION_TOKEN = /§\s?(\d+[a-z]?(?:\.\d+)?)/gu;
+
+/** Every section id a spec or architecture document declares. */
+export function sectionsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  const out = new Set();
+  let src;
+  try { src = readFile(file); } catch { return out; }
+  let fenced = false;
+  for (const line of src.split("\n")) {
+    if (FENCE.test(line)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+    const m = SECTION_HEADING.exec(line);
+    if (m !== null) out.add(m[1]);
+  }
+  return out;
+}
+
+/** The document a spec id names — a component or an architecture note. */
+function docPath(id) {
+  const dir = id.startsWith("A") ? ARCHITECTURE : id.startsWith("S") ? SURFACES : COMPONENTS;
+  let files;
+  try { files = readdirSync(dir); } catch { return null; }
+  const hit = files.find((f) => f.startsWith(`${id}_`));
+  return hit === undefined ? null : `${dir}/${hit}`;
+}
+
+/**
+ * Section references, with the same owner and adjacency rules SP3 uses.
+ *
+ * **Adjacency is qualification** — `C12 §3r` binds to C12 whatever the file's
+ * owner is — and a file's owner answers a bare `§3r`. A file with a `§` and no
+ * owner is reported rather than skipped, which is SS26: a check that cannot
+ * find what it was asked about passes exactly like one that is satisfied.
+ */
+export function scanSections(file, src, options = {}) {
+  const owner = options.owner ?? sectionOwnerOf(file);
+  const code = options.code ?? !file.endsWith(".md");
+  const out = [];
+  let fenced = false;
+
+  for (const [i, raw] of src.split("\n").entries()) {
+    if (!code && FENCE.test(raw)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+    const text = code ? raw : mask(raw);
+    if (SECTION_HEADING.test(text)) continue;
+
+    SECTION_TOKEN.lastIndex = 0;
+    let m;
+    while ((m = SECTION_TOKEN.exec(text))) {
+      // The nearest spec id to the left on this line qualifies, which is how
+      // the corpus writes it: `C12 §3r`, `A03 §7a`, `see A02 §1 and §4`.
+      const before = text.slice(0, m.index);
+      const q = /\b([CAS]\d{2})\b(?!.*\b[CAS]\d{2}\b)/u.exec(before);
+      out.push({ line: i + 1, id: m[1], spec: q?.[1] ?? owner, qualified: q !== null });
+    }
+  }
+  return out;
+}
+
+/**
+ * SP8 — every `§` reference resolves against the document that owns it.
+ *
+ * **The counter is the point**, as it is for SP5: a rule reporting zero over a
+ * corpus it cannot read looks exactly like one reporting zero over a clean one,
+ * and this rule's whole subject is a pointer that resolves to nothing.
+ */
+export function checkSectionReferences(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exceptions = SECTION_EXCEPTIONS,
+) {
+  const violations = [];
+  const declared = new Map();
+  let resolved = 0;
+
+  const sections = (spec) => {
+    if (!declared.has(spec)) {
+      const path = docPath(spec);
+      declared.set(spec, path === null ? null : sectionsOf(path, readFile));
+    }
+    return declared.get(spec);
+  };
+
+  for (const file of files) {
+    let src;
+    try { src = readFile(file); } catch { continue; }
+    const excused = exceptions[file] !== undefined;
+
+    for (const ref of scanSections(file, src)) {
+      const where = `${file}:${String(ref.line)}`;
+      if (ref.spec === null) {
+        if (!excused) {
+          violations.push({
+            rule: "SP8",
+            file: where,
+            spec: "A02 §1 · A03 §7a",
+            message:
+              `cites a bare §${ref.id} and nothing before it says which document owns it. ` +
+              `Write it as \`C12 §${ref.id}\`, add the file to OWNERS or TOPICS, or name it ` +
+              `in SECTION_EXCEPTIONS with why.`,
+          });
+        }
+        continue;
+      }
+
+      const own = sections(ref.spec);
+      // **A dotted id falls back to its parent and a lettered one does not**,
+      // which is the corpus's own grammar rather than a leniency. `§8b.7` names
+      // the seventh item *inside* C26 §8b — a numbered line, not a heading — so
+      // an index of headings cannot see it and reporting it would be the
+      // instrument over-reporting, which is worse than not having one. `§3a` is
+      // a **sibling** of `§3` in this corpus (3, 3a, 3b, 3c are four sections),
+      // so it must not fall back: `C04 §3a` is cited twenty-five times and C04
+      // declares 3 and 3c and no 3a, which is this rule's largest finding and
+      // a prefix rule would have hidden it.
+      const parent = ref.id.includes(".") ? ref.id.slice(0, ref.id.lastIndexOf(".")) : null;
+      if (own !== null && (own.has(ref.id) || (parent !== null && own.has(parent)))) {
+        resolved += 1;
+        continue;
+      }
+      if (excused) continue;
+      violations.push({
+        rule: "SP8",
+        file: where,
+        spec: "A02 §1 · A03 §7a",
+        message:
+          `cites ${ref.spec} §${ref.id}${ref.qualified ? "" : " (bare, by owner)"}, and ` +
+          `${ref.spec} has no such section. **A citation reads as a source**: \`C12 §3q\` was ` +
+          `pointed at by three source comments and had never been written, which is what this ` +
+          `rule exists for.`,
+      });
+    }
+  }
+
+  return { violations, resolved };
+}
+
+/** Files whose `§` references are deliberately unresolvable, each with why. */
+export const SECTION_EXCEPTIONS = Object.freeze({});
+
 export function referenceFiles() {
   const out = [];
   const walk = (dir, keep) => {
@@ -848,6 +1023,22 @@ export function referenceFiles() {
 function selfOwner(file) {
   const m = /^docs\/components\/(C\d{2})_/.exec(file);
   return m === null ? null : m[1];
+}
+
+/**
+ * The same question for **sections**, and it is a wider corpus than invariants.
+ *
+ * `selfOwner` is SP3's and stays components-only: widening it to the A- and
+ * S-series made SP3 claim `docs/surfaces/S13_*.md` as the owner of its own bare
+ * `I21`, and the S-series declares no invariants — so a rule about invariants
+ * started reporting a document that has none. **One shared owner map for two
+ * different vocabularies is the drift, so this is a second function rather than
+ * a widened first.**
+ */
+function sectionOwnerOf(file) {
+  const m = /^docs\/(?:components\/(C\d{2})|architecture\/(A\d{2})|surfaces\/(S\d{2}))_/.exec(file);
+  if (m !== null) return m[1] ?? m[2] ?? m[3];
+  return ownerOf(file);
 }
 
 function ownerOf(file) {

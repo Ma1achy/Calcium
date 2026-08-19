@@ -42,7 +42,7 @@ const TAU = Math.PI * 2;
 const START_ANGLE = -Math.PI / 2;
 
 /** Cells between the figure and the legend beside it. */
-const LEGEND_GAP = 2;
+export const LEGEND_GAP = 2;
 
 /** Below this the legend goes and the disc takes the whole width. */
 const MIN_DISC_CELLS = 8;
@@ -255,11 +255,11 @@ function dashSwatch(dash: Dash, wide: number): string {
  */
 export type MarkedText = Readonly<{ text: string; index: number }>;
 
-type Entry = Readonly<{ swatch: string; label: string; value: string; index: number }>;
+export type LegendEntryOf = Readonly<{ swatch: string; label: string; value: string; index: number }>;
 
-type Legend = Readonly<{ width: number; lines: readonly (readonly MarkedText[])[] }>;
+export type SegmentLegend = Readonly<{ width: number; lines: readonly (readonly MarkedText[])[] }>;
 
-const NO_LEGEND: Legend = Object.freeze({ width: 0, lines: Object.freeze([]) });
+export const NO_SEGMENT_LEGEND: SegmentLegend = Object.freeze({ width: 0, lines: Object.freeze([]) });
 
 /**
  * The legend block: swatch, label, and an optional value, one entry per row.
@@ -268,16 +268,21 @@ const NO_LEGEND: Legend = Object.freeze({ width: 0, lines: Object.freeze([]) });
  * and T3.3's ladder — labels are dropped before the figure is starved. More
  * entries than rows truncates with a count, reusing I8's wording.
  */
-function legendFor(entries: readonly Entry[], rows: number, budget: number, caps: Caps): Legend {
+export function segmentLegend(
+  entries: readonly LegendEntryOf[],
+  rows: number,
+  budget: number,
+  caps: Caps,
+): SegmentLegend {
   const count = entries.length; // cells-ok — an entry count
-  if (count === 0 || rows <= 0) return NO_LEGEND;
+  if (count === 0 || rows <= 0) return NO_SEGMENT_LEGEND;
 
   const ambiguous = caps.ambiguousWidth;
   const swatchW = entries.reduce((m, e) => Math.max(m, cells(e.swatch, ambiguous)), 0);
   const valueW = entries.reduce((m, e) => Math.max(m, cells(e.value, ambiguous)), 0);
   const natural = entries.reduce((m, e) => Math.max(m, cells(e.label, ambiguous)), 0);
   const spare = budget - swatchW - 1 - (valueW > 0 ? valueW + 1 : 0);
-  if (spare < 1) return NO_LEGEND;
+  if (spare < 1) return NO_SEGMENT_LEGEND;
 
   const labelW = Math.min(natural, spare);
   const width = swatchW + 1 + labelW + (valueW > 0 ? valueW + 1 : 0);
@@ -405,7 +410,7 @@ export function pieRender(
   const slices = slicesOf(segments, radius);
   if (slices.length === 0) return empty; // cells-ok — a slice count
 
-  const legend = legendFor(
+  const legend = segmentLegend(
     slices.map((s) => ({
       swatch: patternSwatch(patternFor(s.originalIndex, caps)),
       label: s.label,
@@ -641,7 +646,7 @@ export function radarRender(
   // bit the dash is the only thing that says which is which.
   const legend =
     series.length > 1 // cells-ok — a series count
-      ? legendFor(
+      ? segmentLegend(
           series.map((sr, i) => ({
             swatch: dashSwatch(dashFor(i, caps), 2),
             label: sr.label ?? `series ${String(i + 1)}`,
@@ -652,7 +657,7 @@ export function radarRender(
           Math.floor(w / 3),
           caps,
         )
-      : NO_LEGEND;
+      : NO_SEGMENT_LEGEND;
 
   const room = legend.width > 0 ? w - legend.width - LEGEND_GAP : w;
   // One row above and below for the labels the ring would otherwise sit on.

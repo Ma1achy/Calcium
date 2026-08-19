@@ -233,7 +233,7 @@ A *sequence* of blocks — a document's top level, a `panel`'s children, a `colu
 group's children — occupies `Σ` of the above **plus one row for each block
 declaring `gapBefore`** (§3a). No block's own height includes its gap.
 
-### `gapBefore` — the one field that is vertical rhythm
+### 3a. `gapBefore` — the one field that is vertical rhythm
 
 ```typescript
 gapBefore?: boolean       // default false — one blank row before this block

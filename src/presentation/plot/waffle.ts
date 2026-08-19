@@ -9,7 +9,8 @@ import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
 
 /** Ten rows of ten, one square per percent. */
-const WAFFLE_ROWS = 10;
+/** The mosaic's rows — ten, so one square is one per cent (C12 §3g). */
+export const WAFFLE_ROWS = 10;
 import { markOf } from "./marks.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;

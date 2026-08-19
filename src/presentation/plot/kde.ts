@@ -10,7 +10,7 @@ import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
 import { boxplotBand, boxplotColumn } from "./glyph-row.js";
 import { stripColumn, stripRow } from "./strip.js";
 import { cells } from "../text.js";
-import { glyphForMask, strokePolyline } from "./linedraw.js";
+import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP, strokePolyline } from "./linedraw.js";
 import { glyphs } from "../blocks/glyphs.js";
 import type { Range } from "./scale.js";
 
@@ -334,25 +334,42 @@ export function violinColumn(
   const mask: number[][] = Array.from({ length: n }, () => new Array<number>(w).fill(0));
   const leftEdge: [number, number][] = [];
   const rightEdge: [number, number][] = [];
+  const spineCol = Math.round(midCol); // cells-ok — a column index
+  // **The tails close onto the spine**, the transpose of `violinRows`' and for
+  // the same reason: outside the support the density is zero, so the outline is
+  // on the centre column there. Without the closing point a vertical violin
+  // drew `╴│╶` at each extreme — the two halves stubbed either side of the rule
+  // they taper into, which is the horizontal arm's `╶──╯ … ╰─╴` stood up.
+  // **Clamped, not skipped, at the area's edge.** A support reaching row zero
+  // has no row outside itself to close in, and skipping the point left the two
+  // halves stubbed either side of the rule — `╴│╶` — which reads as broken
+  // rather than as clipped. Closing on the extreme row itself draws the taper
+  // meeting the spine at that row, which is what a shape cut off by the frame
+  // looks like.
+  const above = Math.max(0, support.first - 1); // cells-ok — a row index
+  const below = Math.min(n - 1, support.last + 1); // cells-ok — a row index
+  leftEdge.push([spineCol, above]);
+  rightEdge.push([spineCol, above]);
   for (let r = support.first; r <= support.last; r += 1) {
     leftEdge.push([edge(r, -1), r]);
     rightEdge.push([edge(r, 1), r]);
   }
+  leftEdge.push([spineCol, below]);
+  rightEdge.push([spineCol, below]);
   strokePolyline(mask, leftEdge, false);
   strokePolyline(mask, rightEdge, false);
 
-  const spineCol = Math.round(midCol); // cells-ok — a column index
   const gl = glyphs(caps);
 
-  // The spine is a full-height rule drawn under the outline, for the two reasons
-  // its horizontal twin has: a summary mark in a tail would otherwise float on a
-  // cell with nothing under it, and an outline cell carrying one edge bit
-  // renders as a stub rather than joining its neighbour.
+  // **The spine is part of the mask, not a fill behind it** — `violinRows`'
+  // ruling stood up. A fill only reaches cells the outline left blank, and the
+  // cells that matter are the ones the outline already wrote: a tail's last
+  // cell sits on the spine column carrying one bit, so it rendered as a stub a
+  // half-cell clear of the rule. `UP | DOWN` in the mask makes the join a
+  // junction — `├`, `┤`, `┼` — which is what the glyph table is for.
+  const spineBits = LINE_UP | LINE_DOWN;
   const grid: string[][] = mask.map((row) =>
-    row.map((m, x) => {
-      const g = glyphForMask(m, corners, caps);
-      return g === " " && x === spineCol ? gl.vertical : g;
-    }),
+    row.map((m, x) => glyphForMask(x === spineCol ? m | spineBits : m, corners, caps)),
   );
 
   if (quartiles !== undefined) {
@@ -607,10 +624,29 @@ export function violinRows(
   const mask: number[][] = Array.from({ length: n }, () => new Array<number>(w).fill(0));
   const upper: [number, number][] = [];
   const lower: [number, number][] = [];
+  // **The tails close onto the spine, which the comment below already said and
+  // nothing did.** Outside the support the density is zero, so the outline is
+  // exactly on the centre row there — and adding that point is what makes the
+  // shape *meet* the line rather than stop a row above it with a stub. Without
+  // it a violin drew `╶──╯ … ╰─╴` one row up, two fragments a half-cell clear
+  // of the rule they taper into, at every variant that tapers.
+  //
+  // **Clamped, not skipped, at the frame's edge.** A support reaching column
+  // zero has no column outside itself to close in, and skipping the point left
+  // a stub against the border — which reads as broken rather than as clipped.
+  // Closing on the extreme column draws the taper meeting the spine there,
+  // which is what a shape cut off by the frame looks like.
+  const spine = Math.round(mid); // cells-ok — a row index
+  const before = Math.max(0, support.first - 1); // cells-ok — a column index
+  const after = Math.min(w - 1, support.last + 1); // cells-ok — a column index
+  upper.push([before, spine]);
+  lower.push([before, spine]);
   for (let x = support.first; x <= support.last; x += 1) {
     upper.push([x, edge(x, -1)]);
     lower.push([x, edge(x, 1)]);
   }
+  upper.push([after, spine]);
+  lower.push([after, spine]);
   // **No end caps.** Closing the ring drew a vertical wall at each extreme, so
   // the figure was a capped blob rather than a shape that tapers into the axis.
   // A violin's tails go to nothing and meet the centre line; they are not
@@ -618,21 +654,31 @@ export function violinRows(
   strokePolyline(mask, upper, false);
   strokePolyline(mask, lower, false);
 
-  const spineRow = Math.round(mid);
+  const spineRow = spine;
   const gl = glyphs(caps);
 
-  // **The spine is a full-width rule, drawn before the outline.** Two defects
-  // shared one cause: the summary marks sat on a row with nothing under them
-  // wherever the body was narrow, so a median or a mean in a tail appeared to
-  // float outside the shape. And an outline cell carrying a single edge bit
-  // renders as a stub — `╴` — rather than joining its neighbour, so a fast
-  // density change left visible gaps. A rule across the whole area gives every
-  // mark something to sit on and closes the joins along the centre.
+  // **The spine is part of the mask, not a fill behind it.**
+  //
+  // Two defects shared one cause: the summary marks sat on a row with nothing
+  // under them wherever the body was narrow, so a median or a mean in a tail
+  // appeared to float outside the shape. And an outline cell carrying a single
+  // edge bit renders as a stub — `╴` — rather than joining its neighbour, so a
+  // fast density change left visible gaps.
+  //
+  // **The first remedy filled the spine row's *blank* cells and left the stubs
+  // standing**, which is the half that shows: where a tail returns to the axis
+  // its last cell is on the spine row and already carries a bit, so the fill
+  // skipped it and the figure drew `╶──╮ … ╭─╴` — two fragments a half-cell
+  // clear of the rule they belong to. The tails did not close onto the line.
+  //
+  // Adding the rule's own `LEFT | RIGHT` to every cell of that row instead
+  // makes the join a junction rather than a coincidence: a stub becomes `─`, a
+  // corner becomes `┬` or `┴`, and a crossing becomes `┼`. Which is what the
+  // glyph table is for — a cell resolves from the edges that meet in it, and
+  // the spine is an edge.
+  const spineBits = LINE_LEFT | LINE_RIGHT;
   const grid: string[][] = mask.map((r, y) =>
-    r.map((m) => {
-      const g = glyphForMask(m, corners, caps);
-      return g === " " && y === spineRow ? gl.horizontal : g;
-    }),
+    r.map((m) => glyphForMask(y === spineRow ? m | spineBits : m, corners, caps)),
   );
 
   // The box, on the spine. A violin is a box plot that also shows the
