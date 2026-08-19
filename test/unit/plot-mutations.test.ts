@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
-import { block, type Plot } from "../../src/data/viewmodel/index.js";
+import { block, type Plot, type QuartileSummary } from "../../src/data/viewmodel/index.js";
 import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
@@ -17,7 +17,7 @@ import { extentFor, extentRun, ladderFor, pairFor } from "../../src/presentation
 import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
-import { kde, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
+import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
@@ -347,6 +347,251 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     const sharpCorner = (rows: readonly string[]): boolean => rows.some((r) => r.includes("\u250c"));
     expect(sharpCorner(vertical(12)), "four columns a band: every band clears the floor").toBe(false); // cells-ok — a width
     expect(sharpCorner(vertical(8)), "the band left with two columns falls to the box").toBe(true); // cells-ok — a width
+  });
+
+  /** A five-number summary, and no mean — a `◆` would sit over the median. */
+  const summary = (values: readonly number[]): QuartileSummary => {
+    const v = [...values].sort((a, b) => a - b);
+    const at = (f: number): number => v[Math.min(v.length - 1, Math.floor(f * v.length))]!; // cells-ok — a sample count
+    return { min: v[0]!, q1: at(0.25), median: at(0.5), q3: at(0.75), max: v[v.length - 1]! }; // cells-ok — a sample count
+  };
+
+  /**
+   * The cloud's fullest column — **the centre of the tied run, not its first.**
+   * More than one column can reach the ladder's top, and `indexOf` would then
+   * report a symmetric distribution's mode to the left of its own median.
+   */
+  const peakOf = (row: string): number => {
+    const ladder = [...ladderFor("height", FULL_CAPS).steps];
+    const levels = [...row].map((c) => ladder.indexOf(c)); // cells-ok — a ladder index
+    const best = Math.max(...levels);
+    const hit = levels.flatMap((l, i) => (l === best ? [i] : [])); // cells-ok — a column index
+    return hit.length === 0 ? -1 : Math.round((hit[0]! + hit[hit.length - 1]!) / 2); // cells-ok — a column index
+  };
+
+  it("T1.91 (C12 I34): the cloud and the box read one axis", () => {
+    // **The defect this row exists for is invisible to every count.**
+    // `violinRows` pads its value axis by a tenth at each end so a tail has
+    // somewhere to taper; `boxplotBand` puts `min` in column 0 and `max` in the
+    // last with no pad. Both are right for the figure that owns them, and a
+    // raincloud is both figures in one band — so composed without a decision the
+    // cloud's mode sits a tenth of the width from the median below it, with
+    // every value in range and every column accounted for.
+    //
+    // **The axis is pinned off-centre and that is what makes the row bite.**
+    // The violin's pad is symmetric — a tenth at each end — so a distribution
+    // sitting at the *middle* of its axis has the same mode column under both
+    // mappings, and the row would pass against the defect it names. Pinned to
+    // 0..100 with the mass down at 15, the pad compresses the cloud toward the
+    // centre and the box does not move: the two disagree by four columns.
+    const LO = 0, HI = 100, W = 61; // cells-ok — a frame width, odd so a centre column exists
+    const symmetric = Array.from({ length: 60 }, (_v, i) => 15 + 3 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4));
+    const skewed = Array.from({ length: 60 }, (_v, i) => 18 + 34 * ((i + 0.5) / 60) ** 3);
+
+    const rain = (values: readonly number[]): { peak: number; median: number } => {
+      const rows = rainRows({ values: [...values] }, summary(values), LO, HI, W, FULL_CAPS); // cells-ok — a column budget
+      return { peak: peakOf(rows[0] ?? ""), median: [...(rows[1] ?? "")].indexOf(glyphs(FULL_CAPS).vertical) }; // cells-ok — a column index
+    };
+
+    // A distribution whose mode **is** its median: the cloud's fullest column
+    // and the box's median are the same column, or the two axes disagree.
+    const sym = rain(symmetric);
+    expect(sym.peak, "the cloud has a fullest column").toBeGreaterThanOrEqual(0); // cells-ok — a column index
+    expect(sym.median, "the box has a median").toBeGreaterThanOrEqual(0); // cells-ok — a column index
+    expect(sym.peak, "mode and median in one column").toBe(sym.median); // cells-ok — a column index
+
+    // And where the data says they differ, they differ **by what the data
+    // says**. A cubic's mass is low and its tail is long, so the mode sits
+    // below the median — a relationship no axis mismatch produces and no
+    // rounding erases.
+    const skew = rain(skewed);
+    expect(skew.peak, "a skew puts the mode below the median").toBeLessThan(skew.median); // cells-ok — a column index
+
+    // **The fixture responds, measured rather than assumed.** The defect is
+    // internal — the cloud on one axis, the box on another — so it cannot be
+    // reached by changing an argument, and the mutation is what tests it
+    // (T6.24). What *can* be shown here is that the padded axis puts the mode
+    // somewhere else at all, which is the premise the mutation trades on: if a
+    // tenth of this axis were worth nothing, T6.24 would fail nothing.
+    const pad = (HI - LO) * 0.1;
+    const moved = peakOf(rainRows({ values: symmetric }, summary(symmetric), LO - pad, HI + pad, W, FULL_CAPS)[0] ?? ""); // cells-ok — a column budget
+    expect(moved, "a tenth of this axis is worth columns").not.toBe(sym.peak); // cells-ok — a column index
+  });
+
+  it("T1.92 (C12 I34, I16): blank is outside the support, and the first step is not blank", () => {
+    // **One row, two meanings, and I16 is what keeps them apart.** A ramp's
+    // first step is ink because a blank minimum reads as *nothing here* — and
+    // *nothing here* is exactly what a column beyond the cut has to say. Drawn
+    // without the cut the row is `▁` from edge to edge: a rule along the bottom
+    // saying this distribution is everywhere, which is the picture the violin's
+    // outline drew before `cut` landed one rung up.
+    //
+    // **The spread is measured, not chosen.** At a spread of 0.4 on this axis
+    // the whole support falls inside one column, whose step is the *maximum* —
+    // so the row's second half asserts nothing and its first half is trivially
+    // true. Measured across 0.4 · 1 · 2 · 3 · 5 · 8, the support runs
+    // 1 · 3 · 7 · 11 · 19 · 31 columns and its edge step 7 · 2 · 1 · 0 · 0 · 0.
+    // Three is the first that reaches the ladder's floor, which is the glyph
+    // this row is about.
+    const tight = Array.from({ length: 60 }, (_v, i) => 40 + 3 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4));
+    // A wide axis the sample occupies a sliver of, so the cut has somewhere to
+    // bite. Pinned by hand rather than taken from the data.
+    const cloud = [...(rainRows({ values: tight }, summary(tight), 0, 100, 61, FULL_CAPS)[0] ?? "")]; // cells-ok — a column budget
+
+    const ladder = [...ladderFor("height", FULL_CAPS).steps];
+    const drawn = cloud.filter((c) => c !== " ");
+
+    expect(drawn.length, "something is drawn").toBeGreaterThan(0); // cells-ok — a cell count
+    expect(cloud.filter((c) => c === " ").length, "and the ends are not").toBeGreaterThan(0); // cells-ok — a cell count
+    // Contiguous: the support is a run, so a blank inside it would be a hole and
+    // a hole is the collision this row forbids.
+    const lo = cloud.findIndex((c) => c !== " "); // cells-ok — a column index
+    const hi = cloud.length - 1 - [...cloud].reverse().findIndex((c) => c !== " "); // cells-ok — a column index
+    for (let i = lo; i <= hi; i += 1) { // cells-ok — a column index
+      expect(cloud[i], `column ${String(i)} of the support is not blank`).not.toBe(" ");
+    }
+    // **And the support's faintest column is the ladder's first step**, which is
+    // the half a cut alone does not give: a cut says where to stop, and C12 I16
+    // says that what stands at the minimum is ink. Both ends, because the cut is
+    // applied at both and an off-by-one at one of them is a hole.
+    expect(cloud[lo], "the support's low edge is the ladder's floor").toBe(ladder[0]);
+    expect(cloud[hi], "and so is its high edge").toBe(ladder[0]);
+  });
+
+  it("T1.93 (C12 I21, I34): the vertical cloud is a run that grows away from the box", () => {
+    // **A run, not a ladder** — the band is thin in *width*, so the resolution
+    // is the run's length across cells rather than a step inside one, and which
+    // shape a density needs is decided by the dimension the band is thin in and
+    // not by the axis the values lie along. This was very nearly a third
+    // `Encoding` called `column`.
+    //
+    // The direction is the assertion, because a leftward run drawn with
+    // rightward glyphs is right in every count and reversed in the picture: the
+    // cloud would grow *from* the box's neighbour toward the frame instead of
+    // toward the box, and the two would be separated by the density's own
+    // shortfall.
+    const values = Array.from({ length: 60 }, (_v, i) => 40 + 6 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4));
+    const COL = 4, ROWS = 15; // cells-ok — a column budget and a row budget
+    const rows = rainColumns({ values }, summary(values), 0, 100, COL, ROWS, FULL_CAPS);
+
+    expect(rows.length, "one row per row").toBe(ROWS); // cells-ok — a row count
+    for (const r of rows) expect(cells(r, "narrow"), "and each is the slot wide").toBe(COL); // cells-ok — a column count
+
+    // The box is the figure's last column; the cloud is everything before it.
+    // **Ink in the cloud is a suffix**: no blank between the run and the box,
+    // whatever the run's length. Under a rightward vocabulary it is a prefix,
+    // and the gap opens against the box.
+    const inked: number[] = []; // cells-ok — a row count
+    for (const [ri, row] of rows.entries()) {
+      const cloud = [...row].slice(0, COL - 1); // cells-ok — a column count
+      const hit = cloud.flatMap((c, i) => (c === " " ? [] : [i])); // cells-ok — a column index
+      if (hit.length === 0) continue; // cells-ok — a cell count
+      inked.push(ri);
+      expect(hit[hit.length - 1], `row ${String(ri)}: the run reaches the box`)
+        .toBe(cloud.length - 1); // cells-ok — a column index
+      expect(hit.length, `row ${String(ri)}: and it is contiguous`)
+        .toBe(hit[hit.length - 1]! - hit[0]! + 1); // cells-ok — a cell count
+    }
+
+    expect(inked.length, "rows carry a cloud").toBeGreaterThan(0); // cells-ok — a row count
+
+    // **The tip is what the direction moves, and the suffix rule above cannot
+    // see it.** The caller right-aligns either way, so a rightward vocabulary
+    // draws the same run in the same cells — with its fractional glyph on the
+    // end *against the box* instead of on the end away from it. That is a
+    // dot-column of daylight between the cloud and the box it belongs to, and
+    // it survived the alignment assertion untouched.
+    //
+    // The two arms share no glyph (T1.88), so this is about direction and not
+    // about a count: `⢸` is the right dot-column and `⡇` the left.
+    const left = extentFor(FULL_CAPS, "leftward");
+    const right = extentFor(FULL_CAPS, "rightward");
+    let tips = 0; // cells-ok — a cell count
+    for (const [ri, row] of rows.entries()) {
+      const cloud = [...row].slice(0, COL - 1); // cells-ok — a column count
+      const hit = cloud.flatMap((c, i) => (c === " " ? [] : [i])); // cells-ok — a column index
+      for (const g of right.partials) {
+        expect(cloud.includes(g), `row ${String(ri)}: no rightward tip`).toBe(false);
+      }
+      for (const [i, c] of cloud.entries()) {
+        if (!left.partials.includes(c)) continue;
+        tips += 1; // cells-ok — a cell count
+        expect(i, `row ${String(ri)}: the tip is at the run's far end`).toBe(hit[0]); // cells-ok — a column index
+      }
+    }
+    // **The fixture responds**: a cloud that saturates every row it touches is
+    // a full run either way, and this row would pass against a reversed
+    // vocabulary it never met.
+    expect(tips, "some row draws a fractional tip").toBeGreaterThan(0); // cells-ok — a cell count
+
+    // **Two width rules and each needs the slot where only it bites** — at
+    // eleven columns either one alone leaves the same gap, so a row written
+    // there passes against a tree missing either.
+    const span = (slot: number): { lo: number; hi: number } => {
+      const drawn = rainColumns({ values }, summary(values), 0, 100, slot, ROWS, FULL_CAPS); // cells-ok — a column budget
+      let lo = slot, hi = -1; // cells-ok — a column index
+      for (const row of drawn) {
+        for (const [i, c] of [...row].entries()) {
+          if (c === " ") continue;
+          if (i < lo) lo = i; // cells-ok — a column index
+          if (i > hi) hi = i; // cells-ok — a column index
+        }
+      }
+      return { lo, hi };
+    };
+
+    // **The cap.** A longer run is magnitude resolution, and a density has none
+    // to spend: the two arms put the magnitude on different axes, so a wider
+    // horizontal band buys more of the *value* axis and a wider vertical band
+    // buys only a longer ruler. At twenty-one columns three fifths is thirteen,
+    // and the frame drew a filled bar chart with its shape legible only along
+    // one edge. Five — four cells of cloud and one of box — is where the run's
+    // `2n + 1` levels match the height ladder's eight.
+    const capped = span(21); // cells-ok — a column budget
+    expect(capped.hi - capped.lo + 1, "the figure is capped, not three fifths of the slot").toBeLessThanOrEqual(5); // cells-ok — a column width
+
+    // **The narrowing**, which the cap does not do at six columns: capped alone
+    // the figure is five of six and sits against its neighbour, and this is
+    // `boxplotColumn`'s rule rather than a second one — drawn to the full slot
+    // one band's cloud ran into the next band's box, `⣿⣿─⣿⣿─` reading as a
+    // single six-cell run with three distributions in it.
+    const narrow = span(6); // cells-ok — a column budget
+    expect(narrow.lo, "a gap on the left at six columns").toBeGreaterThan(0); // cells-ok — a column index
+    expect(narrow.hi, "and on the right").toBeLessThan(5); // cells-ok — a column index
+
+    // At the three-column budget there is nothing to spare and the figure takes
+    // the slot whole, exactly as the box rung does there.
+    const floor = span(3); // cells-ok — a column budget
+    expect(floor.lo, "the budget's own width has no gap to give").toBe(0); // cells-ok — a column index
+    expect(floor.hi, "and uses all three").toBe(2); // cells-ok — a column index
+  });
+
+  it("T1.94 (C12 I34): the renderer reaches the raincloud, not only the function", () => {
+    // **The wiring, which the two rows above cannot see.** T1.91 and T1.92 call
+    // `rainRows` directly, so they pass on the day nothing calls it — the
+    // seam-level shape that has cost this project a defect before. What decides
+    // it is the *rung*, and the rung is chosen inside `definition.ts`.
+    //
+    // Discriminated by vocabulary: a height ladder's steps are drawn by the
+    // cloud and by nothing else a violin renders. `violinRows` draws `╶─╮╰` and
+    // `boxplotBand` draws `├┤█│`; neither reaches for a ramp at all.
+    const values = Array.from({ length: 60 }, (_v, i) => 30 + 6 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4));
+    const violin = (detail: Plot["plotDetail"], height: number): string =>
+      plain(block({
+        kind: "plot", id: "rc", form: "violin", height, axes: false,
+        categories: ["A"], series: [{ values }],
+        ...(detail === undefined ? {} : { plotDetail: detail }),
+      }) as Plot).join("\n");
+
+    const ladder = [...ladderFor("height", FULL_CAPS).steps];
+    const clouded = (frame: string): boolean => ladder.some((g) => frame.includes(g));
+
+    expect(clouded(violin("compact", 8)), "the floor of a violin is the raincloud").toBe(true); // cells-ok — a row count
+    expect(clouded(violin(undefined, 2)), "and two rows is the rung it fits").toBe(true); // cells-ok — a row count
+    // And the top rung is still the mirrored outline, which draws no ramp at
+    // all — so the row is about which rung was chosen rather than about a glyph
+    // being available.
+    expect(clouded(violin("full", 12)), "the mirrored violin reaches for no ramp").toBe(false); // cells-ok — a row count
   });
 
   it("T1.90 (C12 I28): a rung shorter than its band takes its name with it", () => {

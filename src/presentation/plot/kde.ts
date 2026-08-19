@@ -6,7 +6,9 @@
 import type { QuartileSummary, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { curveRows } from "./curve.js";
-import { pairFor } from "./ramp.js";
+import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
+import { boxplotBand, boxplotColumn } from "./glyph-row.js";
+import { cells } from "../text.js";
 import { glyphForMask, strokePolyline } from "./linedraw.js";
 import { glyphs } from "../blocks/glyphs.js";
 import type { Range } from "./scale.js";
@@ -186,6 +188,83 @@ function supported(
   return first < 0 ? { first: 0, last: points.length - 1 } : { first, last }; // cells-ok — a sample count
 }
 
+/**
+ * The raincloud — a one-sided cloud over the compact box (C12 §3i, I34).
+ *
+ * ```
+ *    ▁▂▄▆███▆▄▂▁                 row 0   the density, growing away from the box
+ *  ├──┤███│███├──┤  ▪ ▪          row 1   `boxplotBand` at one row, unchanged
+ * ```
+ *
+ * **Two rows hold what five hold, and the mirror is what pays for it.** A
+ * classic violin is symmetric about its spine, so the reflected half carries no
+ * information — dropping it buys the summary row outright. Allen et al. (2019)
+ * rather than an abbreviation invented here.
+ *
+ * **The cloud is sampled on the box's axis and this is the whole of the joint.**
+ * `violinRows` pads its value axis by a tenth at each end so a tail has
+ * somewhere to taper; `boxplotBand` puts `min` in column 0 and `max` in the last
+ * with no pad. Each is right for the figure that owns it, and composing them
+ * without deciding puts the cloud's mode a tenth of the width from the median it
+ * sits above — in a frame where every value is in range and every count agrees.
+ * The box wins, because the ladder's promise is that the same figure appears at
+ * every rung and a box that shifts when a row is added above it is a different
+ * box.
+ *
+ * What the pad bought is bought by the cut instead: the estimate still stops two
+ * bandwidths past the data, by the mechanism already ruled for that.
+ *
+ * **Blank is outside the support; the ladder's first step is an estimate near
+ * zero** (I16). One row, two meanings, and they must not collide — a ramp's
+ * first step is ink precisely because a blank minimum reads as *nothing here*,
+ * which is what a column beyond the cut has to say. Without the cut the row
+ * draws `▁` from edge to edge: a flat line saying *this distribution is
+ * everywhere*, which is the picture the violin's outline drew before `cut`
+ * landed one rung up.
+ */
+export function rainRows(
+  series: Series,
+  quartiles: QuartileSummary | undefined,
+  min: number,
+  max: number,
+  areaWidth: number,
+  caps: Caps,
+  adjust?: number,
+): readonly string[] {
+  const w = Math.max(1, Math.floor(areaWidth));
+  const blank = " ".repeat(w);
+  // The box is `boxplotBand`'s compact arm and not a second drawing of one —
+  // the rung ladder is one figure gaining parts, not four figures.
+  const box = quartiles === undefined ? blank : boxplotBand(quartiles, min, max, w, 1, caps)[0] ?? blank;
+
+  const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
+  if (finite.length === 0) return [blank, box]; // cells-ok — a sample count
+
+  const sorted = [...finite].sort((a, b) => a - b);
+  // **`boxplotBand`'s own mapping, inverted.** Its `at(v)` is
+  // `round((v − min) ÷ (max − min) × (w − 1))`, so column `i` is the value
+  // below — and the two agreeing is the finding this function is written
+  // around, not an incidental.
+  const span = max - min;
+  const points = Array.from({ length: w }, (_, i) => min + (span * i) / Math.max(1, w - 1));
+  const bw = scaledBandwidth(finite, adjust);
+  const densities = kde(finite, points, bw);
+  const maxD = Math.max(...densities);
+  if (maxD <= 0) return [blank, box];
+  const support = supported(points, sorted, bw ?? silvermanBandwidth(finite));
+
+  // **The axis, not a ramp** (I21). A cloud cell is a column of a vertical
+  // axis — the band is thin in *height*, so the resolution is inside one cell
+  // and a ladder is the only shape that fits.
+  const ladder = [...ladderFor("height", caps).steps];
+  const top = ladder.length - 1; // cells-ok — a ladder length
+  const cloud = points.map((_p, i) => {
+    if (i < support.first || i > support.last) return " ";
+    return ladder[Math.round((densities[i]! / maxD) * top)] ?? " ";
+  });
+  return [cloud.join(""), box];
+}
+
 export function violinColumn(
   series: Series,
   colWidth: number,
@@ -283,6 +362,114 @@ export function violinColumn(
   }
 
   return grid.map((r) => r.join(""));
+}
+
+/**
+ * The raincloud **stood up** — `rainRows` transposed (C12 §3i, I30, I34).
+ *
+ * ```
+ *   ⣿⣿│      the cloud grows leftward, away from the box's column
+ *  ⢸⣿⣿┴
+ *   ⣿⣿█
+ *   ⢸⣿─
+ *    ⣿█
+ *    ⢸┬
+ *     │
+ * ```
+ *
+ * **A run rather than a ladder, and that is I21's finding rather than an
+ * implementation detail.** A ladder is per-cell and an extent is per-run, and
+ * which shape a density needs is decided by the dimension its *band* is thin in
+ * — not by the axis the values lie along. A horizontal band has one row, so all
+ * the resolution is inside a cell and only a ladder fits. A vertical band has
+ * two or three columns, so the resolution is the run's length and a ladder has
+ * nothing to index. This was very nearly written as a third `Encoding` called
+ * `column`; opening `ramp.ts` to build it showed `extentRun` at width 2 with one
+ * partial already returning the five levels, reflected.
+ *
+ * **The box takes one column and the cloud takes the rest**, which is where the
+ * three-column budget comes from: two columns of cloud is four dot-columns and
+ * five levels, and the box needs the third. Two columns for both is four
+ * dot-columns split between them, too coarse to carry a shape.
+ */
+const CLOUD_CELLS = 4;
+
+export function rainColumns(
+  series: Series,
+  quartiles: QuartileSummary | undefined,
+  min: number,
+  max: number,
+  colWidth: number,
+  rows: number,
+  caps: Caps,
+  adjust?: number,
+): readonly string[] {
+  const slot = Math.max(1, Math.floor(colWidth));
+  const n = Math.max(1, Math.floor(rows));
+  // **`boxplotColumn`'s own narrowing, and the frame is what asked for it.**
+  // Drawn to the full slot at eleven cells a band, one band's cloud ran into the
+  // next band's box: `⣿⣿─⣿⣿─` reads as a single six-cell run, and the three
+  // distributions read as one field. The box rung already solves this — three
+  // fifths of the slot, centred, which is matplotlib's `widths=0.6` — and the
+  // two rungs of one ladder must separate their bands the same way or the
+  // figure changes character when a row is added. At the three-column budget
+  // there is nothing to spare and it takes the slot, exactly as the box does.
+  //
+  // **And capped, because a longer run is magnitude resolution and a density
+  // has none to spend.** The two arms put the magnitude on different axes: a
+  // ladder step is *inside* a cell, so a wider horizontal band buys more of the
+  // value axis; a run is *across* cells, so a wider vertical band buys nothing
+  // but a longer ruler for a number nobody reads off one. Drawn to three fifths
+  // of a twenty-five-cell band the cloud was fourteen solid cells a row — a
+  // filled bar chart with the shape legible only along its left edge.
+  //
+  // Four is derived rather than chosen: a leftward run of `n` cells with one
+  // partial resolves `2n + 1` levels, and the height ladder resolves eight, so
+  // four is where the vertical arm reads the same number of levels the
+  // horizontal arm does.
+  const w = Math.min(slot >= 5 ? Math.max(3, Math.round(slot * 0.6)) : slot, CLOUD_CELLS + 1); // cells-ok — a column width
+  const padL = Math.floor((slot - w) / 2); // cells-ok — a column width
+  const padR = slot - w - padL; // cells-ok — a column width
+  // **The compact vertical box is one column wide**, which `boxplotColumn`
+  // already draws — below five cells it takes its slot whole, and at one cell
+  // its interior is inked because there are no sides to enclose it (I33).
+  const box = quartiles === undefined
+    ? Array.from({ length: n }, () => " ")
+    : boxplotColumn(quartiles, min, max, 1, n, caps); // cells-ok — a column budget
+  const cloudW = w - 1; // cells-ok — a column count
+  const beside = (r: number, run: string): string =>
+    " ".repeat(padL) +
+    " ".repeat(Math.max(0, cloudW - cells(run, caps.ambiguousWidth))) +
+    run + (box[r] ?? " ") + " ".repeat(padR);
+  const blank = (): readonly string[] => Array.from({ length: n }, (_v, r) => beside(r, ""));
+
+  if (cloudW < 1) return boxplotColumn(quartiles ?? { min, q1: min, median: min, q3: min, max }, min, max, slot, n, caps); // cells-ok — a column count
+  const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
+  if (finite.length === 0) return blank(); // cells-ok — a sample count
+
+  const sorted = [...finite].sort((a, b) => a - b);
+  // **`boxplotColumn`'s mapping, inverted** — its `at(v)` counts rows down from
+  // the top, so row 0 is `max`. The cloud and the box read one axis; see
+  // `rainRows` for why that is the joint rather than a convenience.
+  const span = max - min;
+  const points = Array.from(
+    { length: n },
+    (_v, r) => min + (span * (n - 1 - r)) / Math.max(1, n - 1),
+  );
+  const bw = scaledBandwidth(finite, adjust);
+  const densities = kde(finite, points, bw);
+  const maxD = Math.max(...densities);
+  if (maxD <= 0) return blank();
+  const support = supported(points, sorted, bw ?? silvermanBandwidth(finite));
+
+  // **The direction is on the vocabulary and not on the call.** A leftward run
+  // handed rightward glyphs draws its tip on the wrong end — a picture correct
+  // in every count and reversed — so `extentFor` carries it and the pairing is
+  // unspellable.
+  const ext = extentFor(caps, "leftward");
+  return points.map((_p, r) =>
+    beside(r, r < support.first || r > support.last ? "" : extentRun(densities[r]! / maxD, cloudW, ext)),
+  );
 }
 
 /**

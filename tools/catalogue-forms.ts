@@ -604,10 +604,33 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         s([1, 2, 3, 4, 5, 6, 7, 8]),
       ],
     },
+    // **Eight samples again, carrying the defect `default` above records.** That
+    // comment says a fixture must be shown to respond to the thing under test,
+    // and this one was still `[1, 1, 2, 3, 3, 3, 4, 5]` — five distinct values
+    // on a shared axis of five, which Silverman smooths into one broad mass. The
+    // rung it exercises is the raincloud, whose whole subject is a *shape* over
+    // a box, so the fixture could not show its own subject.
+    //
+    // The same three shapes `default` uses, so the two rungs are comparable:
+    // the compact frame and the full frame are the same distributions with the
+    // mirror dropped, which is the claim the ladder makes.
     compact: {
-      form: "violin", height: 6, axes: true, categories: ["A", "B", "C"],
+      form: "violin", height: 6, axes: true, categories: ["tight", "wide", "skewed"],
       series: [
-        s([1, 1, 2, 3, 3, 3, 4, 5]), s([2, 3, 3, 4, 4, 4, 5, 6]), s([1, 2, 2, 2, 3, 4, 5, 5]),
+        s(Array.from({ length: 60 }, (_v, i) => 30 + 4 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4))),
+        s(Array.from({ length: 60 }, (_v, i) => 30 + 15 * Math.tan((((i + 0.5) / 60) - 0.5) * 2.4))),
+        s(Array.from({ length: 60 }, (_v, i) => 18 + 34 * ((i + 0.5) / 60) ** 3)),
+      ],
+    },
+    // The vertical arm of the same rung — the cloud as a run of dot-columns
+    // rather than a ladder step, three columns a band (C12 §3i, I21).
+    "compact-vertical": {
+      form: "violin", height: 14, axes: true, orientation: "vertical", plotDetail: "compact",
+      categories: ["control", "dose-a", "dose-b"],
+      series: [
+        s(Array.from({ length: 40 }, (_v, i) => 30 + Math.sin(i * 0.7) * 9)),
+        s(Array.from({ length: 40 }, (_v, i) => 45 + Math.sin(i * 0.5) * 6)),
+        s(Array.from({ length: 40 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12)),
       ],
     },
   },

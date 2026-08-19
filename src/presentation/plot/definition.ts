@@ -58,7 +58,7 @@ import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, 
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
-import { densitySeries, densityRows, violinColumn, violinRows, ridgelineArea } from "./kde.js";
+import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
 import { horizonRows } from "./horizon.js";
@@ -208,16 +208,14 @@ const RUNGS: Readonly<Record<"boxplot" | "violin", readonly RungSpec[]>> = Objec
   // **A violin's floor is the raincloud rather than the box**, because a violin
   // with no density is a box plot and the field said `violin` (C04 I56).
   //
-  // **`rain` and `raindrop` scale today because their figures do not exist
-  // yet.** The rung is *chosen* correctly — a four-row band affords `raindrop`
-  // and not the mirrored violin — and `violinRows` is what draws all three
-  // until `rainRows` and the jittered strip land, two commits along in this
-  // plan. Clamping them to their own budgets now would shrink a figure into
-  // three rows of a four-row band to make room for a density that is not
-  // drawn, which is a worse frame for two commits and a golden diff nobody
-  // would accept on its own. **The blocker is a symbol: grep `rainRows`.**
+  // **`raindrop` scales today because its figure does not exist yet.** The rung
+  // is *chosen* correctly — a four-row band affords it and not the mirrored
+  // violin — and `violinRows` draws it until the jittered strip lands, one
+  // commit along in this plan. Clamping it now would shrink a figure into three
+  // rows of a four-row band to make room for a strip that is not drawn, which is
+  // a worse frame for one commit. **The blocker is a symbol: grep `rainStrip`.**
   violin: Object.freeze([
-    Object.freeze({ rung: "rain" as const, rows: 2, columns: 3, density: true, scales: true }),
+    Object.freeze({ rung: "rain" as const, rows: 2, columns: 3, density: true, scales: false }),
     Object.freeze({ rung: "raindrop" as const, rows: 3, columns: 4, density: true, scales: true }),
     Object.freeze({ rung: "violin" as const, rows: 5, columns: 5, density: true, scales: true }),
   ]),
@@ -1765,9 +1763,13 @@ const FORM_ROWS: Readonly<
         // columns a violin is four dot-columns split between density and box, so
         // the honest figure is the box.
         const rung = rungFor(block, "violin", cw, "columns", finiteCount(sr));
-        return !rung.density
-          ? boxplotColumn(qs[i] ?? summaryOf(sr) ?? EMPTY_SUMMARY, shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities)
-          : violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
+        if (!rung.density) {
+          return boxplotColumn(qs[i] ?? summaryOf(sr) ?? EMPTY_SUMMARY, shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities);
+        }
+        if (rung.rung === "rain") {
+          return rainColumns(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities, block.bandwidth);
+        }
+        return violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
       });
     }
     // **The violin routes through the same chooser as the boxplot**, which is
@@ -1782,6 +1784,12 @@ const FORM_ROWS: Readonly<
         return q === undefined
           ? Array.from({ length: rows }, () => " ".repeat(aw))
           : boxplotBand(q, shared?.min ?? 0, shared?.max ?? 1, aw, spent, ctx.capabilities);
+      }
+      // **The rung, not the row count**, because two rungs can be handed the
+      // same budget: `"compact"` takes the floor at any height, so a raincloud
+      // and a mirrored violin both arrive here with rows to spare.
+      if (rung.rung === "rain") {
+        return rainRows(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw, ctx.capabilities, block.bandwidth);
       }
       return violinRows(sr, aw, spent, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
     });

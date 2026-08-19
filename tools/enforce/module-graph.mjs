@@ -1252,13 +1252,20 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // deferral at all: the day `rainColumns` names `grows`, this entry becomes a
   // violation in its own right.
   "Extent.grows":
-    "C12 I34 — the direction exists for the vertical raincloud's density, which " +
-    "is a run of dot-columns rather than a ladder step (C12 §3i, I21). The " +
-    "consumer is `rainColumns` in `src/presentation/plot/kde.ts`, two commits " +
-    "along in the same plan. **`extentRun` reads it in the same file**, so this " +
-    "is the cross-module arm firing and not the field being inert: the leftward " +
-    "vocabulary is already the only one whose partials are mirrored, and " +
-    "T1.88 asserts the five levels it produces",
+    "C12 I34, I21 — **the deferral was discharged and the answer did not move, " +
+    "which is the entry worth keeping.** This said the consumer was " +
+    "`rainColumns`, two commits along; `rainColumns` landed, draws the vertical " +
+    "raincloud's density with it, and MG24 still reports the member — because " +
+    "it calls `extentFor(caps, \"leftward\")` and never touches `.grows`. The " +
+    "condition was named as a symbol, the symbol arrived, and it was not the " +
+    "condition the rule tests. " +
+    "**So this is permanent and it is the rule's documented blind spot rather " +
+    "than a wait**: a member read only inside its declaring file. `extentRun` " +
+    "reads it, and a *renderer* reading it would be branching on direction, " +
+    "which is the exact move the field exists to make unnecessary — the " +
+    "vocabulary carries the direction so that a leftward run cannot be handed " +
+    "rightward glyphs. A consumer outside `ramp.ts` would be evidence the design " +
+    "had failed. T1.88 asserts the five mirrored levels it produces",
 
   "SgrStyle.italic":
     "roadmap 50 — `Style.italic` and its SGR-3 twin are the *capability*, and the " +
