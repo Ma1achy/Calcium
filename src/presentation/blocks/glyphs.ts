@@ -71,6 +71,28 @@ export type GlyphSet = Readonly<{
   stubLeft: string;
   stubRight: string;
   /** A second centre that must never share the median's glyph (C04 I53). */
+  /**
+   * A candlestick's body and its crossing (C12 §3r, C12 I36).
+   *
+   * **Three slots and not five**: the wick is `vertical` and the doji is
+   * `horizontal`, which are the same statements those slots already make.
+   *
+   * **Hollow is rising and filled is falling at every depth**, rather than a
+   * pair reserved for the monochrome rung. I25's sweep is indexed by
+   * `PlotForm` and a candlestick is a *style* on `line`, so the one rule that
+   * would catch a tone-only distinction renders a document without any
+   * candles in it — and the catalogue's `.plain` frames, which are what the
+   * scheduled frame-read looks at, strip colour. Colour reinforces the mark
+   * here; it never carries it alone.
+   *
+   * `candleCross` is the cell where a body shorter than one cell meets the
+   * wick running past it on both sides. Without it the body wins the overlap
+   * and the wick disappears at exactly the bar the reader is looking at
+   * (§6b B13).
+   */
+  candleHollow: string;
+  candleFilled: string;
+  candleCross: string;
   diamond: string;
   /** Mean and median in one cell, so *they coincide* never reads as *it is missing* (C12 I33). */
   diamondTee: string;
@@ -121,6 +143,9 @@ const UNICODE: GlyphSet = Object.freeze({
   stubUp: "╵",
   stubLeft: "╴",
   stubRight: "╶",
+  candleHollow: "▯",
+  candleFilled: "┃",
+  candleCross: "┿",
   diamond: "◆",
   diamondTee: "◈",
   teeLeft: "├",
@@ -156,6 +181,9 @@ const ASCII: GlyphSet = Object.freeze({
   stubUp: "|",
   stubLeft: "-",
   stubRight: "-",
+  candleHollow: "=",
+  candleFilled: "#",
+  candleCross: "+",
   diamond: "x",
   diamondTee: "X",
   teeLeft: "+",

@@ -19,6 +19,8 @@ import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
 import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
+import { aggregate, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
+import { seriesRange } from "../../src/presentation/plot/scale.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
@@ -1861,5 +1863,234 @@ describe("C12 §3f — the bar's readout and its bins", () => {
     );
     const bounds = narrow.labels.map((l) => l.split(",")[0]);
     expect(new Set(bounds).size, "every lower bound is distinct").toBe(bounds.length);
+  });
+});
+
+describe("C12 §3r — the candlestick", () => {
+  const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" } as const;
+  const walk = (
+    steps: readonly number[],
+    wick = 2,
+  ): readonly { open: number; high: number; low: number; close: number }[] => {
+    const out: { open: number; high: number; low: number; close: number }[] = [];
+    let last = 100;
+    for (const d of steps) {
+      const open = last;
+      const close = last + d;
+      out.push({ open, close, high: Math.max(open, close) + wick, low: Math.min(open, close) - wick });
+      last = close;
+    }
+    return out;
+  };
+  const candles = (over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot", id: "cs", form: "line", height: 12, axes: true,
+      plotStyle: "candlestick", series: [], ohlc: walk([3, -2, 5, -1, -4, 6, 2, -3]),
+      ...over,
+    } as unknown as Plot) as Plot;
+  const framed = (b: Plot, width = 60, caps = FULL_CAPS): readonly string[] =>
+    measurable({ definitions: [plotDefinition], capabilities: caps }).renderToLines(b, width)
+      .map((l) => l.split(String.fromCharCode(27)).map((p, i) => (i === 0 ? p : p.slice(p.indexOf("m") + 1))).join(""));
+  const ink = (rows: readonly string[]): string => rows.join("");
+
+  it("CS1 (C12 I36, §6b B1): `ohlc` with `series: []` renders candles, not the empty message", () => {
+    // **The row that would have been got wrong**, and the reason it is first:
+    // every emptiness check in this component asks about `series`, and a
+    // correct plain-candles block has none. The failure it guards is a frame
+    // that is internally consistent, passes every width and row assertion, and
+    // is about nothing.
+    const rows = framed(candles());
+    const g = glyphs(FULL_CAPS);
+    expect(ink(rows)).not.toContain("No data");
+    expect(ink(rows), "hollow bodies").toContain(g.candleHollow);
+    expect(ink(rows), "filled bodies").toContain(g.candleFilled);
+
+    // And the fixture responds: strip the bars and the same block *is* empty,
+    // or the row passes against a renderer that ignores `ohlc` entirely.
+    expect(ink(framed(candles({ ohlc: [] })))).toContain("No data");
+  });
+
+  it("CS2 (C12 I36, I25): direction is a mark at every depth, on the colour-stripped rows", () => {
+    // **I25's sweep cannot reach this** — it is indexed by `PlotForm`, renders
+    // `ONE_PER_FORM["line"]`, and a candlestick is a *style*. So the property
+    // is asserted here, and asserted on rows with the escapes removed, which is
+    // both what makes it a claim about marks and what the catalogue's `.plain`
+    // frames show a reader.
+    for (const [name, caps] of [
+      ["24-bit", FULL_CAPS], ["1-bit", MONO_UNICODE_CAPS], ["ascii", ASCII_CAPS],
+    ] as const) {
+      const g = glyphs(caps);
+      const seen = ink(framed(candles(), 60, caps));
+      expect(seen, `${name}: rising`).toContain(g.candleHollow);
+      expect(seen, `${name}: falling`).toContain(g.candleFilled);
+      expect(g.candleHollow, `${name}: the two marks differ`).not.toBe(g.candleFilled);
+    }
+  });
+
+  it("CS3 (C12 I36, §6b B7, B15): the width, the pitch, and no two candles touching", () => {
+    // The clamp binding and not binding, plus the budget where the gap is
+    // unaffordable — one row per regime, since a rule asserted at one width is
+    // a rule that holds at one width.
+    expect(candleWidth(60, 8), "clamp does not bind: ⌊60÷8⌋−1").toBe(6 - 1);
+    expect(candleWidth(200, 8), "clamp binds at 5").toBe(5);
+    expect(candleWidth(16, 8), "⌊16÷8⌋−1 = 1").toBe(1);
+    expect(candleWidth(8, 8), "one cell each, and the floor holds").toBe(1);
+
+    // **Two adjacent candles never touch above the one-cell budget**, which is
+    // the property the arithmetic exists for: at `⌊areaWidth ÷ n⌋` exactly they
+    // did, and two rising candles side by side read as one double-width body.
+    for (const width of [30, 40, 60, 90]) {
+      const rows = framed(candles({ ohlc: walk([2, 3, 4, 5, 6]) }), width);
+      const g = glyphs(FULL_CAPS);
+      const doubled = new RegExp(`${g.candleHollow}{${String(candleWidth(width - 6, 5) + 1)}}`, "u");
+      expect(rows.some((r) => doubled.test(r)), `width ${String(width)}: no run wider than one body`)
+        .toBe(false);
+    }
+
+    // **Left of centre at an even width** — `⌊(w−1)÷2⌋`, `boxplotColumn`'s
+    // rounding, so the component has one rule and not two that agree.
+    //
+    // **At an odd width the two roundings agree**, which is what the first form
+    // of this assertion measured: area 4 gives `cw = 3` and `⌊1⌋ = ⌈1⌉`, so a
+    // mutation to `Math.ceil` passed it. Area 3 gives `cw = 2`, where floor is
+    // 0 and ceil is 1 — the only widths that can see the rule are the even ones.
+    expect(candleWidth(3, 1), "the fixture is an even candle").toBe(2);
+    const even = candleRows(walk([4]), { min: 90, max: 110 }, 3, 9, FULL_CAPS);
+    const wickRow = even.rising.find((r) => r.trimEnd() === glyphs(FULL_CAPS).vertical);
+    expect(wickRow, "a wick-only row exists to read").toBeDefined();
+    expect(wickRow?.indexOf(glyphs(FULL_CAPS).vertical), "cw=2 → the left cell").toBe(0);
+
+    // And an odd width centres it, or the rule above is a statement about one
+    // parity rather than about rounding.
+    expect(candleWidth(4, 1)).toBe(3);
+    const odd = candleRows(walk([4]), { min: 90, max: 110 }, 4, 9, FULL_CAPS);
+    expect(odd.rising.find((r) => r.trimEnd() === ` ${glyphs(FULL_CAPS).vertical}`), "cw=3 → centred")
+      .toBeDefined();
+  });
+
+  it("CS3b (C12 I36, §6b B15): fewer bars than columns are left-aligned, not spread", () => {
+    // **C12 I13's ruling** — four bars read as *four bars so far, growing
+    // rightward*, and a layout that spreads them across the window asserts that
+    // the four samples span it. The first form of B15 spread the remainder a
+    // cell at a time, which put one candle every eleven cells in a 44-column
+    // area, and no arithmetic assertion could see it.
+    const rows = candleRows(walk([3, -2, 5, -1]), { min: 90, max: 115 }, 44, 8, FULL_CAPS);
+    const merged = rows.rising.map((r, i) =>
+      [...r].map((c, j) => (c === " " ? rows.falling[i]![j]! : c)).join(""));
+    const rightmost = Math.max(...merged.map((r) => r.trimEnd().length)); // cells-ok — a column index
+    // Four candles at a pitch of `candleWidth + 1`, so the ink ends well before
+    // the right edge and the remainder is blank rather than gap.
+    expect(candleWidth(44, 4), "the clamp binds at 5").toBe(5);
+    expect(rightmost, "4 × 6 − 1 columns of ink, then nothing").toBe(4 * 6 - 1);
+    for (const r of merged) expect(r.slice(4 * 6).trim(), "the right is empty").toBe("");
+  });
+
+  it("CS4 (C12 I36, §6b B12): more bars than columns aggregate, and the extreme survives", () => {
+    // **A series whose extreme falls on a bar sampling would drop**, since an
+    // aggregation that happens to agree with sampling tests nothing. Bar 7 of
+    // 24 carries the high; with 6 columns a sampler taking every fourth bar
+    // reads bars 0, 4, 8, … and never sees it.
+    const bars = walk(Array.from({ length: 24 }, () => 1), 1).map((b, i) =>
+      i === 7 ? { ...b, high: 999 } : b);
+    const agg = aggregate(bars, 6);
+    expect(agg).toHaveLength(6);
+    expect(Math.max(...agg.map((b) => b.high)), "the spike survives").toBe(999);
+    expect(agg[0]!.open, "open of the first").toBe(bars[0]!.open);
+    expect(agg[5]!.close, "close of the last").toBe(bars[23]!.close);
+    expect(Math.min(...agg.map((b) => b.low)), "low of the minima")
+      .toBe(Math.min(...bars.map((b) => b.low)));
+
+    // Sampling every fourth bar is what this replaces, and it loses the spike.
+    const sampled = bars.filter((_b, i) => i % 4 === 0);
+    expect(Math.max(...sampled.map((b) => b.high)), "the fixture responds").not.toBe(999);
+
+    // Fewer bars than columns are returned unchanged — C12 I13's left-alignment is
+    // the caller's, and aggregation must not quietly stretch them.
+    expect(aggregate(bars.slice(0, 3), 40)).toHaveLength(3);
+  });
+
+  it("CS8 (C12 I36): a wide terminal draws the ASCII arm and fits the same candles", () => {
+    // **The row that would have asserted the conflation.** Its first form said
+    // *half as many*, which is what §3r said before `glyphs()` was measured:
+    // two different swaps were both called *the wide arm*, and only the ramp's
+    // is braille. `glyphs()` returns ASCII at `wide`, so the shape is identical
+    // and the glyphs are not.
+    const narrow = framed(candles(), 60, FULL_CAPS);
+    const wide = framed(candles(), 60, WIDE_CAPS);
+    const ascii = framed(candles(), 60, ASCII_CAPS);
+    expect(wide, "wide draws what ascii draws").toEqual(ascii);
+    expect(ink(wide), "and not the ambiguous vocabulary").not.toContain(glyphs(FULL_CAPS).candleHollow);
+
+    // Same shape: the ink sits in the same columns, whatever the glyphs are.
+    const shape = (rows: readonly string[]): string =>
+      rows.map((r) => [...r].map((c) => (c === " " ? " " : "#")).join("")).join("\n");
+    expect(shape(wide), "the column count does not change").toBe(shape(narrow));
+    for (const rows of [narrow, wide]) {
+      for (const r of rows) expect(cells(r, "narrow")).toBeLessThanOrEqual(60);
+    }
+  });
+
+  it("CS9 (C12 I36, §6b B13): `┿` where the wick shares the body's cell — never the only cell", () => {
+    // A wick reaching no row beyond the body: `┿` carries both, because the
+    // body wins the overlap and the wick would simply vanish.
+    const tight = [{ open: 100, high: 110, low: 99.5, close: 108 }];
+    const wide9 = candleRows(tight, { min: 90, max: 112 }, 9, 10, FULL_CAPS);
+    expect(ink(wide9.rising), "the lower wick shares the body's end cell")
+      .toContain(glyphs(FULL_CAPS).candleCross);
+
+    // **And every candle still says which way it went.** This is the bound the
+    // frame added: 120 bars in 44 columns put every body in one row and one
+    // column, and the first form of the rule drew a chart of nothing but `┿`.
+    const dense = walk(Array.from({ length: 120 }, (_u, i) => [3, -2, 5, -1, -4, 6, 2, -3][i % 8]!));
+    const rows = framed(candles({ ohlc: dense, height: 10 }), 50);
+    const g = glyphs(FULL_CAPS);
+    expect(ink(rows), "rising is visible").toContain(g.candleHollow);
+    expect(ink(rows), "falling is visible").toContain(g.candleFilled);
+    const packed = candleRows(dense, { min: 50, max: 250 }, 44, 8, FULL_CAPS);
+    const marks = [...ink([...packed.rising, ...packed.falling])].filter((c) => c !== " ");
+    expect(marks.filter((c) => c === g.candleCross).length, "no cross at one cell wide").toBe(0);
+  });
+
+  it("CS-B3 (§6b B3): the axis unions the candles and the overlays, and a pin still wins", () => {
+    // `low`/`high` bound the candles and the overlays bound themselves. Without
+    // the union a plain-candles block scales against nothing.
+    const bars = [{ open: 10, high: 40, low: 5, close: 20 }];
+    expect(seriesRange([], {}, bars)).toEqual({ min: 5, max: 40 });
+    expect(seriesRange([{ values: [1, 60] }], {}, bars), "the union, not either half")
+      .toEqual({ min: 1, max: 60 });
+    expect(seriesRange([], { yMin: 0, yMax: 100 }, bars), "a pin replaces rather than widens")
+      .toEqual({ min: 0, max: 100 });
+
+    // **Gated on the style, not on the field.** Bars a block does not draw must
+    // not move its axis — an axis widened by invisible data is a curve that
+    // does not reach its own edges for no stated reason.
+    const plain = framed(block({
+      kind: "plot", id: "plain", form: "line", height: 6, axes: true,
+      series: [{ values: [1, 2, 3] }], ohlc: bars,
+    } as unknown as Plot) as Plot, 40);
+    expect(ink(plain), "40 is nowhere on this axis").not.toContain("40");
+  });
+
+  it("CS-B4 (§6b B4): the legend names both directions, and the candles lead", () => {
+    const rows = framed(candles({ legend: "right", series: [{ values: [100, 104, 102], label: "ma" }] }), 64);
+    const seen = ink(rows);
+    expect(seen).toContain("rising");
+    expect(seen).toContain("falling");
+    expect(seen).toContain("ma");
+    // The swatch is the body glyph rather than `markOf`'s ladder: a legend
+    // whose mark is not the thing it names is this function's recorded defect.
+    expect(rows.some((r) => r.includes(`${glyphs(FULL_CAPS).candleHollow} rising`))).toBe(true);
+    expect(rows.some((r) => r.includes(`${glyphs(FULL_CAPS).candleFilled} falling`))).toBe(true);
+  });
+
+  it("CS-B5 (§6b B5): a doji draws the flat mark, and an overlay through it draws the same", () => {
+    // **Not a defect and it needs no glyph change**: a candle whose open equals
+    // its close *is* flat, and so is a line crossing that column. Both
+    // statements are true of the cell, and the readout is what disambiguates —
+    // which is what makes it load-bearing rather than a convenience.
+    const doji = [{ open: 100, high: 104, low: 96, close: 100 }];
+    const rows = candleRows(doji, { min: 90, max: 110 }, 7, 9, FULL_CAPS);
+    expect(ink(rows.rising), "the doji is the flat mark").toContain(glyphs(FULL_CAPS).horizontal);
+    expect(ink(rows.falling), "a doji is in neither direction's layer").toBe(" ".repeat(7 * 9));
   });
 });

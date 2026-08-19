@@ -434,11 +434,28 @@ export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendE
   // control survived and the harness reported itself blind. A legend whose
   // swatch is a different colour from the thing it names is the exact defect
   // this function's own comment warns about.
-  return source.map((label, i) => ({
-    mark: markOf(i, ctx.capabilities),
-    label,
-    ref: refOf(i),
-  }));
+  const g = glyphs(ctx.capabilities);
+  // **A candlestick names both directions, and the candles come first**
+  // (C12 §6b B4). The overlays are what `source` already holds — a moving
+  // average is a series like any other — and the candles are what the block is
+  // about, so they lead. Their marks are the body glyphs rather than `markOf`'s
+  // ladder: a legend whose swatch is not the glyph it names is this function's
+  // own recorded defect, one category along.
+  const candles: readonly LegendEntry[] =
+    block.plotStyle === "candlestick" && block.ohlc !== undefined
+      ? [
+          { mark: g.candleHollow, label: "rising", ref: "tone.ok" },
+          { mark: g.candleFilled, label: "falling", ref: "tone.error" },
+        ]
+      : [];
+  return [
+    ...candles,
+    ...source.map((label, i) => ({
+      mark: markOf(i, ctx.capabilities),
+      label,
+      ref: refOf(i),
+    })),
+  ];
 }
 
 /** `swatch label`, measured in cells. */

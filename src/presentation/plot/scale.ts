@@ -9,7 +9,7 @@
  * shape is C05 §3a's: a `WeakMap` keyed on the `Series` object, never on the
  * content of its values.
  */
-import type { Plot, Series } from "../../data/viewmodel/index.js";
+import type { OHLC, Plot, Series } from "../../data/viewmodel/index.js";
 
 /**
  * A finite value and **its position in the original series**.
@@ -83,6 +83,7 @@ export function finiteSamples(values: readonly (number | null)[]): readonly Samp
 export function seriesRange(
   series: readonly Series[],
   pin: Pick<Plot, "yMin" | "yMax">,
+  bars?: readonly OHLC[],
 ): Range | null {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -91,6 +92,19 @@ export function seriesRange(
   for (const s of series) {
     for (const v of s.values) {
       if (v === null || !Number.isFinite(v)) continue;
+      seen = true;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+  // **The union, in one scan** (C12 §6b B3). A candlestick's extremes are its
+  // wicks and its overlays bound themselves, so both go in before the pin is
+  // applied — folding them here rather than taking a maximum of two ranges is
+  // what keeps `!seen` meaning *nothing was measured anywhere*, which is the
+  // condition the empty message hangs on.
+  for (const b of bars ?? []) {
+    for (const v of [b.open, b.high, b.low, b.close]) {
+      if (!Number.isFinite(v)) continue;
       seen = true;
       if (v < min) min = v;
       if (v > max) max = v;

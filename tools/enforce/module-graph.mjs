@@ -1259,18 +1259,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // MG24's bidirectional arm is what makes this self-expiring rather than a
   // deferral at all: the day `rainColumns` names `grows`, this entry becomes a
   // violation in its own right.
-  // **A deferral naming a symbol, so picking the entry up begins by grepping
-  // it** — and the bidirectional arm is what makes the grep unnecessary: the
-  // day `definition.ts` reads `block.ohlc`, this entry is a violation.
-  "Plot.ohlc":
-    "C04 I57, C12 I36 — **published one commit ahead of the renderer that draws it, " +
-    "deliberately.** The type, both gates and the builder land together because a " +
-    "spec commit ahead of code is this repo's order; the candlestick rasteriser is " +
-    "the next commit and `seriesRange`/`hasSamples` widen with it (C12 §6b B1, B3). " +
-    "Until then a `plotStyle: \"candlestick\"` block is constructible and renders as " +
-    "\"No data.\", which is the walk's first row rather than a surprise — and no " +
-    "fixture, example or golden frame builds one, so the window has no consumer",
-
   "Extent.grows":
     "C12 I34, I21 — **the deferral was discharged and the answer did not move, " +
     "which is the entry worth keeping.** This said the consumer was " +

@@ -58,13 +58,14 @@ import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, 
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
+import { candleRows, hasBars } from "./candles.js";
 import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
-import type { Annotation, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
+import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -111,6 +112,18 @@ function ownedSpans(
 /** Whether anything was measured at all — distinct from whether a range exists. */
 function hasSamples(series: readonly Series[]): boolean {
   return series.some((sr) => sr.values.some((v) => v !== null && Number.isFinite(v)));
+}
+
+/**
+ * The bars this block draws, or none (C12 §6b B1, I36).
+ *
+ * **Gated on the style and not on the field being present.** `ohlc` on a block
+ * whose style does not draw it contributes nothing to the frame, so it must
+ * contribute nothing to the axis either — an axis widened by data nobody can see
+ * is a plot whose curve does not reach its own edges for no stated reason.
+ */
+function candlesOf(block: Plot): readonly OHLC[] | undefined {
+  return block.plotStyle === "candlestick" ? block.ohlc : undefined;
 }
 
 /** The narrowest plot area worth drawing a curve in. Below it, furniture goes. */
@@ -665,7 +678,12 @@ function styleRasteriser(
 ): Rasteriser {
   const ps = block.plotStyle ?? "auto";
   if (ps === "braille") return base;
-  const useLineDraw = ps === "line" || (ps === "auto" && caps.ambiguousWidth !== "wide");
+  // **`candlestick` names what the *candles* draw, and this function chooses what the
+  // *overlays* draw** — so it takes `auto`'s answer rather than a third arm. A
+  // moving average over candles is an ordinary curve and there is no reason for
+  // it to be drawn differently from the same curve on its own.
+  const auto = ps === "auto" || ps === "candlestick";
+  const useLineDraw = ps === "line" || (auto && caps.ambiguousWidth !== "wide");
   if (!useLineDraw) return base;
   const corners = block.plotCorners ?? "rounded";
   // **The interpolation is passed, not inferred from the base rasteriser.**
@@ -683,6 +701,7 @@ function overlaidRows(
   layout: Layout,
   ctx: RenderContext,
   rasterise: Rasteriser = curveRows,
+  under: readonly Layer[] = [],
 ): readonly string[] {
   // **The scale, and the capability.** Both were dropped here and nowhere else:
   // `yLabels` was called without `yScale`, so a log axis was labelled linearly,
@@ -702,6 +721,10 @@ function overlaidRows(
       glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
       ref: refOf(s, index),
     })),
+    // **The candles sit between**, because layers resolve first-non-blank: the
+    // overlay series must win a shared cell (§3r — a moving average is drawn
+    // *over* the candles) and the annotations must lose it (C04 I52).
+    ...under,
     ...(block.annotations ?? []).map((a) => ({
       glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
       ref: `tone.${a.tone ?? "muted"}` as ColourRef,
@@ -719,6 +742,37 @@ function overlaidRows(
       ctx,
     ),
   );
+}
+
+/**
+ * A candlestick's two layers — rising, then falling (C12 I36, §6b B4).
+ *
+ * **Two, because a `Layer` carries one `ColourRef` and this has two
+ * categories.** A column is rising or falling and never both, so the layers are
+ * disjoint and the merge composes them with no rule about which wins.
+ *
+ * **`tone.ok` and `tone.error` rather than the categorical palette**, which is
+ * the one place a judgement tone is the right answer and not roadmap 51's
+ * defect. That defect was *unrelated* quantities cycled through judgement
+ * tones — series three reading as good because it was third. Here the tone
+ * names the thing the category **is**, green up and red down is what every
+ * reader of this figure expects, and the mark already carries the direction at
+ * every depth (§3r), so a theme where the two tones are close still reads.
+ */
+function candleLayers(
+  bars: readonly OHLC[] | undefined,
+  range: Range,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly Layer[] {
+  if (!hasBars(bars)) return [];
+  const { rising, falling } = candleRows(
+    bars ?? [], range, layout.areaWidth, layout.areaRows, ctx.capabilities,
+  );
+  return [
+    { glyphRows: rising, ref: "tone.ok" },
+    { glyphRows: falling, ref: "tone.error" },
+  ];
 }
 
 /**
@@ -1237,7 +1291,8 @@ function positionalForm(
   rasterise: Rasteriser,
 ): readonly string[] {
   const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
-  const data = seriesRange(block.series, block);
+  const bars = candlesOf(block);
+  const data = seriesRange(block.series, block, bars);
   const range =
     data === null || stacked
       ? data
@@ -1254,12 +1309,18 @@ function positionalForm(
   // other empty variant says *No data.* The question here is whether anything
   // was measured, and only the samples can answer it. The same defect waits on
   // any form given pinned bounds and no data; this is the one that had one.
-  if (range === null || !hasSamples(block.series)) return emptyRows(block, layout, ctx);
+  // **B1 — the row that would have been got wrong.** Every emptiness check in
+  // this component asks about `series`, and plain candles are `series: []` with
+  // a full `ohlc`: a correct block rendering *"No data."*, internally consistent
+  // and about nothing. `series: []` being legal is exactly what hides it.
+  if (range === null || !(hasSamples(block.series) || hasBars(bars))) {
+    return emptyRows(block, layout, ctx);
+  }
 
   const cursorIdx = ctx.cursorPositions?.[block.id];
   const area = stacked
     ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, range, layout, ctx, rasterise);
+    : overlaidRows(block, range, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx));
   if (block.axes === true && cursorIdx !== undefined && Number.isFinite(cursorIdx)) {
     return axedWithCursor(block, cursorIdx, area, layout, ctx);
   }
