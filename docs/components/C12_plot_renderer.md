@@ -1941,6 +1941,52 @@ Without the cut the row would draw `▁` from edge to edge, which is a flat line
 the cloud saying *this distribution is everywhere* — the same picture the violin's outline drew
 before `cut` landed, one rung down.
 
+### A mirror needs a centre, so the mirrored rung draws on an odd extent
+
+The top rung is the outline reflected about the spine, and it drew **three rows of ink above the
+rule against two below** at every even height — measured at 4, 6 and 8, in both arms, every time.
+
+The cause is two correct statements meeting. Both arms split the slot as `⌊(k−1) ÷ 2⌋` above and
+`⌈(k−1) ÷ 2⌉` below, which is symmetric and has a comment saying why: *the offset is rounded once
+and applied both ways, because rounding each edge independently is not.* Then both take the spine
+at `round((k−1) ÷ 2)` — and for an even `k` that is the **lower** of the two baselines, not the
+axis they mirror about. So the outline reflected about `k/2 − 0.5` while the rule, the box, the
+median and the closing points sat half a cell below it.
+
+**Neither statement is wrong and the pair is.** That is why the existing comment is exactly right
+about the class and did not prevent the instance: *"a violin that is asymmetric by a row is a
+violin that is wrong, and it is invisible in anything but a mirror assertion."* No mirror
+assertion existed.
+
+**And the golden corpus could not have been one**: landing the fix moved four vertical frames and
+**not one horizontal frame**, out of 284. The reason is the rung and not the parity — `ONE_PER_FORM`'s
+violin is `height: 12` over three categories, four rows a band, which this section spends on the
+**raincloud**; the mirrored outline starts at five. So the top rung of the ladder had no horizontal
+golden frame at all, and a green run cannot tell *a case the corpus covers and passes* from *a case
+the corpus does not reach*. `MIRRORED` is that corpus, at six rows a band and seven, so the parity
+is a comparison a reader makes rather than a claim this section makes.
+
+*The paragraph above said the band height was odd until it was measured at four. The observation
+that prompted it — four frames moved and no horizontal one — was right, and the reason under it was
+not.*
+
+So the mirrored rung takes the largest odd extent that fits, and the spare cell is left blank.
+
+**The spare cell goes *before* the figure, and two rules the fix does not touch are what say so.**
+`bandedForm` puts a band's name at `⌊rows ÷ 2⌋` of the figure it was handed; `columnLabels` puts a
+band's tick at `x + ⌊w ÷ 2⌋`. Padding at the top — and at the left, standing up — lands the spine
+on both, at every even extent. Padding after lands it one cell short of both. Two independent
+placements agreeing is what makes this a derivation rather than a preference.
+
+At an extent of two the odd extent is one, and the floor arm draws the fill instead — which is the
+case that arm's own comment already calls a summary: two cells is an upper edge and a lower edge
+with no centre between them.
+
+**The raincloud rungs are unaffected and it is worth saying why**, because *the violin is
+asymmetric* would otherwise read as covering them: a raincloud is **one-sided by construction** —
+§3i's own *the mirror carries no information* — so it has no reflection to be wrong about and an
+even budget costs it nothing.
+
 ### The budgets are asymmetric, and it is the cell's aspect showing through
 
 | form | horizontal | vertical |
@@ -2306,6 +2352,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I36** — **`candlestick` is a curve style and not a form, its data is a typed field, and the readout is part of it.** Everything a line plot has is unchanged — axis, grid, annotations, legend, crosshair — and what differs is what one column draws, so it sits in `plotStyle` beside `braille` and `line` with `form` still `line` or `step`. **Bullish and bearish are two categories, so §3b binds**: hollow-versus-filled carries direction at **every** depth and colour reinforces it — because I25's sweep is indexed by `PlotForm` and a style is invisible to it, and because the frame-read this repository schedules strips colour. **There is no sub-cell win, and the section records that the mechanism was looked for** — a body floats between open and close so both ends fall inside a cell, Unicode's vertical eighths ladder upward only, and the one vocabulary that resolves both ends is the one that cannot draw a hollow body. Cell resolution, as every reference implementation draws it; what is exact here is the aggregation. **The width is a stated layout rule** — `clamp(⌊areaWidth ÷ n⌋ − 1, 1, 5)` with the gap taken before the body, the wick left of centre at an even width by `boxplotColumn`'s existing rounding — and **more bars than columns aggregate rather than sample**: open of the first, high of the maxima, low of the minima, close of the last, which is exact where every other downsampling in this component approximates. **The vocabulary is not swapped to braille** — a bar's length *is* its value so doubling the glyph doubles the datum, while a candle's glyph carries direction and its column carries the time — **and the wide arm is `glyphs()`' ASCII set, so the column count does not change.** Two swaps were both called *the wide arm*, and drawing the consequence from the wrong one would have set a layout floor of one cell that `wide` cannot reach. **The readout is load-bearing rather than a convenience**, because a doji and an overlay line both draw `─` in one cell and only the four values tell them apart (§3r, §6b B5).
 - **I37** — **The cursor's column is marked twice, and the mapping from index to column is the form's.** A readout names values and a reader cannot use them without knowing which mark they describe — which is what §6b B5's ruling about the doji rests on. **A dashed vertical behind the data** through the same path the gridlines take, so it never overwrites a sample; **and a mark on the bottom rule**, because the dashed line is invisible in exactly the case that motivates it, a dense column with ink in every row. *The index is into the data and not the area* — `cursorReadout` has always read `values[cursorIdx]` — so a candlestick inverts through its own pitch and its buckets. **Measured: the two mappings agree at the dense end and separate at the sparse one**, because a candle is left-aligned at a fixed pitch where a curve spreads across the width — four bars in forty-four columns put the last candle at column 20 and the curve's rule at 43. **C12 owns what a cursor draws and not who moves one**: nothing in `src/` writes `cursorPositions`, and §10's Phase 2 row is about that writer (§3s).
 - **I38** — **Colour indexes an identity, and a row that is a slice of a continuous axis has none.** A histogram's bins and a correlogram's lags are cut from an axis by the renderer, so eight bins are one distribution and drew eight colours; a band named `control` is a thing the caller chose and keeps its slot. `ROW_IS_AN_IDENTITY` is that partition, total over `PlotForm`. *The claim this replaced lived in a code comment and no file — true about the grouped bar it was written for, general by nothing — and **the first correction over-reached in the other direction**: eleven reference renderings draw one colour per series and that is the references' taste rather than the principle under it, so reading the measurement as the ruling took the colour off every named band too. A measurement settles what is true; it does not settle what to draw.* **The switch is span ownership and not `SHARES_CELLS`**, which is indexed by form and so answers for a plain bar and a stacked one at once: a builder returning owners has interior identities and each run takes its owner's slot; a builder returning a string has none, and the row's identity is in the gutter already. **A form whose rows are series says so** — the timeline is the single cell where the old default was accidentally right, three tracks in one colour is what the correction costs there, and every count in that frame would still be correct. Measured against eleven reference renderings: the cycle advances per series and only per series, and mapping the category axis to colour is `hue=x` — available, explicit, and redundant by construction (§3t).
+- **I39** — **A mirrored figure draws on an odd extent, and the spare cell precedes it.** A reflection needs a centre and an even extent has none: both violin arms split their slot symmetrically and then take the spine at `round((k−1) ÷ 2)`, which for an even `k` is the lower baseline rather than the axis of reflection — so the figure carried three rows of ink above its rule against two below, at 4, 6 and 8, in both arms. *Neither statement is wrong and the pair is, which is why the comment already standing over the first one — **a violin that is asymmetric by a row is a violin that is wrong, and it is invisible in anything but a mirror assertion** — was right about the class and did not reach the instance. No mirror assertion existed, and the golden corpus could not supply one: `ONE_PER_FORM`'s violin is four rows a band, which this ladder spends on the **raincloud**, so the top rung had no horizontal golden frame at all and the fix moved four vertical frames and none of the other 280.* **The spare cell goes first** because `bandedForm` places a band's name at `⌊rows ÷ 2⌋` and `columnLabels` places its tick at `x + ⌊w ÷ 2⌋` — padding before lands the spine on both at every even extent and padding after lands it one short of both, so two untouched placements agree. **The raincloud rungs are outside this**, being one-sided by construction, and an extent of two falls to the fill because two cells are two edges with no centre between them (§3i).
 
 ## 8. Commitments
 
@@ -2341,6 +2388,7 @@ orientation — and belongs in the classification table as its own rows.
 30. **`candlestick` is a curve style over the positional machinery**, with its own typed data, a stated candle width, exact OHLC aggregation, and a readout that is load-bearing because a doji and an overlay line share a glyph (I36).
 28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
 32. **Colour indexes an identity** — a row cut from a continuous axis has none and takes one colour, a named row keeps its slot, a row's interior identities are coloured by their owner, and a form whose rows *are* series declares it (I38, §3t).
+33. **A mirrored figure draws on an odd extent** — a reflection needs a centre, the spare cell precedes the figure so the band's own label and tick still land on the spine, and the one-sided rungs are outside it (I39, §3i).
 
 ---
 
