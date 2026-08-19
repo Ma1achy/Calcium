@@ -22,7 +22,24 @@ const CATALOGUE = join(import.meta.dirname, "..", "docs", "catalogue");
 
 const FONT_SIZE = 14;
 const CELL_W = 8.41;
-const CELL_H = 18;
+/**
+ * **16, and it is a measurement rather than a taste.**
+ *
+ * A terminal stretches `│` to its cell, so a frame's left edge is one unbroken
+ * line. An SVG `<text>` draws the glyph at its natural extent and leaves
+ * whatever is left over blank, so a row pitch wider than the glyph dashes every
+ * vertical rule in the catalogue — which is most of what made correct frames
+ * look broken.
+ *
+ * Probed at 18 / 17 / 16.5 / 16 with a stacked `┌ │ │ │ │ └`: 18 shows gaps of
+ * about a fifth of a cell, 17 half that, 16.5 hairline, **16 continuous**. The
+ * ceiling is the glyph's own vertical extent, 1.143 × the font size, and the
+ * advance is 0.601 × it — so the widest cell aspect this font can draw without
+ * dashing is 1.902, just under the 2 that `plot/aspect.ts` assumes. Circles
+ * come out about 5% wide as a result, which is the smaller of the two errors
+ * and the one that does not read as a defect.
+ */
+const CELL_H = 16;
 const PAD = 6;
 const GAP = 10;
 /**
@@ -203,32 +220,46 @@ export function ansiToSvg(ansi) {
 
     for (const span of spans) {
       if (span.text.length === 0) continue;
-      // Split into braille and non-braille runs
+      // **A space is a column advance, never a glyph** — and that is the whole
+      // of a defect that made every catalogue frame look broken while the
+      // frames themselves were correct.
+      //
+      // SVG's default `xml:space="default"` strips leading and trailing
+      // whitespace from a `<text>` and collapses internal runs to one space.
+      // A row's indent survives only when it lands in a span of its own: row 0
+      // of a plot is `"      "` then an SGR then `┌───┐`, two spans, and it
+      // drew correctly. Row 1 is `SGR + "      │"` — one span — so the border
+      // drew at column 0 and the frame looked shattered. An x-label row is one
+      // span of `"    setosa      versicolor"`, so the labels bunched together
+      // at the left with single spaces between them.
+      //
+      // Emitting one `<text>` per contiguous non-space run at its own column
+      // removes the dependence on XML whitespace handling *and* on the font's
+      // space advance matching CELL_W, which was the other way this could
+      // drift. Nothing is drawn for a space, so nothing can be collapsed.
       let textRun = "";
       let textStart = col;
+      const flush = () => {
+        if (!textRun) return;
+        const x = PAD + textStart * CELL_W;
+        parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}">${escapeXml(textRun)}</text>`);
+        textRun = "";
+      };
       for (const ch of span.text) {
         if (isBraille(ch)) {
-          // Flush any pending text run
-          if (textRun) {
-            const x = PAD + textStart * CELL_W;
-            parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}">${escapeXml(textRun)}</text>`);
-            textRun = "";
-          }
-          // Render braille as dots
+          flush();
           const cx = PAD + col * CELL_W;
           const cy = PAD + row * CELL_H;
           parts.push(renderBrailleCell(cx, cy, ch, span.colour, CELL_W, CELL_H));
-          textStart = col + 1;
+        } else if (ch === " ") {
+          flush();
         } else {
           if (!textRun) textStart = col;
           textRun += ch;
         }
         col++;
       }
-      if (textRun) {
-        const x = PAD + textStart * CELL_W;
-        parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}">${escapeXml(textRun)}</text>`);
-      }
+      flush();
     }
   }
 

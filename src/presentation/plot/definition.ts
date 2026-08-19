@@ -50,7 +50,7 @@ import {
 import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
-import { CATEGORY_REFS, markOf, refOf as slotOf } from "./marks.js";
+import { markOf, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
@@ -333,8 +333,12 @@ function axed(
   const indent = (r: string): string =>
     placement === "left" && r !== "" ? " ".repeat(colWidth) + r : r; // cells-ok — a cell width
 
+  // **A horizontal legend is indented to the plot area, like the x-labels.**
+  // Emitted at column 0 it hangs left of the frame's own left edge, which is
+  // the one thing in the frame that does not line up with anything — and it
+  // reads as the frame being broken rather than as a placement choice.
   const horizontal = placement === "above" || placement === "below"
-    ? [legendRow(entries, layout.width, ctx)]
+    ? [" ".repeat(layout.gutter) + legendRow(entries, layout.areaWidth, ctx)]
     : [];
   const top = block.axes === true ? [indent(furnitureFor(block, layout, ctx).top)] : [];
   const bottom = block.axes === true
@@ -1528,6 +1532,9 @@ const FORM_ROWS: Readonly<
   violin: (block, width, ctx) => {
     const cats = block.categories ?? block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
     const qs = block.quartiles ?? [];
+    // One value axis for every band, so the categories can be compared — which
+    // is what the form is for (C12 §3q).
+    const shared = seriesRange(block.series, block) ?? undefined;
     if (block.orientation === "vertical") {
       // **The conventional orientation**: seaborn and matplotlib both draw a
       // violin this way and the horizontal arm is the terminal's accommodation.
@@ -1538,12 +1545,12 @@ const FORM_ROWS: Readonly<
       return categoricalColumnForm({ ...block, categories: cats }, width, ctx, (i, cw, rows) => {
         const sr = block.series[i];
         return sr
-          ? violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth)
+          ? violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared)
           : Array.from({ length: rows }, () => " ".repeat(cw));
       });
     }
     return bandedForm(block, cats, width, ctx, (sr, aw, rows, i) =>
-      violinRows(sr, aw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth),
+      violinRows(sr, aw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared),
     );
   },
   ridgeline: (block, width, ctx) => {
@@ -1558,18 +1565,40 @@ const FORM_ROWS: Readonly<
     if (block.series.length === 0) return emptyRows(block, fallback, ctx); // cells-ok — a series count
 
     const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities), block, width, ctx);
-    const { rows, baselines } = ridgelineArea(block.series, layout.areaWidth, areaRows, ctx.capabilities, block.bandwidth);
+    const { rows, baselines, owners } = ridgelineArea(
+      block.series, layout.areaWidth, areaRows, ctx.capabilities, block.bandwidth, block.plotCorners ?? "rounded",
+    );
     const labelAt = new Map(baselines.map((r, i) => [r, cats[i] ?? ""]));
+
+    // **Each curve carries its own colour, so a row is more than one span.**
+    // The curves overlap by construction — that is the form — so a row holds
+    // cells from two or three of them and there is no per-row colour to pick.
+    // Asking `baselines.indexOf(row)` gave -1 everywhere but the baselines, and
+    // the whole tangle drew in the fallback tone.
+    const tinted = (text: string, at: number): Span =>
+      at < 0 // cells-ok — a sentinel owner
+        ? { text }
+        : { text, style: slot(refOf(block.series[at] ?? { values: [] }, at), ctx.theme, ctx.capabilities) };
 
     const out = rows.map((content, r) => {
       const label = truncate(labelAt.get(r) ?? "", layout.labelColumn, ctx.capabilities);
-      const ref = CATEGORY_REFS[baselines.indexOf(r) % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a series index
+      const chars = [...areaText(content, layout, ctx)];
+      const own = owners[r] ?? [];
+      const runs: Span[] = [];
+      let text = "";
+      let at = -2; // cells-ok — a sentinel owner
+      for (let x = 0; x < chars.length; x += 1) { // cells-ok — the area grid is one code point per cell
+        const o = own[x] ?? -1; // cells-ok — a sentinel owner
+        if (o !== at) {
+          if (text !== "") runs.push(tinted(text, at));
+          text = "";
+          at = o;
+        }
+        text += chars[x];
+      }
+      if (text !== "") runs.push(tinted(text, at));
       return line(
-        [
-          ...gutterSpans(label, layout, ctx),
-          { text: areaText(content, layout, ctx), style: slot(ref, ctx.theme, ctx.capabilities) },
-          ...rightBorder(layout, ctx),
-        ],
+        [...gutterSpans(label, layout, ctx), ...runs, ...rightBorder(layout, ctx)],
         layout,
         ctx,
       );

@@ -153,6 +153,39 @@ export function densityRows(
  * - **No end caps**, so the tails taper into the axis instead of being stopped
  *   by a wall.
  */
+/**
+ * **The columns a violin's outline actually covers**, which is not all of them.
+ *
+ * A kernel estimate is defined everywhere, so evaluated across a *shared* value
+ * axis it returns a near-zero density far outside its own data — and a
+ * near-zero density draws the two edges on the rows either side of the centre,
+ * which is a pair of flat lines running to the frame's edge. Three violins then
+ * look like three shapes with infinite tails.
+ *
+ * seaborn's answer is `cut`: extend the estimate that many bandwidths past the
+ * extreme datapoints and stop. Two is its default and it is what this uses. The
+ * spine still runs the full width — it is the axis, and the marks sit on it —
+ * but the outline stops where the data stops having anything to say.
+ */
+const CUT = 2;
+
+function supported(
+  points: readonly number[],
+  sorted: readonly number[],
+  bandwidth: number,
+): { first: number; last: number } {
+  const lo = sorted[0]! - CUT * bandwidth;
+  const hi = sorted[sorted.length - 1]! + CUT * bandwidth; // cells-ok — a sample count
+  let first = -1; // cells-ok — a sentinel index
+  let last = -1; // cells-ok — a sentinel index
+  for (let i = 0; i < points.length; i += 1) { // cells-ok — a sample count
+    if (points[i]! < lo || points[i]! > hi) continue;
+    if (first < 0) first = i;
+    last = i;
+  }
+  return first < 0 ? { first: 0, last: points.length - 1 } : { first, last }; // cells-ok — a sample count
+}
+
 export function violinColumn(
   series: Series,
   colWidth: number,
@@ -161,6 +194,7 @@ export function violinColumn(
   quartiles?: QuartileSummary,
   corners: "rounded" | "sharp" = "rounded",
   adjust?: number,
+  shared?: { min: number; max: number },
 ): readonly string[] {
   const w = Math.max(1, Math.floor(colWidth));
   const n = Math.max(1, Math.floor(rows));
@@ -170,17 +204,26 @@ export function violinColumn(
   if (finite.length === 0) return blank(); // cells-ok — a sample count
 
   const sorted = [...finite].sort((a, b) => a - b);
-  const lo = sorted[0]!;
-  const hi = sorted[sorted.length - 1]!; // cells-ok — a sample count
+  // **The shared value axis, where the caller has one** (C12 §3q). Scaled to its
+  // own extent each violin fills its band, so a tight distribution and a wide
+  // one draw the *same* shape — and comparing the categories is the whole of
+  // what the form is for. Third instance: `ridgelineArea` had it, and the two
+  // arms had it separately.
+  const lo = shared?.min ?? sorted[0]!;
+  const hi = shared?.max ?? sorted[sorted.length - 1]!; // cells-ok — a sample count
   const pad = (hi - lo) * 0.1 || 1;
   // Sampled up the rows: row 0 is the top, so the highest value is sampled first.
   const points: number[] = [];
   for (let r = 0; r < n; r += 1) {
     points.push(hi + pad - ((hi - lo + 2 * pad) * r) / Math.max(1, n - 1));
   }
-  const densities = kde(finite, points, scaledBandwidth(finite, adjust));
+  const bw = scaledBandwidth(finite, adjust);
+  const densities = kde(finite, points, bw);
   const maxD = Math.max(...densities);
   if (maxD <= 0) return blank();
+  // `bw` is undefined unless the caller asked for an adjustment, in which case
+  // `kde` computes Silverman's itself — so the cut has to ask for the same one.
+  const support = supported(points, sorted, bw ?? silvermanBandwidth(finite));
 
   // Two columns is the floor for an outline: a left and a right edge sharing a
   // column are one line and say nothing about width.
@@ -202,7 +245,7 @@ export function violinColumn(
   const mask: number[][] = Array.from({ length: n }, () => new Array<number>(w).fill(0));
   const leftEdge: [number, number][] = [];
   const rightEdge: [number, number][] = [];
-  for (let r = 0; r < n; r += 1) {
+  for (let r = support.first; r <= support.last; r += 1) {
     leftEdge.push([edge(r, -1), r]);
     rightEdge.push([edge(r, 1), r]);
   }
@@ -279,6 +322,7 @@ export function violinRows(
   quartiles?: QuartileSummary,
   corners: "rounded" | "sharp" = "rounded",
   adjust?: number,
+  shared?: { min: number; max: number },
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const n = Math.max(1, Math.floor(rowsPerCategory));
@@ -289,16 +333,21 @@ export function violinRows(
   if (finite.length === 0) return blank(); // cells-ok — a sample count
 
   const sorted = [...finite].sort((a, b) => a - b);
-  const lo = sorted[0]!;
-  const hi = sorted[sorted.length - 1]!; // cells-ok — a sample count
+  // The shared value axis — see `violinColumn` above (C12 §3q).
+  const lo = shared?.min ?? sorted[0]!;
+  const hi = shared?.max ?? sorted[sorted.length - 1]!; // cells-ok — a sample count
   const pad = (hi - lo) * 0.1 || 1;
   const points: number[] = [];
   for (let i = 0; i < w; i += 1) {
     points.push(lo - pad + ((hi - lo + 2 * pad) * i) / Math.max(1, w - 1));
   }
-  const densities = kde(finite, points, scaledBandwidth(finite, adjust));
+  const bw = scaledBandwidth(finite, adjust);
+  const densities = kde(finite, points, bw);
   const maxD = Math.max(...densities);
   if (maxD <= 0) return blank();
+  // `bw` is undefined unless the caller asked for an adjustment, in which case
+  // `kde` computes Silverman's itself — so the cut has to ask for the same one.
+  const support = supported(points, sorted, bw ?? silvermanBandwidth(finite));
 
   // **Two rows is the floor for an outline**, because an upper and a lower edge
   // that share a row are one line and say nothing about width. Below that the
@@ -338,7 +387,7 @@ export function violinRows(
   const mask: number[][] = Array.from({ length: n }, () => new Array<number>(w).fill(0));
   const upper: [number, number][] = [];
   const lower: [number, number][] = [];
-  for (let x = 0; x < w; x += 1) {
+  for (let x = support.first; x <= support.last; x += 1) {
     upper.push([x, edge(x, -1)]);
     lower.push([x, edge(x, 1)]);
   }
@@ -423,12 +472,28 @@ export function ridgelineArea(
   areaRows: number,
   caps: Caps,
   adjust?: number,
-): { readonly rows: readonly string[]; readonly baselines: readonly number[] } {
+  corners: "rounded" | "sharp" = "rounded",
+): {
+  readonly rows: readonly string[];
+  readonly baselines: readonly number[];
+  /**
+   * **Which curve owns each cell**, or -1 where nothing does.
+   *
+   * The rows alone cannot be coloured: the curves overlap by construction, so
+   * a row carries cells from two or three of them and there is no per-row
+   * answer. The caller had been asking `baselines.indexOf(row)`, which is -1
+   * on every row that is not a baseline — so every ridge drew in the fallback
+   * colour and only the four baselines were tinted. Four coloured rules over a
+   * monochrome tangle is what a ridgeline is not.
+   */
+  readonly owners: readonly (readonly number[])[];
+} {
   const w = Math.max(1, Math.floor(areaWidth));
   const h = Math.max(1, Math.floor(areaRows));
   const n = seriesList.length; // cells-ok — a series count
   const blank = Array.from({ length: h }, () => " ".repeat(w));
-  if (n === 0) return { rows: blank, baselines: [] }; // cells-ok — a series count
+  const nothing = { rows: blank, baselines: [], owners: blank.map(() => []) };
+  if (n === 0) return nothing; // cells-ok — a series count
 
   // Baselines from the bottom up, evenly spaced. The last one sits on the floor
   // so the front curve has the whole area beneath it.
@@ -436,8 +501,8 @@ export function ridgelineArea(
   const baseline = (i: number): number => Math.round(h - 1 - i * step); // cells-ok — a row index
   const curveRowsFor = Math.max(1, Math.round(step * OVERLAP)); // cells-ok — a row count
 
-  const gl = glyphs(caps);
   const grid: string[][] = Array.from({ length: h }, () => new Array<string>(w).fill(" "));
+  const owners: number[][] = Array.from({ length: h }, () => new Array<number>(w).fill(-1)); // cells-ok — a sentinel owner
 
   // **One x-axis for every curve, which is the comparison the form makes.**
   // Sampled over its own range each distribution fills the width and the *shift*
@@ -445,7 +510,7 @@ export function ridgelineArea(
   // distributions centred at 2, 4 and 9 would draw as three identical humps.
   const all = seriesList.flatMap((sr) =>
     sr.values.filter((v): v is number => v !== null && Number.isFinite(v)));
-  if (all.length === 0) return { rows: blank, baselines: [] }; // cells-ok — a sample count
+  if (all.length === 0) return nothing; // cells-ok — a sample count
   const lo = Math.min(...all);
   const hi = Math.max(...all);
   const pad = (hi - lo) * 0.1 || 1;
@@ -460,7 +525,7 @@ export function ridgelineArea(
     return finite.length === 0 ? [] : kde(finite, points, scaledBandwidth(finite, adjust)); // cells-ok — a sample count
   });
   const maxD = Math.max(0, ...perSeries.flat());
-  if (maxD <= 0) return { rows: blank, baselines: [] };
+  if (maxD <= 0) return nothing;
 
   // Back to front: the highest baseline is the furthest away.
   for (let i = n - 1; i >= 0; i -= 1) { // cells-ok — a series index
@@ -472,16 +537,37 @@ export function ridgelineArea(
     // needs the cells *under* the outline blanked as well as the outline drawn —
     // otherwise a far curve shows through a near one's body and the two read as
     // crossing rather than as one in front.
-    for (let x = 0; x < w; x += 1) {
-      const top = base - Math.round((densities[x]! / maxD) * curveRowsFor); // cells-ok — a row index
-      for (let r = Math.max(0, top); r <= base && r < h; r += 1) grid[r]![x] = " "; // cells-ok — a row index
-    }
+    // **The curve is stroked, not stippled.** Writing one `─` at each column's
+    // top row leaves a rising curve as a row of disconnected dashes with no
+    // vertical joins — the shape is in the data and not on the screen. The
+    // violin arm has always gone through `strokePolyline` + `glyphForMask`;
+    // this did not, and it is the same curve.
+    const tops: [number, number][] = [];
     for (let x = 0; x < w; x += 1) {
       const top = Math.max(0, base - Math.round((densities[x]! / maxD) * curveRowsFor)); // cells-ok — a row index
-      if (top <= base && base < h) grid[top]![x] = gl.horizontal; // cells-ok — a row index
+      tops.push([x, top]);
+      for (let r = top; r <= base && r < h; r += 1) { // cells-ok — a row index
+        grid[r]![x] = " ";
+        owners[r]![x] = -1; // cells-ok — a sentinel owner
+      }
+    }
+    const mask: number[][] = Array.from({ length: h }, () => new Array<number>(w).fill(0));
+    strokePolyline(mask, tops, false);
+    for (let r = 0; r < h; r += 1) {
+      for (let x = 0; x < w; x += 1) {
+        if (mask[r]![x] === 0) continue;
+        const g = glyphForMask(mask[r]![x]!, corners, caps);
+        if (g === " ") continue;
+        grid[r]![x] = g;
+        owners[r]![x] = i; // cells-ok — a series index
+      }
     }
   }
-  return { rows: grid.map((r) => r.join("")), baselines: Array.from({ length: n }, (_, i) => baseline(i)) };
+  return {
+    rows: grid.map((r) => r.join("")),
+    baselines: Array.from({ length: n }, (_, i) => baseline(i)),
+    owners,
+  };
 }
 
 // **`ridgeRows` is gone, and its epitaph is the finding.** It drew one series

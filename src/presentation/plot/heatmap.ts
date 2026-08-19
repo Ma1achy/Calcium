@@ -13,6 +13,7 @@ import type { RenderContext } from "../blocks/types.js";
 import type { Range } from "./scale.js";
 import type { ColourValue } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
+import type { ColormapName } from "../../data/colormaps/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { ladderFor } from "./ramp.js";
 import { cells, truncate } from "../text.js";
@@ -80,7 +81,20 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
  * reading it in a sequential one is the single most common chart defect there
  * is. A declared `colormap` still wins.
  */
-const DEFAULT_COLORMAP: Readonly<Record<string, string>> = Object.freeze({
+/**
+ * **Total over `PlotForm`, and `utilisation` is why.**
+ *
+ * This was `Record<string, string>` — one of the four silent tables — so a
+ * matrix form added without an entry did not fail to compile. `utilisation`
+ * was, and `colormapFor` returned undefined for it at every colour depth, so a
+ * 24-bit terminal drew a braille density ramp and a monochrome legend. The
+ * defect is invisible in the stripped frame, because a washed heatmap is blank
+ * there by construction: the colour is a background.
+ *
+ * `MATRIX_LAYOUT` above was closed in the same sweep and this one was not,
+ * which is the argument for closing a class rather than an instance.
+ */
+const DEFAULT_COLORMAP: Readonly<Record<PlotForm, ColormapName | null>> = Object.freeze({
   heatmap: "viridis",
   spectrogram: "viridis",
   latency: "viridis",
@@ -88,6 +102,18 @@ const DEFAULT_COLORMAP: Readonly<Record<string, string>> = Object.freeze({
   calendar: "viridis",
   density2d: "viridis",
   correlation: "coolwarm",
+  // Load reads as a temperature, and the convention every dashboard uses is a
+  // warm ramp rather than a perceptual one — `viridis` says *more* where a
+  // reader of a utilisation strip wants *hotter*.
+  utilisation: "inferno",
+  // Not matrix forms.
+  line: null, sparkline: null, scatter: null, step: null, ecdf: null, density: null,
+  bar: null, histogram: null, boxplot: null, violin: null, ridgeline: null,
+  forest: null, dumbbell: null, lollipop: null, dotplot: null, waffle: null,
+  flame: null, icicle: null, treemap: null, funnel: null, gantt: null,
+  waterfall: null, streamgraph: null, stackedarea: null,
+  smallmultiples: null, pairplot: null, pie: null, radar: null, horizon: null,
+  slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,
 });
 
 function linePaint(spans: readonly Span[], layout: Layout, ctx: RenderContext): string {
@@ -251,7 +277,7 @@ function heatSpans(
 
 function colormapFor(block: Plot): Colormap | undefined {
   const named = block.colormap ?? DEFAULT_COLORMAP[block.form];
-  return named === undefined ? undefined : COLORMAPS[named];
+  return named === null || named === undefined ? undefined : COLORMAPS[named];
 }
 
 function matrixRows(

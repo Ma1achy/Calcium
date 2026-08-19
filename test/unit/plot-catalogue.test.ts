@@ -8,12 +8,14 @@
 // that returns a plausible answer for an input it does not handle.
 import { describe, expect, it } from "vitest";
 
+import { cells as width } from "../../src/presentation/text.js";
+
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { CAPS, FORMS, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { brailleDots, colour256, isBraille, parseLine, sheetBg } from "../../tools/catalogue-png.mjs";
+import { ansiToSvg, brailleDots, colour256, isBraille, parseLine, sheetBg } from "../../tools/catalogue-png.mjs";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { ALL_FORMS } from "../support/plot-forms.js";
 
@@ -43,6 +45,93 @@ describe("plot-catalogue — the corpus renders", () => {
     }
     console.log(`plot-catalogue — ${String(rendered)}/${String(rendered)} rows`);
     expect(rendered).toBeGreaterThan(30); // cells-ok — a frame count
+  });
+
+  it("PC12: every frame's border sits in one column, and no row overruns", () => {
+    // **The whole corpus looked shattered once and the frames were correct.**
+    // The defect was in the PNG renderer (PC9/PC10), and the only way to know
+    // that without reading 388 images was to ask the text whether it was
+    // aligned. This is that question, kept.
+    //
+    // Anchored on the frame's *own* rules — `^┌───┐$` — and not on the
+    // characters, because a boxplot draws `└────┴────┘` inside the plot area
+    // and matching the codepoint alone reported six correct frames as broken.
+    const bad: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const rows = frame(spec, caps[0]!.caps, 80).map((r) => strip(r));
+        const colOf = (line: string, ch: string): number => {
+          const chars = [...line];
+          let c = 0;
+          for (const g of chars) {
+            if (g === ch) return c;
+            c += width(g);
+          }
+          return -1; // cells-ok — a sentinel column
+        };
+        const top = rows.find((r) => /^\s*┌─[─┬]*┐$/u.test(r));
+        const bottoms = rows.filter((r) => /^\s*└─[─┬┴]*┘$/u.test(r));
+        const bottom = bottoms[bottoms.length - 1];
+        const where = `${form}/${variant}`;
+        if (top !== undefined && bottom !== undefined && colOf(top, "┌") !== colOf(bottom, "└")) {
+          bad.push(`${where}: top at ${String(colOf(top, "┌"))}, bottom at ${String(colOf(bottom, "└"))}`);
+        }
+        if (top !== undefined) {
+          const sides = [...new Set(rows.filter((r) => /^\s*│/u.test(r)).map((r) => colOf(r, "│")))];
+          if (sides.length > 1 || (sides.length === 1 && sides[0] !== colOf(top, "┌"))) {
+            bad.push(`${where}: left border in column(s) ${sides.join(", ")}, corner at ${String(colOf(top, "┌"))}`);
+          }
+        }
+        const over = rows.filter((r) => width(r) > 80); // cells-ok — the render width
+        if (over.length > 0) bad.push(`${where}: ${String(over.length)} row(s) over 80 cells`);
+
+        // **The rows below the rule live in the plot area's columns.** Added
+        // because shifting `xLabelRowFor`'s indent by one failed nothing: the
+        // arms above check the border and the corners, and the x-labels are
+        // neither. That is the symptom this whole row was written for — labels
+        // that do not sit under what they name.
+        if (bottom !== undefined) {
+          const start = colOf(bottom, "└");
+          const end = colOf(bottom, "┘");
+          for (const r of rows.slice(rows.lastIndexOf(bottom) + 1)) {
+            const ink = r.replace(/\s+$/u, "");
+            if (ink.trim() === "") continue;
+            const first = width(ink) - width(ink.replace(/^\s+/u, ""));
+            if (first <= start) bad.push(`${where}: a row below the rule starts at ${String(first)}, inside the gutter`);
+            if (end >= 0 && width(ink) - 1 > end) bad.push(`${where}: a row below the rule ends at ${String(width(ink) - 1)}, past ${String(end)}`);
+          }
+
+          // **A label is centred on the tick it names**, which is the one
+          // statement that fails when the x-label row drifts by a single
+          // column — the containment arms above both pass a one-cell shift,
+          // and a one-cell shift is what a mutation of `xLabelRowFor`'s indent
+          // produces. Known limit: only frames whose rule carries `┬` ticks,
+          // and only when no label was dropped for collision, so the counts
+          // still correspond.
+          const ticks: number[] = [];
+          for (let i = 0, c = 0; i < [...bottom].length; i++) {
+            if ([...bottom][i] === "┬") ticks.push(c);
+            c += width([...bottom][i]!);
+          }
+          const labelRow = rows.slice(rows.lastIndexOf(bottom) + 1).find((r) => r.trim() !== "");
+          if (ticks.length > 0 && labelRow !== undefined) {
+            const words: { at: number; text: string }[] = [];
+            for (const m of labelRow.matchAll(/\S+/gu)) {
+              words.push({ at: width(labelRow.slice(0, m.index)), text: m[0] });
+            }
+            if (words.length === ticks.length) {
+              for (let i = 0; i < ticks.length; i++) {
+                const centre = words[i]!.at + (width(words[i]!.text) - 1) / 2;
+                if (Math.abs(centre - ticks[i]!) > 1) {
+                  bad.push(`${where}: "${words[i]!.text}" centred at ${centre.toFixed(1)}, tick at ${String(ticks[i])}`);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(bad, `misaligned frames:\n${bad.join("\n")}`).toEqual([]);
   });
 
   it("PC2: at least one frame carries 24-bit colour, or the corpus proves nothing about it", () => {
@@ -113,6 +202,63 @@ describe("catalogue-png — the parser that failed silently", () => {
     expect(runs.map((r) => r.text).join("")).toBe("ABCD");
     expect(runs.find((r) => r.text === "AB")?.background).toBe("rgb(10,20,30)");
     expect(runs.find((r) => r.text === "CD")?.background).toBe(null);
+  });
+
+  // --- placement ---------------------------------------------------------
+  //
+  // **This renderer made every correct frame look shattered**, which is the
+  // third shape of instrument failure and the worst one to review by eye: the
+  // frames on disk were right in every byte, and the images said otherwise.
+
+  const svgOf = (line: string): string => ansiToSvg(line) as string;
+  const xOf = (svg: string, text: string): number => {
+    const m = new RegExp(`<text x="([-0-9.]+)"[^>]*>${text}</text>`, "u").exec(svg);
+    if (m === null) throw new Error(`no <text> run for ${text}`);
+    return Number(m[1]);
+  };
+  // Derived rather than imported, so the rows below assert placement and not a
+  // constant — and derived across an **SGR boundary** rather than a space,
+  // because a fixture must not be built out of the mechanism it measures. Two
+  // adjacent runs split by a colour change are one column apart under any
+  // whitespace handling; split by a space they are not, and deriving it that
+  // way took the whole file down at module scope instead of failing the row.
+  const PROBE = svgOf(`A\x1b[38;2;98;98;98mB`);
+  const CELL = xOf(PROBE, "B") - xOf(PROBE, "A");
+  const ORIGIN = xOf(PROBE, "A");
+  const GREY = "\x1b[38;2;98;98;98m";
+
+  it("PC9: an indent inside an SGR run places the same as a bare one", () => {
+    // The two forms a plot frame actually emits. Row 0 of a box frame is bare
+    // spaces then an SGR; every other row is the SGR then the spaces, because
+    // the gutter and the border are one painted span. SVG's default
+    // `xml:space` strips leading whitespace inside a `<text>`, so only the
+    // second form lost its indent — the border drew at column 0 with the frame
+    // top correctly indented above it.
+    const bare = svgOf(`             ${GREY}\u2502\x1b[39m`);
+    const inside = svgOf(`${GREY}             \u2502\x1b[39m`);
+    expect(xOf(inside, "\u2502")).toBeCloseTo(xOf(bare, "\u2502"), 0);
+    expect(xOf(inside, "\u2502")).toBeCloseTo(ORIGIN + 13 * CELL, 0); // cells-ok — an indent
+  });
+
+  it("PC10: a gap between two words is its columns, not a collapsed space", () => {
+    // An x-label row is one span. Collapsed, the four labels of a vertical
+    // boxplot bunched together at the left under a plot whose columns were
+    // spread correctly across all 80 cells.
+    const row = svgOf(`${GREY}         setosa           versicolor\x1b[39m`);
+    expect(xOf(row, "setosa")).toBeCloseTo(ORIGIN + 9 * CELL, 0); // cells-ok — a label column
+    expect(xOf(row, "versicolor")).toBeCloseTo(ORIGIN + 26 * CELL, 0); // cells-ok — a label column
+  });
+
+  it("PC11: the row pitch does not exceed the glyph's own extent", () => {
+    // A pitch wider than the glyph dashes every vertical rule, which reads as a
+    // shattered frame over frames that are correct. 1.143 is measured, not
+    // nominal: a stacked `┌ │ │ └` is continuous at 16px pitch on a 14px
+    // DejaVu Sans Mono and gapped at 17.
+    const two = svgOf("\u2502\n\u2502");
+    const ys = [...two.matchAll(/<text [^>]*y="([-0-9.]+)"/gu)].map((m) => Number(m[1]));
+    expect(ys.length).toBe(2); // cells-ok — a row count
+    const size = Number(/font-size: ([0-9.]+)px/u.exec(two)?.[1]);
+    expect(ys[1]! - ys[0]!).toBeLessThanOrEqual(1.143 * size);
   });
 
   it("PC5: braille dots land where the codepoint says", () => {
