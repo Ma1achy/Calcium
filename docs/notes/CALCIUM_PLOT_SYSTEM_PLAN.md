@@ -323,7 +323,7 @@ it is not like-for-like.
 | `make instruments` | every tool has a fixture |
 | `make test` | six tiers |
 | `make golden` | frames at 2 modes × 2 widths |
-| `make refdiff` | every form beside its braille-rendered matplotlib twin |
+| `make refdiff` | every form beside its braille-rendered matplotlib twin — **built, `145607e`**; 25 of 34 compared, the rest excluded with a stated condition |
 
 **Per target, exit code read directly.** `make all | tail` reports the *pipe's*
 status — it once showed green while 44 tier-5 rows failed. A background task
@@ -401,18 +401,18 @@ Dependency-ordered. Items 3–10 are independent of each other.
 
 | # | step | why here |
 |---|---|---|
-| 0 | **The y-axis measurement fix** | alone, because it has a *measurable* check — `labelWidth` at `ambiguousWidth: "wide"` — and bundling it behind a visual gate wastes that |
-| 1 | **Axes, ticks, frame** | every form's furniture |
-| 2 | **`furniture.ts`** | matrix family first as the falsifier |
+| 0 | ~~**The y-axis measurement fix**~~ **`78667bc`** | alone, because it has a *measurable* check — `labelWidth` at `ambiguousWidth: "wide"` — and bundling it behind a visual gate wastes that |
+| 1 | ~~**Axes, ticks, frame**~~ **`78667bc`** — only `plotFrame: "box"`; C12 I26's other three owed | every form's furniture |
+| 2 | ~~**`furniture.ts`**~~ **`78667bc`** | matrix family first as the falsifier |
 | 3 | **Orientation** | 11 forms at once, and `categoricalForm` is structurally row-major — **moved from 7**, because "before the per-form work" and "at position 7" contradicted each other and the per-form work is 8–12 |
 | 4 | **Painted cells (C12 I29)** | 7 matrix forms + bars + pie wedges; wiring, highest leverage |
-| 5 | **Dot-grid geometry** | pie, radar — one root cause |
+| 5 | ~~**Dot-grid geometry**~~ **`78667bc`** | pie, radar — one root cause |
 | 6 | **Legend** | closes two recorded deferrals (`Annotation.label`, C04 §3b's five members); both carrier forms per C12 I29 |
 | 7 | **`CATEGORY_MARKS` + sweeps** | the degradation ladder, gated |
 | 8 | **Stacking fold** | `stackedarea` + `streamgraph` |
 | 9 | **Distribution** | violin taper + bandwidth, ridgeline overlap, forest |
 | 10 | **`hierarchy`** | flame, icicle, treemap |
-| 11 | **Facet spans** | smallmultiples, pairplot |
+| 11 | ~~**Facet spans**~~ **`4a2efb8`** | smallmultiples, pairplot |
 | 12 | **Remaining new forms** | slope, bubble, autocorrelation, timeline, bullet, utilisation |
 | 13 | **`height: "fill"`, aspect, reflow** | needs the frame settled |
 | 14 | **Silent tables + `PaletteName`** | close the drift class |
@@ -439,3 +439,16 @@ commits evaporates.
   with the painting, not ahead of it.
 - **The ambiguous-width arm is forgotten again.** Three defects so far. Every new
   glyph table needs a wide arm or a stated reason.
+
+- **Four forms measure one thing and render another.** `radar` and `horizon`
+  declare `axedFurniture` and draw none of it; `smallmultiples` and `pairplot`
+  return whatever the facet layout produced. None routes through `composeRows`,
+  so the compositor's guarantee does not reach them — which is the *bypass* risk
+  above, already realised, in the four forms that were never migrated. Measured
+  over 26 800 capability × form × width combinations. Fixing it changes the
+  height table, so the spec edit goes first.
+
+- **A defect can mask a defect.** The facet composition's byte-counting cut every
+  row short, so the re-paint at its call site never fired. The correct fix made
+  the frame visibly worse. Expect this wherever two clamps sit in series, and read
+  the frame after a fix rather than only before it.

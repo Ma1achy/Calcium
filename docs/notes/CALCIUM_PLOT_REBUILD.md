@@ -41,6 +41,10 @@ Companion to `CALCIUM_PLOT_PRIOR_ART.md` (what other libraries do) and
 | `c21a30c` | Degraded arms — violin ASCII, stacked marks, compact box |
 | `0cf53e1` | C12 I29 — colour leads, glyph is the fallback |
 | `3790162` | Violin spine full width, no end caps |
+| `3d9145a` | The plan, and five corrections that changed it |
+| `145607e` | `make refdiff` — matplotlib rendered to braille, as a gate |
+| `78667bc` | The box frame, the straight axis, `furniture.ts`, pie/radar on the dot grid |
+| `4a2efb8` | Facets compose painted rows |
 
 ### 2.1 The instruments lied first
 
@@ -282,13 +286,14 @@ fixtures (`CATALOGUE_FORMS` → JSON) or the comparison is not like-for-like.
 
 ## 7. Queue, in dependency order
 
-1. **Axes and ticks** *(in progress)* — termplot's scheme: full border box, ticks
+1. ~~**Axes and ticks**~~ — **landed** `78667bc`. termplot's scheme: full border box, ticks
    on the axes, y labels outside the left border, x labels under their tick
    columns. Fixes two recorded defects: the not-straight y-axis (`labelWidth` and
    `padStart` default to `ambiguousWidth: "narrow"`, and `overlaidRows` never
    passes the real capability while `categoricalForm` and `bandedForm` do), and
    `yLabels` always calling the linear `niceAxis` regardless of `yScale`.
-2. **Pie and radar on the dot grid** *(in progress)* — §4.1.
+2. ~~**Pie and radar on the dot grid**~~ — **landed** `78667bc`. §4.1's shared
+   root cause; `strokePolyline` is no longer imported by `circle.ts`.
 3. **Background-painted cells** — C12 I29. Highest leverage remaining: wiring, seven
    matrix forms plus solid bars and pie wedges, and the colour-scale legend.
 4. **YouPlot scatter and density** — needs 1 for the frame and legend. Note
@@ -305,7 +310,9 @@ the per-form work, which is items 8–12; the position and the reason contradict
 each other, and eleven forms rebuilt twice is the cost of not resolving it.)*
 8. **`height: "fill"` and the aspect rule** — see §8.
 9. **The eight new forms**, and `hierarchy` for `treemap`/`flame`/`icicle`.
-10. **Facet composition** — §4.1, needs the spans change.
+10. ~~**Facet composition**~~ — **landed** `4a2efb8`, and §4.1's diagnosis was
+    wrong about the remedy: `displayCells`/`fitStyled`/`sliceCells` are
+    sanctioned in L1 and were written for this. See §11.
 
 ---
 
@@ -380,3 +387,50 @@ alongside the data files, as `ColormapName` already is.
 - **A load-sensitive failing set is not a regression.** 72 failures across 42
   files, including `manifest` and `parser`, all timeouts; the same files passed
   in isolation.
+
+---
+
+## 11. The instruments' own findings, this round
+
+Four defects came out of the tools rather than the renderer, and each names the
+instrument that reached it.
+
+**A claim about a rule, carried into a plan, never checked.** §4.1 said the facet
+fix was blocked because *SS14 rejects measuring escapes in L1*. SS14's own
+comment says it guards the **write** path and names the two files allowed to hold
+escape literals; `displayCells`, `fitStyled` and `sliceCells` live in L1, and
+`sliceCells` is cited to C09 I20 §5a as being **for compositing a layer over a
+painted row** — this case, named. *Ask where a settled claim is written down*,
+fifth instance, and again wrong in both directions: not forbidden for the reason
+given, and the remedy already built.
+
+**A defect can mask a defect, and the correct fix is what exposes it.** The facet
+composition and the re-paint at its call site were both live; the first cut every
+row to 80 code units, so the second — `clampSpans` measuring painted text with
+`cells()` — always saw a row it believed fitted. Fixing the composition made the
+frame visibly *worse*. The recorded rule is the inverse case (*a correct fix that
+changes nothing observable is the signal*); this is the same mechanism read from
+the other end, and worth expecting.
+
+**An instrument can be wrong in the shape that looks like data.** `make refdiff`
+produced three wrong answers before a right one, all of them plausible braille:
+`drawilleplot.show()` trims its output to the bounding box of the ink, so the
+grid was derived from the answer and a curve in the wrong half came back
+identical to one in the right half; the reference read `series` for the boxplot
+family, which is empty there, and rendered nothing; and a fixed 16-row grid
+scored `sparkline`'s single row against sixteen, reading 10.0% where the truth
+is 21.9%. Only the second was caught by a check that existed.
+
+**A measure that flags a correct form is worse than no measure.** Cell-by-cell
+ink called `bar` 55.9% different while every bar length agreed to within a cell —
+it was comparing *layout*, ours being one row per category against matplotlib's
+proportional bands. The next person tunes the form to the number. The extent
+profile is layout-invariant and reads 0.3%.
+
+**And the inventory had an extension-shaped hole.** `tools/instruments.mjs`
+derives its list from the filesystem rather than a hand-list, which is its whole
+argument — but the suffix was `mjs|py|sh`. `catalogue-forms.ts` was moved out of a
+`.mjs` *precisely* to get it type-checked, after an untyped literal drifted and
+left eight forms in no rendered frame; that move took it out of this inventory.
+The remedy for one gate opened a hole in another, the same shape as the original.
+
