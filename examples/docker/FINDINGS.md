@@ -8954,3 +8954,63 @@ The heatmap shipped complete and unusable. The walk found seven defects before a
 build took a spec section, an invariant, a renderer, a validator arm, three golden variants, nine
 mutations and an audit — and an application could not construct one. **Every instrument was
 pointed at whether it was correct, and none at whether it was reachable.**
+
+---
+
+## F181 — the coverage rule reads one of the two builder files ★★★
+
+| | |
+|---|---|
+| **Surface** | `b.figure`, `BUILDER_OMISSIONS`, and MG27's subject |
+| **Reached for** | asking whether a `setOhlc` on `FigureBuilder` would have anything to draw |
+| **Verdict** | **ten exemptions whose reason is not the reason, and six parameters no caller can pass** |
+| **Absorbed by** | MG27's blind-spot paragraph gains the file scope; `setOhlc` withheld until `b.figure` forwards `plotStyle` |
+
+F180's shape one door along. MG27 asks *a block field no builder can set* and its violation reads
+*buildable by nothing public* — and `checkBuilderCoverage` opens `src/data/viewmodel/types.ts` and
+`src/shell/builders/index.ts`. **`figure.ts` is a second builder file and the rule never reads it.**
+
+Measured, not inferred — `b.figure({height: 5}).setQuartiles([…]).setCategories(["a"]).setBands(7).build()`
+returns a `Plot` carrying all three:
+
+```
+BUILDER_OMISSIONS               14 entries
+set by FigureBuilder.build()    12 — categories layout binning quartiles offsets totals
+                                     startDate bands facets segments xScale yScale
+of those, publicly reachable    10 — every one with a setter
+```
+
+The entries read *step 0 scaffolding — builder shorthand lands in step 11*, and that sentence is
+**true**: `b.plot` has no `categories` parameter. It is also not the claim the rule enforces. So the
+list reads as *nothing can set this* while meaning *`b.plot` has no shorthand for this*, and the two
+diverge silently for ten fields. **This is the correct-sentence-justifying-the-wrong-decision class**
+(F84) inside an exemption list rather than a scope.
+
+### The two that are genuinely unreachable are unreachable for a different reason
+
+`xScale` and `yScale` **are** written by `FigureBuilder.build()` — from `this.opts`, and `b.figure`
+does not forward them. Six of `FigureOpts`' twelve fields are in that state:
+
+```
+FigureOpts declares      title height axes yFormat yMin yMax
+                         colormap xScale yScale plotStyle plotDetail plotCorners
+b.figure forwards        the first six
+```
+
+So the chain declares six parameters no caller can pass, and its own `build()` faithfully spreads
+three of them from a field that is always `undefined`. Nothing is wrong in either file on its own.
+
+### What it cost here, which is a method not written
+
+`plotStyle` is one of the six. A `setOhlc` on the chain would have set candles that no chain could
+ever ask to be drawn as candles — **an operation with no seam to call it from**, and the reason it is
+absent from `figure.ts` with a comment rather than present and inert. The remedy is `b.figure`
+forwarding `FigureOpts`, at which point the method lands and ten exemptions get re-argued or removed.
+
+### The instrument
+
+Not a test and not a gate. It is *does this new member have a caller that could reach it* — asked
+because `plotStyle: "candlestick"` was the field being added, and the chain's copy of that union was
+the thing that had to be touched. **The union copy was the visible defect and the file scope was the
+one underneath it.**
+

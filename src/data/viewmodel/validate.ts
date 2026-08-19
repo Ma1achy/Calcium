@@ -22,6 +22,8 @@ import {
   type DocumentStatus,
   type Glyph,
   COLORMAP_NAMES,
+  type OHLC,
+  type Plot,
   type PlotForm,
   type Result,
   type ViewDocument,
@@ -471,8 +473,55 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "yFormat" must be one of ${[...Y_FORMATS].join(", ")} (C04 I41)`);
     }
     const ps = b["plotStyle"];
-    if (ps !== undefined && ps !== "auto" && ps !== "braille" && ps !== "line") {
-      e.push(`${at}: "plotStyle" must be "auto", "braille", or "line"`);
+    if (ps !== undefined && !PLOT_STYLES.has(String(ps))) {
+      e.push(`${at}: "plotStyle" must be one of ${[...PLOT_STYLES].join(", ")}`);
+    }
+    // **C04 I57 — the geometry is refused wherever the bars are**, not only
+    // under the style that draws them. A wick that does not contain its body is
+    // not a candle drawn oddly; it is not a candle, and a document carrying one
+    // is wrong before anything decides how to render it (C12 §6b B11).
+    const ohlc = b["ohlc"];
+    if (ohlc !== undefined) {
+      if (!isArray(ohlc)) {
+        e.push(`${at}: "ohlc" must be an array of {open, high, low, close} (C04 I57)`);
+      } else {
+        for (const [i, bar] of ohlc.entries()) {
+          if (!isRecord(bar) || !OHLC_KEYS.every((k) => isFiniteNumber(bar[k]))) {
+            e.push(
+              `${at}: ohlc[${String(i)}] is not four finite numbers (C04 I57) — ` +
+                `open, high, low and close, each a number`,
+            );
+            continue;
+          }
+          const [open, high, low, close] = [bar["open"], bar["high"], bar["low"], bar["close"]]
+            .map(Number) as [number, number, number, number];
+          if (low > Math.min(open, close) || high < Math.max(open, close)) {
+            e.push(
+              `${at}: ohlc[${String(i)}] has low ${String(low)} and high ${String(high)} around ` +
+                `open ${String(open)} and close ${String(close)} (C04 I57) — a candle's wick ` +
+                `contains its body, so this is not a candle that renders oddly, it is not a candle`,
+            );
+          }
+        }
+      }
+    }
+    // **The style's two refusals** (C04 I57, C12 §6b B9 and B10). An ignored
+    // member reads as one not yet implemented, which is this type's established
+    // idiom and the reason both are construction errors rather than fallbacks.
+    if (ps === "candlestick") {
+      if (ohlc === undefined) {
+        e.push(
+          `${at}: "plotStyle" is "candlestick" and there is no "ohlc" (C04 I57) — the style ` +
+            `has nothing to draw, and "series" is the overlay rather than the candles`,
+        );
+      }
+      if (form !== "line" && form !== "step") {
+        e.push(
+          `${at}: "plotStyle" is "candlestick" on form "${String(form)}" (C04 I57) — a ` +
+            `candlestick is a curve style over the positional machinery (C12 I36), so the ` +
+            `form is "line" or "step"`,
+        );
+      }
     }
     const pc = b["plotCorners"];
     if (pc !== undefined && pc !== "rounded" && pc !== "sharp") {
@@ -697,6 +746,14 @@ const PLOT_FORM_MEMBERS = {
   horizon: true,
 } satisfies Record<PlotForm, true>;
 const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
+
+const PLOT_STYLE_MEMBERS = {
+  auto: true, braille: true, line: true, candlestick: true,
+} satisfies Record<NonNullable<Plot["plotStyle"]>, true>;
+const PLOT_STYLES: ReadonlySet<string> = new Set(Object.keys(PLOT_STYLE_MEMBERS));
+
+/** The four numbers, in the order the type declares them (C04 I57). */
+const OHLC_KEYS = ["open", "high", "low", "close"] as const satisfies readonly (keyof OHLC)[];
 
 /**
  * Children of a container, for the recursive walk. Total on malformed input.

@@ -49,6 +49,7 @@ export type {
   BarSpec,
   QuartileSummary,
   HierarchyNode,
+  OHLC,
   Segment,
   ScaleType,
   Progress,

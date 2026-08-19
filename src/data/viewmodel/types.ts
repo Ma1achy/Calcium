@@ -644,6 +644,15 @@ export type Plot = Readonly<{
   layout?: "overlap" | "grouped" | "stacked" | "normalised";
   binning?: "sturges" | "freedman-diaconis" | "scott";
   quartiles?: readonly QuartileSummary[];
+  /**
+   * The bars a `plotStyle: "candlestick"` draws (C04 I57, C12 I36).
+   *
+   * **Overlay `series` are optional and `series: []` is the ordinary case.** A
+   * non-empty `series` draws over the candles on the shared axis — a moving
+   * average is what that is for — so the range unions both and the legend
+   * names the candles as well as each series.
+   */
+  ohlc?: readonly OHLC[];
   offsets?: readonly number[];
   totals?: readonly boolean[];
   startDate?: string;
@@ -661,7 +670,15 @@ export type Plot = Readonly<{
    * height affords, and an explicit "full" that does not fit degrades.
    */
   plotDetail?: "auto" | "compact" | "full";
-  plotStyle?: "auto" | "braille" | "line";
+  /**
+   * What one column draws (C12 I36, §3r).
+   *
+   * **`candlestick` is a style and not a thirty-third form**, because everything
+   * a line plot has is unchanged — axis, grid, annotations, legend, crosshair
+   * — and only the column's mark differs. So `form` stays `line` or `step`,
+   * and the data it draws is `ohlc` rather than `series`.
+   */
+  plotStyle?: "auto" | "braille" | "line" | "candlestick";
   plotCorners?: "rounded" | "sharp";
   /**
    * Which axis a categorical or distribution form runs along (C12 §3j, C12 I30).
@@ -779,6 +796,20 @@ export type QuartileSummary = Readonly<{
    */
   pooled?: boolean;
 }>;
+
+/**
+ * One bar of a candlestick chart (C04 I57, C12 §3r).
+ *
+ * **A shape rather than four series in an agreed order**, on the precedent
+ * `QuartileSummary` and `HierarchyNode` set: an order is a convention nothing
+ * checks, so the first caller to pass `high` where `low` belongs gets a chart
+ * that renders and is wrong.
+ *
+ * **The wick contains the body**, and construction refuses a bar where it does
+ * not — `low` above `min(open, close)`, or `high` below `max(open, close)`,
+ * is not a candle drawn oddly, it is not a candle.
+ */
+export type OHLC = Readonly<{ open: number; high: number; low: number; close: number }>;
 
 export type Segment = Readonly<{ label: string; value: number }>;
 

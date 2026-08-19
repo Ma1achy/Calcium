@@ -394,6 +394,14 @@ function plot(
      */
     xLabels?: Plot["xLabels"];
     plotStyle?: Plot["plotStyle"];
+    /**
+     * The candles (C04 I57, C12 I36).
+     *
+     * **Optional beside `series` rather than instead of it.** Plain candles are
+     * `ohlc` with `series: []`; a non-empty `series` is the overlay a moving
+     * average goes in, drawn over them on the shared axis.
+     */
+    ohlc?: Plot["ohlc"];
     plotDetail?: Plot["plotDetail"];
     plotCorners?: Plot["plotCorners"];
     orientation?: Plot["orientation"];
@@ -404,7 +412,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -433,6 +441,37 @@ function plot(
       );
     }
   }
+  // **The same three refusals a second time** (C04 I57), and the geometry one is
+  // not under the style: a wick that does not contain its body is wrong wherever
+  // the bars are, because it is not a candle (C12 §6b B9–B11).
+  for (const [i, bar] of (ohlc ?? []).entries()) {
+    if (bar.low > Math.min(bar.open, bar.close) || bar.high < Math.max(bar.open, bar.close)) {
+      throw new TypeError(
+        `b.plot: ohlc[${String(i)}] has low ${String(bar.low)} and high ${String(bar.high)} ` +
+          `around open ${String(bar.open)} and close ${String(bar.close)} (C04 I57) — a ` +
+          `candle's wick contains its body, so this is not a candle that renders oddly, it ` +
+          `is not a candle`,
+      );
+    }
+  }
+  if (plotStyle === "candlestick") {
+    if (ohlc === undefined) {
+      throw new TypeError(
+        `b.plot: "plotStyle" is "candlestick" and there is no "ohlc" (C04 I57) — the style ` +
+          `has nothing to draw, and "series" is the overlay rather than the candles`,
+      );
+    }
+    // The **resolved** form, because `b.plot` defaults it to `line` below and a
+    // check on the parameter would refuse the ordinary call that omits it.
+    const drawn = form ?? "line";
+    if (drawn !== "line" && drawn !== "step") {
+      throw new TypeError(
+        `b.plot: "plotStyle" is "candlestick" on form "${drawn}" (C04 I57) — a candlestick ` +
+          `is a curve style over the positional machinery (C12 I36), so the form is "line" ` +
+          `or "step"`,
+      );
+    }
+  }
   return finish<Plot>(
     {
       kind: "plot",
@@ -448,6 +487,7 @@ function plot(
       ...(colormap === undefined ? {} : { colormap }),
       ...(xLabels === undefined ? {} : { xLabels }),
       ...(plotStyle === undefined ? {} : { plotStyle }),
+      ...(ohlc === undefined ? {} : { ohlc }),
       ...(plotDetail === undefined ? {} : { plotDetail }),
       ...(plotCorners === undefined ? {} : { plotCorners }),
       ...(orientation === undefined ? {} : { orientation }),

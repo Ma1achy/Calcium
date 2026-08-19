@@ -37,9 +37,19 @@ type FigureOpts = {
   colormap?: ColormapName;
   xScale?: ScaleType;
   yScale?: ScaleType;
-  plotStyle?: "auto" | "braille" | "line";
-  plotDetail?: "auto" | "compact" | "full";
-  plotCorners?: "rounded" | "sharp";
+  // **Indexed rather than restated.** These were three hand-copies of `Plot`'s
+  // unions, and `plotStyle` gaining `"candlestick"` is what a copy cannot
+  // survive — it would have gone on reading as a complete vocabulary.
+  //
+  // **`setOhlc` is deliberately absent, and these three fields are why**
+  // (FINDINGS F181). `b.figure` is the only public door to this chain and it
+  // forwards six of `FigureOpts`' twelve fields — not `plotStyle` — so a chain
+  // that could set the candles could never set the style that draws them. A
+  // method whose data has no reachable renderer is an operation with no seam to
+  // call it from; it lands when `b.figure` forwards the style.
+  plotStyle?: Plot["plotStyle"];
+  plotDetail?: Plot["plotDetail"];
+  plotCorners?: Plot["plotCorners"];
 };
 
 type SeriesOpts = {

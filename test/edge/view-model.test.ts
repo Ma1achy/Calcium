@@ -245,6 +245,129 @@ describe("C04 width arithmetic at the boundaries", () => {
     }
   });
 
+  it("T3.25 (I57): the candlestick's three refusals, at both gates", () => {
+    // **Refused rather than ignored**, which is this type's established idiom
+    // (I50a, I56) and the reason is the same each time: a member a renderer
+    // silently drops reads as one not yet implemented, and the document the
+    // caller wrote is not the document that draws.
+    const bar = { open: 10, high: 12, low: 9, close: 11 };
+    const candles = (over: Record<string, unknown>): unknown => ({
+      kind: "plot", id: "c", form: "line", height: 8, series: [],
+      plotStyle: "candlestick", ohlc: [bar], ...over,
+    });
+    const errors = (block: unknown): string => {
+      const outcome = validateBlock(block);
+      return outcome.ok ? "" : outcome.error.join(" ");
+    };
+
+    // B10 — the style with nothing to draw. `series` is the overlay, so an
+    // empty one is the ordinary case rather than the missing data.
+    expect(errors(candles({ ohlc: undefined }))).toMatch(/there is no "ohlc" \(C04 I57\)/u);
+    expect(
+      () => b.plot({ series: [], height: 8, plotStyle: "candlestick" }),
+      "the builder",
+    ).toThrow(/there is no "ohlc" \(C04 I57\)/u);
+
+    // B9 — the style on a form it is not a style of.
+    expect(errors(candles({ form: "pie" }))).toMatch(/on form "pie" \(C04 I57\)/u);
+    expect(
+      () => b.plot({ series: [], height: 8, form: "pie", plotStyle: "candlestick", ohlc: [bar] }),
+      "the builder",
+    ).toThrow(/on form "pie" \(C04 I57\)/u);
+
+    // B11 — the wick that does not contain its body. **Not under the style**:
+    // the bars are wrong wherever they are, so the refusal is on `ohlc` and
+    // fires with no `plotStyle` at all.
+    const inverted = { open: 5, high: 3, low: 6, close: 4 };
+    expect(errors(candles({ ohlc: [inverted], plotStyle: undefined })))
+      .toMatch(/it is not a candle/u);
+    expect(
+      () => b.plot({ series: [], height: 8, ohlc: [inverted] }),
+      "the builder, with no style set",
+    ).toThrow(/it is not a candle/u);
+
+    // The single-fault bars at this gate too, for the reason below: `inverted`
+    // faults on both sides, so it cannot tell the two halves apart and it
+    // cannot tell `low` from `open`.
+    expect(
+      () => b.plot({ series: [], height: 8, ohlc: [{ open: 10, high: 12, low: 11, close: 11 }] }),
+      "the builder, low only",
+    ).toThrow(/it is not a candle/u);
+    expect(
+      () => b.plot({ series: [], height: 8, ohlc: [{ open: 10, high: 10, low: 9, close: 11 }] }),
+      "the builder, high only",
+    ).toThrow(/it is not a candle/u);
+
+    // And the message names the field rather than the block, or a document with
+    // forty bars says only that one of them is wrong.
+    expect(errors(candles({ ohlc: [bar, bar, inverted] }))).toMatch(/ohlc\[2\]/u);
+
+    // **One fault at a time, because `inverted` has two.** Its open and its low
+    // are both wrong, so the two halves of the inequality are never separated
+    // and a check reading `open` where it means `low` refuses it anyway — a
+    // mutation swapping them survived sixteen assertions. These two bars fault
+    // on exactly one side each.
+    expect(errors(candles({ ohlc: [{ open: 10, high: 12, low: 11, close: 11 }] })), "low only")
+      .toMatch(/it is not a candle/u);
+    expect(errors(candles({ ohlc: [{ open: 10, high: 10, low: 9, close: 11 }] })), "high only")
+      .toMatch(/it is not a candle/u);
+
+    // **A bar that is not four numbers is refused before the geometry reads
+    // it**, or `Number(undefined)` is `NaN`, every comparison against it is
+    // false, and a malformed bar is accepted in silence. `null` is the sharper
+    // one: `Number(null)` is 0, which passes the inequalities outright.
+    expect(errors(candles({ ohlc: [{ open: 10, high: 12, low: 9 }] })), "a missing close")
+      .toMatch(/not four finite numbers/u);
+    expect(errors(candles({ ohlc: [{ open: 10, high: 12, low: null, close: 11 }] })), "a null low")
+      .toMatch(/not four finite numbers/u);
+    expect(errors(candles({ ohlc: [{ open: "10", high: 12, low: 9, close: 11 }] })), "a string")
+      .toMatch(/not four finite numbers/u);
+    expect(errors(candles({ ohlc: "bars" })), "not an array").toMatch(/must be an array/u);
+
+    // A bar whose body touches its wick is legal, or the row passes for a gate
+    // that refuses every candle: `low === open` and `high === close` are the
+    // inequalities' boundary and an ordinary marubozu.
+    expect(errors(candles({ ohlc: [{ open: 9, high: 11, low: 9, close: 11 }] })), "touching").toBe("");
+  });
+
+  it("T3.26 (I57): `ohlc` with `series: []` validates", () => {
+    // **The row that says the ordinary case is legal.** Every other refusal
+    // here is about a member that should not be there and this one is about a
+    // member that need not be — so without it the suite agrees with a gate that
+    // has learned to refuse plain candles.
+    expect(
+      validateBlock({
+        kind: "plot", id: "candles", form: "line", height: 8, series: [],
+        plotStyle: "candlestick", ohlc: [{ open: 1, high: 3, low: 0, close: 2 }],
+      }).ok,
+    ).toBe(true);
+    // **The built block carries the field**, asserted rather than inferred from
+    // the builder not throwing: a parameter accepted, destructured and left out
+    // of the constructed literal type-checks and throws nothing, which is the
+    // wiring MG27 watches and the shape a call-site row is blind to.
+    const built = b.plot({
+      series: [], height: 8, plotStyle: "candlestick",
+      ohlc: [{ open: 1, high: 3, low: 0, close: 2 }],
+    });
+    expect(built.ohlc).toEqual([{ open: 1, high: 3, low: 0, close: 2 }]);
+    expect(built.plotStyle).toBe("candlestick");
+
+    // And a style outside the vocabulary is refused, or the set that now holds
+    // it is a list nothing reads.
+    expect(validateBlock({ ...(built as object), plotStyle: "candles" }).ok, "unknown style")
+      .toBe(false);
+
+    // And an overlay is legal beside them, which is the field's whole reason
+    // for being optional rather than exclusive with `series`.
+    expect(
+      validateBlock({
+        kind: "plot", id: "candles-ma", form: "line", height: 8,
+        series: [{ values: [1, 2, 3], label: "ma" }],
+        plotStyle: "candlestick", ohlc: [{ open: 1, high: 3, low: 0, close: 2 }],
+      }).ok,
+    ).toBe(true);
+  });
+
   it("T3.6c (§3): a row group splits equally, and still measures when it cannot", () => {
     expect(groupChildWidths(rowOf(3, "row"), 80)[0], "floor((80 - 2) / 3)").toBe(26);
 
