@@ -240,9 +240,14 @@ export function boxplotColumn(
   set(yMax, runRow(g.stubRight, g.teeDown, g.stubLeft));
   set(yMin, runRow(g.stubRight, g.teeUp, g.stubLeft));
   // The whisker arrives from above at the lid and leaves below at the floor, so
-  // the junction points the way the whisker goes.
-  set(yQ3, runRow(g.topLeft, g.teeUp, g.topRight));
-  set(yQ1, runRow(g.bottomLeft, g.teeDown, g.bottomRight));
+  // the junction points the way the whisker goes — and **where there is no
+  // whisker there is nothing to point toward** (I33). The lid is written over
+  // the cap when the two rows coincide, so without this the figure keeps a stub
+  // aimed at blank rows. Horizontal `─`, the transpose of the band's `│`.
+  const upperWhisker = yQ3 > yMax; // cells-ok — a row index
+  const lowerWhisker = yMin > yQ1; // cells-ok — a row index
+  set(yQ3, runRow(g.topLeft, upperWhisker ? g.teeUp : g.horizontal, g.topRight));
+  set(yQ1, runRow(g.bottomLeft, lowerWhisker ? g.teeDown : g.horizontal, g.bottomRight));
   set(yMed, runRow(g.teeLeft, g.horizontal, g.teeRight));
 
   // The mean last and only where it differs — a second centre needs its own
@@ -299,22 +304,6 @@ export function boxplotBand(
   // happen to line up; ASCII collapses the corners it cannot spell and the
   // figure still reads.
   const g = glyphs(caps);
-  const T = {
-    minCap: [g.stubDown, g.teeLeft, g.stubUp],
-    whisker: [" ", g.horizontal, " "],
-    boxL: [g.topLeft, g.teeRight, g.bottomLeft],
-    boxEdge: [g.horizontal, " ", g.horizontal],
-    median: [g.teeDown, g.vertical, g.teeUp],
-    boxR: [g.topRight, g.teeLeft, g.bottomRight],
-    maxCap: [g.stubDown, g.teeRight, g.stubUp],
-    mean: g.diamond,
-    outlier: g.dotted,
-  };
-
-  // The interquartile run's ink, for the compact arm. `pairFor` is the gauge
-  // vocabulary and this *is* a gauge: a span of the axis that is filled or not.
-  const fill = pairFor(caps).filled;
-
   const at = (v: number): number => {
     const span = max - min;
     const t = span <= 0 ? 0 : (v - min) / span;
@@ -324,11 +313,46 @@ export function boxplotBand(
   const xMin = at(q.min), xQ1 = at(q.q1), xMed = at(q.median);
   const xQ3 = at(q.q3), xMax = at(q.max);
 
+  // The interquartile run's ink, for the compact arm. `pairFor` is the gauge
+  // vocabulary and this *is* a gauge: a span of the axis that is filled or not.
+  const fill = pairFor(caps).filled;
+  const compact = n < 3; // cells-ok — a row count
+
+  // **No whisker, no stub** (I33). The cap and the box edge are two writes to
+  // one column when a whisker has zero length at cell resolution, and the edge
+  // is written second — so the spine kept `├` pointing right at blank columns,
+  // promising a whisker that is not there. The condition is on the *columns*
+  // rather than on the values: two readings a hair apart round into one cell
+  // and there is nothing drawn between them to point at.
+  const lowWhisker = xQ1 > xMin; // cells-ok — a column index
+  const highWhisker = xMax > xQ3; // cells-ok — a column index
+  // **What a box edge draws with no whisker to point at, and the two arms
+  // differ for the reason they already differ about the interior.** With three
+  // rows the interior is clear and the edges are the only thing saying where
+  // the box is, so the spine keeps a plain `│`. With one row the box **is** the
+  // filled run, and its edge is where that run begins — a `│` there says
+  // nothing the ink does not, and collides with the median, which is the one
+  // other `│` on that row. One glyph, two meanings, in the arm that has no
+  // corners to tell them apart.
+  const edge = compact ? fill : g.vertical;
+
+  const T = {
+    minCap: [g.stubDown, g.teeLeft, g.stubUp],
+    whisker: [" ", g.horizontal, " "],
+    boxL: [g.topLeft, lowWhisker ? g.teeRight : edge, g.bottomLeft],
+    boxEdge: [g.horizontal, " ", g.horizontal],
+    median: [g.teeDown, g.vertical, g.teeUp],
+    boxR: [g.topRight, highWhisker ? g.teeLeft : edge, g.bottomRight],
+    maxCap: [g.stubDown, g.teeRight, g.stubUp],
+    mean: g.diamond,
+    outlier: g.dotted,
+  };
+
+
   // **Compact is one row and it is the spine, not a different drawing.** A
   // single row taken from the same table keeps the median and the caps; taking
   // a separate renderer is how the two would drift.
   const wanted = n >= 3 ? [0, 1, 2] : n === 2 ? [0, 1] : [1]; // cells-ok — a row count
-  const compact = n < 3; // cells-ok — a row count
   const out: string[] = [];
 
   for (const r of wanted) {

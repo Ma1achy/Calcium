@@ -1867,6 +1867,85 @@ describe("C12 §3f — the bar's readout and its bins", () => {
   });
 });
 
+describe("C12 I33 — no whisker, no stub", () => {
+  const g = glyphs(FULL_CAPS);
+  const band = (q: Record<string, number>, rows = 3): readonly string[] =>
+    boxplotBand(q as never, 0, 10, 31, rows, FULL_CAPS);
+  const spine = (q: Record<string, number>): string => band(q)[1] ?? "";
+
+  it("T1.100 (C12 I33): the box edge loses its stem where its cap is not a separate cell", () => {
+    // **The ordinary case first, in the same row.** A fix that removed every
+    // stub satisfies an assertion written only about the collapsed one, and
+    // both halves of the rule are what makes it a rule.
+    const ordinary = spine({ min: 1, q1: 3, median: 5, q3: 7, max: 9 });
+    expect(ordinary, "a whisker on both sides keeps both stubs")
+      .toBe(`   ${g.teeLeft}${g.horizontal.repeat(5)}${g.teeRight}     ${g.vertical}     ${g.teeLeft}${g.horizontal.repeat(5)}${g.teeRight}   `);
+
+    // `q3 === max`: the cap and the box's right edge are one column, the edge is
+    // written second, and its stub used to survive — `├` pointing at blank
+    // columns, promising a whisker that is not there.
+    const highFlat = spine({ min: 1, q1: 3, median: 5, q3: 9, max: 9 });
+    expect(highFlat.trimEnd().at(-1), "the right edge").toBe(g.vertical);
+    expect(highFlat, "and nothing after it").toMatch(/│\s*$/u);
+
+    // The mirror, which the task named only one half of.
+    const lowFlat = spine({ min: 1, q1: 1, median: 5, q3: 7, max: 9 });
+    expect(lowFlat.trimStart()[0], "the left edge").toBe(g.vertical);
+
+    // Both ends collapsed: a box with no whiskers at all is a plain box.
+    const both = spine({ min: 2, q1: 2, median: 5, q3: 8, max: 8 });
+    expect(both).not.toContain(g.teeLeft);
+    expect(both).not.toContain(g.teeRight);
+    expect(both, "and it is still a box").toContain(g.vertical);
+
+    // The compact arm takes the same table, so it moves with it.
+    expect((boxplotBand({ min: 2, q1: 2, median: 5, q3: 8, max: 8 } as never, 0, 10, 31, 1, FULL_CAPS)[0] ?? ""))
+      .not.toContain(g.teeRight);
+
+    // **The condition is on the columns, not on the values** — and every
+    // fixture above has them exactly equal, where the two readings agree. At
+    // 31 cells over 0…10 a column is a third of a unit, so `q3: 9` and
+    // `max: 9.1` are two different numbers in one cell with nothing drawn
+    // between them, and a stub there points at the cap it is standing on.
+    const near = { min: 1, q1: 3, median: 5, q3: 9, max: 9.1 };
+    expect(near.max, "the fixture responds: the values differ").toBeGreaterThan(near.q3);
+    expect(spine(near).trimEnd().at(-1), "and the columns do not").toBe(g.vertical);
+  });
+
+  it("T1.100b (C12 I33): the vertical arm's lid, and the alphabet that can say it after all", () => {
+    // The transpose: `┴` on the lid points up, and there is nothing above it.
+    const col = (q: Record<string, number>): readonly string[] =>
+      boxplotColumn(q as never, 0, 10, 5, 11, FULL_CAPS);
+    const lidOf = (rows: readonly string[]): string =>
+      rows.find((r) => r.includes(g.topLeft)) ?? "";
+
+    expect(lidOf(col({ min: 1, q1: 3, median: 5, q3: 7, max: 9 })), "a real upper whisker")
+      .toContain(g.teeUp);
+    expect(lidOf(col({ min: 1, q1: 3, median: 5, q3: 9, max: 9 })), "none")
+      .not.toContain(g.teeUp);
+    const floorOf = (rows: readonly string[]): string =>
+      rows.find((r) => r.includes(g.bottomLeft)) ?? "";
+    expect(floorOf(col({ min: 1, q1: 3, median: 5, q3: 9, max: 9 })), "the lower one is untouched")
+      .toContain(g.teeDown);
+    expect(floorOf(col({ min: 1, q1: 1, median: 5, q3: 7, max: 9 })), "and collapses on its own side")
+      .not.toContain(g.teeDown);
+
+    // **ASCII carries the fix, which is not what the spec first said.** Every
+    // tee collapses to `+` and `vertical` is `|`, so the alphabet loses *which
+    // way* a stub points and keeps *whether there is one* — the distinction
+    // this rule is about. Measured rather than assumed: the row was first
+    // written to assert the two were identical in ASCII, and they are not.
+    const a = glyphs(ASCII_CAPS);
+    expect(a.teeLeft, "the tees are one glyph").toBe(a.teeRight);
+    expect(a.teeLeft, "and so is the corner").toBe(a.topLeft);
+    expect(a.vertical, "but a plain vertical is its own").not.toBe(a.teeLeft);
+    const flat = boxplotBand({ min: 1, q1: 3, median: 5, q3: 9, max: 9 } as never, 0, 10, 31, 3, ASCII_CAPS);
+    const full = boxplotBand({ min: 1, q1: 3, median: 5, q3: 7, max: 9 } as never, 0, 10, 31, 3, ASCII_CAPS);
+    expect(flat[1]?.trimEnd().at(-1), "collapsed").toBe(a.vertical);
+    expect(full[1]?.trimEnd().at(-1), "and a whisker still ends in a junction").toBe(a.teeRight);
+  });
+});
+
 describe("C12 §3r — the candlestick", () => {
   const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" } as const;
   const walk = (
