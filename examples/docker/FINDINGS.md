@@ -9298,3 +9298,80 @@ touches, agreeing.
 - **`MIRRORED`** is the golden corpus this needed, at six rows a band and seven — the case that was
   broken and its control, so parity is something a reader compares rather than something the spec
   asserts.
+
+---
+
+## F186 — one merge rule, three symptoms, and a test that failed for two different reasons ★★★★
+
+| | |
+|---|---|
+| **Surface** | every figure that composites layers — a pie's wedges, a radar's polygons over its frame, `slope`'s overlaid series |
+| **Reached for** | two user reports read as separate: *gaps appear between the pie's slices* and *the radar's lines seem dashed / have gaps* |
+| **Verdict** | **`mergedRow` gave a whole cell to the first layer that inked it, and every compositing form folds to braille before it gets there** |
+| **Absorbed by** | C12 I40 and §3u — the merge is per dot where the vocabulary allows it |
+
+```ts
+for (const layer of layers) {
+  if (isBlank(candidate)) continue;
+  cell = candidate; cellRef = layer.ref; break;      // ← the cell, to one layer
+}
+```
+
+**The two reports are one defect.** A pie's disc is covered by construction — the fractions sum
+to one, so every dot inside the radius belongs to some wedge — and `pie-default-40` had **seven
+cells flanked by a full cell on each side that were not themselves full**. The radar has it
+twice: its layers are `[labels, …polygons, frame]`, so a polygon crossing another loses cells to
+it, and the frame is drawn **only where nothing else drew**. Fragmented rings and strokes that
+read as dashed and are not — `dashFor` returns solid at any depth above one bit.
+
+A braille cell is `U+2800 + bits`, so the union is an OR. Where any candidate is not braille the
+first-wins rule stands: a letter and a polygon cannot share a cell.
+
+**The colour stays one layer's and the spec says so** rather than implying otherwise. A `Span`
+carries one `ColourRef`, so two wedges meeting in a cell draw both sets of dots in the first
+wedge's colour — the union removes the gap, not the boundary's inexactness. And the priority
+order stays the ref's rather than becoming the densest layer's, because that order is a ruling
+(labels over polygons over frame) that a dot count would overturn wherever the frame was denser.
+
+### The assertion failed twice, and only the second failure was the code's
+
+LM1 read *every cell between two full cells is itself full* and failed against the shipped
+code — correctly. It then failed **after the fix**, and the second failure was its own: it
+dropped the non-braille cells from a row and read neighbours out of the filtered array, so it
+compared the last cell of the disc with the first cell of the legend's swatch, forty columns
+away. A probe over the raw row found no partials at all.
+
+**A red test agreeing with you is not evidence.** Both failures said *partial cells exist*; one
+was true and one was an index. What separated them was measuring the row directly rather than
+re-reading the assertion.
+
+### The mutation pass found the clause nothing had a subject for
+
+Four mutations, three killed at once. **The letter guard survived** — the clause that stops a
+polygon overwriting a category name — because `labelRows` places the names outside the disc and
+at every width the catalogue uses no polygon cell ever lands on a letter. Measured with every
+value at the ceiling:
+
+```
+80×17 · 60×13 · 40×11     0 label/polygon clashes
+34×9                      2
+28×9                      6
+```
+
+The disc grows into its labels as the room shrinks, so the guard has a subject at 34 columns and
+below and none above. The row is anchored there now, and asserted as containment — *no letter
+becomes a glyph* — rather than as *the names are still readable*, which is the weaker claim and
+the one that passed against the mutation.
+
+### What the whole corpus says about the change
+
+Every golden frame that moved was compared cell by cell against its predecessor:
+
+```
+cells that gained dots   95
+cells that lost dots      0
+changed some other way    0
+```
+
+**Provably additive**, which is the check that says a merge rule did what it claimed and nothing
+else — and it reaches `slope`, a form neither report mentioned and neither of us predicted.

@@ -403,14 +403,39 @@ function behind(
   return out;
 }
 
+/** Braille is `U+2800 + bits`, which is what makes the union below an OR. */
+const BRAILLE_BASE = 0x2800;
+const BRAILLE_TOP = 0x28ff;
+
+function brailleBits(ch: string): number | null {
+  const c = ch.codePointAt(0);
+  if (c === undefined || c < BRAILLE_BASE || c > BRAILLE_TOP) return null;
+  return c - BRAILLE_BASE;
+}
+
 /**
- * Layers to one row of spans.
+ * Layers to one row of spans — **per dot where the vocabulary allows it** (C12 I40, §3u).
  *
- * Where two series ink the same cell the earlier one keeps it. Overlaying is lossy
- * at cell granularity and there is no version that is not; what matters is that
- * the loss is deterministic and favours the series a reader is looking at, which
- * is the first. At `colourDepth: 1` this path is not taken at all — the plot
- * stacks instead (I6).
+ * This took the whole cell to the first layer that inked it, and every figure
+ * that composites is folded to braille *before* it arrives, so the second
+ * layer's dots were dropped. A pie's disc is covered by construction and had
+ * seven cells flanked by full ones that were not full; a radar's frame was drawn
+ * only in the cells no polygon wanted, which reads as fragmented rings and
+ * dashed strokes — and `dashFor` is solid at any depth above one bit.
+ *
+ * **Where every candidate is braille the bits are unioned.** Where any is not —
+ * a radar's category names are text — the first-wins rule stands, because a
+ * letter and a polygon cannot share a cell and one of them has to lose.
+ *
+ * **The colour is still the first layer's, and that is the span model's limit
+ * rather than an oversight.** A `Span` carries one `ColourRef`, so two wedges
+ * meeting in a cell draw both sets of dots in the first wedge's colour: the
+ * union removes the *gap* and not the boundary's inexactness. The priority order
+ * stays the ref's rather than becoming the densest layer's, because that order
+ * is a ruling — labels over polygons over frame — that a dot count would
+ * overturn wherever the frame happened to be denser.
+ *
+ * At `colourDepth: 1` this path is not taken at all — the plot stacks (I6).
  */
 function mergedRow(
   layers: readonly Layer[],
@@ -435,12 +460,24 @@ function mergedRow(
   for (let x = 0; x < layout.areaWidth; x += 1) {
     let cell = " ";
     let cellRef: ColourRef | null = null;
+    let bits = 0;
     for (const layer of layers) {
       const candidate = [...(layer.glyphRows[rowIndex] ?? "")][x] ?? " ";
       if (isBlank(candidate)) continue;
-      cell = candidate;
-      cellRef = layer.ref;
-      break;
+      const dots = brailleBits(candidate);
+      if (cellRef === null) {
+        cell = candidate;
+        cellRef = layer.ref;
+        // A non-braille winner ends the cell: nothing may be OR-ed into a letter.
+        if (dots === null) break;
+        bits = dots;
+        continue;
+      }
+      // Past the first inking layer, only braille contributes — and only to a
+      // cell that is itself braille.
+      if (dots === null) continue;
+      bits |= dots;
+      cell = String.fromCodePoint(BRAILLE_BASE + bits);
     }
     if (cellRef !== runRef) {
       flush();
