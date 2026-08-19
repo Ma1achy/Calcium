@@ -25,7 +25,7 @@ import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 
 const mask = inkMask as (row: string) => string;
 const profile = extentProfile as (m: readonly string[]) => readonly number[];
-const err = extentError as (a: readonly string[], b: readonly string[]) => number | undefined;
+const err = extentError as (a: readonly string[], b: readonly string[]) => { value?: number; why?: string };
 const disagree = disagreement as (a: readonly string[], b: readonly string[], rows: number, cols: number) => number;
 const ours = calciumMask as (spec: never) => readonly string[];
 const theirs = referenceRows as (form: string) => readonly string[] | undefined;
@@ -79,12 +79,21 @@ describe("refdiff — the grid is the model, not the answer", () => {
     expect(new Set(rightmost).size, "the defect: one distinct extent for three bars").toBe(1); // cells-ok — a set size
   });
 
-  it("RD3: a form is incomparable rather than compared when the bands differ", () => {
-    expect(err(["##......", "####...."], ["##......", "####...."])).toBe(0);
+  it("RD3: a form is incomparable rather than compared when the bands differ, and says why", () => {
+    expect(err(["##......", "####...."], ["##......", "####...."])).toEqual({ value: 0 });
     // Different band counts must not be silently zipped to the shorter one.
-    expect(err(["##......", "####...."], ["##......"])).toBeUndefined();
+    // Three bands against two is the case that reaches the count comparison —
+    // *fewer than two* is checked first and is the more specific statement.
+    expect(err(["#.......", "###.....", "#####..."], ["#.......", "###....."]))
+      .toEqual({ why: "3 bands vs 2" });
     // Fewer than two bands says nothing about whether lengths agree.
-    expect(err(["####...."], ["########"])).toBeUndefined();
+    expect(err(["####...."], ["########"]))
+      .toEqual({ why: "fewer than two bands — ours 1, theirs 1" });
+    // **The reason is the point of the change.** A bare `undefined` printed a
+    // dash, and a dash reads as *this form has no bands* — the opposite of the
+    // truth for `bar`, `histogram` and `waffle`, which have shown one since the
+    // measure landed and have bands in every frame.
+    expect(err(["####...."], ["########"]).why, "an instrument that declines says why").toBeDefined();
   });
 
   it("RD4: disagreement is 0 for identical frames and 1 for complements", () => {

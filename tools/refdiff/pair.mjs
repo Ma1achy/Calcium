@@ -63,11 +63,31 @@ export function extentProfile(mask) {
   return ends.map((e) => e / max);
 }
 
-/** Mean absolute difference of two extent profiles, or undefined if incomparable. */
+/**
+ * Mean absolute difference of two extent profiles, or **why not**.
+ *
+ * **It reports `—` for every form it was written for, and always has.** The
+ * measure exists because ink called `bar` 51% different while every bar length
+ * agreed — and `bar`, `histogram`, `waffle`, `waterfall` and `bullet` have shown
+ * a bare dash since the day it landed. A dash that does not say why reads as
+ * *this form has no bands*, which is the opposite of the truth: they have bands
+ * and the two sides count a different number of them, because matplotlib draws a
+ * proportional band over several raster rows and the run-length collapse lands
+ * on a boundary differently at each end.
+ *
+ * Returning the reason does not fix the comparison. It makes the next person's
+ * first question answerable from the table instead of from the source, which is
+ * the whole of what an instrument owes when it declines to measure.
+ */
 export function extentError(a, b) {
   const x = extentProfile(a), y = extentProfile(b);
-  if (x.length < 2 || y.length < 2 || x.length !== y.length) return undefined;
-  return x.reduce((n, v, i) => n + Math.abs(v - y[i]), 0) / x.length;
+  if (x.length < 2 || y.length < 2) {
+    return { why: `fewer than two bands — ours ${x.length}, theirs ${y.length}` };
+  }
+  if (x.length !== y.length) {
+    return { why: `${x.length} bands vs ${y.length}` };
+  }
+  return { value: x.reduce((n, v, i) => n + Math.abs(v - y[i]), 0) / x.length };
 }
 
 /** Fraction of cells where exactly one side has ink, over the form's own grid. */
@@ -120,7 +140,7 @@ if (isMain) {
 
     const pane = [`── ${form} · calcium (left) vs matplotlib→braille (right) · ${COLS}x${rows}`,
       `   cells disagreeing: ${(d * 100).toFixed(1)}%`,
-      `   extent profile:    ${e === undefined ? "incomparable — fewer than two comparable bands" : `${(e * 100).toFixed(1)}% mean error`}`,
+      `   extent profile:    ${e.value === undefined ? `incomparable — ${e.why}` : `${(e.value * 100).toFixed(1)}% mean error`}`,
       ""];
     for (let r = 0; r < rows; r++) {
       pane.push(`${(ours[r] ?? "").padEnd(COLS)} │ ${theirs[r] ?? ""}`);
@@ -147,7 +167,7 @@ if (isMain) {
     "| form | grid | ink | extent |", "|---|---|---|---|"];
   for (const r of report) {
     if (r.skipped !== undefined) { lines.push(`| ${r.form} | — | — | *${r.skipped}* |`); continue; }
-    const ext = r.extent === undefined ? "—" : `${(r.extent * 100).toFixed(1)}%`;
+    const ext = r.extent.value === undefined ? `— *${r.extent.why}*` : `${(r.extent.value * 100).toFixed(1)}%`;
     lines.push(`| ${r.form} | ${COLS}x${r.rows} | ${(r.disagreement * 100).toFixed(1)}% | ${ext} |`);
   }
   writeFileSync(join(outDir, "README.md"), `${lines.join("\n")}\n`);

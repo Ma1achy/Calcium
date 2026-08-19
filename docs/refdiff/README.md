@@ -21,35 +21,35 @@ change is the signal.
 
 | form | grid | ink | extent |
 |---|---|---|---|
-| waffle | 64x10 | 59.4% | — |
-| bar | 64x16 | 51.2% | — |
-| histogram | 64x16 | 46.0% | — |
-| waterfall | 64x16 | 40.8% | — |
-| bullet | 64x16 | 39.6% | — |
-| ridgeline | 64x16 | 39.3% | — |
-| boxplot | 64x16 | 35.6% | — |
-| funnel | 64x16 | 32.4% | — |
-| line | 64x16 | 27.1% | — |
-| pie | 64x16 | 27.1% | — |
-| lollipop | 64x16 | 26.8% | — |
-| gantt | 64x16 | 26.3% | — |
-| streamgraph | 64x16 | 25.8% | — |
-| radar | 64x16 | 25.5% | — |
-| stackedarea | 64x16 | 23.5% | — |
-| autocorrelation | 64x16 | 23.4% | — |
-| sparkline | 64x1 | 21.9% | — |
+| waffle | 64x10 | 59.4% | — *fewer than two bands — ours 1, theirs 0* |
+| bar | 64x16 | 51.2% | — *3 bands vs 7* |
+| histogram | 64x16 | 46.0% | — *3 bands vs 8* |
+| ridgeline | 64x16 | 41.0% | — *fewer than two bands — ours 4, theirs 1* |
+| waterfall | 64x16 | 40.8% | — *fewer than two bands — ours 2, theirs 1* |
+| bullet | 64x16 | 39.6% | — *fewer than two bands — ours 1, theirs 3* |
+| boxplot | 64x16 | 35.6% | — *fewer than two bands — ours 0, theirs 1* |
+| funnel | 64x16 | 32.4% | — *fewer than two bands — ours 1, theirs 1* |
+| line | 64x16 | 27.1% | — *fewer than two bands — ours 2, theirs 1* |
+| pie | 64x16 | 27.1% | — *fewer than two bands — ours 0, theirs 0* |
+| lollipop | 64x16 | 26.8% | — *5 bands vs 4* |
+| gantt | 64x16 | 26.3% | — *fewer than two bands — ours 1, theirs 1* |
+| streamgraph | 64x16 | 25.8% | — *9 bands vs 8* |
+| radar | 64x16 | 25.5% | — *fewer than two bands — ours 0, theirs 0* |
+| stackedarea | 64x16 | 23.5% | — *7 bands vs 9* |
+| autocorrelation | 64x16 | 23.4% | — *fewer than two bands — ours 0, theirs 2* |
+| sparkline | 64x1 | 21.9% | — *fewer than two bands — ours 1, theirs 1* |
 | slope | 64x16 | 19.3% | 7.7% |
-| timeline | 64x16 | 18.8% | — |
-| forest | 64x16 | 17.9% | — |
+| timeline | 64x16 | 18.8% | — *fewer than two bands — ours 1, theirs 1* |
+| forest | 64x16 | 17.9% | — *fewer than two bands — ours 1, theirs 0* |
 | violin | 64x16 | 16.1% | 1.0% |
-| horizon | 64x16 | 14.6% | — |
-| density | 64x16 | 13.7% | — |
-| dumbbell | 64x16 | 9.7% | — |
-| ecdf | 64x16 | 9.4% | — |
-| bubble | 64x16 | 9.0% | — |
-| scatter | 64x16 | 4.5% | — |
-| step | 64x16 | 4.0% | — |
-| dotplot | 64x16 | 1.9% | — |
+| horizon | 64x16 | 14.6% | — *13 bands vs 9* |
+| density | 64x16 | 13.7% | — *fewer than two bands — ours 2, theirs 1* |
+| dumbbell | 64x16 | 9.7% | — *fewer than two bands — ours 1, theirs 1* |
+| ecdf | 64x16 | 9.4% | — *fewer than two bands — ours 1, theirs 2* |
+| bubble | 64x16 | 9.0% | — *fewer than two bands — ours 1, theirs 1* |
+| scatter | 64x16 | 4.5% | — *fewer than two bands — ours 1, theirs 2* |
+| step | 64x16 | 4.0% | — *fewer than two bands — ours 1, theirs 1* |
+| dotplot | 64x16 | 1.9% | — *fewer than two bands — ours 1, theirs 1* |
 | heatmap | — | — | *C04 I50b — no `axes: false`; lifts with furniture.ts `AreaContent`* |
 | flame | — | — | *no reference renderer — see reference.py SKIPPED* |
 | icicle | — | — | *no reference renderer — see reference.py SKIPPED* |
