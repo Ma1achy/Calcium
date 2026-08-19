@@ -256,6 +256,39 @@ That is C23 §8a A4's shape: **an artefact correct about the interaction it foun
 
 So `surfaces.selection` is a text-bearing surface and `SELECTION_SLOTS` is its pairing. **One slot: `tone.default`.** The prompt's text is `default`; ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is adjacent to a selection and never inside one.
 
+### 4c. The wash a matrix paints, and the one word in I21 that decides it
+
+C12 I29 makes a heatmap cell **a painted background rather than a lit glyph**, which is what
+granite does and what makes a matrix read as the continuous field it is. Its own §"Painting the
+cell" calls that *wiring rather than machinery*, because `Style` carries a `background`.
+
+**That is wrong, and it is §4b's shape a second time — an artefact correct about the interaction
+and wrong about a mechanism it assumed existed.** `resolveBackground` refuses every ref that is
+not `surface.*` and returns `NO_STYLE`; a colormap value is not a ref at all. The channel exists
+and the door to it is shut.
+
+**The word that decides it is *text*.** I21's reason is that a tone painted as a background is a
+tone nothing measured a floor for **in that role** — and a contrast floor is a property of text
+*on* a surface. A painted matrix cell carries no text: it is a blank cell whose colour is the
+datum. There is no foreground to be illegible against it, so there is no floor to measure, and
+the constraint has nothing to constrain.
+
+So I21 gains exactly one further way in, and its shape is the guarantee:
+
+- **`wash(width, colour)` returns a `Span`, not a `Style`.** It builds the text itself — blank,
+  of the given width — so a caller *cannot* pair a computed background with a glyph. The rule
+  that makes the widening safe is unforgeable rather than remembered, which is the difference
+  between this and the convention four gutters each had to honour.
+- A `ColourValue` reaching the background channel any other way is still refused. `resolveBackground`
+  is unchanged.
+
+**What it does not do is make the pair checkable, and that is the trade stated.** Two adjacent
+cells of similar value are told apart by the colormap's own perceptual spacing, not by anything
+C10 measures — a floor between two data colours is not a floor this component has ever computed
+and would be the wrong instrument if it did. C10 I31 already keeps the continuous path off
+terminals below 8-bit, where a colormap is an ordering over indices whose luminance is unknown,
+and that is the rung where the density ramp takes over.
+
 **The measured figures, because they are what would tempt a widening.** On the light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and the fix would look like weakening the check. §4's argument for excluding `bgDeep`, in the mirror: do not validate a slot against a surface that slot never lands on.
 
 Shipped values, measured against `tone.default`'s 4.5 floor: dark `#264057` at **7.25**, light `#c9ddf5` at **8.18**.
@@ -515,7 +548,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I18** — A `defaultTheme` ships and satisfies every contrast floor, so the one required config field is one line to fill. A framework whose only required field has no working value is a framework nobody starts.
 - **I19** — Contrast is validated against `bg` and `bgElev`, the two surfaces text lands on, and never against `bgDeep`, which carries none. Validating against a surface no text meets would reject themes for a failure that cannot be seen.
 - **I20** — The shipped tokens are A01 Appendix A.1's catalogue, and T2.4 recomputes every ratio from them rather than trusting the recorded figures. The table is an assertion the suite upholds, not a record of intent.
-- **I21** — `Style` has exactly two colour channels, `colour` and `background`, and both are `ColourValue` or absent. `background` is set only by `resolveBackground`, and only from a `surface` ref — a palette slot never resolves into it, because a tone painted as a background is a tone nothing checked the floor for.
+- **I21** — `Style` has exactly two colour channels, `colour` and `background`, and both are `ColourValue` or absent. `background` is set only by `resolveBackground` from a `surface` ref, **or by `wash`, which returns a blank `Span` and never a bare `Style`** (§4c). A palette slot still never resolves into it: a tone painted behind *text* is a tone nothing checked the floor for. `wash` is admitted because it carries no text — the floor is a property of a foreground on a surface, and a painted matrix cell has no foreground. The `Span` return is what makes that unforgeable: there is no way to hand the colour to a glyph.
 - **I22** — The two diff surfaces are text-bearing, and every `syntax` slot and every gutter tone (`ok`, `error`, `muted`) clears its floor against both in both variants (§4a) — **those twelve slots and no others**, asserted on the pairing rather than on its results, because a widened pairing passes on the tokens as shipped and only costs something later. There is no third or fourth: §4a measured a stronger pair for word-level emphasis and found under ten units of one channel between it and the plain pair, so word-level emphasis is `underline`'s and not a background's. `bgDeep` remains excluded because it carries no text; the criterion is text, not the word "surface".
 - **I23** — A diff background is the third signal and never the only one. At 1-bit it is absent, and the marker and the toned gutter carry the distinction alone (→ C25 I13, → A01 D29).
 - **I24** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.

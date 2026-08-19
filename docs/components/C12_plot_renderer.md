@@ -247,7 +247,11 @@ So `db` above is a stopped container: a whole row of nothing, quiet, and still o
 
 ### Painting the cell, and why the glyph is the fallback rather than the carrier
 
-**The whole pipeline already does this and the plot module is the one kind that does not.** `Style` carries a `background`, `paint.ts` applies it, and `escapes.ts` emits `48` for it — and `paint.ts`' own header records the state: *C25 is the only consumer and the only kind that paints a background at all.* So this is wiring rather than machinery.
+**The whole pipeline already does this and the plot module is the one kind that does not.** `Style` carries a `background`, `paint.ts` applies it, and `escapes.ts` emits `48` for it — and `paint.ts`' own header records the state: *C25 is the only consumer and the only kind that paints a background at all.*
+
+~~So this is wiring rather than machinery.~~ **That sentence was wrong, and it is worth keeping struck through because of how it was wrong.** The channel exists and the door to it is shut: `resolveBackground` refuses every ref that is not `surface.*` and a colormap value is not a ref at all, so the one function that fills the channel returns `NO_STYLE` for this case by design. C10 I21 is the constraint and it is C10's to widen, not this component's to route around — *an artefact correct about the interaction it found and wrong about a mechanism it assumed existed*, which is C23 §8a A4's shape and C10 §4b's, and now this.
+
+**C10 §4c is where it was settled**, and the deciding word is *text*: I21's floor is a property of a foreground **on** a surface, and a painted matrix cell has no foreground — it is a blank cell whose colour is the datum. So C10 admits one further way in, `wash(width, colour)`, which returns a blank `Span` rather than a `Style`. A caller cannot pair a computed background with a glyph, because there is no glyph to pair it with. **The rule that makes the widening safe is unforgeable rather than remembered**, which is the difference between this and the four gutters that each had to honour a convention.
 
 It changes seven forms at once — `heatmap`, `correlation`, `confusion`, `spectrogram`, `latency`, `density2d`, `calendar` — plus solid bars and solid pie wedges.
 
