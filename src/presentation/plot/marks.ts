@@ -79,8 +79,23 @@ export function refOf(index: number): ColourRef {
 /** The depth at or above which the categorical palette separates its entries. */
 const CATEGORY_COLOUR_FLOOR = 4;
 
+/**
+ * **Textures, not the shade ramp** — §3b of the spec says so and this ladder
+ * opened `█ ▒ ▓ ░`, which is the ramp with the ends swapped.
+ *
+ * The cost is not aesthetic. A 1-bit waffle of 65 / 15 / 12 drew `█` then `▒`
+ * then `▓`: apparent density falling, then rising, against a magnitude that
+ * only falls. A ramp used for identity does not merely fail to encode
+ * magnitude — it encodes a *wrong* one, and a reader has no way to know the
+ * axis is not there.
+ *
+ * Quadrant and checker blocks carry no order: `▚` and `▞` tile into diagonal
+ * stripes running opposite ways, and the four three-quarter blocks tile into
+ * patterns that differ by which corner is open. All are U+2580–U+259F and so
+ * `East_Asian_Width=Ambiguous`, which is what `WIDE_MARKS` below is for.
+ */
 const UNICODE_MARKS: readonly string[] = Object.freeze([
-  "█", "▒", "▓", "░", "▙", "▟", "▚", "▞",
+  "█", "▚", "▞", "▙", "▟", "▛", "▜", "▖",
 ]);
 
 // Braille, because U+2800–U+28FF is Neutral and survives a wide terminal intact.
@@ -88,8 +103,17 @@ const WIDE_MARKS: readonly string[] = Object.freeze([
   "⣿", "⡇", "⢶", "⠉", "⠒", "⢤", "⡋", "⣘",
 ]);
 
+/**
+ * Same correction. This was `# = - : . + * o`, and `RAMP_ASCII` is `.:-=+*#@` —
+ * the first five marks were the ramp read backwards.
+ *
+ * `#` stays as the first, because it is ASCII's only solid and it is what
+ * `markOf` returns above the colour floor. The rule §3b states is against a
+ * *monotone density sequence*, not against any character a ramp also contains:
+ * one glyph on its own carries no ordering.
+ */
 const ASCII_MARKS: readonly string[] = Object.freeze([
-  "#", "=", "-", ":", ".", "+", "*", "o",
+  "#", "/", "\\", "x", "o", "v", "~", "%",
 ]);
 
 /** The eight marks for a capability set, most contrasting first. */
