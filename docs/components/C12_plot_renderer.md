@@ -1496,19 +1496,41 @@ is*, and an explicit `"full"` that does not fit degrades. A caller who declares 
 below the floor has asked for a picture that cannot exist; a caller who declares `"full"` in
 four rows has asked for the best available, which is a request the renderer can honour.
 
-### The two density ramps, which are not one ramp
+### The two densities are two *shapes*, not two axes — and one of them already exists
 
 **A vertical form reaching for the height ramp is the encoding mismatch I21 exists to make
-unspellable**, and it is reachable here because the raincloud draws density on both axes:
+unspellable**, and the raincloud is the first form that can reach for it, because it draws
+density on both axes. But the two are not two ladders:
 
-| the density grows | the axis | the ramp |
+| the band is thin in | resolution comes from | the vocabulary |
 |---|---|---|
-| horizontal band, growing **up** | `height` | `⠀ ⣀ ⣤ ⣶ ⣿` — five levels, a cell is four dots tall |
-| vertical band, growing **sideways** | `column` | `⠀ ⢸ ⣿` — three levels, a cell is two dots wide |
+| **height** — one row, N columns | *within* a cell, four dot-rows | a **ladder**: one value indexes one of eight steps |
+| **width** — N rows, two or three columns | *across* cells, four dot-columns | an **extent**: a run of solid cells with a fractional tip |
 
-Two cells of the column ramp give five levels filling right-to-left — `⠀⠀ · ⠀⢸ · ⠀⣿ ·
-⢸⣿ · ⣿⣿` — which is why the vertical budget is three columns and not two: two would be
-four dot-columns for the density *and* the box.
+**A ladder is per-cell and an extent is per-run**, and which one a density needs is decided
+by the dimension its band is thin in — not by the axis the values lie along. A horizontal
+band has one row to spend, so all the resolution is inside one cell and a ladder is the only
+shape that fits. A vertical band has two or three columns, so the resolution is the run's
+length and the ladder has nothing to index.
+
+**So there is no third axis. There are two directions of `extent`**, and the five levels the
+figure needs are what `extentRun` already returns at width 2 with one partial:
+
+```
+leftward   ⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿
+rightward  ⠀⠀ · ⡇⠀ · ⣿⠀ · ⣿⡇ · ⣿⣿      what `extentFor`'s wide arm draws today
+```
+
+**The leftward arm is braille at every width, and that is a limit rather than a choice.**
+`extentFor`'s narrow arm uses the left-eighths `▏▎▍▌▋▊▉` — seven fractions growing from the
+left. Unicode has no matching set growing from the right: `▕` and `▐` are the only two, an
+eighth and a half, and both are `East_Asian_Width=Ambiguous`. Braille is `Neutral`
+throughout and `⢸` is the right dot-column, which is the one fraction the block can express
+sideways — the same trade `extentFor` already records for its wide arm, arriving from the
+other direction.
+
+That is why the vertical budget is three columns and not two: two would be four dot-columns
+for the density *and* the box.
 
 ### The stub always points toward the whisker
 
@@ -1600,7 +1622,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I18** — **A heatmap spends width on columns first, then truncates its labels, and never draws an unlabelled matrix.** Row labels are the ordinate: a matrix with no names beside it is a picture of numbers. Where the width cannot spare a cell for a label beside a minimum plot area the block draws a centred notice at its declared height instead — I1 holds, and the reader is told rather than shown something they cannot read. *The line form keeps T3.3's opposite ladder, because a y-label is a scale and a row label is an identity.*
 - **I19** — **The scale legend spans the full row and never truncates its range.** The dropped-column clause goes first and the ramp swatch second; the range is what the legend exists to state, and it is the reason `axes: false` is refused (C04 I50b). A key with no scale beside it is decoration.
 - **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, and an absent value draws a mark.** One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
-- **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density, fill and **column** are four encodings and `position` is a fifth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **`column` is the one a shape can force**: a braille cell is two dots wide and four tall, so density growing *sideways* has three states per cell where density growing *up* has five, and a vertical raincloud reaching for the height ramp would draw a five-step scale on a three-step axis (§3i). **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
+- **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density and fill are three encodings and `position` is a fourth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **`extent` is the fifth and it has a direction**, which is not a new axis and was very nearly written as one: a vertical raincloud's density is a run of dot-columns, which is `extent` mirrored, and not a ladder of a third axis called `column`. **A ladder is per-cell and an extent is per-run**, and which a density needs is decided by the dimension its band is thin in rather than by the axis its values lie along (§3i). The mismatch that would follow from getting that wrong is a five-step scale drawn on a three-step axis — arithmetically monotone, right in its row count, and wrong about how much of each cell a level fills. **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
 - **I22** — **An axis picks nice numbers, snaps a derived bound outward, never moves a declared one, and drops a tick that would abut its neighbour.** The step is 1, 2, 2.5, 5 or 10 times a power of ten — 2.5 is in the set because without it `0 · 25 · 50 · 75 · 100` is unreachable. **The snap is per end** (C04 I29): loose labelling exists so the ends read round and a pinned axis exists so two plots can be compared, so a pin that silently grew would defeat what it is for. **Precision is one per axis and comes from the step** — the smallest gap two labels can differ by — and it is the step's *own* decimals rather than two significant figures of it, and a named precision is **kept in the string** rather than trimmed back into three (F177). **The tick count is a result**, bounded below by how fine a step is worth asking for and above by how many labels the height seats two rows apart. **And a step the arithmetic cannot pick is `0`**, never a plausible constant: a denormal span underflows, and `1` there snaps `5e-324 … 1e-323` to `0 … 1`, which terminates and is wrong where nothing downstream can detect it (F178).
 - **I23** — **An annotation is a dashed line in the same raster, drawn behind the data, and an edge outside the range is dropped rather than clamped.** Dashed is the carrier and the tone is decoration (F34): a reference line is broken where a curve is continuous, at every colour depth. **A band is two lines** — one statement, two edges — because a fill would compete for the cells the curve occupies. **Behind, and the layer order is the rule**: one that overwrote a sample would hide what it exists to be compared against. **Dropped rather than clamped is the one place this differs from a sample** (C04 I29): data pressed against a ceiling is honest, and a claim about *where a value sits* moved onto a scale it is outside is not. **At ASCII it is not the raster** — `foldRamp` encodes height, and folding a one-dot line by ink weight drew `# # # #`, heavier than the curve; there the line is drawn at cell resolution with `-`, which is narrow under both width conventions where every box-drawing dash is not.
 - **I24** — **One compositor owns the gutter, the frame and the legend, and it asserts its own row count.** Four independent gutter implementations is what produced a y-axis that is not straight: `labelWidth` and `padStart` default to `ambiguousWidth: "narrow"` and only two of the four passed the real capability, so one row's `│` sits a column right of the others wherever an ambiguous-width label appears. **The assertion is the point rather than the deduplication** — `area.rows + furniture === plotHeight(block)` was a convention four call sites each had to honour and is now one checked equality (I1's other half, at render time rather than at measure time). It **reconciles** rather than throwing: I2 says no series input throws, and the caller is a renderer, so a short block is filled with blank rows and a long one is cut. **`padStart` is the half the audit missed** — the two forms that measured with the real capability still padded with the default one, so all four gutters were crooked on a wide terminal and only the reason differed. **And the equality reaches only what routes through it**, which is not a caveat but the measured failure: `radar`, `horizon`, `smallmultiples` and `pairplot` composed their own rows and were therefore outside the one check written to catch exactly their defect. A compositor that can be bypassed is a convention again for whoever bypasses it, so the four now go through `composeRows` and §2's height table names them.
@@ -1701,7 +1723,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.67** (I33): the stub points toward the whisker in both arms — `├` at the min cap and `┤` at Q1 horizontally, `┬` at the max cap and `┴` at Q3 vertically — asserted as the *rule* over both tables rather than as two literal figures, so a table transcribed correctly from a wrong rule still fails.
 - **T1.68** (I33): a compact box is filled between Q1 and Q3 and a three-row box is hollow there, and a mean landing on the median draws `◈`.
 - **T1.69** (I34): `plotDetail: "auto"` picks the richest rung the declared height affords — 1, 2, 3 and 5 rows give the box, the raincloud, the jittered raincloud and the mirrored violin — and `"compact"` gives the *form's* lowest rung, which is 1 for a boxplot and 2 for a violin.
-- **T1.70** (I34): a vertical raincloud reads `ladderFor("column")` and a horizontal one `ladderFor("height")`, asserted by the glyph set each draws rather than by the call, so the row survives the call being moved.
+- **T1.70** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
 
 ### Tier 2 — contract / interface
@@ -1772,7 +1794,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 - **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
-- **T6.22** (I34): a vertical raincloud reaching for the height ramp → T1.70 fails, and the density draws a five-step scale on a three-step axis. Arithmetically self-consistent — the levels are monotone and the row count is right — and wrong about how much of the cell a level fills.
+- **T6.22** (I34, I21): a vertical raincloud reaching for the height ladder → T1.70 fails, and the density draws a per-cell scale where the axis is a run. Arithmetically self-consistent — the levels are monotone and the row count is right — and wrong about how much of each cell a level fills.
 
 ---
 
