@@ -1138,6 +1138,45 @@ it must.
 
 ---
 
+## 3k. The forest plot draws its interval, and the box was drawing over it
+
+`forestRow` builds the figure correctly — a thin line from `lower` to `upper`,
+end caps, a mark at the centre — and then, **whenever `q1` and `q3` are present,
+overwrites the whole interior with a box plot's body.** The catalogue fixture
+always sets them, so the interval was never visible in any rendered frame; what
+shipped was a box plot with a forest plot underneath it.
+
+A forest plot and a box plot look alike and mean different things. A box's edges
+are *quartiles of a sample*; a forest plot's interval is a **confidence interval
+on one estimate**, and its ends are the two numbers the reader came for. Drawing
+the first over the second does not lose decoration — it replaces the statistic.
+
+### What the figure needs, and which parts are data rather than drawing
+
+```
+ study            ├────■─────┤          the interval, with the estimate on it
+ larger study        ├──███──┤          sized by weight
+ small study    ├─────────▪────────┤
+ ─────────────────────────┊──────────   the null, from an annotation
+ pooled              ├───◆───┤          the summary, a diamond
+```
+
+- **The estimate is sized by `weight`.** A wide interval drawn small contributed
+  little; a narrow one drawn large carried the result. Without it the plot is a
+  list of intervals and the reader cannot see which one the conclusion rests on.
+- **The pooled estimate is a diamond**, and `pooled` is its own field rather than
+  a convention about the last row — *the last row is the summary* is a rule the
+  data cannot state and a renderer cannot check.
+- **The null reference line is an `Annotation`**, not a new field. C04 already has
+  one and it already means *a claim about the ordinate drawn beside the data*; a
+  forest plot's null is exactly that, and inventing `nullValue` beside it would be
+  the second way to say one thing.
+
+Both new members are optional and their absence is a real state: a summary
+computed from quantiles has no weight, and a meta-analysis need not be pooled.
+
+---
+
 ## 3j. `orientation` — the axis a categorical form runs along
 
 `bar`, `histogram`, `boxplot` and `violin` are drawn horizontally and matplotlib
@@ -1263,6 +1302,7 @@ classification table as its own rows.
 - **I28** — **`plotDetail` selects a renderer inside the declared height and never contributes to it**, because rows-per-band times category count is a height derived from data (I1). `"auto"` is the richest renderer the quotient affords; an explicit `"full"` that does not fit degrades to `"compact"` and reports rather than overflowing its band.
 - **I29** — **Colour carries magnitude where there is colour; the glyph is the fallback, never the lead.** A form that encodes magnitude paints the cell — a background-coloured space — at any depth that separates its values, and reaches for the density ramp only below it.
 - **I30** — **`orientation` chooses the axis, and the eighths vocabulary follows it.** Horizontal is the default because a cell is one wide by two tall and a category's name is text — a horizontal bar writes its label beside itself, a vertical one gets a column two cells wide to write it under. The partials are **left** eighths horizontally and **lower** eighths vertically; they look interchangeable, encode different axes, and the vertical arm reaches its through `ladderFor("height")` rather than naming a constant (I21). Both eighths sets are ambiguous-width, and the escapes are asymmetric: the vertical arm keeps seven partials on a wide terminal because braille fills bottom-up, and the horizontal arm has one because braille has no left-filling series. A form with no second axis refuses the field at construction rather than ignoring it.
+- **I31** — **A forest plot draws its interval, and nothing draws over it.** The ends of a confidence interval are the two numbers the reader came for; a box plot's body over them replaces the statistic rather than decorating it, and the two figures look alike enough that no count notices. `weight` sizes the estimate because *which study carried the result* is the plot's subject, and `pooled` is a field rather than a convention about the last row. The null reference is an `Annotation` (C04 §3e), which already means a claim about the ordinate drawn beside the data.
 
 **"Separates its values" is a real threshold and it is 8-bit, not 1-bit.** C10 I31 already ruled that a continuous map below 8-bit says *nothing* — an ordering over sixteen indices whose luminances the terminal never reports, so a ramp across them is an ordering that is not one — and `continuousColour` returns `undefined` there rather than guessing. **So the ladder has four rungs, not two, and the middle one is the rung most terminals actually report**: at 24- and 8-bit colour carries and the cell is painted; **at 4-bit colour exists and cannot carry, so density does**; at 1-bit there is nothing else. The mechanism is already built — the caller falls back because the map declines — and naming the rung is what stops someone reading *any depth with colour* as *any depth at all*.
 

@@ -10,7 +10,8 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
-import { boxplotBand, boxplotColumn } from "../../src/presentation/plot/glyph-row.js";
+import { boxplotBand, boxplotColumn, forestRow } from "../../src/presentation/plot/glyph-row.js";
+import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, ladderFor } from "../../src/presentation/plot/ramp.js";
 import { kde } from "../../src/presentation/plot/kde.js";
@@ -470,6 +471,55 @@ describe("GROUP 6e: the horizon folds", () => {
     const top = horizonRows(deep, R, 5, 8, 6, FULL_CAPS);
     const col0 = new Set(top.map((r) => r[0]).filter((g) => g !== undefined && g !== " "));
     expect(col0.size, "a cleared band shows above the one being filled").toBe(2); // cells-ok — a density count
+  });
+});
+
+describe("GROUP 6f: the forest draws its interval", () => {
+  const Q = { min: 0, q1: 0, median: 0, q3: 0, max: 0, centre: 0, lower: -1, upper: 1 } as const;
+
+  it("T1.53 (C12 I31): the interval survives, where a box used to draw over it", () => {
+    // **The catalogue fixture set `q1`/`q3` on every entry**, so the box drew
+    // over the interval in every rendered frame and the interval was never seen.
+    // A box's edges are quartiles of a sample; this interval is a confidence
+    // bound on one estimate, and replacing the second with the first is not
+    // decoration — the two figures look alike and mean different things.
+    const boxed = { ...Q, q1: -0.5, q3: 0.5 };
+    const row = forestRow(boxed, -2, 2, 41, FULL_CAPS);
+    expect(row, "a tee at each end").toMatch(/├─+/u);
+    expect(row).toMatch(/─+┤/u);
+    expect(row, "and no box body").not.toContain("[");
+    expect(row).not.toContain("]");
+  });
+
+  it("T1.54 (C12 I31): the estimate is sized by weight, and one cell without", () => {
+    // Which study carried the result is the plot's subject. Without this every
+    // estimate is one cell and the figure is a list of intervals.
+    const heavy = forestRow({ ...Q, weight: 0.8 }, -2, 2, 41, FULL_CAPS);
+    const light = forestRow({ ...Q, weight: 0.1 }, -2, 2, 41, FULL_CAPS);
+    const none = forestRow(Q, -2, 2, 41, FULL_CAPS);
+    const mark = glyphs(FULL_CAPS).filled;
+    const count = (r: string): number => [...r].filter((c) => c === mark).length; // cells-ok — a cell count
+    expect(count(heavy), "a heavy study is drawn larger").toBeGreaterThan(count(light)); // cells-ok — a cell count
+    expect(count(none), "and no weight is one cell").toBe(1); // cells-ok — a cell count
+  });
+
+  it("T1.55 (C12 I31): the pooled estimate is a diamond, not the study mark", () => {
+    // Its own field rather than a convention about the last row — *the last row
+    // is the summary* is a rule the data cannot state and a renderer cannot check.
+    const pooled = forestRow({ ...Q, weight: 0.5, pooled: true }, -2, 2, 41, FULL_CAPS);
+    expect(pooled).toContain(glyphs(FULL_CAPS).diamond);
+    expect(pooled, "and never both").not.toContain(glyphs(FULL_CAPS).filled);
+  });
+
+  it("T1.56 (C12 I31): the null is broken, and the data draws over it", () => {
+    // Broken because a solid rule crossing five intervals reads as a sixth. And
+    // *under* the data, because an interval interrupted by its own reference
+    // line is an interval that appears to stop there.
+    const g = glyphs(FULL_CAPS);
+    const away = forestRow({ ...Q, centre: 1.5, lower: 1.2, upper: 1.8 }, -2, 2, 41, FULL_CAPS, [0]);
+    expect(away, "visible where nothing covers it").toContain(g.dashedVertical);
+    const over = forestRow(Q, -2, 2, 41, FULL_CAPS, [0]);
+    expect(over, "and hidden where the interval crosses it").not.toContain(g.dashedVertical);
   });
 });
 

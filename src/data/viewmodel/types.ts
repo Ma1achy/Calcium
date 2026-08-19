@@ -705,6 +705,24 @@ export type QuartileSummary = Readonly<{
   centre?: number;
   lower?: number;
   upper?: number;
+  /**
+   * The study's weight in a meta-analysis, as a fraction of the total (C12 §3k).
+   *
+   * **A forest plot's point estimate is sized by it**, and that is not
+   * decoration: the whole reading of the chart is that a wide interval drawn
+   * small contributed little and a narrow one drawn large carried the result.
+   * Absent, every estimate is one cell and the plot is a list of intervals.
+   */
+  weight?: number;
+  /**
+   * The pooled estimate — the summary row, drawn as a diamond (C12 §3k).
+   *
+   * Its own field rather than a convention about the last entry, because *the
+   * last row is the summary* is a rule the data cannot state and a renderer
+   * cannot check. A meta-analysis with no pooled estimate is ordinary, and one
+   * with the summary first is a formatting choice.
+   */
+  pooled?: boolean;
 }>;
 
 export type Segment = Readonly<{ label: string; value: number }>;

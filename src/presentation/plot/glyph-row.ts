@@ -60,11 +60,21 @@ export function forestRow(
   max: number,
   width: number,
   caps: Caps,
+  references: readonly number[] = [],
 ): string {
   const ch = glyphCharsFor(caps);
+  const g = glyphs(caps);
   const w = Math.max(1, Math.floor(width));
+  const row = new Array<string>(w).fill(" ");
 
-  const row = new Array(w).fill(" ");
+  // **The reference lines first, so the data draws over them** (C12 §3k, C12 I31).
+  // A null line is a claim about the ordinate beside the data, not a member of
+  // it; broken rather than solid because a solid rule crossing five intervals
+  // reads as a sixth.
+  for (const v of references) {
+    const x = scaleX(v, min, max, w);
+    if (x >= 0 && x < w) row[x] = g.dashedVertical; // cells-ok — a column index
+  }
 
   const lower = q.lower ?? q.min;
   const upper = q.upper ?? q.max;
@@ -74,20 +84,31 @@ export function forestRow(
   const xUpper = scaleX(upper, min, max, w);
   const xCentre = scaleX(centre, min, max, w);
 
-  for (let i = xLower; i <= xUpper; i++) row[i] = ch.line;
-  row[xLower] = ch.filled;
-  row[xUpper] = ch.filled;
-  row[xCentre] = ch.filled;
+  // The interval, with a tee at each end — a plain `─` at the end of a run does
+  // not say the interval stops there.
+  for (let i = xLower; i <= xUpper; i += 1) row[i] = ch.line;
+  row[xLower] = ch.whiskerLeft;
+  row[xUpper] = ch.whiskerRight;
 
-  if (q.q1 !== undefined && q.q3 !== undefined) {
-    const xQ1 = scaleX(q.q1, min, max, w);
-    const xQ3 = scaleX(q.q3, min, max, w);
-    row[xQ1] = ch.boxLeft;
-    for (let i = xQ1 + 1; i < xQ3; i++) row[i] = ch.boxFill;
-    row[xQ3] = ch.boxRight;
-    row[scaleX(q.median, min, max, w)] = ch.median;
-    row[xCentre] = ch.filled;
+  // **The estimate, sized by weight** (C12 I31, §3k). A wide interval drawn small
+  // contributed little and a narrow one drawn large carried the result — which
+  // is the reading a forest plot exists for. No weight means one cell, so an
+  // ordinary quartile summary still draws a point.
+  //
+  // **And nothing draws over the interval.** The old row overwrote the whole
+  // interior with a box plot's body wherever `q1`/`q3` were present — which the
+  // catalogue fixture always sets, so the interval was never visible in any
+  // rendered frame. A box's edges are quartiles of a sample; this interval is a
+  // confidence bound on one estimate, and replacing the second with the first
+  // is not decoration.
+  const wt = q.weight;
+  const span = wt !== undefined && Number.isFinite(wt) ? Math.max(0, Math.min(1, wt)) : 0;
+  const halfCells = Math.floor((span * Math.max(0, xUpper - xLower)) / 2); // cells-ok — a cell count
+  const mark = q.pooled === true ? g.diamond : ch.filled;
+  for (let i = xCentre - halfCells; i <= xCentre + halfCells; i += 1) {
+    if (i >= 0 && i < w) row[i] = mark; // cells-ok — a column index
   }
+  row[xCentre] = mark;
 
   return row.join("");
 }

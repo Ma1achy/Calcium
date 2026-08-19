@@ -36,7 +36,7 @@ change is the signal.
 | radar | 64x16 | 25.5% | — |
 | flame | 64x16 | 24.8% | 0.5% |
 | sparkline | 64x1 | 21.9% | — |
-| forest | 64x16 | 16.2% | — |
+| forest | 64x16 | 17.9% | — |
 | horizon | 64x16 | 14.6% | — |
 | density | 64x16 | 13.7% | — |
 | streamgraph | 64x16 | 12.6% | — |

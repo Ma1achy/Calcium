@@ -56,7 +56,7 @@ import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText }
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
-import type { QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
+import type { Annotation, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -1018,10 +1018,18 @@ const FORM_ROWS: Readonly<
       lo = Math.min(lo, q.lower ?? q.min, ...(q.outliers ?? []));
       hi = Math.max(hi, q.upper ?? q.max, ...(q.outliers ?? []));
     }
+    // A forest plot's null is an `Annotation` — C04 already means *a claim about
+    // the ordinate drawn beside the data* by it, and inventing `nullValue` beside
+    // that would be the second way to say one thing. The value maps to a
+    // **column** here rather than a row, so `annotationRows` is the wrong helper
+    // and the reference goes to the row builder.
+    const refs = (block.annotations ?? [])
+      .filter((a): a is Extract<Annotation, { kind: "line" }> => a.kind === "line")
+      .map((a) => a.value);
     let qi = 0;
     return categoricalForm(block, width, ctx, (_label, aw) => {
       const q = qs[qi++];
-      return q ? forestRow(q, lo, hi, aw, ctx.capabilities) : "";
+      return q ? forestRow(q, lo, hi, aw, ctx.capabilities, refs) : "";
     });
   },
   dumbbell: (block, width, ctx) => {

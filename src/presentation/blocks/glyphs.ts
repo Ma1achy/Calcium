@@ -35,6 +35,15 @@ export type GlyphSet = Readonly<{
   // Box drawing — panel borders, rules.
   horizontal: string;
   vertical: string;
+  /**
+   * A **broken** vertical rule — a reference line drawn beside data (C12 §3k).
+   *
+   * Its own slot rather than `vertical`, because a solid rule through a figure
+   * reads as part of it: a forest plot's null line crossing five intervals looks
+   * like a sixth interval unless it is visibly not one. ASCII takes `:`, which
+   * is the same statement with the alphabet it has.
+   */
+  dashedVertical: string;
   topLeft: string;
   topRight: string;
   bottomLeft: string;
@@ -96,6 +105,7 @@ const UNICODE: GlyphSet = Object.freeze({
   residue: "\u22ef",
   horizontal: "─",
   vertical: "│",
+  dashedVertical: "┊",
   topLeft: "┌",
   topRight: "┐",
   bottomLeft: "└",
@@ -128,6 +138,7 @@ const ASCII: GlyphSet = Object.freeze({
   residue: "~",
   horizontal: "-",
   vertical: "|",
+  dashedVertical: ":",
   topLeft: "+",
   topRight: "+",
   bottomLeft: "+",

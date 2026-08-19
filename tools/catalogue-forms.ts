@@ -197,7 +197,24 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   forest: {
+    // **The fixture set `q1`/`q3` on every entry**, which is why the box drew
+    // over the interval in every rendered frame and nobody saw the interval at
+    // all. Kept as `boxed` below, because a summary carrying both is a real
+    // input and the row must draw the interval anyway.
     default: {
+      form: "forest", height: 5, axes: true,
+      categories: ["Aalborg 92", "Basel 88", "Cardiff 95", "Delft 01", "pooled"],
+      quartiles: [
+        { min: 0, q1: 0, median: 0, q3: 0, max: 0, centre: -0.6, lower: -1.4, upper: 0.2, weight: 0.18 },
+        { min: 0, q1: 0, median: 0, q3: 0, max: 0, centre: -0.2, lower: -0.7, upper: 0.3, weight: 0.34 },
+        { min: 0, q1: 0, median: 0, q3: 0, max: 0, centre: -1.1, lower: -2.4, upper: -0.1, weight: 0.09 },
+        { min: 0, q1: 0, median: 0, q3: 0, max: 0, centre: -0.4, lower: -0.9, upper: 0.1, weight: 0.29 },
+        { min: 0, q1: 0, median: 0, q3: 0, max: 0, centre: -0.42, lower: -0.72, upper: -0.12, weight: 0.55, pooled: true },
+      ],
+      series: [],
+      annotations: [{ kind: "line", value: 0, tone: "muted" }],
+    },
+    boxed: {
       form: "forest", height: 3, axes: true, categories: ["Study A", "Study B", "Study C"],
       quartiles: [
         { min: 1, q1: 3, median: 5, q3: 7, max: 9, centre: 5, lower: 3, upper: 7 },
