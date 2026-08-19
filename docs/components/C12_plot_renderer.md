@@ -1490,11 +1490,39 @@ A vertical violin in two columns is four dot-columns split between the density a
 too coarse to carry a shape, so it would draw a flat bar and call it a distribution.
 
 **Refuse below the floor; degrade above it**, and the two are not in tension because they
-have different subjects. The budget is about *whether the form has room at all* and is
-refused at construction (C04 I56). `plotDetail` is about *which renderer fits the room there
-is*, and an explicit `"full"` that does not fit degrades. A caller who declares a height
+have different subjects. The budget is about *whether the form has room at all*.
+`plotDetail` is about *which renderer fits the room there is*. A caller who declares a height
 below the floor has asked for a picture that cannot exist; a caller who declares `"full"` in
 four rows has asked for the best available, which is a request the renderer can honour.
+
+**And only the row floor is refused at construction**, because only the row budget is
+declared there. `validateBlock` takes a block and no width — a terminal's width is handed
+down from `terminal/lifecycle.ts` — so `height ÷ categories` is in hand at construction and
+`width ÷ categories` is not (C04 I56). The column floor is enforced here instead, by
+**drawing the box rung rather than a flat density**, which is I18's ladder: where the width
+cannot spare what a figure needs, the honest answer is the figure that fits.
+
+### `"auto"` and `"full"` were the same value, and now are not
+
+`detailRows` read `if (mode === "compact") return 1;` and then returned the same expression
+for both of the others. **Three names, two behaviours** — a distinction that reads as
+meaningful and forbids nothing, which is A03 §2's vacuity class arriving in a field rather
+than in a rule. Nothing could see it: every assertion about `"full"` was satisfied by the
+`"auto"` branch.
+
+| value | the rung |
+|---|---|
+| `"compact"` | the **form's floor** — 1 row for a boxplot, 2 for a violin |
+| `"full"` | the highest rung the **budget** affords |
+| `"auto"` | the highest rung the budget affords **and the data supports** |
+
+**`"auto"` is the one that reads the data, which is what makes its name true.** A density
+rung draws five levels, and a band with fewer than five finite samples cannot distinguish
+five — so `"auto"` falls to the box rung there and `"full"` does not. The number is derived
+rather than chosen: it is the level count the rung draws.
+
+This is not a height derived from the data (I1). The rung is chosen *inside* the rows the
+caller declared, and `plotHeight` never consults it.
 
 ### The two densities are two *shapes*, not two axes — and one of them already exists
 
@@ -1645,7 +1673,7 @@ orientation — and belongs in the classification table as its own rows.
 
 ---
 - **I33** — **The stub always points toward the whisker, and both box-plot glyph tables fall out of that one rule.** `├`/`┤` horizontally and `┬`/`┴` vertically, swapping roles between the caps and the box edges — which reads as arbitrary and is not, because a cap's whisker leaves inward and a box edge's whisker leaves outward. *The rule was implemented in both arms and written down in neither, and the vertical arm was built by re-deriving it from the horizontal one; a table without its rule is a table the next arm re-derives.* **The compact box is filled where the three-row box is hollow**: with a lid and a floor the interior must stay clear for the median and the mean, and with one row there are no edges, so `┤    │    ├` says nothing about where the box is. **A mean landing on the median draws `◈`** rather than nothing — suppressing it left one band with no mean mark beside two that had one, so *they coincide* read as *it is missing*.
-- **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; 3 rows / 4 columns adds the raw samples as a jittered strip; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all (C04 I56), and the mode asks which renderer fits the room there is. **The jitter is a pure function of the sample's identity** — no clock, no `Math.random`, no module counter — because I11 says every render is a pure function of block, width and context, and a strip that moves between two renders of the same block is a picture of the renderer.
+- **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; 3 rows / 4 columns adds the raw samples as a jittered strip; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a pure function of the sample's identity** — no clock, no `Math.random`, no module counter — because I11 says every render is a pure function of block, width and context, and a strip that moves between two renders of the same block is a picture of the renderer.
 
 ## 8. Commitments
 
