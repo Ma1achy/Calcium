@@ -1239,9 +1239,32 @@ from the other side: mapping a variable to colour is something a caller asks for
 *category axis* to it — `hue=x`, where `x` is already the x axis — is available, explicit, and
 redundant by construction.
 
-So the palette indexes the series. A form with one series draws one colour whatever its row
-count, in `slotOf(0)` — **the slot a single-series line, scatter or sparkline already takes**, so
-a bar and a curve of the same data are the same colour rather than accidentally different ones.
+### The measurement is not the ruling, and reading it as one was the over-reach
+
+**Colour indexes an identity.** That is the rule, and *the palette indexes the series* was a
+first draft of it that took the references' default for the principle behind it. The two agree on
+a histogram and part company on a box plot, which is where it was caught: the first form's rows
+are **slices of a continuous axis** and the second's are **named things the caller chose**.
+
+| the row axis | the rows | colour | forms |
+|---|---|---|---|
+| continuous, sliced by the renderer | `[15.4, 24.1)` · lag 3 | nothing to name — **one colour** | `histogram`, `autocorrelation` |
+| a set of names the caller supplied | `control` · `Opex` · `Deploy` | an identity — **a slot each** | every other categorical form |
+
+**The references draw both cases in one colour and that is a defensible taste this component does
+not take.** matplotlib and seaborn have fill against edge, alpha, marker size and a wide canvas;
+a terminal band is one row of glyphs in a narrow gutter, colour is the channel it has, and a
+reader tracking `dose-b` across three bands is using it. The references' answer is a caller's to
+ask for — a series carrying an explicit `tone` takes it, which `refOf` has always honoured.
+
+What the measurement does settle, and what no taste reaches, is the first row of that table: eight
+bins are one distribution and nine lags are one statistic, and there is no reading under which
+either has eight identities. `ROW_IS_AN_IDENTITY` is the partition, `Record<PlotForm, boolean>`
+and total, so the thirty-fifth form declares which it is or does not compile.
+
+**Where a row is an identity, the slot is the row's; where it is not, it is `slotOf(0)`** — the
+slot a single-series line, scatter or sparkline already takes, so a histogram and a curve of the
+same data are the same colour rather than accidentally different ones.
 
 ### `SHARES_CELLS` is not the switch, and it reads exactly as though it is
 
@@ -1264,14 +1287,15 @@ governed by one of the three restates that one and finds nothing:
 
 | the row is | series | owners | what colour could name | before | ruling |
 |---|---|---|---|---|---|
-| a category, one series | 1 | — | nothing | `slotOf(row)` | `slotOf(0)` |
-| a category, n series across it | n | — | the series — but the row is one span | `slotOf(row)` | `slotOf(0)`; the glyph pair separates the ends |
+| **a slice of a continuous axis** — a bin, a lag | 1 | — | nothing | `slotOf(row)` | **`slotOf(0)`** |
+| a named category, one series | 1 | — | the category | `slotOf(row)` | unchanged — `slotOf(row)` |
+| a named category, n series across it | n | — | the series — but the row is one span | `slotOf(row)` | unchanged; the glyph pair separates the ends |
 | a category, layers within it | n | yes | the layer | per owner | unchanged |
 | a *(category, series)* pair | n | — | the series | `refFor(r mod n)` | unchanged |
 | **a series** | n | — | the series | `slotOf(row)` | **its own `refFor`** |
 | a series, curves overlapping | n | yes | the series | per owner | unchanged |
-| a band whose data is `quartiles` | 0 | — | nothing | `slotOf(band)` | `slotOf(0)` |
-| a column, one series | 1 | — | nothing | `slotOf(col)` | `slotOf(0)` |
+| a band whose data is `quartiles` | 0 | — | the band's name | `slotOf(band)` | unchanged |
+| a column, one series | 1 | — | the column's name | `slotOf(col)` | unchanged, unless the axis is sliced |
 | a segment in one figure | — | legend | the segment | `categoryRef(i)` | unchanged |
 
 **Two rows are cells where two rules overlap, and they are the whole reason for the table.** A
@@ -2281,7 +2305,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I35** — **A categorical distribution form scales every band to one value axis, and the caller's pin is what that axis is.** Scaled to its own extent each band fills its own width, so a tight distribution and a wide one draw the same shape and the comparison the form exists to make is gone — with every count in the figure agreeing. *Three instances, because the fix is per call site: `ridgelineArea` had it and the two violin arms each computed their own bounds.* Where there is no pin the axis is the union, which `seriesRange` already computes — the same argument §6a A6 makes for a matrix, one form along. **And the cut is what keeps a shared axis readable**: a kernel estimate is defined everywhere, so across a shared axis it draws flat tails to the frame's edge unless it is stopped two bandwidths past the data (§3q).
 - **I36** — **`candlestick` is a curve style and not a form, its data is a typed field, and the readout is part of it.** Everything a line plot has is unchanged — axis, grid, annotations, legend, crosshair — and what differs is what one column draws, so it sits in `plotStyle` beside `braille` and `line` with `form` still `line` or `step`. **Bullish and bearish are two categories, so §3b binds**: hollow-versus-filled carries direction at **every** depth and colour reinforces it — because I25's sweep is indexed by `PlotForm` and a style is invisible to it, and because the frame-read this repository schedules strips colour. **There is no sub-cell win, and the section records that the mechanism was looked for** — a body floats between open and close so both ends fall inside a cell, Unicode's vertical eighths ladder upward only, and the one vocabulary that resolves both ends is the one that cannot draw a hollow body. Cell resolution, as every reference implementation draws it; what is exact here is the aggregation. **The width is a stated layout rule** — `clamp(⌊areaWidth ÷ n⌋ − 1, 1, 5)` with the gap taken before the body, the wick left of centre at an even width by `boxplotColumn`'s existing rounding — and **more bars than columns aggregate rather than sample**: open of the first, high of the maxima, low of the minima, close of the last, which is exact where every other downsampling in this component approximates. **The vocabulary is not swapped to braille** — a bar's length *is* its value so doubling the glyph doubles the datum, while a candle's glyph carries direction and its column carries the time — **and the wide arm is `glyphs()`' ASCII set, so the column count does not change.** Two swaps were both called *the wide arm*, and drawing the consequence from the wrong one would have set a layout floor of one cell that `wide` cannot reach. **The readout is load-bearing rather than a convenience**, because a doji and an overlay line both draw `─` in one cell and only the four values tell them apart (§3r, §6b B5).
 - **I37** — **The cursor's column is marked twice, and the mapping from index to column is the form's.** A readout names values and a reader cannot use them without knowing which mark they describe — which is what §6b B5's ruling about the doji rests on. **A dashed vertical behind the data** through the same path the gridlines take, so it never overwrites a sample; **and a mark on the bottom rule**, because the dashed line is invisible in exactly the case that motivates it, a dense column with ink in every row. *The index is into the data and not the area* — `cursorReadout` has always read `values[cursorIdx]` — so a candlestick inverts through its own pitch and its buckets. **Measured: the two mappings agree at the dense end and separate at the sparse one**, because a candle is left-aligned at a fixed pitch where a curve spreads across the width — four bars in forty-four columns put the last candle at column 20 and the curve's rule at 43. **C12 owns what a cursor draws and not who moves one**: nothing in `src/` writes `cursorPositions`, and §10's Phase 2 row is about that writer (§3s).
-- **I38** — **Colour indexes the series and never the row.** A form with one series draws one colour whatever its category count, in the slot a single-series curve already takes, so a bar and a line of the same data agree rather than differing by accident. *The palette cycling per row claimed an identity per bin — a histogram's eight bins are one distribution and drew eight colours, a correlogram's nine lags one statistic and nine — and the claim it followed lived in a code comment and no file, true about the grouped bar it was written for and generalised on its own.* **The switch is span ownership and not `SHARES_CELLS`**, which is indexed by form and so answers for a plain bar and a stacked one at once: a builder returning owners has interior identities and each run takes its owner's slot; a builder returning a string has none, and the row's identity is in the gutter already. **A form whose rows are series says so** — the timeline is the single cell where the old default was accidentally right, three tracks in one colour is what the correction costs there, and every count in that frame would still be correct. Measured against eleven reference renderings: the cycle advances per series and only per series, and mapping the category axis to colour is `hue=x` — available, explicit, and redundant by construction (§3t).
+- **I38** — **Colour indexes an identity, and a row that is a slice of a continuous axis has none.** A histogram's bins and a correlogram's lags are cut from an axis by the renderer, so eight bins are one distribution and drew eight colours; a band named `control` is a thing the caller chose and keeps its slot. `ROW_IS_AN_IDENTITY` is that partition, total over `PlotForm`. *The claim this replaced lived in a code comment and no file — true about the grouped bar it was written for, general by nothing — and **the first correction over-reached in the other direction**: eleven reference renderings draw one colour per series and that is the references' taste rather than the principle under it, so reading the measurement as the ruling took the colour off every named band too. A measurement settles what is true; it does not settle what to draw.* **The switch is span ownership and not `SHARES_CELLS`**, which is indexed by form and so answers for a plain bar and a stacked one at once: a builder returning owners has interior identities and each run takes its owner's slot; a builder returning a string has none, and the row's identity is in the gutter already. **A form whose rows are series says so** — the timeline is the single cell where the old default was accidentally right, three tracks in one colour is what the correction costs there, and every count in that frame would still be correct. Measured against eleven reference renderings: the cycle advances per series and only per series, and mapping the category axis to colour is `hue=x` — available, explicit, and redundant by construction (§3t).
 
 ## 8. Commitments
 
@@ -2316,7 +2340,7 @@ orientation — and belongs in the classification table as its own rows.
 31. **A cursor is marked where it points**, behind the data and on the rule, through a mapping the form owns — a readout whose column is unknown is a set of numbers about nothing in particular (I37).
 30. **`candlestick` is a curve style over the positional machinery**, with its own typed data, a stated candle width, exact OHLC aggregation, and a readout that is load-bearing because a doji and an overlay line share a glyph (I36).
 28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
-32. **Colour indexes the series, never the row** — one series is one colour whatever its category count, a row's interior identities are coloured by their owner, and a form whose rows *are* series declares it (I38, §3t).
+32. **Colour indexes an identity** — a row cut from a continuous axis has none and takes one colour, a named row keeps its slot, a row's interior identities are coloured by their owner, and a form whose rows *are* series declares it (I38, §3t).
 
 ---
 
