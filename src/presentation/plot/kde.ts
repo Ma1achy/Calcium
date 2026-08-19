@@ -45,6 +45,22 @@ function silvermanBandwidth(values: readonly number[]): number {
 }
 
 /**
+ * The rule of thumb, scaled by the caller's `bandwidth` (C12 §3m).
+ *
+ * **A multiplier, which is seaborn's `bw_adjust` and for its reason**: a
+ * bandwidth in the data's own units means nothing until you know the data, so an
+ * absolute field would have every caller computing Silverman themselves in order
+ * to scale it.
+ *
+ * `undefined` and `1` are the same answer, and both leave `kde` to its own
+ * default — so the adjust costs nothing where nobody asks for it.
+ */
+export function scaledBandwidth(data: readonly number[], adjust?: number): number | undefined {
+  if (adjust === undefined || !Number.isFinite(adjust) || adjust <= 0 || adjust === 1) return undefined;
+  return silvermanBandwidth(data) * adjust;
+}
+
+/**
  * Estimate the density at `points` given `data` values and a bandwidth.
  */
 export function kde(
@@ -68,7 +84,11 @@ export function kde(
  * Series whose values are the density estimates, suitable for rendering as a
  * line/curve.
  */
-export function densitySeries(series: Series, resolution = 100): { series: Series; range: Range } {
+export function densitySeries(
+  series: Series,
+  resolution = 100,
+  adjust?: number,
+): { series: Series; range: Range } {
   const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
   if (finite.length === 0) return { series: { ...series, values: [] }, range: { min: 0, max: 1 } }; // cells-ok — a sample count
 
@@ -82,7 +102,7 @@ export function densitySeries(series: Series, resolution = 100): { series: Serie
     points.push(lo - pad + ((hi - lo + 2 * pad) * i) / (resolution - 1));
   }
 
-  const densities = kde(finite, points);
+  const densities = kde(finite, points, scaledBandwidth(finite, adjust));
   const maxD = Math.max(...densities);
 
   return {
@@ -140,6 +160,7 @@ export function violinColumn(
   caps: Caps,
   quartiles?: QuartileSummary,
   corners: "rounded" | "sharp" = "rounded",
+  adjust?: number,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(colWidth));
   const n = Math.max(1, Math.floor(rows));
@@ -157,7 +178,7 @@ export function violinColumn(
   for (let r = 0; r < n; r += 1) {
     points.push(hi + pad - ((hi - lo + 2 * pad) * r) / Math.max(1, n - 1));
   }
-  const densities = kde(finite, points);
+  const densities = kde(finite, points, scaledBandwidth(finite, adjust));
   const maxD = Math.max(...densities);
   if (maxD <= 0) return blank();
 
@@ -257,6 +278,7 @@ export function violinRows(
   caps: Caps,
   quartiles?: QuartileSummary,
   corners: "rounded" | "sharp" = "rounded",
+  adjust?: number,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const n = Math.max(1, Math.floor(rowsPerCategory));
@@ -274,7 +296,7 @@ export function violinRows(
   for (let i = 0; i < w; i += 1) {
     points.push(lo - pad + ((hi - lo + 2 * pad) * i) / Math.max(1, w - 1));
   }
-  const densities = kde(finite, points);
+  const densities = kde(finite, points, scaledBandwidth(finite, adjust));
   const maxD = Math.max(...densities);
   if (maxD <= 0) return blank();
 
@@ -400,6 +422,7 @@ export function ridgelineArea(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
+  adjust?: number,
 ): { readonly rows: readonly string[]; readonly baselines: readonly number[] } {
   const w = Math.max(1, Math.floor(areaWidth));
   const h = Math.max(1, Math.floor(areaRows));
@@ -434,7 +457,7 @@ export function ridgelineArea(
   // figure says the distributions are equally concentrated when they are not.
   const perSeries = seriesList.map((sr) => {
     const finite = sr.values.filter((v): v is number => v !== null && Number.isFinite(v));
-    return finite.length === 0 ? [] : kde(finite, points); // cells-ok — a sample count
+    return finite.length === 0 ? [] : kde(finite, points, scaledBandwidth(finite, adjust)); // cells-ok — a sample count
   });
   const maxD = Math.max(0, ...perSeries.flat());
   if (maxD <= 0) return { rows: blank, baselines: [] };

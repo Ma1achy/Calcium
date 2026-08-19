@@ -367,6 +367,21 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     bimodal: { form: "density", height: 8, axes: true, series: [s([1, 1, 1, 1, 2, 3, 5, 5, 5, 5])] },
   },
   violin: {
+    // **The rule of thumb's named failure**: two separated modes, which
+    // Silverman widens the kernel until it fills in. The same data at
+    // `bandwidth: 0.4` shows both.
+    "bimodal-sharp": {
+      form: "violin", height: 12, axes: true, bandwidth: 0.4,
+      categories: ["measured"],
+      series: [s([...Array.from({ length: 25 }, (_, i) => 10 + (i % 5) * 0.4),
+                  ...Array.from({ length: 25 }, (_, i) => 30 + (i % 5) * 0.4)])],
+    },
+    "bimodal-default": {
+      form: "violin", height: 12, axes: true,
+      categories: ["measured"],
+      series: [s([...Array.from({ length: 25 }, (_, i) => 10 + (i % 5) * 0.4),
+                  ...Array.from({ length: 25 }, (_, i) => 30 + (i % 5) * 0.4)])],
+    },
     // C12 §3j — the conventional orientation, and one shared value axis.
     vertical: {
       form: "violin", height: 14, axes: true, orientation: "vertical",

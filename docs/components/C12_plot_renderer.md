@@ -1138,6 +1138,29 @@ it must.
 
 ---
 
+## 3m. `bandwidth` — the rule of thumb has a known failure and no better default
+
+Every kernel density in this component — `violin`, `ridgeline`, `density` —
+chooses its bandwidth by Silverman's rule, and **Silverman assumes something
+roughly normal.** Two separated peaks are exactly the case it flattens: the
+estimator widens the kernel until the trough between them fills in, and the
+figure reports one mode where the data has two.
+
+That is a property of the rule rather than a defect in it, and no automatic
+choice repairs it — which is why the escape is a field. `bandwidth` is a
+**multiplier**, seaborn's `bw_adjust`, and a multiplier for seaborn's reason: a
+width in the data's own units means nothing until you know the data, so an
+absolute field would have every caller computing Silverman themselves in order to
+scale it. Below 1 sharpens, above 1 smooths, and `undefined` and `1` are the same
+answer.
+
+**Recorded rather than hidden**, because the violin's flat catalogue frame was
+read as a rendering defect twice before the cause turned out to be the fixture and
+the estimator between them. A form whose default is known to fail on a named
+input should say so where the input is described.
+
+---
+
 ## 3l. The ridgeline overlaps, or it is a stack of area charts
 
 `ridgeline` gave each series a band of its own through `bandedForm` — one series

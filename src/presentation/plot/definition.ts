@@ -1180,7 +1180,7 @@ const FORM_ROWS: Readonly<
   density: (block, width, ctx) => {
     const s = block.series[0];
     if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    const { series: ds, range } = densitySeries(s);
+    const { series: ds, range } = densitySeries(s, 100, block.bandwidth);
     const densityBlock = { ...block, series: [ds], yMin: range.min, yMax: range.max };
     return positionalForm(densityBlock, width, ctx, styleRasteriser(block, ctx.capabilities, densityRows));
   },
@@ -1197,12 +1197,12 @@ const FORM_ROWS: Readonly<
       return categoricalColumnForm({ ...block, categories: cats }, width, ctx, (i, cw, rows) => {
         const sr = block.series[i];
         return sr
-          ? violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded")
+          ? violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth)
           : Array.from({ length: rows }, () => " ".repeat(cw));
       });
     }
     return bandedForm(block, cats, width, ctx, (sr, aw, rows, i) =>
-      violinRows(sr, aw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded"),
+      violinRows(sr, aw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth),
     );
   },
   ridgeline: (block, width, ctx) => {
@@ -1217,7 +1217,7 @@ const FORM_ROWS: Readonly<
     if (block.series.length === 0) return emptyRows(block, fallback, ctx); // cells-ok — a series count
 
     const layout = bandLayout(cats, width, block.axes === true, areaRows, ctx.capabilities);
-    const { rows, baselines } = ridgelineArea(block.series, layout.areaWidth, areaRows, ctx.capabilities);
+    const { rows, baselines } = ridgelineArea(block.series, layout.areaWidth, areaRows, ctx.capabilities, block.bandwidth);
     const labelAt = new Map(baselines.map((r, i) => [r, cats[i] ?? ""]));
 
     const out = rows.map((content, r) => {

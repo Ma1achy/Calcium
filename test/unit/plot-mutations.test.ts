@@ -14,7 +14,7 @@ import { boxplotBand, boxplotColumn, forestRow } from "../../src/presentation/pl
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, ladderFor } from "../../src/presentation/plot/ramp.js";
-import { kde, ridgelineArea } from "../../src/presentation/plot/kde.js";
+import { kde, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
@@ -611,6 +611,69 @@ describe("GROUP 6g: the ridgeline overlaps", () => {
     const inked = rows.filter((r) => (r[col] ?? " ") !== " ").length; // cells-ok — a cell count
     expect(inked, "both outlines survive in the shared column").toBe(2); // cells-ok — a cell count
     expect(baselines[0]).toBeGreaterThan(baselines[1]!); // cells-ok — a row index
+  });
+});
+
+describe("GROUP 6h: the bandwidth's rule of thumb has a named failure", () => {
+  // Two tight clusters far apart — the exact case Silverman flattens, because
+  // the rule assumes something roughly normal and widens the kernel until the
+  // trough between the modes fills in.
+  const bimodal = {
+    values: [...Array.from({ length: 25 }, (_, i) => 10 + (i % 5) * 0.4),
+             ...Array.from({ length: 25 }, (_, i) => 30 + (i % 5) * 0.4)],
+  };
+
+  const pts = Array.from({ length: 80 }, (_, i) => 5 + (i / 79) * 30);
+  /** How deep the valley between the modes runs, as a fraction of the peaks. */
+  const troughRatio = (d: readonly number[]): number => {
+    const peak = Math.max(...d);
+    const mid = d.slice(Math.floor(d.length / 3), Math.ceil((d.length * 2) / 3)); // cells-ok — an index
+    return peak === 0 ? 1 : Math.min(...mid) / peak;
+  };
+
+  it("T1.60: the default keeps the trough and loses its depth", () => {
+    // **Written first as *the default reports one mode*, and the estimator said
+    // otherwise.** It does find the valley; what the rule of thumb takes is its
+    // depth, so at a dozen rows the two lobes round into one waisted shape. The
+    // claim came from reading a frame and was promoted to a claim about the
+    // estimator without measuring it — a true observation about the rendering,
+    // stated about the wrong layer.
+    const d = kde(bimodal.values, pts);
+    const troughs = d.filter((v, i) => i > 0 && i < d.length - 1 && v < d[i - 1]! && v < d[i + 1]!);
+    expect(troughs.length, "the valley is there").toBeGreaterThan(0); // cells-ok — a trough count
+    // 0.11 of the peak at the default against 0.001 adjusted — the valley is
+    // present and two orders of magnitude shallower, which is the difference a
+    // dozen rows cannot show and the field exists for.
+    expect(troughRatio(d), "and it is shallow").toBeGreaterThan(0.05);
+  });
+
+  it("T1.61 (C12 §3m): the adjust deepens the valley until the modes separate", () => {
+    const sharp = kde(bimodal.values, pts, scaledBandwidth(bimodal.values, 0.4));
+    const peaks = sharp.filter((v, i) => i > 0 && i < sharp.length - 1 && v > sharp[i - 1]! && v > sharp[i + 1]!);
+    expect(peaks.length, "two modes").toBeGreaterThanOrEqual(2); // cells-ok — a peak count
+    expect(troughRatio(sharp), "and a valley the renderer can resolve")
+      .toBeLessThan(troughRatio(kde(bimodal.values, pts)));
+  });
+
+  it("T1.62 (C12 §3m): 1 and absent are the same answer, so the adjust costs nothing unused", () => {
+    expect(scaledBandwidth([1, 2, 3], 1)).toBeUndefined();
+    expect(scaledBandwidth([1, 2, 3], undefined)).toBeUndefined();
+    // And a nonsense value is refused rather than producing a degenerate kernel.
+    expect(scaledBandwidth([1, 2, 3], 0)).toBeUndefined();
+    expect(scaledBandwidth([1, 2, 3], -1)).toBeUndefined();
+    expect(scaledBandwidth([1, 2, 3], 2)).toBeGreaterThan(0);
+  });
+
+  it("T1.63 (C12 §3m): the field reaches the renderer, not only the estimator", () => {
+    // **A test that calls the mechanism misses the wiring.** The rows above
+    // exercise `kde` directly and would pass with `block.bandwidth` threaded
+    // nowhere.
+    const mk = (bw?: number): Plot => block({
+      kind: "plot", id: "v", form: "violin", height: 11, axes: true,
+      categories: ["m"], series: [bimodal], ...(bw === undefined ? {} : { bandwidth: bw }),
+    } as Plot);
+    const k = kit();
+    expect(k.renderToLines(mk(0.4), 60).join("\n")).not.toBe(k.renderToLines(mk(), 60).join("\n"));
   });
 });
 

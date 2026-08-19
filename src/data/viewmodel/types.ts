@@ -681,6 +681,21 @@ export type Plot = Readonly<{
    * something else.
    */
   orientation?: "horizontal" | "vertical";
+  /**
+   * The kernel bandwidth, as a **multiplier** on the rule of thumb (C12 §3m).
+   *
+   * seaborn's `bw_adjust`, and a multiplier rather than an absolute width for
+   * the reason seaborn chose one: a bandwidth in the data's own units means
+   * nothing until you know the data, so every caller would be computing
+   * Silverman themselves to scale it.
+   *
+   * **The default oversmooths multimodal data and that is a property of the
+   * rule, not a defect.** Silverman assumes something roughly normal; two
+   * separated peaks are exactly the case it flattens, and no automatic choice
+   * fixes it — which is why the escape is a field rather than a better default.
+   * Below 1 sharpens, above 1 smooths.
+   */
+  bandwidth?: number;
   palette?: string;
 }> & Gap;
 
