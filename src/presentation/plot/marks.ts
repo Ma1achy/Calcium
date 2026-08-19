@@ -153,6 +153,47 @@ export function markOf(index: number, caps: Caps, always = false): string {
  * member declares which it is or does not compile — one of the four tables that
  * used to be silent about a thirty-fifth form.
  */
+/**
+ * Whether a row of this form is a **thing with a name**, or a slice of an axis.
+ *
+ * **C12 I38's partition, and the axis a rule about colour was missing.** Colour
+ * names an identity. A band called `control` is one the caller chose; a bin
+ * called `[15.4, 24.1)` is a cut this renderer made in a continuous axis, and a
+ * lag is an offset — so eight bins are one distribution and drew eight colours,
+ * claiming eight things where there is one.
+ *
+ * **Not `SHARES_CELLS`, which reads as though it answers this.** That record is
+ * indexed by *form* and its `bar: true` is about *layers inside one bar*, so a
+ * plain bar and a stacked one share an entry and want opposite answers from it.
+ * Two records, two questions: which channel separates the things in one cell,
+ * and whether a row is a thing at all.
+ *
+ * **Total over `PlotForm`**, so the thirty-fifth form declares which it is or
+ * does not compile — §3h's reason for the other record, and the same one here:
+ * a rule remembered per form is a rule that lapses on the thirty-fifth.
+ */
+export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // **The two the renderer cuts.** `binValues` makes the bins and the lags are
+  // offsets into one series — neither is anything the caller named.
+  histogram: false, autocorrelation: false,
+  // One row, column or band per name the caller supplied.
+  bar: true, boxplot: true, violin: true, ridgeline: true, forest: true, dumbbell: true,
+  lollipop: true, dotplot: true, funnel: true, gantt: true, waterfall: true,
+  timeline: true, bullet: true, utilisation: true,
+  // Segments and layers in one figure — their identity is the segment's, and
+  // these forms never reach the row default at all.
+  pie: true, radar: true, waffle: true, flame: true, icicle: true, treemap: true,
+  // A curve is not a row. These have no per-row category axis, so the entry is
+  // stated rather than meaningful — which is what a total record costs and why
+  // it is worth it: nothing here is answered by omission.
+  line: true, scatter: true, step: true, ecdf: true, density: true,
+  streamgraph: true, stackedarea: true, slope: true, bubble: true,
+  heatmap: true, calendar: true, correlation: true, confusion: true,
+  spectrogram: true, latency: true, density2d: true,
+  sparkline: true, horizon: true,
+  smallmultiples: true, pairplot: true,
+});
+
 export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // The geometric family: segments and polygons in one figure, no gutter at all.
   pie: true, radar: true, waffle: true,

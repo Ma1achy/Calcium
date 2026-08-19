@@ -9134,3 +9134,101 @@ an absence they would have to go looking for.
 Asking what a new fixture would actually be compared against, before adding it. The comparison
 would have run green with the candlestick in the tree and never rendered it.
 
+
+---
+
+## F184 — the palette indexed the row, and the rule saying it should was a code comment ★★★★
+
+| | |
+|---|---|
+| **Surface** | a histogram's bins and a correlogram's lags — rows the renderer cut from a continuous axis |
+| **Reached for** | a user asking *I don't think each bar of a histogram should be a different colour?* |
+| **Verdict** | **the claim it followed exists in one comment and no file, and the first correction over-reached** |
+| **Absorbed by** | C12 §3t, I38 and `ROW_IS_AN_IDENTITY` — colour names an identity, and a slice of an axis has none |
+
+Eight bins of one distribution drew eight colours. Nine lags of one statistic drew seven. The
+channel was naming an identity per row, and those rows have none — `[15.4, 24.1)` is a cut this
+renderer made, not a thing the caller chose.
+
+**The rule it was following:**
+
+```
+src/presentation/plot/definition.ts:998
+  The default stays: a plain bar is one series across N categories and the
+  category *is* what a colour can name.
+```
+
+That sentence is the whole record. `grep` across `docs/`, `src/`, `test/` and `tools/` returns
+that line and nothing else — the spec never states it, no invariant covers it, and the four
+enforcement scans that read colour have nothing to say about which slot a row takes. It was
+written while fixing the grouped bar, where it was **true**: one row per *(category, series)* pair
+means slot 3 named the row rather than `before`, group A drew the legend's two colours and group B
+drew two others. A correct sentence about one instance, sitting in the parameter doc of the
+function that then applied it to thirty forms.
+
+**Measured**, in `make refdiff`'s own container — matplotlib 3.9.2, seaborn 0.13.2:
+
+```
+ax.bar 5 categories · ax.barh 4 · ax.hist 8 bins             1 colour
+ax.broken_barh 4 rows · ax.eventplot 3 tracks                1
+ax.acorr 9 lags · ax.boxplot 3 · ax.violinplot 3             1
+sns.barplot · histplot · countplot · stripplot               1
+sns.boxplot 3 bands · sns.violinplot 3 bands                 1
+two ax.scatter calls                                         2
+sns.boxplot(hue=x), 3 levels                                 3
+```
+
+### The first correction read the measurement as the ruling, and that is the finding under the finding
+
+*The palette indexes the series* fits all eleven rows and is **not** the rule behind them. It is
+the references' taste, and taking it whole took the colour off every named band as well as off the
+bins — box plots, violins, bar categories, funnel stages, all of it. Reported by the user within
+the same turn, twice, and correctly.
+
+**A measurement settles what is true; it does not settle what to draw.** The partition is the row
+axis, and it splits exactly where the two cases part:
+
+| the row axis | the rows | colour | forms |
+|---|---|---|---|
+| continuous, sliced by the renderer | `[15.4, 24.1)` · lag 3 | nothing to name — **one colour** | `histogram`, `autocorrelation` |
+| a set of names the caller supplied | `control` · `Opex` · `Deploy` | an identity — **a slot each** | every other categorical form |
+
+Nothing but measurement reaches the first row: there is no reading under which eight bins are
+eight identities. Nothing but taste reaches the second, and this component's differs from the
+references' with a reason — they have fill against edge, alpha, marker size and a wide canvas; a
+terminal band is one row of glyphs in a narrow gutter, and a reader tracking `dose-b` across three
+bands is using the colour. Their answer stays reachable: a series with an explicit `tone` takes it.
+
+**`ROW_IS_AN_IDENTITY` is the axis the rule was missing**, `Record<PlotForm, boolean>` and total,
+so the thirty-fifth form declares which it is or does not compile. Deliberately not `SHARES_CELLS`,
+which reads as though it answers this and does not: that record is indexed by *form* and its
+`bar: true` is about *layers inside one bar*, so a plain bar and a stacked one share an entry and
+want opposite answers from it. Two records, two questions.
+
+### What the walk found and what only the pass found
+
+**Three renderers held their own copy of the decision** — `categoricalForm`, its transposed twin
+`categoricalColumnForm` (C12 §3j: *a different renderer, not a flag*), and `bandedForm`. Fixing one
+would have left the vertical arm cycling.
+
+**A row past the last label was taking a slot.** `categoricalForm` loops to `areaRows`, so a
+timeline of three tracks in four rows asked for slot 3 and painted a blank row in it — invisible,
+and still a fourth colour in a frame with three tracks. `bullet` had it too. Found by counting the
+regenerated catalogue against what a test asserts, which is a disagreement a reader would hit and a
+suite would not.
+
+**And the mutation pass found the row that could not tell two arms apart.** Removing the timeline's
+`refFor` declaration survived sixteen green assertions, twice. The first reading — *it is redundant
+now* — was wrong; the second — *no test builds a per-track tone* — was also wrong, because the row
+built to test that asserted *each track has its own colour and no other row has it*, which the
+default satisfies too. What separates them is **which** colour: the declaration reads *this
+track's* tone, the default reads the first track's. The fixture had to become a pair — the same
+timeline with and without a tone on the middle track — before the mutation died. Twice past a
+plausible diagnosis, and the frame is what settled it.
+
+Eleven mutations, all caught. Golden frames moved twice and **every glyph is identical to HEAD once
+colour is stripped**, which is the check that says the change did what it claimed and nothing more.
+
+**Under it, a gap named rather than closed:** a dumbbell's row holds two series and draws in one
+span, so `before` and `after` are separated by `●` against `○` alone where the reference gives them
+two colours. That is a `BandRow` with two owners and it is not built.

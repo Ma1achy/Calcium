@@ -38,7 +38,7 @@ type change.
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 18 | **14** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader |
 | **8** | [Absence indistinguishable from failure](#8) | 15 | **3 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 14 | **6** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about** |
+| **10** | [**A claim carried without a record**](#10) | 15 | **7** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
 | **11** | [A gate that passes without checking](#11) | 37 | **13** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
@@ -435,7 +435,7 @@ says a demo of a plot should have a shape.
 | **F130** | the grant's own tests could not see it, because the double was narrower |
 
 
-## 10 · A claim carried without a record — **6: five findings disproved, one claim caught before it was filed** · new at F80
+## 10 · A claim carried without a record — **7: five findings disproved, one claim caught before it was filed, one rule that governed thirty forms** · new at F80
 
 **This group is the disposition.** The first five entries are findings that were filed,
 believed, and then turned out to be wrong — and a log that quietly dropped them would read as
@@ -498,6 +498,8 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F123** | a promise needs three mechanisms and the finding that named it found one |
 | **F134** | corrected twice; the drift is real and shipped by a route neither reading found |
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
+
+| **F184** | **the palette indexed the row, and the rule saying it should was a code comment** | *A plain bar is one series across N categories and the category **is** what a colour can name* — `definition.ts:998`, and a grep of `docs/`, `src/`, `test/` and `tools/` returns that line and nothing else. True about the grouped bar it was written for; general by nothing, and enough to give a histogram's eight bins eight colours for one distribution. **The correction then over-reached, which is the finding under the finding**: eleven reference renderings draw one colour per series, that fits every row and is the references' *taste* rather than the rule behind it, and taking it whole took the colour off every named band too — reported by the user in the same turn, twice, and correctly. A measurement settles what is true and not what to draw. The partition is the **row axis**: a bin and a lag are cuts this renderer made and have no identity; `control` and `Opex` are names the caller chose and keep their slots. **Fixed** — C12 §3t, I38 and `ROW_IS_AN_IDENTITY`, total over `PlotForm` and deliberately not `SHARES_CELLS`, which is indexed by form so a plain bar and a stacked one share an entry. Eleven mutations caught, and the survivor took two wrong diagnoses before the fixture became a pair |
 
 
 ## 11 · A gate that passes without checking — **18: 9 closed, 9 open**

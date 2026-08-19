@@ -50,7 +50,7 @@ import {
 import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
-import { markOf, refOf as slotOf } from "./marks.js";
+import { ROW_IS_AN_IDENTITY, markOf, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
@@ -989,13 +989,21 @@ function categoricalForm(
   ctx: RenderContext,
   rowBuilder: (label: string, areaWidth: number, categoryIndex: number) => string | BandRow,
   /**
-   * The row's colour, where it is not the category's.
+   * The row's colour, for the two forms whose rows are not plain categories.
    *
-   * **A grouped bar is the case that broke the default.** One row per
+   * **A grouped bar is the case that broke the default**, and the sentence
+   * written here to explain it is what C12 §3t was about. One row per
    * (category, series) pair means row 3 is *B · before*, and slot 3 named the
    * row rather than `before` — so group A drew the legend's two colours and
-   * group B drew two others. The default stays: a plain bar is one series
-   * across N categories and the category *is* what a colour can name.
+   * group B drew two others. Correct, and it closed with *the default stays: a
+   * plain bar is one series across N categories and the category **is** what a
+   * colour can name* — which was a general rule inferred from one instance,
+   * held in this comment and in no file, and wrong. Colour indexes the series
+   * (I38): a histogram's bins are one distribution and drew eight colours.
+   *
+   * Two callers pass it — the grouped bar, whose row is a *(category, series)*
+   * pair, and the timeline, whose row is a track. Everything else draws one row
+   * per category and takes the default's single colour.
    */
   refFor?: (rowIndex: number) => ColourRef,
 ): readonly string[] {
@@ -1012,8 +1020,23 @@ function categoricalForm(
     const built = i < labels.length ? rowBuilder(cat, layout.areaWidth, i) : ""; // cells-ok — a label count
     const content = typeof built === "string" ? built : built.text;
     const gutter = gutterSpans(label, layout, ctx);
-    const s = block.series[i] ?? block.series[0];
-    const ref = s?.tone !== undefined ? `tone.${s.tone}` as ColourRef : (refFor?.(i) ?? slotOf(i)); // cells-ok — a category index
+    // **Colour names an identity** (C12 I38, §3t). A named row keeps its slot;
+    // a row the renderer cut from a continuous axis — a histogram's bin, a
+    // correlogram's lag — has nothing for a slot to name, and eight of them
+    // drew eight colours for one distribution.
+    //
+    // **`block.series[i]` read a row index as a series index**, which is a
+    // second thing and was invisible under the first: for every form but the
+    // timeline a row is a category, and only the timeline's `series[i]` was
+    // ever the right series. It says so now with `refFor`.
+    const s = block.series[0];
+    // **A row past the last label has nothing to name**, so it does not consult
+    // `refFor` — the loop runs to `areaRows` and a timeline of three tracks in
+    // four rows asked for slot 3 and painted a blank row in it. Invisible, and
+    // still a fourth colour in a frame with three tracks, which is a count a
+    // reader and a test would disagree about.
+    const own = i < labels.length && ROW_IS_AN_IDENTITY[block.form] ? i : 0; // cells-ok — a category index
+    const ref = (i < labels.length ? refFor?.(i) : undefined) ?? refOf(s ?? { values: [] }, own); // cells-ok — a category count
     const body: readonly Span[] = typeof built === "string"
       ? [{ text: areaText(content, layout, ctx), style: slot(ref, ctx.theme, ctx.capabilities) }]
       : ownedSpans(areaText(content, layout, ctx), built.owners, (k) => refOf(block.series[k] ?? { values: [] }, k), ctx);
@@ -1103,7 +1126,9 @@ function categoricalColumnForm(
   for (let r = 0; r < areaRows; r += 1) {
     const spans: Span[] = [...gutterSpans(byRow.get(r) ?? "", layout, ctx)];
     for (const [i, col] of columns.entries()) {
-      const ref = slotOf(i); // cells-ok — a category index
+      // C12 I38 stood up: a named column keeps its slot, a vertical
+      // histogram's bins are one distribution and take one colour.
+      const ref = refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? i : 0); // cells-ok — a column index
       spans.push({ text: col[r] ?? " ".repeat(widths[i]!), style: slot(ref, ctx.theme, ctx.capabilities) });
     }
     spans.push(...rightBorder(layout, ctx));
@@ -1458,7 +1483,14 @@ function bandedForm(
     // fills its band, which is every scaling rung and every other form.
     const offset = Math.max(0, Math.floor((rowsPer - band.length) / 2)); // cells-ok — a row count
     const labelRow = offset + Math.floor(band.length / 2); // cells-ok — a row count
-    const styled = slot(refOf(sr ?? { values: [] }, ci), ctx.theme, ctx.capabilities);
+    // **A band is a category and not a series** (C12 I38). Its data is in
+    // `quartiles`, so `sr` is absent — the palette index has to come from the
+    // band rather than from a series that is not there, and `block.series[0]`
+    // is what carries a caller's explicit `tone` when there is one.
+    const styled = slot(
+      refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? ci : 0),
+      ctx.theme, ctx.capabilities,
+    );
 
     for (let r = 0; r < rowsPer && out.length < areaRows; r += 1) { // cells-ok — a row count
       const label = r === labelRow ? truncate(cats[ci] ?? "", layout.labelColumn, ctx.capabilities) : "";
@@ -1849,7 +1881,14 @@ const FORM_ROWS: Readonly<
     if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
     let ti = 0;
     return categoricalForm({ ...block, categories: cats }, width, ctx, (_label, aw) =>
-      timelineRow(block.series[ti++], data, aw, ctx.capabilities));
+      timelineRow(block.series[ti++], data, aw, ctx.capabilities),
+      // **The one form whose rows are series** (I38, §3t's table). Every other
+      // caller draws one row per category and takes the default's one colour;
+      // a track is a series, so the palette indexes it. Stated rather than
+      // inherited — the old default was accidentally right here, and losing it
+      // would have drawn three tracks in one colour with every count correct.
+      (r) => refOf(block.series[r] ?? { values: [] }, r), // cells-ok — a track index
+    );
   },
 
   /**
