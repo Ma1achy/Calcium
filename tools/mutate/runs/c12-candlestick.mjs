@@ -185,6 +185,53 @@ const results = runPass({
       expect: "CS7",
     },
     {
+      // **C12 I37 — the mapping.** The curve's placement for a candlestick
+      // points into blank space right of the last candle whenever the bars are
+      // sparse; the two rules agree only at one cell per candle filling the
+      // area, which is why a row written at the dense end sees nothing.
+      name: "the cursor column uses the curve's placement for candles too",
+      file: DEFN,
+      from: "  if (bars !== undefined) return candleColumn(bars, cursorIdx, areaWidth);",
+      to: "  if (bars !== undefined && false) return candleColumn(bars, cursorIdx, areaWidth);",
+      expect: "T1.99",
+    },
+    {
+      // The bucket inverse dropped: bar `i` maps to candle `i`, which is right
+      // below the threshold and wrong above it.
+      name: "the aggregation is not inverted",
+      file: CANDLES,
+      from: "  const bucket = Math.min(drawn - 1, Math.floor((index * drawn) / bars.length)); // cells-ok — a bar index",
+      to: "  const bucket = Math.min(drawn - 1, index); // cells-ok — a bar index",
+      expect: "T1.99b",
+    },
+    {
+      // The rule's mark removed — the dashed line alone, which is invisible in
+      // a dense column and is the case that motivates the second mark.
+      name: "the rule stops marking the cursor",
+      file: FURNITURE,
+      from: "    x === cursorAt ? g.cursorMark : at.has(x) ? g.teeDown : between, // cells-ok — a column index",
+      to: "    at.has(x) ? g.teeDown : between, // cells-ok — a column index",
+      expect: "T1.99",
+    },
+    {
+      // The dashed column removed — the rule mark alone, so nothing carries the
+      // eye from the axis up into the figure.
+      name: "the cursor's column is not dashed behind the data",
+      file: DEFN,
+      from: "  if (column === null) return \"\";",
+      to: "  if (column !== null || column === null) return \"\";",
+      expect: "T1.99",
+    },
+    {
+      // Out of range must draw neither, or a cursor past the data points at a
+      // candle that is not the one the readout's dashes describe.
+      name: "an out-of-range cursor is clamped rather than dropped",
+      file: CANDLES,
+      from: "  if (bars.length === 0 || index < 0 || index >= bars.length) return null; // cells-ok — a bar count",
+      to: "  if (bars.length === 0) return null; // cells-ok — a bar count",
+      expect: "T1.99",
+    },
+    {
       // The doji goes in a direction's layer, so a flat bar acquires one.
       name: "a doji is drawn as a rising body",
       file: CANDLES,

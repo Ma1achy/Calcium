@@ -258,6 +258,7 @@ export function frameBottom(
   layout: Layout,
   tickColumns: readonly number[],
   ctx: RenderContext,
+  cursorAt: number | null = null,
 ): string {
   const g = glyphs(ctx.capabilities);
   const muted = tone("muted", ctx.theme, ctx.capabilities);
@@ -267,8 +268,12 @@ export function frameBottom(
   // has one.
   const at = style === "corners" ? new Set<number>() : new Set(tickColumns);
   const between = style === "corners" ? " " : g.horizontal;
+  // **The cursor wins the cell it shares with a tick** (C12 I37). A tick says
+  // *a label is written below this column* and the label is still there; the
+  // cursor says *the readout on the next row is about this column*, and it is
+  // the only mark on the frame that answers a question the reader just asked.
   const run = Array.from({ length: Math.max(0, layout.areaWidth) }, (_, x) =>
-    at.has(x) ? g.teeDown : between,
+    x === cursorAt ? g.cursorMark : at.has(x) ? g.teeDown : between, // cells-ok — a column index
   ).join("");
   if (layout.gutter === 0) return line([{ text: run, style: muted }], layout, ctx);
   return line(
@@ -335,11 +340,19 @@ export function xLabelRowFor(
  */
 export type Furniture = Readonly<{ top: string; bottom: readonly string[] }>;
 
-export function furnitureFor(block: Plot, layout: Layout, ctx: RenderContext): Furniture {
+export function furnitureFor(
+  block: Plot,
+  layout: Layout,
+  ctx: RenderContext,
+  cursorAt: number | null = null,
+): Furniture {
   const axis = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities);
   return {
     top: frameTop(layout, ctx),
-    bottom: [frameBottom(layout, axis.tickColumns, ctx), xLabelRowFor(axis.text, layout, ctx)],
+    bottom: [
+      frameBottom(layout, axis.tickColumns, ctx, cursorAt),
+      xLabelRowFor(axis.text, layout, ctx),
+    ],
   };
 }
 

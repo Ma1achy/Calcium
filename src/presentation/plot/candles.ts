@@ -135,6 +135,31 @@ export function candleReadout(bar: OHLC | undefined, format: Plot["yFormat"]): s
   return `O ${o ?? "—"}  H ${h ?? "—"}  L ${l ?? "—"}  C ${c ?? "—"}`;
 }
 
+/**
+ * Which column bar `index` is drawn in (C12 §3s, I37).
+ *
+ * **Through the aggregation, which is what a single placement rule gets wrong.**
+ * Past the threshold the candle at column *j* is a bucket of bars, so the
+ * inverse of `aggregate`'s `⌊j × bars.length ÷ n⌋` is `⌊index × n ÷
+ * bars.length⌋` — and a marker placed by the curve's `columnsOf` rule would
+ * point at a candle the reader is not being told about.
+ *
+ * The wick's column rather than the body's left edge, because that is the one
+ * cell of a candle that is always drawn.
+ */
+export function candleColumn(
+  bars: readonly OHLC[],
+  index: number,
+  areaWidth: number,
+): number | null {
+  const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
+  if (bars.length === 0 || index < 0 || index >= bars.length) return null; // cells-ok — a bar count
+  const drawn = Math.min(bars.length, w); // cells-ok — a bar count
+  const bucket = Math.min(drawn - 1, Math.floor((index * drawn) / bars.length)); // cells-ok — a bar index
+  const column = bucket * pitchFor(w, drawn) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index
+  return column < w ? column : null; // cells-ok — a column index
+}
+
 /** Whether anything was measured — the candlestick's half of `hasSamples`. */
 export function hasBars(bars: readonly OHLC[] | undefined): boolean {
   return bars !== undefined && bars.some((b) =>

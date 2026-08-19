@@ -19,7 +19,7 @@ import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
 import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
-import { aggregate, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
+import { aggregate, candleColumn, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
 import { seriesRange } from "../../src/presentation/plot/scale.js";
 import { formatReadout, readoutSet } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
@@ -2150,6 +2150,83 @@ describe("C12 §3r — the candlestick", () => {
     expect(readoutSet([12.4, 13.1, 12.0, 12.9], undefined).join(" ")).toBe("12.4 13.1 12.0 12.9");
     expect(readoutSet([12.75, 12.75], undefined).join(" ")).toBe("12.75 12.75");
     expect(readoutSet([1, undefined, 3], undefined).join(" ")).toBe("1 — 3");
+  });
+
+  it("T1.99 (C12 I37, §3s): the cursor is marked behind the data and on the rule", () => {
+    const g = glyphs(FULL_CAPS);
+    const marked = (b: Plot, idx: number, width = 50, caps = FULL_CAPS): readonly string[] =>
+      measurable({ definitions: [plotDefinition], capabilities: caps, cursorPositions: { p: idx } })
+        .renderToLines(b, width)
+        .map((l) => l.split(String.fromCharCode(27)).map((pt, i) => (i === 0 ? pt : pt.slice(pt.indexOf("m") + 1))).join(""));
+    const cs = (over: Record<string, unknown> = {}): Plot =>
+      block({
+        kind: "plot", id: "p", form: "line", height: 10, axes: true,
+        plotStyle: "candlestick", series: [], ohlc: walk([3, -2, 5, -1, -4, 6, 2, -3]), ...over,
+      } as unknown as Plot) as Plot;
+    const ruleRow = (rows: readonly string[]): string =>
+      rows.find((r) => r.includes(g.cursorMark)) ?? "";
+
+    // **Both marks, because either alone fails the case that motivates it.**
+    const rows = marked(cs(), 2);
+    expect(ink(rows), "the dashed column").toContain(g.dashedVertical);
+    expect(ruleRow(rows), "and the mark on the rule").not.toBe("");
+
+    // They agree on the column, or the reader is pointed at two places.
+    const dashRow = rows.find((r) => r.includes(g.dashedVertical)) ?? "";
+    expect(dashRow.indexOf(g.dashedVertical)).toBe(ruleRow(rows).indexOf(g.cursorMark));
+
+    // **Never over the data**: the dashed line is composited behind, so no row
+    // that carries a candle at that column carries the dash there too.
+    // **Over the plot area only**, sliced between the two border rows — the
+    // rule row carries the mark by construction and the readout row carries
+    // text, so a sweep over every row of the block asserts about neither.
+    const col = ruleRow(rows).indexOf(g.cursorMark);
+    const top = rows.findIndex((r) => r.includes(g.topLeft));
+    const area = rows.slice(top + 1, rows.findIndex((r) => r.includes(g.bottomLeft)));
+    expect(area.length, "there are area rows to read").toBeGreaterThan(4);
+    for (const r of area) {
+      expect([g.candleHollow, g.candleFilled, g.candleCross, g.vertical, g.dashedVertical, " ", undefined],
+        `row "${r}" at column ${String(col)}`).toContain(r[col]);
+    }
+    expect(area.some((r) => r[col] === g.dashedVertical), "and the dash is in some of them").toBe(true);
+
+    // Out of range draws neither, which is what the readout's dashes say.
+    const past = marked(cs(), 99);
+    expect(ink(past), "no rule mark").not.toContain(g.cursorMark);
+    expect(ink(past), "no dashed column").not.toContain(g.dashedVertical);
+  });
+
+  it("T1.99b (C12 I37, §3s): the column is the form's mapping, through the aggregation", () => {
+    const w = 44;
+    const curve = (i: number, n: number): number =>
+      n <= 1 ? Math.floor((w - 1) / 2) : Math.round((i / (n - 1)) * (w - 1));
+
+    // The aggregation, inverted: bar `i` is drawn in bucket `⌊i × n ÷ len⌋`.
+    const many = walk(Array.from({ length: 120 }, (_u, i) => [3, -2, 5, -1][i % 4]!));
+    const drawn = Math.min(many.length, w);
+    const pitch = Math.min(Math.floor(w / drawn), candleWidth(w, drawn) + 1);
+    const wick = Math.floor((candleWidth(w, drawn) - 1) / 2);
+    for (const i of [0, 1, 59, 60, 61, 119]) {
+      expect(candleColumn(many, i, w), `bar ${String(i)}`)
+        .toBe(Math.floor((i * drawn) / many.length) * pitch + wick);
+    }
+
+    // **Where the two rules actually separate, measured rather than assumed.**
+    // The dense end is where they *agree* — one cell per candle filling the
+    // area lands both on the same column. What separates them is the sparse
+    // end, because a candle sits at a fixed pitch and is left-aligned (C12 I13)
+    // where a curve stretches across the whole width.
+    expect(candleColumn(many, 60, w), "120 bars: they meet").toBe(curve(60, many.length));
+    const few = walk([1, 2, 3, 4]);
+    expect(candleColumn(few, 3, w), "4 bars: the candle").toBe(20);
+    expect(curve(3, 4), "4 bars: the curve's rule points into blank space").toBe(43);
+    const eight = walk([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(candleColumn(eight, 7, w)).toBe(36);
+    expect(curve(7, 8)).toBe(43);
+
+    expect(candleColumn(few, 0, w)).toBe(Math.floor((candleWidth(w, 4) - 1) / 2));
+    expect(candleColumn(few, 9, w), "out of range").toBeNull();
+    expect(candleColumn([], 0, w), "no bars").toBeNull();
   });
 
   it("CS-B5 (§6b B5): a doji draws the flat mark, and an overlay through it draws the same", () => {

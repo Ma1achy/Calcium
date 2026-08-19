@@ -58,7 +58,8 @@ import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, 
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
-import { candleReadout, candleRows, hasBars } from "./candles.js";
+import { glyphs } from "../blocks/glyphs.js";
+import { candleColumn, candleReadout, candleRows, hasBars } from "./candles.js";
 import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
@@ -550,15 +551,65 @@ function axed(
 function axedWithCursor(
   block: Plot,
   cursorIdx: number,
+  at: number | null,
   area: readonly string[],
   layout: Layout,
   ctx: RenderContext,
 ): readonly string[] {
-  const furniture = furnitureFor(block, layout, ctx);
+  const furniture = furnitureFor(block, layout, ctx, at);
   return composeRows(plotHeight(block), [furniture.top], area, [
     furniture.bottom[0] ?? "",
     cursorReadout(block, cursorIdx, layout, ctx),
   ]);
+}
+
+/**
+ * Which column the cursor's index is drawn in (C12 §3s, I37).
+ *
+ * **The index is into the data, not the area** — `cursorReadout` reads
+ * `values[cursorIdx]` and always has — so the column is whatever the *form*
+ * maps that index to. Two mappings, because a candlestick lays its bars out and
+ * a curve places its samples, and one rule for both points at the wrong candle
+ * as soon as the bars aggregate.
+ */
+function cursorColumn(block: Plot, cursorIdx: number, areaWidth: number): number | null {
+  const bars = candlesOf(block);
+  if (bars !== undefined) return candleColumn(bars, cursorIdx, areaWidth);
+  const n = block.series.reduce((most, sr) => Math.max(most, sr.values.length), 0); // cells-ok — a sample count
+  if (n === 0 || cursorIdx < 0 || cursorIdx >= n) return null; // cells-ok — a sample count
+  const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
+  const span = Math.max(0, n - 1); // cells-ok — a sample count
+  // `columnsOf`'s placement, which is what put the sample in that column.
+  return span === 0 || w === 1
+    ? Math.floor((w - 1) / 2) // cells-ok — a column index
+    : Math.round((cursorIdx / span) * (w - 1)); // cells-ok — a column index
+}
+
+/**
+ * A blank area row with the cursor's column dashed, for `behind()` (C12 I37).
+ *
+ * **Behind the data and never over it.** `dashedVertical` is already the slot
+ * for a reference line drawn beside data, and its own comment gives the reason:
+ * a solid rule through a figure reads as part of it. Merged with the gridline
+ * row so the two share one pass, with the gridline winning a shared cell —
+ * it marks a value written in the gutter, and the cursor's column is carried by
+ * the rule below in any case.
+ */
+function cursorRule(column: number | null, layout: Layout, ctx: RenderContext): string {
+  if (column === null) return "";
+  const g = glyphs(ctx.capabilities);
+  return Array.from({ length: Math.max(0, layout.areaWidth) }, (_, x) =>
+    x === column ? g.dashedVertical : " ").join(""); // cells-ok — a column index
+}
+
+/** First non-blank of two reference rows, so `behind()` takes one string. */
+function overlay(over: string, under: string): string {
+  if (under === "") return over;
+  if (over.trim() === "") return under;
+  return Array.from({ length: Math.max(over.length, under.length) }, (_, i) => { // cells-ok — a column index
+    const a = over[i] ?? " "; // cells-ok — a column index
+    return a === " " ? under[i] ?? " " : a; // cells-ok — a column index
+  }).join("");
 }
 
 function cursorReadout(
@@ -714,6 +765,7 @@ function overlaidRows(
   ctx: RenderContext,
   rasterise: Rasteriser = curveRows,
   under: readonly Layer[] = [],
+  cursorAt: number | null = null,
 ): readonly string[] {
   // **The scale, and the capability.** Both were dropped here and nowhere else:
   // `yLabels` was called without `yScale`, so a log axis was labelled linearly,
@@ -743,11 +795,16 @@ function overlaidRows(
     })),
   ];
 
+  const cursor = cursorRule(cursorAt, layout, ctx);
   return Array.from({ length: layout.areaRows }, (_, i) =>
     line(
       [
         ...gutterSpans(byRow.get(i) ?? "", layout, ctx),
-        ...behind(gridRow(layout, gridTicks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
+        ...behind(
+          overlay(gridRow(layout, gridTicks, ctx, byRow.has(i)), cursor),
+          mergedRow(layers, i, layout, ctx),
+          ctx,
+        ),
         ...rightBorder(layout, ctx),
       ],
       layout,
@@ -1330,11 +1387,13 @@ function positionalForm(
   }
 
   const cursorIdx = ctx.cursorPositions?.[block.id];
+  const marked = block.axes === true && cursorIdx !== undefined && Number.isFinite(cursorIdx);
+  const at = marked ? cursorColumn(block, cursorIdx, layout.areaWidth) : null;
   const area = stacked
     ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, range, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx));
-  if (block.axes === true && cursorIdx !== undefined && Number.isFinite(cursorIdx)) {
-    return axedWithCursor(block, cursorIdx, area, layout, ctx);
+    : overlaidRows(block, range, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx), at);
+  if (marked) {
+    return axedWithCursor(block, cursorIdx, at, area, layout, ctx);
   }
   return axed(block, area, layout, ctx);
 }

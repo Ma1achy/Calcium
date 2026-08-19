@@ -90,6 +90,19 @@ export type GlyphSet = Readonly<{
    * and the wick disappears at exactly the bar the reader is looking at
    * (§6b B13).
    */
+  /**
+   * Where a cursor points, on the rule below the plot area (C12 §3s, C12 I37).
+   *
+   * **Its own slot beside `dashedVertical` because the two do different jobs.**
+   * The dashed line runs behind the data and disappears under it, which is
+   * right for a reference line and wrong for the one mark that has to survive a
+   * dense column. This one sits on the rule, where nothing else is drawn.
+   *
+   * It shares a code point with `warning` and never shares a figure: one is a
+   * notice's tone mark and one is a plot's axis. Named separately so a theme or
+   * a substitution can move either without moving the other.
+   */
+  cursorMark: string;
   candleHollow: string;
   candleFilled: string;
   candleCross: string;
@@ -143,6 +156,7 @@ const UNICODE: GlyphSet = Object.freeze({
   stubUp: "╵",
   stubLeft: "╴",
   stubRight: "╶",
+  cursorMark: "▲",
   candleHollow: "▯",
   candleFilled: "┃",
   candleCross: "┿",
@@ -181,6 +195,7 @@ const ASCII: GlyphSet = Object.freeze({
   stubUp: "|",
   stubLeft: "-",
   stubRight: "-",
+  cursorMark: "^",
   candleHollow: "=",
   candleFilled: "#",
   candleCross: "+",
