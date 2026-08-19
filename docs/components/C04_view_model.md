@@ -145,6 +145,8 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
                            yFormat?: "number" | "fraction" | "percent"
                                    | "bytes" | "duration";   // the unit IN, not OUT (I41)
                            yMin?: number; yMax?: number;      // pin the range (I29)
+                           xMin?: number; xMax?: number;      // the domain the samples span (I58)
+                           xFormat?: Plot["yFormat"];         // one formatter, two axes (I58)
                            emptyMessage?: string }> & Gap;
 ```
 
@@ -1235,6 +1237,7 @@ persisted document rests on.
 
 ---
 - **I57** — **A plot whose data is not a flat series carries a typed field for it, and `ohlc` is the third.** Four numbers per bar in a declared order — open, high, low, close — is a convention nothing checks, so four `Series` in an agreed sequence gives the first caller who transposes two of them a chart that renders and is wrong. `quartiles` (I53) and `hierarchy` (I54) are the precedents and the argument is theirs: a form whose subject is not *a list of labelled magnitudes* gets a shape rather than an encoding. **Overlay series stay optional and `series: []` is the ordinary case** — plain candles — with a non-empty `series` drawn over them on the shared axis, which is what a moving average is. **Three refusals at construction rather than three ignored members**, C04's established idiom in this exact type: `plotStyle: "candlestick"` with no `ohlc`; the style on a form that is not `line` or `step`; and an `OHLC` whose `low` exceeds `min(open, close)` or whose `high` is below `max(open, close)`, which is not a candle that renders oddly but not a candle. Both gates say all three, as I50a and I56 already do. *A construction throw leaves nothing behind, because it happens before any render state exists — which is the question every throw owes an answer to, answered here by when it fires rather than by what it cleans up.* C12 I36 is the style this is the data for.
+- **I58** — **A plot's horizontal domain is declarable, and the sample index is what it falls back to.** `xMin` / `xMax` / `xFormat` mirror `yMin` / `yMax` / `yFormat` — the same optionality, the same independence, the same formatter vocabulary, for `BarSpec.format`'s reason: a second enum is a second place for the `fraction`/`percent` confusion to happen. **`Series.values` is a bare array, so there is no x coordinate anywhere in this type** and the abscissa a sample has is its index; absent a declaration the domain is `[0, n − 1]`, which is what `ax.plot(y)` labels and what the data has when nothing else was said. *This is not a second way to spell `xLabels`* — that field is three captions, the caller's own words at left, centre and right, and this is a scale; where both are present the captions win, because overriding what a caller wrote with what we inferred is the wrong direction. **Unlike `yMin`/`yMax` these do not clamp**, and the asymmetry is the axis rather than an oversight: a y pin bounds *values*, which may fall outside it and are held at the edge, while an x domain describes how the samples are *spread* — there is no sample outside `[0, n − 1]` to clamp. C12 I41 is the axis this is the domain for.
 
 ## 7. Commitments
 
@@ -1299,6 +1302,7 @@ persisted document rests on.
 55. `QuartileSummary.mean`, drawn with its own mark so two centres never share a glyph (I53).
 56. Every style field is a literal union, generated alongside its data where the values are generated (I55).
 58. **A plot whose data is not a flat series gets a typed field** — `ohlc` is the third after `quartiles` and `hierarchy`, because four series in a declared order is a convention nothing checks and a transposed pair renders (I57).
+59. **A plot's horizontal domain is declarable and falls back to the sample index** — `xMin`/`xMax`/`xFormat` mirroring the y trio, with the caller's captions winning the row where both exist, and no clamping because there is no sample outside `[0, n − 1]` to clamp (I58).
 57. **A distribution form's lowest rung is a floor, not a preference** — below it the figure states a property of the room and not of the data. The *row* floor is refused here because `height` is declared; the *column* floor is C12's, because a width is discovered rather than declared (I56).
 
 ---

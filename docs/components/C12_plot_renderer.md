@@ -539,6 +539,45 @@ point to iterate towards.
 reasonable and what decides it is which axis the count is chosen against — measured rather than
 inherited.
 
+### The x axis, and the row it has been reserving for it all along
+
+§3d is about the **y** axis. The positional family had no x axis at all — `xLabels` is a
+three-caption tuple, a left/centre/right *caption* rather than a scale, and `Series.values` is a
+bare array with no x coordinate anywhere in the type. So every line, scatter, step, ecdf, density,
+slope and bubble in the catalogue draws a frame with nothing under it.
+
+**And the row is already paid for.** Measured: `height: 10` with `axes: true` renders **13** rows —
+`AXIS_ROWS + FRAME_ROWS` is added to the declared height rather than taken from it — and with no
+`xLabels` the last of those three is **`""`**. Every axed positional plot has been spending a row
+on an x-label row it never fills. Filling it costs nothing, which is why this is not weighed
+against the height invariant.
+
+**The domain is declared, and the sample index is what it falls back to.** `Plot` gains
+`xMin` / `xMax` / `xFormat`, mirroring `yMin` / `yMax` / `yFormat` exactly — the same `axisFor`,
+the same precision rule, the same formatter. Absent, the domain is `[0, n − 1]`: the sample index,
+which is what the data *has* when nothing else was said. Measured against the reference:
+`ax.plot(y)` over 24 samples ticks `0 5 10 15 20`, and `ax.plot(x, y)` over `0..60` ticks
+`0 10 20 30 40 50 60`. Not an invention.
+
+#### 3d.1 — The classification table
+
+Indexed by rule interaction, because a row governed by one rule restates it:
+
+| the interaction | the two rules | the ruling |
+|---|---|---|
+| `xLabels` set **and** a domain declared | a caption is the caller's words; a scale is derived from the data | **the caption wins.** Replacing what a caller wrote with what we inferred is the wrong direction, and both cannot have the row |
+| no domain, a positional form | *ticks come from the domain* meets *there is no domain* | the index, `[0, n − 1]` — a fallback rather than a special case, so one code path serves both |
+| `plotFrame: "corners"` | I26: a tick is a mark **on an edge** and corners have no edge | **no ticks, and the labels stay.** The converse is already ruled the other way: a tick under a label that was never drawn marks nothing, so it goes; a label without a tick is still a reading |
+| `xScale: "log"` or a time scale | `yLabels` records this exact defect at `axes.ts:411` — ticks picked by `axisFor` and *labelled* by `niceAxis` | the label goes through `axisFor` too, or the two halves of one axis disagree and neither is wrong on its own |
+| a label wider than its room | `xAxis`'s placement: a label that cannot keep its one-cell gap is dropped | **verbatim, and a dropped label takes its tick with it** — the anchor comes out of the placement rather than beside it |
+| a tick and the cursor in one column | I37: the cursor answers a question the reader just asked | the cursor wins, unchanged |
+| **`plotStyle: "candlestick"`** | the tick's column comes from the *curve's* mapping; a candle's comes from its own pitch | **the form owns the mapping** (I37). *Measured there: the two agree at the dense end and separate at the sparse one — four bars in forty-four columns put the last candle at column 20 and the curve's rule at 43.* A tick placed by the curve's rule would point between candles |
+| the categorical family | the vertical arm already labels its columns through `columnLabels`; the horizontal arm's bottom axis is a **value** axis | **out of scope, and named rather than left silent.** A value axis under a horizontal bar is a different thing from a position axis under a curve, and it does not exist either |
+
+**The candlestick row is the one that would have shipped wrong.** Everything else on this table is
+a rule meeting a boundary; that one is two correct mappings from the same index, and the frame
+would have looked right at the width the catalogue happens to use.
+
 ### Named and not built, with the reason
 
 **A time axis is a different algorithm, not a different format.** `:00 · :15 · :30`, or midnight,
@@ -2447,6 +2486,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I38** — **Colour indexes an identity, and a row that is a slice of a continuous axis has none.** A histogram's bins and a correlogram's lags are cut from an axis by the renderer, so eight bins are one distribution and drew eight colours; a band named `control` is a thing the caller chose and keeps its slot. `ROW_IS_AN_IDENTITY` is that partition, total over `PlotForm`. *The claim this replaced lived in a code comment and no file — true about the grouped bar it was written for, general by nothing — and **the first correction over-reached in the other direction**: eleven reference renderings draw one colour per series and that is the references' taste rather than the principle under it, so reading the measurement as the ruling took the colour off every named band too. A measurement settles what is true; it does not settle what to draw.* **The switch is span ownership and not `SHARES_CELLS`**, which is indexed by form and so answers for a plain bar and a stacked one at once: a builder returning owners has interior identities and each run takes its owner's slot; a builder returning a string has none, and the row's identity is in the gutter already. **A form whose rows are series says so** — the timeline is the single cell where the old default was accidentally right, three tracks in one colour is what the correction costs there, and every count in that frame would still be correct. Measured against eleven reference renderings: the cycle advances per series and only per series, and mapping the category axis to colour is `hue=x` — available, explicit, and redundant by construction (§3t).
 - **I39** — **A mirrored figure draws on an odd extent, and the spare cell precedes it.** A reflection needs a centre and an even extent has none: both violin arms split their slot symmetrically and then take the spine at `round((k−1) ÷ 2)`, which for an even `k` is the lower baseline rather than the axis of reflection — so the figure carried three rows of ink above its rule against two below, at 4, 6 and 8, in both arms. *Neither statement is wrong and the pair is, which is why the comment already standing over the first one — **a violin that is asymmetric by a row is a violin that is wrong, and it is invisible in anything but a mirror assertion** — was right about the class and did not reach the instance. No mirror assertion existed, and the golden corpus could not supply one: `ONE_PER_FORM`'s violin is four rows a band, which this ladder spends on the **raincloud**, so the top rung had no horizontal golden frame at all and the fix moved four vertical frames and none of the other 280.* **The spare cell goes first** because `bandedForm` places a band's name at `⌊rows ÷ 2⌋` and `columnLabels` places its tick at `x + ⌊w ÷ 2⌋` — padding before lands the spine on both at every even extent and padding after lands it one short of both, so two untouched placements agree. **The raincloud rungs are outside this**, being one-sided by construction, and an extent of two falls to the fill because two cells are two edges with no centre between them (§3i).
 - **I40** — **Where two layers ink one cell the merge is per dot, and the colour is the first layer's.** `mergedRow` resolved the whole cell to the first layer that inked it, and every figure that composites — a pie's wedges, a radar's polygons over its frame — is folded to braille *before* it arrives, so the second layer's dots were dropped. *A pie's disc is fully covered by construction and `pie-default-40` had seven cells flanked by a full cell on each side that were not themselves full; the radar had it twice, its polygons eating each other and its frame drawn only in the cells nothing else wanted — which reads as dashed strokes and is not, because `dashFor` is solid at any depth above one bit.* A braille cell is `U+2800 + bits`, so the union is `0x2800 | (bitsA | bitsB)`; where any candidate is **not** braille the first-wins rule stands, because a letter and a polygon cannot share a cell. **The colour remains one layer's and that is a limit of the span model, not an oversight** — two wedges meeting in a cell draw both sets of dots in the first wedge's colour, so what the union removes is the gap and not the boundary's exactness, and saying *the gaps are fixed* would imply a per-dot colour a `Span` cannot carry. **The priority order stays the ref's** rather than becoming the densest layer's, because that order is a ruling — labels over polygons over frame — and a dot count would overturn it wherever the frame was denser (§3u).
+- **I41** — **The positional family's x axis is nice numbers over a declared domain, and the sample index is what it falls back to.** `Plot` gains `xMin` / `xMax` / `xFormat` mirroring the y axis — the same `axisFor`, the same precision, the same formatter — and absent them the domain is `[0, n − 1]`, which is what the data has when nothing else was said. *Measured: `ax.plot(y)` over 24 samples ticks 0 5 10 15 20.* **The row it draws in was already reserved**: `axes: true` adds `AXIS_ROWS + FRAME_ROWS` to the declared height rather than taking it, and with no `xLabels` the third of those rows rendered as `""` — so every axed positional plot had been spending a row on an x-label row it never filled, and filling it costs nothing against I1. **`xLabels` wins where both are present**, because a caption is the caller's words and a scale is inferred, and overriding the first with the second is the wrong direction. A label that cannot keep its one-cell gap is dropped **with its tick**, `plotFrame: "corners"` draws the labels and no ticks — a tick is a mark on an edge and there is no edge, where a label is still a reading — and a log or time scale is labelled through `axisFor` or the two halves of one axis disagree. **The form owns the index-to-column mapping** (I37): a candlestick's ticks come from its own pitch, and the curve's rule would place them between candles at every width where the two separate (§3d.1).
 
 ## 8. Commitments
 
@@ -2484,6 +2524,7 @@ orientation — and belongs in the classification table as its own rows.
 32. **Colour indexes an identity** — a row cut from a continuous axis has none and takes one colour, a named row keeps its slot, a row's interior identities are coloured by their owner, and a form whose rows *are* series declares it (I38, §3t).
 33. **A mirrored figure draws on an odd extent** — a reflection needs a centre, the spare cell precedes the figure so the band's own label and tick still land on the spine, and the one-sided rungs are outside it (I39, §3i).
 34. **A cell two layers ink carries both layers' dots** — unioned where the vocabulary allows it, first-wins where it does not, and coloured by the priority order either way (I40, §3u).
+35. **The positional family has an x axis** — nice numbers over a declared domain, the sample index where none is declared, in the row `axes: true` was already reserving; the caller's captions win it where they exist, and the form owns which column a tick lands on (I41, §3d.1).
 
 ---
 
