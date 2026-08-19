@@ -724,7 +724,6 @@ export type Plot = Readonly<{
    * that can turn itself on.
    */
   legend?: "above" | "below" | "left" | "right" | false;
-  palette?: string;
 }> & Gap;
 
 export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };

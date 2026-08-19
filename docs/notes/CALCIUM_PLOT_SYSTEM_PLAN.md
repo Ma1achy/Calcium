@@ -407,13 +407,13 @@ Dependency-ordered. Items 3–10 are independent of each other.
 | 3 | ~~**Orientation**~~ **`567eff9`** — bar, histogram, boxplot, violin | 11 forms at once, and `categoricalForm` is structurally row-major — **moved from 7**, because "before the per-form work" and "at position 7" contradicted each other and the per-form work is 8–12 |
 | 4 | ~~**Painted cells (C12 I29)**~~ **`506c62d`** — and it was never wiring: C10 I21 shut the door, C10 §4c opened it via `wash` | 7 matrix forms + bars + pie wedges; wiring, highest leverage |
 | 5 | ~~**Dot-grid geometry**~~ **`78667bc`** | pie, radar — one root cause |
-| 6 | **Legend** | closes two recorded deferrals (`Annotation.label`, C04 §3b's five members); both carrier forms per C12 I29 |
+| 6 | ~~**Legend**~~ **`234bab7`** — four placements, `SHARES_CELLS` reused | closes two recorded deferrals (`Annotation.label`, C04 §3b's five members); both carrier forms per C12 I29 |
 | 7 | ~~**`CATEGORY_MARKS` + sweeps**~~ **`cc9f513`** — `SHARES_CELLS` is the partition, and §3g's legend reads the same one | the degradation ladder, gated |
 | 8 | ~~**Stacking fold**~~ **`7480435`** — streamgraph 52% → 12.6% against matplotlib | `stackedarea` + `streamgraph` |
 | 9 | ~~**Distribution**~~ — horizon `21ac7aa` (62.8% → 14.6%), forest `5b871b8`, ridgeline `d164270`, bandwidth `ee75b04` | violin taper + bandwidth, ridgeline overlap, forest |
 | 10 | ~~**`hierarchy`**~~ **`018cbe9`** — flame, icicle, treemap | flame, icicle, treemap |
 | 11 | ~~**Facet spans**~~ **`4a2efb8`** | smallmultiples, pairplot |
-| 12 | **Remaining new forms** | slope, bubble, autocorrelation, timeline, bullet, utilisation |
+| 12 | ~~**Remaining new forms**~~ **`ee1b94c`** — slope, bubble, autocorrelation, timeline, bullet, utilisation; all 42 exist | slope, bubble, autocorrelation, timeline, bullet, utilisation |
 | 13 | **`height: "fill"`, aspect, reflow** | needs the frame settled |
 | 14 | **Silent tables + `PaletteName`** | close the drift class |
 | 15 | **Animation demo + tier 5** | prove, do not build |

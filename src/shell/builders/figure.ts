@@ -40,7 +40,6 @@ type FigureOpts = {
   plotStyle?: "auto" | "braille" | "line";
   plotDetail?: "auto" | "compact" | "full";
   plotCorners?: "rounded" | "sharp";
-  palette?: string;
 };
 
 type SeriesOpts = {
@@ -225,7 +224,6 @@ export class FigureBuilder {
       ...(this.opts.plotStyle !== undefined ? { plotStyle: this.opts.plotStyle } : {}),
       ...(this.opts.plotDetail !== undefined ? { plotDetail: this.opts.plotDetail } : {}),
       ...(this.opts.plotCorners !== undefined ? { plotCorners: this.opts.plotCorners } : {}),
-      ...(this.opts.palette !== undefined ? { palette: this.opts.palette } : {}),
       ...(this.xLabels_ !== undefined ? { xLabels: this.xLabels_ } : {}),
       ...(this.annotationList.length > 0 ? { annotations: Object.freeze([...this.annotationList]) } : {}),
       ...(this.categories_ !== undefined ? { categories: this.categories_ } : {}),

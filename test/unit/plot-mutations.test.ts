@@ -24,7 +24,9 @@ import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
 import { bandRows, stackBands } from "../../src/presentation/plot/stack.js";
 import { strips, tiles } from "../../src/presentation/plot/hierarchy.js";
-import { categoryMarks } from "../../src/presentation/plot/marks.js";
+import { categoryMarks, refOf as paletteRef } from "../../src/presentation/plot/marks.js";
+import { slot } from "../../src/presentation/blocks/paint.js";
+import { DARK_THEME } from "../support/render.js";
 import type { RenderContext } from "../../src/presentation/blocks/types.js";
 import { displayCells } from "../../src/presentation/text.js";
 
@@ -959,6 +961,31 @@ describe("GROUP 6k: the legend, and the asymmetry that is a constraint", () => {
       categories: ["a", "b"], series: [{ values: [1, 2] }],
     } as Plot);
     expect(legendPlacement(bars, FULL_CAPS)).toBeNull();
+  });
+});
+
+describe("GROUP 6l: `palette` had one legal value, so it is gone", () => {
+  it("T1.79 (C04 I55): a series' colour comes from `categorical`, and there is no other", () => {
+    // **The field was untyped *and* inert, and typing it would have fixed one.**
+    // `palette?: string` shipped beside `colormap?: ColormapName`, so
+    // `palette: "tab-10"` compiled and resolved to nothing at render — F172's
+    // shape, one field along from the clause that refuses it. C04 I55's remedy
+    // was a literal union, and building it found something better: `tone` and
+    // `syntax` carry meaning, C10 I16 closes `spectrum` to declared art with a
+    // third consumer stated as a four-place spec change, and what remains is
+    // `categorical`. A field with one legal value is not a choice.
+    //
+    // It was also read by no renderer — settable, carried through the builder,
+    // which is why MG24 counted it consumed. A name-based seam check cannot tell
+    // *named* from *acted on*.
+    for (let i = 0; i < 8; i += 1) { // cells-ok — a palette size
+      const ref = paletteRef(i);
+      expect(ref.startsWith("categorical."), `slot ${String(i)}`).toBe(true);
+      expect(slot(ref, DARK_THEME, FULL_CAPS).colour, `slot ${String(i)} resolves`).toBeDefined();
+    }
+    // And it wraps rather than running out, so a ninth category is a repeat and
+    // never an uncoloured run.
+    expect(paletteRef(8)).toBe(paletteRef(0)); // cells-ok — a palette size
   });
 });
 

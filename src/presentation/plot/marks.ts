@@ -50,6 +50,32 @@ export const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
   "categorical.c8",
 ]);
 
+/**
+ * The slot for category `index`.
+ *
+ * **`Plot.palette` was removed rather than typed, and the measurement is why.**
+ * The field shipped as a bare `string` beside `colormap?: ColormapName`, so
+ * `palette: "tab-10"` compiled and resolved to nothing at render — F172's shape,
+ * one field along from the clause that refuses it. C04 I55's remedy was a
+ * literal union, and building it turned up something better: there is only one
+ * palette a plot may draw a series from.
+ *
+ * `tone` and `syntax` carry **meaning** — a series taking `tone.error` says
+ * something is wrong about series three — and C10 I16 closes `spectrum` to
+ * declared art, with a third consumer stated as a four-place spec change. What
+ * remains is `categorical`, which is the palette for exactly this. **A field
+ * with one legal value is not a choice**, and typing it would have made the
+ * defect unreachable while leaving a knob that turns nothing.
+ *
+ * It was also *inert*: settable, carried through the builder — which is why MG24
+ * counted it consumed — and read by no renderer. A name-based seam check cannot
+ * tell *named* from *acted on*, and that is a real blind spot rather than an
+ * oversight here.
+ */
+export function refOf(index: number): ColourRef {
+  return CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size
+}
+
 /** The depth at or above which the categorical palette separates its entries. */
 const CATEGORY_COLOUR_FLOOR = 4;
 

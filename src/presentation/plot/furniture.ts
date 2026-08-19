@@ -37,7 +37,7 @@ import { xAxis } from "./axes.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
-import { CATEGORY_REFS, SHARES_CELLS, markOf } from "./marks.js";
+import { SHARES_CELLS, markOf, refOf } from "./marks.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -342,10 +342,16 @@ export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendE
   const source = segs !== undefined && segs.length > 0 // cells-ok — a segment count
     ? segs.map((sg) => sg.label)
     : block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
+  // **Through `refOf`, not by indexing the table** — the legend was a second
+  // door to the palette, and the mutation harness proved it: forcing every
+  // series to slot one left the legend drawing four distinct colours, so the
+  // control survived and the harness reported itself blind. A legend whose
+  // swatch is a different colour from the thing it names is the exact defect
+  // this function's own comment warns about.
   return source.map((label, i) => ({
     mark: markOf(i, ctx.capabilities),
     label,
-    ref: CATEGORY_REFS[i % CATEGORY_REFS.length] ?? "categorical.c1", // cells-ok — a palette size
+    ref: refOf(i),
   }));
 }
 

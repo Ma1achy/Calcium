@@ -49,7 +49,7 @@ import {
 import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
-import { CATEGORY_REFS, markOf } from "./marks.js";
+import { CATEGORY_REFS, markOf, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
@@ -142,7 +142,7 @@ function baselineFor(dataMin: number): number {
 
 function refOf(series: Series, index: number): ColourRef {
   if (series.tone !== undefined) return `tone.${series.tone}`;
-  return CATEGORY_REFS[index] ?? "categorical.c1"; // cells-ok — a category index
+  return slotOf(index);
 }
 
 /**
@@ -152,8 +152,7 @@ function refOf(series: Series, index: number): ColourRef {
  * the wedge and once for the legend entry beside it — and a legend whose swatch
  * is a different colour from the thing it names is worse than none.
  */
-const categoryRef = (index: number): ColourRef =>
-  CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size
+const categoryRef = (index: number): ColourRef => slotOf(index);
 
 /**
  * `MarkedText` runs to spans: the renderer says which slot owns a run, and this
@@ -644,7 +643,7 @@ function categoricalForm(
     const content = i < labels.length ? rowBuilder(cat, layout.areaWidth, i) : ""; // cells-ok — a label count
     const gutter = gutterSpans(label, layout, ctx);
     const s = block.series[i] ?? block.series[0];
-    const ref = s?.tone !== undefined ? `tone.${s.tone}` as ColourRef : (CATEGORY_REFS[i % CATEGORY_REFS.length] ?? "categorical.c1"); // cells-ok — a category index
+    const ref = s?.tone !== undefined ? `tone.${s.tone}` as ColourRef : (slotOf(i)); // cells-ok — a category index
     const styled = slot(ref, ctx.theme, ctx.capabilities);
     out.push(
       line(
@@ -722,7 +721,7 @@ function categoricalColumnForm(
   for (let r = 0; r < areaRows; r += 1) {
     const spans: Span[] = [...gutterSpans(byRow.get(r) ?? "", layout, ctx)];
     for (const [i, col] of columns.entries()) {
-      const ref = CATEGORY_REFS[i % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a category index
+      const ref = slotOf(i); // cells-ok — a category index
       spans.push({ text: col[r] ?? " ".repeat(widths[i]!), style: slot(ref, ctx.theme, ctx.capabilities) });
     }
     spans.push(...rightBorder(layout, ctx));
@@ -1283,7 +1282,7 @@ const FORM_ROWS: Readonly<
       const flush = (): void => {
         if (run === "") return;
         if (runIdx >= 0) {
-          const ref = CATEGORY_REFS[runIdx % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a segment index
+          const ref = slotOf(runIdx); // cells-ok — a segment index
           spans.push({ text: run, style: slot(ref, ctx.theme, ctx.capabilities) });
         } else {
           spans.push({ text: run });
@@ -1574,7 +1573,7 @@ const FORM_ROWS: Readonly<
     if (segs.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a segment count
     if (ctx.capabilities.unicode === "ascii") {
       return pieAsciiRows(segs, width, areaRows, ctx.capabilities).map((row) =>
-        line(markedSpans(row, categoryRef, ctx), layout, ctx),
+        line(markedSpans(row, (i) => categoryRef(i), ctx), layout, ctx),
       );
     }
     const pie = pieRender(segs, width, areaRows, ctx.capabilities);
@@ -1592,7 +1591,7 @@ const FORM_ROWS: Readonly<
     const out: string[] = [];
     for (let r = 0; r < areaRows; r += 1) {
       out.push(line(
-        [...mergedRow(fills, r, discLayout, ctx), ...markedSpans(pie.legend[r] ?? [], categoryRef, ctx)],
+        [...mergedRow(fills, r, discLayout, ctx), ...markedSpans(pie.legend[r] ?? [], (i) => categoryRef(i), ctx)],
         layout,
         ctx,
       ));
