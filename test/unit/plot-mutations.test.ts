@@ -21,6 +21,7 @@ import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../.
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
 import { aggregate, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
 import { seriesRange } from "../../src/presentation/plot/scale.js";
+import { formatReadout, readoutSet } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
@@ -2081,6 +2082,74 @@ describe("C12 §3r — the candlestick", () => {
     // whose mark is not the thing it names is this function's recorded defect.
     expect(rows.some((r) => r.includes(`${glyphs(FULL_CAPS).candleHollow} rising`))).toBe(true);
     expect(rows.some((r) => r.includes(`${glyphs(FULL_CAPS).candleFilled} falling`))).toBe(true);
+  });
+
+  it("CS7 (C12 I36, §6b B6): four values, then the overlays, through `yFormat`", () => {
+    const priced = [
+      { open: 12.4, high: 13.1, low: 12.0, close: 12.9 },
+      { open: 12.9, high: 13.4, low: 12.2, close: 12.3 },
+    ];
+    const at = (idx: number, over: Record<string, unknown> = {}): string =>
+      measurable({
+        definitions: [plotDefinition], capabilities: FULL_CAPS, cursorPositions: { cs: idx },
+      }).renderToLines(candles({ ohlc: priced, ...over }), 56)
+        .map((l) => l.split(String.fromCharCode(27)).map((pt, i) => (i === 0 ? pt : pt.slice(pt.indexOf("m") + 1))).join(""))
+        .at(-1) ?? "";
+
+    // **All four, and formatted through `yFormat` rather than a hand-rolled
+    // round.** `cursorReadout` was the fifth instance of F175's class and the
+    // last in `src/`; the numeric arm was F182.
+    expect(at(0).trim()).toBe("O 12.4  H 13.1  L 12.0  C 12.9");
+    expect(at(0, { yFormat: "percent" }).trim()).toBe("O 12.4%  H 13.1%  L 12.0%  C 12.9%");
+
+    // **One precision across the four** (F177, F182). `L 12` beside `O 12.4`
+    // reads as a coarser measurement, and the eye compares the digit count
+    // before it compares the value — so the row above is the assertion, and
+    // this is the fixture that would have shown four precisions.
+    expect(at(0)).toContain("L 12.0");
+
+    // **B6 — four dashes past the end**, not one and not none: a candlestick
+    // has four values to be absent, and a readout that shortens reads as
+    // *this bar has no open* rather than as *there is no bar*.
+    expect(at(9).trim()).toBe("O —  H —  L —  C —");
+
+    // The overlays follow the candles, in the legend's order.
+    const withMa = at(1, { series: [{ values: [12.5, 12.64], label: "ma" }] });
+    expect(withMa.trim()).toBe("O 12.9  H 13.4  L 12.2  C 12.3  ma: 12.64");
+    expect(withMa.indexOf("O "), "the candles lead").toBeLessThan(withMa.indexOf("ma:"));
+
+    // **The series' own number goes through `yFormat` too**, which is the half
+    // of the defect a rounding assertion cannot see: `Math.round(v * 100) / 100`
+    // and `formatReadout` agree on `12.64` and disagree on whether it is a
+    // percentage. The old line ignored the field entirely, so a percentage, a
+    // byte count and a duration all read as bare numbers.
+    const pct = at(1, { yFormat: "percent", series: [{ values: [12.5, 12.64], label: "ma" }] });
+    expect(pct.trim()).toBe("O 12.9%  H 13.4%  L 12.2%  C 12.3%  ma: 12.6%");
+    const bytes = at(1, { yFormat: "bytes", series: [{ values: [2048, 4096], label: "rss" }] });
+    expect(bytes).toContain("rss: 4 KB");
+  });
+
+  it("CS7b (F182): the numeric arm keeps the digit the producer sent", () => {
+    // **F175's defect in the arm its fix did not reach.** A bar with no
+    // `yFormat` drew `45` for `45.2` while the identical block with
+    // `yFormat: "percent"` drew `45.2%` — same function, same values.
+    expect(formatReadout(45.2, undefined)).toBe("45.2");
+    expect(formatReadout(12.75, undefined)).toBe("12.75");
+    expect(formatReadout(45.2, "percent")).toBe("45.2%");
+
+    // **And it does not manufacture digits.** A floor of one decimal was the
+    // first fix and it rounds `12.75` to `12.8`; a fixed precision would make
+    // `1284` read `1284.0`. What holds is the shortest round trip, capped —
+    // `1/3` is float noise past six places, not a measurement.
+    expect(formatReadout(1284, undefined)).toBe("1284");
+    expect(formatReadout(0.023, undefined)).toBe("0.023");
+    expect(formatReadout(1 / 3, undefined)).toBe("0.333333");
+
+    // A set shares one precision; a lone value does not, which is the claim
+    // only a caller can make.
+    expect(readoutSet([12.4, 13.1, 12.0, 12.9], undefined).join(" ")).toBe("12.4 13.1 12.0 12.9");
+    expect(readoutSet([12.75, 12.75], undefined).join(" ")).toBe("12.75 12.75");
+    expect(readoutSet([1, undefined, 3], undefined).join(" ")).toBe("1 — 3");
   });
 
   it("CS-B5 (§6b B5): a doji draws the flat mark, and an overlay through it draws the same", () => {

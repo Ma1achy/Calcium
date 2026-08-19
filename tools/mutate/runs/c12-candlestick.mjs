@@ -141,6 +141,50 @@ const results = runPass({
       expect: "CS3",
     },
     {
+      // **F175's fifth instance restored** — the readout ignoring `yFormat`
+      // again, at the one place a reader reads the number rather than the
+      // picture.
+      name: "the readout hand-rolls its rounding again",
+      file: DEFN,
+      from: "    return `${label}: ${formatReadout(v, block.yFormat)}`;",
+      to: "    return `${label}: ${String(Math.round(v * 100) / 100)}`;",
+      expect: "CS7",
+    },
+    {
+      // **F182 restored.** `decimalsFor` is two significant figures — right for
+      // a tick, and it drops the digit a readout exists to show.
+      name: "the numeric arm falls back to the tick's precision",
+      file: "src/presentation/plot/axes.ts",
+      from: "    return formatValue(v, format, decimalsNeeded(v));",
+      to: "    return formatValue(v, format);",
+      expect: "CS7b",
+    },
+    {
+      // The floor that was tried first, which rounds `12.75` to `12.8`.
+      name: "the numeric arm takes a one-decimal floor instead",
+      file: "src/presentation/plot/axes.ts",
+      from: "    return formatValue(v, format, decimalsNeeded(v));",
+      to: "    return formatValue(v, format, Number.isInteger(v) ? 0 : 1);",
+      expect: "CS7b",
+    },
+    {
+      // **F177 on a set** — four readings of one quantity at four precisions.
+      name: "the four values are formatted one at a time",
+      file: "src/presentation/plot/axes.ts",
+      from: "  const places = finite.reduce((most, v) => Math.max(most, decimalsNeeded(v)), 0); // cells-ok — a decimal count",
+      to: "  const places = undefined; // cells-ok — a decimal count",
+      expect: "CS7",
+    },
+    {
+      // B6 — a readout that shortens reads as *this bar has no open*, not as
+      // *there is no bar*. Four values to be absent rather than one.
+      name: "an absent bar reads as one dash rather than four",
+      file: CANDLES,
+      from: '  return `O ${o ?? "—"}  H ${h ?? "—"}  L ${l ?? "—"}  C ${c ?? "—"}`;',
+      to: '  return bar === undefined ? "—" : `O ${o}  H ${h}  L ${l}  C ${c}`;',
+      expect: "CS7",
+    },
+    {
       // The doji goes in a direction's layer, so a flat bar acquires one.
       name: "a doji is drawn as a rising body",
       file: CANDLES,

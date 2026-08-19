@@ -16,8 +16,9 @@
  * **Nothing here reads a clock, a width or an environment.** Every function is a
  * pure function of its arguments, as I11 requires of the whole component.
  */
-import type { OHLC } from "../../data/viewmodel/types.js";
+import type { OHLC, Plot } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
+import { readoutSet } from "./axes.js";
 import { glyphs } from "../blocks/glyphs.js";
 import { rowOf, type Range } from "./scale.js";
 
@@ -106,6 +107,32 @@ export function aggregate(bars: readonly OHLC[], columns: number): readonly OHLC
     out.push({ open: first.open, high, low, close: last.close });
   }
   return out;
+}
+
+/**
+ * The four values at the crosshair (C12 §3r, §6b B6, CS7).
+ *
+ * **Load-bearing rather than a convenience**, which is §6b B5's ruling: a doji
+ * draws `─` and an overlay line crossing that column draws `─` too, so one glyph
+ * has two sources. Both statements are true of the cell — a candle whose open
+ * equals its close *is* flat, and so is the line through it — and the only thing
+ * that tells a reader which it is looking at is these four numbers.
+ *
+ * **Four dashes past the end, not one and not none.** A candlestick has four
+ * values to be absent rather than one, and a readout that shortens when the
+ * cursor runs off the data reads as *this bar has no open* rather than as *there
+ * is no bar*. `—` is what a null series value already draws.
+ *
+ * Formatted through `yFormat`, because a readout is the answer and not a mark on
+ * a scale — `formatReadout`, never a hand-rolled round (F175).
+ */
+export function candleReadout(bar: OHLC | undefined, format: Plot["yFormat"]): string {
+  // **One precision across the four**, because they are four readings of one
+  // quantity: `O 12.4  H 13.1  L 12  C 12.9` reads as though the low were
+  // measured more coarsely, which is F177's finding about an axis's labels
+  // arriving on a set nobody had formatted as one.
+  const [o, h, l, c] = readoutSet([bar?.open, bar?.high, bar?.low, bar?.close], format);
+  return `O ${o ?? "—"}  H ${h ?? "—"}  L ${l ?? "—"}  C ${c ?? "—"}`;
 }
 
 /** Whether anything was measured — the candlestick's half of `hasSamples`. */

@@ -9014,3 +9014,70 @@ because `plotStyle: "candlestick"` was the field being added, and the chain's co
 the thing that had to be touched. **The union copy was the visible defect and the file scope was the
 one underneath it.**
 
+---
+
+## F182 — the fix landed on the two arms it was found on, not on the class ★★★★
+
+| | |
+|---|---|
+| **Surface** | `formatReadout`, and every plot number a reader reads rather than looks at |
+| **Reached for** | adopting `formatReadout` in `cursorReadout`, which is what F175's own remedy asked for |
+| **Verdict** | **a bar with no `yFormat` draws `45` for `45.2` — F175's defect, in the arm its fix did not touch** |
+| **Absorbed by** | the numeric arm keeps what the producer sent; `readoutSet` formats a set at one precision |
+
+F175 is *a tick is a mark on a scale and a readout is the answer* — `docker stats` sends
+`45.2%` and the cell drew `45%`. Its remedy was `formatReadout`, a named entry point beside
+`formatValue`:
+
+```ts
+if (format === "percent")  return `${v.toFixed(READOUT_PLACES)}%`;
+if (format === "fraction") return `${(v * 100).toFixed(READOUT_PLACES)}%`;
+return formatValue(v, format);          // ← the arm nothing fixed
+```
+
+**The two arms the finding was found on got a precision and the default arm kept
+`decimalsFor`**, which answers *how many digits does an axis label at this scale want* — two
+significant figures. Measured:
+
+```
+formatReadout(45.2,  undefined) = "45"        formatReadout(45.2,  "percent") = "45.2%"
+formatReadout(12.4,  undefined) = "12"        formatReadout(12.75, undefined) = "13"
+```
+
+Rendered, a `bar` block with `series: [{ values: [45.2, 8.7, 91.35] }]` and no `yFormat` draws
+`45`, `9`, `91`; the identical block with `yFormat: "percent"` draws `45.2%`, `8.7%`, `91.3%`.
+**Same function, same values, one loses the digit it exists to keep.**
+
+### Why nothing caught it
+
+`categorical.ts` carries a comment reading *`axes.ts` records this exact class as having
+happened three times before; this was the fourth*. Accurate, and about the call site rather
+than about the function — the fourth instance was fixed by **calling** `formatReadout`, and
+whether `formatReadout` was right on every arm is a different question that the comment's
+confidence closes off.
+
+The golden corpus is silent: 260 frames pass unchanged across this fix, so no committed frame
+exercises a plot number with a fractional value and no `yFormat`.
+
+### And a second one underneath, on a set rather than an arm
+
+With the arm fixed, the four values of a candlestick's readout came out
+`O 12.4  H 13.1  L 12  C 12.9` — **four precisions for four readings of one quantity**, which
+is F177 exactly: *the eye compares the digit count before it compares the value*. F177 fixed it
+for an axis's labels, where the caller names a shared precision; nothing named one here because
+nothing had formatted a *set* before. `readoutSet` is that name, and the claim it encodes —
+*these values are one quantity* — is one only a caller can make: a plot's several series are
+not.
+
+### The rule that replaced the floor
+
+A floor of one decimal was tried first and rounds `12.75` to `12.8` — the same digit loss one
+order down. What holds is **what the producer sent, short of noise**: the decimals of the
+shortest round-tripping representation, capped at six. `1284` stays `1284`, `0.023` stays
+`0.023`, `1/3` stops at `0.333333`.
+
+### The instrument
+
+Reading the frame of my own change. The readout was correct against its spec's example on the
+`percent` arm and wrong on the default one, and only the two side by side say so.
+

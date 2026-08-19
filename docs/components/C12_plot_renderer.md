@@ -1391,6 +1391,18 @@ The arithmetic is in cells regardless, measured with `cells()` (A03 SS23), and *
 still carry both ambiguous widths for this style** — now to assert that the two agree rather than
 that they differ.
 
+### The readout has no column marker, and that bounds what it disambiguates
+
+**Measured while building it**: `cursorPositions` is read in one place, and all it selects is
+`axedWithCursor`, which appends a readout row. **Nothing marks the cursor's column in the plot
+area** — there is no crosshair, for a candlestick or for any other form.
+
+So the readout tells a reader *what this mark is* — four numbers with `O` equal to `C` is a
+doji, and a series value beside them is the overlay — and it does not tell them *which candle*.
+That is a pre-existing property of every positional form here rather than something this style
+introduces, and it is written down because §6b B5's ruling leans on the readout and a ruling
+should say how far its support reaches. Roadmap work, not this section's.
+
 ### The readout is what disambiguates the doji, so it is load-bearing
 
 At the crosshair a candlestick reads `O 12.4  H 13.1  L 12.0  C 12.9`, then each overlay
@@ -2203,7 +2215,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **CS4** (I36): more bars than columns aggregate — open of the first, high of the maxima, low of the minima, close of the last. **Asserted against a series whose extreme falls on a bar that sampling would drop**, since an aggregation that happens to agree with sampling tests nothing.
 - **CS5** (C04 I57): `plotStyle: "candlestick"` with no `ohlc` is refused at construction, by both gates.
 - **CS6** (C04 I57): `plotStyle: "candlestick"` on a form that is not `line` or `step` is refused, by both gates.
-- **CS7** (I36): the readout at the crosshair carries all four values and then each overlay series, formatted through `yFormat` rather than a hand-rolled rounding — and a cursor past the end of `ohlc` reads four dashes.
+- **CS7** (I36, §6b B6): the readout carries all four values and then each overlay series, formatted through `yFormat` rather than a hand-rolled rounding — and a cursor past the end of `ohlc` reads **four** dashes. **Asserted on `yFormat` rather than on the rounding**, which is the half a rounding assertion cannot see: `Math.round(v × 100) ÷ 100` and `formatReadout` agree on `12.64` and disagree on whether it is a percentage, so a mutation restoring the old line survived twelve assertions.
+- **CS7b** (I36, FINDINGS F182): `formatReadout`'s numeric arm keeps the digit the producer sent — `45.2`, not `45` — and does not manufacture one: `1284` stays `1284` and `1/3` stops at six places. The four values of one readout share **one** precision (F177), which is a claim only a caller can make and is why `readoutSet` takes a set rather than an argument.
 - **CS8** (I36): a wide terminal fits the **same** number of candles as a narrow one and draws them `= # |`, and the frame is exactly its declared width at both. **The row that would have asserted the conflation**: its first form said *half as many*, which is what the section said before `glyphs()` was measured — and the reason the golden frames carry both widths is now that the two agree.
 - **T1.98** (I35): three distributions of very different spread in one block draw three different widths, and the same three scaled to their own extents draw the same shape. **The fixture responds first**: the spreads differ by a factor that a shared axis must show and an unshared one cannot.
 - **T1.97** (I34): eighteen bands in a vertical violin at a width their count does not divide — every band draws the same rung, and the three bands a cell wider draw that rung wider rather than a different one. Asserted over the *set* of figures in the frame rather than on any band, because the defect is that the set has two members.

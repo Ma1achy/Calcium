@@ -52,11 +52,75 @@ export function formatReadout(v: number, format: Plot["yFormat"]): string {
   if (!Number.isFinite(v)) return "—";
   if (format === "percent") return `${v.toFixed(READOUT_PLACES)}%`;
   if (format === "fraction") return `${(v * 100).toFixed(READOUT_PLACES)}%`;
+  // **The numeric arm, which F175's fix did not reach** (F182). `decimalsFor`
+  // gives two significant figures — `45.2` came out `45` and `12.4` came out
+  // `12`, which is the digit this whole function exists to keep, on the arm a
+  // block with no `yFormat` takes. The fix landed on the two arms the finding
+  // was *found* on rather than on the class it named.
+  //
+  // **What the producer sent, short of noise** — not a fixed precision and not
+  // a significant-figure count. `1284` stays `1284`, `0.023` stays `0.023`,
+  // `12.75` stays `12.75`; a value that genuinely needs sixteen digits is float
+  // noise and is capped. A floor of one decimal was tried first and rounded
+  // `12.75` to `12.8`, which is the same digit loss one order down.
+  if (format === undefined || format === "number") {
+    return formatValue(v, format, decimalsNeeded(v));
+  }
   return formatValue(v, format);
 }
 
-/** Decimals in a readout. One — enough for a reading, short of noise. */
+/** Decimals in a readout of a percentage. One — a reading, short of noise. */
 const READOUT_PLACES = 1;
+
+/** Beyond this a decimal expansion is float noise rather than a measurement. */
+const MAX_READOUT_DECIMALS = 6;
+
+/**
+ * The decimals a value needs to survive the round trip, capped.
+ *
+ * **Read off the shortest representation rather than derived from the
+ * magnitude.** `decimalsFor` answers *how many digits does an axis label at this
+ * scale want* — two significant figures — which is right for a tick and drops
+ * the digit a readout exists to show: `45.2` came out `45` and `12.75` came out
+ * `12.8`. The producer sent those digits and a readout is the answer (F175,
+ * F182).
+ */
+function decimalsNeeded(v: number): number {
+  const text = String(v);
+  const dot = text.indexOf(".");
+  if (dot === -1 || text.includes("e") || text.includes("E")) return 0; // cells-ok — a decimal count
+  return Math.min(MAX_READOUT_DECIMALS, text.length - dot - 1); // cells-ok — a decimal count
+}
+
+/**
+ * Several readings of **one quantity**, formatted at one precision (F177).
+ *
+ * `formatReadout` answers for a lone value and trims what it does not need, so
+ * four readings side by side come out at four precisions —
+ * `O 12.4  H 13.1  L 12  C 12.9`. That is exactly what F177 records of an axis's
+ * labels: *the eye compares the digit count before it compares the value*, and
+ * `L 12` reads as a coarser measurement rather than as the same one.
+ *
+ * **A set rather than an argument**, the same shape `formatReadout` takes beside
+ * `formatValue`: the caller states that these values are one quantity, and that
+ * is a claim only the caller can make. A plot's several *series* are not one —
+ * a price and its volume share a readout row and share no precision.
+ *
+ * The non-numeric arms already fix their own: `percent` and `fraction` at
+ * `READOUT_PLACES`, `bytes` and `duration` on their unit ladders.
+ */
+export function readoutSet(
+  values: readonly (number | undefined)[],
+  format: Plot["yFormat"],
+): readonly string[] {
+  if (format !== undefined && format !== "number") {
+    return values.map((v) => (v === undefined ? "—" : formatReadout(v, format)));
+  }
+  const finite = values.filter((v): v is number => v !== undefined && Number.isFinite(v));
+  const places = finite.reduce((most, v) => Math.max(most, decimalsNeeded(v)), 0); // cells-ok — a decimal count
+  return values.map((v) =>
+    v === undefined || !Number.isFinite(v) ? "—" : formatValue(v, format, places));
+}
 
 export function formatValue(v: number, format: Plot["yFormat"], places?: number): string {
   if (!Number.isFinite(v)) return "—";

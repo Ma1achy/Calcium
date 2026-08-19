@@ -28,7 +28,7 @@ import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
 import { gridRow } from "./furniture.js";
-import { labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
+import { formatReadout, labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
 import {
   areaText,
   bandLayout,
@@ -58,7 +58,7 @@ import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, 
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
-import { candleRows, hasBars } from "./candles.js";
+import { candleReadout, candleRows, hasBars } from "./candles.js";
 import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
@@ -571,9 +571,21 @@ function cursorReadout(
     const v = s.values[cursorIdx];
     const label = s.label ?? "";
     if (v === null || v === undefined || !Number.isFinite(v)) return `${label}: —`; // cells-ok — label formatting
-    return `${label}: ${String(Math.round(v * 100) / 100)}`;
+    // **`formatReadout`, not a hand-rolled round** (F175). The old line was
+    // `String(Math.round(v * 100) / 100)` — it ignored `yFormat` entirely, so a
+    // percentage, a byte count and a duration all read as bare numbers at the
+    // one place a reader reads the number rather than the picture. `axes.ts`
+    // records two ramps and `categorical.ts` records the bar as the fourth;
+    // **this was the fifth and the last in `src/`.**
+    return `${label}: ${formatReadout(v, block.yFormat)}`;
   });
-  const readoutText = truncate(values.join("  "), layout.width, ctx.capabilities);
+  // **The candles first**, because they are what the block is about and the
+  // series are the overlay — the same order the legend takes (§6b B4).
+  const bars = candlesOf(block);
+  const parts = bars === undefined
+    ? values
+    : [candleReadout(bars[cursorIdx], block.yFormat), ...values];
+  const readoutText = truncate(parts.join("  "), layout.width, ctx.capabilities);
   const muted = tone("muted", ctx.theme, ctx.capabilities);
   return line([{ text: readoutText, style: muted }], layout, ctx);
 }
