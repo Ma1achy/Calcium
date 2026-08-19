@@ -121,6 +121,12 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     empty: { form: "heatmap", height: 3, axes: true, series: [s([], "empty")] },
   },
   bar: {
+    // **C12 §3j's case for the field**: ordered categories along the bottom.
+    vertical: {
+      form: "bar", height: 10, axes: true, orientation: "vertical",
+      categories: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+      series: [s([12, 19, 15, 22, 30, 8, 4])],
+    },
     default: {
       form: "bar", height: 5, axes: true,
       categories: ["alpha", "beta", "gamma", "delta", "epsilon"], series: [s([10, 25, 15, 30, 20])],
@@ -146,11 +152,29 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     empty: { form: "bar", height: 3, axes: true, categories: ["x"], series: [{ values: [] }] },
   },
   histogram: {
+    // A histogram is what vertical was asked for — its bins are ordered and its
+    // labels are half-open intervals, which read along a bottom axis.
+    vertical: {
+      form: "histogram", height: 10, axes: true, orientation: "vertical",
+      series: [s(Array.from({ length: 200 }, (_, i) => 40 + Math.sin(i * 0.37) * 22 + prng(7)() * 14))],
+    },
     default: { form: "histogram", height: 8, axes: true, series: [s(bell)] },
     "freedman-diaconis": { form: "histogram", height: 8, axes: true, binning: "freedman-diaconis", series: [s(bell)] },
     scott: { form: "histogram", height: 8, axes: true, binning: "scott", series: [s(bell)] },
   },
   boxplot: {
+    // C12 §3j — the figure stood up, three columns where the band has three rows.
+    vertical: {
+      form: "boxplot", height: 12, axes: true, orientation: "vertical",
+      categories: ["setosa", "versicolor", "virginica", "hybrid"],
+      series: [],
+      quartiles: [
+        { min: 4.3, q1: 5.1, median: 5.8, q3: 6.4, max: 7.9, mean: 5.9 },
+        { min: 2.0, q1: 2.8, median: 3.0, q3: 3.3, max: 4.4, mean: 3.1, outliers: [4.4] },
+        { min: 1.0, q1: 1.6, median: 4.35, q3: 5.1, max: 6.9, mean: 3.8 },
+        { min: 0.1, q1: 0.3, median: 1.3, q3: 1.8, max: 2.5, mean: 1.2 },
+      ],
+    },
     default: {
       form: "boxplot", height: 12, axes: true, categories: ["sepal_length", "sepal_width", "petal_length", "petal_width"],
       quartiles: [
@@ -298,6 +322,16 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     bimodal: { form: "density", height: 8, axes: true, series: [s([1, 1, 1, 1, 2, 3, 5, 5, 5, 5])] },
   },
   violin: {
+    // C12 §3j — the conventional orientation, and one shared value axis.
+    vertical: {
+      form: "violin", height: 14, axes: true, orientation: "vertical",
+      categories: ["control", "dose-a", "dose-b"],
+      series: [
+        s(Array.from({ length: 40 }, (_, i) => 30 + Math.sin(i * 0.7) * 9)),
+        s(Array.from({ length: 40 }, (_, i) => 45 + Math.sin(i * 0.5) * 6)),
+        s(Array.from({ length: 40 }, (_, i) => 38 + Math.cos(i * 0.9) * 12)),
+      ],
+    },
     default: {
       form: "violin", height: 18, axes: true, categories: ["A", "B", "C"],
       // **Thirty samples, not eight, and the fixture was the third cause.**

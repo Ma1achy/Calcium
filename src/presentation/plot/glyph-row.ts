@@ -121,6 +121,122 @@ export function dumbbellRow(
 }
 
 /**
+ * The box plot **stood up** — `boxplotBand` transposed (C12 I30).
+ *
+ * ```
+ *    ╷        the max cap
+ *    │        whisker
+ *  ┌─┴─┐      q3, the box's lid
+ *  │   │
+ *  ├─◆─┤      the median, and the mean where it differs
+ *  │   │
+ *  └─┬─┘      q1, the floor
+ *    │
+ *    ╵        the min cap
+ * ```
+ *
+ * **Column-indexed where its sibling is row-indexed**, and that is what keeps
+ * the two one figure rather than two drawings that happen to agree. The three
+ * slots are the box's left edge, its spine and its right edge, exactly as the
+ * horizontal table's three are its top edge, spine and bottom — every glyph
+ * appears in both tables in the position the other one gives it, rotated.
+ *
+ * `at(v)` inverts, because a row index grows downwards and a value grows up.
+ */
+export function boxplotColumn(
+  q: QuartileSummary,
+  min: number,
+  max: number,
+  width: number,
+  rows: number,
+  caps: Caps,
+): readonly string[] {
+  const slot = Math.max(1, Math.floor(width));
+  const n = Math.max(1, Math.floor(rows));
+  const g = glyphs(caps);
+  const fill = pairFor(caps).filled;
+
+  // **The box is narrower than its column, and that is the figure rather than
+  // taste.** Drawn to the full slot the four categories touched — three boxes
+  // with no gap read as one continuous object, and the whole point of a
+  // categorical axis is that the categories are separate. Three fifths is what
+  // matplotlib's `widths=0.6` draws and what UnicodePlots leaves; below five
+  // cells there is nothing to spare and it takes the slot.
+  const w = slot >= 5 ? Math.max(3, Math.round(slot * 0.6)) : slot; // cells-ok — a column width
+  const padL = Math.floor((slot - w) / 2); // cells-ok — a column width
+  const padR = slot - w - padL; // cells-ok — a column width
+
+  // **Rows built whole, not as three slots.** The first version wrote a glyph at
+  // the left, centre and right of each row and left the cells between them
+  // blank, so the box came out as three disconnected columns — the transpose of
+  // `boxplotBand` in arithmetic and not in figure. A box's lid is a *run*.
+  const mid = Math.floor((w - 1) / 2); // cells-ok — a column index
+  const runRow = (left: string, joint: string, right: string): string => {
+    if (w === 1) return joint; // cells-ok — a column count
+    const cells = new Array<string>(w).fill(g.horizontal);
+    cells[0] = left;
+    cells[w - 1] = right;
+    if (mid > 0 && mid < w - 1) cells[mid] = joint; // cells-ok — a column index
+    return cells.join("");
+  };
+  const centred = (glyph: string): string => {
+    const cells = new Array<string>(w).fill(" ");
+    cells[mid] = glyph;
+    return cells.join("");
+  };
+  const sides = (): string => {
+    if (w === 1) return g.vertical; // cells-ok — a column count
+    const cells = new Array<string>(w).fill(" ");
+    cells[0] = g.vertical;
+    cells[w - 1] = g.vertical;
+    return cells.join("");
+  };
+
+  // Inverted: a value grows upwards and a row index grows down.
+  const at = (v: number): number => {
+    const span = max - min;
+    const t = span <= 0 ? 0 : (v - min) / span;
+    return Math.max(0, Math.min(n - 1, n - 1 - Math.round(t * (n - 1)))); // cells-ok — a row index
+  };
+  const yMax = at(q.max), yQ3 = at(q.q3), yMed = at(q.median);
+  const yQ1 = at(q.q1), yMin = at(q.min);
+
+  const blank = " ".repeat(w);
+  const grid = Array.from({ length: n }, () => blank);
+  const set = (r: number, text: string): void => {
+    if (r >= 0 && r < n) grid[r] = text; // cells-ok — a row index
+  };
+
+  // Whiskers first, so every edge below overwrites them where they meet.
+  for (let r = yMax + 1; r < yQ3; r += 1) set(r, centred(g.vertical));
+  for (let r = yQ1 + 1; r < yMin; r += 1) set(r, centred(g.vertical));
+  // **The interior is clear where edges enclose it and inked where they cannot** —
+  // `boxplotBand`'s compact rule, standing up: a one-cell column has no sides,
+  // so a blank interior would say nothing about where the box is.
+  for (let r = yQ3 + 1; r < yQ1; r += 1) set(r, w === 1 ? fill : sides()); // cells-ok — a column count
+
+  set(yMax, runRow(g.stubRight, g.teeDown, g.stubLeft));
+  set(yMin, runRow(g.stubRight, g.teeUp, g.stubLeft));
+  // The whisker arrives from above at the lid and leaves below at the floor, so
+  // the junction points the way the whisker goes.
+  set(yQ3, runRow(g.topLeft, g.teeUp, g.topRight));
+  set(yQ1, runRow(g.bottomLeft, g.teeDown, g.bottomRight));
+  set(yMed, runRow(g.teeLeft, g.horizontal, g.teeRight));
+
+  // The mean last and only where it differs — a second centre needs its own
+  // mark (C04 I53), and on an edge row it would read as a corner.
+  const punch = (r: number, glyph: string): void => {
+    if (r < 0 || r >= n) return; // cells-ok — a row index
+    const cells = [...(grid[r] ?? blank)];
+    cells[mid] = glyph; // cells-ok — a column index
+    grid[r] = cells.join("");
+  };
+  if (q.mean !== undefined && Number.isFinite(q.mean) && at(q.mean) !== yMed) punch(at(q.mean), g.diamond);
+  for (const o of q.outliers ?? []) punch(at(o), g.dotted);
+  return grid.map((r) => " ".repeat(padL) + r + " ".repeat(padR));
+}
+
+/**
  * A box plot as three rows — the UnicodePlots / YouPlot figure.
  *
  * ```

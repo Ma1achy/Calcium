@@ -1172,11 +1172,22 @@ defects. The vertical arm reaches its ramp through `ladderFor("height", caps)`,
 which is the door — a renderer names the axis it draws and never a vocabulary
 (I21, SS51). `extentFor` stays the horizontal one.
 
-**The wide arm is not the narrow arm's mirror.** U+2580–U+259F are all
-`East_Asian_Width=Ambiguous`, so neither eighths set survives a wide terminal, and
-both fall back to a single solid step. That is a rung, not an oversight: a
-vertical bar on a wide terminal is quantised to whole cells and says so by being
-blocky rather than by being wrong.
+**The wide arm is not the narrow arm's mirror, and the asymmetry is the other way
+round from what this section first claimed.** U+2580–U+259F are all
+`East_Asian_Width=Ambiguous`, so neither eighths set survives a wide terminal —
+but the two axes have different escapes, and only one of them is poor:
+
+| axis | wide arm | partials |
+|---|---|---|
+| horizontal | `extentFor` — `⣿` and `⡇` | **one**, because braille has no left-filling series |
+| vertical | `ladderFor("height")` — `⡀⣀⣄⣤⣦⣶⣷⣿` | **seven**, because braille *does* fill bottom-up |
+
+So a vertical bar on a wide terminal keeps its sub-cell precision and a horizontal
+one loses it. Measured rather than reasoned: the first version of this paragraph
+said both quantise to whole cells, and the frame said otherwise. **Braille filling
+bottom-up is exactly what made `RAMP_BRAILLE` the wrong ramp for a matrix cell**
+(§"The ramp is the density ramp") — the same property, wanted here and refused
+there, which is what it means for a vocabulary to encode an axis.
 
 ### What is not orientable, and why it is a shorter list than it looks
 
@@ -1251,7 +1262,7 @@ classification table as its own rows.
 - **I27** — **A legend costs width or a row, and only the width-costing placements may enable themselves.** A row must declare its cost before the data is visible (I1); width is already data-dependent through the gutter, so it may not. That is why `"right"` is the default and `"above"`/`"below"` are opt-in — not a preference. **Skipped entirely at `colourDepth: 1`**, where a swatch carries nothing and still takes the row.
 - **I28** — **`plotDetail` selects a renderer inside the declared height and never contributes to it**, because rows-per-band times category count is a height derived from data (I1). `"auto"` is the richest renderer the quotient affords; an explicit `"full"` that does not fit degrades to `"compact"` and reports rather than overflowing its band.
 - **I29** — **Colour carries magnitude where there is colour; the glyph is the fallback, never the lead.** A form that encodes magnitude paints the cell — a background-coloured space — at any depth that separates its values, and reaches for the density ramp only below it.
-- **I30** — **`orientation` chooses the axis, and the eighths vocabulary follows it.** Horizontal is the default because a cell is one wide by two tall and a category's name is text — a horizontal bar writes its label beside itself, a vertical one gets a column two cells wide to write it under. The partials are **left** eighths horizontally and **lower** eighths vertically; they look interchangeable, encode different axes, and the vertical arm reaches its through `ladderFor("height")` rather than naming a constant (I21). Both are ambiguous-width, so a wide terminal quantises to whole cells on either axis. A form with no second axis refuses the field at construction rather than ignoring it.
+- **I30** — **`orientation` chooses the axis, and the eighths vocabulary follows it.** Horizontal is the default because a cell is one wide by two tall and a category's name is text — a horizontal bar writes its label beside itself, a vertical one gets a column two cells wide to write it under. The partials are **left** eighths horizontally and **lower** eighths vertically; they look interchangeable, encode different axes, and the vertical arm reaches its through `ladderFor("height")` rather than naming a constant (I21). Both eighths sets are ambiguous-width, and the escapes are asymmetric: the vertical arm keeps seven partials on a wide terminal because braille fills bottom-up, and the horizontal arm has one because braille has no left-filling series. A form with no second axis refuses the field at construction rather than ignoring it.
 
 **"Separates its values" is a real threshold and it is 8-bit, not 1-bit.** C10 I31 already ruled that a continuous map below 8-bit says *nothing* — an ordering over sixteen indices whose luminances the terminal never reports, so a ramp across them is an ordering that is not one — and `continuousColour` returns `undefined` there rather than guessing. **So the ladder has four rungs, not two, and the middle one is the rung most terminals actually report**: at 24- and 8-bit colour carries and the cell is painted; **at 4-bit colour exists and cannot carry, so density does**; at 1-bit there is nothing else. The mechanism is already built — the caller falls back because the map declines — and naming the rung is what stops someone reading *any depth with colour* as *any depth at all*.
 
@@ -1322,6 +1333,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.27** (I20): exactly `width` cells at every width including 1, and the run takes the residual after the number.
 - **T1.22** (I18): a heatmap whose labels exceed the width keeps a matrix and truncates the labels; below the rung where one label cell fits, it draws a notice at its declared height and **never a matrix with no names beside it**. Asserted at five widths, because the defect was a state reachable only between two of them.
 - **T1.23** (I19): the legend's range survives a label column wide enough to have truncated it, and the drop order is asserted by rendering a row too narrow for all three parts.
+- **T1.36–T1.39** (I30): the transpose, asserted as the four things that change — the gutter numbers the value axis where it named the categories, the names move under the columns, a column fills from the bottom with the **height** ladder's partials and none of the extent's, and a form with no vertical arm throws. **T1.37 is the one worth writing first**: a column built from the left-eighths is arithmetically perfect and draws a bar chart lying on its side inside every cell.
+- **T1.40–T1.43** (I30): the box plot stood up — the lid, floor and median are **runs** rather than three cells, the box is narrower than its column so categories separate, the whisker's junction points the way the whisker goes, and the mean keeps its own mark. The first version drew three disconnected columns: the transpose of `boxplotBand` in arithmetic and not in figure.
 - **T1.31** (I10): a facet column is measured in **display cells**, not code units — four styled facets compose to exactly `width` and all four survive. **T1.32** (I10): a facet short of its column is padded rather than pulling the ones after it leftwards. **T1.33**: the composed row reaches the frame with its escapes intact and no literal residue. **T1.34** (I10): `facetWidths` distributes the remainder, so three columns of an eighty-cell row are 27/27/26 and not 26/26/26 with two dead columns. **T1.35** is the **control** — an unstyled facet composes correctly under the wrong reading too, which is why every row above uses a styled one: `padEnd` is right whenever there is nothing invisible to miscount.
 - **T1.1b** (I24): `composeRows` pads a short block and cuts a long one to `plotHeight`. **A guard whose trigger has not fired**, and the row exists because the mutation pass swapping the clamp out killed nothing: no form routed through the compositor gets the count wrong, and four outside it do — `radar` and `horizon` declare `axedFurniture` and draw none of it, `smallmultiples` and `pairplot` return whatever the facet layout produced. Kept on the asymmetry rather than on odds.
 - **T1.20** (I16, I17): the heatmap's ramp is `RAMP_DENSITY` and not `RAMP_BRAILLE` — asserted as a *difference*, because both are eight narrow braille steps and a frame drawn with the wrong one is a matrix of bar fragments that every count agrees with.

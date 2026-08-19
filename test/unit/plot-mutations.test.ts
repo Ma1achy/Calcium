@@ -10,8 +10,9 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
-import { boxplotBand } from "../../src/presentation/plot/glyph-row.js";
+import { boxplotBand, boxplotColumn } from "../../src/presentation/plot/glyph-row.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
+import { extentFor, ladderFor } from "../../src/presentation/plot/ramp.js";
 import { kde } from "../../src/presentation/plot/kde.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { horizonRows } from "../../src/presentation/plot/horizon.js";
@@ -212,6 +213,133 @@ describe("GROUP 6: facets compose rows another renderer has already painted", ()
     const rows = smallMultiplesRows(four, 80, 1, ctx, plain);
     expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
     expect(rows[0]!.padEnd(80).slice(0, 80).length).toBe(80); // cells-ok — a cell count
+  });
+});
+
+describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with it", () => {
+  const ESC = String.fromCharCode(27);
+  const plain = (b: Plot, caps = FULL_CAPS, w = 40): readonly string[] =>
+    measurable({ definitions: [plotDefinition], capabilities: caps })
+      .renderToLines(b, w)
+      .map((r) => r.replace(new RegExp(`${ESC}\\[[0-9;]*m`, "gu"), ""));
+
+  const vbar = (over: Partial<Plot> = {}): Plot =>
+    block({
+      kind: "plot", id: "vb", form: "bar", height: 7, axes: true, orientation: "vertical",
+      categories: ["a", "b", "c"], series: [{ values: [10, 25, 17] }], ...over,
+    } as Plot);
+
+  it("T1.36 (C12 I30): the gutter holds the value scale and the names run along the bottom", () => {
+    // The transpose in one assertion: horizontally the gutter names the
+    // categories, vertically it numbers the axis and the names move under the
+    // columns. A form that ignored `orientation` passes neither half.
+    const rows = plain(vbar());
+    // **The property, not the numbers.** A first version asserted `25` or `30`
+    // and the axis draws `40 / 20 / 0` — a derived bound snaps outward to the
+    // nice step (C12 I22), so naming the data's own values tests the fixture
+    // rather than the transpose.
+    const numeric = rows.filter((r) => /^\s*-?[0-9.]+\s*┤/u.test(r));
+    expect(numeric.length, "the gutter numbers the value axis").toBeGreaterThanOrEqual(2); // cells-ok — a row count
+    expect(rows.slice(-1)[0], "and the names run beneath").toMatch(/a\s+b\s+c/u);
+
+    const horizontal = plain(vbar({ orientation: "horizontal" }));
+    expect(horizontal.some((r) => /^a\s*┤/u.test(r)), "where horizontally they are the gutter").toBe(true);
+  });
+
+  it("T1.37 (C12 I30): a column fills from the bottom, with the height ladder's partials", () => {
+    // **The vocabulary is the defect this row exists for.** `▏▎▍▌▋▊▉` and
+    // `▁▂▃▄▅▆▇` are the same eighths on different axes and look interchangeable;
+    // a column built from the left-eighths would be arithmetically perfect and
+    // draw a bar chart lying on its side inside each cell.
+    const ladder = ladderFor("height", FULL_CAPS).steps;
+    const rows = plain(vbar());
+    const area = rows.slice(1, -2).join("");
+    // Some partial from the height ladder appears — the tip of a column that
+    // does not land on a cell boundary.
+    expect([...ladder.slice(0, -1)].some((g) => area.includes(g)), "a lower-eighth partial").toBe(true);
+    // And none of the horizontal extent's partials do.
+    const ext = extentFor(FULL_CAPS).partials;
+    expect(ext.some((g) => area.includes(g)), "and no left-eighth ones").toBe(false);
+    // Bottom-anchored: the last area row is the fullest.
+    const ink = (r: string): number => [...r].filter((c) => c !== " " && c !== "│" && c !== "┤").length; // cells-ok — a cell count
+    const areaRows = rows.slice(1, -2);
+    expect(ink(areaRows[areaRows.length - 1] ?? ""), "the floor row is the fullest")
+      .toBeGreaterThanOrEqual(ink(areaRows[0] ?? "")); // cells-ok — a cell count
+  });
+
+  it("T1.38 (C12 I30): a label that cannot be read whole is dropped, not sliced", () => {
+    // A histogram at nine cells per column cannot hold `[18.3, 23.1)`, and
+    // slicing produced `[18.3, 23[23.1, 28[28.0,` — three labels running
+    // together, each naming a bin it does not describe. Absent is honest.
+    const wide = vbar({ categories: ["a-very-long-name-indeed", "b", "c"] });
+    const last = plain(wide).slice(-1)[0] ?? "";
+    expect(last, "the name that does not fit is gone").not.toContain("a-very-long");
+    expect(last, "and the ones that do remain").toMatch(/b\s+c/u);
+  });
+
+  it("T1.39 (C12 I30): a form with no second axis refuses the field", () => {
+    // Refused rather than ignored: a plot that quietly drops a field is one the
+    // caller believes is showing something else.
+    expect(() => block({
+      kind: "plot", id: "p", form: "pie", height: 8, orientation: "vertical",
+      series: [], segments: [{ label: "a", value: 1 }],
+    } as Plot)).toThrow(/no vertical arm/u);
+    // And the converse, so the row is not passing on a typo in the message.
+    expect(() => vbar()).not.toThrow();
+  });
+});
+
+describe("GROUP 6c: the box plot stood up", () => {
+  const Q = { min: 1, q1: 3, median: 5, q3: 7, max: 9, mean: 5.5 } as const;
+
+  it("T1.40 (C12 I30): the lid, the floor and the median are runs, not three cells", () => {
+    // **The defect the first version had.** It wrote a glyph at the left, centre
+    // and right of each row and left the cells between blank, so the box came
+    // out as three disconnected columns — the transpose of `boxplotBand` in
+    // arithmetic and not in figure. A box's lid is a *run*.
+    const col = boxplotColumn(Q, 1, 9, 11, 11, FULL_CAPS);
+    const lid = col.find((r) => r.includes("┌")) ?? "";
+    expect(lid, "the lid joins its corners").toMatch(/┌─+┴─+┐/u);
+    const floor = col.find((r) => r.includes("└")) ?? "";
+    expect(floor, "and the floor joins its own").toMatch(/└─+┬─+┘/u);
+    const median = col.find((r) => r.includes("├")) ?? "";
+    expect(median, "and the median spans the box").toMatch(/├─+┤/u);
+  });
+
+  it("T1.41 (C12 I30): the box is narrower than its column, so categories separate", () => {
+    // Drawn to the full slot, four boxes touched and read as one object — the
+    // whole point of a categorical axis is that the categories are apart.
+    const col = boxplotColumn(Q, 1, 9, 20, 11, FULL_CAPS);
+    for (const r of col) expect(r.length).toBe(20); // cells-ok — a cell count
+    const lid = col.find((r) => r.includes("┌")) ?? "";
+    expect(lid.startsWith(" "), "a gutter on the left").toBe(true);
+    expect(lid.endsWith(" "), "and on the right").toBe(true);
+    // And it does not give up the gap until there is nothing to give.
+    const tight = boxplotColumn(Q, 1, 9, 4, 11, FULL_CAPS);
+    expect((tight.find((r) => r.includes("┌")) ?? "").trim().length).toBe(4); // cells-ok — a cell count
+  });
+
+  it("T1.42 (C12 I30): the whisker's junction points the way the whisker goes", () => {
+    // `┴` at the lid because the whisker is above it, `┬` at the floor because
+    // it is below. Reversed, the figure is arithmetically identical and reads as
+    // two boxes joined by nothing.
+    const col = boxplotColumn(Q, 1, 9, 11, 11, FULL_CAPS);
+    const lidRow = col.findIndex((r) => r.includes("┌"));
+    const floorRow = col.findIndex((r) => r.includes("└"));
+    expect(col[lidRow]).toContain("┴");
+    expect(col[floorRow]).toContain("┬");
+    // The whisker itself is between the cap and the lid, centred and vertical.
+    expect(col[lidRow - 1], "a whisker above the lid").toMatch(/^\s*│\s*$/u);
+  });
+
+  it("T1.43 (C12 I30): the mean is a distinct mark and the vertical arm keeps it", () => {
+    // C04 I53 — a second centre never shares the median's glyph. The horizontal
+    // band already asserts this; the transpose is where it would be dropped,
+    // because the median row is the obvious place to stop.
+    const col = boxplotColumn(Q, 1, 9, 11, 11, FULL_CAPS).join("");
+    expect(col).toContain("◆");
+    const noMean = boxplotColumn({ min: 1, q1: 3, median: 5, q3: 7, max: 9 }, 1, 9, 11, 11, FULL_CAPS).join("");
+    expect(noMean, "and draws none where there is none").not.toContain("◆");
   });
 });
 

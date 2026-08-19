@@ -105,6 +105,123 @@ export function densityRows(
 }
 
 /**
+ * The violin **stood up** — `violinRows` transposed (C12 I30).
+ *
+ * ```
+ *      ╭──╮
+ *     ╭╯  ╰╮
+ *    ╭╯ ┌┐ ╰╮      the box, on the spine
+ *    │  │◆│  │
+ *    ╰╮ └┘ ╭╯
+ *     ╰╮  ╭╯
+ *      ╰──╯
+ * ```
+ *
+ * **The conventional orientation, which is why it is here rather than owed.**
+ * seaborn and matplotlib both draw a violin vertically by default; the
+ * horizontal arm is the terminal's accommodation, not the chart's. The value
+ * axis runs up the rows and the density spreads across the columns, which is the
+ * same maths on the other axis and the same three traps:
+ *
+ * - **The offset is rounded once and applied both ways.** Rounding each edge
+ *   independently is not symmetric — `Math.round` breaks ties toward +∞ — and a
+ *   violin asymmetric by a cell is wrong in a way only a mirror assertion sees.
+ * - **Both edges are stroked in the same direction.** `strokePolyline` steps one
+ *   axis before the other, so a ring drawn forwards and back disagrees with
+ *   itself wherever the density changes quickly, which is where a violin is
+ *   interesting.
+ * - **No end caps**, so the tails taper into the axis instead of being stopped
+ *   by a wall.
+ */
+export function violinColumn(
+  series: Series,
+  colWidth: number,
+  rows: number,
+  caps: Caps,
+  quartiles?: QuartileSummary,
+  corners: "rounded" | "sharp" = "rounded",
+): readonly string[] {
+  const w = Math.max(1, Math.floor(colWidth));
+  const n = Math.max(1, Math.floor(rows));
+  const blank = (): readonly string[] => Array.from({ length: n }, () => " ".repeat(w));
+
+  const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
+  if (finite.length === 0) return blank(); // cells-ok — a sample count
+
+  const sorted = [...finite].sort((a, b) => a - b);
+  const lo = sorted[0]!;
+  const hi = sorted[sorted.length - 1]!; // cells-ok — a sample count
+  const pad = (hi - lo) * 0.1 || 1;
+  // Sampled up the rows: row 0 is the top, so the highest value is sampled first.
+  const points: number[] = [];
+  for (let r = 0; r < n; r += 1) {
+    points.push(hi + pad - ((hi - lo + 2 * pad) * r) / Math.max(1, n - 1));
+  }
+  const densities = kde(finite, points);
+  const maxD = Math.max(...densities);
+  if (maxD <= 0) return blank();
+
+  // Two columns is the floor for an outline: a left and a right edge sharing a
+  // column are one line and say nothing about width.
+  if (w < 2) { // cells-ok — a column count
+    const pair = pairFor(caps);
+    return densities.map((d) => (d / maxD > 0.05 ? pair.filled : " "));
+  }
+
+  const left0 = Math.floor((w - 1) / 2); // cells-ok — a column index
+  const right0 = Math.ceil((w - 1) / 2); // cells-ok — a column index
+  const half = Math.max(1, Math.floor(w / 2)); // cells-ok — a column count
+  const midCol = (w - 1) / 2; // cells-ok — a column index
+  const edge = (r: number, sign: number): number => {
+    const off = Math.round((densities[r]! / maxD) * half);
+    const c = sign < 0 ? left0 - off : right0 + off;
+    return Math.max(0, Math.min(w - 1, c)); // cells-ok — a column index
+  };
+
+  const mask: number[][] = Array.from({ length: n }, () => new Array<number>(w).fill(0));
+  const leftEdge: [number, number][] = [];
+  const rightEdge: [number, number][] = [];
+  for (let r = 0; r < n; r += 1) {
+    leftEdge.push([edge(r, -1), r]);
+    rightEdge.push([edge(r, 1), r]);
+  }
+  strokePolyline(mask, leftEdge, false);
+  strokePolyline(mask, rightEdge, false);
+
+  const spineCol = Math.round(midCol); // cells-ok — a column index
+  const gl = glyphs(caps);
+
+  // The spine is a full-height rule drawn under the outline, for the two reasons
+  // its horizontal twin has: a summary mark in a tail would otherwise float on a
+  // cell with nothing under it, and an outline cell carrying one edge bit
+  // renders as a stub rather than joining its neighbour.
+  const grid: string[][] = mask.map((row) =>
+    row.map((m, x) => {
+      const g = glyphForMask(m, corners, caps);
+      return g === " " && x === spineCol ? gl.vertical : g;
+    }),
+  );
+
+  if (quartiles !== undefined) {
+    const span = hi - lo + 2 * pad;
+    const at = (v: number): number =>
+      Math.max(0, Math.min(n - 1, n - 1 - Math.round(((v - (lo - pad)) / (span || 1)) * (n - 1)))); // cells-ok — a row index
+    const put = (r: number, ch: string): void => {
+      if (r >= 0 && r < n) grid[r]![spineCol] = ch; // cells-ok — a row index
+    };
+    put(at(quartiles.q1), gl.horizontal);
+    put(at(quartiles.q3), gl.horizontal);
+    put(at(quartiles.median), gl.teeRight);
+    if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
+      const rm = at(quartiles.mean);
+      if (rm !== at(quartiles.median)) put(rm, gl.diamond);
+    }
+  }
+
+  return grid.map((r) => r.join(""));
+}
+
+/**
  * A violin — the density's **outline**, mirrored about a centre line.
  *
  * ```

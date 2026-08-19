@@ -210,6 +210,50 @@ function checkPlotFormat(plot: Plot): void {
 }
 
 /** Every shape check that applies to a block, by kind. */
+/**
+ * Which forms have a second axis to run along (C12 §3j, C12 I30).
+ *
+ * **Total over `PlotForm`, so a new member declares.** A `Partial` answers
+ * `undefined` for a form it has never heard of, and the natural reading of
+ * `undefined` here is *not orientable* — so a thirty-fifth form would refuse the
+ * field it might well want, silently, and the table would look complete.
+ *
+ * The `false` entries each have a reason and they are not the same reason: the
+ * matrix family has two real axes already, `pie` and `radar` have none, and a
+ * `gantt` bar *is* a time interval so its long axis is not a choice. The five
+ * glyph-row forms are orientable in principle and their vertical arm is a
+ * separate renderer nobody has asked for — recorded as unbuilt rather than
+ * unbuildable.
+ */
+const ORIENTABLE: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
+  bar: true, histogram: true, boxplot: true, violin: true,
+  // Not built: each needs its own column renderer and none was asked for.
+  lollipop: false, dotplot: false, funnel: false, dumbbell: false, forest: false,
+  ridgeline: false, flame: false, icicle: false,
+  // Horizontal by construction — the bar is an interval on a time axis.
+  gantt: false, waterfall: false,
+  // Two axes already.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false,
+  // No cartesian axes at all.
+  pie: false, radar: false, waffle: false,
+  // A shared scale along one axis; transposing is `plotStyle`'s question, not this.
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  density: false, streamgraph: false, horizon: false,
+  // Composition — each facet answers for itself.
+  smallmultiples: false, pairplot: false,
+});
+
+function checkOrientation(plot: Plot): void {
+  if (plot.orientation === undefined || plot.orientation === "horizontal") return;
+  if (ORIENTABLE[plot.form]) return;
+  throw new BlockShapeError(
+    `plot "${plot.id}": form "${plot.form}" has no vertical arm (C12 I30) — ` +
+      `refused rather than ignored, because a plot that quietly drops a field is ` +
+      `one the caller believes is showing something else`,
+  );
+}
+
 function checkShape(block: Block): void {
   switch (block.kind) {
     case "notice":
@@ -219,6 +263,7 @@ function checkShape(block: Block): void {
       checkHeatmap(block);
       checkPlotHeight(block);
       checkPlotFormat(block);
+      checkOrientation(block);
       break;
     case "table":
       for (const row of block.rows) {

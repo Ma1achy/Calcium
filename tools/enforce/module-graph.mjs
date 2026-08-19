@@ -1548,13 +1548,13 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // three different claims about the data and a diverging map used for
   // sequential data hides the sign — but that is a fact about the field, not a
   // reason for a row the list would have to keep forever.
-  "Axis.ticks":
-    "**consumed inside its own module, which is where the decision belongs.** `yLabels` reads " +
-    "it to place each label on the row its value falls on; `definition.ts` takes only `range`, " +
-    "because a caller outside the axis has no business knowing where the marks are. MG24 counts " +
-    "names *outside the declaring file* and is right that no other file names it — the answer " +
-    "is that no other file should. It would gain a consumer the day an x-axis picks its own " +
-    "ticks, which is the algorithm this pass named and did not build (C12 \u00a73d)",
+  // **`Axis.ticks` was here and its exemption named its own expiry**: *it would
+  // gain a consumer the day an x-axis picks its own ticks*. An x-axis now does —
+  // `xAxis()` returns `tickColumns` and `frameBottom` marks the rule with them —
+  // so MG24 reported the entry as outliving its reason, on the commit that met
+  // the condition rather than whenever someone next read the list. That is the
+  // deferral-expiry pattern working for once, and it worked because the entry
+  // stated the blocker as something checkable instead of as "for now".
   "Ladder.serves":
     "**consumed by the type checker rather than by a statement.** `LADDERS` is a mapped type " +
     "over the axis and `LadderOf<E>` reads `Record<E, true>`, so a ladder under the wrong key " +

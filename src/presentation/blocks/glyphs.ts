@@ -46,11 +46,19 @@ export type GlyphSet = Readonly<{
    * edges; `stubDown`/`stubUp` are a whisker's end cap on a row with no
    * horizontal run to join. ASCII collapses all four, which is what makes the
    * figure survive C09 I22 rather than depending on it.
+   *
+   * **`stubLeft`/`stubRight` are the same pair rotated**, and they arrived with
+   * the vertical box plot (C12 I30): a whisker running *up* ends in a cap that is
+   * a horizontal stub, and the vertical pair cannot spell it. Two slots rather
+   * than reusing `horizontal`, because a bare `─` at a whisker's end is
+   * indistinguishable from a run that continues.
    */
   teeDown: string;
   teeUp: string;
   stubDown: string;
   stubUp: string;
+  stubLeft: string;
+  stubRight: string;
   /** A second centre that must never share the median's glyph (C04 I53). */
   diamond: string;
   teeLeft: string;
@@ -96,6 +104,8 @@ const UNICODE: GlyphSet = Object.freeze({
   teeUp: "┴",
   stubDown: "╷",
   stubUp: "╵",
+  stubLeft: "╴",
+  stubRight: "╶",
   diamond: "◆",
   teeLeft: "├",
   teeRight: "┤",
@@ -126,6 +136,8 @@ const ASCII: GlyphSet = Object.freeze({
   teeUp: "+",
   stubDown: "|",
   stubUp: "|",
+  stubLeft: "-",
+  stubRight: "-",
   diamond: "x",
   teeLeft: "+",
   teeRight: "+",

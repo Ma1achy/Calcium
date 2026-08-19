@@ -396,10 +396,11 @@ function plot(
     plotStyle?: Plot["plotStyle"];
     plotDetail?: Plot["plotDetail"];
     plotCorners?: Plot["plotCorners"];
+    orientation?: Plot["orientation"];
     palette?: Plot["palette"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotDetail, plotCorners, palette } =
+  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, plotDetail, plotCorners, orientation, palette } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -427,6 +428,7 @@ function plot(
       ...(plotStyle === undefined ? {} : { plotStyle }),
       ...(plotDetail === undefined ? {} : { plotDetail }),
       ...(plotCorners === undefined ? {} : { plotCorners }),
+      ...(orientation === undefined ? {} : { orientation }),
       ...(palette === undefined ? {} : { palette }),
     } as Plot,
     spec,

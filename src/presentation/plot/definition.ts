@@ -31,21 +31,24 @@ import {
   areaText,
   bandLayout,
   composeRows,
+  frameBottom,
+  frameTop,
   furnitureFor,
   gutterSpans,
   line,
   rightBorder,
+  xLabelRowFor,
   type Layout,
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { sparkline } from "./sparkline.js";
 import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
-import { boxplotBand, forestRow, dumbbellRow } from "./glyph-row.js";
-import { barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
+import { boxplotBand, boxplotColumn, forestRow, dumbbellRow } from "./glyph-row.js";
+import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
-import { densitySeries, densityRows, violinRows, ridgeRows } from "./kde.js";
+import { densitySeries, densityRows, violinColumn, violinRows, ridgeRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
 import { horizonRows } from "./horizon.js";
@@ -588,6 +591,130 @@ function categoricalForm(
   return axed(block, out, layout, ctx);
 }
 
+/**
+ * A categorical form drawn **down the columns** — `categoricalForm` transposed.
+ *
+ * **A separate function rather than a flag, because almost nothing is shared.**
+ * `categoricalForm` is row-major to its bones: it walks `areaRows`, takes one
+ * category per row, and writes the name in the gutter. Transposing it means the
+ * gutter holds the *value* scale, the names move under the columns, and the
+ * builder returns a column of rows instead of a row of cells. A flag threaded
+ * through that is two renderers sharing a name.
+ *
+ * What *is* shared is the layout: a vertical bar chart has a value axis on the
+ * left exactly as a line chart does, so it takes `layoutFor` rather than
+ * `bandLayout` and the y-labels come out right without a second implementation.
+ *
+ * `block.categories` becomes `xLabels`' job — the names run along the bottom,
+ * which is C12 §3j's whole argument for the orientation existing: an ordered
+ * category axis reads left-to-right and a horizontal bar chart runs it downwards.
+ */
+function categoricalColumnForm(
+  block: Plot,
+  width: number,
+  ctx: RenderContext,
+  columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number) => readonly string[],
+): readonly string[] {
+  const cats = block.categories ?? [];
+  const n = cats.length; // cells-ok — a category count
+  const areaRows = plotAreaRows(block);
+  const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (n === 0) return emptyRows(block, fallback, ctx);
+
+  const data = seriesRange(block.series, block);
+  if (data === null) return emptyRows(block, fallback, ctx);
+  // A bar's baseline is zero unless the data goes below it — the same rule
+  // `barRow` takes, and the reason `[10, 25, 15]` used to draw nothing at 10.
+  const zeroed = { min: baselineFor(data.min), max: data.max };
+  const range = axisFor(zeroed, ticksFor(areaRows), block, block.yScale).range;
+  const layout = layoutFor(block, range, width, false, ctx.capabilities) ?? fallback;
+
+  // Columns divide the area, remainder distributed left to right — the same
+  // arithmetic `facetWidths` uses, and for the same reason: `floor(w / n)` times
+  // n leaves a ragged edge at every width the count does not divide.
+  const base = Math.max(1, Math.floor(layout.areaWidth / n)); // cells-ok — a column width
+  const extra = layout.areaWidth - base * n; // cells-ok — a column width
+  const widths = Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0)); // cells-ok — a column width
+
+  const columns = widths.map((cw, i) => columnBuilder(i, cw, areaRows, range.min, range.max));
+
+  // The value scale in the gutter, placed exactly as `overlaidRows` places it —
+  // one implementation of *which row carries which label*, and the scale and the
+  // capability both passed, which is the pair §3f names.
+  const byRow = new Map(
+    (layout.labelColumn === 0
+      ? []
+      : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
+    ).map((l) => [l.row, l.text]),
+  );
+
+  const out: string[] = [];
+  for (let r = 0; r < areaRows; r += 1) {
+    const spans: Span[] = [...gutterSpans(byRow.get(r) ?? "", layout, ctx)];
+    for (const [i, col] of columns.entries()) {
+      const ref = CATEGORY_REFS[i % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a category index
+      spans.push({ text: col[r] ?? " ".repeat(widths[i]!), style: slot(ref, ctx.theme, ctx.capabilities) });
+    }
+    spans.push(...rightBorder(layout, ctx));
+    out.push(line(spans, layout, ctx));
+  }
+  if (block.axes !== true) return composeRows(plotHeight(block), [], out, []);
+  // The frame composed here rather than through `axed`, because `furnitureFor`
+  // derives its label row from `block.xLabels` and this form's labels are one
+  // per column — a shape that tuple cannot hold.
+  const { row, ticks } = columnLabels(cats, widths, ctx.capabilities);
+  return composeRows(
+    plotHeight(block),
+    [frameTop(layout, ctx)],
+    out,
+    [frameBottom(layout, ticks, ctx), xLabelRowFor(row, layout, ctx)],
+  );
+}
+
+/**
+ * The category names under their columns, and the ones that would collide dropped.
+ *
+ * **`xLabels` is the wrong shape and cannot be made right.** It is a fixed
+ * three-tuple for a left/centre/right caption, so handing it one name per column
+ * centres the whole composed string and truncates it — the first frame drew
+ * `mon        tue      …` for seven categories. So this composes the row and
+ * `categoricalColumnForm` hands it to `xLabelRowFor` directly.
+ *
+ * **Dropped rather than truncated, which is the part that matters.** A histogram
+ * at nine cells per column cannot hold `[18.3, 23.1)`, and slicing it produced
+ * `[18.3, 23[23.1, 28[28.0,` — three labels running together, each naming a bin
+ * it does not describe. A label that cannot be read whole is worse than absent,
+ * because absent is honest. Walking left to right and keeping a name only where
+ * it fits *and* clears the last one is what every plotting library does with a
+ * crowded axis, and it degrades to the two ends rather than to mush.
+ *
+ * Returns the row and the columns that got a tick, so the rule beneath is marked
+ * where a name actually is.
+ */
+function columnLabels(
+  cats: readonly string[],
+  widths: readonly number[],
+  caps: RenderContext["capabilities"],
+): { readonly row: string; readonly ticks: readonly number[] } {
+  const ambiguous = caps.ambiguousWidth;
+  let row = "";
+  const ticks: number[] = [];
+  let x = 0; // cells-ok — a column position
+  for (const [i, w] of widths.entries()) {
+    const name = cats[i] ?? "";
+    const nw = cells(name, ambiguous);
+    const centre = x + Math.floor(w / 2); // cells-ok — a column position
+    // Fits in its own column, and starts at or after where the row already ends.
+    const start = centre - Math.floor(nw / 2); // cells-ok — a column position
+    if (nw > 0 && nw <= w && start >= cells(row, ambiguous)) {
+      row += " ".repeat(start - cells(row, ambiguous)) + name;
+      ticks.push(centre);
+    }
+    x += w; // cells-ok — a column width
+  }
+  return { row, ticks };
+}
+
 function positionalForm(
   block: Plot,
   width: number,
@@ -753,6 +880,14 @@ const FORM_ROWS: Readonly<
         barRow(ordered[oi++] ?? null, base, data.max, aw, ctx.capabilities, true, block.yFormat),
       );
     }
+    // **Vertical is a different renderer, not a flag** (C12 §3j). The gutter holds
+    // the value scale instead of the names, the names run along the bottom, and
+    // the eighths fill from the cell's bottom rather than its left.
+    if (block.orientation === "vertical") {
+      return categoricalColumnForm(block, width, ctx, (i, cw, rows, lo, hi) =>
+        barColumn(block.series[0]?.values[i] ?? null, lo, hi, cw, rows, ctx.capabilities),
+      );
+    }
     let ri = 0;
     const base = baselineFor(data.min);
     return categoricalForm(block, width, ctx, (_label, aw) => {
@@ -763,10 +898,23 @@ const FORM_ROWS: Readonly<
   histogram: (block, width, ctx) => {
     const s = block.series[0];
     if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    const { labels, counts } = binValues(s.values, block.binning ?? "sturges");
+    const { labels, counts, edges } = binValues(s.values, block.binning ?? "sturges");
     if (counts.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx); // cells-ok — a bin count
     const maxCount = Math.max(...counts);
-    const histBlock = { ...block, categories: labels };
+    const histBlock = { ...block, categories: labels, series: [{ values: counts }] };
+    // **A histogram is the form vertical was asked for.** Its bins are ordered
+    // and its labels are half-open intervals — `[15.4, 24.1)` reads along a
+    // bottom axis and is unreadable stacked down a gutter.
+    if (block.orientation === "vertical") {
+      // The bin's **lower edge**, not its interval: `[18.3, 23.1)` needs twelve
+      // cells and a column of a nine-bin histogram at 80 has nine, so every
+      // label was dropped and the axis came back blank. The boundary is what a
+      // bottom axis names.
+      const edged = { ...histBlock, categories: edges.slice(0, counts.length).map((e) => e.trim()) }; // cells-ok — a bin count
+      return categoricalColumnForm(edged, width, ctx, (i, cw, rows, lo, hi) =>
+        barColumn(counts[i] ?? 0, lo, hi, cw, rows, ctx.capabilities),
+      );
+    }
     let ci = 0;
     return categoricalForm(histBlock, width, ctx, (_label, aw) =>
       barRow(counts[ci++] ?? 0, 0, maxCount, aw, ctx.capabilities, true),
@@ -781,6 +929,18 @@ const FORM_ROWS: Readonly<
       hi = Math.max(hi, q.max, ...(q.outliers ?? []));
     }
     const cats = block.categories ?? qs.map((_q, i) => `series ${String(i + 1)}`);
+    if (block.orientation === "vertical") {
+      // The same figure stood up: one column band per category, the value scale
+      // in the gutter, and `boxplotColumn`'s three columns where the horizontal
+      // table has three rows.
+      const boxed = { ...block, categories: cats, yMin: lo, yMax: hi };
+      return categoricalColumnForm(boxed, width, ctx, (i, cw, rows, low, high) => {
+        const q = qs[i];
+        return q
+          ? boxplotColumn(q, low, high, cw, rows, ctx.capabilities)
+          : Array.from({ length: rows }, () => " ".repeat(cw));
+      });
+    }
     return bandedForm(block, cats, width, ctx, (_sr, aw, rows, i) => {
       const q = qs[i];
       return q
@@ -955,6 +1115,20 @@ const FORM_ROWS: Readonly<
   violin: (block, width, ctx) => {
     const cats = block.categories ?? block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
     const qs = block.quartiles ?? [];
+    if (block.orientation === "vertical") {
+      // **The conventional orientation**: seaborn and matplotlib both draw a
+      // violin this way and the horizontal arm is the terminal's accommodation.
+      // The value axis is shared across the categories, so the gutter numbers it
+      // once and each column is a distribution on that same scale — which is the
+      // comparison a violin plot exists to make and the horizontal arm gives up
+      // by scaling every band to itself.
+      return categoricalColumnForm({ ...block, categories: cats }, width, ctx, (i, cw, rows) => {
+        const sr = block.series[i];
+        return sr
+          ? violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded")
+          : Array.from({ length: rows }, () => " ".repeat(cw));
+      });
+    }
     return bandedForm(block, cats, width, ctx, (sr, aw, rows, i) =>
       violinRows(sr, aw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded"),
     );

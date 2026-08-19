@@ -13,7 +13,7 @@
  */
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import { extentFor, extentRun, pairFor } from "./ramp.js";
+import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
 import { categoryMarks } from "./marks.js";
 import { formatReadout } from "./axes.js";
 import type { Plot } from "../../data/viewmodel/index.js";
@@ -66,6 +66,57 @@ export function barRow(
   const run = extentRun(t, barWidth, ext);
   const pad = " ".repeat(Math.max(0, barWidth - cells(run, caps.ambiguousWidth)));
   return (run + pad + label).slice(0, w);
+}
+
+/**
+ * One **column** of a vertical bar chart, top row first.
+ *
+ * The horizontal bar's transpose, and the vocabulary transposes with it (C12 I30):
+ * `barRow` fills from the left with `extentFor`'s left-eighths, this fills from
+ * the bottom with the **height** ladder's lower-eighths. They look
+ * interchangeable and encode different axes, which is the mismatch `ramp.ts` was
+ * written about.
+ *
+ * **`ladderFor("height", caps)` rather than `RAMP_UNICODE`.** A renderer names
+ * the axis it draws and never a vocabulary (C12 I21, SS51), and this is the one
+ * place in the component where the two ramps are a step apart in meaning and
+ * identical to the eye.
+ *
+ * Returns exactly `rows` strings of exactly `width` cells each.
+ */
+export function barColumn(
+  value: number | null,
+  min: number,
+  max: number,
+  width: number,
+  rows: number,
+  caps: Caps,
+): readonly string[] {
+  const w = Math.max(1, Math.floor(width));
+  const h = Math.max(1, Math.floor(rows));
+  const blank = " ".repeat(w);
+  if (value === null || !Number.isFinite(value)) return Array.from({ length: h }, () => blank);
+
+  const span = max - min;
+  const t = span <= 0 ? (value > min ? 1 : 0) : (value - min) / span;
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+
+  const ladder = ladderFor("height", caps);
+  const steps = ladder.steps;
+  const top = steps[steps.length - 1] ?? "#"; // cells-ok — a ladder length
+  // Height in eighths of a cell, then split into whole cells and a remainder.
+  const eighths = Math.round(clamped * h * (steps.length)); // cells-ok — a ladder length
+  const whole = Math.floor(eighths / steps.length); // cells-ok — a ladder length
+  const part = eighths % steps.length; // cells-ok — a ladder length
+
+  const out: string[] = [];
+  for (let r = 0; r < h; r += 1) {
+    const fromBottom = h - 1 - r; // cells-ok — a row index
+    if (fromBottom < whole) out.push(top.repeat(w));
+    else if (fromBottom === whole && part > 0) out.push((steps[part - 1] ?? top).repeat(w)); // cells-ok — a ladder index
+    else out.push(blank);
+  }
+  return out;
 }
 
 /**
@@ -169,15 +220,15 @@ export function binValues(
   values: readonly (number | null)[],
   method: "sturges" | "freedman-diaconis" | "scott" = "sturges",
   maxBins = 40,
-): { labels: string[]; counts: number[] } {
+): { labels: string[]; counts: number[]; edges: string[] } {
   const finite = values.filter((v): v is number => v !== null && Number.isFinite(v));
-  if (finite.length === 0) return { labels: [], counts: [] }; // cells-ok — a sample count
+  if (finite.length === 0) return { labels: [], counts: [], edges: [] }; // cells-ok — a sample count
 
   const sorted = [...finite].sort((a, b) => a - b);
   const n = sorted.length; // cells-ok — a sample count
   const lo = sorted[0]!;
   const hi = sorted[n - 1]!;
-  if (lo === hi) return { labels: [String(lo)], counts: [n] };
+  if (lo === hi) return { labels: [String(lo)], counts: [n], edges: [String(lo), String(lo)] };
 
   let binCount: number;
   if (method === "freedman-diaconis") {
@@ -209,6 +260,11 @@ export function binValues(
   //
   // Decimal-aligned by padding the left number, so a column of intervals reads
   // down its own separator rather than ragged.
+  // **The edges are returned as well as consumed** (C12 I30). A vertical
+  // histogram labels its bottom axis with the *boundary* rather than the
+  // interval: `[18.3, 23.1)` needs twelve cells and a nine-cell column drops it,
+  // so the axis came back empty. `18.3` under the column's left edge is what
+  // matplotlib draws and what the width affords.
   const places = binPlaces(binWidth);
   const edges: string[] = [];
   for (let i = 0; i <= binCount; i++) edges.push((lo + i * binWidth).toFixed(places));
@@ -225,7 +281,7 @@ export function binValues(
     if (bin >= 0 && bin < binCount) counts[bin] = (counts[bin] ?? 0) + 1;
   }
 
-  return { labels, counts };
+  return { labels, counts, edges };
 }
 
 /**

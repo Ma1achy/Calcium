@@ -662,6 +662,25 @@ export type Plot = Readonly<{
   plotDetail?: "auto" | "compact" | "full";
   plotStyle?: "auto" | "braille" | "line";
   plotCorners?: "rounded" | "sharp";
+  /**
+   * Which axis a categorical or distribution form runs along (C12 §3j, C12 I30).
+   *
+   * **`"horizontal"` is the default and it is a terminal's answer, not a
+   * chart's.** A cell is about twice as tall as it is wide and a category's name
+   * is text, so a horizontal bar gets its name written beside it in full while a
+   * vertical one gets a column two or three cells wide to write it under. That
+   * is why every terminal plotting library defaults this way and matplotlib does
+   * not.
+   *
+   * Vertical is what a caller wants when the categories are **ordered** — a
+   * histogram's bins, a month of readings — because a horizontal bar chart runs
+   * its category axis top-to-bottom and time does not go that way.
+   *
+   * A form with no second axis refuses it at construction rather than ignoring
+   * it: a plot that quietly drops a field is one the caller believes is showing
+   * something else.
+   */
+  orientation?: "horizontal" | "vertical";
   palette?: string;
 }> & Gap;
 
