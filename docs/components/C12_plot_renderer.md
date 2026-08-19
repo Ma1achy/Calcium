@@ -1446,11 +1446,120 @@ A boxplot at one row per category cannot show a mean; at three it is the referen
 violin needs five before an outline and its box overlay are both legible. Both wants are real
 and neither should cost the caller arithmetic.
 
+**Four rungs, and every one adds information rather than resolution.** That is the test a
+rung has to pass: a figure that says the same thing larger is not a rung, it is a bigger
+drawing.
+
+```
+1 row  / 1 col     box only
+2 rows / 3 cols    half-violin + box            the raincloud
+3 rows / 4 cols    + raw jittered strip         the full raincloud
+5+ rows            mirrored outline + box       the classic violin
+```
+
 | form | `"compact"` | `"full"` |
 |---|---|---|
 | `boxplot` | 1 row — whiskers, box, median, mean | 3 rows |
-| `violin` | 2 rows — mirrored outline | 5+ rows, with the box overlaid |
+| `violin` | 2 rows — half-violin over the box | 5+ rows, mirrored outline with the box overlaid |
 | `ridgeline` | 1 row per series | 3+ rows per series, overlapping |
+
+**`"compact"` is the lowest rung the *form* has, not one row for everything.** A box plot's
+lowest rung is one row; a violin's is two, because a violin with no density is a box plot
+and the field said `violin`.
+
+### The mirror is what the raincloud spends
+
+A classic violin is symmetric about its spine, and **the mirror carries no information** —
+it is the same estimate reflected. Dropping it buys the summary row for free, which is the
+whole of why two rows can hold what five hold. This is the raincloud (Allen et al. 2019)
+rather than an abbreviation invented here.
+
+```
+   ⣀⣤⣶⣿⣿⣿⣶⣤⣀                      row 0   density, one-sided, growing away from the box
+ ├──┤████│████├──┤  ▪ ▪            row 1   the compact box, unchanged
+```
+
+### The budgets are asymmetric, and it is the cell's aspect showing through
+
+| form | horizontal | vertical |
+|---|---|---|
+| box plot | 1 row | 1 column |
+| violin | 2 rows | 3 columns |
+
+A vertical violin in two columns is four dot-columns split between the density and the box —
+too coarse to carry a shape, so it would draw a flat bar and call it a distribution.
+
+**Refuse below the floor; degrade above it**, and the two are not in tension because they
+have different subjects. The budget is about *whether the form has room at all* and is
+refused at construction (C04 I56). `plotDetail` is about *which renderer fits the room there
+is*, and an explicit `"full"` that does not fit degrades. A caller who declares a height
+below the floor has asked for a picture that cannot exist; a caller who declares `"full"` in
+four rows has asked for the best available, which is a request the renderer can honour.
+
+### The two density ramps, which are not one ramp
+
+**A vertical form reaching for the height ramp is the encoding mismatch I21 exists to make
+unspellable**, and it is reachable here because the raincloud draws density on both axes:
+
+| the density grows | the axis | the ramp |
+|---|---|---|
+| horizontal band, growing **up** | `height` | `⠀ ⣀ ⣤ ⣶ ⣿` — five levels, a cell is four dots tall |
+| vertical band, growing **sideways** | `column` | `⠀ ⢸ ⣿` — three levels, a cell is two dots wide |
+
+Two cells of the column ramp give five levels filling right-to-left — `⠀⠀ · ⠀⢸ · ⠀⣿ ·
+⢸⣿ · ⣿⣿` — which is why the vertical budget is three columns and not two: two would be
+four dot-columns for the density *and* the box.
+
+### The stub always points toward the whisker
+
+**One rule, and both glyph tables fall out of it.** The tables are what a reader sees and
+the rule is what makes them derivable rather than memorised — and the vertical arm was
+written by re-deriving it, which is the case for stating it once.
+
+```
+horizontal    ▪  ├──────────┤████████████│███████████├────────────┤  ▪ ▪
+                min        Q1          median       Q3           max
+
+              ├  min cap    stub points RIGHT, toward the whisker
+              ─  whisker
+              ┤  Q1         stub points LEFT, toward the whisker
+              █  IQR
+              │  median
+              ├  Q3         stub points RIGHT, toward the whisker
+              ┤  max cap    stub points LEFT, toward the whisker
+              ▪  outlier
+              ◆  mean, overlaid where it falls  (◈ where it falls on the median)
+
+vertical      ▪    outlier
+              ┬    max cap  stub points DOWN, toward the whisker
+              │    whisker
+              ┴    Q3       stub points UP, toward the whisker
+              █    IQR
+              ─    median
+              █    IQR
+              ┬    Q1       stub points DOWN
+              │    whisker
+              ┴    min cap  stub points UP
+              ▪    outlier
+```
+
+`┬`/`┴` and `├`/`┤` swap roles between the caps and the box edges, which reads as arbitrary
+and is not: a cap's whisker leaves *inward* and a box edge's whisker leaves *outward*, so
+the same rule points them opposite ways.
+
+**ASCII collapses what it cannot spell and the figure still reads**, because the rule
+survives the alphabet:
+
+```
+horizontal    *  |----------[============+===========]------------|  * *
+vertical      *  +  |  +  #  #  -  #  #  +  |  +  *      (top to bottom)
+```
+
+**The compact box is filled where the three-row box is hollow.** With a lid and a floor the
+interquartile range is enclosed and the interior must stay clear so the median and the mean
+are legible inside it; with one row there are no edges, and `┤    │    ├` is two tees, a
+rule, and nothing saying those cells are the box.
+
 
 **`plotDetail` selects a renderer inside the declared height; it never contributes to it.**
 That is forced, not chosen: rows-per-band times category count derives height from the data,
@@ -1460,10 +1569,10 @@ category count and the mode picks which renderer fits the quotient.
 **So `"auto"` means the richest form the declared height affords** — and a caller who wrote
 `height: 12` for four categories gets full boxplots without having asked for them.
 
-**An explicit `"full"` under an insufficient budget degrades to compact and says so.** Silently
-drawing three rows into a one-row band is the class this component keeps having; the
-interaction is three-way — declared height, mode, category count — and belongs in the
-classification table as its own rows.
+**An explicit `"full"` under an insufficient budget degrades to the richest rung that fits,
+and says so.** Silently drawing three rows into a one-row band is the class this component
+keeps having; the interaction is four-way now — declared height, mode, category count and
+orientation — and belongs in the classification table as its own rows.
 
 ---
 
@@ -1491,7 +1600,7 @@ classification table as its own rows.
 - **I18** — **A heatmap spends width on columns first, then truncates its labels, and never draws an unlabelled matrix.** Row labels are the ordinate: a matrix with no names beside it is a picture of numbers. Where the width cannot spare a cell for a label beside a minimum plot area the block draws a centred notice at its declared height instead — I1 holds, and the reader is told rather than shown something they cannot read. *The line form keeps T3.3's opposite ladder, because a y-label is a scale and a row label is an identity.*
 - **I19** — **The scale legend spans the full row and never truncates its range.** The dropped-column clause goes first and the ramp swatch second; the range is what the legend exists to state, and it is the reason `axes: false` is refused (C04 I50b). A key with no scale beside it is decoration.
 - **I20** — **A value bar encodes `fill`: the run is the axis, the fill clamps at the scale's top and the number does not, and an absent value draws a mark.** One row of exactly `width` cells, so a cell holding one is the same height as a cell without (I13's rule for the other cell form). **An empty run is a legible value** — it reads as *zero* — which is why absence is a mark here where it is a blank in a grid: the same question answered per geometry, which is the encoding rule applied to absence rather than to magnitude.
-- **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density and fill are three encodings and `position` is a fourth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
+- **I21** — **A vocabulary declares the axis it encodes, a renderer names an axis rather than a ramp, and a ladder that serves an axis it does not equal says so.** Height, density, fill and **column** are four encodings and `position` is a fifth with no vocabulary at all — the unicode line reaches for no ramp because its axis is the grid. **`column` is the one a shape can force**: a braille cell is two dots wide and four tall, so density growing *sideways* has three states per cell where density growing *up* has five, and a vertical raincloud reaching for the height ramp would draw a five-step scale on a three-step axis (§3i). **The mismatch is unspellable rather than checked**: `LADDERS` is keyed by axis and typed to return that axis, so a ladder of the wrong one does not compile, and a source scan forbids reading a ramp constant outside `ramp.ts` because importing one directly is the move that produced the defect. `substitutes` is a field and not a comment: `RAMP_ASCII` *is* density and *stands in for* height, and losing that distinction is what cost two defects.
 - **I22** — **An axis picks nice numbers, snaps a derived bound outward, never moves a declared one, and drops a tick that would abut its neighbour.** The step is 1, 2, 2.5, 5 or 10 times a power of ten — 2.5 is in the set because without it `0 · 25 · 50 · 75 · 100` is unreachable. **The snap is per end** (C04 I29): loose labelling exists so the ends read round and a pinned axis exists so two plots can be compared, so a pin that silently grew would defeat what it is for. **Precision is one per axis and comes from the step** — the smallest gap two labels can differ by — and it is the step's *own* decimals rather than two significant figures of it, and a named precision is **kept in the string** rather than trimmed back into three (F177). **The tick count is a result**, bounded below by how fine a step is worth asking for and above by how many labels the height seats two rows apart. **And a step the arithmetic cannot pick is `0`**, never a plausible constant: a denormal span underflows, and `1` there snaps `5e-324 … 1e-323` to `0 … 1`, which terminates and is wrong where nothing downstream can detect it (F178).
 - **I23** — **An annotation is a dashed line in the same raster, drawn behind the data, and an edge outside the range is dropped rather than clamped.** Dashed is the carrier and the tone is decoration (F34): a reference line is broken where a curve is continuous, at every colour depth. **A band is two lines** — one statement, two edges — because a fill would compete for the cells the curve occupies. **Behind, and the layer order is the rule**: one that overwrote a sample would hide what it exists to be compared against. **Dropped rather than clamped is the one place this differs from a sample** (C04 I29): data pressed against a ceiling is honest, and a claim about *where a value sits* moved onto a scale it is outside is not. **At ASCII it is not the raster** — `foldRamp` encodes height, and folding a one-dot line by ink weight drew `# # # #`, heavier than the curve; there the line is drawn at cell resolution with `-`, which is narrow under both width conventions where every box-drawing dash is not.
 - **I24** — **One compositor owns the gutter, the frame and the legend, and it asserts its own row count.** Four independent gutter implementations is what produced a y-axis that is not straight: `labelWidth` and `padStart` default to `ambiguousWidth: "narrow"` and only two of the four passed the real capability, so one row's `│` sits a column right of the others wherever an ambiguous-width label appears. **The assertion is the point rather than the deduplication** — `area.rows + furniture === plotHeight(block)` was a convention four call sites each had to honour and is now one checked equality (I1's other half, at render time rather than at measure time). It **reconciles** rather than throwing: I2 says no series input throws, and the caller is a renderer, so a short block is filled with blank rows and a long one is cut. **`padStart` is the half the audit missed** — the two forms that measured with the real capability still padded with the default one, so all four gutters were crooked on a wide terminal and only the reason differed. **And the equality reaches only what routes through it**, which is not a caveat but the measured failure: `radar`, `horizon`, `smallmultiples` and `pairplot` composed their own rows and were therefore outside the one check written to catch exactly their defect. A compositor that can be bypassed is a convention again for whoever bypasses it, so the four now go through `composeRows` and §2's height table names them.
@@ -1513,6 +1622,8 @@ classification table as its own rows.
 *Gated as a sweep over every form at two depths, not as a source scan: the subject is the rendered cell and a scan would be asking about the call site.*
 
 ---
+- **I33** — **The stub always points toward the whisker, and both box-plot glyph tables fall out of that one rule.** `├`/`┤` horizontally and `┬`/`┴` vertically, swapping roles between the caps and the box edges — which reads as arbitrary and is not, because a cap's whisker leaves inward and a box edge's whisker leaves outward. *The rule was implemented in both arms and written down in neither, and the vertical arm was built by re-deriving it from the horizontal one; a table without its rule is a table the next arm re-derives.* **The compact box is filled where the three-row box is hollow**: with a lid and a floor the interior must stay clear for the median and the mean, and with one row there are no edges, so `┤    │    ├` says nothing about where the box is. **A mean landing on the median draws `◈`** rather than nothing — suppressing it left one band with no mean mark beside two that had one, so *they coincide* read as *it is missing*.
+- **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; 3 rows / 4 columns adds the raw samples as a jittered strip; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all (C04 I56), and the mode asks which renderer fits the room there is. **The jitter is a pure function of the sample's identity** — no clock, no `Math.random`, no module counter — because I11 says every render is a pure function of block, width and context, and a strip that moves between two renders of the same block is a picture of the renderer.
 
 ## 8. Commitments
 
@@ -1542,6 +1653,8 @@ classification table as its own rows.
 24. Category identity survives colour loss, asserted as a sweep over every form rather than per form (I25).
 25. `plotDetail` picks a renderer inside the declared height and degrades rather than overflowing (I28).
 26. Magnitude is carried by colour where there is colour and by the glyph ramp where there is not, which is one rule with two arms rather than two rules (I29, I25).
+27. **One rule generates both box-plot glyph tables** — the stub points toward the whisker — and the compact box is filled because it has no edges to enclose it (I33).
+28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
 
 ---
 
@@ -1585,6 +1698,11 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.15** (I16): every ramp — Unicode, ASCII, braille — has eight steps, each visible, monotone in ink, and **no step equal to the pad character**. Asserted over the constants, because the defect is a property of the set rather than of a call: `sparkline([0, 5], 6, wide)` measured 6 cells and drew its minimum as whitespace, so every width and length row passed against it.
 - **T1.16** (I4, C04 I46): `null` is a gap in both forms — the line breaks across it and the sparkline marks it — and a series carrying `null` **round-trips through JSON unchanged**, which `NaN` does not. The row a fixture of `NaN` cannot express.
 - **T1.14**: pinned `yMin`/`yMax` override the computed range, and out-of-range points clamp to the edge rather than escaping the grid.
+- **T1.67** (I33): the stub points toward the whisker in both arms — `├` at the min cap and `┤` at Q1 horizontally, `┬` at the max cap and `┴` at Q3 vertically — asserted as the *rule* over both tables rather than as two literal figures, so a table transcribed correctly from a wrong rule still fails.
+- **T1.68** (I33): a compact box is filled between Q1 and Q3 and a three-row box is hollow there, and a mean landing on the median draws `◈`.
+- **T1.69** (I34): `plotDetail: "auto"` picks the richest rung the declared height affords — 1, 2, 3 and 5 rows give the box, the raincloud, the jittered raincloud and the mirrored violin — and `"compact"` gives the *form's* lowest rung, which is 1 for a boxplot and 2 for a violin.
+- **T1.70** (I34): a vertical raincloud reads `ladderFor("column")` and a horizontal one `ladderFor("height")`, asserted by the glyph set each draws rather than by the call, so the row survives the call being moved.
+- **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
 
 ### Tier 2 — contract / interface
 
@@ -1653,6 +1771,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.20** (I10): re-painting the composed row through `line` → T1.33 fails, and the escapes print as text. `clampSpans` measures span text with `cells()`, which counts a painted row's escape bytes as visible. **Unreachable until T6.19's defect was fixed** — the old cut to 80 code units left the clamp believing the row fitted, so one defect masked the other and the correct fix to the first is what exposed the second.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
+- **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
+- **T6.22** (I34): a vertical raincloud reaching for the height ramp → T1.70 fails, and the density draws a five-step scale on a three-step axis. Arithmetically self-consistent — the levels are monotone and the row count is right — and wrong about how much of the cell a level fills.
 
 ---
 

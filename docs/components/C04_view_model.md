@@ -1231,6 +1231,7 @@ persisted document rests on.
   field was settable, was carried through the builder — which is why MG24 counted
   it consumed — and was read by no renderer. A name-based seam check cannot tell
   *named* from *acted on*. **A name that resolves to nothing renders uncoloured**, which is F172's shape and the one this type will not reproduce twice. `plotFrame`, `legend`, `plotDetail`, `orientation` and `matrixAnchor` are unions for the same reason, and `matrixAnchor` additionally keys its table by `PlotForm` rather than `string`, so a new matrix form cannot silently inherit a default nobody chose for it.
+- **I56** — **A distribution form declares the room its lowest rung needs, and a block below that floor is refused rather than drawn.** One row or one column for a `boxplot`, two rows or three columns for a `violin` — asymmetric because a terminal cell is about twice as tall as it is wide, so a vertical violin in two columns is four dot-columns split between the density and the box. **Below the floor there is no honest picture**: the density flattens to a bar and the figure says *this distribution is uniform*, which is a statement about the width rather than about the data, and nothing on screen distinguishes the two. **This is not C12 §3i's degradation and the subjects are different** — `plotDetail` asks which renderer fits the room there is, and answers by degrading; this asks whether the form has room at all, and a caller who has declared less has asked for a picture that cannot exist. Both gates say it: `b.plot` throws and `validateBlock` reports, as I50a and I50b already do. *C12 I34 is the ladder this is the floor of; C12 I33 is the figure at the lowest rung.*
 
 ---
 
@@ -1296,6 +1297,7 @@ persisted document rests on.
 54. Eight forms the survey named and the union never carried, each a fold of existing machinery (I54 for the three that are not).
 55. `QuartileSummary.mean`, drawn with its own mark so two centres never share a glyph (I53).
 56. Every style field is a literal union, generated alongside its data where the values are generated (I55).
+57. **A distribution form's lowest rung is a floor, not a preference** — below it the figure states a property of the width and not of the data, so the block is refused rather than flattened (I56).
 
 ---
 
