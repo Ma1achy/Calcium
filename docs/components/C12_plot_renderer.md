@@ -1445,6 +1445,60 @@ counts would put the frame above a polygon wherever the frame happened to be den
 
 ---
 
+## 3v. More than one histogram, and the edges they have to share
+
+A histogram bins one series and stopped there: `binValues(block.series[0].values)`, with series
+2..n reaching nothing. **The edges are the whole of what makes this more than a loop.**
+
+**One edge set over the union, and separate edges is the defect C12 I35 already names one form
+along.** Binned on its own extent each series fills the width, so two distributions with different
+spreads draw the same picture and the comparison the plot exists for is gone — which is exactly
+what a violin does when each band is scaled to itself. Measured against the reference:
+`ax.hist([a, b], bins=8)` returns **one** edge array spanning the union and one count array per
+dataset; `ax.hist(a, bins=8)` alone returns edges over `a` only.
+
+**The strategy's inputs are the union's too**, because the edges are: Sturges reads `n` and
+Freedman–Diaconis and Scott read a spread, and answering them per series would choose a bin
+*count* for edges that are not that series'.
+
+### `layout: "overlap"` cannot mean *draw the first one*
+
+The default layout drops every series after the first, and a bar has done so all along:
+
+```
+  a ┤████████                     10│ █ first
+  b ┤████████████████             20│ █ second
+  c ┤████████████████████████     30│
+```
+
+**Two series, one drawn, and the legend names both** — so the picture does not merely omit the
+second, it asserts it is there. C12 I8 says a series is never dropped silently and the *grouped*
+arm carries a comment about being fixed for exactly this; `overlap` is the same defect one arm
+along, and a histogram inheriting it would ship it wider.
+
+**There is no overlapping picture a bar can draw.** Two runs superimposed in one row of cells is
+one run, so the name describes a thing the vocabulary does not have. So `overlap` with more than
+one series **means grouped** — for the bar and the histogram alike — which is also the reference's
+default: `ax.hist([a, b])` draws them side by side per bin.
+
+### The four layouts, and where the vertical arm was short
+
+Binned, a histogram *is* a bar chart of counts, so the drawing is the bar's and all four layouts
+arrive together rather than being invented here. One row per bin becomes one row per *(bin,
+series)* pair under `grouped`, category-major, which is the arm the bar already has.
+
+**The vertical arm needed the parameter its transpose already had.** `categoricalForm` takes a
+`refFor` precisely so a grouped bar's rows take their *series'* colour rather than their row's —
+the fix recorded in its own doc — and `categoricalColumnForm` never got one, so N×S column bands
+would have drawn in one colour with the legend naming S. It takes one now, and the two arms say
+the same thing in the same way.
+
+**A series with no finite values keeps its bands.** It contributes no counts and drawing nothing
+for it would renumber the groups, so the bin a reader is looking at would hold different series in
+different bins.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -2487,6 +2541,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I39** — **A mirrored figure draws on an odd extent, and the spare cell precedes it.** A reflection needs a centre and an even extent has none: both violin arms split their slot symmetrically and then take the spine at `round((k−1) ÷ 2)`, which for an even `k` is the lower baseline rather than the axis of reflection — so the figure carried three rows of ink above its rule against two below, at 4, 6 and 8, in both arms. *Neither statement is wrong and the pair is, which is why the comment already standing over the first one — **a violin that is asymmetric by a row is a violin that is wrong, and it is invisible in anything but a mirror assertion** — was right about the class and did not reach the instance. No mirror assertion existed, and the golden corpus could not supply one: `ONE_PER_FORM`'s violin is four rows a band, which this ladder spends on the **raincloud**, so the top rung had no horizontal golden frame at all and the fix moved four vertical frames and none of the other 280.* **The spare cell goes first** because `bandedForm` places a band's name at `⌊rows ÷ 2⌋` and `columnLabels` places its tick at `x + ⌊w ÷ 2⌋` — padding before lands the spine on both at every even extent and padding after lands it one short of both, so two untouched placements agree. **The raincloud rungs are outside this**, being one-sided by construction, and an extent of two falls to the fill because two cells are two edges with no centre between them (§3i).
 - **I40** — **Where two layers ink one cell the merge is per dot, and the colour is the first layer's.** `mergedRow` resolved the whole cell to the first layer that inked it, and every figure that composites — a pie's wedges, a radar's polygons over its frame — is folded to braille *before* it arrives, so the second layer's dots were dropped. *A pie's disc is fully covered by construction and `pie-default-40` had seven cells flanked by a full cell on each side that were not themselves full; the radar had it twice, its polygons eating each other and its frame drawn only in the cells nothing else wanted — which reads as dashed strokes and is not, because `dashFor` is solid at any depth above one bit.* A braille cell is `U+2800 + bits`, so the union is `0x2800 | (bitsA | bitsB)`; where any candidate is **not** braille the first-wins rule stands, because a letter and a polygon cannot share a cell. **The colour remains one layer's and that is a limit of the span model, not an oversight** — two wedges meeting in a cell draw both sets of dots in the first wedge's colour, so what the union removes is the gap and not the boundary's exactness, and saying *the gaps are fixed* would imply a per-dot colour a `Span` cannot carry. **The priority order stays the ref's** rather than becoming the densest layer's, because that order is a ruling — labels over polygons over frame — and a dot count would overturn it wherever the frame was denser (§3u).
 - **I41** — **The positional family's x axis is nice numbers over a declared domain, and the sample index is what it falls back to.** `Plot` gains `xMin` / `xMax` / `xFormat` mirroring the y axis — the same `axisFor`, the same precision, the same formatter — and absent them the domain is `[0, n − 1]`, which is what the data has when nothing else was said. *Measured: `ax.plot(y)` over 24 samples ticks 0 5 10 15 20.* **The row it draws in was already reserved**: `axes: true` adds `AXIS_ROWS + FRAME_ROWS` to the declared height rather than taking it, and with no `xLabels` the third of those rows rendered as `""` — so every axed positional plot had been spending a row on an x-label row it never filled, and filling it costs nothing against I1. **`xLabels` wins where both are present**, because a caption is the caller's words and a scale is inferred, and overriding the first with the second is the wrong direction. A label that cannot keep its one-cell gap is dropped **with its tick**, `plotFrame: "corners"` draws the labels and no ticks — a tick is a mark on an edge and there is no edge, where a label is still a reading — and a log or time scale is labelled through `axisFor` or the two halves of one axis disagree. **The form owns the index-to-column mapping** (I37): a candlestick's ticks come from its own pitch, and the curve's rule would place them between candles at every width where the two separate (§3d.1).
+- **I42** — **A histogram bins every series on one shared edge set, and `layout: "overlap"` cannot mean *draw the first one*.** Binned on its own extent each series fills the width, so two distributions of different spreads draw the same picture and the comparison is gone — I35's argument one form along, and the reference's answer: `ax.hist([a, b], bins=8)` returns one edge array over the union and a count array per dataset. **The strategy's inputs are the union's too**, because the edges are: a bin *count* chosen from one series' `n` and spread belongs to edges that are not that series'. *The default layout dropped every series after the first and the legend named them all, so the picture asserted a series it did not draw — I8's rule, in the arm beside the one whose comment records being fixed for it.* **There is no overlapping picture a bar can draw** — two runs superimposed in one row of cells is one run — so `overlap` with more than one series means **grouped**, for the bar and the histogram alike, which is also what `ax.hist([a, b])` draws. Binned, a histogram *is* a bar chart of counts, so all four layouts arrive from the bar rather than being invented. **The vertical arm needed the `refFor` its transpose already had**, or N×S column bands draw in one colour under a legend naming S; and a series with no finite values keeps its bands, because dropping it renumbers the groups and the bin a reader is looking at holds different series in different bins (§3v).
 
 ## 8. Commitments
 
@@ -2525,6 +2580,7 @@ orientation — and belongs in the classification table as its own rows.
 33. **A mirrored figure draws on an odd extent** — a reflection needs a centre, the spare cell precedes the figure so the band's own label and tick still land on the spine, and the one-sided rungs are outside it (I39, §3i).
 34. **A cell two layers ink carries both layers' dots** — unioned where the vocabulary allows it, first-wins where it does not, and coloured by the priority order either way (I40, §3u).
 35. **The positional family has an x axis** — nice numbers over a declared domain, the sample index where none is declared, in the row `axes: true` was already reserving; the caller's captions win it where they exist, and the form owns which column a tick lands on (I41, §3d.1).
+36. **A histogram is every series binned on one edge set** — the union's, with the strategy's inputs taken from the union too, drawn through the bar's four layouts, and `overlap` meaning grouped because there is no overlapping picture and I8 forbids the alternative (I42, §3v).
 
 ---
 
