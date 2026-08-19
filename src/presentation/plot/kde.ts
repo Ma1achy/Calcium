@@ -275,6 +275,29 @@ export function rainRows(
   return rows(cloud.join(""));
 }
 
+/**
+ * The extent a mirrored figure can actually use.
+ *
+ * **A mirror needs a centre, and an even extent has none.** Both violin arms
+ * split their slot as `floor((k-1)/2)` above and `ceil((k-1)/2)` below, which
+ * is symmetric — and then take the spine at `round((k-1)/2)`, which for an even
+ * `k` is the *lower* of the two and not the axis of symmetry. So the outline
+ * mirrored about `k/2 - 0.5` while the rule, the box and the closing points sat
+ * half a cell below it, and the figure drew three rows of ink above its spine
+ * against two below. Measured at 4, 6 and 8, both arms, every time.
+ *
+ * **The spare cell goes before the figure, and two rules the fix does not touch
+ * are what say so.** `bandedForm` puts a band's name at `⌊rows ÷ 2⌋` of the
+ * figure it was handed, and `columnLabels` puts a band's tick at `x + ⌊w ÷ 2⌋`.
+ * Padding at the top — and at the left, standing up — lands the spine on both,
+ * for every even extent. Padding after lands it one short of both.
+ *
+ * At an extent of two this returns one, and the caller's floor arm draws the
+ * fill instead: two cells is an upper edge and a lower edge with no centre
+ * between them, which is the case that comment already calls a summary.
+ */
+const mirrorable = (k: number): number => (k % 2 === 1 ? k : k - 1); // cells-ok — a cell count
+
 export function violinColumn(
   series: Series,
   colWidth: number,
@@ -285,9 +308,11 @@ export function violinColumn(
   adjust?: number,
   shared?: { min: number; max: number },
 ): readonly string[] {
-  const w = Math.max(1, Math.floor(colWidth));
+  const slot = Math.max(1, Math.floor(colWidth)); // cells-ok — a column count
+  const w = mirrorable(slot); // cells-ok — a column count
   const n = Math.max(1, Math.floor(rows));
-  const blank = (): readonly string[] => Array.from({ length: n }, () => " ".repeat(w));
+  const gap = " ".repeat(slot - w); // cells-ok — a column count
+  const blank = (): readonly string[] => Array.from({ length: n }, () => " ".repeat(slot));
 
   const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
   if (finite.length === 0) return blank(); // cells-ok — a sample count
@@ -318,7 +343,7 @@ export function violinColumn(
   // column are one line and say nothing about width.
   if (w < 2) { // cells-ok — a column count
     const pair = pairFor(caps);
-    return densities.map((d) => (d / maxD > 0.05 ? pair.filled : " "));
+    return densities.map((d) => gap + (d / maxD > 0.05 ? pair.filled : " "));
   }
 
   const left0 = Math.floor((w - 1) / 2); // cells-ok — a column index
@@ -388,7 +413,7 @@ export function violinColumn(
     }
   }
 
-  return grid.map((r) => r.join(""));
+  return grid.map((r) => gap + r.join(""));
 }
 
 /**
@@ -562,9 +587,11 @@ export function violinRows(
   shared?: { min: number; max: number },
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
-  const n = Math.max(1, Math.floor(rowsPerCategory));
+  const slot = Math.max(1, Math.floor(rowsPerCategory)); // cells-ok — a row count
+  const n = mirrorable(slot); // cells-ok — a row count
+  const gap = Array.from({ length: slot - n }, () => " ".repeat(w)); // cells-ok — a row count
   const blank = (): readonly string[] =>
-    Array.from({ length: n }, () => " ".repeat(w));
+    Array.from({ length: slot }, () => " ".repeat(w));
 
   const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
   if (finite.length === 0) return blank(); // cells-ok — a sample count
@@ -704,7 +731,7 @@ export function violinRows(
     }
   }
 
-  return grid.map((r) => r.join(""));
+  return [...gap, ...grid.map((r) => r.join(""))];
 }
 
 /**

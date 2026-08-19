@@ -161,6 +161,62 @@ describe("golden frames — the vertical arm", () => {
   }
 });
 
+/**
+ * The distribution ladder's **top rung**, at both parities (C12 I39, §3i).
+ *
+ * **Its own corpus because `ONE_PER_FORM`'s violin never reaches this rung.**
+ * That block is `height: 12` over three categories — four rows a band, which
+ * §3i spends on the raincloud, a figure that is one-sided by construction and
+ * has no reflection to be wrong about. The mirrored outline starts at five.
+ *
+ * **Measured after asserting the opposite.** The first form of I39 said the
+ * corpus missed this because the fixture's band height is *odd*; it is four,
+ * and the reason is the rung rather than the parity. The observation that
+ * prompted it stands either way — landing a fix that changed every mirrored
+ * violin moved four vertical frames and no horizontal one, out of 284 — and
+ * what a green run cannot distinguish is *a case the corpus covers and passes*
+ * from *a case the corpus does not reach*.
+ *
+ * Six rows a band is the case that was broken and seven is its control, so a
+ * reader comparing the two frames sees the rule rather than one picture.
+ */
+const MIRRORED = [
+  ["violin · 6 rows a band", 18],
+  ["violin · 7 rows a band", 21],
+] as const;
+
+const MIRRORED_SERIES = [
+  { values: Array.from({ length: 60 }, (_v, i) => 30 + Math.sin(i * 0.7) * 9 + (i % 5)) }, // cells-ok — a sample count
+  { values: Array.from({ length: 60 }, (_v, i) => 45 + Math.sin(i * 0.5) * 6 + (i % 7)) }, // cells-ok — a sample count
+  { values: Array.from({ length: 60 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12 + (i % 3)) }, // cells-ok — a sample count
+];
+
+describe("golden frames — the mirrored rung, both parities", () => {
+  for (const [name, height] of MIRRORED) {
+    for (const mode of MODES) {
+      for (const width of WIDTHS) {
+        it(`${name} · ${mode.name} · ${String(width)}`, () => {
+          const b = block({
+            kind: "plot", id: `m-${String(height)}`, form: "violin", height, axes: true,
+            categories: ["tight", "wide", "skewed"], series: MIRRORED_SERIES,
+          });
+          const kit = measurable({
+            definitions: [plotDefinition],
+            theme: DARK_THEME,
+            capabilities: mode.capabilities,
+          });
+          const lines = kit.renderToLines(b, width);
+          const frame = [
+            `── ${name} · measured ${String(kit.measure(b, width))} · rendered ${String(lines.length)}`, // cells-ok
+            ...lines,
+          ].join("\n");
+          expect(frame).toMatchSnapshot();
+        });
+      }
+    }
+  }
+});
+
 describe("golden frames — every form", () => {
   for (const form of ALL_FORMS) {
     for (const mode of MODES) {

@@ -9232,3 +9232,69 @@ colour is stripped**, which is the check that says the change did what it claime
 **Under it, a gap named rather than closed:** a dumbbell's row holds two series and draws in one
 span, so `before` and `after` are separated by `●` against `○` alone where the reference gives them
 two colours. That is a `BandRow` with two owners and it is not built.
+
+---
+
+## F185 — a mirror with no centre, and the corpus that could not have caught it ★★★
+
+| | |
+|---|---|
+| **Surface** | both violin arms, at every even extent — three rows of ink above the rule against two below |
+| **Reached for** | a user calling it *kinda ugly*, having already been told it was there |
+| **Verdict** | **two correct statements meeting, with the right comment standing over one of them** |
+| **Absorbed by** | C12 I39 and §3i — the mirrored rung draws on an odd extent, the spare cell precedes it |
+
+Both arms split their slot as `⌊(k−1) ÷ 2⌋` above and `⌈(k−1) ÷ 2⌉` below. That is symmetric and
+carries a comment saying exactly why:
+
+```
+kde.ts — the offset is rounded once and applied both ways. Rounding each edge
+independently is not symmetric, because Math.round breaks ties toward +∞ …
+A violin that is asymmetric by a row is a violin that is wrong, and it is
+invisible in anything but a mirror assertion.
+```
+
+Then both take the spine at `round((k−1) ÷ 2)` — and for an even `k` that is the **lower** of the
+two baselines, not the axis they mirror about. The outline reflected about `k/2 − 0.5`; the rule,
+the box, the median and the closing points sat half a cell below it. Measured at 4, 6 and 8, both
+arms, every time.
+
+**Neither statement is wrong and the pair is**, which is why that comment is right about the class
+and did not reach the instance. It also names its own remedy and nothing built it: **there was no
+mirror assertion.**
+
+### The corpus could not have supplied one, and the first reason given was wrong
+
+Landing the fix moved **four vertical frames and not one horizontal frame**, out of 284. The
+first reading — *the horizontal fixture's band height is odd* — went into the spec, and measuring
+it gives **four**. Even. The reason is the **rung**: `ONE_PER_FORM`'s violin is `height: 12` over
+three categories, and §3i spends four rows a band on the **raincloud**, which is one-sided by
+construction and has no reflection to be wrong about. The mirrored outline starts at five, so the
+ladder's top rung had no horizontal golden frame at all.
+
+The observation was right and the reason under it was not — F58's shape, one turn wide instead of
+four documents, and caught because a spec sentence naming a number is a sentence someone can go
+and count. **A green run cannot tell *a case the corpus covers and passes* from *a case the corpus
+does not reach*.**
+
+### The spare cell's side is a derivation, not a preference
+
+`bandedForm` places a band's name at `⌊rows ÷ 2⌋` of the figure it is handed. `columnLabels` places
+a band's tick at `x + ⌊w ÷ 2⌋`. Padding **before** the figure lands the spine on both, at every even
+extent; padding after lands it one cell short of both. Two placements neither of which the fix
+touches, agreeing.
+
+### What each instrument contributed
+
+- **The frame-read** found it — the user's, from a picture, after the same figure had been through
+  two fixes for its tails.
+- **The sweep** is what it needed: one assertion per extent, both parities, both arms, both
+  alphabets. A suite that picks a height tests whichever side of the parity it picked.
+- **The mutation pass** killed the padding-side mutations immediately and left one alive — *the
+  vertical arm's fill row forgets the spare column*, which the sweep could not reach because it
+  starts at three and the fill is drawn below two. Sixty-two green rows and a path with no
+  coverage. **Only the vertical arm has to pad**: `categoricalColumnForm` composes each band into
+  one row, so a short string moves every band to its right, while `bandedForm` stacks and centres.
+- **`MIRRORED`** is the golden corpus this needed, at six rows a band and seven — the case that was
+  broken and its control, so parity is something a reader compares rather than something the spec
+  asserts.
