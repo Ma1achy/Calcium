@@ -17,7 +17,7 @@ exports[`golden frames — one per state > dark-ascii at 40 1`] = `
 ── plot · plot-heatmap
    api +                                
 worker +                                
- cache +                       
+ cache +              
     db +
         -60 ticks                    now
 0%          100%
@@ -74,7 +74,7 @@ exports[`golden frames — one per state > dark-ascii at 80 1`] = `
 ── plot · plot-heatmap
    api +                                                                        
 worker +                                                                        
- cache +                                                               
+ cache +                                
     db +
         -60 ticks                                                            now
 0%          100%
@@ -130,7 +130,7 @@ exports[`golden frames — one per state > dark-unicode at 40 1`] = `
 ── plot · plot-heatmap
    api ┤                                
 worker ┤                                
- cache ┤                       
+ cache ┤              
     db ┤
         -60 ticks                    now
 0%          100%
@@ -187,7 +187,7 @@ exports[`golden frames — one per state > dark-unicode at 80 1`] = `
 ── plot · plot-heatmap
    api ┤                                                                        
 worker ┤                                                                        
- cache ┤                                                               
+ cache ┤                                
     db ┤
         -60 ticks                                                            now
 0%          100%
@@ -243,7 +243,7 @@ exports[`golden frames — one per state > dark-wide at 40 1`] = `
 ── plot · plot-heatmap
    api +                                
 worker +                                
- cache +                       
+ cache +              
     db +
         -60 ticks                    now
 0%          100%
@@ -300,7 +300,7 @@ exports[`golden frames — one per state > dark-wide at 80 1`] = `
 ── plot · plot-heatmap
    api +                                                                        
 worker +                                                                        
- cache +                                                               
+ cache +                                
     db +
         -60 ticks                                                            now
 0%          100%
@@ -356,7 +356,7 @@ exports[`golden frames — one per state > light-unicode at 40 1`] = `
 ── plot · plot-heatmap
    api ┤                                
 worker ┤                                
- cache ┤                       
+ cache ┤              
     db ┤
         -60 ticks                    now
 0%          100%
@@ -413,7 +413,7 @@ exports[`golden frames — one per state > light-unicode at 80 1`] = `
 ── plot · plot-heatmap
    api ┤                                                                        
 worker ┤                                                                        
- cache ┤                                                               
+ cache ┤                                
     db ┤
         -60 ticks                                                            now
 0%          100%
@@ -467,16 +467,16 @@ exports[`golden frames — one per state > mono-unicode at 40 1`] = `
 ── plot · plot-zero-minimum
                                 ▁▂▃▄▅▆▇█
 ── plot · plot-heatmap
-   api ┤                ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker ┤                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache ┤                ⠄⠄⠄⠄⠄⠄⠄
+   api ┤⠄⠄⠔⠔⠖⠖⠷⠷⡿⡿⣿⣿⠿⠿⠖⠖⠔⠔⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠶⠶⠿⠿
+worker ┤⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
+ cache ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
     db ┤
         -60 ticks                    now
 0% ⠄⠔⠖⠶⠷⠿⡿⣿ 100%
 ── plot · plot-heatmap-overfull
-climb ┤⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
- fall ┤⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
- late ┤             ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+climb ┤⠄⠄⠄⠔⠔⠔⠔⠔⠖⠖⠖⠖⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠿⠿⠿⠿⡿⡿⡿⡿⡿⣿⣿
+ fall ┤⣿⣿⣿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠖⠖⠖⠖⠔⠔⠔⠔⠔⠄⠄
+ late ┤                      ⠄⠄⠔⠖⠖⠶⠷⠷⠿⡿⡿
        -60 ticks                     now
 0 ⠄⠔⠖⠶⠷⠿⡿⣿ 100 · 27 older not shown
 ── table · table-value-bar
@@ -524,16 +524,16 @@ exports[`golden frames — one per state > mono-unicode at 80 1`] = `
 ── plot · plot-zero-minimum
                                                                         ▁▂▃▄▅▆▇█
 ── plot · plot-heatmap
-   api ┤                                                        ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker ┤                                                        ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache ┤                                                        ⠄⠄⠄⠄⠄⠄⠄
+   api ┤⠄⠄⠄⠄⠄⠔⠔⠔⠔⠖⠖⠖⠖⠖⠷⠷⠷⠷⡿⡿⡿⡿⡿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠖⠖⠖⠖⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠔⠶⠶⠶⠶⠶⠿⠿⠿⠿
+worker ┤⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
+ cache ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
     db ┤
         -60 ticks                                                            now
 0% ⠄⠔⠖⠶⠷⠿⡿⣿ 100%
 ── plot · plot-heatmap-overfull
-climb ┤             ⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠖⠖⠖⠖⠖⠖⠖⠖⠶⠶⠶⠶⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿
- fall ┤             ⣿⣿⣿⣿⣿⡿⡿⡿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄
- late ┤                                                     ⠄⠄⠔⠔⠔⠖⠖⠖⠶⠶⠷⠷⠷⠿⠿⠿⡿⡿⡿⣿
+climb ┤⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠔⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿⣿
+ fall ┤⣿⣿⣿⣿⣿⣿⣿⡿⡿⡿⡿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄
+ late ┤                                                 ⠄⠄⠄⠔⠔⠔⠖⠖⠖⠖⠶⠶⠷⠷⠷⠷⠿⠿⠿⠿⡿⡿⡿⣿
        -60 ticks                                                             now
 0 ⠄⠔⠖⠶⠷⠿⡿⣿ 100
 ── table · table-value-bar

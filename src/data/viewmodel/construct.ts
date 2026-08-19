@@ -141,8 +141,30 @@ function checkPlotHeight(plot: Plot): void {
  * nothing in one arm is indistinguishable from one not yet implemented, and the
  * reader who finds it cannot tell which.
  */
+/**
+ * The matrix family, keyed so a ninth member declares (C04 I50b).
+ *
+ * **The refusal reached one form of eight.** `checkHeatmap` tested
+ * `form === "heatmap"` while I50b's own reason — *the scale legend is the only
+ * thing that says what a cell means* — is true of all of them, and the family
+ * grew after the check was written. Found by `utilisation` accepting
+ * `axes: false` and rendering eighteen rows into a sixteen-row grid.
+ */
+const IS_MATRIX: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
+  heatmap: true, calendar: true, correlation: true, confusion: true,
+  spectrogram: true, latency: true, density2d: true, utilisation: true,
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  density: false, bar: false, histogram: false, boxplot: false, violin: false,
+  ridgeline: false, forest: false, dumbbell: false, lollipop: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false,
+  funnel: false, gantt: false, waterfall: false, streamgraph: false,
+  stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
+  radar: false, horizon: false, slope: false, bubble: false,
+  autocorrelation: false, timeline: false, bullet: false,
+});
+
 function checkHeatmap(plot: Plot): void {
-  if (plot.form !== "heatmap") return;
+  if (!IS_MATRIX[plot.form]) return;
 
   if (plot.axes === false) {
     throw new BlockShapeError(

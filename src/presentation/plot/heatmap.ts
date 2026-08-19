@@ -5,7 +5,7 @@
  * All share: density ramp from ramp.ts, continuous colour from colormap.ts,
  * equal-length row validation, axes required.
  */
-import type { Plot, Series } from "../../data/viewmodel/index.js";
+import type { Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
 import { spanCells, wash } from "../blocks/paint.js";
@@ -27,7 +27,7 @@ const HEATMAP_ABSENT = " ";
 const MIN_AREA = 4;
 
 /** Whether a form's columns are a time window or a fixed set of categories. */
-type MatrixLayout = "window" | "stretch";
+type MatrixLayout = NonNullable<Plot["matrixAnchor"]>;
 
 /**
  * Which of the two a form is, as a table rather than a condition.
@@ -37,16 +37,37 @@ type MatrixLayout = "window" | "stretch";
  * beside the table is what let `confusion` inherit the ring's right-anchoring
  * in the first place.
  */
-const MATRIX_LAYOUT: Readonly<Record<string, MatrixLayout>> = Object.freeze({
-  // Time on the abscissa: readings arrive, newest on the right.
-  heatmap: "window",
-  spectrogram: "window",
-  latency: "window",
-  // Categories on the abscissa: a fixed grid that fills the area.
+/**
+ * Where each matrix form puts a row shorter than its width (C12 §3o).
+ *
+ * **Total over `PlotForm`, and `utilisation` is why.** It was
+ * `Record<string, …>`, so the eighth matrix form fell through it and inherited a
+ * default nobody chose — the class the four silent tables were about, found by
+ * the first member added after they were closed. `null` is *not a matrix*, which
+ * is a different answer from *a matrix with no preference*.
+ */
+const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.freeze({
+  // **Every matrix stretches by default, including the feeds** — the reported
+  // defect was a heatmap's blank fringe, and *the column a reading occupies must
+  // not move* is a real argument that loses to it. A live feed wanting the
+  // anchor now says so, which also means the caller who needs it is the one who
+  // knows they do.
+  heatmap: "stretch",
+  spectrogram: "stretch",
+  latency: "stretch",
   confusion: "stretch",
   correlation: "stretch",
   calendar: "stretch",
   density2d: "stretch",
+  utilisation: "stretch",
+  // Not matrix forms.
+  line: null, sparkline: null, scatter: null, step: null, ecdf: null, density: null,
+  bar: null, histogram: null, boxplot: null, violin: null, ridgeline: null,
+  forest: null, dumbbell: null, lollipop: null, dotplot: null, waffle: null,
+  flame: null, icicle: null, treemap: null, funnel: null, gantt: null,
+  waterfall: null, streamgraph: null, stackedarea: null,
+  smallmultiples: null, pairplot: null, pie: null, radar: null, horizon: null,
+  slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,
 });
 
 /**
@@ -128,8 +149,18 @@ function columnMap(count: number, width: number, layout: MatrixLayout): readonly
     return out;
   }
 
-  // The last `w` readings, right-anchored: fewer readings than cells reads as
-  // "this many so far, growing rightward" rather than as a stretched history.
+  if (layout === "left") {
+    // Grows from the left and scrolls once full — a feed read as history, where
+    // the *oldest* column is the fixed one.
+    const from = Math.max(0, count - w);
+    for (let x = 0; x < w; x += 1) out.push(x < count - from ? from + x : null); // cells-ok — a column index
+    return out;
+  }
+
+  // "window": the last `w` readings, right-anchored. **Correct for a live feed
+  // and the reported defect as a default** — a column a reading occupies must
+  // not move every tick, which is what anchoring buys, and a matrix of
+  // categories has no time axis to anchor to and loses the width instead.
   const start = Math.max(0, count - w);
   const pad = Math.max(0, w - count);
   for (let x = 0; x < w; x += 1) out.push(x < pad ? null : start + (x - pad));
@@ -231,7 +262,10 @@ function matrixRows(
 ): readonly string[] {
   const style = { ramp: ladderFor("density", ctx.capabilities).steps, absent: HEATMAP_ABSENT };
   const map = colormapFor(block);
-  const matrixLayout = MATRIX_LAYOUT[block.form] ?? "window";
+  // The caller's choice wins, then the form's, then `stretch` — which is the
+  // safe fallback rather than `window`: a form with no entry is one nobody
+  // decided about, and blanking most of the width is not a neutral answer.
+  const matrixLayout = block.matrixAnchor ?? MATRIX_LAYOUT[block.form] ?? "stretch";
   const out: string[] = [];
 
   const overflow = block.series.length > layout.areaRows; // cells-ok — a row count

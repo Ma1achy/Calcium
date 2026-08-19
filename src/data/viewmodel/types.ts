@@ -699,6 +699,16 @@ export type Plot = Readonly<{
   bandwidth?: number;
   /** The tree `flame`, `icicle` and `treemap` are drawn from (C04 I54, C12 §3n). */
   hierarchy?: HierarchyNode;
+  /**
+   * Where a matrix puts a row shorter than its width (C12 §3o).
+   *
+   * `"stretch"` spreads the readings across the area, `"window"` keeps the
+   * newest at the right and blanks the left, `"left"` grows from the left and
+   * scrolls once full. The default is per form: a live feed anchors so a
+   * column does not move every tick, and a grid of categories has no time axis
+   * to anchor to.
+   */
+  matrixAnchor?: "stretch" | "window" | "left";
   palette?: string;
 }> & Gap;
 

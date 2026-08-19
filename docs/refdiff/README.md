@@ -53,7 +53,7 @@ change is the signal.
 | heatmap | — | — | *C04 I50b — no `axes: false`; lifts with furniture.ts `AreaContent`* |
 | flame | — | — | *no reference renderer — see reference.py SKIPPED* |
 | icicle | — | — | *no reference renderer — see reference.py SKIPPED* |
-| utilisation | — | — | *C04 I50b — as heatmap, though the refusal does not yet reach it* |
+| utilisation | — | — | *C04 I50b — as heatmap; the refusal reaches it now* |
 | treemap | — | — | *no reference renderer — see reference.py SKIPPED* |
 | calendar | — | — | *C04 I50b — as heatmap* |
 | correlation | — | — | *C04 I50b — as heatmap* |

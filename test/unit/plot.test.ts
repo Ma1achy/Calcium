@@ -989,6 +989,49 @@ describe("C12 I17 — the heatmap", () => {
       .toContain(RAMP_DENSITY[0]);
   });
 
+  it("T1.24 (C12 §3o): a matrix shorter than its width stretches, and can be anchored", () => {
+    // **The reported defect**: *AXES | MASSIVE GAP OF NOTHING | HEAT MAP* — the
+    // `"window"` arm emits `null` for the leading columns when there are fewer
+    // readings than cells, and `null` is a blank. Correct for a live feed, where
+    // the column a reading occupies must not move; worth less than the width,
+    // which is what the report said.
+    const sparse = heat({ series: [{ values: [1, 5, 3, 9], label: "r" }], height: 1 });
+    const stretched = rowsOf(sparse, 40, MONO_UNICODE_CAPS)[0] ?? "";
+    const area = stretched.split("┤")[1] ?? "";
+    expect(area.trimStart(), "no blank fringe").toBe(area);
+    expect(area.trimEnd().length, "and the readings fill the width").toBeGreaterThan(20); // cells-ok — a cell count
+
+    // The anchor is still available, and it is what it was.
+    const anchored = rowsOf({ ...sparse, matrixAnchor: "window" } as Plot, 40, MONO_UNICODE_CAPS)[0] ?? "";
+    const anchoredArea = anchored.split("┤")[1] ?? "";
+    expect(anchoredArea.startsWith(" "), "blanks at the left").toBe(true);
+    expect(anchoredArea.trimEnd().endsWith(" "), "and the newest at the right").toBe(false);
+
+    // And `left` is the third: the *oldest* column is the fixed one.
+    const leftward = rowsOf({ ...sparse, matrixAnchor: "left" } as Plot, 40, MONO_UNICODE_CAPS)[0] ?? "";
+    const leftArea = leftward.split("┤")[1] ?? "";
+    expect(leftArea.startsWith(" "), "no blanks at the left").toBe(false);
+    expect(leftArea.trimEnd().length, "and blanks at the right").toBeLessThan(20); // cells-ok — a cell count
+  });
+
+  it("T1.19b (C04 I50b): the refusal is the matrix family's, not the heatmap's", () => {
+    // `checkHeatmap` tested `form === "heatmap"` and C04 I50b's reason — the scale
+    // legend is the only thing saying what a cell means — is true of all eight.
+    // Found by `utilisation` accepting the flag and rendering 18 rows into 16.
+    for (const form of ["heatmap", "calendar", "correlation", "confusion",
+      "spectrogram", "latency", "density2d", "utilisation"] as const) {
+      expect(() => block({
+        kind: "plot", id: "m", form, height: 2, axes: false,
+        series: [{ values: [1, 2] }],
+      } as Plot), form).toThrow(/axes: false/u);
+    }
+    // And the converse, so the row is not passing on a message that never fires.
+    expect(() => block({
+      kind: "plot", id: "m", form: "line", height: 2, axes: false,
+      series: [{ values: [1, 2] }],
+    } as Plot)).not.toThrow();
+  });
+
   it("T1.22 (C12 I18): width goes to columns first, labels truncate, and an unlabelled matrix is never drawn", () => {
     // **The state this refuses was reachable between two ordinary widths**, and
     // the comment above `layoutFor`'s fallback already called it unreadable: the

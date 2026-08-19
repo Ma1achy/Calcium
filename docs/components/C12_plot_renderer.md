@@ -1146,16 +1146,20 @@ it must.
 resolves to a blank — so the frame is the gutter, a long run of nothing, and the
 matrix jammed against the right edge.
 
-**It is right for a live feed and wrong as a default.** A `heatmap` of arriving
-readings *should* keep the newest at the right and grow leftwards: the column a
-reading occupies would otherwise move every tick, and a matrix whose columns
-shift is one nobody can read across time. But a matrix of *categories* — a
-confusion matrix, a correlation grid, a utilisation board — has no time axis and
-nothing to anchor to, and a run of blank columns is simply lost width.
+**There is a real argument for it and it loses.** A `heatmap` of arriving
+readings gains something by keeping the newest at the right: the column a reading
+occupies does not move every tick, and a matrix whose columns shift is harder to
+read across time. That is true, and it is worth less than the width — a fringe of
+blanks is the defect that got reported, by someone looking at a heatmap and not at
+a confusion matrix.
+
+So **every matrix stretches by default, feeds included**, and a caller who wants
+the anchor asks for it. That also puts the choice with the person who knows they
+need it, rather than with a table that guessed from the form's name.
 
 | value | shape | for |
 |---|---|---|
-| `stretch` *(default)* | columns spread across the full width | categories, and anything with no time axis |
+| `stretch` *(default, every form)* | columns spread across the full width | anything, and the answer when nobody has chosen |
 | `window` | newest at the right, blanks at the left | a live feed, where a column must not move |
 | `left` | grows from the left, scrolls once full | a feed being read as history |
 
