@@ -268,6 +268,28 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     empty: { form: "bar", height: 3, axes: true, categories: ["x"], series: [{ values: [] }] },
   },
   histogram: {
+
+    // **Two distributions on one edge set** (C12 I42, §3v). Separated on
+    // purpose: binned on its own extent each would fill the width and the two
+    // would draw the same picture, which is the comparison the plot exists for.
+    "two-series": {
+      // **Eighteen, because nine bins grouped over two series is eighteen
+      // rows** and `categoricalForm` slices what does not fit *without saying
+      // so* (F192). A fixture short by two would ship a frame missing a bin
+      // with nothing on it to say a bin is missing.
+      form: "histogram", height: 18, axes: true, legend: "right",
+      series: [
+        { values: Array.from({ length: 120 }, (_, i) => 20 + ((i * 37) % 23) * 0.6), label: "before" },
+        { values: Array.from({ length: 120 }, (_, i) => 45 + ((i * 53) % 31) * 0.7), label: "after" },
+      ],
+    },
+    "two-series-stacked": {
+      form: "histogram", height: 14, axes: true, legend: "right", layout: "stacked",
+      series: [
+        { values: Array.from({ length: 120 }, (_, i) => 30 + ((i * 37) % 29) * 0.8), label: "control" },
+        { values: Array.from({ length: 120 }, (_, i) => 34 + ((i * 53) % 31) * 0.8), label: "treated" },
+      ],
+    },
     // A histogram is what vertical was asked for — its bins are ordered and its
     // labels are half-open intervals, which read along a bottom axis.
     vertical: {

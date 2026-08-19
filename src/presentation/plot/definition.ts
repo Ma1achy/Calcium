@@ -1134,6 +1134,16 @@ function categoricalColumnForm(
    * draws its raincloud five wide. Only the choice of figure is the chart's.
    */
   columnBuilder: (categoryIndex: number, colWidth: number, rows: number, min: number, max: number, narrowest: number) => readonly string[],
+  /**
+   * The column's colour, where it is not the category's — **the parameter
+   * `categoricalForm` already had** (C12 I42, §3v).
+   *
+   * Its transpose takes one so a grouped bar's rows carry their *series'*
+   * colour rather than their row's, and this never got one: N×S column bands
+   * would have drawn in a single colour under a legend naming S. Two arms, one
+   * statement, said the same way.
+   */
+  refFor?: (columnIndex: number) => ColourRef,
 ): readonly string[] {
   const cats = block.categories ?? [];
   const n = cats.length; // cells-ok — a category count
@@ -1174,7 +1184,8 @@ function categoricalColumnForm(
     for (const [i, col] of columns.entries()) {
       // C12 I38 stood up: a named column keeps its slot, a vertical
       // histogram's bins are one distribution and take one colour.
-      const ref = refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? i : 0); // cells-ok — a column index
+      const ref = refFor?.(i)
+        ?? refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? i : 0); // cells-ok — a column index
       spans.push({ text: col[r] ?? " ".repeat(widths[i]!), style: slot(ref, ctx.theme, ctx.capabilities) });
     }
     spans.push(...rightBorder(layout, ctx));
@@ -1635,7 +1646,40 @@ const FORM_ROWS: Readonly<
     // the single-series path below and series 2..n were never drawn — no
     // notice, no truncation mark, nothing. C12 I8 says series are never dropped
     // silently; this arm was the one place that did.
-    if (layout === "grouped" && block.series.length > 1) { // cells-ok — a series count
+    // **`overlap` with more than one series means grouped** (C12 I42, §3v).
+    // Two runs superimposed in one row of cells is one run, so the name
+    // describes a picture the vocabulary does not have — and falling through to
+    // the single-series path drew the first while the legend named them all,
+    // which is I8's rule broken in the arm beside the one whose comment records
+    // being fixed for it.
+    const spread = (layout === "grouped" || layout === "overlap") && block.series.length > 1; // cells-ok — a series count
+    // **Vertical is tested before grouped, and the order is the ruling.** A
+    // grouped *vertical* bar fell into the horizontal arm and came back as rows
+    // — the orientation is what decides which renderer draws, and the layout
+    // only what it draws.
+    if (spread && block.orientation === "vertical") {
+      const cats = block.categories ?? [];
+      const per = block.series.length; // cells-ok — a series count
+      const ordered = cats.flatMap((_c, i) => block.series.map((sr) => sr.values[i] ?? null));
+      // **The group's name goes under its first band and the rest go blank**,
+      // where the horizontal arm names every row. A gutter has room for
+      // `[20.0, 25.1) · before`; a band three cells wide has room for nothing,
+      // so composing the same label under a column drops **every** label and
+      // the bin edges disappear from the axis entirely. The series is named by
+      // the legend — which is what §3g auto-enables a legend for.
+      const banded: Plot = {
+        ...block,
+        categories: cats.flatMap((c) => block.series.map((_sr, k) => (k === 0 ? c : ""))),
+        series: [{ values: ordered }],
+      };
+      return categoricalColumnForm(banded, width, ctx, (i, cw, rows, lo, hi) =>
+        barColumn(ordered[i] ?? null, lo, hi, cw, rows, ctx.capabilities, true, block.yFormat),
+        // Bands run category-major, so band `r` is series `r % n` — which is
+        // what the legend names, and what the band's own index does not.
+        (r) => slotOf(r % per), // cells-ok — a series index
+      );
+    }
+    if (spread) { // cells-ok — a series count
       // One row per (category, series), in category-major order, so a group's
       // bars sit together and the gutter names which series each one is.
       const cats = block.categories ?? [];
@@ -1675,30 +1719,57 @@ const FORM_ROWS: Readonly<
     });
   },
   histogram: (block, width, ctx) => {
-    const s = block.series[0];
-    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    const { labels, counts, edges } = binValues(s.values, block.binning ?? "sturges");
-    if (counts.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx); // cells-ok — a bin count
-    const maxCount = Math.max(...counts);
-    const histBlock = { ...block, categories: labels, series: [{ values: counts }] };
-    // **A histogram is the form vertical was asked for.** Its bins are ordered
-    // and its labels are half-open intervals — `[15.4, 24.1)` reads along a
-    // bottom axis and is unreadable stacked down a gutter.
-    if (block.orientation === "vertical") {
-      // The bin's **lower edge**, not its interval: `[18.3, 23.1)` needs twelve
-      // cells and a column of a nine-bin histogram at 80 has nine, so every
-      // label was dropped and the axis came back blank. The boundary is what a
-      // bottom axis names.
-      const edged = { ...histBlock, categories: edges.slice(0, counts.length).map((e) => e.trim()) }; // cells-ok — a bin count
-      return categoricalColumnForm(edged, width, ctx, (i, cw, rows, lo, hi) =>
-        barColumn(counts[i] ?? 0, lo, hi, cw, rows, ctx.capabilities, true),
-      );
-    }
-    let ci = 0;
-    const histAllow = labelAllowance(counts, undefined, ctx.capabilities);
-    return categoricalForm(histBlock, width, ctx, (_label, aw) =>
-      barRow(counts[ci++] ?? 0, 0, maxCount, aw, ctx.capabilities, true, undefined, histAllow),
+    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width };
+    if (block.series.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a series count
+    // **Every series, on one edge set** (C12 I42, §3v). Binned on its own
+    // extent each series fills the width, so two distributions of different
+    // spreads draw the same picture and the comparison is gone — I35's argument
+    // one form along.
+    const { labels, counts, edges } = binValues(
+      block.series.map((sr) => sr.values), block.binning ?? "sturges",
     );
+    if (counts[0] === undefined || counts[0].length === 0) return emptyRows(block, layout, ctx); // cells-ok — a bin count
+
+    // **Binned, a histogram *is* a bar chart of counts**, so the drawing is the
+    // bar's and all four layouts arrive together rather than being invented
+    // here. The series keep their labels and tones: the legend names them and
+    // the picture has to agree with it.
+    const counted: readonly Series[] = counts.map((values, i) => {
+      const sr = block.series[i];
+      return {
+        values,
+        ...(sr?.label === undefined ? {} : { label: sr.label }),
+        ...(sr?.tone === undefined ? {} : { tone: sr.tone }),
+      };
+    });
+    // **`overlap` cannot mean *draw the first one*** (C12 I42). Two runs
+    // superimposed in one row of cells is one run, so the name describes a
+    // picture the vocabulary does not have, and dropping the rest is what I8
+    // forbids — with the legend still naming them, which makes it an assertion
+    // rather than an omission.
+    const many = counted.length > 1; // cells-ok — a series count
+    // **`form` stays `histogram`, and the golden corpus is what said so.**
+    // Rewriting it to `"bar"` made the delegation an *identity* change as well
+    // as a rendering one: `ROW_IS_AN_IDENTITY` is keyed on the form, `bar`'s
+    // rows are named categories and a histogram's are slices of an axis, so the
+    // bins came back in eight colours — I38's defect, reintroduced by the
+    // delegation that fixed I42. Four frames moved and nothing else did.
+    //
+    // Nothing in the bar arm branches on the form's name; the three records it
+    // reads — `ROW_IS_AN_IDENTITY`, `HAS_POSITION_AXIS`, `SHARES_CELLS` — all
+    // want the histogram's answers, so the delegation is a call and not a cast.
+    const asBar: Plot = {
+      ...block,
+      categories: labels,
+      series: counted,
+      ...(many ? { layout: block.layout === undefined || block.layout === "overlap" ? "grouped" : block.layout } : {}),
+      // The bin's **lower edge** along a bottom axis, not its interval:
+      // `[18.3, 23.1)` needs twelve cells and a nine-cell column drops it.
+      ...(block.orientation === "vertical"
+        ? { categories: edges.slice(0, counts[0].length).map((e) => e.trim()) } // cells-ok — a bin count
+        : {}),
+    };
+    return FORM_ROWS.bar(asBar, width, ctx);
   },
   boxplot: (block, width, ctx) => {
     const qs = block.quartiles ?? [];

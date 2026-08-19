@@ -104,8 +104,11 @@ const results = runPass({
     {
       name: "the column renderer stops reading the axis",
       file: DEFN,
-      from: "      const ref = refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? i : 0); // cells-ok — a column index",
-      to: "      const ref = refOf(block.series[0] ?? { values: [] }, i); // cells-ok — a column index",
+      // The line gained a `refFor` when the vertical arm learned to group
+      // (C12 I42); the clause under test is the fallback, which is the half a
+      // grouped chart does not use.
+      from: "        ?? refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? i : 0); // cells-ok — a column index",
+      to: "        ?? refOf(block.series[0] ?? { values: [] }, i); // cells-ok — a column index",
       expect: "DC12",
     },
     {

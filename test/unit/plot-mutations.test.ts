@@ -1777,10 +1777,15 @@ describe("M2: annotation drawn in colour at 1-bit — F34", () => {
 describe("histogram binning rules differ", () => {
   it("Sturges, Freedman-Diaconis, Scott produce different bin counts", () => {
     const data = Array.from({ length: 200 }, (_, i) => Math.sin(i * 0.1) * 10);
-    const sturges = binValues(data, "sturges");
-    const fd = binValues(data, "freedman-diaconis");
-    const scott = binValues(data, "scott");
-    const counts = new Set([sturges.counts.length, fd.counts.length, scott.counts.length]); // cells-ok — bin counts
+    const sturges = binValues([data], "sturges");
+    const fd = binValues([data], "freedman-diaconis");
+    const scott = binValues([data], "scott");
+    // **`counts` is per series now** (C12 I42), so the bin count is the length
+    // of a series' row rather than of the outer array — which is 1 here and
+    // would have made this row assert that one number differs from itself.
+    const counts = new Set([
+      sturges.counts[0]?.length, fd.counts[0]?.length, scott.counts[0]?.length, // cells-ok — bin counts
+    ]);
     expect(counts.size).toBeGreaterThanOrEqual(2);
   });
 });
@@ -1849,7 +1854,7 @@ describe("C12 §3f — the bar's readout and its bins", () => {
     // A bare left edge reads as a point value, not a range — and a fixed two
     // decimals prints `[3.00, 3.00)` for a narrow bin, a statement no reading
     // can satisfy.
-    const wide = binValues([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], "sturges");
+    const wide = binValues([[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]], "sturges");
     for (const l of wide.labels) {
       expect(l, "an interval is bracketed").toMatch(/^\[.*[)\]]$/u);
       expect(l, "and has two bounds").toContain(",");
@@ -1859,7 +1864,7 @@ describe("C12 §3f — the bar's readout and its bins", () => {
     // A span of 0.001 across several bins needs more than two decimals, or every
     // label collides with its neighbour.
     const narrow = binValues(
-      Array.from({ length: 40 }, (_, i) => 1 + i * 0.0001),
+      [Array.from({ length: 40 }, (_, i) => 1 + i * 0.0001)],
       "sturges",
     );
     const bounds = narrow.labels.map((l) => l.split(",")[0]);

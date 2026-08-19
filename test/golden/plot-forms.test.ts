@@ -191,6 +191,55 @@ const MIRRORED_SERIES = [
   { values: Array.from({ length: 60 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12 + (i % 3)) }, // cells-ok — a sample count
 ];
 
+/**
+ * More than one histogram on one edge set (C12 I42, §3v).
+ *
+ * **Its own corpus because `ONE_PER_FORM` is one block per form**, and that
+ * block has one series — so every layout renders the same picture and the
+ * corpus cannot tell *one edge set for all of them* from *edges for the first*.
+ * Landing the shared edges moved **no golden frame at all**, which is what an
+ * uncovered case looks like from a green run; that is also the evidence that a
+ * single-series histogram is byte-identical to what it was.
+ *
+ * Two separated distributions, so per-series edges would differ by a lot, and
+ * both spreading layouts, because `overlap` means grouped now and stacked is
+ * the other picture a reader would ask for.
+ */
+const HIST_SERIES = [
+  { values: Array.from({ length: 120 }, (_v, i) => 20 + ((i * 37) % 23) * 0.6), label: "before" }, // cells-ok — a sample count
+  { values: Array.from({ length: 120 }, (_v, i) => 45 + ((i * 53) % 31) * 0.7), label: "after" }, // cells-ok — a sample count
+];
+
+describe("golden frames — two histograms, one edge set", () => {
+  for (const [name, extra] of [
+    ["grouped (the default)", {}],
+    ["stacked", { layout: "stacked" as const }],
+    ["vertical", { orientation: "vertical" as const }],
+  ] as const) {
+    for (const mode of MODES) {
+      for (const width of WIDTHS) {
+        it(`${name} · ${mode.name} · ${String(width)}`, () => {
+          const b = block({
+            kind: "plot", id: "hist-two", form: "histogram", height: 18, axes: true,
+            legend: "right", series: HIST_SERIES, ...extra,
+          });
+          const kit = measurable({
+            definitions: [plotDefinition],
+            theme: DARK_THEME,
+            capabilities: mode.capabilities,
+          });
+          const lines = kit.renderToLines(b, width);
+          const frame = [
+            `── histogram · ${name} · measured ${String(kit.measure(b, width))} · rendered ${String(lines.length)}`, // cells-ok
+            ...lines,
+          ].join("\n");
+          expect(frame).toMatchSnapshot();
+        });
+      }
+    }
+  }
+});
+
 describe("golden frames — the mirrored rung, both parities", () => {
   for (const [name, height] of MIRRORED) {
     for (const mode of MODES) {

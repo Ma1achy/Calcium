@@ -272,18 +272,31 @@ export function dotplotRow(
  * Histogram binning: Sturges, Freedman–Diaconis, Scott.
  */
 export function binValues(
-  values: readonly (number | null)[],
+  series: readonly (readonly (number | null)[])[],
   method: "sturges" | "freedman-diaconis" | "scott" = "sturges",
   maxBins = 40,
-): { labels: string[]; counts: number[]; edges: string[] } {
-  const finite = values.filter((v): v is number => v !== null && Number.isFinite(v));
-  if (finite.length === 0) return { labels: [], counts: [], edges: [] }; // cells-ok — a sample count
+): { labels: string[]; counts: number[][]; edges: string[] } {
+  // **One edge set over the union, and the strategy's inputs come from it too**
+  // (C12 I42, §3v). Binned on its own extent each series fills the width, so two
+  // distributions of different spreads draw the same picture — I35's argument
+  // one form along. And a bin *count* chosen from one series' `n` and spread
+  // would belong to edges that are not that series'.
+  const per = series.map((vs) => vs.filter((v): v is number => v !== null && Number.isFinite(v)));
+  const finite = per.flat();
+  const empty = { labels: [], counts: series.map(() => []) as number[][], edges: [] };
+  if (finite.length === 0) return empty; // cells-ok — a sample count
 
   const sorted = [...finite].sort((a, b) => a - b);
   const n = sorted.length; // cells-ok — a sample count
   const lo = sorted[0]!;
   const hi = sorted[n - 1]!;
-  if (lo === hi) return { labels: [String(lo)], counts: [n], edges: [String(lo), String(lo)] };
+  if (lo === hi) {
+    return {
+      labels: [String(lo)],
+      counts: per.map((vs) => [vs.length]), // cells-ok — a sample count
+      edges: [String(lo), String(lo)],
+    };
+  }
 
   let binCount: number;
   if (method === "freedman-diaconis") {
@@ -304,7 +317,10 @@ export function binValues(
 
   const binWidth = (hi - lo) / binCount;
   const labels: string[] = [];
-  const counts = new Array(binCount).fill(0) as number[];
+  // **A series with no finite values keeps its row of zeroes.** Dropping it
+  // renumbers the groups, so the bin a reader is looking at would hold
+  // different series in different bins (C12 I42).
+  const counts: number[][] = per.map(() => new Array(binCount).fill(0) as number[]);
 
   // **A bin is an interval, and the label said it was a point.** The old line
   // pushed the rounded *left edge* alone — `0.03` — with no upper bound and no
@@ -330,11 +346,14 @@ export function binValues(
     labels.push(`[${a}, ${b}${i === binCount - 1 ? "]" : ")"}`);
   }
 
-  for (const v of finite) {
-    let bin = Math.floor((v - lo) / binWidth);
-    if (bin >= binCount) bin = binCount - 1;
-    if (bin >= 0 && bin < binCount) counts[bin] = (counts[bin] ?? 0) + 1;
-  }
+  per.forEach((vs, si) => {
+    const row = counts[si]!;
+    for (const v of vs) {
+      let bin = Math.floor((v - lo) / binWidth);
+      if (bin >= binCount) bin = binCount - 1; // cells-ok — a bin index
+      if (bin >= 0 && bin < binCount) row[bin] = (row[bin] ?? 0) + 1; // cells-ok — a bin index
+    }
+  });
 
   return { labels, counts, edges };
 }

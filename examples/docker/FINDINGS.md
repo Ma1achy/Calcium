@@ -9570,3 +9570,90 @@ column.** Ten mutations, all caught after.
 **The pattern under all three is one sentence**: an assertion that is *implied by* the claim is not
 the claim, and it stops being implied the moment anything else in the picture changes. `T2.12b`
 had been correct for as long as the frame had nothing else to say.
+
+---
+
+## F192 — a categorical chart with more rows than height draws what fits and says nothing ★★★
+
+| | |
+|---|---|
+| **Surface** | every form through `categoricalForm` — bar, histogram, lollipop, dotplot, funnel, forest, gantt, waterfall, bullet |
+| **Reached for** | sizing a two-series histogram fixture, where nine bins grouped over two series is eighteen rows |
+| **Verdict** | **`labels.slice(0, areaRows)` — the excess is dropped with no notice, no count and no mark** |
+| **Absorbed by** | nothing — **open** |
+
+```
+8 categories at height 4:
+    ┌────────────────────────────────────┐
+  a ┤████▎                              1│
+  b ┤████████▌                          2│
+  c ┤████████████▊                      3│
+  d ┤█████████████████                  4│
+    └────────────────────────────────────┘
+```
+
+`e` through `h` are not there and nothing on the frame says so. **A reader has no way to know
+they are looking at half a chart** — the frame closes, the axis is correct, every count is right.
+
+**I8 is the neighbouring rule and does not cover this.** It says *series that cannot be given a
+row are named in a legend, never dropped silently*, and it is about **series**; these are
+**categories**, and the mechanism it asks for — a legend naming what did not fit — has no
+counterpart on the category axis. §3g's *horizontal placements truncate with a count* is the
+shape the remedy would take.
+
+**Found by making it twice as likely rather than by looking for it.** A grouped histogram is one
+row per *(bin, series)* pair, so two series double the row count and a chart that fit stops
+fitting. The fixture is sized to eighteen rather than sixteen so the catalogue does not ship a
+frame missing a bin — which is the workaround, not the fix.
+
+---
+
+## F193 — the delegation that fixed one invariant reintroduced another, and only the frames said so ★★★★
+
+| | |
+|---|---|
+| **Surface** | every histogram, at the moment it learned to draw more than one series |
+| **Reached for** | C12 I42 — *binned, a histogram is a bar chart of counts, so the drawing is the bar's* |
+| **Verdict** | **the delegation rewrote `form` to `"bar"`, and three records are keyed on the form's name** |
+| **Absorbed by** | the block keeps `form: "histogram"`; the delegation is a call, not a cast |
+
+Handing the binned block to `FORM_ROWS.bar` is right — all four layouts arrive without being
+invented. Setting `form: "bar"` on the way is not, and nothing in the type system says so:
+
+```
+- [1.80, 2.60) ┤ 38;2;230;159;0 █████████████████▎      3│
++ [1.80, 2.60) ┤ 38;2;86;180;233 █████████████████▎      3│
+- [2.60, 3.40) ┤ 38;2;230;159;0 ███████████▌            2│
++ [2.60, 3.40) ┤ 38;2;60;191;154 ███████████▌            2│
+```
+
+**Every bin in a different colour — I38's defect, in the commit that fixed I42.** That is the
+user's original report, reintroduced four steps later by a delegation whose purpose was
+unrelated. `ROW_IS_AN_IDENTITY` is keyed on `PlotForm`: `bar`'s rows are names a caller chose and
+a histogram's are cuts the renderer made, and rewriting the field made the block answer the wrong
+one. `HAS_POSITION_AXIS` and `SHARES_CELLS` are keyed the same way.
+
+**The delegation is fine and the cast was not.** Nothing in the bar arm branches on the form's
+name; it reads those three records and they should all give the histogram's answers. With `form`
+left alone, **all 292 golden frames pass unchanged** — which is simultaneously the proof that the
+regression is gone and the proof that a single-series histogram is byte-identical to what it was.
+
+### Nothing but the frames could have caught it
+
+- The type checker cannot: `form: "bar"` is a valid `PlotForm`.
+- The unit rows cannot: they were written for the multi-series case, which has no
+  single-colour claim to make.
+- **The mutation pass cannot**, and this is the part worth keeping: every mutation of the new
+  code was caught, because the defect is not in the new code — it is in one word of the block
+  handed to old code.
+- The colour rows from I38's own commit **did not fire**, because they render `histogram` blocks
+  and the substitution happens inside the renderer, after the assertion's reach.
+
+What caught it was four golden frames moving in a commit that had no business changing them, and
+reading the diff instead of updating it. **A snapshot records; the reading is the check** — and
+this is the second time in this arc that a `-u` would have laundered a defect into the corpus.
+
+**And the corpus could not see the new case either.** `ONE_PER_FORM.histogram` has one series, so
+every layout renders the same picture and the shared-edge work moved no frame at all. *Green
+because it is right* and *green because it never ran* are the same colour. `two histograms, one
+edge set` is that corpus — grouped, stacked and vertical, at both capability sets and both widths.
