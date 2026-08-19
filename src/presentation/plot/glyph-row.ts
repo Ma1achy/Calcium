@@ -253,7 +253,10 @@ export function boxplotColumn(
     cells[mid] = glyph; // cells-ok — a column index
     grid[r] = cells.join("");
   };
-  if (q.mean !== undefined && Number.isFinite(q.mean) && at(q.mean) !== yMed) punch(at(q.mean), g.diamond);
+  // Mean on median gets its own glyph rather than no glyph — see `kde.ts`.
+  if (q.mean !== undefined && Number.isFinite(q.mean)) {
+    punch(at(q.mean), at(q.mean) === yMed ? g.diamondTee : g.diamond);
+  }
   for (const o of q.outliers ?? []) punch(at(o), g.dotted);
   return grid.map((r) => " ".repeat(padL) + r + " ".repeat(padR));
 }

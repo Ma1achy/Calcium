@@ -72,6 +72,8 @@ export type GlyphSet = Readonly<{
   stubRight: string;
   /** A second centre that must never share the median's glyph (C04 I53). */
   diamond: string;
+  /** Mean and median in one cell — see C12 §3r. */
+  diamondTee: string;
   teeLeft: string;
   teeRight: string;
 
@@ -120,6 +122,7 @@ const UNICODE: GlyphSet = Object.freeze({
   stubLeft: "╴",
   stubRight: "╶",
   diamond: "◆",
+  diamondTee: "◈",
   teeLeft: "├",
   teeRight: "┤",
 
@@ -154,6 +157,7 @@ const ASCII: GlyphSet = Object.freeze({
   stubLeft: "-",
   stubRight: "-",
   diamond: "x",
+  diamondTee: "X",
   teeLeft: "+",
   teeRight: "+",
 

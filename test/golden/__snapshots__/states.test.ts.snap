@@ -11,9 +11,9 @@ exports[`golden frames — one per state > dark-ascii at 40 1`] = `
    +-----------------------------------+
 
 ── plot · plot-gapped-sparkline
-                                 ?.:?*#@
+?.:?*#@                                 
 ── plot · plot-zero-minimum
-                                .:-=+*#@
+.:-=+*#@                                
 ── plot · plot-heatmap
    api +                                
 worker +                                
@@ -68,9 +68,9 @@ exports[`golden frames — one per state > dark-ascii at 80 1`] = `
    +---------------------------------------------------------------------------+
 
 ── plot · plot-gapped-sparkline
-                                                                         ?.:?*#@
+?.:?*#@                                                                         
 ── plot · plot-zero-minimum
-                                                                        .:-=+*#@
+.:-=+*#@                                                                        
 ── plot · plot-heatmap
    api +                                                                        
 worker +                                                                        
@@ -124,9 +124,9 @@ exports[`golden frames — one per state > dark-unicode at 40 1`] = `
    └───────────────────────────────────┘
 
 ── plot · plot-gapped-sparkline
-                                 ?▁▂?▆▇█
+?▁▂?▆▇█                                 
 ── plot · plot-zero-minimum
-                                ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                
 ── plot · plot-heatmap
    api ┤                                
 worker ┤                                
@@ -181,9 +181,9 @@ exports[`golden frames — one per state > dark-unicode at 80 1`] = `
    └───────────────────────────────────────────────────────────────────────────┘
 
 ── plot · plot-gapped-sparkline
-                                                                         ?▁▂?▆▇█
+?▁▂?▆▇█                                                                         
 ── plot · plot-zero-minimum
-                                                                        ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                                                        
 ── plot · plot-heatmap
    api ┤                                                                        
 worker ┤                                                                        
@@ -237,9 +237,9 @@ exports[`golden frames — one per state > dark-wide at 40 1`] = `
    +-----------------------------------+
 
 ── plot · plot-gapped-sparkline
-                                 ?⡀⣀?⣶⣷⣿
+?⡀⣀?⣶⣷⣿                                 
 ── plot · plot-zero-minimum
-                                ⡀⣀⣄⣤⣦⣶⣷⣿
+⡀⣀⣄⣤⣦⣶⣷⣿                                
 ── plot · plot-heatmap
    api +                                
 worker +                                
@@ -294,9 +294,9 @@ exports[`golden frames — one per state > dark-wide at 80 1`] = `
    +---------------------------------------------------------------------------+
 
 ── plot · plot-gapped-sparkline
-                                                                         ?⡀⣀?⣶⣷⣿
+?⡀⣀?⣶⣷⣿                                                                         
 ── plot · plot-zero-minimum
-                                                                        ⡀⣀⣄⣤⣦⣶⣷⣿
+⡀⣀⣄⣤⣦⣶⣷⣿                                                                        
 ── plot · plot-heatmap
    api +                                                                        
 worker +                                                                        
@@ -350,9 +350,9 @@ exports[`golden frames — one per state > light-unicode at 40 1`] = `
    └───────────────────────────────────┘
 
 ── plot · plot-gapped-sparkline
-                                 ?▁▂?▆▇█
+?▁▂?▆▇█                                 
 ── plot · plot-zero-minimum
-                                ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                
 ── plot · plot-heatmap
    api ┤                                
 worker ┤                                
@@ -407,9 +407,9 @@ exports[`golden frames — one per state > light-unicode at 80 1`] = `
    └───────────────────────────────────────────────────────────────────────────┘
 
 ── plot · plot-gapped-sparkline
-                                                                         ?▁▂?▆▇█
+?▁▂?▆▇█                                                                         
 ── plot · plot-zero-minimum
-                                                                        ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                                                        
 ── plot · plot-heatmap
    api ┤                                                                        
 worker ┤                                                                        
@@ -463,9 +463,9 @@ exports[`golden frames — one per state > mono-unicode at 40 1`] = `
    └───────────────────────────────────┘
 
 ── plot · plot-gapped-sparkline
-                                 ?▁▂?▆▇█
+?▁▂?▆▇█
 ── plot · plot-zero-minimum
-                                ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█
 ── plot · plot-heatmap
    api ┤⠄⠄⠔⠔⠖⠖⠷⠷⡿⡿⣿⣿⠿⠿⠖⠖⠔⠔⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠶⠶⠿⠿
 worker ┤⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
@@ -520,9 +520,9 @@ exports[`golden frames — one per state > mono-unicode at 80 1`] = `
    └───────────────────────────────────────────────────────────────────────────┘
 
 ── plot · plot-gapped-sparkline
-                                                                         ?▁▂?▆▇█
+?▁▂?▆▇█
 ── plot · plot-zero-minimum
-                                                                        ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█
 ── plot · plot-heatmap
    api ┤⠄⠄⠄⠄⠄⠔⠔⠔⠔⠖⠖⠖⠖⠖⠷⠷⠷⠷⡿⡿⡿⡿⡿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠖⠖⠖⠖⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠔⠶⠶⠶⠶⠶⠿⠿⠿⠿
 worker ┤⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶

@@ -6,13 +6,17 @@
 // asking whether the colour was there. So the rows below are mostly about the
 // two things that fail quietly: a corpus that renders nothing, and a parser
 // that returns a plausible answer for an input it does not handle.
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { cells as width } from "../../src/presentation/text.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { CAPS, FORMS, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
+import { CAPS, FORMS, clearGenerated, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { ansiToSvg, brailleDots, colour256, isBraille, parseLine, sheetBg } from "../../tools/catalogue-png.mjs";
@@ -132,6 +136,30 @@ describe("plot-catalogue — the corpus renders", () => {
       }
     }
     expect(bad, `misaligned frames:\n${bad.join("\n")}`).toEqual([]);
+  });
+
+  it("PC13: a removed fixture's frame does not outlive it", () => {
+    // **`histogram · sturges` sat in the catalogue through the whole rebuild.**
+    // Its variant was gone; its four frames were not, and they were drawn by the
+    // pre-rebuild renderer — bare bin edges, the `rule` frame, the `░` meter
+    // track. A reader comparing the histogram family across binning strategies
+    // read the difference as an inconsistency in the current code, which is an
+    // instrument manufacturing evidence rather than merely missing some.
+    //
+    // Asserted against a temp directory rather than `docs/catalogue`, which is
+    // gitignored and empty in a fresh clone — a disk assertion there would fail
+    // for everyone who had not run the generator.
+    const dir = mkdtempSync(join(tmpdir(), "calcium-catalogue-"));
+    try {
+      writeFileSync(join(dir, "ghost-24bit.plain"), "stale\n");
+      writeFileSync(join(dir, "ghost-24bit.png"), "stale\n");
+      writeFileSync(join(dir, "keep.md"), "not generated\n");
+      const removed = (clearGenerated as (d: string) => number)(dir);
+      expect(removed).toBe(2); // cells-ok — a file count
+      expect(readdirSync(dir)).toEqual(["keep.md"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("PC2: at least one frame carries 24-bit colour, or the corpus proves nothing about it", () => {

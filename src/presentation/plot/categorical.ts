@@ -14,13 +14,15 @@
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
-import { categoryMarks } from "./marks.js";
+import { markOf } from "./marks.js";
 import { formatReadout } from "./axes.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
 import { glyphs } from "../blocks/glyphs.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+/** Choosing a mark needs the depth as well as the alphabet — see `markOf`. */
+type MarkCaps = Caps & Pick<TerminalCapabilities, "colourDepth">;
 
 /**
  * Decimals for a bin edge — enough that two adjacent edges differ.
@@ -120,47 +122,63 @@ export function barColumn(
 }
 
 /**
+ * A row whose cells belong to different series — the text, and which series
+ * holds each cell (`-1` where none does).
+ *
+ * A single string cannot be coloured per segment, and a stack is segments by
+ * definition. The caller spans it.
+ */
+export type BandRow = Readonly<{ text: string; owners: readonly number[] }>;
+
+/**
  * A stacked bar: values concatenated end-to-end.
+ *
+ * **Each layer takes its own colour, and the mark is the fallback.** The whole
+ * row used to carry one `ColourRef` keyed on the *category*, so a four-quarter
+ * stack of two series drew four colours naming the quarters and none naming
+ * `direct` or `referral` — the legend beside it answered a question the bars
+ * did not ask. `owners` carries which series holds each cell so the caller can
+ * span them.
+ *
+ * **And `markOf`, not `categoryMarks` directly**, which is a second defect in
+ * the same three lines. Reading the ladder here gave every layer its own mark at
+ * *every* colour depth, so a 24-bit stack was hatched — texture doing work tone
+ * was already doing, which I29 calls a claim rather than a redundancy. `markOf`
+ * is uniform above the colour floor and varies below it, and that rule belongs
+ * in one place.
  */
 export function stackedBarRow(
   series: readonly Series[],
   categoryIndex: number,
   totalMax: number,
   width: number,
-  caps: Caps,
+  caps: MarkCaps,
   normalised: boolean,
-): string {
+): BandRow {
   const w = Math.max(1, Math.floor(width));
   const ext = extentFor(caps);
   let sum = 0;
   for (const s of series) sum += (s.values[categoryIndex] ?? 0);
-  if (sum === 0) return " ".repeat(w);
+  const empty = { text: " ".repeat(w), owners: new Array<number>(w).fill(-1) }; // cells-ok — a sentinel owner
+  if (sum === 0) return empty;
 
-  // **Each layer takes its own mark, and colour is the second channel.** Every
-  // segment drew `mark.filled` and the whole row carried one `ColourRef`, so a
-  // stacked bar could not show where one series ended — not by glyph, and not by
-  // tone either. At `colourDepth: 1` that is a solid run saying nothing, which
-  // is C12 I25's subject: two things a reader must tell apart differ by mark,
-  // never by colour alone.
-  //
-  // The ladder is the density one, taken from the top down, because a stack is
-  // read as adjacent bands rather than as a scale — neighbouring layers want
-  // maximum contrast, not adjacent steps.
-  const marks = categoryMarks(caps);
   const scale = normalised ? w / sum : (totalMax > 0 ? w / totalMax : 0);
   let used = 0;
   let result = "";
+  const owners: number[] = [];
   for (let i = 0; i < series.length; i += 1) { // cells-ok — a series count
     const v = series[i]?.values[categoryIndex] ?? 0;
     const fill = Math.round(v * scale);
     const clamped = Math.min(fill, w - used);
-    result += (marks[i % marks.length] ?? ext.solid).repeat(clamped); // cells-ok — a ladder length
+    result += (markOf(i, caps) || ext.solid).repeat(clamped);
+    for (let c = 0; c < clamped; c += 1) owners.push(i); // cells-ok — a cell count
     used += clamped;
   }
   // Blank, not shaded — the remainder of a stacked bar is the part of the
   // total nothing accounts for, and shading it makes it look like a layer.
   result += " ".repeat(Math.max(0, w - used));
-  return result.slice(0, w);
+  for (let c = used; c < w; c += 1) owners.push(-1); // cells-ok — a sentinel owner
+  return { text: result.slice(0, w), owners: owners.slice(0, w) };
 }
 
 /**

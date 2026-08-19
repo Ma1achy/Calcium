@@ -632,7 +632,8 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   pie: {
-    "default-40": { form: "pie", height: 10, series: [], segments: [...PIE_SEGMENTS] },
+    // Same argument as the radar's — `narrow-20` below keeps the small case.
+    "default-40": { form: "pie", height: 18, series: [], segments: [...PIE_SEGMENTS] },
     "narrow-20": { form: "pie", height: 5, series: [], segments: [...PIE_SEGMENTS] },
     "many-segments": {
       form: "pie", height: 10, series: [],
@@ -645,8 +646,12 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   radar: {
+    // **Height is what sizes a circle**, because `rx = 2 · ry` is the cell
+    // aspect and nothing can widen a disc past what its rows allow. At 10 the
+    // figure was 20 columns in an 80-cell frame and two braille polygons
+    // sharing that raster read as a dot cloud — the fixture, not the renderer.
     default: {
-      form: "radar", height: 10, categories: ["Speed", "Power", "Range", "Defence", "HP"],
+      form: "radar", height: 18, categories: ["Speed", "Power", "Range", "Defence", "HP"],
       series: [s([80, 60, 90, 40, 70], "alpha"), s([50, 85, 45, 75, 55], "beta")],
     },
   },

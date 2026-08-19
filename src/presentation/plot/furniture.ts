@@ -454,11 +454,27 @@ function entryText(e: LegendEntry): string {
  * already rules that labels are dropped before the area is starved. A third is
  * `categoricalForm`'s existing cap, so the two agree.
  */
-export function legendWidth(entries: readonly LegendEntry[], width: number, ctx: RenderContext): number {
+export function legendWidth(
+  entries: readonly LegendEntry[],
+  width: number,
+  ctx: RenderContext,
+  /**
+   * **A left legend needs a blank on *both* sides and a right legend on one.**
+   *
+   * `legendColumn` writes ` ${entry}` — the leading blank is the gap, and on the
+   * right that is the gap from the frame. On the left the gap that matters is
+   * the *other* one, between the entry and the y-labels, and there was none: a
+   * frame with a `100` tick and an `alpha` series drew `alpha100` as one word.
+   * Symmetric in the description and not in the geometry, which is why reading
+   * the right placement said nothing about the left.
+   */
+  placement: "left" | "right" = "right",
+): number {
   if (entries.length === 0) return 0; // cells-ok — an entry count
   const ambiguous = ctx.capabilities.ambiguousWidth;
   const longest = entries.reduce((m, e) => Math.max(m, cells(entryText(e), ambiguous)), 0);
-  return Math.min(longest + 1, Math.floor(width / 3)); // cells-ok — a cell count
+  const gaps = placement === "left" ? 2 : 1; // cells-ok — a cell count
+  return Math.min(longest + gaps, Math.floor(width / 3)); // cells-ok — a cell count
 }
 
 /**

@@ -427,9 +427,14 @@ export function violinRows(
     put(at(quartiles.q1), gl.vertical);
     put(at(quartiles.q3), gl.vertical);
     put(at(quartiles.median), gl.teeDown);
+    // **When the mean lands on the median, say so.** Skipping the diamond
+    // avoided hiding the median tee, which was right, and left a band with no
+    // mean mark beside two bands that had one — so *they coincide* read as *it
+    // is missing*, and a reader has no way to tell those apart. A cell holds one
+    // glyph, so the glyph names both.
     if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
       const xm = at(quartiles.mean);
-      if (xm !== at(quartiles.median)) put(xm, gl.diamond);
+      put(xm, xm === at(quartiles.median) ? gl.diamondTee : gl.diamond);
     }
   }
 

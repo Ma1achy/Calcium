@@ -55,7 +55,7 @@ import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
-import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
+import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
 import { densitySeries, densityRows, violinColumn, violinRows, ridgelineArea } from "./kde.js";
@@ -68,6 +68,50 @@ import type { Annotation, QuartileSummary, Plot, PlotForm, Series } from "../../
 import type { ColourRef } from "../theme/index.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
+
+/**
+ * Spans for a row whose cells belong to different series.
+ *
+ * **Two forms needed this within a week of each other** — a ridgeline's curves
+ * overlap by construction, and a stacked bar's segments are adjacent by
+ * construction — and in both the row had been given a single colour keyed on
+ * something that was not the series. The ridgeline asked
+ * `baselines.indexOf(row)`, which is -1 everywhere but a baseline; the stack
+ * asked the *category* index, so a two-series stack across four quarters drew
+ * four colours naming the quarters. Neither could be fixed by choosing a better
+ * per-row colour, because there is no per-row answer.
+ */
+function ownedSpans(
+  text: string,
+  owners: readonly number[],
+  ref: (index: number) => ColourRef,
+  ctx: RenderContext,
+): readonly Span[] {
+  const chars = [...text];
+  const out: Span[] = [];
+  const push = (run: string, at: number): void => {
+    if (run === "") return;
+    out.push(at < 0 ? { text: run } : { text: run, style: slot(ref(at), ctx.theme, ctx.capabilities) }); // cells-ok — a sentinel owner
+  };
+  let run = "";
+  let at = -2; // cells-ok — a sentinel owner
+  for (let x = 0; x < chars.length; x += 1) { // cells-ok — one code point per cell in a composed area row
+    const o = owners[x] ?? -1; // cells-ok — a sentinel owner
+    if (o !== at) {
+      push(run, at);
+      run = "";
+      at = o;
+    }
+    run += chars[x];
+  }
+  push(run, at);
+  return out;
+}
+
+/** Whether anything was measured at all — distinct from whether a range exists. */
+function hasSamples(series: readonly Series[]): boolean {
+  return series.some((sr) => sr.values.some((v) => v !== null && Number.isFinite(v)));
+}
 
 /** The narrowest plot area worth drawing a curve in. Below it, furniture goes. */
 const MIN_AREA = 4;
@@ -570,7 +614,7 @@ function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth):
 function reservedFor(block: Plot, width: number, ctx: RenderContext): number {
   const placement = legendPlacement(block, ctx.capabilities);
   if (placement !== "left" && placement !== "right") return 0; // cells-ok — a cell width
-  return Math.min(width - 1, legendWidth(legendEntries(block, ctx), width, ctx)); // cells-ok — a cell width
+  return Math.min(width - 1, legendWidth(legendEntries(block, ctx), width, ctx, placement)); // cells-ok — a cell width
 }
 
 function usableWidth(block: Plot, width: number, ctx: RenderContext): number {
@@ -679,7 +723,17 @@ function categoricalForm(
   block: Plot,
   width: number,
   ctx: RenderContext,
-  rowBuilder: (label: string, areaWidth: number, categoryIndex: number) => string,
+  rowBuilder: (label: string, areaWidth: number, categoryIndex: number) => string | BandRow,
+  /**
+   * The row's colour, where it is not the category's.
+   *
+   * **A grouped bar is the case that broke the default.** One row per
+   * (category, series) pair means row 3 is *B · before*, and slot 3 named the
+   * row rather than `before` — so group A drew the legend's two colours and
+   * group B drew two others. The default stays: a plain bar is one series
+   * across N categories and the category *is* what a colour can name.
+   */
+  refFor?: (rowIndex: number) => ColourRef,
 ): readonly string[] {
   const cats = block.categories ?? [];
   const areaRows = plotAreaRows(block);
@@ -691,18 +745,17 @@ function categoricalForm(
   for (let i = 0; i < areaRows; i++) {
     const cat = labels[i] ?? "";
     const label = i < labels.length ? truncate(cat, layout.labelColumn, ctx.capabilities) : ""; // cells-ok — a label count
-    const content = i < labels.length ? rowBuilder(cat, layout.areaWidth, i) : ""; // cells-ok — a label count
+    const built = i < labels.length ? rowBuilder(cat, layout.areaWidth, i) : ""; // cells-ok — a label count
+    const content = typeof built === "string" ? built : built.text;
     const gutter = gutterSpans(label, layout, ctx);
     const s = block.series[i] ?? block.series[0];
-    const ref = s?.tone !== undefined ? `tone.${s.tone}` as ColourRef : (slotOf(i)); // cells-ok — a category index
-    const styled = slot(ref, ctx.theme, ctx.capabilities);
+    const ref = s?.tone !== undefined ? `tone.${s.tone}` as ColourRef : (refFor?.(i) ?? slotOf(i)); // cells-ok — a category index
+    const body: readonly Span[] = typeof built === "string"
+      ? [{ text: areaText(content, layout, ctx), style: slot(ref, ctx.theme, ctx.capabilities) }]
+      : ownedSpans(areaText(content, layout, ctx), built.owners, (k) => refOf(block.series[k] ?? { values: [] }, k), ctx);
     out.push(
       line(
-        [
-          ...gutter,
-          { text: areaText(content, layout, ctx), style: styled },
-          ...rightBorder(layout, ctx),
-        ],
+        [...gutter, ...body, ...rightBorder(layout, ctx)],
         layout,
         ctx,
       ),
@@ -1049,7 +1102,13 @@ function positionalForm(
       ?? { areaRows: plotAreaRows(block), width: usable, gutter: 0, labelColumn: 0, areaWidth: usable },
     block, width, ctx,
   );
-  if (range === null) return emptyRows(block, layout, ctx);
+  // **A pinned range is not a reading.** `seriesRange` answers *what are the
+  // bounds*, and with `yMin`/`yMax` given it answers even for an empty series —
+  // so `ecdf`, which pins 0..1 to build its block, drew bare axes where every
+  // other empty variant says *No data.* The question here is whether anything
+  // was measured, and only the samples can answer it. The same defect waits on
+  // any form given pinned bounds and no data; this is the one that had one.
+  if (range === null || !hasSamples(block.series)) return emptyRows(block, layout, ctx);
 
   const cursorIdx = ctx.cursorPositions?.[block.id];
   const area = stacked
@@ -1195,8 +1254,13 @@ const FORM_ROWS: Readonly<
         ),
       };
       let oi = 0;
-      return categoricalForm(grouped, width, ctx, (_label, aw) =>
-        barRow(ordered[oi++] ?? null, base, data.max, aw, ctx.capabilities, true, block.yFormat),
+      const perSeries = block.series.length; // cells-ok — a series count
+      return categoricalForm(
+        grouped, width, ctx,
+        (_label, aw) => barRow(ordered[oi++] ?? null, base, data.max, aw, ctx.capabilities, true, block.yFormat),
+        // Rows run category-major, so row `r` is series `r % n` — which is what
+        // the legend names, and what slot `r` did not.
+        (r) => slotOf(r % perSeries), // cells-ok — a series index
       );
     }
     // **Vertical is a different renderer, not a flag** (C12 §3j). The gutter holds
@@ -1575,28 +1639,14 @@ const FORM_ROWS: Readonly<
     // cells from two or three of them and there is no per-row colour to pick.
     // Asking `baselines.indexOf(row)` gave -1 everywhere but the baselines, and
     // the whole tangle drew in the fallback tone.
-    const tinted = (text: string, at: number): Span =>
-      at < 0 // cells-ok — a sentinel owner
-        ? { text }
-        : { text, style: slot(refOf(block.series[at] ?? { values: [] }, at), ctx.theme, ctx.capabilities) };
-
     const out = rows.map((content, r) => {
       const label = truncate(labelAt.get(r) ?? "", layout.labelColumn, ctx.capabilities);
-      const chars = [...areaText(content, layout, ctx)];
-      const own = owners[r] ?? [];
-      const runs: Span[] = [];
-      let text = "";
-      let at = -2; // cells-ok — a sentinel owner
-      for (let x = 0; x < chars.length; x += 1) { // cells-ok — the area grid is one code point per cell
-        const o = own[x] ?? -1; // cells-ok — a sentinel owner
-        if (o !== at) {
-          if (text !== "") runs.push(tinted(text, at));
-          text = "";
-          at = o;
-        }
-        text += chars[x];
-      }
-      if (text !== "") runs.push(tinted(text, at));
+      const runs = ownedSpans(
+        areaText(content, layout, ctx),
+        owners[r] ?? [],
+        (i) => refOf(block.series[i] ?? { values: [] }, i),
+        ctx,
+      );
       return line(
         [...gutterSpans(label, layout, ctx), ...runs, ...rightBorder(layout, ctx)],
         layout,

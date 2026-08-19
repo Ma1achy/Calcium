@@ -7,7 +7,7 @@
  *
  * Run: node tools/plot-catalogue.mjs
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createBlockRegistry } from "../src/presentation/blocks/index.js";
 import { plotDefinition } from "../src/presentation/plot/index.js";
@@ -56,9 +56,36 @@ export function frameFor(spec, caps, width) {
 const isMain = process.argv[1] !== undefined
   && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 
+/**
+ * **Cleared before writing, because a removed fixture leaves its frame behind.**
+ *
+ * `histogram · sturges` outlived the variant that produced it and sat in the
+ * catalogue through the whole rebuild — bare bin edges, the `rule` frame, and
+ * the `░` meter track this component deleted. So a reader comparing the
+ * histogram family across binning strategies was comparing three current frames
+ * against one drawn by a renderer that no longer exists, and the difference
+ * looked like an inconsistency in the *current* code.
+ *
+ * A generator that only ever writes cannot say what it did not write. The same
+ * correction `tools/refdiff/reference.py` needed, one directory along, which is
+ * the second instance and the reason this is a named function rather than four
+ * lines inside the main block.
+ */
+export function clearGenerated(dir) {
+  let removed = 0;
+  for (const f of readdirSync(dir)) {
+    if (/\.(txt|plain|png)$/.test(f)) {
+      rmSync(join(dir, f));
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 if (isMain) {
 const outDir = join(import.meta.dirname, "..", "docs", "catalogue");
 mkdirSync(outDir, { recursive: true });
+const stale = clearGenerated(outDir);
 
 let totalFiles = 0;
 
@@ -81,5 +108,5 @@ for (const [formName, variants] of Object.entries(FORMS)) {
   }
 }
 
-console.log(`catalogue: ${totalFiles} files written to docs/catalogue/`);
+console.log(`catalogue: ${totalFiles} files written to docs/catalogue/ (${stale} stale cleared first)`);
 }

@@ -652,11 +652,15 @@ describe("C12 tier 1 — sparklines", () => {
     expect(out).toContain("█");
   });
 
-  it("T1.13: fewer values than cells are right-anchored", () => {
-    // The window is of the *last* points, so three samples in eight cells read as
-    // three samples so far, growing rightward — not as a stretched curve that
-    // changes shape as it fills.
-    expect(sparkline([1, 2, 3], 8, FULL_CAPS)).toBe("     ▁▅█");
+  it("T1.13 (I13): fewer values than cells fill from the left, and nothing moves as they arrive", () => {
+    // **The old row asserted the other anchor and its comment argued for this
+    // one.** *"Three samples so far, growing rightward — not as a stretched
+    // curve that changes shape as it fills"* is true of both anchors, because
+    // what it argues against is *stretching*. The second assertion is the one
+    // that tells them apart, and it is the behaviour that sentence describes: a
+    // glyph already drawn stays where it is when the next sample lands. C12 §B3.
+    expect(sparkline([1, 2, 3], 8, FULL_CAPS)).toBe("▁▅█     ");
+    expect(sparkline([1, 2, 3, 4], 8, FULL_CAPS).startsWith("▁")).toBe(true);
   });
 
   it("T1.13 (I3): a constant window is the middle step, not a division by zero", () => {
@@ -672,7 +676,7 @@ describe("C12 tier 1 — sparklines", () => {
 
     // The interior case, where the old behaviour SHORTENED the row: seven
     // positions came back as six glyphs, and no assertion here counted them.
-    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS)).toBe("     ▁▂▃?▆▇█");
+    expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS)).toBe("▁▂▃?▆▇█     ");
 
     // And the two forms agree now, which is the actual claim: the same array
     // breaks the line and marks the sparkline, rather than breaking one and
@@ -693,7 +697,7 @@ describe("C12 tier 1 — sparklines", () => {
     // type forbade it — which is why this row asserts the *serialisation* and not
     // only the glyphs. A row that checked the picture alone passes for both and
     // says nothing about the one that matters.
-    expect(sparkline([1, 2, 3, null, 7, 8, 9], 12, FULL_CAPS)).toBe("     ▁▂▃?▆▇█");
+    expect(sparkline([1, 2, 3, null, 7, 8, 9], 12, FULL_CAPS)).toBe("▁▂▃?▆▇█     ");
     expect(sparkline([1, 2, 3, Number.NaN, 7, 8, 9], 12, FULL_CAPS), "same picture").toBe(
       sparkline([1, 2, 3, null, 7, 8, 9], 12, FULL_CAPS),
     );
@@ -717,7 +721,7 @@ describe("C12 tier 1 — sparklines", () => {
     // **Asserted over the constants, because the defect is a property of the
     // set.** `RAMP_BRAILLE` began at `U+2800` — BRAILLE PATTERN BLANK — so a
     // sparkline on a wide terminal drew its minimum as whitespace, which the
-    // right-anchor already uses for *fewer samples than cells*. Every width and
+    // padding already uses for *fewer samples than cells*. Every width and
     // length assertion in this file passed against it, and `cells()` counted it
     // as one, which is what left the arm with nothing looking at it.
     for (const [name, ramp] of [
@@ -741,10 +745,11 @@ describe("C12 tier 1 — sparklines", () => {
     );
     expect(dots, "one dot to eight, no gaps").toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
-    // The measured case: the minimum must not be the padding beside it.
+    // The measured case: the minimum must not be the padding beside it. Index 0
+    // since C12 §B3 — the readings fill from the left and the pad is the tail.
     const drawn = sparkline([0, 5], 6, { ...FULL_CAPS, ambiguousWidth: "wide" });
     expect(drawn).toHaveLength(6);
-    expect(drawn[4], "the lowest reading, and it is not a space").not.toBe(" ");
+    expect(drawn[0], "the lowest reading, and it is not a space").not.toBe(" ");
   });
 
   it("T1.13b (I4): the marker is the same character in every ramp, because absence is not a magnitude", () => {
