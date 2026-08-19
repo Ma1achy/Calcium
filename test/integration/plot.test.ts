@@ -18,6 +18,7 @@ import {
 } from "../support/render.js";
 import { checkMeasurement } from "../../src/testing/measurement-conformance.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
+import { RenderCache } from "../../src/shell/render-cache.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";
 import { doc } from "../support/blocks.js";
@@ -205,6 +206,69 @@ describe("C12 tier 4 — a growing series", () => {
   // C13 landed and supplies the streaming half — a series patched tick by tick
   // into a held document. "Does not move the viewport" is the other half, and a
   // viewport is what does not exist.
+  it("T4.7: a live plot re-renders one entry, and its siblings keep their cache", () => {
+    // **The animation claim, tested where it can run.** The plan's version is a
+    // tier-5 row counting bytes on the wire; `node-pty` has no prebuild for this
+    // container, so thirteen of sixteen tier-5 files fail to *load* and a row
+    // written there would be unverified. The mechanism the byte count is a proxy
+    // for is here: `RenderCache` keys on `(rev, width, focus, theme)`, a patch
+    // bumps one entry's `rev`, and every sibling is a hit.
+    const cache = new RenderCache();
+    const lines = (n: number): readonly string[] => [`row ${String(n)}`];
+    for (const id of ["a", "b", "c"]) cache.set(id, 1, 80, "", "dark", lines(1));
+
+    // One entry patched: its own slot misses and the other two hit.
+    cache.set("b", 2, 80, "", "dark", lines(2));
+    expect(cache.get("b", 1, 80, "", "dark"), "the patched entry's old rev is gone").toBeUndefined();
+    for (const id of ["a", "c"]) {
+      expect(cache.get(id, 1, 80, "", "dark"), `${id} is untouched`).toEqual(["row 1"]);
+    }
+    // And the patched entry's *new* rev is what it was given.
+    expect(cache.get("b", 2, 80, "", "dark")).toEqual(["row 2"]);
+    // A width change misses everywhere, which is the other axis of the key: a
+    // resize is not a patch, and nothing is reusable across it.
+    for (const id of ["a", "b", "c"]) {
+      expect(cache.get(id, id === "b" ? 2 : 1, 81, "", "dark"), `${id} at a new width`).toBeUndefined();
+    }
+    expect(cache.size, "and no slot is added by a patch").toBe(3); // cells-ok — a slot count
+  });
+
+  it("T4.8 (C12 I1): a hundred patches never move the plot, and the gutter widens once", () => {
+    // **The wrinkle exercised deliberately rather than discovered later.** The
+    // gutter's *width* is data-dependent — `layoutFor` sizes it from the y-range
+    // — so a value crossing 99 → 100 widens the label column and shifts the plot
+    // area one column sideways on that tick. It never breaks I1, which is about
+    // rows, and it has an escape valve: pin `yMin`/`yMax`.
+    const m = withPlot();
+    const heights = new Set<number>();
+    const gutters = new Set<number>();
+    for (let n = 1; n <= 100; n += 1) { // cells-ok — a tick count
+      const b = block({
+        kind: "plot", id: "live", form: "line", height: 6, axes: true,
+        series: [{ values: Array.from({ length: 12 }, (_, i) => (n * (i + 1)) / 12) }],
+      });
+      const rows = m.renderToLines(b, 60).map(visible);
+      heights.add(rows.length); // cells-ok — a row count
+      gutters.add((rows.find((r) => r.includes("┤")) ?? "").indexOf("┤")); // cells-ok — a column index
+    }
+    expect(heights.size, "the height never moves").toBe(1); // cells-ok — a set size
+    expect(gutters.size, "and the gutter does, exactly where the digits do")
+      .toBeGreaterThan(1); // cells-ok — a set size
+
+    // Pinned, it does not: the escape valve, asserted so it is a documented
+    // answer rather than folklore.
+    const pinned = new Set<number>();
+    for (let n = 1; n <= 100; n += 1) { // cells-ok — a tick count
+      const b = block({
+        kind: "plot", id: "live", form: "line", height: 6, axes: true, yMin: 0, yMax: 100,
+        series: [{ values: Array.from({ length: 12 }, (_, i) => (n * (i + 1)) / 12) }],
+      });
+      const rows = m.renderToLines(b, 60).map(visible);
+      pinned.add((rows.find((r) => r.includes("┤")) ?? "").indexOf("┤")); // cells-ok — a column index
+    }
+    expect(pinned.size, "pinned, the gutter holds still").toBe(1); // cells-ok — a set size
+  });
+
   it("T4.6: a streamed series does not move the viewport", () => {
     const store = createTranscriptStore();
     const viewport = createViewport(store, { width: 80, height: 6, measureSequence });

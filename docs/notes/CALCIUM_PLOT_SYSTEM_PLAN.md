@@ -414,12 +414,15 @@ Dependency-ordered. Items 3–10 are independent of each other.
 | 10 | ~~**`hierarchy`**~~ **`018cbe9`** — flame, icicle, treemap | flame, icicle, treemap |
 | 11 | ~~**Facet spans**~~ **`4a2efb8`** | smallmultiples, pairplot |
 | 12 | ~~**Remaining new forms**~~ **`ee1b94c`** — slope, bubble, autocorrelation, timeline, bullet, utilisation; all 42 exist | slope, bubble, autocorrelation, timeline, bullet, utilisation |
-| 13 | **`height: "fill"`, aspect, reflow** | needs the frame settled |
-| 14 | **Silent tables + `PaletteName`** | close the drift class |
-| 15 | **Animation demo + tier 5** | prove, do not build |
+| 13 | ~~**`height: "fill"`, aspect, reflow**~~ **`80e3dab`** | needs the frame settled |
+| 14 | ~~**Silent tables + `PaletteName`**~~ **`1564950`** — and `palette` was removed rather than typed | close the drift class |
+| 15 | ~~**Animation demo + tier 5**~~ — the demo already ships in `examples/docker` (a live CPU heatmap per tick); the tests are T4.7/T4.8, at tier 4 because `node-pty` has no prebuild here | prove, do not build |
 
 **Spec edits commit alone and ahead of their code.** A ruling taken between
 commits evaporates.
+
+**And C12 I26's four `plotFrame` shapes landed with `1243e0f`**, which was owed
+from step 1 — only `"box"` shipped with the frame itself.
 
 ---
 
