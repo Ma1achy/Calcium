@@ -21,9 +21,9 @@ change is the signal.
 
 | form | grid | ink | extent |
 |---|---|---|---|
+| waffle | 64x10 | 59.4% | — |
 | bar | 64x16 | 51.2% | — |
 | histogram | 64x16 | 46.0% | — |
-| waffle | 64x10 | 43.8% | — |
 | waterfall | 64x16 | 40.8% | — |
 | bullet | 64x16 | 39.6% | — |
 | ridgeline | 64x16 | 39.3% | — |

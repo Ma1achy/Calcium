@@ -402,7 +402,7 @@ Dependency-ordered. Items 3–10 are independent of each other.
 | # | step | why here |
 |---|---|---|
 | 0 | ~~**The y-axis measurement fix**~~ **`78667bc`** | alone, because it has a *measurable* check — `labelWidth` at `ambiguousWidth: "wide"` — and bundling it behind a visual gate wastes that |
-| 1 | ~~**Axes, ticks, frame**~~ **`78667bc`** — only `plotFrame: "box"`; C12 I26's other three owed | every form's furniture |
+| 1 | ~~**Axes, ticks, frame**~~ **`78667bc`**, and C12 I26's other three shapes **`1243e0f`** | every form's furniture |
 | 2 | ~~**`furniture.ts`**~~ **`78667bc`** | matrix family first as the falsifier |
 | 3 | ~~**Orientation**~~ **`567eff9`** — bar, histogram, boxplot, violin | 11 forms at once, and `categoricalForm` is structurally row-major — **moved from 7**, because "before the per-form work" and "at position 7" contradicted each other and the per-form work is 8–12 |
 | 4 | ~~**Painted cells (C12 I29)**~~ **`506c62d`** — and it was never wiring: C10 I21 shut the door, C10 §4c opened it via `wash` | 7 matrix forms + bars + pie wedges; wiring, highest leverage |

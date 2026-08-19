@@ -390,6 +390,37 @@ alongside the data files, as `ColormapName` already is.
 
 ---
 
+## 10a. What the whole run came to
+
+**All 42 forms exist and all fifteen steps landed**, over 29 commits. The order
+table in `CALCIUM_PLOT_SYSTEM_PLAN.md` §IV carries the commit for each.
+
+Measured against matplotlib where a comparison is meaningful — `make refdiff`,
+30 of 42 forms, the rest excluded with a stated reason:
+
+| form | before | after |
+|---|---|---|
+| horizon | 62.8% | **14.6%** |
+| streamgraph | 52.0% | **12.6%** |
+
+**Four rulings changed under measurement**, which is the run's real shape:
+
+1. **Painting a cell was never wiring.** C12 said the pipeline already supported
+   it; C10 I21 shut the door and the word that opened it was *text* — a contrast
+   floor is a property of a foreground **on** a surface, and a painted cell has
+   none. `wash` returns a `Span` rather than a `Style` so the widening cannot be
+   misused.
+2. **C12 I25's sweep as specified fails eight correct forms.** A category named
+   in the gutter is told apart by reading it, so the rule gained *by mark or by
+   name* and `SHARES_CELLS` is the partition — which §3g's legend then reused.
+3. **`palette` had one legal value.** Its remedy was a union; building it found
+   that `tone` and `syntax` carry meaning and C10 I16 closes `spectrum` to
+   declared art. A field with one legal value is not a choice, so it is gone.
+4. **Facet sizing was deferred and the golden diff falsified the deferral** one
+   commit later: reconciling without sizing *cut* the children's bottom borders.
+
+---
+
 ## 11. The instruments' own findings, this round
 
 Four defects came out of the tools rather than the renderer, and each names the
