@@ -690,30 +690,30 @@ exports[`golden frames — every form > histogram · full · 80 1`] = `
 
 exports[`golden frames — every form > horizon · ascii-1bit-wide · 40 1`] = `
 "── horizon · measured 3 · rendered 3
-    -@
-   +@@@.
- =#@@@@@="
+       ---------****@@@@*****----
+       ----*********@@@@*****----
+   --------*****@@@@@@@@*********----"
 `;
 
 exports[`golden frames — every form > horizon · ascii-1bit-wide · 80 1`] = `
 "── horizon · measured 3 · rendered 3
-    -@
-   +@@@.
- =#@@@@@="
+              -----------------*********@@@@@@@@@*********--------
+              --------******************@@@@@@@@@*********--------
+     -----------------*********@@@@@@@@@@@@@@@@@@*****************---------"
 `;
 
 exports[`golden frames — every form > horizon · full · 40 1`] = `
 "── horizon · measured 3 · rendered 3
-    ⠖⣿
-   ⠷⣿⣿⣿⠄
- ⠶⡿⣿⣿⣿⣿⣿⠶"
+       ⠖⠖⠖⠖⠖⠖⠖⠖⠖⠿⠿⠿⠿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠖⠖⠖⠖
+       ⠖⠖⠖⠖⠿⠿⠿⠿⠿⠿⠿⠿⠿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠖⠖⠖⠖
+   ⠖⠖⠖⠖⠖⠖⠖⠖⠿⠿⠿⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠖⠖⠖⠖"
 `;
 
 exports[`golden frames — every form > horizon · full · 80 1`] = `
 "── horizon · measured 3 · rendered 3
-    ⠖⣿
-   ⠷⣿⣿⣿⠄
- ⠶⡿⣿⣿⣿⣿⣿⠶"
+              ⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠿⠿⠿⠿⠿⠿⠿⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠖⠖⠖⠖⠖⠖⠖⠖
+              ⠖⠖⠖⠖⠖⠖⠖⠖⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠖⠖⠖⠖⠖⠖⠖⠖
+     ⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠿⠿⠿⠿⠿⠿⠿⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠖⠖⠖⠖⠖⠖⠖⠖⠖"
 `;
 
 exports[`golden frames — every form > icicle · ascii-1bit-wide · 40 1`] = `

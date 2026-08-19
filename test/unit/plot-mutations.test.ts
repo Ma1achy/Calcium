@@ -416,6 +416,63 @@ describe("GROUP 6d: one fold, two origins", () => {
   });
 });
 
+describe("GROUP 6e: the horizon folds", () => {
+  const wave = { values: Array.from({ length: 50 }, (_, i) => 50 + Math.sin(i * 0.25) * 50) };
+  const R = { min: 0, max: 100 };
+
+  it("T1.49: the row count is the height, whatever the band count", () => {
+    // **The whole claim of the form**, and the old version broke it: one row per
+    // band, clipped at `min(areaRows, bands)`. This file's own header says *a
+    // series that would need twelve rows fits in two*.
+    for (const bands of [1, 2, 5, 12]) {
+      for (const h of [1, 2, 5]) {
+        expect(horizonRows(wave, R, bands, 40, h, FULL_CAPS).length, `${String(bands)} bands in ${String(h)} rows`).toBe(h); // cells-ok — a row count
+      }
+    }
+  });
+
+  it("T1.50: height 1 with 3 bands reads three depths, where it used to saturate", () => {
+    // The measured defect: the defaults interacted, `bands` defaulting to 3 and
+    // `height` to 1, so band 0 was drawn alone and everything above a normalised
+    // third saturated at maximum ink. No fixture pinned the two apart.
+    const row = horizonRows(wave, R, 3, 60, 1, FULL_CAPS)[0] ?? "";
+    const inks = new Set([...row].filter((c) => c !== " "));
+    expect(inks.size, "three bands, three densities").toBeGreaterThanOrEqual(3); // cells-ok — a density count
+  });
+
+  it("T1.51: a series shorter than its area is stretched, never left to run out", () => {
+    // The heatmap's right-anchoring defect in a second form: `values[col]` found
+    // nothing past column 49 of an 80-cell area and left thirty columns blank.
+    const rows = horizonRows(wave, R, 3, 80, 2, FULL_CAPS);
+    for (const r of rows) expect(r.length).toBe(80); // cells-ok — a cell count
+    // The last column carries the last sample rather than nothing.
+    expect(rows.some((r) => r[79] !== " "), "the right edge is drawn").toBe(true); // cells-ok — a column index
+  });
+
+  it("T1.52: a column carries at most two depths — its band, and the one it cleared", () => {
+    // The fold's shape. Three or more in a column means the bands are not
+    // overdrawing, which is a stack of separate charts wearing one frame.
+    const rows = horizonRows(wave, R, 5, 40, 6, FULL_CAPS);
+    for (let c = 0; c < 40; c += 1) { // cells-ok — a column count
+      const depths = new Set(rows.map((r) => r[c]).filter((g) => g !== undefined && g !== " "));
+      expect(depths.size, `column ${String(c)}`).toBeLessThanOrEqual(2); // cells-ok — a density count
+    }
+
+    // **And at least two somewhere, which is the half `≤ 2` cannot see.**
+    // Removing the overdraw entirely leaves one depth per column and satisfies
+    // the bound above perfectly — a mutation that survived until this row. A
+    // value in the top band has cleared four below it, so the column above its
+    // own fill must carry the fourth band's ink rather than nothing.
+    // Mid-band, not at the ceiling: a value at exactly the top fills the whole
+    // height with its own band and leaves nothing above it to be the second
+    // depth — the state has to be constructed rather than assumed.
+    const deep = { values: [90, 90, 90, 90] };
+    const top = horizonRows(deep, R, 5, 8, 6, FULL_CAPS);
+    const col0 = new Set(top.map((r) => r[0]).filter((g) => g !== undefined && g !== " "));
+    expect(col0.size, "a cleared band shows above the one being filled").toBe(2); // cells-ok — a density count
+  });
+});
+
 describe("GROUP 7: pie merges sub-threshold slices", () => {
   it("at small radius, tiny segments merge into other", () => {
     const segs = [
