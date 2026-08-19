@@ -23,14 +23,14 @@ change is the signal.
 what both halves independently took before F183 and is why a *style* was
 uncomparable: a candlestick is `form: "line"`. The extras are `EXTRA_VARIANTS`
 in `export-fixtures.ts`. So this table ranks
-**43 of 103 catalogue variants**, and the rest are unread rather than passing —
+**43 of 106 catalogue variants**, and the rest are unread rather than passing —
 adding one means adding a reference renderer beside it.
 
 | form | grid | ink | extent |
 |---|---|---|---|
-| waffle | 64x10 | 59.4% | — *fewer than two bands — ours 1, theirs 0* |
-| bar | 64x16 | 51.2% | — *3 bands vs 7* |
-| histogram | 64x16 | 46.0% | — *3 bands vs 8* |
+| waffle | 64x10 | 55.9% | — *fewer than two bands — ours 1, theirs 0* |
+| bar | 64x16 | 50.4% | — *3 bands vs 7* |
+| histogram | 64x16 | 46.3% | — *3 bands vs 8* |
 | ridgeline | 64x16 | 41.0% | — *fewer than two bands — ours 4, theirs 1* |
 | waterfall | 64x16 | 40.8% | — *fewer than two bands — ours 2, theirs 1* |
 | bullet | 64x16 | 39.6% | — *fewer than two bands — ours 1, theirs 3* |
@@ -48,7 +48,7 @@ adding one means adding a reference renderer beside it.
 | slope | 64x16 | 19.3% | 7.7% |
 | timeline | 64x16 | 18.8% | — *fewer than two bands — ours 1, theirs 1* |
 | forest | 64x16 | 17.9% | — *fewer than two bands — ours 1, theirs 0* |
-| violin | 64x16 | 16.1% | 1.0% |
+| violin | 64x16 | 17.4% | — *5 bands vs 3* |
 | horizon | 64x16 | 14.6% | — *13 bands vs 9* |
 | density | 64x16 | 13.7% | — *fewer than two bands — ours 2, theirs 1* |
 | line.candlestick | 64x16 | 12.9% | — *fewer than two bands — ours 1, theirs 3* |

@@ -364,12 +364,26 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
     // is the code restated — what changed is the picture, and the picture is the
     // reason the field exists.
     const r = kit();
+    // **The y-label gutter, not the whole frame** (C12 I41). This joined the
+    // rendered lines and asked whether `0` appeared anywhere in them — a proxy
+    // for *the y axis reaches zero* that held only while nothing else in the
+    // picture wrote a number. The positional family has an x axis now, whose
+    // first label is the sample index `0`, and the control failed on a frame
+    // whose y axis was correct. The claim was always about the gutter, so that
+    // is what is read: everything left of the axis rule.
     const axis = (blk: Block): string =>
       renderSequenceToLines(r.registry, seq([blk]), 40, {
         theme: DARK_THEME,
         capabilities: FULL_CAPS,
       })
         .map((line) => visible(line))
+        // A row has a gutter only if it has an axis edge to the right of one.
+        // Splitting every row and keeping the head returns the *whole* x-label
+        // row, which carries no box-drawing character at all — so the first
+        // form of this narrowing still read the sample indices it was written
+        // to stop reading.
+        .filter((line) => /[┤│]/u.test(line))
+        .map((line) => line.split(/[┤│]/u)[0] ?? "")
         .join("\n");
 
     const flat = [100.0, 100.2, 100.1, 100.2];

@@ -580,6 +580,31 @@ export type Plot = Readonly<{
   axes?: boolean;
   xLabels?: readonly [string, string, string];
   /**
+   * Pin the horizontal domain the samples span, independently and optionally
+   * (I58, C12 I41, §3d.1).
+   *
+   * **`Series.values` is a bare array, so there is no x coordinate anywhere in
+   * this type** — the abscissa a sample has is its *index*. Absent, that is the
+   * domain: `[0, n − 1]`, which is what `ax.plot(y)` labels and what the data
+   * has when nothing else was said. Present, the samples are read as spanning
+   * `xMin … xMax` evenly, so a series sampled once a second for a minute says
+   * `xMin: 0, xMax: 60` and its axis reads in seconds.
+   *
+   * **Not a second way to spell `xLabels`.** That field is three captions —
+   * the caller's own words at left, centre and right — and this is a scale.
+   * Where both are present the captions win: overriding what a caller wrote
+   * with what we inferred is the wrong direction.
+   */
+  xMin?: number;
+  xMax?: number;
+  /**
+   * The unit the abscissa arrives in — **`yFormat`'s vocabulary, deliberately**.
+   *
+   * One formatter, two axes, for `BarSpec.format`'s reason exactly: a second
+   * enum is a second place for the `fraction`/`percent` confusion to happen.
+   */
+  xFormat?: Plot["yFormat"];
+  /**
    * **The unit the value arrives in, not the unit it renders as** (I41, F31).
    *
    * `fraction` takes `0.84` and `percent` takes `100.2`; both draw a per-cent

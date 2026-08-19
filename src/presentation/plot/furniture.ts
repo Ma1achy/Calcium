@@ -33,7 +33,10 @@
 import { glyphs } from "../blocks/glyphs.js";
 import { clampSpans, pad, padStart, paint, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, truncate, type AmbiguousWidth } from "../text.js";
-import { xAxis } from "./axes.js";
+import { xAxis, xTickRow } from "./axes.js";
+import type { XAxis } from "./axes.js";
+import { HAS_POSITION_AXIS } from "./marks.js";
+import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
@@ -340,13 +343,73 @@ export function xLabelRowFor(
  */
 export type Furniture = Readonly<{ top: string; bottom: readonly string[] }>;
 
+/**
+ * The domain the samples span (C12 I41, C04 I58).
+ *
+ * **The index is the fallback and not a special case**, so one path serves a
+ * declared domain and an undeclared one: absent `xMin`/`xMax`, a series of `n`
+ * samples spans `[0, n − 1]`, which is the abscissa the data actually has and
+ * what `ax.plot(y)` labels.
+ *
+ * `null` where there is nothing to span — no samples, or one, which has no
+ * extent and would give a zero-width domain to divide by.
+ */
+function xDomain(block: Plot): { min: number; max: number } | null {
+  const declared = block.xMin !== undefined || block.xMax !== undefined;
+  const n = sampleCount(block);
+  if (!declared && n < 2) return null; // cells-ok — a sample count
+  const min = block.xMin ?? 0;
+  const max = block.xMax ?? n - 1; // cells-ok — a sample count
+  return max > min ? { min, max } : null;
+}
+
+/**
+ * How many positions the abscissa has.
+ *
+ * **A candlestick's are in `ohlc` and its `series` is ordinarily empty** — the
+ * shape C12 §3r calls *plain candles*. Reading `series` alone gives zero, and a
+ * domain of nothing draws no axis at all: a silent gap under exactly the style
+ * whose frame a reader most wants numbered.
+ */
+function sampleCount(block: Plot): number {
+  const bars = candlesOf(block);
+  if (bars !== undefined) return bars.length; // cells-ok — a bar count
+  return block.series.reduce((most, sr) => Math.max(most, sr.values.length), 0); // cells-ok — a sample count
+}
+
+/**
+ * The x row a block gets, and which of the two mechanisms writes it.
+ *
+ * **The caller's captions win** (C12 I41). `xLabels` is three words the caller
+ * chose and the numeric axis is inferred from the data; overriding the first
+ * with the second is the wrong direction, and both want the same row.
+ */
+function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAxis {
+  if (block.xLabels !== undefined) return xAxis(block.xLabels, areaWidth, ctx.capabilities);
+  if (block.axes !== true || !HAS_POSITION_AXIS[block.form]) {
+    return xAxis(undefined, areaWidth, ctx.capabilities);
+  }
+  const domain = xDomain(block);
+  if (domain === null) return xAxis(undefined, areaWidth, ctx.capabilities);
+  // **The form owns which column a position lands in** (C12 I37, §3d.1). Every
+  // other row of that table is a rule meeting a boundary; this one is two
+  // correct mappings from the same index, and the frame would have looked right
+  // at the width the catalogue happens to use.
+  const bars = candlesOf(block);
+  const n = sampleCount(block);
+  const columnAt = bars === undefined
+    ? undefined
+    : (t: number): number | null => candleColumn(bars, Math.round(t * Math.max(0, n - 1)), areaWidth); // cells-ok — a bar index
+  return xTickRow(domain, areaWidth, block.xFormat, ctx.capabilities, block.xScale, columnAt);
+}
+
 export function furnitureFor(
   block: Plot,
   layout: Layout,
   ctx: RenderContext,
   cursorAt: number | null = null,
 ): Furniture {
-  const axis = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities);
+  const axis = xRowFor(block, layout.areaWidth, ctx);
   return {
     top: frameTop(layout, ctx),
     bottom: [

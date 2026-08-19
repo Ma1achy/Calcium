@@ -61,7 +61,7 @@ import { squareColumns } from "./aspect.js";
 import { WAFFLE_ROWS, waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
 import { glyphs } from "../blocks/glyphs.js";
-import { candleColumn, candleReadout, candleRows, hasBars } from "./candles.js";
+import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
 import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
@@ -115,18 +115,6 @@ function ownedSpans(
 /** Whether anything was measured at all — distinct from whether a range exists. */
 function hasSamples(series: readonly Series[]): boolean {
   return series.some((sr) => sr.values.some((v) => v !== null && Number.isFinite(v)));
-}
-
-/**
- * The bars this block draws, or none (C12 §6b B1, I36).
- *
- * **Gated on the style and not on the field being present.** `ohlc` on a block
- * whose style does not draw it contributes nothing to the frame, so it must
- * contribute nothing to the axis either — an axis widened by data nobody can see
- * is a plot whose curve does not reach its own edges for no stated reason.
- */
-function candlesOf(block: Plot): readonly OHLC[] | undefined {
-  return block.plotStyle === "candlestick" ? block.ohlc : undefined;
 }
 
 /** The narrowest plot area worth drawing a curve in. Below it, furniture goes. */

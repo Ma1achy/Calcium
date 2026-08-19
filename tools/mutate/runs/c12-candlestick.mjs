@@ -101,8 +101,11 @@ const results = runPass({
     {
       // The gate on the style. `ohlc` on a block that does not draw it would
       // widen the axis, and the curve stops reaching its own edges.
+      // `candlesOf` moved down to `candles.ts` when the x axis needed it too:
+      // `furniture.ts` places the ticks and `definition.ts` imports it, so the
+      // helper could not be reached sideways (A02 §1, acyclic within a layer).
       name: "`ohlc` moves the axis whatever the style",
-      file: DEFN,
+      file: CANDLES,
       from: '  return block.plotStyle === "candlestick" ? block.ohlc : undefined;',
       to: "  return block.ohlc;",
       expect: "CS-B3",

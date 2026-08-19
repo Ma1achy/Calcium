@@ -172,6 +172,42 @@ export function markOf(index: number, caps: Caps, always = false): string {
  * does not compile — §3h's reason for the other record, and the same one here:
  * a rule remembered per form is a rule that lapses on the thirty-fifth.
  */
+/**
+ * Whether this form's abscissa is a **position** — an index across the area —
+ * rather than a category, a band or a figure of its own.
+ *
+ * **C12 I41's scope, stated as data.** These are the forms that map sample *i*
+ * to a column and draw a frame with nothing under it; everything else either
+ * labels its own columns (the categorical vertical arm, through `columnLabels`)
+ * or has no cartesian abscissa at all.
+ *
+ * **`bar` and the rest of the categorical family are `false` for a reason worth
+ * writing down**: a horizontal bar's bottom axis is a *value* axis, not a
+ * position axis, and it does not exist either. That is a different missing
+ * thing, named here so it is a known gap rather than an omission this record
+ * quietly implies is covered.
+ *
+ * Total over `PlotForm`, so the thirty-fifth form declares which it is.
+ */
+export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // Sample index across the area — one column per position (C12 I41).
+  line: true, scatter: true, step: true, ecdf: true, density: true,
+  slope: true, bubble: true, stackedarea: true, streamgraph: true,
+  // One row or column per category; the vertical arm labels its own columns.
+  bar: false, histogram: false, boxplot: false, violin: false, ridgeline: false,
+  forest: false, dumbbell: false, lollipop: false, dotplot: false, funnel: false,
+  gantt: false, waterfall: false, timeline: false, bullet: false, autocorrelation: false,
+  // A matrix labels its rows and its columns from `categories`, not from a scale.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  // No cartesian abscissa at all — a disc, a polygon, a mosaic, a tree.
+  pie: false, radar: false, waffle: false, flame: false, icicle: false, treemap: false,
+  // One row, no furniture.
+  sparkline: false, horizon: false,
+  // Composition: each facet answers this for itself.
+  smallmultiples: false, pairplot: false,
+});
+
 export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // **The two the renderer cuts.** `binValues` makes the bins and the lags are
   // offsets into one series — neither is anything the caller named.

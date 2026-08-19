@@ -9493,3 +9493,80 @@ of 100 in ten rows, which is *exactly five whole cells*. With `part` zero, count
 cell and not counting it give the same answer. 53 of 100 is five cells and two eighths, and the
 row is anchored there now, with the partial cell shown to be partial before anything is asserted
 about the row above it.
+
+---
+
+## F189 — `yScale: "log"` chooses the ticks and moves nothing ★★★★
+
+| | |
+|---|---|
+| **Surface** | every plot with a non-linear `yScale` — the labels are logarithmic, the data is not |
+| **Reached for** | building the x axis, and checking whether a log domain needed a transform |
+| **Verdict** | **the scale reaches the labels and never the rasteriser, so the two halves of one axis disagree** |
+| **Absorbed by** | nothing yet — **open**, and named at C12 §3d.1's log row |
+
+`scatter` of `[1, 10, 100, 1000]` at height 9, with and without `yScale: "log"`:
+
+```
+linear                          log
+1000 ┤                     ⠈│   1000 ┤                     ⠈│
+     │                      │        │                      │
+ 750 ┤                      │        │                      │
+ 500 ┤                      │        │                      │
+ 250 ┤                      │    200 ┤                      │
+   0 ┤⡀     ⡀     ⠈         │      1 ┤⡀     ⡀     ⠈         │
+```
+
+**The labels changed and not one point moved.** 1, 10 and 100 all sit on the bottom row in both;
+on a log axis they belong at 0, ⅓ and ⅔. `axisFor` dispatches on the scale and returns log-valued
+ticks; `rowOf` places by `(v − min) / (max − min)`, unconditionally.
+
+**This is the class `yLabels` records of itself, one layer down.** Its own body carries the note
+*"`yLabels` was called without `yScale`, so a log axis was labelled linearly"* — a defect between
+the *tick chooser* and the *label writer*, found and fixed. The same seam exists between the tick
+chooser and the **rasteriser**, and nothing had asked.
+
+**The x axis does not share it, and the asymmetry is real rather than an inconsistency.** A y value
+*is* the datum, so a log y needs the rasteriser to plot `log(v)`. An x sample is placed by its
+**index**, evenly, and the domain declares which value that index carries: under `xMin: 1,
+xMax: 1000, xScale: "log"`, sample *i* of *n* holds `1000 ^ (i / (n − 1))` and already sits at
+`i / (n − 1)` of the width, so placing its tick at `log(v) / log(max/min)` is what makes the label
+agree with the sample beneath it. That is built; the y transform is not.
+
+**Found because `xScale` had no consumer at all.** Before this work it was declared on `Plot`,
+forwarded by `figure.ts`, and read by nothing in `src/` — so asking *what does the existing scale
+machinery actually move* was the first question the field had ever been put to.
+
+---
+
+## F190 — three tests that asserted a claim by a proxy, and the proxy broke the day the frame gained a row ★★★
+
+| | |
+|---|---|
+| **Surface** | `T2.12b`, and two rows of the x axis's own new suite |
+| **Reached for** | landing the x axis, which writes numbers where no numbers were |
+| **Verdict** | **each asserted something true *about* the claim rather than the claim, and each held only while the rest of the frame stayed quiet** |
+
+**`T2.12b` asked whether the y axis reaches zero by grepping the whole rendered frame for `0`.**
+Its data is flat at 100.2, so unpinned the y axis has no zero and the control passed — until the
+x axis wrote `0` as its first sample index, and a correct y axis failed. The claim was always
+about the *gutter*; that is what it reads now. **And narrowing it once was not enough**: splitting
+every row on its axis edge and keeping the head returns the whole x-label row, which carries no
+box-drawing character at all, so the first narrowing still read the indices it was written to stop
+reading. Only rows that *have* an edge have a gutter.
+
+**The other two are the mutation pass finding the same shape in rows written the same hour.**
+§3d.1's load-bearing row is that a candlestick's ticks come from its own pitch, and both of its
+tests survived their mutations:
+
+- one called `xTickRow` with a **hand-written** column mapping — the mechanism, never the wiring —
+  so removing the wiring changed nothing it could see;
+- the other filtered the empty rows out of the frame before taking the last one, and asserted *the
+  last row is not blank* of the frame's bottom rule, which is never blank.
+
+Both now read the composed frame and assert what the ruling says: **every tick has a candle in its
+column.** Ten mutations, all caught after.
+
+**The pattern under all three is one sentence**: an assertion that is *implied by* the claim is not
+the claim, and it stops being implied the moment anything else in the picture changes. `T2.12b`
+had been correct for as long as the frame had nothing else to say.

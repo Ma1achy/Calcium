@@ -366,6 +366,10 @@ function plot(
     yMin?: number;
     yMax?: number;
     yFormat?: Plot["yFormat"];
+    /** The domain the samples span; the sample index where absent (C04 I58). */
+    xMin?: number;
+    xMax?: number;
+    xFormat?: Plot["yFormat"];
     annotations?: Plot["annotations"];
     colormap?: Plot["colormap"];
     /**
@@ -412,7 +416,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, annotations, colormap, form, xLabels, plotStyle, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -480,6 +484,9 @@ function plot(
       series,
       height,
       ...(axes === undefined ? {} : { axes }),
+      ...(xMin === undefined ? {} : { xMin }),
+      ...(xMax === undefined ? {} : { xMax }),
+      ...(xFormat === undefined ? {} : { xFormat }),
       ...(yMin === undefined ? {} : { yMin }),
       ...(yMax === undefined ? {} : { yMax }),
       ...(yFormat === undefined ? {} : { yFormat }),

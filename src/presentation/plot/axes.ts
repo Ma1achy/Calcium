@@ -592,6 +592,133 @@ export function xAxis(
   return { text: row.join("").replace(/\s+$/, ""), tickColumns };
 }
 
+/**
+ * How many x ticks a width could carry.
+ *
+ * **`ticksFor`'s shape, in the other dimension and with the other constant.** A
+ * y label owns a whole row and abuts its neighbour a row away; an x label is
+ * several cells wide on a row it shares with every other label, so the spacing
+ * that matters is *cells per label* rather than rows between them. Eight is one
+ * `-1234.5` plus the gap, which is the widest a formatted number gets before the
+ * placement starts dropping them anyway.
+ */
+const X_LABEL_PITCH = 8;
+
+/**
+ * Where a value sits along the x domain, as a fraction (C12 I41, §3d.1).
+ *
+ * **The x axis transforms where the y axis cannot, and the asymmetry is real
+ * rather than an inconsistency.** A y value *is* the datum, so placing it under
+ * a log scale needs the rasteriser to plot `log(v)` — which this component does
+ * not do, and `yScale: "log"` therefore picks log ticks and draws them at linear
+ * rows (F189). An x sample is placed by its **index**, evenly, and the domain is
+ * what declares which value that index carries: under `xMin: 1, xMax: 1000,
+ * xScale: "log"`, sample *i* of *n* holds `1000 ^ (i / (n − 1))` and already
+ * sits at `i / (n − 1)` of the width. Placing a tick at `log(v) / log(max/min)`
+ * is what makes the label agree with the sample beneath it.
+ *
+ * **`symlog` falls back to linear, and that is stated rather than silent.** Its
+ * transform is piecewise — linear inside a threshold and logarithmic outside —
+ * and the threshold is not on the scale value, so there is nothing here to read
+ * it from. `niceSymlogAxis` still chooses the tick *values*; only their spacing
+ * is linear, which is wrong near the origin and is the one arm of this function
+ * that does not agree with its samples.
+ */
+function xPositionOf(value: number, range: Range, scale?: ScaleType): number {
+  const span = range.max - range.min;
+  const linear = span <= 0 ? 0 : (value - range.min) / span;
+  const isLog = scale === "log" || scale === "log2" || scale === "ln"
+    || (typeof scale === "object" && "log" in scale);
+  if (!isLog || range.min <= 0 || range.max <= 0) return linear;
+  const lo = Math.log(range.min);
+  const hi = Math.log(range.max);
+  return hi === lo ? 0 : (Math.log(Math.max(value, Number.MIN_VALUE)) - lo) / (hi - lo);
+}
+
+export function xTicksFor(width: number): number {
+  return Math.max(2, Math.min(9, Math.floor(Math.max(0, width) / X_LABEL_PITCH) + 1)); // cells-ok — a label count
+}
+
+/**
+ * The numeric x axis: nice numbers over a domain, and the columns they land on
+ * (C12 I41, §3d.1).
+ *
+ * **The domain is passed as its own pin, and that is load-bearing.** §3d's rule
+ * is *a derived bound snaps outward and a declared one never moves* — right for
+ * the ordinate, where the range exists to contain the data. Here the domain
+ * *is* the geometry: sample 0 is drawn in column 0 and sample n−1 in column
+ * w−1, so a range that snapped outward would put its own top tick at the right
+ * edge where the last sample already is, and every label would name a value one
+ * step along from the sample under it. Nice numbers **inside** the domain, ends
+ * not forced to be ticks — which is what `ax.plot(y)` does: 0 5 10 15 20 over
+ * 0…23.
+ *
+ * **Through `axisFor` and never `niceAxis`**, for the defect `yLabels` records
+ * at the top of its own body: the ticks were picked by the dispatcher and the
+ * labels written by the linear arm, so a log axis was labelled linearly and
+ * neither half was wrong on its own.
+ *
+ * The placement is `xAxis`'s, verbatim: a label that cannot keep its one-cell
+ * gap is dropped, **and a dropped label contributes no tick** — the anchor comes
+ * out of the placement rather than beside it, so a mark never survives the label
+ * it was marking.
+ */
+export function xTickRow(
+  range: Range,
+  width: number,
+  format: Plot["yFormat"],
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  scale?: ScaleType,
+  /**
+   * Where a normalised position lands, **because the form owns that** (C12 I37,
+   * I41). A curve spreads its samples across the width; a candlestick
+   * left-aligns them at a fixed pitch, and I37 measured that the two agree at
+   * the dense end and separate at the sparse one — four bars in forty-four
+   * columns put the last candle at column 20 and the curve's rule at 43. A tick
+   * placed by the curve's rule would point between candles.
+   */
+  columnAt?: (t: number) => number | null,
+): XAxis {
+  const w = Math.max(0, Math.floor(width));
+  if (w === 0 || !Number.isFinite(range.min) || !Number.isFinite(range.max)) {
+    return { text: "", tickColumns: [] };
+  }
+  const axis = axisFor(range, xTicksFor(w), { yMin: range.min, yMax: range.max }, scale);
+  // **`stepDecimals` and not `decimalsFor`**, which is §3d's own rule — *one
+  // precision per axis, from the step, and it is the step's own decimals*.
+  // `decimalsFor` answers a different question (how many digits does a value at
+  // this magnitude want) and gives a step of 5 one decimal, so an index axis
+  // came out `0.0 5.0 10.0` where the reference draws `0 5 10`. The rule was
+  // already written and `yLabels` already followed it.
+  const decimals = axis.step > 0 ? stepDecimals(axis.step) : undefined;
+
+  const row: string[] = Array.from({ length: w }, () => " ");
+  const tickColumns: number[] = [];
+  let free = 0; // the first cell no label has claimed
+
+  for (const value of axis.ticks) {
+    const text = formatValue(value, format, decimals);
+    const wide = cells(text, caps.ambiguousWidth); // cells-ok — a label width
+    const t = xPositionOf(value, axis.range, scale);
+    const at = columnAt?.(t) ?? Math.round(t * (w - 1)); // cells-ok — a column index
+    if (at === null || at < 0) continue; // cells-ok — a column index
+    // Centred on its own tick, then held inside the row and clear of its
+    // neighbour — the same three clamps `xAxis` applies to its three captions.
+    const ideal = at - Math.floor((wide - 1) / 2); // cells-ok — a column position
+    const start = Math.max(free, Math.min(ideal, w - wide)); // cells-ok — a column position
+    if (start < 0 || start + wide > w) continue; // cells-ok — no room with its gap
+    // **The tick is the label's own anchor and not the value's column.** A
+    // label pushed right to clear its neighbour is describing where it now is;
+    // a mark left behind at the value's column points at a label that moved.
+    const anchor = start + Math.floor((wide - 1) / 2); // cells-ok — a column position
+    [...text].forEach((ch, i) => { row[start + i] = ch; }); // cells-ok — a column position
+    tickColumns.push(anchor);
+    free = start + wide + 1; // cells-ok — a column position
+  }
+
+  return { text: row.join("").replace(/\s+$/u, ""), tickColumns };
+}
+
 // --- log / time / symlog axes -----------------------------------------------
 
 function logBase(scale: ScaleType): number {

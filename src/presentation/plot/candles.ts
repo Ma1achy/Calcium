@@ -39,6 +39,24 @@ const MAX_CANDLE = 5;
  * slot: the remainder becomes gap (see `slotsFor`), and a candle wider than its
  * neighbours would read as a datum (§6b B15).
  */
+/**
+ * The bars this block draws, or none (C12 §6b B1, I36).
+ *
+ * **Gated on the style and not on the field being present.** `ohlc` on a block
+ * whose style does not draw it contributes nothing to the frame, so it must
+ * contribute nothing to the axis either — an axis widened by data nobody can see
+ * is a plot whose curve does not reach its own edges for no stated reason.
+ *
+ * **Here rather than in `definition.ts`, because the x axis needs it too.**
+ * `furniture.ts` places the ticks and `definition.ts` imports `furniture.ts`,
+ * so the helper had to move down to the file that already owns the candle's
+ * geometry rather than be reached for sideways (A02 §1 — acyclic within a
+ * layer).
+ */
+export function candlesOf(block: Plot): readonly OHLC[] | undefined {
+  return block.plotStyle === "candlestick" ? block.ohlc : undefined;
+}
+
 export function candleWidth(areaWidth: number, n: number): number {
   const per = Math.floor(Math.max(0, areaWidth) / Math.max(1, n)); // cells-ok — a cell width
   // **The gap comes out of the slot before the body does**, which the first
