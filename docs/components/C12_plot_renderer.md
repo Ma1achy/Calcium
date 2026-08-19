@@ -1590,6 +1590,75 @@ other direction.
 That is why the vertical budget is three columns and not two: two would be four dot-columns
 for the density *and* the box.
 
+### The rain is the only part of the figure that is the data
+
+A density is an estimate and a box is five numbers. Neither says how many readings there
+were, whether they cluster, or that two of them coincide — so the third rung adds the raw
+samples and nothing else, which is what makes it a rung rather than a bigger drawing.
+
+```
+   ▁▁▂▂▃▃▄▅▆▇███▇▆▅▄▃▃▂▂▁▁         the cloud
+ ├──────┤██│███├─────┤            the box
+   ⢀⢀⠔⠐⡡⠊⢎⡼⢾⢷⠶⡚⠶⠥⠉⠄⠑⠁⠂           the rain
+```
+
+**The rain falls below the box**, which is where the form's name comes from (Allen et al.
+2019) and what the vertical arm transposes into left-to-right: cloud, box, rain.
+
+**The strip carries the sub-cell win, and it is on one axis.** A braille cell is two dots
+wide and four tall, so a horizontal strip resolves **two** value positions per cell where the
+cloud and the box resolve one, and spends the four dot rows on jitter. Standing up, the two
+swap: four value positions down a cell, two jitter positions across. That asymmetry is the
+same cell aspect the budgets show, and it is why the vertical budget is four columns where the
+horizontal one is three rows — a one-column strip has two jitter positions where its
+horizontal twin has four.
+
+**ASCII draws a rug and that is I21 rather than a shortfall.** An ASCII cell has no sub-cell
+position to spend, so there is nowhere to put the jitter — and folding through the ramp would
+draw `. : - =` by where a sample happened to land *inside* its cell, which is a magnitude the
+data has not got. One mark where a sample falls says exactly what ASCII can say. `foldPresence`
+is a third fold for exactly this: `foldBraille` puts the dots' arrangement in the glyph and
+`foldRamp` puts the topmost dot's height in it, and a strip has neither to say.
+
+**The strip reads the box's axis**, on the cloud's ruling and for its reason: every part of a
+raincloud is one figure, and a part that moves relative to the others is a different figure.
+
+### The jitter is a function of the sample's identity, and a counter is not the only way to be wrong
+
+I11 says every render is a pure function of block, width and context, so the offsets cannot
+come from a clock, from `Math.random`, or from a module-level counter. **A strip that moves
+between two renders of one block is a picture of the renderer**, and it fails nothing else:
+every count agrees, both frames are plausible, and the difference exists only between two
+frames nobody puts side by side.
+
+**But `index % positions` is deterministic and it is still not a jitter.** It satisfies I11
+exactly and draws a sawtooth — consecutive samples marching down the dot rows in lockstep — so
+**sorted data draws diagonal stripes**: a pattern in the renderer, read as a pattern in the
+measurements. Distribution data arrives sorted often enough that this is the ordinary case
+rather than the adversarial one. So the requirement is a *hash* and not merely a pure
+function, and the band's index is one of its inputs so that two bands of one distribution do
+not draw the same speckle.
+
+**The measured trap is the fixture, not the code.** A module counter running 1…60 and then
+61…120 gives the same `% 4` in both renders whenever the sample count is a multiple of four:
+the phase resets exactly, the two frames come back byte-identical, and the row written to
+catch a counter passes against one. Sixty samples is what the first draft used. A count
+coprime to the jitter's positions is the fixture responding to the thing under test, and it is
+asserted rather than chosen.
+
+### `U+2800` is the braille blank and only a banded form has to know
+
+`foldBraille` emits `U+2800` for an empty cell — a printing character that looks blank. Every
+other braille form in this component reaches the frame through `positionalForm`'s layer merge,
+which starts each cell at a space and takes a glyph only where `isBlank` says there is one, so
+the blanks are lost there and nobody has had to think about them. **A banded form has no
+merge**: the band's rows go into the frame verbatim.
+
+Left alone, the strip's empty cells are ink to everything that measures ink — `refdiff`'s own
+mask records why that matters, because counting `U+2800` as ink reports every braille form as
+almost entirely covered — and inside one figure it means three rows disagree about what empty
+is, in a frame where they look identical.
+
 ### The vertical bands touched, and the box rung already knew
 
 Drawn to the full slot at eleven cells a band, one band's cloud runs straight into the next
@@ -1606,6 +1675,27 @@ at both rungs, and it is the width rather than the rung that decides.
 **Found by reading the frame.** Every count was right — the runs are the density's, the box is
 in its own column, the widths sum to the slot. What was wrong was legibility, and no
 arithmetic in the figure had anything to say about it.
+
+### The rung is the chart's and the width is the band's
+
+`categoricalColumnForm` divides the area and distributes the remainder one cell at a time, so
+eighteen bands over seventy-five cells is four each and three of them five. A rung ladder
+keyed on the band's own width then draws **three mirrored violins among fifteen rainclouds** —
+and a reader takes that as a property of those three categories rather than of the division.
+
+Every width sums, every band is the richest figure its own width affords, and nothing in it is
+arithmetically wrong. **Found by reading the frame**, which is the only instrument that could:
+the numbers are all correct and the picture says something the data does not.
+
+**So the rung is chosen once, from the narrowest band, and the drawing still uses each band's
+own width.** A five-column band draws its raincloud five wide; it does not draw a different
+figure. One chart, one figure, and the remainder decides nothing but how much room each copy
+of it gets.
+
+The horizontal arm never had this: `bandedForm` gives every band `⌊areaRows ÷ n⌋` and drops
+the remainder, so the bands are equal by construction. The asymmetry is worth naming — the two
+arms distribute their leftover differently, and only one of them can reach a rung boundary
+with it.
 
 ### And capped, because a longer run is magnitude resolution
 
@@ -1779,7 +1869,7 @@ orientation — and belongs in the classification table as its own rows.
 
 ---
 - **I33** — **The stub always points toward the whisker, and both box-plot glyph tables fall out of that one rule.** `├`/`┤` horizontally and `┬`/`┴` vertically, swapping roles between the caps and the box edges — which reads as arbitrary and is not, because a cap's whisker leaves inward and a box edge's whisker leaves outward. *The rule was implemented in both arms and written down in neither, and the vertical arm was built by re-deriving it from the horizontal one; a table without its rule is a table the next arm re-derives.* **The compact box is filled where the three-row box is hollow**: with a lid and a floor the interior must stay clear for the median and the mean, and with one row there are no edges, so `┤    │    ├` says nothing about where the box is. **A mean landing on the median draws `◈`** rather than nothing — suppressing it left one band with no mean mark beside two that had one, so *they coincide* read as *it is missing*.
-- **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; **its density is sampled on the box's axis and not on the violin's**, which pads by a tenth at each end, or the cloud's mode sits a tenth of the width from the median below it with every count agreeing — and the tail is stopped by the cut that already stops the violin's outline rather than by a second mechanism. **Blank means outside the support and the ladder's first step means an estimate near zero** (I16), which is the one place those two can collide; **and the vertical figure narrows to three fifths of its slot at five columns or more, by the rule `boxplotColumn` already applies, and is capped at five cells on top of that** — drawn to the full slot a band's cloud ran into the next band's box and three distributions read as one field; drawn to three fifths of a wide one it was fourteen solid cells a row, because a run is the magnitude axis and lengthening it is the same move as adding steps to the ladder. Four cells of cloud resolve `2n + 1` = nine levels against the height ladder's eight, which is the derivation. Every count was right in both; 3 rows / 4 columns adds the raw samples as a jittered strip; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a pure function of the sample's identity** — no clock, no `Math.random`, no module counter — because I11 says every render is a pure function of block, width and context, and a strip that moves between two renders of the same block is a picture of the renderer.
+- **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; **its density is sampled on the box's axis and not on the violin's**, which pads by a tenth at each end, or the cloud's mode sits a tenth of the width from the median below it with every count agreeing — and the tail is stopped by the cut that already stops the violin's outline rather than by a second mechanism. **Blank means outside the support and the ladder's first step means an estimate near zero** (I16), which is the one place those two can collide; **and the vertical figure narrows to three fifths of its slot at five columns or more, by the rule `boxplotColumn` already applies, and is capped at five cells on top of that** — drawn to the full slot a band's cloud ran into the next band's box and three distributions read as one field; drawn to three fifths of a wide one it was fourteen solid cells a row, because a run is the magnitude axis and lengthening it is the same move as adding steps to the ladder. Four cells of cloud resolve `2n + 1` = nine levels against the height ladder's eight, which is the derivation. Every count was right in both; 3 rows / 4 columns adds the raw samples as a jittered strip — **the only part of the figure that is the data**, and the part that carries the sub-cell win: two value positions per cell against the cloud's one horizontally, four down a cell vertically, with the remaining dot axis spent on jitter. ASCII draws a rug instead and that is I21 — there is no sub-cell position to spend, and folding through the ramp would draw a magnitude the data has not got; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **The rung is chosen once for the chart, from its narrowest band** — a vertical arm distributes its remainder a cell at a time, so a ladder keyed on each band's own width drew three mirrored violins among fifteen rainclouds and a reader reads that as a property of three categories. The drawing still takes each band's own width. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a *hash* of the sample's identity and not merely a pure function** — no clock, no `Math.random`, no module counter, because I11 says every render is a pure function of block, width and context and a strip that moves between two renders of one block is a picture of the renderer; **and not `index % positions` either**, which satisfies I11 exactly and draws a sawtooth, so sorted data comes out in diagonal stripes that are a pattern in the renderer read as a pattern in the measurements. The band's index is an input so two bands of one distribution do not draw the same speckle. *The counter is invisible when the sample count is a multiple of the jitter's positions — the phase resets and both frames are byte-identical — so the fixture asserts its count is coprime to them.*
 
 ## 8. Commitments
 
@@ -1857,6 +1947,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.67** (I33): the stub points toward the whisker in both arms — `├` at the min cap and `┤` at Q1 horizontally, `┬` at the max cap and `┴` at Q3 vertically — asserted as the *rule* over both tables rather than as two literal figures, so a table transcribed correctly from a wrong rule still fails.
 - **T1.68** (I33): a compact box is filled between Q1 and Q3 and a three-row box is hollow there, and a mean landing on the median draws `◈`.
 - **T1.69** (I34): `plotDetail: "auto"` picks the richest rung the declared height affords — 1, 2, 3 and 5 rows give the box, the raincloud, the jittered raincloud and the mirrored violin — and `"compact"` gives the *form's* lowest rung, which is 1 for a boxplot and 2 for a violin.
+- **T1.96** (I21, I34): the strip reads the box's axis and resolves twice its detail — the minimum inks column 0, the maximum the last, and two values half a cell apart resolve into one cell's two dot columns, which is a distinction the box cannot make at any width. The vertical arm inverts with its box: `max` on row 0, `min` on the last. And the ASCII arm draws only its rug mark — never a ramp step, which would encode a magnitude from where a sample landed inside its cell.
+- **T1.97** (I34): eighteen bands in a vertical violin at a width their count does not divide — every band draws the same rung, and the three bands a cell wider draw that rung wider rather than a different one. Asserted over the *set* of figures in the frame rather than on any band, because the defect is that the set has two members.
+- **T1.95** (I11, I34): the jitter is decorrelated from the index it is drawn from — every position is reached, fewer than half the indices agree with `index % positions`, and a second band is a different speckle. **The sawtooth is the row's subject**: it is deterministic, satisfies I11, and draws diagonal stripes through sorted data.
 - **T1.93** (I21, I34): the vertical cloud is a run that grows toward the box — ink in the cloud is a suffix, the fractional tip sits at the run's end *away* from the box, and no cell carries the rightward vocabulary's partial. **Three assertions because the caller right-aligns either way**: a reversed vocabulary draws the same run in the same cells with its tip on the other end, which is a dot-column of daylight against the box and invisible to an alignment check. The fixture is shown to produce a fractional tip first, since a cloud that saturates every row it touches is a full run in both directions. Plus the two width rules, **each asserted at the slot where only it bites**: the cap at twenty-one columns, where three fifths would give thirteen; the narrowing at six, where the cap alone leaves five of six and no gap; and the budget's own three, where the figure takes the slot whole. At eleven either rule alone is sufficient, so a row written there passes against a tree missing either — which is what the first form of this row did.
 - **T1.94** (I34): the *renderer* reaches the raincloud, not only the function — a violin at `"compact"` and a violin in two rows both draw a height-ladder step, and one at `"full"` in twelve rows draws none. T1.91 and T1.92 call `rainRows` directly and pass on the day nothing calls it; this is the row that fails when the rung is chosen and then ignored. Discriminated by vocabulary rather than by shape: the cloud is the only thing a violin draws that reaches for a ramp at all.
 - **T1.91** (I34): a raincloud's cloud and its box read the same axis — the column holding the cloud's maximum is the column holding the box's median, for a distribution whose mode *is* its median. Asserted against a skewed sample as well, where the two columns differ and must differ by what the data says rather than by a tenth of the width. **The fixture responds first**: sampled on the violin's padded axis instead, the symmetric case is off by ⌊w ÷ 10⌋ and the row fails.
@@ -1933,6 +2026,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 - **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
+- **T6.29** (I34): choosing the rung from each band's own width rather than from the narrowest → T1.97 fails, and a chart whose band count does not divide its width draws two different figures with the boundary set by the remainder.
+- **T6.28** (I11, I34): placing the strip from a module-level counter → T6.28's own row fails, and a block renders differently the second time. **The fixture is the finding here**: at sixty samples and four positions the counter's phase resets between renders and the two frames are byte-identical, so the row passed against the defect it names until the count was made coprime.
+- **T6.28a** (I34): the strip taking its two-column ceiling before the cloud has its two-column floor → T1.93 fails, and the raindrop draws three levels of density at the width whose budget promises five.
 - **T6.27** (I34): dispatching `rain` to `violinRows` — the rung still chosen, the figure ignored → T1.94 fails and nothing else does. **The wiring mutation**, and it survived four rows written about the raincloud because every one of them called the function.
 - **T6.26** (I21): building the vertical cloud's run with the rightward vocabulary → T1.93 fails on the tip. Both arms right-align, so the run occupies the same cells and only the fractional glyph moves — to the end against the box, where it leaves a dot-column of daylight between the cloud and the box it belongs to.
 - **T6.25a** (I34): dropping the cap so the figure is three fifths of its slot → T1.93 fails at twenty-one columns, and a wide band draws a fourteen-cell solid run whose shape is legible only along one edge.
