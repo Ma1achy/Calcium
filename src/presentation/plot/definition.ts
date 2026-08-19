@@ -44,6 +44,7 @@ import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
 import { markOf } from "./marks.js";
+import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
 import { boxplotBand, boxplotColumn, forestRow, dumbbellRow } from "./glyph-row.js";
@@ -777,6 +778,141 @@ function stackedForm(
   return axed(block, area, layout, ctx);
 }
 
+/**
+ * The pre-`hierarchy` arm, kept for a block that has only `series`.
+ *
+ * It is a bar chart with the labels off, which is what these two forms were and
+ * is not what they are. Kept because a caller passing `series` is asking for the
+ * shape it used to get and silently drawing nothing is worse; **not** kept as an
+ * equal alternative, which is why it is named for what it is.
+ */
+function legacyDepthBars(
+  block: Plot,
+  width: number,
+  ctx: RenderContext,
+  reversed: boolean,
+): readonly string[] {
+  const data = seriesRange(block.series, block);
+  const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width };
+  if (data === null) return emptyRows(block, layout, ctx);
+  const src = reversed
+    ? {
+        ...block,
+        categories: [...(block.categories ?? [])].reverse(),
+        series: [{ ...block.series[0]!, values: [...(block.series[0]?.values ?? [])].reverse() }],
+      }
+    : block;
+  let ri = 0;
+  return categoricalForm(src, width, ctx, (_label, aw) => {
+    const v = src.series[0]?.values[ri++] ?? null;
+    return barRow(v, baselineFor(data.min), data.max, aw, ctx.capabilities, false);
+  });
+}
+
+/**
+ * A flame graph or an icicle plot — the tree as strips, one row per depth.
+ *
+ * **`inverted` is the only difference**, which is what these two forms are:
+ * a flame graph puts the root at the bottom and grows upward, an icicle puts it
+ * at the top. Both previously dispatched to `barRow` with the labels suppressed,
+ * so they were a bar chart and a reversed bar chart — correct in every count and
+ * about nothing, because a bar chart cannot say that one frame *sits on*
+ * another and spans a sub-range of it.
+ *
+ * A frame's label is written inside it where it fits and dropped where it does
+ * not; a name sliced to three characters names nothing, and the strip's extent
+ * is the datum either way.
+ */
+function hierarchyStripRows(
+  block: Plot,
+  width: number,
+  ctx: RenderContext,
+  inverted: boolean,
+): readonly string[] {
+  const root = block.hierarchy;
+  const areaRows = plotAreaRows(block);
+  const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (root === undefined) return emptyRows(block, layout, ctx);
+
+  const placed = strips(root);
+  const maxDepth = placed.reduce((m, st) => Math.max(m, st.depth), 0); // cells-ok — a depth count
+  const rowFor = (depth: number): number =>
+    inverted ? depth : areaRows - 1 - depth; // cells-ok — a row index
+
+  const out: string[] = [];
+  for (let r = 0; r < areaRows; r += 1) {
+    const depth = inverted ? r : areaRows - 1 - r; // cells-ok — a depth index
+    const here = placed.filter((st) => st.depth === depth && rowFor(st.depth) === r);
+    if (here.length === 0 || depth > maxDepth) { // cells-ok — a strip count
+      out.push(line([{ text: " ".repeat(width) }], layout, ctx));
+      continue;
+    }
+    const spans: Span[] = [];
+    let cursor = 0; // cells-ok — a column position
+    for (const st of here) {
+      const from = Math.round(st.from * width); // cells-ok — a column position
+      const to = Math.max(from + 1, Math.round(st.to * width)); // cells-ok — a column position
+      if (from > cursor) spans.push({ text: " ".repeat(from - cursor) });
+      const cells = Math.max(1, Math.min(to, width) - from); // cells-ok — a cell count
+      // The name inside the frame where it fits, and nothing where it does not:
+      // three characters of a symbol name is not a shorter name, it is a
+      // different one.
+      const label = st.label.length + 2 <= cells ? ` ${st.label} ` : ""; // cells-ok — a cell count
+      const text = label === "" ? markOf(st.index, ctx.capabilities).repeat(cells)
+        : label + markOf(st.index, ctx.capabilities).repeat(cells - label.length); // cells-ok — a cell count
+      spans.push({ text, style: slot(categoryRef(st.index), ctx.theme, ctx.capabilities) });
+      cursor = from + cells; // cells-ok — a column position
+    }
+    out.push(line(spans, layout, ctx));
+  }
+  return composeRows(plotHeight(block), [], out, []);
+}
+
+/**
+ * A treemap — the tree as tiles, drawn as filled rectangles.
+ *
+ * Nesting is drawn by **depth ordering**: a parent is painted, then its children
+ * over it, so a child is visibly inside the rectangle that contains it. There is
+ * no border vocabulary that survives a two-cell tile, and a mark that does not
+ * fit the smallest tile is a mark that lies about the ones it does fit.
+ */
+function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
+  const root = block.hierarchy;
+  const areaRows = plotAreaRows(block);
+  const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (root === undefined) return emptyRows(block, layout, ctx);
+
+  // A cell's worth of padding in each direction, expressed on the unit square
+  // so the layout stays resolution-independent.
+  const placed = [...tiles(root, 1 / Math.max(width, plotAreaRows(block)))].sort((a, b) => a.depth - b.depth); // cells-ok — a depth index
+  const grid = Array.from({ length: areaRows }, () => new Array<number>(width).fill(-1)); // cells-ok — a tile index
+  for (const t of placed) {
+    const x0 = Math.round(t.x0 * width), x1 = Math.round(t.x1 * width); // cells-ok — a column position
+    const y0 = Math.round(t.y0 * areaRows), y1 = Math.round(t.y1 * areaRows); // cells-ok — a row position
+    for (let r = y0; r < Math.max(y0 + 1, y1) && r < areaRows; r += 1) {
+      for (let c = x0; c < Math.max(x0 + 1, x1) && c < width; c += 1) grid[r]![c] = t.index; // cells-ok — a tile index
+    }
+  }
+
+  const out = grid.map((row) => {
+    const spans: Span[] = [];
+    let run = "", runIdx = -2; // cells-ok — a tile index
+    const flush = (): void => {
+      if (run === "") return;
+      spans.push(runIdx < 0 ? { text: run }
+        : { text: run, style: slot(categoryRef(runIdx), ctx.theme, ctx.capabilities) });
+      run = "";
+    };
+    for (const idx of row) {
+      if (idx !== runIdx) { flush(); runIdx = idx; }
+      run += idx < 0 ? " " : markOf(idx, ctx.capabilities); // cells-ok — a tile index
+    }
+    flush();
+    return line(spans, layout, ctx);
+  });
+  return composeRows(plotHeight(block), [], out, []);
+}
+
 function positionalForm(
   block: Plot,
   width: number,
@@ -1092,27 +1228,21 @@ const FORM_ROWS: Readonly<
       return line(spans, layout, ctx);
     });
   },
-  flame: (block, width, ctx) => {
-    const data = seriesRange(block.series, block);
-    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    let ri = 0;
-    return categoricalForm(block, width, ctx, (_label, aw) => {
-      const v = block.series[0]?.values[ri++] ?? null;
-      return barRow(v, baselineFor(data.min), data.max, aw, ctx.capabilities, false);
-    });
-  },
-  icicle: (block, width, ctx) => {
-    const data = seriesRange(block.series, block);
-    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    const cats = [...(block.categories ?? [])].reverse();
-    const vals = [...(block.series[0]?.values ?? [])].reverse();
-    const flipped = { ...block, categories: cats, series: [{ ...block.series[0]!, values: vals }] };
-    let ri = 0;
-    return categoricalForm(flipped, width, ctx, (_label, aw) => {
-      const v = flipped.series[0]?.values[ri++] ?? null;
-      return barRow(v, baselineFor(data.min), data.max, aw, ctx.capabilities, false);
-    });
-  },
+  // **The tree, where these were a bar chart and a reversed bar chart** (C04 I54).
+  // Both dispatched to `barRow` with labels suppressed — correct in every count
+  // and about nothing, because a bar chart cannot say that one frame sits on
+  // another and spans a sub-range of it. `hierarchy` absent falls back to the
+  // old arm rather than drawing nothing, since a caller with only `series` is
+  // asking for the shape it used to get.
+  flame: (block, width, ctx) =>
+    block.hierarchy !== undefined
+      ? hierarchyStripRows(block, width, ctx, false)
+      : legacyDepthBars(block, width, ctx, false),
+  icicle: (block, width, ctx) =>
+    block.hierarchy !== undefined
+      ? hierarchyStripRows(block, width, ctx, true)
+      : legacyDepthBars(block, width, ctx, true),
+  treemap: (block, width, ctx) => treemapRows(block, width, ctx),
   funnel: (block, width, ctx) => {
     const data = seriesRange(block.series, block);
     if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);

@@ -1138,6 +1138,46 @@ it must.
 
 ---
 
+## 3n. Containment — `flame`, `icicle`, `treemap`
+
+**`flame` and `icicle` shipped as `barRow` with the labels suppressed**, so they
+were a bar chart and a reversed bar chart: correct in every count and about
+nothing. A flame graph's whole content is that a frame *sits on* the one beneath
+it and spans a sub-range of it, and a bar chart has no way to say either. C04 I54
+is the field; this is what the three do with it.
+
+**Two layouts, not three.** `strips` places the tree on the unit interval by
+depth and `tiles` places it in the unit square, because what the forms disagree
+about is how a subtree occupies space — and `flame` and `icicle` disagree only
+about which way is up. `inverted` is the whole of the difference.
+
+**Containment is structural.** Children divide their parent's span in order and
+in proportion, so a child is inside its parent for every input rather than for
+the ones somebody tested. A node's extent is `max(own, subtree)`: a parent
+stating less than its children sum to is ordinary in profiling data — self time
+against total — and taking the stated value would draw the children outside it.
+
+### The treemap is squarified, and padded where it can afford to be
+
+Slice-and-dice produces long thin slivers whose areas the eye cannot compare,
+which is the one thing the form exists to let it do. So the layout is Bruls,
+Huizing and van Wijk's: children laid along the shorter side, a new row started
+when the worst aspect ratio would get worse.
+
+**And children are inset by a cell where the rectangle can spare it.** Filling the
+parent exactly is arithmetically right and draws a *mosaic* — the leaf areas are
+correct, the siblings are adjacent, and nothing says which belong together. The
+padding ring is the parent showing through, and it is the only nesting cue that
+survives a two-cell tile; there is no border vocabulary that does. Skipped where
+the rectangle cannot afford it, because a tile shrunk to nothing reports an area
+of zero.
+
+A frame's label is written inside it where it fits and dropped where it does not.
+Three characters of a symbol name is not a shorter name; it is a different one,
+and the strip's extent is the datum either way.
+
+---
+
 ## 3m. `bandwidth` — the rule of thumb has a known failure and no better default
 
 Every kernel density in this component — `violin`, `ridgeline`, `density` —

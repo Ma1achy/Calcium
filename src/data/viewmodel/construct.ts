@@ -98,7 +98,7 @@ const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
   scatter: true, step: true, ecdf: true,
   bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
   lollipop: true, dotplot: true,
-  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true,
   calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
   density: true, violin: true, ridgeline: true,
   smallmultiples: true, pairplot: true,
@@ -229,7 +229,10 @@ const ORIENTABLE: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
   bar: true, histogram: true, boxplot: true, violin: true,
   // Not built: each needs its own column renderer and none was asked for.
   lollipop: false, dotplot: false, funnel: false, dumbbell: false, forest: false,
-  ridgeline: false, flame: false, icicle: false,
+  ridgeline: false,
+  // The containment family: `flame` and `icicle` *are* each other's
+  // orientation, and a treemap fills both axes already.
+  flame: false, icicle: false, treemap: false,
   // Horizontal by construction — the bar is an interval on a time axis.
   gantt: false, waterfall: false,
   // Two axes already.

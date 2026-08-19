@@ -27,16 +27,14 @@ change is the signal.
 | waterfall | 64x16 | 40.8% | — |
 | ridgeline | 64x16 | 39.3% | — |
 | boxplot | 64x16 | 35.6% | — |
-| icicle | 64x16 | 34.2% | 49.0% |
 | funnel | 64x16 | 32.4% | — |
-| violin | 64x16 | 28.0% | 81.6% |
 | pie | 64x16 | 27.1% | — |
 | lollipop | 64x16 | 26.8% | — |
 | gantt | 64x16 | 26.3% | — |
 | radar | 64x16 | 25.5% | — |
-| flame | 64x16 | 24.8% | 0.5% |
 | sparkline | 64x1 | 21.9% | — |
 | forest | 64x16 | 17.9% | — |
+| violin | 64x16 | 16.1% | 1.0% |
 | horizon | 64x16 | 14.6% | — |
 | density | 64x16 | 13.7% | — |
 | streamgraph | 64x16 | 12.6% | — |
@@ -48,6 +46,9 @@ change is the signal.
 | line | 64x16 | 3.8% | — |
 | dotplot | 64x16 | 1.9% | — |
 | heatmap | — | — | *C04 I50b — no `axes: false`; lifts with furniture.ts `AreaContent`* |
+| flame | — | — | *no reference renderer — see reference.py SKIPPED* |
+| icicle | — | — | *no reference renderer — see reference.py SKIPPED* |
+| treemap | — | — | *no reference renderer — see reference.py SKIPPED* |
 | calendar | — | — | *C04 I50b — as heatmap* |
 | correlation | — | — | *C04 I50b — as heatmap* |
 | confusion | — | — | *C04 I50b — as heatmap* |

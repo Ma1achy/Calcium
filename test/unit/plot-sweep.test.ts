@@ -42,7 +42,7 @@ describe("P3: height is declared", () => {
     boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
     heatmap: false, calendar: false, correlation: false, confusion: false,
     spectrogram: false, latency: false, density2d: false,
-    streamgraph: false, stackedarea: false, smallmultiples: false, pairplot: false,
+    streamgraph: false, stackedarea: false, treemap: false, smallmultiples: false, pairplot: false,
     pie: false, radar: false, horizon: false,
   };
   for (const form of ALL_FORMS) {

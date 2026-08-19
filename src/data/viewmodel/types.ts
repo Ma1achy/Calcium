@@ -532,7 +532,7 @@ export type PlotForm =
   | "line" | "sparkline" | "heatmap"
   | "scatter" | "step" | "ecdf"
   | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
-  | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea"
+  | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
   | "density" | "violin" | "ridgeline"
   | "smallmultiples" | "pairplot"
@@ -696,6 +696,8 @@ export type Plot = Readonly<{
    * Below 1 sharpens, above 1 smooths.
    */
   bandwidth?: number;
+  /** The tree `flame`, `icicle` and `treemap` are drawn from (C04 I54, C12 §3n). */
+  hierarchy?: HierarchyNode;
   palette?: string;
 }> & Gap;
 
@@ -741,6 +743,25 @@ export type QuartileSummary = Readonly<{
 }>;
 
 export type Segment = Readonly<{ label: string; value: number }>;
+
+/**
+ * A node in a `Plot`'s `hierarchy` (C04 I54, C12 §3n).
+ *
+ * **One field for three forms rather than three shapes.** `flame`, `icicle` and
+ * `treemap` cannot be built from `series` plus `categories` — a call stack is
+ * depth and offset, a treemap is area and nesting — and what they disagree about
+ * is layout while what they share is the tree.
+ *
+ * `value` is the node's **own** magnitude where it has no children and its
+ * subtree's where it does; a renderer takes the larger of the two, so a parent
+ * whose stated value is less than its children's sum does not draw its children
+ * outside itself.
+ */
+export type HierarchyNode = Readonly<{
+  label: string;
+  value: number;
+  children?: readonly HierarchyNode[];
+}>;
 
 export type Progress = Readonly<{
   kind: "progress";

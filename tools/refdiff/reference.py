@@ -45,6 +45,14 @@ ROWS = max(GRID.values())
 DPI = 72
 F = json.load(open("/work/fixtures.json"))
 OUT = "/work/out"
+# **Cleared, not merely created.** A form dropped from `RENDERERS` — because
+# matplotlib has no primitive for it, or because its fixture changed shape —
+# leaves its last render behind, and `pair.mjs` finds the file and compares
+# against it. That is the third manufacture-evidence shape again: real braille
+# from a real run, describing a form that is no longer being rendered.
+if os.path.isdir(OUT):
+    for stale in os.listdir(OUT):
+        os.remove(os.path.join(OUT, stale))
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -317,7 +325,7 @@ RENDERERS = {
     "streamgraph": r_streamgraph, "stackedarea": r_stackedarea,
     "bar": r_bar, "histogram": r_hist, "lollipop": r_lollipop,
     "dotplot": r_dotplot, "funnel": r_funnel, "gantt": r_gantt,
-    "waterfall": r_waterfall, "flame": r_bar, "icicle": r_bar,
+    "waterfall": r_waterfall,
     "boxplot": r_boxplot, "violin": r_violin, "ridgeline": r_ridgeline,
     "forest": r_forest, "dumbbell": r_dumbbell,
     "heatmap": r_matrix, "calendar": r_matrix, "correlation": r_matrix,
@@ -332,6 +340,18 @@ SKIPPED = {
     "smallmultiples": "a composition of other forms; matplotlib's subplot grid "
                       "shares no geometry with ours to diff",
     "pairplot": "same — seaborn's PairGrid is furniture-dominated at this size",
+    # The containment family. matplotlib has no primitive for any of the three:
+    # a treemap needs `squarify`, a flame graph needs `flameprof` or d3, and
+    # neither is a dependency this comparison should acquire to render a figure
+    # whose layout we would then be checking against our own implementation of
+    # the same published algorithm. **The reference for these is the algorithm**
+    # — Bruls/Huizing/van Wijk for the treemap, and containment itself for the
+    # other two — and T1.64–T1.68 assert it directly rather than by diffing a
+    # picture.
+    "treemap": "no matplotlib primitive; the reference is the squarify algorithm "
+               "and T1.66 asserts it directly",
+    "flame": "no matplotlib primitive; containment is asserted structurally in T1.64",
+    "icicle": "same as flame, inverted",
 }
 
 

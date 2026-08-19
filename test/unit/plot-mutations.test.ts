@@ -20,6 +20,7 @@ import { horizonRows } from "../../src/presentation/plot/horizon.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
 import { bandRows, stackBands } from "../../src/presentation/plot/stack.js";
+import { strips, tiles } from "../../src/presentation/plot/hierarchy.js";
 import { categoryMarks } from "../../src/presentation/plot/marks.js";
 import type { RenderContext } from "../../src/presentation/blocks/types.js";
 import { displayCells } from "../../src/presentation/text.js";
@@ -674,6 +675,104 @@ describe("GROUP 6h: the bandwidth's rule of thumb has a named failure", () => {
     } as Plot);
     const k = kit();
     expect(k.renderToLines(mk(0.4), 60).join("\n")).not.toBe(k.renderToLines(mk(), 60).join("\n"));
+  });
+});
+
+describe("GROUP 6i: containment is the subject, not magnitude", () => {
+  const tree = {
+    label: "root", value: 100,
+    children: [
+      { label: "a", value: 60, children: [{ label: "a1", value: 40 }, { label: "a2", value: 20 }] },
+      { label: "b", value: 40 },
+    ],
+  };
+
+  it("T1.64 (C04 I54): a child is inside its parent, structurally", () => {
+    // **Not a fact about the data.** Children divide their parent's span in
+    // proportion, so containment cannot come out wrong for particular values —
+    // which is exactly what `flame` and `icicle` could not say when they were
+    // `barRow` with the labels off.
+    // **The tree's second branch carries the test.** Every first child starts at
+    // its parent's own start, so a layout that ignored the cursor entirely and
+    // put each child at 0 satisfies `from >= parent.from` for all of them — the
+    // mutation survived the first version of this row. `b`'s subtree starts
+    // partway along and cannot.
+    const deep = {
+      label: "root", value: 100,
+      children: [
+        { label: "a", value: 60 },
+        { label: "b", value: 40, children: [{ label: "b1", value: 25 }, { label: "b2", value: 15 }] },
+      ],
+    };
+    const placed = strips(deep);
+    const byLabel = new Map(placed.map((st) => [st.label, st]));
+    expect(byLabel.get("b")!.from, "the second branch starts partway along").toBeGreaterThan(0);
+    for (const [child, parent] of [["a", "root"], ["b", "root"], ["b1", "b"], ["b2", "b"]] as const) {
+      const c = byLabel.get(child)!, p = byLabel.get(parent)!;
+      expect(c.from, `${child} starts inside ${parent}`).toBeGreaterThanOrEqual(p.from);
+      expect(c.to, `${child} ends inside ${parent}`).toBeLessThanOrEqual(p.to + 1e-9);
+      expect(c.depth).toBe(p.depth + 1); // cells-ok — a depth index
+    }
+  });
+
+  it("T1.65 (C04 I54): a node's extent is its subtree's, not its stated value", () => {
+    // Ordinary in profiling data — self time against total time. **The root
+    // cannot show it**: its span is [0, 1] by construction whatever its value
+    // says, so the first version of this row asserted containment on the one
+    // node where containment is free and passed against the mutation. Two
+    // *siblings* is where the stated value is read.
+    const understated = {
+      label: "r", value: 100,
+      children: [
+        { label: "small", value: 1, children: [{ label: "s1", value: 50 }] },
+        { label: "big", value: 50 },
+      ],
+    };
+    const placed = strips(understated);
+    const small = placed.find((st) => st.label === "small")!;
+    const big = placed.find((st) => st.label === "big")!;
+    const span = (st: { from: number; to: number }): number => st.to - st.from;
+    expect(span(small), "sized by its subtree, so equal to its sibling").toBeCloseTo(span(big), 5);
+  });
+
+  it("T1.66 (C04 I54): a tile's area is its share, and children fill their parent", () => {
+    const placed = tiles(tree);
+    const area = (t: { x0: number; y0: number; x1: number; y1: number }): number =>
+      (t.x1 - t.x0) * (t.y1 - t.y0);
+    const a = placed.find((t) => t.label === "a")!;
+    const b = placed.find((t) => t.label === "b")!;
+    expect(area(a) / area(b), "60 against 40").toBeCloseTo(1.5, 1);
+    // And a1 + a2 fill a.
+    const a1 = placed.find((t) => t.label === "a1")!;
+    const a2 = placed.find((t) => t.label === "a2")!;
+    expect(area(a1) + area(a2)).toBeCloseTo(area(a), 5);
+  });
+
+  it("T1.67 (C12 §3n): padding is skipped where the rectangle cannot afford it", () => {
+    // A tile shrunk to nothing reports an area of zero, so the inset is applied
+    // only where there is room — and the nesting it exists to show is worth
+    // nothing if it costs the leaves their size.
+    // **Asserted on the children's *count*, not their area.** A tile's own
+    // rectangle is fixed before the inset — the inset shrinks the box its
+    // children get — so "every tile has positive area" is true whether the
+    // padding is refused or applied until the children vanish. The first version
+    // asserted that and the mutation lived.
+    const modest = tiles(tree, 0.02).filter((t) => t.depth > 0).length; // cells-ok — a tile count
+    const absurd = tiles(tree, 0.4).filter((t) => t.depth > 0).length; // cells-ok — a tile count
+    expect(modest, "a modest pad keeps the children").toBeGreaterThan(0); // cells-ok — a tile count
+    expect(absurd, "and an unaffordable one is refused rather than collapsing them").toBe(modest); // cells-ok — a tile count
+  });
+
+  it("T1.68: flame and icicle are each other, and neither is a bar chart", () => {
+    const mk = (form: "flame" | "icicle"): Plot =>
+      block({ kind: "plot", id: "h", form, height: 4, series: [], hierarchy: tree } as Plot);
+    const k = kit();
+    const f = k.renderToLines(mk("flame"), 40).map((r) => r.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"), ""));
+    const i = k.renderToLines(mk("icicle"), 40).map((r) => r.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"), ""));
+    expect(f.join("\n")).not.toBe(i.join("\n"));
+    // The root spans the full width and sits at opposite ends.
+    expect(f[f.length - 1], "flame's root is at the bottom").toContain("root");
+    expect(i[0], "icicle's is at the top").toContain("root");
   });
 });
 

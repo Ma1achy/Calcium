@@ -97,7 +97,7 @@ export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // One row per category, named in the gutter.
   boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
   lollipop: false, dotplot: false, funnel: false, gantt: false, waterfall: false,
-  flame: false, icicle: false,
+  flame: true, icicle: true, treemap: true,
   // One row per series, named in the gutter, and a scale legend beneath.
   heatmap: false, calendar: false, correlation: false, confusion: false,
   spectrogram: false, latency: false, density2d: false,

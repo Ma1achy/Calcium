@@ -48,6 +48,7 @@ export type {
   Annotation,
   BarSpec,
   QuartileSummary,
+  HierarchyNode,
   Segment,
   ScaleType,
   Progress,

@@ -122,7 +122,9 @@ describe("refdiff — the grid is the model, not the answer", () => {
     }
     // The reference's own skip list is the other half of the record; a form in
     // neither place is an unrecorded gap.
-    const recorded = new Set(["smallmultiples", "pairplot"]);
+    // Kept in step with `reference.py`'s own list — the two halves of one
+    // record, and a form in neither is the gap this row exists for.
+    const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle"]);
     expect(new Set(missing), "forms with neither a reference nor a recorded reason").toEqual(recorded);
     for (const form of excluded) expect(all.has(form), `${form} is excluded and is not a form`).toBe(true);
     console.log(`refdiff-coverage — ${String(all.size - excluded.size - missing.length)}/${String(all.size)} rows`);

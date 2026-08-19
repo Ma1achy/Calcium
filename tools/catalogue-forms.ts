@@ -249,6 +249,23 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   flame: {
+    tree: {
+      form: "flame", height: 6,
+      series: [],
+      hierarchy: {
+        label: "root", value: 100,
+        children: [
+          { label: "render", value: 46, children: [
+            { label: "curve", value: 21, children: [{ label: "raster", value: 12 }] },
+            { label: "paint", value: 17 },
+          ] },
+          { label: "layout", value: 31, children: [
+            { label: "measure", value: 18 }, { label: "wrap", value: 9 },
+          ] },
+          { label: "parse", value: 23 },
+        ],
+      },
+    },
     default: {
       form: "flame", height: 6, axes: true,
       categories: ["main", "parse", "lex", "eval", "gc", "io"],
@@ -256,6 +273,23 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   icicle: {
+    tree: {
+      form: "icicle", height: 6,
+      series: [],
+      hierarchy: {
+        label: "root", value: 100,
+        children: [
+          { label: "render", value: 46, children: [
+            { label: "curve", value: 21, children: [{ label: "raster", value: 12 }] },
+            { label: "paint", value: 17 },
+          ] },
+          { label: "layout", value: 31, children: [
+            { label: "measure", value: 18 }, { label: "wrap", value: 9 },
+          ] },
+          { label: "parse", value: 23 },
+        ],
+      },
+    },
     default: {
       form: "icicle", height: 6, axes: true,
       categories: ["main", "parse", "lex", "eval", "gc", "io"],
@@ -279,6 +313,27 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "waterfall", height: 5, axes: true,
       categories: ["Revenue", "COGS", "Opex", "Tax", "Net"],
       series: [s([100, -40, -25, -10, 25])], totals: [false, false, false, false, true],
+    },
+  },
+  treemap: {
+    // One tree, three forms — C04 I54. The same fixture below under `flame` and
+    // `icicle`, because what they disagree about is layout.
+    default: {
+      form: "treemap", height: 12,
+      series: [],
+      hierarchy: {
+        label: "root", value: 100,
+        children: [
+          { label: "render", value: 46, children: [
+            { label: "curve", value: 21, children: [{ label: "raster", value: 12 }] },
+            { label: "paint", value: 17 },
+          ] },
+          { label: "layout", value: 31, children: [
+            { label: "measure", value: 18 }, { label: "wrap", value: 9 },
+          ] },
+          { label: "parse", value: 23 },
+        ],
+      },
     },
   },
   stackedarea: {

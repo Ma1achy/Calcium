@@ -126,6 +126,19 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
     kind: "plot", id: "form-streamgraph", form: "streamgraph", height: 5, axes: true,
     series: [s([1, 3, 2, 5, 4]), s([2, 1, 4, 3, 5])],
   }),
+  treemap: block({
+    kind: "plot", id: "form-treemap", form: "treemap", height: 8, series: [],
+    hierarchy: {
+      label: "root", value: 100,
+      children: [
+        { label: "src", value: 55, children: [
+          { label: "plot", value: 30 }, { label: "shell", value: 25 },
+        ] },
+        { label: "test", value: 30 },
+        { label: "docs", value: 15 },
+      ],
+    },
+  }),
   stackedarea: block({
     kind: "plot", id: "form-stackedarea", form: "stackedarea", height: 5, axes: true,
     series: [s([1, 3, 2, 5, 4]), s([2, 1, 4, 3, 5])],
