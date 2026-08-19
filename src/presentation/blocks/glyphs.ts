@@ -72,7 +72,7 @@ export type GlyphSet = Readonly<{
   stubRight: string;
   /** A second centre that must never share the median's glyph (C04 I53). */
   diamond: string;
-  /** Mean and median in one cell — see C12 §3r. */
+  /** Mean and median in one cell, so *they coincide* never reads as *it is missing* (C12 I33). */
   diamondTee: string;
   teeLeft: string;
   teeRight: string;
