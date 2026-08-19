@@ -263,7 +263,7 @@ describe("C12 tier 6 — fail-on-revert", () => {
     expect(displayCells(styled)).toBe(20); // cells-ok — a cell count
     const four = [{ form: "line" }, { form: "line" }, { form: "line" },
       { form: "line" }] as unknown as readonly Plot[];
-    const rows = smallMultiplesRows(four, 80, { capabilities: FULL_CAPS } as never, {
+    const rows = smallMultiplesRows(four, 80, 1, { capabilities: FULL_CAPS } as never, {
       line: (_b: Plot, w: number) => [`${ESC}[38;5;241m${"A".repeat(w)}${ESC}[0m`],
     } as never);
     expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count

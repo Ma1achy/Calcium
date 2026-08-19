@@ -36,6 +36,7 @@ import type { Plot } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { displayCells, fitStyled, sliceCells } from "../text.js";
+import { plotAreaRows, plotHeight } from "./height.js";
 
 type FormRenderer = (block: Plot, width: number, ctx: RenderContext) => readonly string[];
 
@@ -56,10 +57,32 @@ export function facetWidths(width: number, n: number): readonly number[] {
   return Array.from({ length: n }, (_, i) => base + (i < extra ? 1 : 0));
 }
 
+/**
+ * A facet resized to the height the parent has for it.
+ *
+ * **The parent owns the layout, and reconciling without this mutilates the
+ * figure.** A parent declaring 5 rows whose children each declare 5 gets
+ * children of 8 — their own height plus their own frame — so cutting to the
+ * declaration took the bottom border off every facet. Honouring C12 I1 by
+ * removing the last three rows of a drawing is obeying the letter of the
+ * invariant and breaking what it protects.
+ *
+ * The child's furniture is whatever its own form declares, so the height handed
+ * back is the parent's budget minus that. A child too small to hold its own
+ * furniture keeps one area row and `composeRows` does the rest — there is no
+ * height at which a frame and a curve both fit in two rows, and a form that
+ * says so is better than one that silently drops the curve.
+ */
+function facetAt(f: Plot, rows: number): Plot {
+  const furniture = plotHeight(f) - plotAreaRows(f);
+  return { ...f, height: Math.max(1, rows - furniture) }; // cells-ok — a row count
+}
+
 /** Small multiples: divide width across the facets, render each child into its column. */
 export function smallMultiplesRows(
   facets: readonly Plot[],
   width: number,
+  areaRows: number,
   ctx: RenderContext,
   formRows: Readonly<Record<string, FormRenderer>>,
 ): readonly string[] {
@@ -70,7 +93,7 @@ export function smallMultiplesRows(
   const widths = facetWidths(width, n);
   const rendered = facets.map((f, i) => {
     const renderer = formRows[f.form];
-    return renderer ? renderer(f, widths[i]!, ctx) : [];
+    return renderer ? renderer(facetAt(f, areaRows), widths[i]!, ctx) : [];
   });
 
   const maxRows = rendered.reduce((m, r) => Math.max(m, r.length), 0); // cells-ok — a row count

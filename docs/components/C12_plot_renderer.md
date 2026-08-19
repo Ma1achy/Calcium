@@ -82,9 +82,18 @@ prevent.
 no cartesian axes and a pie already declared zero — so for the geometric family
 the *declaration* was wrong. For the facet forms the *row count* was wrong too:
 the parent's declared height is the contract whatever its children do, so they
-reconcile through `composeRows` like every axed form. A facet grid whose children
-are shorter than the parent's height pads; **sizing the children to fill it is a
-separate question and belongs with `height: "fill"`**, not here.
+reconcile through `composeRows` like every axed form.
+
+**And the parent sizes its children, which this section deferred one commit ago
+and the implementation falsified.** The ruling was that a short facet grid pads
+and that filling it belongs with `height: "fill"`. Reconciling alone turned out
+to *cut*: a parent declaring 5 rows whose children each declare 5 gets children
+of 8 — their own height plus their own frame — so honouring the declaration took
+the bottom border off every facet. Obeying the letter of I1 by deleting the last
+three rows of a drawing breaks the thing I1 protects. So each facet is rendered
+at the parent's budget minus its own furniture, which is what *the parent owns
+the layout* has to mean. A child with no room for its own furniture keeps one
+area row and `composeRows` finishes the job.
 
 **A heatmap's two rows are not the line's two rows**, and the substitution is deliberate: a
 matrix's cells bound themselves, so there is nothing for a rule to delimit, and the row it would

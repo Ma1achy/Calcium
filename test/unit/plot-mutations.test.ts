@@ -141,7 +141,7 @@ describe("GROUP 6: facets compose rows another renderer has already painted", ()
     // string as wider than its 26-cell column and padded nothing; `slice(0, 80)`
     // then cut at eighty *bytes*, which was forty visible cells, and the cut
     // landed inside an escape so every later facet was gone.
-    const rows = smallMultiplesRows(four, 80, ctx, probe("A"));
+    const rows = smallMultiplesRows(four, 80, 1, ctx, probe("A"));
     expect(rows.length).toBe(1); // cells-ok — a row count
     expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
     // All four facets survive, which is the half `slice` destroyed.
@@ -151,7 +151,7 @@ describe("GROUP 6: facets compose rows another renderer has already painted", ()
   it("T1.32 (C12 I10): a facet short of its column is padded, not pulled leftwards", () => {
     // The other half, and it needs a facet that does not fill its width —
     // otherwise `fitStyled` returns early and the padding path is never taken.
-    const rows = smallMultiplesRows(four, 80, ctx, probe("B", 6));
+    const rows = smallMultiplesRows(four, 80, 1, ctx, probe("B", 6));
     expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
     const runs = rows[0]!.match(/B+/g) ?? [];
     expect(runs.length).toBe(4); // cells-ok — a facet count
@@ -209,7 +209,7 @@ describe("GROUP 6: facets compose rows another renderer has already painted", ()
     const plain = {
       line: (_b: Plot, w: number) => ["C".repeat(w)],
     } as unknown as Readonly<Record<string, FormRenderer>>;
-    const rows = smallMultiplesRows(four, 80, ctx, plain);
+    const rows = smallMultiplesRows(four, 80, 1, ctx, plain);
     expect(displayCells(rows[0]!)).toBe(80); // cells-ok — a cell count
     expect(rows[0]!.padEnd(80).slice(0, 80).length).toBe(80); // cells-ok — a cell count
   });

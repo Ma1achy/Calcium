@@ -977,7 +977,12 @@ const FORM_ROWS: Readonly<
     // place in C12 that composes rows another renderer has already styled, so
     // the span pipeline is the wrong pipeline; `smallMultiplesRows` fits each
     // column in display cells and guarantees the width itself.
-    return smallMultiplesRows(facets, width, ctx, FORM_ROWS);
+    // **Reconciled to the declared height**, like every axed form. The parent's
+    // height is the contract whatever its children do: these two returned
+    // whatever the facet layout produced, so a parent declaring 10 drew 7 and
+    // moved everything below it. Sizing the children to *fill* the parent is a
+    // different question and belongs with `height: "fill"`.
+    return composeRows(areaRows, [], smallMultiplesRows(facets, width, areaRows, ctx, FORM_ROWS), []);
   },
   pairplot: (block, width, ctx) => {
     const facets = block.facets ?? [];
@@ -991,7 +996,12 @@ const FORM_ROWS: Readonly<
     // place in C12 that composes rows another renderer has already styled, so
     // the span pipeline is the wrong pipeline; `smallMultiplesRows` fits each
     // column in display cells and guarantees the width itself.
-    return smallMultiplesRows(facets, width, ctx, FORM_ROWS);
+    // **Reconciled to the declared height**, like every axed form. The parent's
+    // height is the contract whatever its children do: these two returned
+    // whatever the facet layout produced, so a parent declaring 10 drew 7 and
+    // moved everything below it. Sizing the children to *fill* the parent is a
+    // different question and belongs with `height: "fill"`.
+    return composeRows(areaRows, [], smallMultiplesRows(facets, width, areaRows, ctx, FORM_ROWS), []);
   },
   pie: (block, width, ctx) => {
     const segs = block.segments ?? [];

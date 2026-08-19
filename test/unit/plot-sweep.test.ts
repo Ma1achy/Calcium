@@ -10,7 +10,7 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { FULL_CAPS, ASCII_CAPS, MONO_CAPS, measurable } from "../support/render.js";
 import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
-import { validateBlock } from "../../src/data/viewmodel/index.js";
+import { block as blockOf, validateBlock } from "../../src/data/viewmodel/index.js";
 
 function kit(caps = FULL_CAPS) {
   return measurable({ definitions: [plotDefinition], capabilities: caps });
@@ -27,7 +27,23 @@ describe("P1: measure is stable", () => {
 });
 
 describe("P3: height is declared", () => {
-  const FIXED_HEIGHT: Partial<Record<PlotForm, true>> = { sparkline: true, waffle: true };
+  // **Total, not `Partial`.** One of the four tables that were silent about a
+  // new form — a `Partial` accepts a member it has never heard of and answers
+  // `undefined`, so a form whose height stopped being derived would be checked
+  // against the wrong arm and pass. `Record<PlotForm, boolean>` makes the
+  // thirty-fifth member a type error here, which is what every other table in
+  // C12 already does.
+  const FIXED_HEIGHT: Record<PlotForm, boolean> = {
+    sparkline: true, waffle: true,
+    line: false, scatter: false, step: false, ecdf: false, density: false,
+    bar: false, histogram: false, lollipop: false, dotplot: false,
+    funnel: false, gantt: false, waterfall: false, flame: false, icicle: false,
+    boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
+    heatmap: false, calendar: false, correlation: false, confusion: false,
+    spectrogram: false, latency: false, density2d: false,
+    streamgraph: false, smallmultiples: false, pairplot: false,
+    pie: false, radar: false, horizon: false,
+  };
   for (const form of ALL_FORMS) {
     it(form, () => {
       const block = ONE_PER_FORM[form];
@@ -42,15 +58,66 @@ describe("P3: height is declared", () => {
 });
 
 describe("P4: render fits measure", () => {
+  // **This assertion was right and its fixtures could not fail it**, which is
+  // how four forms shipped measuring one height and drawing another — by as
+  // much as six rows, which moves everything below them in the transcript.
+  //
+  // Two independent reasons, and neither is visible from the assertion:
+  //
+  //   - `radar` and `horizon` are declared here with `axes: undefined`, and
+  //     `axedFurniture` is the *only* state in which they were wrong. The
+  //     dimension carrying the defect was never entered.
+  //   - `smallmultiples` and `pairplot` returned whatever their facet layout
+  //     produced, and this fixture's children happen to sum to the declared
+  //     height. Right answer, wrong reason, at one width.
+  //
+  // So the sweep now sweeps: both `axes` flags and four widths. A sweep exists
+  // precisely so a rule does not lapse on the thirty-fifth form, and a sweep
+  // pinned to one flag at one width lapses on the first.
+  // **`validateBlock` returns a `Result`, not a block**, and casting one to
+  // `Plot` gave every measurement the same wrong answer without throwing. The
+  // responds-check below is what caught it, on its first run, in this file.
+  const WIDTHS = [20, 40, 80, 137] as const;
   for (const form of ALL_FORMS) {
     it(form, () => {
-      const block = ONE_PER_FORM[form];
+      const base = ONE_PER_FORM[form];
       const k = kit();
-      const measured = k.measure(block, 40);
-      const rendered = k.renderToLines(block, 40);
-      expect(rendered.length).toBe(measured); // cells-ok — a row count
+      let checked = 0;
+      for (const axes of [true, false] as const) {
+        let block: Plot;
+        try {
+          block = blockOf({ ...base, axes }) as Plot;
+        } catch {
+          continue; // C04 I50b refuses `axes: false` on the matrix family
+        }
+        for (const w of WIDTHS) {
+          const measured = k.measure(block, w);
+          const rendered = k.renderToLines(block, w);
+          expect(rendered.length, `${form} axes:${String(axes)} w${String(w)}`).toBe(measured); // cells-ok — a row count
+          checked += 1;
+        }
+      }
+      expect(checked).toBeGreaterThan(0); // cells-ok — a combination count
     });
   }
+
+  it("the axes flag reaches the height, so the dimension is not inert", () => {
+    // **The fixture must be shown to respond.** If `axes` changed no form's
+    // measured height, every row above would be four identical assertions
+    // wearing a loop, and the two forms whose defect lived only in `axes: true`
+    // would be exactly as invisible as they were.
+    const k = kit();
+    let responded = 0;
+    for (const form of ALL_FORMS) {
+      const base = ONE_PER_FORM[form];
+      try {
+        const on = blockOf({ ...base, axes: true }) as Plot;
+        const off = blockOf({ ...base, axes: false }) as Plot;
+        if (k.measure(on, 40) !== k.measure(off, 40)) responded += 1;
+      } catch { /* the matrix family, which C04 I50b bars from answering this */ }
+    }
+    expect(responded).toBeGreaterThan(10); // cells-ok — a form count
+  });
 });
 
 describe("P5: render is pure", () => {

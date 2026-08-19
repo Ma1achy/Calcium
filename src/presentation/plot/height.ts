@@ -120,9 +120,15 @@ const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>>
   calendar: () => AXIS_ROWS, correlation: () => AXIS_ROWS, confusion: () => AXIS_ROWS,
   spectrogram: () => AXIS_ROWS, latency: () => AXIS_ROWS, density2d: () => AXIS_ROWS,
   density: axedFurniture, violin: axedFurniture, ridgeline: axedFurniture,
-  smallmultiples: axedFurniture, pairplot: axedFurniture,
-  pie: () => 0, radar: axedFurniture,
-  horizon: axedFurniture,
+  // **These five compose their own rows and draw no cartesian furniture** (§2's
+  // height table). `pie` always said so; the other four declared a lid, an axis
+  // rule and an x-label row, and drew none of them — 18 combinations across the
+  // catalogue where the measured height and the rendered height disagreed, by up
+  // to six rows. A radar has no cartesian axes to label and a facet grid's
+  // furniture belongs to its facets, so the declaration was the wrong half.
+  smallmultiples: () => 0, pairplot: () => 0,
+  pie: () => 0, radar: () => 0,
+  horizon: () => 0,
 };
 
 /** The block's measured height (I1). A function of the block alone. */
