@@ -1313,6 +1313,53 @@ built here — named so it is a known gap and not a silence.
 
 ---
 
+## 3u. Layers meet in a cell, and the merge is per dot
+
+`mergedRow` composites the layers a figure is drawn in — a pie's wedges, a radar's polygons
+over its frame — and it resolved **a whole cell to the first layer that inked it**:
+
+```ts
+for (const layer of layers) {
+  if (isBlank(candidate)) continue;
+  cell = candidate; cellRef = layer.ref; break;      // ← the cell, to one layer
+}
+```
+
+Every wedge is filled into its own dot grid and folded to braille before it arrives here, so a
+cell the boundary crosses carries one wedge's dots and drops the other's. **The disc is fully
+covered by construction** — the fractions sum to one, so every dot inside the radius belongs to
+some wedge — and measured on `pie-default-40` there are **seven cells flanked by a full cell on
+each side that are not themselves full**. That is the report *gaps appear between the slices*,
+and the arithmetic was right throughout.
+
+**The radar has it twice over and it reads as a different defect.** Its layers are
+`[labels, …polygons, frame]`, so a polygon crossing another loses cells to it, and the frame is
+drawn **only in the cells nothing else wanted** — the rings and spokes come out as fragments and
+the polygons come out dashed. Neither is a dash: `dashFor` returns `SOLID_DASH` at any depth
+above one bit. *Three symptoms, one rule, and the pie's own comment already named the mechanism
+for an outline layer it deleted rather than for the general case.*
+
+### The union, and the one thing it cannot fix
+
+A braille cell is `U+2800 + bits`, so where every candidate for a cell is braille the merge is
+`0x2800 | (bitsA | bitsB | …)`. Where any candidate is not — a radar's category labels are text
+— the first-wins rule stands, because a letter and a polygon cannot share a cell and one of them
+has to lose.
+
+**The colour is still one layer's, and that is a limit rather than an oversight.** A `Span`
+carries one `ColourRef`. So two wedges meeting in a cell draw both wedges' dots **in the first
+wedge's colour** — the priority order is unchanged, and what the union removes is the *gap*, not
+the boundary's exactness. A reader sees a seam a cell wide where the colour changes one cell
+early or late; they no longer see a hole. Stated here because *the gaps are fixed* would imply
+the stronger thing, and the stronger thing needs a per-dot colour the span model does not have.
+
+**The priority order is what the ref still expresses**, which is why it is worth keeping rather
+than replacing with *the layer owning the most dots*: the radar's order is a ruling — labels over
+polygons over frame, because a word a polygon runs through is unreadable — and reading it off dot
+counts would put the frame above a polygon wherever the frame happened to be denser.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -2353,6 +2400,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I37** — **The cursor's column is marked twice, and the mapping from index to column is the form's.** A readout names values and a reader cannot use them without knowing which mark they describe — which is what §6b B5's ruling about the doji rests on. **A dashed vertical behind the data** through the same path the gridlines take, so it never overwrites a sample; **and a mark on the bottom rule**, because the dashed line is invisible in exactly the case that motivates it, a dense column with ink in every row. *The index is into the data and not the area* — `cursorReadout` has always read `values[cursorIdx]` — so a candlestick inverts through its own pitch and its buckets. **Measured: the two mappings agree at the dense end and separate at the sparse one**, because a candle is left-aligned at a fixed pitch where a curve spreads across the width — four bars in forty-four columns put the last candle at column 20 and the curve's rule at 43. **C12 owns what a cursor draws and not who moves one**: nothing in `src/` writes `cursorPositions`, and §10's Phase 2 row is about that writer (§3s).
 - **I38** — **Colour indexes an identity, and a row that is a slice of a continuous axis has none.** A histogram's bins and a correlogram's lags are cut from an axis by the renderer, so eight bins are one distribution and drew eight colours; a band named `control` is a thing the caller chose and keeps its slot. `ROW_IS_AN_IDENTITY` is that partition, total over `PlotForm`. *The claim this replaced lived in a code comment and no file — true about the grouped bar it was written for, general by nothing — and **the first correction over-reached in the other direction**: eleven reference renderings draw one colour per series and that is the references' taste rather than the principle under it, so reading the measurement as the ruling took the colour off every named band too. A measurement settles what is true; it does not settle what to draw.* **The switch is span ownership and not `SHARES_CELLS`**, which is indexed by form and so answers for a plain bar and a stacked one at once: a builder returning owners has interior identities and each run takes its owner's slot; a builder returning a string has none, and the row's identity is in the gutter already. **A form whose rows are series says so** — the timeline is the single cell where the old default was accidentally right, three tracks in one colour is what the correction costs there, and every count in that frame would still be correct. Measured against eleven reference renderings: the cycle advances per series and only per series, and mapping the category axis to colour is `hue=x` — available, explicit, and redundant by construction (§3t).
 - **I39** — **A mirrored figure draws on an odd extent, and the spare cell precedes it.** A reflection needs a centre and an even extent has none: both violin arms split their slot symmetrically and then take the spine at `round((k−1) ÷ 2)`, which for an even `k` is the lower baseline rather than the axis of reflection — so the figure carried three rows of ink above its rule against two below, at 4, 6 and 8, in both arms. *Neither statement is wrong and the pair is, which is why the comment already standing over the first one — **a violin that is asymmetric by a row is a violin that is wrong, and it is invisible in anything but a mirror assertion** — was right about the class and did not reach the instance. No mirror assertion existed, and the golden corpus could not supply one: `ONE_PER_FORM`'s violin is four rows a band, which this ladder spends on the **raincloud**, so the top rung had no horizontal golden frame at all and the fix moved four vertical frames and none of the other 280.* **The spare cell goes first** because `bandedForm` places a band's name at `⌊rows ÷ 2⌋` and `columnLabels` places its tick at `x + ⌊w ÷ 2⌋` — padding before lands the spine on both at every even extent and padding after lands it one short of both, so two untouched placements agree. **The raincloud rungs are outside this**, being one-sided by construction, and an extent of two falls to the fill because two cells are two edges with no centre between them (§3i).
+- **I40** — **Where two layers ink one cell the merge is per dot, and the colour is the first layer's.** `mergedRow` resolved the whole cell to the first layer that inked it, and every figure that composites — a pie's wedges, a radar's polygons over its frame — is folded to braille *before* it arrives, so the second layer's dots were dropped. *A pie's disc is fully covered by construction and `pie-default-40` had seven cells flanked by a full cell on each side that were not themselves full; the radar had it twice, its polygons eating each other and its frame drawn only in the cells nothing else wanted — which reads as dashed strokes and is not, because `dashFor` is solid at any depth above one bit.* A braille cell is `U+2800 + bits`, so the union is `0x2800 | (bitsA | bitsB)`; where any candidate is **not** braille the first-wins rule stands, because a letter and a polygon cannot share a cell. **The colour remains one layer's and that is a limit of the span model, not an oversight** — two wedges meeting in a cell draw both sets of dots in the first wedge's colour, so what the union removes is the gap and not the boundary's exactness, and saying *the gaps are fixed* would imply a per-dot colour a `Span` cannot carry. **The priority order stays the ref's** rather than becoming the densest layer's, because that order is a ruling — labels over polygons over frame — and a dot count would overturn it wherever the frame was denser (§3u).
 
 ## 8. Commitments
 
@@ -2389,6 +2437,7 @@ orientation — and belongs in the classification table as its own rows.
 28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
 32. **Colour indexes an identity** — a row cut from a continuous axis has none and takes one colour, a named row keeps its slot, a row's interior identities are coloured by their owner, and a form whose rows *are* series declares it (I38, §3t).
 33. **A mirrored figure draws on an odd extent** — a reflection needs a centre, the spare cell precedes the figure so the band's own label and tick still land on the spine, and the one-sided rungs are outside it (I39, §3i).
+34. **A cell two layers ink carries both layers' dots** — unioned where the vocabulary allows it, first-wins where it does not, and coloured by the priority order either way (I40, §3u).
 
 ---
 
