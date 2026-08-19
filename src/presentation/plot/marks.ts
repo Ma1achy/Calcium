@@ -93,11 +93,12 @@ export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // chart rather than a degraded one — but the shared-cell case is what the
   // partition is about, and above the floor these do share.
   line: true, scatter: true, step: true, ecdf: true, density: true,
-  streamgraph: true, stackedarea: true,
+  streamgraph: true, stackedarea: true, slope: true, bubble: true,
   // One row per category, named in the gutter.
   boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
   lollipop: false, dotplot: false, funnel: false, gantt: false, waterfall: false,
   flame: true, icicle: true, treemap: true,
+  autocorrelation: false, timeline: false, bullet: false, utilisation: false,
   // One row per series, named in the gutter, and a scale legend beneath.
   heatmap: false, calendar: false, correlation: false, confusion: false,
   spectrogram: false, latency: false, density2d: false,

@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
-import { scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
-import { boxplotBand, boxplotColumn, forestRow } from "../../src/presentation/plot/glyph-row.js";
+import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
+import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, ladderFor } from "../../src/presentation/plot/ramp.js";
@@ -773,6 +773,87 @@ describe("GROUP 6i: containment is the subject, not magnitude", () => {
     // The root spans the full width and sits at opposite ends.
     expect(f[f.length - 1], "flame's root is at the bottom").toContain("root");
     expect(i[0], "icicle's is at the top").toContain("root");
+  });
+});
+
+describe("GROUP 6j: the six that had no renderer", () => {
+  it("T1.69 (C04 §8): an autocorrelation is signed about zero, not a bar of magnitudes", () => {
+    // **What makes it an autocorrelation.** A negative lag means the series
+    // anti-correlates with itself at that offset, and a plot drawing |r| says
+    // the opposite of the data half the time.
+    const pos = lagRow(0.8, 1, 41, [], FULL_CAPS);
+    const neg = lagRow(-0.8, 1, 41, [], FULL_CAPS);
+    const zero = 20; // cells-ok — a column index
+    expect(pos.slice(zero + 1).trim(), "a positive lag runs right").not.toBe("");
+    expect(pos.slice(0, zero).trim(), "and nothing left of zero").toBe("");
+    expect(neg.slice(0, zero).trim(), "a negative lag runs left").not.toBe("");
+    expect(neg.slice(zero + 1).trim(), "and nothing right").toBe("");
+  });
+
+  it("T1.70 (C04 §8): the significance band is drawn on both sides and under the bar", () => {
+    const g = glyphs(FULL_CAPS);
+    const clear = lagRow(0.1, 1, 41, [0.5], FULL_CAPS);
+    expect([...clear].filter((c) => c === g.dashedVertical).length, "both signs").toBe(2); // cells-ok — a cell count
+    // A bar reaching past the bound draws over it: a bound interrupting a bar
+    // reads as part of it.
+    const over = lagRow(0.9, 1, 41, [0.5], FULL_CAPS);
+    expect([...over].filter((c) => c === g.dashedVertical).length, "the crossed one is covered").toBe(1); // cells-ok — a cell count
+  });
+
+  it("T1.71 (C04 §8): a timeline marks positions, and its magnitudes are not data", () => {
+    // An event happened at a time; asking how big it was is the wrong question.
+    const g = glyphs(FULL_CAPS);
+    // **A range that does not start at zero.** With `min: 0` a renderer dividing
+    // by `max` and one scaling across `[min, max]` give the same answer for
+    // every value, so the mutation dropping the minimum survived — the
+    // convenient fixture is the one where both readings agree.
+    const row = timelineRow({ values: [100, 105, 110] }, { min: 100, max: 110 }, 21, FULL_CAPS);
+    expect(row[0]).toBe(g.filled);
+    expect(row[10]).toBe(g.filled); // cells-ok — a column index
+    expect(row[20]).toBe(g.filled); // cells-ok — a column index
+    expect(row[3], "and a rule between them").toBe(g.horizontal); // cells-ok — a column index
+    // Rescaling the axis with the values moves nothing: only positions matter.
+    const scaled = timelineRow({ values: [0, 50, 100] }, { min: 0, max: 100 }, 21, FULL_CAPS);
+    expect(scaled).toBe(row);
+  });
+
+  it("T1.72 (C04 §8): a bullet's target is perpendicular, and survives the measure", () => {
+    // *Did we hit it* is a boolean, and a longer bar invites the eye to compare
+    // lengths instead. Drawn last, over everything, because it is the question
+    // the row answers.
+    const g = glyphs(FULL_CAPS);
+    const q = { min: 0, q1: 40, median: 60, q3: 80, max: 100, centre: 75 };
+    const under = bulletRow(q, 30, 41, FULL_CAPS);
+    const over = bulletRow(q, 95, 41, FULL_CAPS);
+    expect(under, "visible when the measure falls short").toContain(g.vertical);
+    expect(over, "and when the measure passes it").toContain(g.vertical);
+    expect(under.indexOf(g.vertical), "in the same place either way").toBe(over.indexOf(g.vertical));
+  });
+
+  it("T1.73 (C04 §8): a bubble's size channel is cells, and a small one is one cell", () => {
+    // A cell is the smallest mark there is, so size is spent on how many cells
+    // rather than on a radius. Below one, the channel does not exist — which is
+    // honest: a 1.4-cell bubble *is* a 1-cell bubble.
+    const ink = (rs: readonly string[]): number =>
+      [...rs.join("")].filter((c) => c !== " " && c !== "\u2800").length; // cells-ok — a cell count
+    // **Two halves of one frame.** The size channel is relative to the series'
+    // own maximum, so a lone point is always maximal and comparing two
+    // single-point renders compares nothing — the first version did, and got 4
+    // against 4. Two points at opposite ends, and each half counted.
+    const pair = bubbleRows(
+      { values: [50, 50] }, { values: [1, 100] }, { min: 0, max: 100 }, 30, 8, FULL_CAPS,
+    );
+    const half = (rs: readonly string[], left: boolean): number =>
+      ink(rs.map((r) => (left ? r.slice(0, 15) : r.slice(15)))); // cells-ok — a column index
+    expect(half(pair, false), "the large bubble outdraws the small one")
+      .toBeGreaterThan(half(pair, true));
+    // And the grid is in dots: seven points must produce seven marks, not two.
+    const seven = bubbleRows(
+      { values: [10, 20, 30, 40, 50, 60, 70] },
+      { values: [5, 5, 5, 5, 5, 5, 5] },
+      { min: 0, max: 80 }, 40, 8, FULL_CAPS,
+    );
+    expect(ink(seven), "every point drawn").toBeGreaterThanOrEqual(7); // cells-ok — a cell count
   });
 });
 

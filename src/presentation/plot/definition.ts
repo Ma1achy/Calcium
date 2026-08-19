@@ -46,8 +46,8 @@ import { bandRows, stackBands, stackRange } from "./stack.js";
 import { markOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
-import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
-import { boxplotBand, boxplotColumn, forestRow, dumbbellRow } from "./glyph-row.js";
+import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
+import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
 import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
@@ -1243,6 +1243,100 @@ const FORM_ROWS: Readonly<
       ? hierarchyStripRows(block, width, ctx, true)
       : legacyDepthBars(block, width, ctx, true),
   treemap: (block, width, ctx) => treemapRows(block, width, ctx),
+
+  // --- the six that had no renderer -------------------------------------
+  //
+  // Each reuses machinery that exists, which is C04 §8's claim about them and
+  // is why they arrive together: what a new form usually needs is a layout, and
+  // these six needed none that was not already here.
+
+  /**
+   * A slope graph: two value columns joined by a line each (C04 §8).
+   *
+   * The chart for *ranking change* — the lines crossing is the content, and it
+   * is why this is not two bar charts side by side. Drawn on the same dot grid
+   * as `line`, with the series' first and last readings as the two columns.
+   */
+  slope: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps) => {
+    const vals = sr.values.filter((v): v is number => v !== null && Number.isFinite(v));
+    const ends = vals.length >= 2 // cells-ok — a sample count
+      ? { values: [vals[0]!, vals[vals.length - 1]!] } // cells-ok — a sample index
+      : { values: vals };
+    return curveRows(ends, range, aw, rows, caps);
+  }),
+
+  /**
+   * A bubble chart — scatter with a **size** channel (C04 §8).
+   *
+   * The fourth encoding axis, and the one a terminal has least room for: a cell
+   * is the smallest mark there is, so size is spent on *how many cells* rather
+   * than on a radius. Two series, read as (position, magnitude).
+   */
+  bubble: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps) =>
+    bubbleRows(sr, block.series[1], range, aw, rows, caps)),
+
+  /**
+   * An autocorrelation plot — one bar per lag, with a confidence band.
+   *
+   * `barRow` plus the band, which is an `Annotation` and not a new field: the
+   * significance bounds are a claim about the ordinate drawn beside the data,
+   * exactly as the forest plot's null is.
+   */
+  autocorrelation: (block, width, ctx) => {
+    const s0 = block.series[0];
+    const areaRows = plotAreaRows(block);
+    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+    if (!s0) return emptyRows(block, layout, ctx);
+    const lags = s0.values.map((v, i) => ({ v, i }));
+    const cats = block.categories ?? lags.map((l) => String(l.i));
+    const mag = Math.max(1, ...s0.values.map((v) => Math.abs(v ?? 0)));
+    const bounds = (block.annotations ?? [])
+      .filter((a): a is Extract<Annotation, { kind: "line" }> => a.kind === "line")
+      .map((a) => a.value);
+    let li = 0;
+    return categoricalForm({ ...block, categories: cats }, width, ctx, (_label, aw) =>
+      lagRow(s0.values[li++] ?? null, mag, aw, bounds, ctx.capabilities));
+  },
+
+  /**
+   * A timeline — event marks on a shared time axis, one row per track.
+   *
+   * The glyph-row family: each series is a track and each finite value is an
+   * instant, so a series' *positions* are the data and its magnitudes are not.
+   */
+  timeline: (block, width, ctx) => {
+    const cats = block.categories ?? block.series.map((sr, i) => sr.label ?? `track ${String(i + 1)}`);
+    const data = seriesRange(block.series, block);
+    const areaRows = plotAreaRows(block);
+    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
+    let ti = 0;
+    return categoricalForm({ ...block, categories: cats }, width, ctx, (_label, aw) =>
+      timelineRow(block.series[ti++], data, aw, ctx.capabilities));
+  },
+
+  /**
+   * A bullet graph — a measure against a target, on qualitative bands.
+   *
+   * Stephen Few's replacement for a gauge, and the reason it is not one: the
+   * bands say what *good* is, so a reader needs no legend and no second glance
+   * at a dial. `quartiles` carries the bands and `centre` the target.
+   */
+  bullet: (block, width, ctx) => {
+    const qs = block.quartiles ?? [];
+    const areaRows = plotAreaRows(block);
+    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+    if (qs.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a measure count
+    const cats = block.categories ?? qs.map((_q, i) => `measure ${String(i + 1)}`);
+    let bi = 0;
+    return categoricalForm({ ...block, categories: cats }, width, ctx, (_label, aw) => {
+      const q = qs[bi++];
+      return q ? bulletRow(q, block.series[0]?.values[bi - 1] ?? null, aw, ctx.capabilities) : "";
+    });
+  },
+
+  /** A utilisation grid — one cell per unit, shaded by load. The matrix family exactly. */
+  utilisation: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+
   funnel: (block, width, ctx) => {
     const data = seriesRange(block.series, block);
     if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);

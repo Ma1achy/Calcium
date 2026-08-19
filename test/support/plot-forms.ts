@@ -126,6 +126,37 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
     kind: "plot", id: "form-streamgraph", form: "streamgraph", height: 5, axes: true,
     series: [s([1, 3, 2, 5, 4]), s([2, 1, 4, 3, 5])],
   }),
+  slope: block({
+    kind: "plot", id: "form-slope", form: "slope", height: 6, axes: true,
+    series: [s([10, 40]), s([35, 15])],
+  }),
+  bubble: block({
+    kind: "plot", id: "form-bubble", form: "bubble", height: 6, axes: true,
+    series: [s([10, 25, 15, 30]), s([1, 8, 3, 5])],
+  }),
+  autocorrelation: block({
+    kind: "plot", id: "form-acf", form: "autocorrelation", height: 6, axes: true,
+    series: [s([1, 0.6, 0.2, -0.3, -0.1])],
+    annotations: [{ kind: "line", value: 0.4 }],
+  }),
+  timeline: block({
+    kind: "plot", id: "form-timeline", form: "timeline", height: 3, axes: true,
+    categories: ["deploy", "alert"],
+    series: [s([1, 4, 9]), s([3, 7])],
+  }),
+  bullet: block({
+    kind: "plot", id: "form-bullet", form: "bullet", height: 3, axes: true,
+    categories: ["revenue", "profit"],
+    series: [s([70, 40])],
+    quartiles: [
+      { min: 0, q1: 40, median: 60, q3: 80, max: 100, centre: 75 },
+      { min: 0, q1: 20, median: 35, q3: 45, max: 60, centre: 50 },
+    ],
+  }),
+  utilisation: block({
+    kind: "plot", id: "form-utilisation", form: "utilisation", height: 3,
+    series: [s([10, 40, 90, 30]), s([70, 20, 50, 80]), s([5, 60, 35, 95])],
+  }),
   treemap: block({
     kind: "plot", id: "form-treemap", form: "treemap", height: 8, series: [],
     hierarchy: {

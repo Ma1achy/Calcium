@@ -30,6 +30,12 @@ export const UNISOLABLE: ReadonlyMap<string, string> = new Map([
   ["spectrogram", "C04 I50b — as heatmap"],
   ["latency", "C04 I50b — as heatmap"],
   ["density2d", "C04 I50b — as heatmap"],
+  // **`utilisation` is the same family and C04 I50b does not reach it** —
+  // `checkHeatmap` refuses `axes: false` only where `form === "heatmap"`, so
+  // this one accepts the flag and renders 18 rows into a 16-row grid. Excluded
+  // here for the same reason as its siblings; the refusal's scope is its own
+  // finding and its own fix.
+  ["utilisation", "C04 I50b — as heatmap, though the refusal does not yet reach it"],
 ]);
 
 export const COLS = 64;

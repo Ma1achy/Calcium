@@ -316,7 +316,42 @@ def r_streamgraph(a, s):
 
 def r_slope(a, s):
     for v in series(s):
-        a.plot([0, 1], [v[0], v[-1]], "-o", ms=3, lw=1)
+        if v:
+            a.plot([0, 1], [v[0], v[-1]], "-", lw=1)
+
+
+def r_bubble(a, s):
+    ss = series(s)
+    if len(ss) < 2:
+        return
+    xs, sizes = ss[0], ss[1]
+    n = min(len(xs), len(sizes))
+    a.scatter(range(n), xs[:n], s=[max(1.0, v) * 4 for v in sizes[:n]])
+
+
+def r_autocorrelation(a, s):
+    v = vals(s)
+    a.stem(range(len(v)), v, basefmt=" ")
+
+
+def r_timeline(a, s):
+    for i, track in enumerate(series(s)):
+        a.plot(track, [i] * len(track), "|", ms=8)
+    a.invert_yaxis()
+
+
+def r_bullet(a, s):
+    qs = s.get("quartiles", [])
+    v = vals(s)
+    for i, q in enumerate(qs):
+        a.barh(i, q["max"], color="0.9")
+        a.barh(i, q["q3"], color="0.75")
+        a.barh(i, q["q1"], color="0.6")
+        if i < len(v):
+            a.barh(i, v[i], height=0.3, color="0.1")
+        if q.get("centre") is not None:
+            a.vlines(q["centre"], i - 0.35, i + 0.35, lw=2)
+    a.invert_yaxis()
 
 
 RENDERERS = {
@@ -330,7 +365,9 @@ RENDERERS = {
     "forest": r_forest, "dumbbell": r_dumbbell,
     "heatmap": r_matrix, "calendar": r_matrix, "correlation": r_matrix,
     "confusion": r_matrix, "spectrogram": r_matrix, "latency": r_matrix,
-    "density2d": r_matrix,
+    "density2d": r_matrix, "utilisation": r_matrix,
+    "slope": r_slope, "bubble": r_bubble, "autocorrelation": r_autocorrelation,
+    "timeline": r_timeline, "bullet": r_bullet,
     "pie": r_pie, "radar": r_radar, "waffle": r_waffle, "horizon": r_horizon,
 }
 

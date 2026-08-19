@@ -25,6 +25,7 @@ change is the signal.
 | histogram | 64x16 | 46.0% | — |
 | waffle | 64x10 | 43.8% | — |
 | waterfall | 64x16 | 40.8% | — |
+| bullet | 64x16 | 39.6% | — |
 | ridgeline | 64x16 | 39.3% | — |
 | boxplot | 64x16 | 35.6% | — |
 | funnel | 64x16 | 32.4% | — |
@@ -32,14 +33,18 @@ change is the signal.
 | lollipop | 64x16 | 26.8% | — |
 | gantt | 64x16 | 26.3% | — |
 | radar | 64x16 | 25.5% | — |
+| autocorrelation | 64x16 | 23.4% | — |
 | sparkline | 64x1 | 21.9% | — |
+| timeline | 64x16 | 18.8% | — |
 | forest | 64x16 | 17.9% | — |
 | violin | 64x16 | 16.1% | 1.0% |
 | horizon | 64x16 | 14.6% | — |
 | density | 64x16 | 13.7% | — |
 | streamgraph | 64x16 | 12.6% | — |
+| slope | 64x16 | 12.1% | 8.9% |
 | dumbbell | 64x16 | 9.7% | — |
 | ecdf | 64x16 | 9.4% | — |
+| bubble | 64x16 | 6.7% | — |
 | stackedarea | 64x16 | 6.6% | — |
 | scatter | 64x16 | 4.5% | — |
 | step | 64x16 | 4.0% | — |
@@ -48,6 +53,7 @@ change is the signal.
 | heatmap | — | — | *C04 I50b — no `axes: false`; lifts with furniture.ts `AreaContent`* |
 | flame | — | — | *no reference renderer — see reference.py SKIPPED* |
 | icicle | — | — | *no reference renderer — see reference.py SKIPPED* |
+| utilisation | — | — | *C04 I50b — as heatmap, though the refusal does not yet reach it* |
 | treemap | — | — | *no reference renderer — see reference.py SKIPPED* |
 | calendar | — | — | *C04 I50b — as heatmap* |
 | correlation | — | — | *C04 I50b — as heatmap* |

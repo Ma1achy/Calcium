@@ -102,3 +102,52 @@ export function ecdfSeries(series: Series): Series {
 
   return { ...series, values };
 }
+
+/**
+ * A bubble chart's dots — scatter with a **size** channel (C04 §8).
+ *
+ * **The fourth encoding axis, and the one a terminal has least room for.** A cell
+ * is the smallest mark there is, so size is spent on *how many cells* rather than
+ * on a radius: a bubble is a run of dots centred on its point, one to five wide.
+ * Below that the channel does not exist, which is honest — a 1.4-cell bubble is a
+ * 1-cell bubble and pretending otherwise is a size axis that reports nothing.
+ *
+ * `sizes` is the second series, read positionally against the first.
+ */
+export function bubbleRows(
+  series: Series,
+  sizes: Series | undefined,
+  range: Range,
+  width: number,
+  rows: number,
+  _caps: Caps,
+): readonly string[] {
+  // **The grid is in dots, not cells** — `createGrid(w, h)` made a grid one dot
+  // per cell, so six of seven bubbles landed on the same four dots and two marks
+  // came out of seven points. `scatterRows` multiplies by the dot geometry one
+  // line above its own `createGrid` and this did not.
+  const dots = _caps.unicode === "ascii" ? RAMP_DOTS : BRAILLE_DOTS;
+  const w = Math.max(1, Math.floor(width)) * dots.x; // cells-ok — a dot column count
+  const h = Math.max(1, Math.floor(rows)) * dots.y; // cells-ok — a dot row count
+  const grid = createGrid(w, h);
+  const vals = series.values;
+  const sv = sizes?.values ?? [];
+  const maxSize = Math.max(1, ...sv.filter((v): v is number => v !== null && Number.isFinite(v)));
+
+  for (const [i, v] of vals.entries()) {
+    if (v === null || !Number.isFinite(v)) continue;
+    const x = vals.length <= 1 ? 0 : Math.round((i / (vals.length - 1)) * (w - 1)); // cells-ok — a dot column
+    const y = rowOf(v, range, h); // cells-ok — a dot row
+    const s = sv[i];
+    const radius = s === null || s === undefined || !Number.isFinite(s)
+      ? 0
+      : Math.round((Math.abs(s) / maxSize) * 2); // cells-ok — a dot radius
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        if (dx * dx + dy * dy > radius * radius + 1) continue; // cells-ok — a dot offset
+        setDot(grid, x + dx, y + dy); // cells-ok — a dot offset
+      }
+    }
+  }
+  return foldBraille(grid);
+}

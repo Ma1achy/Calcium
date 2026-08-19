@@ -5,10 +5,11 @@
  * available width. The category label sits in the gutter; the glyphs fill the
  * plot area.
  */
-import type { QuartileSummary } from "../../data/viewmodel/index.js";
+import type { QuartileSummary, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { glyphs } from "../blocks/glyphs.js";
-import { pairFor } from "./ramp.js";
+import { ladderFor, pairFor } from "./ramp.js";
+import type { Range } from "./scale.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
@@ -359,4 +360,112 @@ export function boxplotBand(
   }
   while (out.length < n) out.push(" ".repeat(w)); // cells-ok — a row count
   return out;
+}
+
+/**
+ * One lag of an autocorrelation plot, with its significance band (C04 §8).
+ *
+ * **Signed about zero**, which is what makes it an autocorrelation and not a bar
+ * chart of magnitudes: a negative lag means the series anti-correlates with
+ * itself at that offset, and a plot drawing |r| says the opposite of the data
+ * half the time. Zero sits at the centre column.
+ */
+export function lagRow(
+  value: number | null,
+  magnitude: number,
+  width: number,
+  bounds: readonly number[],
+  caps: Caps,
+): string {
+  const w = Math.max(1, Math.floor(width));
+  const g = glyphs(caps);
+  const ch = glyphCharsFor(caps);
+  const row = new Array<string>(w).fill(" ");
+  const zero = Math.floor((w - 1) / 2); // cells-ok — a column index
+
+  // The band first, so a bar crossing it draws over it — a bound is a claim
+  // beside the data, and one interrupting a bar reads as part of it.
+  for (const b of bounds) {
+    for (const sign of [-1, 1]) {
+      const x = zero + Math.round((sign * Math.abs(b) / magnitude) * zero); // cells-ok — a column index
+      if (x >= 0 && x < w) row[x] = g.dashedVertical; // cells-ok — a column index
+    }
+  }
+  row[zero] = g.vertical;
+
+  if (value !== null && Number.isFinite(value)) {
+    const end = zero + Math.round((value / magnitude) * zero); // cells-ok — a column index
+    const [from, to] = end >= zero ? [zero, end] : [end, zero]; // cells-ok — a column index
+    for (let i = Math.max(0, from); i <= Math.min(w - 1, to); i += 1) row[i] = ch.boxFill; // cells-ok — a column index
+    row[zero] = g.vertical;
+  }
+  return row.join("");
+}
+
+/**
+ * One track of a timeline — event marks on a shared time axis (C04 §8).
+ *
+ * A series' *positions* are the data here and its magnitudes are not, which is
+ * the distinction that makes this a form rather than a scatter with one row: an
+ * event happened at a time, and asking how big it was is asking the wrong
+ * question of it.
+ */
+export function timelineRow(
+  series: Series | undefined,
+  range: Range,
+  width: number,
+  caps: Caps,
+): string {
+  const w = Math.max(1, Math.floor(width));
+  const g = glyphs(caps);
+  const row = new Array<string>(w).fill(g.horizontal);
+  if (series === undefined) return " ".repeat(w);
+  for (const v of series.values) {
+    if (v === null || !Number.isFinite(v)) continue;
+    const x = scaleX(v, range.min, range.max, w);
+    if (x >= 0 && x < w) row[x] = g.filled; // cells-ok — a column index
+  }
+  return row.join("");
+}
+
+/**
+ * A bullet graph's row — qualitative bands, a measure, and a target (C04 §8).
+ *
+ * Stephen Few's replacement for a gauge, and the reason it is not one: the bands
+ * say what *good* is, so the reader needs no legend and no second glance at a
+ * dial. The target is a **perpendicular** mark rather than a longer bar, because
+ * *did we hit it* is a boolean and a bar invites the eye to compare lengths.
+ */
+export function bulletRow(
+  q: QuartileSummary,
+  measure: number | null,
+  width: number,
+  caps: Caps,
+): string {
+  const w = Math.max(1, Math.floor(width));
+  const g = glyphs(caps);
+  const ramp = [...ladderFor("density", caps).steps];
+  const lo = q.min, hi = q.max;
+  const row = new Array<string>(w).fill(" ");
+
+  // The qualitative bands, lightest first — a background the measure sits on.
+  const bands = [q.q1, q.median, q.q3, hi];
+  let from = 0; // cells-ok — a column index
+  for (const [i, edge] of bands.entries()) {
+    const to = scaleX(edge, lo, hi, w);
+    const ink = ramp[Math.min(ramp.length - 1, Math.round(((i + 1) / bands.length) * 3))] ?? ramp[0]!; // cells-ok — a ramp index
+    for (let x = from; x <= to && x < w; x += 1) row[x] = ink; // cells-ok — a column index
+    from = to + 1; // cells-ok — a column index
+  }
+
+  if (measure !== null && Number.isFinite(measure)) {
+    const end = scaleX(measure, lo, hi, w);
+    for (let x = 0; x <= end && x < w; x += 1) row[x] = g.filled; // cells-ok — a column index
+  }
+  // The target last, over everything: it is the question the row answers.
+  if (q.centre !== undefined && Number.isFinite(q.centre)) {
+    const t = scaleX(q.centre, lo, hi, w);
+    if (t >= 0 && t < w) row[t] = g.vertical; // cells-ok — a column index
+  }
+  return row.join("");
 }

@@ -315,6 +315,61 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       series: [s([100, -40, -25, -10, 25])], totals: [false, false, false, false, true],
     },
   },
+  slope: {
+    // Ranking change — the lines crossing *is* the content, which is why this is
+    // not two bar charts side by side.
+    default: {
+      form: "slope", height: 10, axes: true,
+      series: [s([12, 38], "north"), s([31, 14], "south"), s([22, 27], "east")],
+    },
+  },
+  bubble: {
+    default: {
+      form: "bubble", height: 10, axes: true,
+      series: [
+        s([20, 45, 30, 60, 38, 52, 25], "value"),
+        s([2, 9, 4, 14, 6, 11, 3], "size"),
+      ],
+    },
+  },
+  autocorrelation: {
+    default: {
+      form: "autocorrelation", height: 9, axes: true,
+      categories: ["0", "1", "2", "3", "4", "5", "6", "7", "8"],
+      series: [s([1, 0.72, 0.41, 0.12, -0.18, -0.33, -0.21, 0.04, 0.19])],
+      annotations: [{ kind: "line", value: 0.28 }],
+    },
+  },
+  timeline: {
+    default: {
+      form: "timeline", height: 4, axes: true,
+      categories: ["deploy", "incident", "rollback"],
+      series: [s([2, 9, 17, 28, 41]), s([12, 23, 36]), s([13, 37])],
+    },
+  },
+  bullet: {
+    default: {
+      form: "bullet", height: 4, axes: true,
+      categories: ["revenue", "margin", "churn"],
+      series: [s([72, 38, 21])],
+      quartiles: [
+        { min: 0, q1: 40, median: 65, q3: 85, max: 100, centre: 80 },
+        { min: 0, q1: 20, median: 35, q3: 45, max: 60, centre: 42 },
+        { min: 0, q1: 10, median: 20, q3: 30, max: 40, centre: 15 },
+      ],
+    },
+  },
+  utilisation: {
+    default: {
+      form: "utilisation", height: 4,
+      series: [
+        s(Array.from({ length: 24 }, (_, i) => 30 + Math.sin(i * 0.4) * 30), "node-1"),
+        s(Array.from({ length: 24 }, (_, i) => 50 + Math.cos(i * 0.3) * 35), "node-2"),
+        s(Array.from({ length: 24 }, (_, i) => 20 + Math.sin(i * 0.6) * 18), "node-3"),
+        s(Array.from({ length: 24 }, (_, i) => 65 + Math.cos(i * 0.5) * 25), "node-4"),
+      ],
+    },
+  },
   treemap: {
     // One tree, three forms — C04 I54. The same fixture below under `flame` and
     // `icicle`, because what they disagree about is layout.

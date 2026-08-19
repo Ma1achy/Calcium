@@ -533,6 +533,7 @@ export type PlotForm =
   | "scatter" | "step" | "ecdf"
   | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
   | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
+  | "slope" | "bubble" | "autocorrelation" | "timeline" | "bullet" | "utilisation"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
   | "density" | "violin" | "ridgeline"
   | "smallmultiples" | "pairplot"
