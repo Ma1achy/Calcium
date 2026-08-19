@@ -286,10 +286,26 @@ describe("catalogue-png — the parser that failed silently", () => {
   // frames on disk were right in every byte, and the images said otherwise.
 
   const svgOf = (line: string): string => ansiToSvg(line) as string;
+  /**
+   * Every glyph the renderer placed, in order.
+   *
+   * **One element per glyph** since the corners stopped meeting the border —
+   * librsvg implements neither `textLength` nor a per-glyph `x` list, so the
+   * only way a column is honoured is to be its own `<text>`. The rows below
+   * search for a word across those elements rather than for a `<text>` holding
+   * it, which is what they were doing when a run was one element.
+   */
+  const glyphsOf = (svg: string): readonly { x: number; ch: string }[] =>
+    [...svg.matchAll(/<text x="([-0-9.]+)"[^>]*>([^<]*)<\/text>/gu)]
+      .map((m) => ({ x: Number(m[1]), ch: m[2] ?? "" }));
+
   const xOf = (svg: string, text: string): number => {
-    const m = new RegExp(`<text x="([-0-9.]+)"[^>]*>${text}</text>`, "u").exec(svg);
-    if (m === null) throw new Error(`no <text> run for ${text}`);
-    return Number(m[1]);
+    const gs = glyphsOf(svg);
+    const want = [...text];
+    for (let i = 0; i + want.length <= gs.length; i += 1) { // cells-ok — a glyph count
+      if (want.every((c, k) => gs[i + k]?.ch === c)) return gs[i]!.x;
+    }
+    throw new Error(`no glyph run for ${text}`);
   };
   // Derived rather than imported, so the rows below assert placement and not a
   // constant — and derived across an **SGR boundary** rather than a space,
@@ -322,6 +338,48 @@ describe("catalogue-png — the parser that failed silently", () => {
     const row = svgOf(`${GREY}         setosa           versicolor\x1b[39m`);
     expect(xOf(row, "setosa")).toBeCloseTo(ORIGIN + 9 * CELL, 0); // cells-ok — a label column
     expect(xOf(row, "versicolor")).toBeCloseTo(ORIGIN + 26 * CELL, 0); // cells-ok — a label column
+  });
+
+  it("PC14: every glyph is placed at its own column", () => {
+    // **PC9 and PC10 assert where a run *starts* and nothing asserted where it
+    // ends.** A `<text>` holding a run lets the font advance the glyphs inside
+    // it, so a one-character run lands exactly and a long one drifts — the
+    // frame's corners sat three pixels right of the border between them, about
+    // a third of a cell, and the frame read as not meeting itself.
+    //
+    // **Two cheaper fixes are no-ops and only a pixel measurement says so.**
+    // Rendering a 76-glyph rule ending in `┐`, against the same `│` alone at
+    // the same column: `textLength` produced a byte-identical PNG, an `x` list
+    // put the corner at 1285, one `<text>` per glyph at 1282, and the lone
+    // border at 1282. `sharp` renders through librsvg, which implements neither
+    // `textLength` nor per-glyph `x` lists — and **an attribute a renderer
+    // ignores reads exactly like one it honours.**
+    //
+    // So the assertion is on the shape of the output rather than on an
+    // attribute: one element per glyph, each at its own column, which is what
+    // the braille path has always done.
+    const svg = svgOf(`${GREY}┌${"─".repeat(20)}┐\x1b[39m`);
+    const runs = [...svg.matchAll(/<text x="([-0-9.]+)"[^>]*>([^<]*)<\/text>/gu)];
+    expect(runs.length).toBe(22); // cells-ok — a glyph count
+    runs.forEach(([, x, ch], i) => {
+      expect([...(ch ?? "")].length).toBe(1); // cells-ok — a glyph count
+      expect(Number(x)).toBeCloseTo(ORIGIN + i * CELL, 0); // cells-ok — a column position
+    });
+  });
+
+  it("PC14a: the last glyph of a run is one column from the one before it", () => {
+    // The property the drift violated: a glyph's column must not depend on how
+    // many glyphs precede it. **Asserted as a gap between neighbours rather
+    // than against `CELL`**, which is derived through `toFixed(1)` and so is
+    // 8.4 where the renderer's constant is 8.41 — over 74 glyphs that rounding
+    // is 0.74px, and the first form of this row failed on it while the renderer
+    // was right.
+    const gap = (n: number): number => {
+      const gs = glyphsOf(svgOf(`${GREY}${"─".repeat(n)}│\x1b[39m`));
+      return gs[gs.length - 1]!.x - gs[gs.length - 2]!.x; // cells-ok — a glyph count
+    };
+    const base = gap(2);
+    for (const n of [3, 20, 74]) expect(gap(n)).toBeCloseTo(base, 2); // cells-ok — a glyph count
   });
 
   it("PC11: the row pitch does not exceed the glyph's own extent", () => {

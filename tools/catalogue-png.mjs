@@ -239,10 +239,43 @@ export function ansiToSvg(ansi) {
       // drift. Nothing is drawn for a space, so nothing can be collapsed.
       let textRun = "";
       let textStart = col;
+      // **One `<text>` per glyph, because a run's width was never ours to
+      // state and every cheaper way of saying so is ignored.**
+      //
+      // A run placed at `col × CELL_W` lets the *font* advance the glyphs
+      // inside it, so a one-character run lands exactly and a long one drifts.
+      // Cropped and enlarged, the frame's corners sit visibly right of the
+      // border between them.
+      //
+      // **Three fixes were tried and two of them are no-ops here, measured
+      // rather than assumed.** Rendering a 76-glyph rule ending in `┐`, against
+      // the same `│` alone at the same column:
+      //
+      //     one <text> with textLength    ignored — the PNG was identical
+      //     one <text> with an x list     x=1285   ← only the first x is used
+      //     one <text> per glyph          x=1282
+      //     the border alone              x=1282
+      //
+      // `sharp` renders through librsvg, which implements neither `textLength`
+      // nor per-glyph `x` lists. **An attribute a renderer ignores reads exactly
+      // like one it honours**, which is why every step of this was a pixel
+      // measurement and none of it an assertion about the SVG.
+      //
+      // What was *not* the cause, each checked before being ruled out: the frame
+      // rows and the data rows end at the same x in the SVG (670.4, both); the
+      // stems of `│ ┐ ┘ ┌ └ ┤` all rasterise to the same two columns at this
+      // density; and supersampling at 4× and resampling down does not move it,
+      // so it is not hinting.
+      //
+      // Per-glyph elements are what the braille path has always done. The cost
+      // is element count in a build tool and the gain is that no glyph's
+      // position depends on any other glyph's advance.
       const flush = () => {
         if (!textRun) return;
-        const x = PAD + textStart * CELL_W;
-        parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}">${escapeXml(textRun)}</text>`);
+        [...textRun].forEach((ch, i) => {
+          const x = PAD + (textStart + i) * CELL_W;
+          parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}">${escapeXml(ch)}</text>`);
+        });
         textRun = "";
       };
       for (const ch of span.text) {

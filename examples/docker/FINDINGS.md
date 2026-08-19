@@ -9375,3 +9375,61 @@ changed some other way    0
 
 **Provably additive**, which is the check that says a merge rule did what it claimed and nothing
 else — and it reaches `slope`, a form neither report mentioned and neither of us predicted.
+
+---
+
+## F187 — three fixes for one nit, and two of them were no-ops the renderer never told me about ★★★
+
+| | |
+|---|---|
+| **Surface** | every catalogue PNG — the frame's corners sit three pixels right of the border between them |
+| **Reached for** | a user's *really small nit*, with an image |
+| **Verdict** | **librsvg implements neither `textLength` nor a per-glyph `x` list, and ignoring an attribute looks exactly like honouring it** |
+| **Absorbed by** | one `<text>` per glyph in `catalogue-png.mjs` — what the braille path already did |
+
+**The frames were never wrong.** `PC12` asserts every catalogue frame's border sits in one column
+and passes, and the SVG confirms it: every frame run and every data row's border ends at
+**x=670.4**, to the tenth of a unit. The defect is entirely in the image.
+
+### Four diagnoses, three of them wrong, and each was checked before being dropped
+
+| what I thought | what measuring said |
+|---|---|
+| the font's advance drifts over a long run | true, and **not fixable by `textLength`** — the PNG was byte-identical with and without it |
+| an `x` list fixes it | **no** — librsvg uses only the first coordinate |
+| the corner glyph's stem sits right of `│`'s | **no** — `│ ┐ ┘ ┌ └ ┤` all rasterise their stem to the same two columns at this density |
+| it is hinting at 14px | **no** — rendering at 4× and resampling down does not move it |
+
+The measurement that settled it renders a 76-glyph rule ending in `┐` three ways and the same
+`│` alone at the same column:
+
+```
+one <text> with an x list     x = 1285
+one <text> per glyph          x = 1282
+the border alone              x = 1282
+```
+
+**An attribute a renderer ignores reads exactly like one it honours.** That is why every step
+here was a pixel measurement and none of it an assertion about the SVG — the two rejected fixes
+would both have shipped green, with a test asserting the attribute was present and an image
+unchanged.
+
+### The instrument that found the wrong ones was the same one that found the right one
+
+Reading the frame, at increasing magnification. The 3px first appeared as a split in a
+rightmost-ink histogram — **and that histogram lied twice**: once because I mapped rows at a
+pitch of 32 when the image is 2× of a 16px cell over nine rows, and once because a threshold on
+a low-contrast grey put the same `│` at three columns on one row and six on another. Cropping the
+border strip and enlarging it is what showed the step for certain, and it is the only step of the
+four that never gave a wrong answer.
+
+### What it cost and what it bought
+
+One `<text>` per glyph is about 1600 elements a frame against a few dozen. The full catalogue —
+**560 PNGs and a contact sheet — renders in 7 seconds**, so the cost is not a cost. What it buys
+is that no glyph's position depends on any other glyph's advance, which is the property the
+braille path has had since it was written and the box-drawing path never had.
+
+`PC14` asserts the shape of the output — one element per glyph, each at its own column — rather
+than the presence of an attribute, for the reason above. `PC10` and the `xOf` helper had to be
+rewritten with it: they searched for a `<text>` holding a whole word, and there are no longer any.
