@@ -1138,6 +1138,38 @@ it must.
 
 ---
 
+## 3o. `matrixAnchor` — where a matrix puts a row shorter than its width
+
+**The reported defect, and the code read back**: *AXES | MASSIVE GAP OF NOTHING
+| HEAT MAP*. `columnMap`'s `"window"` arm emits `null` for the first
+`width − count` columns when there are fewer readings than cells, and `null`
+resolves to a blank — so the frame is the gutter, a long run of nothing, and the
+matrix jammed against the right edge.
+
+**It is right for a live feed and wrong as a default.** A `heatmap` of arriving
+readings *should* keep the newest at the right and grow leftwards: the column a
+reading occupies would otherwise move every tick, and a matrix whose columns
+shift is one nobody can read across time. But a matrix of *categories* — a
+confusion matrix, a correlation grid, a utilisation board — has no time axis and
+nothing to anchor to, and a run of blank columns is simply lost width.
+
+| value | shape | for |
+|---|---|---|
+| `stretch` *(default)* | columns spread across the full width | categories, and anything with no time axis |
+| `window` | newest at the right, blanks at the left | a live feed, where a column must not move |
+| `left` | grows from the left, scrolls once full | a feed being read as history |
+
+`MATRIX_LAYOUT` keys by `PlotForm` and is **total**, so a new matrix form
+declares its own answer rather than inheriting one nobody chose — it was
+`Record<string, …>` and `utilisation` fell through it silently, which is the
+class the four silent tables were about.
+
+**The shipped catalogue fixture hid it**, over-filling the width with 90 readings
+into 72 cells, so no rendered frame showed the defect that was reported. `sparse`
+exists for that reason and is why the fix is checkable.
+
+---
+
 ## 3n. Containment — `flame`, `icicle`, `treemap`
 
 **`flame` and `icicle` shipped as `barRow` with the labels suppressed**, so they
