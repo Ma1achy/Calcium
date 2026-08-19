@@ -1479,6 +1479,36 @@ rather than an abbreviation invented here.
  ├──┤████│████├──┤  ▪ ▪            row 1   the compact box, unchanged
 ```
 
+### The density is drawn on the box's axis, and the two disagreed by a tenth
+
+`violinRows` pads its value axis by a tenth at each end so a tail has somewhere to taper, and
+samples the estimate across the padded span. `boxplotBand` puts `min` in column 0 and `max` in
+the last column with no pad at all. Each is right for the figure that owns it, and **a
+raincloud is both figures in one band** — so composed without a decision the cloud's mode sits
+a tenth of the width from the median it belongs to, in a frame where every count agrees and
+nothing is out of range.
+
+**The box's axis wins, because the ladder's promise is that the same figure appears at every
+rung.** A box that moves when a density row is added above it is a different box, and a reader
+climbing the ladder would be watching the summary shift while the data did not.
+
+**What the pad bought is bought by the cut instead.** The estimate still stops two bandwidths
+past the extreme datapoints — seaborn's `cut`, already in `kde.ts` for the violin's outline —
+so a tail still ends rather than running to the frame's edge, and it ends by the mechanism
+already ruled for that rather than by a second one that happens to look similar.
+
+### Blank is outside the support; the ladder's first step is an estimate near zero
+
+Two meanings meet on one row, and I16 is what keeps them apart. A ramp's first step is ink
+because a blank minimum reads as *nothing here* — and *nothing here* is exactly what a column
+outside the cut has to say. So the cloud draws a ladder step inside the support and a space
+outside it, and the two statements stay distinct: `▁` says the density is small there, a blank
+says the estimate does not reach.
+
+Without the cut the row would draw `▁` from edge to edge, which is a flat line at the bottom of
+the cloud saying *this distribution is everywhere* — the same picture the violin's outline drew
+before `cut` landed, one rung down.
+
 ### The budgets are asymmetric, and it is the cell's aspect showing through
 
 | form | horizontal | vertical |
@@ -1709,7 +1739,7 @@ orientation — and belongs in the classification table as its own rows.
 
 ---
 - **I33** — **The stub always points toward the whisker, and both box-plot glyph tables fall out of that one rule.** `├`/`┤` horizontally and `┬`/`┴` vertically, swapping roles between the caps and the box edges — which reads as arbitrary and is not, because a cap's whisker leaves inward and a box edge's whisker leaves outward. *The rule was implemented in both arms and written down in neither, and the vertical arm was built by re-deriving it from the horizontal one; a table without its rule is a table the next arm re-derives.* **The compact box is filled where the three-row box is hollow**: with a lid and a floor the interior must stay clear for the median and the mean, and with one row there are no edges, so `┤    │    ├` says nothing about where the box is. **A mean landing on the median draws `◈`** rather than nothing — suppressing it left one band with no mean mark beside two that had one, so *they coincide* read as *it is missing*.
-- **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; 3 rows / 4 columns adds the raw samples as a jittered strip; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a pure function of the sample's identity** — no clock, no `Math.random`, no module counter — because I11 says every render is a pure function of block, width and context, and a strip that moves between two renders of the same block is a picture of the renderer.
+- **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; **its density is sampled on the box's axis and not on the violin's**, which pads by a tenth at each end, or the cloud's mode sits a tenth of the width from the median below it with every count agreeing — and the tail is stopped by the cut that already stops the violin's outline rather than by a second mechanism. **Blank means outside the support and the ladder's first step means an estimate near zero** (I16), which is the one place those two can collide; 3 rows / 4 columns adds the raw samples as a jittered strip; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a pure function of the sample's identity** — no clock, no `Math.random`, no module counter — because I11 says every render is a pure function of block, width and context, and a strip that moves between two renders of the same block is a picture of the renderer.
 
 ## 8. Commitments
 
@@ -1787,6 +1817,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.67** (I33): the stub points toward the whisker in both arms — `├` at the min cap and `┤` at Q1 horizontally, `┬` at the max cap and `┴` at Q3 vertically — asserted as the *rule* over both tables rather than as two literal figures, so a table transcribed correctly from a wrong rule still fails.
 - **T1.68** (I33): a compact box is filled between Q1 and Q3 and a three-row box is hollow there, and a mean landing on the median draws `◈`.
 - **T1.69** (I34): `plotDetail: "auto"` picks the richest rung the declared height affords — 1, 2, 3 and 5 rows give the box, the raincloud, the jittered raincloud and the mirrored violin — and `"compact"` gives the *form's* lowest rung, which is 1 for a boxplot and 2 for a violin.
+- **T1.91** (I34): a raincloud's cloud and its box read the same axis — the column holding the cloud's maximum is the column holding the box's median, for a distribution whose mode *is* its median. Asserted against a skewed sample as well, where the two columns differ and must differ by what the data says rather than by a tenth of the width. **The fixture responds first**: sampled on the violin's padded axis instead, the symmetric case is off by ⌊w ÷ 10⌋ and the row fails.
+- **T1.92** (I34, I16): outside the cut the cloud row is blank and inside it the smallest reading is the ladder's first step, never a space — a tight distribution in a wide band leaves the row's ends empty rather than ruled, and no column of the drawn support is blank.
 - **T1.90** (I28): a compact box plot at three categories in twelve rows, and a three-row box in five — the set of rows carrying a box spine and the set carrying a category name are **the same set**. Equality rather than containment, because *every named row has a spine* passes on a frame with spines elsewhere too and *every spine is named* passes on one where a band lost its name. **The glyph took two goes and both misses were furniture**: the median is `│`, which is the plot's right border on every row, and the box's minimum cap is `┤`, which is the gutter's axis tick on every named row by construction. `├` is drawn by the spine and by nothing else in the frame. Not asserted at a row index, which an off-by-one in the offset satisfies when the index is written from the same expression.
 - **T1.88** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
@@ -1859,6 +1891,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 - **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
+- **T6.24** (I34): sampling the cloud on the violin's padded axis → T1.91 fails, and the raincloud's mode moves a tenth of the width off the median it sits above while every value stays in range and every count agrees. **The mutation that cannot be seen from a number**, which is why the row is written about two columns of one frame rather than about a scale.
 - **T6.23** (I28): returning the label to `⌊band ÷ 2⌋` → T1.90 fails at both rungs, and every rung below the top one has its category name pointing at a blank row. The pre-change pair — that expression *and* no offset — fails it too. **The third mutation is the one that says which half is the ruling**: dropping the offset alone, leaving the label tracking the figure, fails nothing and is *meant* to, because a top-aligned figure named on its own middle row is equally right. It is a recorded control rather than a gap, and it is what stopped the centring being written down as the fix.
 - **T6.22** (I34, I21): a vertical raincloud reaching for the height ladder → T1.70 fails, and the density draws a per-cell scale where the axis is a run. Arithmetically self-consistent — the levels are monotone and the row count is right — and wrong about how much of each cell a level fills.
 
