@@ -1244,7 +1244,22 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "whose whole purpose is to be called from outside it cannot satisfy that scope " +
     "however many consumers it has",
 
-  // --- a field whose consumer is a ruling away ------------------------------
+  // --- a field whose consumer is one commit away ----------------------------
+  //
+  // **The blocker is stated as a symbol, so picking this up begins by grepping
+  // it** — a deferral whose condition is prose is one nobody watches. And
+  // MG24's bidirectional arm is what makes this self-expiring rather than a
+  // deferral at all: the day `rainColumns` names `grows`, this entry becomes a
+  // violation in its own right.
+  "Extent.grows":
+    "C12 I34 — the direction exists for the vertical raincloud's density, which " +
+    "is a run of dot-columns rather than a ladder step (C12 §3i, I21). The " +
+    "consumer is `rainColumns` in `src/presentation/plot/kde.ts`, two commits " +
+    "along in the same plan. **`extentRun` reads it in the same file**, so this " +
+    "is the cross-module arm firing and not the field being inert: the leftward " +
+    "vocabulary is already the only one whose partials are mirrored, and " +
+    "T1.88 asserts the five levels it produces",
+
   "SgrStyle.italic":
     "roadmap 50 — `Style.italic` and its SGR-3 twin are the *capability*, and the " +
     "consumer is span-level styling, which the entry's own ORDER puts behind spans " +

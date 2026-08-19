@@ -13,7 +13,7 @@ import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/s
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
-import { extentFor, ladderFor } from "../../src/presentation/plot/ramp.js";
+import { extentFor, extentRun, ladderFor } from "../../src/presentation/plot/ramp.js";
 import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
@@ -276,6 +276,47 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     const areaRows = rows.slice(1, -2);
     expect(ink(areaRows[areaRows.length - 1] ?? ""), "the floor row is the fullest")
       .toBeGreaterThanOrEqual(ink(areaRows[0] ?? "")); // cells-ok — a cell count
+  });
+
+  it("T1.88 (C12 I21): the extent grows the way its vocabulary says, and the tip follows", () => {
+    // **This was very nearly a third ladder axis.** A vertical raincloud's
+    // density is a run of dot-columns, and reaching for `ladderFor` there is the
+    // mismatch I21 exists to make unspellable — a ladder is per-cell and this is
+    // per-run. Measured before it was built: `extentRun` at width 2 with one
+    // partial already returns the five levels the figure needs, reflected.
+    const levels = (grows: "rightward" | "leftward"): string => {
+      const ext = extentFor(FULL_CAPS, grows);
+      return [0, 0.25, 0.5, 0.75, 1]
+        .map((t) => {
+          const run = extentRun(t, 2, ext); // cells-ok — a column budget
+          const pad = "\u2800".repeat(2 - [...run].length); // cells-ok — a column budget
+          return grows === "leftward" ? pad + run : run + pad;
+        })
+        .join(" ");
+    };
+    expect(levels("leftward")).toBe("\u2800\u2800 \u2800\u28b8 \u2800\u28ff \u28b8\u28ff \u28ff\u28ff");
+
+    // **The direction is on the vocabulary, so the pairing cannot be wrong.**
+    // Leftward is braille at every width because Unicode has no left-growing
+    // eighths — `▕` and `▐` are the only two and both are Ambiguous — while
+    // rightward at narrow is the block set. The two arms therefore share no
+    // glyph, which is what makes the assertion above about direction and not
+    // about a repeat count.
+    const left = extentFor(FULL_CAPS, "leftward");
+    const right = extentFor(FULL_CAPS, "rightward");
+    expect(left.grows).toBe("leftward");
+    expect(right.grows).toBe("rightward");
+    expect([...left.partials, left.solid].some((g) => [...right.partials, right.solid].includes(g)))
+      .toBe(false);
+
+    // The tip is on the growing end. At `t` between two whole cells the partial
+    // leads leftward and trails rightward, which is the whole of the mirror.
+    const l = [...extentRun(0.75, 2, left)]; // cells-ok — a column budget
+    expect(left.partials).toContain(l[0]);
+    expect(l[l.length - 1]).toBe(left.solid);
+    const r = [...extentRun(0.75, 2, right)]; // cells-ok — a column budget
+    expect(right.partials).toContain(r[r.length - 1]);
+    expect(r[0]).toBe(right.solid);
   });
 
   it("T1.38 (C12 I30): a label that cannot be read whole is dropped, not sliced", () => {

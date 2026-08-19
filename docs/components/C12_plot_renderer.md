@@ -1723,7 +1723,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.67** (I33): the stub points toward the whisker in both arms — `├` at the min cap and `┤` at Q1 horizontally, `┬` at the max cap and `┴` at Q3 vertically — asserted as the *rule* over both tables rather than as two literal figures, so a table transcribed correctly from a wrong rule still fails.
 - **T1.68** (I33): a compact box is filled between Q1 and Q3 and a three-row box is hollow there, and a mean landing on the median draws `◈`.
 - **T1.69** (I34): `plotDetail: "auto"` picks the richest rung the declared height affords — 1, 2, 3 and 5 rows give the box, the raincloud, the jittered raincloud and the mirrored violin — and `"compact"` gives the *form's* lowest rung, which is 1 for a boxplot and 2 for a violin.
-- **T1.70** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
+- **T1.88** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
 
 ### Tier 2 — contract / interface

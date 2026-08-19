@@ -92,6 +92,23 @@ export type Pair = Readonly<{
  */
 export type Extent = Readonly<{
   encodes: "extent";
+  /**
+   * Which end the run grows from — **on the vocabulary, not on the call**.
+   *
+   * A leftward run needs mirrored fractions, so a direction passed to the *run*
+   * could be handed rightward glyphs and would draw a tip pointing the wrong
+   * way: a picture that is right in every count and reversed. Carrying it here
+   * makes that pairing unspellable, which is `serves`' argument one vocabulary
+   * along.
+   *
+   * **This is not a third axis, and it was very nearly written as one.** A
+   * vertical raincloud's density is a run of dot-columns — `extent` mirrored —
+   * rather than a ladder of an axis called `column`. A ladder is per-cell and an
+   * extent is per-run, and which shape a density needs is decided by the
+   * dimension its *band* is thin in, not by the axis its values lie along
+   * (C12 §3i, I21).
+   */
+  grows: "rightward" | "leftward";
   solid: string;
   /** Fractions of a cell, ascending. Empty where the arm has none. */
   partials: readonly string[];
@@ -115,17 +132,31 @@ export type Extent = Readonly<{
  * column filled, which is a half and the only fraction the block can express
  * horizontally.
  */
-export function extentFor(caps: Caps): Extent {
+export function extentFor(caps: Caps, grows: "rightward" | "leftward" = "rightward"): Extent {
   if (caps.unicode === "ascii") {
-    return Object.freeze({ encodes: "extent", solid: "#", partials: Object.freeze([]), absent: "-" } as const);
-  }
-  if (caps.ambiguousWidth === "wide") {
     return Object.freeze({
-      encodes: "extent", solid: "\u28ff", partials: Object.freeze(["\u2847"]), absent: "-",
+      encodes: "extent", grows, solid: "#", partials: Object.freeze([]), absent: "-",
+    } as const);
+  }
+  // **Leftward is braille at every width, and that is a limit rather than a
+  // choice.** The narrow arm below uses the left-eighths `▏▎▍▌▋▊▉` — seven
+  // fractions growing from the left. Unicode has no matching set growing from
+  // the right: `▕` and `▐` are the only two it offers, an eighth and a half, and
+  // both are `East_Asian_Width=Ambiguous`. Braille is `Neutral` throughout and
+  // `⢸` is the right dot-column, the one fraction the block can express
+  // sideways — the same trade the wide arm already takes, from the other side.
+  if (grows === "leftward" || caps.ambiguousWidth === "wide") {
+    return Object.freeze({
+      encodes: "extent",
+      grows,
+      solid: "\u28ff",
+      partials: Object.freeze([grows === "leftward" ? "\u28b8" : "\u2847"]),
+      absent: "-",
     } as const);
   }
   return Object.freeze({
     encodes: "extent",
+    grows,
     solid: "\u2588",
     partials: Object.freeze(["\u258f", "\u258e", "\u258d", "\u258c", "\u258b", "\u258a", "\u2589"]),
     absent: "\u2014",
@@ -153,7 +184,12 @@ export function extentRun(t: number, width: number, ext: Extent): string {
   const step = Math.round(rest * (n + 1));
   if (step === 0) return ext.solid.repeat(full);
   if (step > n) return ext.solid.repeat(Math.min(w, full + 1));
-  return ext.solid.repeat(full) + ext.partials[step - 1]!;
+  // The tip goes on the growing end, which the vocabulary carries rather than
+  // the call — a leftward run with a tip on the right is reversed and correct in
+  // every count.
+  return ext.grows === "leftward"
+    ? ext.partials[step - 1]! + ext.solid.repeat(full)
+    : ext.solid.repeat(full) + ext.partials[step - 1]!;
 }
 
 /** Unicode: the lower-block ramp, one eighth per step. */
