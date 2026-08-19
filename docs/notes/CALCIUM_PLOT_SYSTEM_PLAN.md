@@ -357,7 +357,7 @@ new member joins every sweep automatically.
 | sweep | asserts |
 |---|---|
 | **coverage** | every union member has a catalogue entry that draws something |
-| **distinguishability** | at 1-bit, distinct glyphs ≥ categories — **over **, since a category named in the gutter is told apart by reading it (C12 I25) |
+| **distinguishability** | at 1-bit, distinct glyphs ≥ categories — **over `SHARES_CELLS`**, since a category named in the gutter is told apart by reading it (C12 I25) |
 | **carrier** | ≥8-bit paints cells; 1-bit falls back to the ramp (C12 I29) |
 | **height** | rendered rows == `plotHeight`, every form × width (C12 I1) |
 | **width** | no row exceeds its declared width (C12 I10) |
