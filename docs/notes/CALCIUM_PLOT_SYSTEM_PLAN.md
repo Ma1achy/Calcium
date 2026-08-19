@@ -357,7 +357,7 @@ new member joins every sweep automatically.
 | sweep | asserts |
 |---|---|
 | **coverage** | every union member has a catalogue entry that draws something |
-| **distinguishability** | at 1-bit with ≥2 categories, distinct glyphs ≥ categories (C12 I25) |
+| **distinguishability** | at 1-bit, distinct glyphs ≥ categories — **over **, since a category named in the gutter is told apart by reading it (C12 I25) |
 | **carrier** | ≥8-bit paints cells; 1-bit falls back to the ramp (C12 I29) |
 | **height** | rendered rows == `plotHeight`, every form × width (C12 I1) |
 | **width** | no row exceeds its declared width (C12 I10) |
@@ -405,10 +405,10 @@ Dependency-ordered. Items 3–10 are independent of each other.
 | 1 | ~~**Axes, ticks, frame**~~ **`78667bc`** — only `plotFrame: "box"`; C12 I26's other three owed | every form's furniture |
 | 2 | ~~**`furniture.ts`**~~ **`78667bc`** | matrix family first as the falsifier |
 | 3 | **Orientation** | 11 forms at once, and `categoricalForm` is structurally row-major — **moved from 7**, because "before the per-form work" and "at position 7" contradicted each other and the per-form work is 8–12 |
-| 4 | **Painted cells (C12 I29)** | 7 matrix forms + bars + pie wedges; wiring, highest leverage |
+| 4 | ~~**Painted cells (C12 I29)**~~ **`506c62d`** — and it was never wiring: C10 I21 shut the door, C10 §4c opened it via `wash` | 7 matrix forms + bars + pie wedges; wiring, highest leverage |
 | 5 | ~~**Dot-grid geometry**~~ **`78667bc`** | pie, radar — one root cause |
 | 6 | **Legend** | closes two recorded deferrals (`Annotation.label`, C04 §3b's five members); both carrier forms per C12 I29 |
-| 7 | **`CATEGORY_MARKS` + sweeps** | the degradation ladder, gated |
+| 7 | ~~**`CATEGORY_MARKS` + sweeps**~~ **`cc9f513`** — `SHARES_CELLS` is the partition, and §3g's legend reads the same one | the degradation ladder, gated |
 | 8 | **Stacking fold** | `stackedarea` + `streamgraph` |
 | 9 | **Distribution** | violin taper + bandwidth, ridgeline overlap, forest |
 | 10 | **`hierarchy`** | flame, icicle, treemap |
@@ -447,6 +447,13 @@ commits evaporates.
   above, already realised, in the four forms that were never migrated. Measured
   over 26 800 capability × form × width combinations. Fixing it changes the
   height table, so the spec edit goes first.
+
+- **A gate written from a rule can fail correct code.** C12 I25’s sweep as specified
+  — C12 I25’s wording, *every form at 1-bit with two or more categories draws at least as many
+  distinct glyphs* — failed nine forms and eight were right, because a category
+  named in the gutter is told apart by reading it. Measuring the gate before
+  building it is what caught that; it would otherwise have arrived as eight
+  "failures" to be worked around.
 
 - **A defect can mask a defect.** The facet composition's byte-counting cut every
   row short, so the re-paint at its call site never fired. The correct fix made
