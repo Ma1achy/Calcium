@@ -14,6 +14,7 @@
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { extentFor, extentRun, pairFor } from "./ramp.js";
+import { categoryMarks } from "./marks.js";
 import { formatReadout } from "./axes.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
@@ -68,22 +69,6 @@ export function barRow(
 }
 
 /**
- * Marks for stacked layers, most contrasting first.
- *
- * Not a ramp: a stack is adjacent bands and the reader is telling them apart,
- * not reading a magnitude off them, so neighbouring entries want maximum
- * contrast rather than adjacent steps. ASCII gets its own rungs for the same
- * reason `pairFor` does — the block elements are all ambiguous-width.
- */
-function layerMarks(caps: Caps): readonly string[] {
-  if (caps.unicode === "ascii") return Object.freeze(["#", "=", "-", ":", "."]);
-  if (caps.ambiguousWidth === "wide") {
-    return Object.freeze(["\u28ff", "\u2847", "\u28b6", "\u2809", "\u2812"]);
-  }
-  return Object.freeze(["\u2588", "\u2592", "\u2593", "\u2591", "\u2599"]);
-}
-
-/**
  * A stacked bar: values concatenated end-to-end.
  */
 export function stackedBarRow(
@@ -110,7 +95,7 @@ export function stackedBarRow(
   // The ladder is the density one, taken from the top down, because a stack is
   // read as adjacent bands rather than as a scale — neighbouring layers want
   // maximum contrast, not adjacent steps.
-  const marks = layerMarks(caps);
+  const marks = categoryMarks(caps);
   const scale = normalised ? w / sum : (totalMax > 0 ? w / totalMax : 0);
   let used = 0;
   let result = "";

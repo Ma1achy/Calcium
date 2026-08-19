@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 import { ONE_PER_FORM, ALL_FORMS } from "../support/plot-forms.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
-import { FULL_CAPS, ASCII_CAPS, MONO_CAPS, measurable } from "../support/render.js";
+import { FULL_CAPS, ASCII_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
+import { SHARES_CELLS, categoryMarks, markOf } from "../../src/presentation/plot/marks.js";
 import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
 import { block as blockOf, validateBlock } from "../../src/data/viewmodel/index.js";
 
@@ -117,6 +118,73 @@ describe("P4: render fits measure", () => {
       } catch { /* the matrix family, which C04 I50b bars from answering this */ }
     }
     expect(responded).toBeGreaterThan(10); // cells-ok — a form count
+  });
+});
+
+describe("P4b: at one bit, cell-sharing categories differ by mark (C12 I25)", () => {
+  // **The gate for C12 I25, and it is a sweep because a rule remembered per form
+  // lapses on the thirty-fifth.** A form that ships colour-only fails here on
+  // its first run without anyone recalling that §3h exists.
+  //
+  // **Over `SHARES_CELLS`, which is the correction that made the rule true.**
+  // Written as *every form with two or more categories*, this failed nine and
+  // eight of them were right: `boxplot`, `dumbbell`, `lollipop`, `dotplot`,
+  // `funnel`, `gantt`, `waterfall` and `ridgeline` each name their category in
+  // the gutter, and a reader tells them apart by reading it. I25 asks for more
+  // than tone, and a label is more than tone.
+  const FURNITURE = new Set([..." ─│┌┐└┘┤├┬┴┼╴╶╷╵"]);
+  const strip = (rows: readonly string[]): string =>
+    rows.map((r) => r.replace(/\u001b\[[0-9;]*m/gu, "")).join("");
+
+  for (const form of ALL_FORMS) {
+    if (!SHARES_CELLS[form]) continue;
+    it(form, () => {
+      const base = ONE_PER_FORM[form];
+      const cats = (base.segments?.length ?? 0) || (base.series?.length ?? 0); // cells-ok — a category count
+      if (cats < 2) return; // cells-ok — a category count
+      const rows = kit(MONO_UNICODE_CAPS).renderToLines(base, 60);
+      const marks = new Set(
+        [...strip(rows)].filter((ch) => !FURNITURE.has(ch) && !/[\p{L}\p{N}.,%:\-]/u.test(ch)),
+      );
+      expect(marks.size, `${form}: distinct marks at 1-bit`).toBeGreaterThanOrEqual(Math.min(cats, 8)); // cells-ok — a mark count
+    });
+  }
+
+  it("the partition is total, and both halves are populated", () => {
+    // A `Record<PlotForm, boolean>` that is all `false` would make every row
+    // above vacuous by skipping them, and all `true` would put eight correct
+    // forms back under a rule they answer another way. Neither reads as wrong
+    // from the table itself.
+    const shares = ALL_FORMS.filter((f) => SHARES_CELLS[f]);
+    const labelled = ALL_FORMS.filter((f) => !SHARES_CELLS[f]);
+    expect(shares.length).toBeGreaterThan(4); // cells-ok — a form count
+    expect(labelled.length).toBeGreaterThan(4); // cells-ok — a form count
+    expect(shares.length + labelled.length).toBe(ALL_FORMS.length); // cells-ok — a form count
+    // The measured members, named so a silent reclassification is a diff.
+    for (const f of ["pie", "radar", "waffle", "bar"] as const) expect(SHARES_CELLS[f]).toBe(true);
+    for (const f of ["lollipop", "gantt", "boxplot", "heatmap"] as const) expect(SHARES_CELLS[f]).toBe(false);
+  });
+
+  it("the three mark ladders are the same length as the palette's cap", () => {
+    // The premise `MARK_EXEMPTIONS` records for this file: a ninth mark on one
+    // arm is a test failure here rather than a ladder that runs out at a
+    // different index than the colours beside it.
+    const arms = [FULL_CAPS, ASCII_CAPS, { ...FULL_CAPS, ambiguousWidth: "wide" as const }];
+    for (const caps of arms) expect(categoryMarks(caps).length).toBe(8); // cells-ok — a ladder length
+    for (const caps of arms) {
+      expect(new Set(categoryMarks(caps)).size, "and every mark is distinct").toBe(8); // cells-ok — a set size
+    }
+  });
+
+  it("markOf is uniform above the colour floor and a ladder below it", () => {
+    // **C12 I29 in one row.** Where colour separates the categories it is the
+    // carrier, and a varying mark would encode one fact twice — which is what
+    // made a stacked bar's `░▒▓` read as a magnitude it did not have.
+    const at = (depth: 1 | 4 | 8 | 24, always = false): Set<string> =>
+      new Set([0, 1, 2, 3].map((i) => markOf(i, { ...FULL_CAPS, colourDepth: depth }, always)));
+    expect(at(24).size, "uniform where colour carries it").toBe(1); // cells-ok — a set size
+    expect(at(1).size, "and a ladder where it cannot").toBe(4); // cells-ok — a set size
+    expect(at(24, true).size, "`plotMarks: always` overrides in one direction").toBe(4); // cells-ok — a set size
   });
 });
 

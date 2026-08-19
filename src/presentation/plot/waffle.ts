@@ -6,6 +6,7 @@
 import type { Segment } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { pairFor } from "./ramp.js";
+import { markOf } from "./marks.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
 
@@ -42,8 +43,13 @@ export function waffleCells(
     const row: WaffleCell[] = [];
     for (let c = 0; c < cols; c++) {
       const cell = grid[r * 10 + c]!;
+      // **The segment's own mark, not one fill for all of them** (C12 I25).
+      // Every cell drew `pair.filled`, so a three-segment waffle was one solid
+      // block the moment colour went — and it was the single genuine failure of
+      // the nine the sweep first reported. `markOf` is uniform above the colour
+      // floor, so this changes nothing where tone already separates them.
       row.push(cell >= 0
-        ? { mark: pair.filled, segmentIndex: cell }
+        ? { mark: markOf(cell, caps), segmentIndex: cell }
         : { mark: pair.empty, segmentIndex: -1 });
     }
     for (let c = cols; c < w; c++) {

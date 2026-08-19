@@ -934,6 +934,8 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "picks its rule character from the capability in the expression that draws it",
   "src/presentation/plot/ramp.ts":
     "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
+  "src/presentation/plot/marks.ts":
+    "the category ladders, one per capability arm, side by side in the file that *is* the vocabulary — `ramp.ts`'s premise exactly, and `markOf` is the only door. The premise to re-check: all three arms are eight long and `enforce-rules.test.ts` asserts it, so a ninth mark on one arm is a test failure rather than a silent ladder that runs out at a different index than its palette",
   "src/presentation/plot/curve.ts":
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
   "src/presentation/plot/linedraw.ts":
