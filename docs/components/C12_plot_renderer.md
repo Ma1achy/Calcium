@@ -1414,6 +1414,58 @@ than furniture beside it.
 
 ---
 
+## 3s. The cursor's column — what C12 owns of a crosshair, and what it does not
+
+A readout naming four values says *what this mark is*. It does not say **which** mark, and
+§6b B5's ruling — *the readout is what disambiguates a doji from an overlay line* — leans on the
+reader knowing which column it describes.
+
+### The seam, measured rather than assumed
+
+`cursorPositions` is declared on `RenderContext`, threaded through `render-lines.ts`, and read in
+**one** place: `positionalForm`, which selects `axedWithCursor`. **Nothing in `src/` or
+`examples/` writes it.** So this is a complete mechanism with nothing on the other side — the
+shape MG24 exists for, on a context field rather than an interface member, which is why no rule
+fired.
+
+**§10 lists *interactive plots — zoom, crosshair, hover* as Phase 2, and that row is about the
+writer.** Who moves a cursor is L4's question: a key press, a mouse column, a hover. What a
+cursor *draws* once something has set it is C12's, and C12 has answered it since `cursorReadout`
+shipped. Completing that answer is maintenance of a surface already here; it does not move the
+phase boundary, and §10's row is reworded to say which half it defers.
+
+### Two marks, because either alone fails in the case that motivates it
+
+**A dashed vertical behind the data**, at the cursor's column, composited through the same
+`behind()` path the gridlines use — so it never overwrites a sample and shows in the gaps.
+`dashedVertical` is already the slot for *a reference line drawn beside data*, and its comment
+gives the reason: a solid rule through a figure reads as part of it.
+
+**And a mark on the bottom rule** at the same column. The dashed line alone is invisible exactly
+where a reader most needs it — a dense candlestick at one cell per candle fills every row of its
+column — so the rule row carries `▲`, below the data and above the readout text it explains.
+
+### Which column, which is the part that can be silently wrong
+
+The cursor indexes the **data**, not the area, which is what `cursorReadout` has always assumed:
+it reads `series[i].values[cursorIdx]`. So the mark's column is whatever that index maps to, and
+the mapping is the form's rather than one rule:
+
+```
+a curve       round(i ÷ (n − 1) × (areaWidth − 1))    `columnsOf`'s placement
+candlesticks  bucket(i) × pitch + wick                the candle layout, through the aggregation
+```
+
+**A candlestick past the aggregation threshold is the case a single rule gets wrong.** With more
+bars than columns the drawn candle at column *j* is an aggregate of a range of bars, so the
+inverse is `⌊i × n ÷ bars.length⌋` — and a marker placed by the curve's rule would point at a
+candle the reader is not being told about, which is worse than no marker.
+
+Out of range — a cursor past the data — draws **neither** mark, which is the same statement the
+readout's four dashes make.
+
+---
+
 ## 3p. Aspect, reflow, and a deferral whose blocker expired
 
 **A cell is about one column wide and two rows tall, and exactly one file knew
@@ -2127,7 +2179,8 @@ orientation — and belongs in the classification table as its own rows.
 - **I33** — **The stub always points toward the whisker, and both box-plot glyph tables fall out of that one rule.** `├`/`┤` horizontally and `┬`/`┴` vertically, swapping roles between the caps and the box edges — which reads as arbitrary and is not, because a cap's whisker leaves inward and a box edge's whisker leaves outward. *The rule was implemented in both arms and written down in neither, and the vertical arm was built by re-deriving it from the horizontal one; a table without its rule is a table the next arm re-derives.* **The compact box is filled where the three-row box is hollow**: with a lid and a floor the interior must stay clear for the median and the mean, and with one row there are no edges, so `┤    │    ├` says nothing about where the box is. **A mean landing on the median draws `◈`** rather than nothing — suppressing it left one band with no mean mark beside two that had one, so *they coincide* read as *it is missing*.
 - **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; **its density is sampled on the box's axis and not on the violin's**, which pads by a tenth at each end, or the cloud's mode sits a tenth of the width from the median below it with every count agreeing — and the tail is stopped by the cut that already stops the violin's outline rather than by a second mechanism. **Blank means outside the support and the ladder's first step means an estimate near zero** (I16), which is the one place those two can collide; **and the vertical figure narrows to three fifths of its slot at five columns or more, by the rule `boxplotColumn` already applies, and is capped at five cells on top of that** — drawn to the full slot a band's cloud ran into the next band's box and three distributions read as one field; drawn to three fifths of a wide one it was fourteen solid cells a row, because a run is the magnitude axis and lengthening it is the same move as adding steps to the ladder. Four cells of cloud resolve `2n + 1` = nine levels against the height ladder's eight, which is the derivation. Every count was right in both; 3 rows / 4 columns adds the raw samples as a jittered strip — **the only part of the figure that is the data**, and the part that carries the sub-cell win: two value positions per cell against the cloud's one horizontally, four down a cell vertically, with the remaining dot axis spent on jitter. ASCII draws a rug instead and that is I21 — there is no sub-cell position to spend, and folding through the ramp would draw a magnitude the data has not got; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **The rung is chosen once for the chart, from its narrowest band** — a vertical arm distributes its remainder a cell at a time, so a ladder keyed on each band's own width drew three mirrored violins among fifteen rainclouds and a reader reads that as a property of three categories. The drawing still takes each band's own width. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a *hash* of the sample's identity and not merely a pure function** — no clock, no `Math.random`, no module counter, because I11 says every render is a pure function of block, width and context and a strip that moves between two renders of one block is a picture of the renderer; **and not `index % positions` either**, which satisfies I11 exactly and draws a sawtooth, so sorted data comes out in diagonal stripes that are a pattern in the renderer read as a pattern in the measurements. The band's index is an input so two bands of one distribution do not draw the same speckle. *The counter is invisible when the sample count is a multiple of the jitter's positions — the phase resets and both frames are byte-identical — so the fixture asserts its count is coprime to them.*
 - **I35** — **A categorical distribution form scales every band to one value axis, and the caller's pin is what that axis is.** Scaled to its own extent each band fills its own width, so a tight distribution and a wide one draw the same shape and the comparison the form exists to make is gone — with every count in the figure agreeing. *Three instances, because the fix is per call site: `ridgelineArea` had it and the two violin arms each computed their own bounds.* Where there is no pin the axis is the union, which `seriesRange` already computes — the same argument §6a A6 makes for a matrix, one form along. **And the cut is what keeps a shared axis readable**: a kernel estimate is defined everywhere, so across a shared axis it draws flat tails to the frame's edge unless it is stopped two bandwidths past the data (§3q).
-- **I36** — **`candlestick` is a curve style and not a form, its data is a typed field, and the readout is part of it.** Everything a line plot has is unchanged — axis, grid, annotations, legend, crosshair — and what differs is what one column draws, so it sits in `plotStyle` beside `braille` and `line` with `form` still `line` or `step`. **Bullish and bearish are two categories, so §3b binds**: hollow-versus-filled carries direction at **every** depth and colour reinforces it — because I25's sweep is indexed by `PlotForm` and a style is invisible to it, and because the frame-read this repository schedules strips colour. **There is no sub-cell win, and the section records that the mechanism was looked for** — a body floats between open and close so both ends fall inside a cell, Unicode's vertical eighths ladder upward only, and the one vocabulary that resolves both ends is the one that cannot draw a hollow body. Cell resolution, as every reference implementation draws it; what is exact here is the aggregation. **The width is a stated layout rule** — `clamp(⌊areaWidth ÷ n⌋, 1, 5)`, the wick left of centre at an even width by `boxplotColumn`'s existing rounding — and **more bars than columns aggregate rather than sample**: open of the first, high of the maxima, low of the minima, close of the last, which is exact where every other downsampling in this component approximates. **The vocabulary is not swapped to braille** — a bar's length *is* its value so doubling the glyph doubles the datum, while a candle's glyph carries direction and its column carries the time — **and the wide arm is `glyphs()`' ASCII set, so the column count does not change.** Two swaps were both called *the wide arm*, and drawing the consequence from the wrong one would have set a layout floor of one cell that `wide` cannot reach. **The readout is load-bearing rather than a convenience**, because a doji and an overlay line both draw `─` in one cell and only the four values tell them apart (§3r, §6b B5).
+- **I36** — **`candlestick` is a curve style and not a form, its data is a typed field, and the readout is part of it.** Everything a line plot has is unchanged — axis, grid, annotations, legend, crosshair — and what differs is what one column draws, so it sits in `plotStyle` beside `braille` and `line` with `form` still `line` or `step`. **Bullish and bearish are two categories, so §3b binds**: hollow-versus-filled carries direction at **every** depth and colour reinforces it — because I25's sweep is indexed by `PlotForm` and a style is invisible to it, and because the frame-read this repository schedules strips colour. **There is no sub-cell win, and the section records that the mechanism was looked for** — a body floats between open and close so both ends fall inside a cell, Unicode's vertical eighths ladder upward only, and the one vocabulary that resolves both ends is the one that cannot draw a hollow body. Cell resolution, as every reference implementation draws it; what is exact here is the aggregation. **The width is a stated layout rule** — `clamp(⌊areaWidth ÷ n⌋ − 1, 1, 5)` with the gap taken before the body, the wick left of centre at an even width by `boxplotColumn`'s existing rounding — and **more bars than columns aggregate rather than sample**: open of the first, high of the maxima, low of the minima, close of the last, which is exact where every other downsampling in this component approximates. **The vocabulary is not swapped to braille** — a bar's length *is* its value so doubling the glyph doubles the datum, while a candle's glyph carries direction and its column carries the time — **and the wide arm is `glyphs()`' ASCII set, so the column count does not change.** Two swaps were both called *the wide arm*, and drawing the consequence from the wrong one would have set a layout floor of one cell that `wide` cannot reach. **The readout is load-bearing rather than a convenience**, because a doji and an overlay line both draw `─` in one cell and only the four values tell them apart (§3r, §6b B5).
+- **I37** — **The cursor's column is marked twice, and the mapping from index to column is the form's.** A readout names values and a reader cannot use them without knowing which mark they describe — which is what §6b B5's ruling about the doji rests on. **A dashed vertical behind the data** through the same path the gridlines take, so it never overwrites a sample; **and a mark on the bottom rule**, because the dashed line is invisible in exactly the case that motivates it, a dense column with ink in every row. *The index is into the data and not the area* — `cursorReadout` has always read `values[cursorIdx]` — so a candlestick past its aggregation threshold inverts through the buckets rather than through the curve's placement, and a single rule would point at a candle nobody is being told about. **C12 owns what a cursor draws and not who moves one**: nothing in `src/` writes `cursorPositions`, and §10's Phase 2 row is about that writer (§3s).
 
 ## 8. Commitments
 
@@ -2159,6 +2212,7 @@ orientation — and belongs in the classification table as its own rows.
 26. Magnitude is carried by colour where there is colour and by the glyph ramp where there is not, which is one rule with two arms rather than two rules (I29, I25).
 27. **One rule generates both box-plot glyph tables** — the stub points toward the whisker — and the compact box is filled because it has no edges to enclose it (I33).
 29. **One value axis across a distribution form's bands** — scaled to its own extent every band draws the same shape, and the comparison is what the form is for (I35).
+31. **A cursor is marked where it points**, behind the data and on the rule, through a mapping the form owns — a readout whose column is unknown is a set of numbers about nothing in particular (I37).
 30. **`candlestick` is a curve style over the positional machinery**, with its own typed data, a stated candle width, exact OHLC aggregation, and a readout that is load-bearing because a doji and an overlay line share a glyph (I36).
 28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
 
@@ -2318,7 +2372,7 @@ Six tiers. No state machine — C12 is pure over the block.
 |---|---|
 | Where the numbers come from | C07 adapters, the S-series |
 | Terminal image protocols for real charts | Phase 1B — C02 detects them, nothing uses them |
-| Interactive plots — zoom, crosshair, hover | Phase 2 |
+| Interactive plots — **who moves** a cursor: zoom, hover, the key or mouse column that sets `cursorPositions` | Phase 2 · nothing in `src/` writes it (§3s) |
 | Axis tick density beyond max/mid/min | Phase 1B |
 | Tone → colour | C10 |
 | Column planning around a sparkline cell | C11 |
