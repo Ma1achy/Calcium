@@ -345,6 +345,7 @@ export function boxplotBand(
     boxR: [g.topRight, highWhisker ? g.teeLeft : edge, g.bottomRight],
     maxCap: [g.stubDown, g.teeRight, g.stubUp],
     mean: g.diamond,
+    meanTee: g.diamondTee,
     outlier: g.dotted,
   };
 
@@ -377,7 +378,13 @@ export function boxplotBand(
     // (C04 I53), and drawn on an edge row it would read as a corner.
     if (q.mean !== undefined && Number.isFinite(q.mean) && r === 1) {
       const xm = at(q.mean);
-      if (xm !== xMed) row[xm] = T.mean;
+      // **Mean on median gets its own glyph rather than none** (C12 I33,
+      // C04 I53) — the same ruling `boxplotColumn` and `kde.ts` already carry.
+      // This arm dropped it instead: `xm !== xMed` meant a distribution whose
+      // mean *is* its median drew no mean at all, and a reader cannot tell that
+      // from a summary with no mean in it. Two arms of one figure, and the
+      // claim that `◈` landed in both was true of the vertical one.
+      row[xm] = xm === xMed ? T.meanTee : T.mean;
     }
     for (const o of q.outliers ?? []) {
       const xo = at(o);

@@ -1474,8 +1474,23 @@ function bandedForm(
     }
   }
 
+  // **The leftover rows carry a blank plot area, not nothing.** `rowsPer` is
+  // `⌊areaRows ÷ n⌋`, so a height its band count does not divide leaves rows to
+  // pad — and this loop wrote the gutter and the right border with no area
+  // between them, putting the two borders in adjacent columns. Every banded
+  // fixture in the catalogue happened to divide evenly, so the padding loop had
+  // never drawn a row; the first one that did not divide showed `││` three
+  // frames wide. PC12 is named for the border and checked only the left.
   while (out.length < areaRows) { // cells-ok — a row count
-    out.push(line([...gutterSpans("", layout, ctx), ...rightBorder(layout, ctx)], layout, ctx));
+    out.push(line(
+      [
+        ...gutterSpans("", layout, ctx),
+        { text: areaText(" ".repeat(Math.max(0, layout.areaWidth)), layout, ctx) },
+        ...rightBorder(layout, ctx),
+      ],
+      layout,
+      ctx,
+    ));
   }
   return axed(block, out, layout, ctx);
 }

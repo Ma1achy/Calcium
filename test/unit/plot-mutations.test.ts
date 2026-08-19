@@ -1912,6 +1912,26 @@ describe("C12 I33 — no whisker, no stub", () => {
     expect(spine(near).trimEnd().at(-1), "and the columns do not").toBe(g.vertical);
   });
 
+  it("T1.100c (C12 I33, C04 I53): mean on median is a glyph in both arms, not a silence", () => {
+    // **Measured across the two arms of one figure.** `boxplotColumn` drew `◈`
+    // and `boxplotBand` drew nothing — `xm !== xMed` skipped the write — so a
+    // distribution whose mean *is* its median rendered identically to a summary
+    // that carries no mean, in the horizontal arm only.
+    const on = { min: 3, q1: 3, median: 5, q3: 7, max: 7, mean: 5 };
+    const apart = { min: 3, q1: 3, median: 5, q3: 7, max: 7, mean: 6 };
+    expect(spine(on), "the band, mean on median").toContain(g.diamondTee);
+    expect(spine(apart), "the band, mean apart").toContain(g.diamond);
+    expect(spine(apart), "and not the combined mark").not.toContain(g.diamondTee);
+    expect(boxplotColumn(on as never, 0, 10, 5, 11, FULL_CAPS).join(""), "the column arm")
+      .toContain(g.diamondTee);
+
+    // A summary with no mean draws neither, or the row above passes against an
+    // arm that marks the median twice.
+    const none = { min: 3, q1: 3, median: 5, q3: 7, max: 7 };
+    expect(spine(none)).not.toContain(g.diamond);
+    expect(spine(none)).not.toContain(g.diamondTee);
+  });
+
   it("T1.100b (C12 I33): the vertical arm's lid, and the alphabet that can say it after all", () => {
     // The transpose: `┴` on the lid points up, and there is nothing above it.
     const col = (q: Record<string, number>): readonly string[] =>
@@ -2222,7 +2242,14 @@ describe("C12 §3r — the candlestick", () => {
     // `1/3` is float noise past six places, not a measurement.
     expect(formatReadout(1284, undefined)).toBe("1284");
     expect(formatReadout(0.023, undefined)).toBe("0.023");
-    expect(formatReadout(1 / 3, undefined)).toBe("0.333333");
+    expect(formatReadout(1 / 3, undefined)).toBe("0.3333");
+
+    // **Four significant figures, not a decimal cap** — which a catalogue frame
+    // is what settled. A flat six places is right for `0.023` and prints a
+    // computed sine as `55.827460`, float noise with a confident face on it.
+    expect(formatReadout(55.82746018152, undefined)).toBe("55.83");
+    expect(formatReadout(0.000123456, undefined)).toBe("0.0001235");
+    expect(formatReadout(0, undefined)).toBe("0");
 
     // A set shares one precision; a lone value does not, which is the claim
     // only a caller can make.

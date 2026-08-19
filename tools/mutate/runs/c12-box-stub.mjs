@@ -87,6 +87,26 @@ const results = runPass({
       expect: "T1.100",
     },
     {
+      // **The mean silently dropped where it lands on the median**, which is
+      // what the band arm did while the column arm drew `◈`. Two arms of one
+      // figure, and a summary carrying a mean rendered identically to one that
+      // does not.
+      name: "the band arm skips the mean when it lands on the median",
+      file: ROW,
+      from: "      row[xm] = xm === xMed ? T.meanTee : T.mean;",
+      to: "      if (xm !== xMed) row[xm] = T.mean;",
+      expect: "T1.100c",
+    },
+    {
+      // And the other way: a mean apart drawn with the combined mark, so the
+      // glyph stops meaning *these two coincide*.
+      name: "the band arm always draws the combined mark",
+      file: ROW,
+      from: "      row[xm] = xm === xMed ? T.meanTee : T.mean;",
+      to: "      row[xm] = T.meanTee;",
+      expect: "T1.100c",
+    },
+    {
       // The vertical arm's lid, which is the transpose and was re-derived by
       // hand once already.
       name: "the vertical lid always stubs upward",

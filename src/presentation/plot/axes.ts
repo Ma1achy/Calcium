@@ -72,8 +72,16 @@ export function formatReadout(v: number, format: Plot["yFormat"]): string {
 /** Decimals in a readout of a percentage. One — a reading, short of noise. */
 const READOUT_PLACES = 1;
 
-/** Beyond this a decimal expansion is float noise rather than a measurement. */
-const MAX_READOUT_DECIMALS = 6;
+/**
+ * Significant figures a readout keeps — **a cap on meaning, not on length**.
+ *
+ * A flat decimal cap cannot serve both ends of the scale: six places is right
+ * for `0.023` and six places of a computed sine is `55.827460`, which is float
+ * noise printed with confidence. Four significant figures gives `55.83`,
+ * `12.75`, `45.2`, `0.023` and `1284` — each keeping what it has and none
+ * inventing. Found by reading a catalogue frame, which is where the six showed.
+ */
+const READOUT_FIGURES = 4;
 
 /**
  * The decimals a value needs to survive the round trip, capped.
@@ -89,7 +97,14 @@ function decimalsNeeded(v: number): number {
   const text = String(v);
   const dot = text.indexOf(".");
   if (dot === -1 || text.includes("e") || text.includes("E")) return 0; // cells-ok — a decimal count
-  return Math.min(MAX_READOUT_DECIMALS, text.length - dot - 1); // cells-ok — a decimal count
+  const has = text.length - dot - 1; // cells-ok — a decimal count
+  // The places four significant figures leaves at this magnitude, floored at
+  // zero — `decimalsFor`'s arithmetic with a wider target, since two figures is
+  // a tick's question and a readout is the answer.
+  const afford = v === 0
+    ? 0
+    : Math.max(0, READOUT_FIGURES - 1 - Math.floor(Math.log10(Math.abs(v)))); // cells-ok — a decimal count
+  return Math.min(has, afford); // cells-ok — a decimal count
 }
 
 /**

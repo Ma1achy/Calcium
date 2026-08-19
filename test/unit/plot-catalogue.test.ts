@@ -51,7 +51,39 @@ describe("plot-catalogue — the corpus renders", () => {
     expect(rendered).toBeGreaterThan(30); // cells-ok — a frame count
   });
 
-  it("PC12: every frame's border sits in one column, and no row overruns", () => {
+  it("PC12a: some banded fixture reaches the padding loop, or PC12 is about nothing", () => {
+    // **The corpus's coverage of `bandedForm`'s leftover rows is a property of
+    // one fixture's height, and nothing asserted it.** `rowsPer` is
+    // `⌊areaRows ÷ n⌋`, so only a height a band count does not divide leaves
+    // rows to pad — and every banded fixture divided evenly until `flat-whisker`
+    // landed, so the loop had never drawn a row and PC12 was green about a path
+    // it never took.
+    //
+    // A mutation restoring an evenly-dividing height passes PC12, which is what
+    // this row exists to fail.
+    // **The two forms that call `bandedForm`, and horizontal only** — measured
+    // rather than listed by shape. The first form of this row named five
+    // plausible-looking forms and passed on `ridgeline` and three *vertical*
+    // fixtures, none of which take this path at all: `ridgeline` composes its
+    // own rows and a vertical arm goes through `categoricalColumnForm`. A
+    // coverage assertion satisfied by a fixture that does not reach the code is
+    // the proxy failure it exists to prevent.
+    const banded = new Set(["boxplot", "violin"]);
+    const reaching: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      if (!banded.has(form)) continue;
+      for (const [variant, spec] of Object.entries(variants)) {
+        if (spec.orientation === "vertical") continue;
+        const bands = (spec.categories?.length ?? 0) || spec.series.length; // cells-ok — a band count
+        const rows = typeof spec.height === "number" ? spec.height : 0; // cells-ok — a row count
+        if (bands > 1 && rows > 0 && rows % bands !== 0) reaching.push(`${form}/${variant}`); // cells-ok — a row count
+      }
+    }
+    expect(reaching, "a horizontal boxplot or violin whose height its band count does not divide")
+      .not.toEqual([]);
+  });
+
+  it("PC12: every frame's *both* borders sit in one column, and no row overruns", () => {
     // **The whole corpus looked shattered once and the frames were correct.**
     // The defect was in the PNG renderer (PC9/PC10), and the only way to know
     // that without reading 388 images was to ask the text whether it was
@@ -84,6 +116,21 @@ describe("plot-catalogue — the corpus renders", () => {
           const sides = [...new Set(rows.filter((r) => /^\s*│/u.test(r)).map((r) => colOf(r, "│")))];
           if (sides.length > 1 || (sides.length === 1 && sides[0] !== colOf(top, "┌"))) {
             bad.push(`${where}: left border in column(s) ${sides.join(", ")}, corner at ${String(colOf(top, "┌"))}`);
+          }
+          // **And the right one, which this row is named for and did not
+          // check.** A banded form pads its leftover rows with the gutter and
+          // the right border and nothing between them, so the two sit adjacent
+          // — `││` — and the *left* border is still in the correct column. The
+          // arm above passes it. Measured over the whole corpus, every banded
+          // fixture happened to have a height its band count divides, so no
+          // frame reached the padding loop at all.
+          const rightAt = colOf(top, "┐"); // cells-ok — a column index
+          const closers = [...new Set(
+            rows.filter((r) => /^\s*│.*│$/u.test(r)).map((r) => width(r) - 1), // cells-ok — a column index
+          )];
+          const strayed = closers.filter((c) => c !== rightAt);
+          if (rightAt >= 0 && strayed.length > 0) {
+            bad.push(`${where}: right border in column(s) ${strayed.join(", ")}, corner at ${String(rightAt)}`);
           }
         }
         const over = rows.filter((r) => width(r) > 80); // cells-ok — the render width

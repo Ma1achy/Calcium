@@ -47,9 +47,22 @@ export function stripSgr(s) {
  * Separated so a fixture can ask whether a form renders without writing four
  * hundred files to do it, and so `n/m rows` counts something observed.
  */
-export function frameFor(spec, caps, width) {
-  return renderToLines(registry, block({ kind: "plot", id: "cat", ...spec }), width, {
-    theme, capabilities: caps,
+export function frameFor(spec, caps, width, id = "cat") {
+  // **`cursor` is context and not a block field** (C12 §3s). Stripped here
+  // rather than tolerated by `block()`, which is transparent to excess
+  // properties (F104) — a fixture field that reached the document would be a
+  // `Plot` carrying something C04 never declared, and nothing would say so.
+  //
+  // **And the catalogue goes through this function**, which it did not. The
+  // main loop built its own block and called `renderToLines` itself, so this
+  // was a second renderer that only `export-fixtures.ts` used: a `cursor`
+  // added here drew a crosshair in refdiff's half and nothing in the frames the
+  // catalogue writes. Two paths, one of them the one a reader looks at.
+  const { cursor, ...rest } = spec;
+  return renderToLines(registry, block({ kind: "plot", id, ...rest }), width, {
+    theme,
+    capabilities: caps,
+    ...(cursor === undefined ? {} : { cursorPositions: { [id]: cursor } }),
   });
 }
 
@@ -94,9 +107,7 @@ for (const [formName, variants] of Object.entries(FORMS)) {
     for (const { name: capsName, caps } of CAPS) {
       const id = `cat-${formName}-${variantName}`;
       const width = capsName === "ascii-wide" ? 60 : 80;
-      const b = block({ kind: "plot", id, ...spec });
-
-      const lines = renderToLines(registry, b, width, { theme, capabilities: caps });
+      const lines = frameFor(spec, caps, width, id);
       const header = `── ${formName} · ${variantName} · ${capsName} · ${width}w`;
       const frame = [header, ...lines].join("\n");
 

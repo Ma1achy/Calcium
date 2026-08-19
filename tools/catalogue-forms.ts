@@ -24,7 +24,17 @@
 import type { OHLC, Plot, PlotForm, Series } from "../src/data/viewmodel/index.js";
 
 /** A plot with its identity removed — the catalogue supplies `kind` and `id`. */
-export type PlotSpec = Omit<Plot, "kind" | "id">;
+/**
+ * A catalogue fixture — a `Plot` minus its identity, plus what only the render
+ * context can carry.
+ *
+ * **`cursor` is not a block field and that is the point** (C12 §3s). Where a
+ * crosshair points is `RenderContext.cursorPositions`, so a catalogue that only
+ * knew how to build blocks could not draw the readout or the column mark at
+ * all — two of this component's surfaces with no panel between them, in the
+ * document whose job is to show what it draws.
+ */
+export type PlotSpec = Omit<Plot, "kind" | "id"> & { readonly cursor?: number };
 
 /** Variants for one form, keyed by variant name. */
 export type FormVariants = Readonly<Record<string, PlotSpec>>;
@@ -178,6 +188,20 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "line", height: 10, axes: true, plotStyle: "candlestick",
       series: [], ohlc: candles(160),
     },
+    // **The crosshair and the readout** (C12 §3s, I37) — a dashed column behind
+    // the data, `▲` on the rule, and the value at that index below it. Nothing
+    // in `src/` writes `cursorPositions`, so without a fixture here these two
+    // surfaces are drawn by no frame in the catalogue.
+    cursor: {
+      form: "line", height: 9, axes: true, cursor: 32,
+      series: [s(sin50, "alpha"), s(sin(50, 0.2), "gamma")],
+    },
+    // The same, over candles: four values and then the overlay (§6b B6).
+    "cursor-candles": {
+      form: "line", height: 11, axes: true, plotStyle: "candlestick", cursor: 9,
+      ohlc: candles(24),
+      series: [s(movingAverage(candles(24).map((b) => b.close), 3), "ma3")],
+    },
   },
   sparkline: {
     default: { form: "sparkline", series: [s(sin50)] },
@@ -294,6 +318,18 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // where it does not, and a category's name sat two rows below the box it
     // named through every visual review the component has had. Three in twelve
     // is four rows a band against a one-row figure, which is the case.
+    // **No whisker, no stub** (C12 I33). `q3 === max` on the first band and
+    // `q1 === min` on the second, which is the pair that drew a stem pointing
+    // at blank columns until a golden frame was read.
+    "flat-whisker": {
+      form: "boxplot", height: 7, axes: true, categories: ["capped", "floored", "both"],
+      series: [],
+      quartiles: [
+        { min: 1, q1: 3, median: 5, q3: 9, max: 9 },
+        { min: 1, q1: 1, median: 4, q3: 7, max: 9 },
+        { min: 3, q1: 3, median: 5, q3: 7, max: 7, mean: 5 },
+      ],
+    },
     roomy: {
       form: "boxplot", height: 12, axes: true, plotDetail: "compact",
       categories: ["A", "B", "C"],
