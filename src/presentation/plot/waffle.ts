@@ -12,19 +12,6 @@ type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDep
 export type WaffleCell = Readonly<{ mark: string; segmentIndex: number }>;
 
 /**
- * 10 rows of exactly `width` cells. Each cell represents 1% of the total.
- *
- * Segments fill left-to-right, top-to-bottom.
- */
-export function waffleRows(
-  segments: readonly Segment[],
-  width: number,
-  caps: Caps,
-): readonly string[] {
-  return waffleCells(segments, width, caps).map((row) => row.map((c) => c.mark).join(""));
-}
-
-/**
  * Per-cell segment info for coloured rendering.
  */
 export function waffleCells(

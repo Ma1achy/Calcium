@@ -14,6 +14,9 @@ import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
 import { lossCurve, plotOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { yLabels } from "../../src/presentation/plot/axes.js";
+import { cells } from "../../src/presentation/text.js";
+import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { block, type Plot, type Series } from "../../src/data/viewmodel/index.js";
 
 const m = (): ReturnType<typeof measurable> =>
@@ -27,10 +30,10 @@ describe("C12 tier 6 — fail-on-revert", () => {
     const two = plotOf({ id: "two-points", points: 2, height: 6 });
     const many = plotOf({ id: "many-points", points: 5_000, height: 6 });
 
-    expect(plotHeight(two)).toBe(8);
-    expect(plotHeight(many)).toBe(8);
-    expect(m().renderToLines(two, 80)).toHaveLength(8);
-    expect(m().renderToLines(many, 80)).toHaveLength(8);
+    expect(plotHeight(two)).toBe(9);
+    expect(plotHeight(many)).toBe(9);
+    expect(m().renderToLines(two, 80)).toHaveLength(9);
+    expect(m().renderToLines(many, 80)).toHaveLength(9);
   });
 
   it("T6.2 (I3): dividing by the range without guarding a constant series → T1.5 fails with NaN", () => {
@@ -95,7 +98,7 @@ describe("C12 tier 6 — fail-on-revert", () => {
     // Stacked: both labels present, each on its own strip's first row.
     expect(rendered).toContain("train");
     expect(rendered).toContain("val");
-    expect(mono.renderToLines(b, 48)).toHaveLength(10);
+    expect(mono.renderToLines(b, 48)).toHaveLength(11);
   });
 
   it("T6.11 (I7): giving each strip a label row → T3.11c fails, and every stacked plot overflows", () => {
@@ -162,7 +165,7 @@ describe("C12 tier 6 — fail-on-revert", () => {
     const b = plotOf({ height: 5 });
     for (const width of [1, 2, 3, 5]) {
       const lines = m().renderToLines(b, width);
-      expect(lines, `width ${String(width)}`).toHaveLength(7);
+      expect(lines, `width ${String(width)}`).toHaveLength(8);
       for (const row of lines) {
         expect([...visible(row)].length, `width ${String(width)}`).toBeLessThanOrEqual(width);
       }
@@ -206,19 +209,57 @@ describe("C12 tier 6 — fail-on-revert", () => {
     expect(m().kinds).toContain("plot");
   });
 
+  it("T6.17 (I24): the gutter measuring against a default width → T3.17 fails, and the axis bends", () => {
+    // The revert: dropping `ctx.capabilities.ambiguousWidth` from `gutterSpans`'
+    // `padStart`, or from the `labelWidth`/`seriesLabelWidth` call that sizes the
+    // column. Either half alone bends it, which is why there were four gutters
+    // and two of them were half-right: the two that measured correctly still
+    // padded against the default.
+    //
+    // **One row and not two**, because the failure is one thing: the budget and
+    // the drawing disagreeing. Which of the two moved is the diff's job.
+    const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    const g = glyphs(WIDE);
+    const b = block({
+      kind: "plot", id: "revert-amb", form: "bar", height: 3, axes: true,
+      categories: ["a\u2192b", "rpm", "kPa"], series: [{ values: [3, 7, 5] }],
+    }) as Plot;
+    const kit = measurable({ definitions: [plotDefinition] as never, capabilities: WIDE });
+
+    const columns = kit.renderToLines(b, 30).flatMap((row) => {
+      const chars = [...visible(row)];
+      const i = chars.findIndex((c) => c === g.vertical || c === g.teeRight);
+      return i < 0 ? [] : [cells(chars.slice(0, i).join(""), "wide")]; // cells-ok — a row's edge
+    });
+    expect(new Set(columns).size, `edge columns: ${columns.join(",")}`).toBe(1);
+  });
+
+  it("T6.18 (I15, I22): y-labels reaching past `axisFor` → S9 fails, and a log plot is labelled linearly", () => {
+    // The revert: `yLabels` calling `niceAxis` directly, which is what it did.
+    // It is invisible from the block: `positionalForm` picks the *right* ticks
+    // through `axisFor` and reads only `.range` off them, so the correct set is
+    // computed and discarded while the labels are derived a second time from the
+    // linear arm. Two computations of one axis, and the one nobody drew was the
+    // one that was right.
+    const range = { min: 1, max: 1000 };
+    expect(yLabels(range, 9, undefined, {}, "log").map((l) => l.text)).toContain("200");
+    expect(yLabels(range, 9, undefined, {}).map((l) => l.text)).toContain("750");
+  });
+
   it("T6.13 (I15): three unconditional y-labels → T3.2 renders outside its rows", () => {
     // Not in §9's list, and it belongs there: §3 made three labels unconditional
     // while T3.2 renders `height: 1` with axes, so the section contradicted its own
     // test. The revert is placing a label at the midpoint row of a one-row area.
     const b = plotOf({ height: 1 });
     const lines = m().renderToLines(b, 40);
-    expect(lines).toHaveLength(3);
+    expect(lines).toHaveLength(4);
 
     // One label, and it is the maximum: the extremes bound the data and the
     // midpoint is interpolation between them, so the midpoint is what goes. Only
     // the plot-area rows are examined — the x-label row carries `epoch 20`, which
     // is a digit and not a y-label.
-    const area = lines.slice(0, 1);
+    // Row 0 is the frame's lid, so the one plot-area row is row 1 (§3f).
+    const area = lines.slice(1, 2);
     const labelled = area.filter((row) => /[0-9]/u.test(visible(row)));
     expect(labelled).toHaveLength(1);
     // `1`, not the data's `0.82` — the bounds snap outward to a nice number now

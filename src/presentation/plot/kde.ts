@@ -122,10 +122,16 @@ export function densityRows(
  * the distribution, so the interior has to stay empty.
  *
  * **Nothing new is built to draw it.** `strokePolyline` already traces an
- * arbitrary closed path with two y-values per column — `circleOutline` and
- * `radarOutlines` both do exactly this — so the ring is the upper edge left to
- * right, then the mirrored lower edge right to left, and `glyphForMask` turns
- * the edge mask into `╭╮╰╯─│`.
+ * arbitrary closed path with two y-values per column, so the ring is the upper
+ * edge left to right, then the mirrored lower edge right to left, and
+ * `glyphForMask` turns the edge mask into `╭╮╰╯─│`.
+ *
+ * **The pie's rim and the radar's ring used to be cited here and are not any
+ * more**, because they left this vocabulary: `strokePolyline` steps north,
+ * south, east and west, which is a shallow slope's staircase in a line chart
+ * and a blocky polygon in a circle. A violin's outline is two functions of `x`
+ * with one y-value each, which is the case the cell grid does draw well —
+ * `circle.ts`'s header carries the distinction.
  */
 export function violinRows(
   series: Series,

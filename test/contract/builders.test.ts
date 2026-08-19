@@ -323,11 +323,12 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
     // label. A builder that dropped it renders `100` where `100%` belongs, and
     // the gutter shifts with it.
     const r = kit();
+    // Row 0 is the frame's lid (C12 §3f), so the top label is on row 1.
     const axis = (blk: Block): string =>
       renderSequenceToLines(r.registry, seq([blk]), 40, {
         theme: DARK_THEME,
         capabilities: FULL_CAPS,
-      })[0] ?? "";
+      })[1] ?? "";
 
     const cpu = axis(
       b.plot({

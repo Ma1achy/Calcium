@@ -1213,6 +1213,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.27** (I20): exactly `width` cells at every width including 1, and the run takes the residual after the number.
 - **T1.22** (I18): a heatmap whose labels exceed the width keeps a matrix and truncates the labels; below the rung where one label cell fits, it draws a notice at its declared height and **never a matrix with no names beside it**. Asserted at five widths, because the defect was a state reachable only between two of them.
 - **T1.23** (I19): the legend's range survives a label column wide enough to have truncated it, and the drop order is asserted by rendering a row too narrow for all three parts.
+- **T1.1b** (I24): `composeRows` pads a short block and cuts a long one to `plotHeight`. **A guard whose trigger has not fired**, and the row exists because the mutation pass swapping the clamp out killed nothing: no form routed through the compositor gets the count wrong, and four outside it do — `radar` and `horizon` declare `axedFurniture` and draw none of it, `smallmultiples` and `pairplot` return whatever the facet layout produced. Kept on the asymmetry rather than on odds.
 - **T1.20** (I16, I17): the heatmap's ramp is `RAMP_DENSITY` and not `RAMP_BRAILLE` — asserted as a *difference*, because both are eight narrow braille steps and a frame drawn with the wrong one is a matrix of bar fragments that every count agrees with.
 - **T1.21** (I17): an absent cell is blank and a minimum cell has ink, so the two are distinguishable in a grid — the converse of the sparkline's rule and for the same reason stated from the other side.
 - **T1.17** (I17): **a matrix and a stack of lines with the same data at the same width do not render identically.** The row worth writing first: if they match, the form member is not reaching the renderer, and nothing else about a heatmap distinguishes it from the arm it would otherwise fall into.
@@ -1249,6 +1250,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T3.11c** (I7): for n from 1 to 12 and height from 1 to 20, Σ strips equals height in every combination. The arithmetic is property-tested, not spot-checked.
 - **T3.12**: a `spark` on a table cell narrower than the series → windows to the last N points, matching the mockup's behaviour.
 - **T3.13**: a series of exactly `width × 2` points → one point per dot column, no downsampling, no interpolation.
+- **T3.17** (I24): on a terminal reporting `ambiguousWidth: "wide"`, a label carrying an ambiguous-width character leaves every row's border in the **same cell column**, across all four gutter paths — positional, categorical, banded, matrix. Asserted by *measuring the rows against each other* rather than by matching a border at a fixed offset, which would pass on a frame where every row is wrong by the same amount. The fixture is shown to respond first: `a→b` is 3 cells narrow and 4 wide, and a label with no ambiguous character passes against a renderer that ignores the capability entirely.
 
 ### Tier 4 — integration
 
@@ -1284,6 +1286,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.15** (I17): dispatching `form` with a two-armed switch again → T1.17 fails, and a heatmap renders as a line, silently and correctly-shaped.
 - **T6.13** (I16): restoring `U+2800` as the braille ramp's first step → T1.15 fails, and every wide-terminal sparkline draws its minimum as padding.
 - **T6.14** (I4, C04 I46): narrowing `Series.values` back to `readonly number[]` → T1.16 fails, and a gap is expressible only as a value the validator refuses and JSON rewrites.
+- **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
+- **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 
 ---
 

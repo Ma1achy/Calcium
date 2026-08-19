@@ -326,9 +326,17 @@ export function yLabels(
   rows: number,
   format: Plot["yFormat"],
   pin: Pick<Plot, "yMin" | "yMax"> = {},
+  scale?: ScaleType,
 ): readonly YLabel[] {
   const h = Math.max(1, Math.floor(rows));
-  const axis = niceAxis(range, ticksFor(h), pin);
+  // **Through the dispatcher, not straight to the linear arm.** `axisFor` has
+  // existed for every scale since the scales landed and this function called
+  // `niceAxis` regardless, so a `yScale: "log"` plot picked log ticks in
+  // `positionalForm` — where only `.range` was read — and was then *labelled*
+  // linearly. The two halves of one axis disagreed and neither was wrong on its
+  // own, which is why nothing failed: the ticks were computed twice and the set
+  // nobody drew was the correct one.
+  const axis = axisFor(range, ticksFor(h), pin, scale);
   // **Precision from the step, which is the smallest gap** (§3d). It was taken
   // from the *span* before, which is the same number divided by the tick count —
   // right when there were three labels and wrong the moment there are five, and
@@ -437,16 +445,52 @@ export function xLabelRow(
   width: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): string {
+  return xAxis(labels, width, caps).text;
+}
+
+/**
+ * An x-label row and the plot-area columns its labels are anchored to.
+ *
+ * **`tickColumns` and not `ticks`, because `Axis.ticks` are values.** One is a
+ * set of numbers on the scale and the other a set of cells on the row, and the
+ * two would have shared a name in a component that converts between them all
+ * day. MG24 found it as a name collision; it is a conflation either way.
+ */
+export type XAxis = Readonly<{ text: string; tickColumns: readonly number[] }>;
+
+/**
+ * The same row, **with the columns the ticks belong on** (§3f).
+ *
+ * **The anchors come out of the placement rather than beside it.** The tick
+ * columns are derivable — first sample, centre, last — and deriving them is how
+ * the mark ends up a cell away from the label it marks: the placement clamps a
+ * label that would collide with its neighbour, and it drops one that cannot
+ * keep its gap at all. A tick under a label that was never drawn marks nothing,
+ * and a tick one column off reads as a different sample. So `place` records
+ * where each label actually landed, and a label that is dropped contributes no
+ * tick.
+ *
+ * The anchor is the label's own reference point, not its start: the left label
+ * begins at its tick, the centre label straddles it, and the right label ends
+ * on it — which is what makes the three read as marks on one scale rather than
+ * three captions.
+ */
+export function xAxis(
+  labels: readonly [string, string, string] | undefined,
+  width: number,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): XAxis {
   const w = Math.max(0, Math.floor(width));
-  if (labels === undefined || w === 0) return "";
+  if (labels === undefined || w === 0) return { text: "", tickColumns: [] };
 
   const third = Math.max(1, Math.floor(w / 3));
   const [left, centre, right] = labels.map((l) => truncate(l, third, caps));
 
   const row: string[] = Array.from({ length: w }, () => " ");
+  const tickColumns: number[] = [];
   let free = 0; // the first cell no label has claimed
 
-  const place = (text: string, ideal: number): void => {
+  const place = (text: string, ideal: number, anchor: (wide: number) => number): void => {
     if (text === "") return;
     const wide = cells(text, caps.ambiguousWidth);
     const start = Math.max(free, Math.min(ideal, w - wide));
@@ -454,14 +498,19 @@ export function xLabelRow(
     [...text].forEach((ch, i) => {
       row[start + i] = ch;
     });
+    tickColumns.push(start + anchor(wide));
     free = start + wide + 1;
   };
 
-  place(left ?? "", 0);
-  place(centre ?? "", Math.floor((w - cells(centre ?? "", caps.ambiguousWidth)) / 2));
-  place(right ?? "", w - cells(right ?? "", caps.ambiguousWidth));
+  place(left ?? "", 0, () => 0);
+  place(
+    centre ?? "",
+    Math.floor((w - cells(centre ?? "", caps.ambiguousWidth)) / 2),
+    (wide) => Math.floor((wide - 1) / 2),
+  );
+  place(right ?? "", w - cells(right ?? "", caps.ambiguousWidth), (wide) => wide - 1);
 
-  return row.join("").replace(/\s+$/, "");
+  return { text: row.join("").replace(/\s+$/, ""), tickColumns };
 }
 
 // --- log / time / symlog axes -----------------------------------------------

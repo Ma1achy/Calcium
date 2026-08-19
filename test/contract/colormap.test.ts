@@ -88,7 +88,10 @@ describe("C10 I31 — a colormap is data, a channel, and vacuous below 8-bit", (
       .renderToLines(heat, 30)
       .join("");
 
-    const area = line.slice(line.lastIndexOf("│"));
+    // **Either edge**: a labelled row carries the tick and not the plain border
+    // (C12 §3f), and every matrix row is labelled — so a search for `│` alone
+    // found nothing and the window silently became the last character.
+    const area = line.slice(Math.max(line.lastIndexOf("│"), line.lastIndexOf("┤")));
     const cells = [...area.matchAll(/38;2;(\d+);(\d+);(\d+)m(.)/gu)]
       .map((m) => ({ rgb: [Number(m[1]), Number(m[2]), Number(m[3])] as const, glyph: m[4] ?? "" }))
       .filter((c) => c.glyph.trim() !== "");

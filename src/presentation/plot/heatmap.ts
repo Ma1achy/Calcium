@@ -5,8 +5,8 @@
  * All share: density ramp from ramp.ts, continuous colour from colormap.ts,
  * equal-length row validation, axes required.
  */
-import type { AmbiguousWidth } from "../text.js";
 import type { Plot, Series } from "../../data/viewmodel/index.js";
+import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { Range } from "./scale.js";
@@ -17,10 +17,10 @@ import { ladderFor } from "./ramp.js";
 import { cells, truncate } from "../text.js";
 import { seriesRange } from "./scale.js";
 import { formatValue } from "./axes.js";
-import { clampSpans, paint, padStart, tone } from "../blocks/paint.js";
-import { glyphs } from "../blocks/glyphs.js";
+import { clampSpans, paint, tone } from "../blocks/paint.js";
 import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
+import { gutterSpans, labelColumnWidth, type Layout } from "./furniture.js";
 
 const HEATMAP_ABSENT = " ";
 const MIN_AREA = 4;
@@ -68,38 +68,22 @@ const DEFAULT_COLORMAP: Readonly<Record<string, string>> = Object.freeze({
   correlation: "coolwarm",
 });
 
-type Layout = Readonly<{
-  gutter: number;
-  labelColumn: number;
-  areaWidth: number;
-  areaRows: number;
-  width: number;
-}>;
-
 function linePaint(spans: readonly Span[], layout: Layout, ctx: RenderContext): string {
   return paint(clampSpans(spans, layout.width, ctx.capabilities));
 }
 
-function gutterSpans(label: string, layout: Layout, ctx: RenderContext): readonly Span[] {
-  if (layout.gutter === 0) return [];
-  const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
-  return [
-    { text: padStart(label, layout.labelColumn), style: muted },
-    { text: ` ${g.vertical}`, style: muted },
-  ];
-}
-
-function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth = "narrow"): number {
-  let widest = 0;
-  for (const s of series) widest = Math.max(widest, cells(s.label ?? "", ambiguous));
-  return widest;
-}
-
-function layoutFor(block: Plot, width: number): Layout | null {
+/**
+ * **No frame, and §2 is why.** A matrix's cells bound themselves, so there is
+ * nothing for a rule to delimit and the row a lid would take pays for the scale
+ * legend instead — the only thing that says what a cell means. The left border
+ * and its ticks stay: a row label *is* the ordinate here (I18), so every row is
+ * a labelled row and every row gets its mark, which is termplot's histogram
+ * exactly.
+ */
+function layoutFor(block: Plot, width: number, caps: Pick<TerminalCapabilities, "ambiguousWidth">): Layout | null {
   const areaRows = plotAreaRows(block);
   const base = { areaRows, width };
-  const wanted = seriesLabelWidth(block.series);
+  const wanted = labelColumnWidth(block.series.map((s) => s.label ?? ""), caps.ambiguousWidth);
 
   if (width - wanted - AXIS_GUTTER >= MIN_AREA) {
     return {
@@ -320,7 +304,7 @@ export function heatmapFormRows(
   ctx: RenderContext,
 ): readonly string[] {
   const range = seriesRange(block.series, block);
-  const layout = layoutFor(block, width);
+  const layout = layoutFor(block, width, ctx.capabilities);
 
   if (layout === null) {
     const flat: Layout = {

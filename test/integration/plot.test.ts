@@ -174,8 +174,8 @@ describe("C12 tier 4 — a growing series", () => {
       rowCounts.add(m.renderToLines(b, 80).length);
     }
 
-    expect([...heights]).toEqual([8]);
-    expect([...rowCounts]).toEqual([8]);
+    expect([...heights]).toEqual([9]);
+    expect([...rowCounts]).toEqual([9]);
   });
 
   it("T4.5: a plot in an expanded table row shifts blocks by its height", () => {

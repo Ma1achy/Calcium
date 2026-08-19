@@ -22,23 +22,32 @@
  */
 import type { AmbiguousWidth } from "../text.js";
 import type { ReactElement } from "react";
-import { glyphs } from "../blocks/glyphs.js";
-import { clampSpans, paint, padStart, rows, slot, tone, type Span } from "../blocks/paint.js";
+import { rows, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, truncate } from "../text.js";
-import { AXIS_GUTTER, plotAreaRows, plotHeight } from "./height.js";
+import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { curveRows, isBlank } from "./curve.js";
-import { labelWidth, ticksFor, xLabelRow, yLabels, axisFor } from "./axes.js";
+import { labelWidth, ticksFor, yLabels, axisFor } from "./axes.js";
+import {
+  areaText,
+  bandLayout,
+  composeRows,
+  furnitureFor,
+  gutterSpans,
+  line,
+  rightBorder,
+  type Layout,
+} from "./furniture.js";
 import { annotationRows } from "./annotate.js";
 import { seriesRange, type Range } from "./scale.js";
 import { sparkline } from "./sparkline.js";
 import { scatterRows, stepRows, ecdfSeries } from "./scatter.js";
 import { boxplotBand, forestRow, dumbbellRow } from "./glyph-row.js";
 import { barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow } from "./categorical.js";
-import { waffleRows, waffleCells } from "./waffle.js";
+import { waffleCells } from "./waffle.js";
 import { heatmapFormRows } from "./heatmap.js";
 import { densitySeries, densityRows, violinRows, ridgeRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
-import { pieLayers, circleOutline, radarOutlines, radarFrame, radarAsciiRows } from "./circle.js";
+import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText } from "./circle.js";
 import { horizonRows } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
@@ -64,15 +73,6 @@ const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
 
 /** A rasterised series and the colour it carries. */
 type Layer = Readonly<{ glyphRows: readonly string[]; ref: ColourRef }>;
-
-/** Everything the row builders need, resolved once. */
-type Layout = Readonly<{
-  gutter: number;
-  labelColumn: number;
-  areaWidth: number;
-  areaRows: number;
-  width: number;
-}>;
 
 /**
  * Which colour a series carries (roadmap 51).
@@ -144,33 +144,30 @@ function refOf(series: Series, index: number): ColourRef {
 }
 
 /**
- * One row of spans, clamped and painted.
+ * A segment's palette slot, by position.
  *
- * **Every row in this file goes through here**, which is I10 made mechanical
- * rather than checked. A row one cell over its width is a row the terminal wraps
- * itself, adding a line no measurer counted — `paint.ts` records the argument for
- * every single-row kind, and a plot is where it bites hardest: an unclamped plot
- * of declared height 5 rendered nineteen rows at width 1.
+ * Wrapped rather than inlined because the circle forms name it twice — once for
+ * the wedge and once for the legend entry beside it — and a legend whose swatch
+ * is a different colour from the thing it names is worse than none.
  */
-function line(spans: readonly Span[], layout: Layout, ctx: RenderContext): string {
-  return paint(clampSpans(spans, layout.width, ctx.capabilities));
-}
+const categoryRef = (index: number): ColourRef =>
+  CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size
 
 /**
- * The gutter: a right-aligned label, a space, and the `│`.
- *
- * Empty when `gutter` is 0, which is both the `axes: false` case and the
- * too-narrow one. One branch for two reasons is right here — the plot area is the
- * full width in both, and nothing downstream needs to know which.
+ * `MarkedText` runs to spans: the renderer says which slot owns a run, and this
+ * side — the one that holds the theme — turns a slot into a style. `-1` is text
+ * with no owner, which is a gap or a count rather than a reading.
  */
-function gutterSpans(label: string, layout: Layout, ctx: RenderContext): readonly Span[] {
-  if (layout.gutter === 0) return [];
-  const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
-  return [
-    { text: padStart(label, layout.labelColumn), style: muted },
-    { text: ` ${g.vertical}`, style: muted },
-  ];
+function markedSpans(
+  pieces: readonly MarkedText[],
+  refFor: (index: number) => ColourRef,
+  ctx: RenderContext,
+): readonly Span[] {
+  return pieces.map((piece) =>
+    piece.index < 0
+      ? { text: piece.text }
+      : { text: piece.text, style: slot(refFor(piece.index), ctx.theme, ctx.capabilities) },
+  );
 }
 
 /**
@@ -245,53 +242,43 @@ function emptyRows(block: Plot, layout: Layout, ctx: RenderContext): readonly st
   return Array.from({ length: total }, (_, i) => (i === middle ? styled : ""));
 }
 
-/** The x-axis rule and the x-labels beneath it. */
-function axisRows(block: Plot, layout: Layout, ctx: RenderContext): readonly string[] {
-  const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
-
-  // The corner sits under the `│`, so the rule starts one cell left of the plot
-  // area. With no gutter there is no corner to align, and the rule is the width.
-  const corner = layout.gutter === 0 ? "" : g.bottomLeft;
-  const rule = line(
-    [
-      { text: " ".repeat(Math.max(0, layout.gutter - 1)) },
-      { text: corner + g.horizontal.repeat(Math.max(0, layout.areaWidth)), style: muted },
-    ],
-    layout,
-    ctx,
-  );
-
-  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities);
-  const labelled =
-    labels === ""
-      ? ""
-      : line([{ text: " ".repeat(layout.gutter) }, { text: labels, style: muted }], layout, ctx);
-
-  return [rule, labelled];
-}
-
-function axisRowsWithCursor(
+/**
+ * An axed block: the frame's lid, the area rows, the rule and the x-labels.
+ *
+ * **The row count is reconciled here rather than trusted** (I24). Four call
+ * sites used to append their own furniture and each had to agree with
+ * `FURNITURE_ROWS` by convention; `composeRows` makes the equality the thing
+ * that ships.
+ */
+function axed(
   block: Plot,
-  cursorIdx: number,
+  area: readonly string[],
   layout: Layout,
   ctx: RenderContext,
 ): readonly string[] {
-  const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  if (block.axes !== true) return composeRows(plotHeight(block), [], area, []);
+  const furniture = furnitureFor(block, layout, ctx);
+  return composeRows(plotHeight(block), [furniture.top], area, [...furniture.bottom]);
+}
 
-  const corner = layout.gutter === 0 ? "" : g.bottomLeft;
-  const rule = line(
-    [
-      { text: " ".repeat(Math.max(0, layout.gutter - 1)) },
-      { text: corner + g.horizontal.repeat(Math.max(0, layout.areaWidth)), style: muted },
-    ],
-    layout,
-    ctx,
-  );
-
-  const readout = cursorReadout(block, cursorIdx, layout, ctx);
-  return [rule, readout];
+/**
+ * The same, with the cursor's readout where the x-labels would be.
+ *
+ * The readout replaces the label row rather than joining it — both name the
+ * abscissa, and the reader asked about one position by putting a cursor on it.
+ */
+function axedWithCursor(
+  block: Plot,
+  cursorIdx: number,
+  area: readonly string[],
+  layout: Layout,
+  ctx: RenderContext,
+): readonly string[] {
+  const furniture = furnitureFor(block, layout, ctx);
+  return composeRows(plotHeight(block), [furniture.top], area, [
+    furniture.bottom[0] ?? "",
+    cursorReadout(block, cursorIdx, layout, ctx),
+  ]);
 }
 
 function cursorReadout(
@@ -349,6 +336,7 @@ function stackedRows(
             [
               ...gutterSpans(i === 0 ? (first.label ?? "") : "", layout, ctx),
               ...mergedRow([layer], i, layout, ctx),
+              ...rightBorder(layout, ctx),
             ],
             layout,
             ctx,
@@ -361,7 +349,8 @@ function stackedRows(
       line(
         [
           ...gutterSpans("", layout, ctx),
-          { text: legend, style: tone("warn", ctx.theme, ctx.capabilities) },
+          { text: areaText(legend, layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) },
+          ...rightBorder(layout, ctx),
         ],
         layout,
         ctx,
@@ -380,6 +369,7 @@ function stackedRows(
           [
             ...gutterSpans(i === 0 ? (s.label ?? "") : "", layout, ctx),
             ...mergedRow([layer], i, layout, ctx),
+            ...rightBorder(layout, ctx),
           ],
           layout,
           ctx,
@@ -427,8 +417,15 @@ function overlaidRows(
   ctx: RenderContext,
   rasterise: Rasteriser = curveRows,
 ): readonly string[] {
+  // **The scale, and the capability.** Both were dropped here and nowhere else:
+  // `yLabels` was called without `yScale`, so a log axis was labelled linearly,
+  // and the labels were measured against a default `ambiguousWidth` by
+  // `labelWidth` while `gutterSpans` padded against another — the two defects
+  // §3f names, in one call.
   const labels =
-    layout.labelColumn === 0 ? [] : yLabels(range, layout.areaRows, block.yFormat, block);
+    layout.labelColumn === 0
+      ? []
+      : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale);
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   const layers: readonly Layer[] = [
     ...block.series.map((s, index) => ({
@@ -443,15 +440,25 @@ function overlaidRows(
 
   return Array.from({ length: layout.areaRows }, (_, i) =>
     line(
-      [...gutterSpans(byRow.get(i) ?? "", layout, ctx), ...mergedRow(layers, i, layout, ctx)],
+      [
+        ...gutterSpans(byRow.get(i) ?? "", layout, ctx),
+        ...mergedRow(layers, i, layout, ctx),
+        ...rightBorder(layout, ctx),
+      ],
       layout,
       ctx,
     ),
   );
 }
 
-/** The widest series label — the stacked form's label column (§5). */
-function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth = "narrow"): number {
+/**
+ * The widest series label — the stacked form's label column (§5).
+ *
+ * **The capability is a parameter and not a default**, which is the whole of
+ * `labelWidth`'s defect one file over: a default that is right on most
+ * terminals is a measurement nobody notices is wrong on the rest.
+ */
+function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth): number {
   let widest = 0;
   for (const s of series) widest = Math.max(widest, cells(s.label ?? "", ambiguous));
   return widest;
@@ -464,7 +471,13 @@ function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth =
  * first, then the **axis furniture**, and the **curve** last. A plot whose label
  * column does not fit is still a plot; a plot with no plot area is a `…`.
  */
-function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): Layout | null {
+function layoutFor(
+  block: Plot,
+  range: Range,
+  width: number,
+  stacked: boolean,
+  caps: Pick<TerminalCapabilities, "ambiguousWidth">,
+): Layout | null {
   const areaRows = plotAreaRows(block);
   const base = { areaRows, width };
   // **A heatmap is always gutter-ed**, whatever `axes` says, because the row
@@ -480,14 +493,21 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
   // `…` on the first row of every stacked frame. Two different sets of strings, one
   // column: it has to be measured from whichever set will be drawn.
   const wanted = stacked || block.form === "heatmap"
-    ? seriesLabelWidth(block.series)
-    : labelWidth(yLabels(range, areaRows, block.yFormat, block));
-  if (width - wanted - AXIS_GUTTER >= MIN_AREA) {
+    ? seriesLabelWidth(block.series, caps.ambiguousWidth)
+    : labelWidth(
+        yLabels(range, areaRows, block.yFormat, block, block.yScale),
+        caps.ambiguousWidth,
+      );
+  // **The frame's right edge is furniture and pays before the curve**, which is
+  // the same rung it has always been: labels, then furniture, then the plot
+  // area. A cell narrower is a curve; a cell narrower still is a `…`.
+  if (width - wanted - AXIS_GUTTER - FRAME_RIGHT >= MIN_AREA) {
     return {
       ...base,
       gutter: wanted + AXIS_GUTTER,
       labelColumn: wanted,
-      areaWidth: width - wanted - AXIS_GUTTER,
+      areaWidth: width - wanted - AXIS_GUTTER - FRAME_RIGHT,
+      frame: true,
     };
   }
 
@@ -508,8 +528,14 @@ function layoutFor(block: Plot, range: Range, width: number, stacked: boolean): 
     return { ...base, gutter: room + AXIS_GUTTER, labelColumn: room, areaWidth: MIN_AREA };
   }
 
-  if (width - AXIS_GUTTER >= MIN_AREA) {
-    return { ...base, gutter: AXIS_GUTTER, labelColumn: 0, areaWidth: width - AXIS_GUTTER };
+  if (width - AXIS_GUTTER - FRAME_RIGHT >= MIN_AREA) {
+    return {
+      ...base,
+      gutter: AXIS_GUTTER,
+      labelColumn: 0,
+      areaWidth: width - AXIS_GUTTER - FRAME_RIGHT,
+      frame: true,
+    };
   }
   return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
 }
@@ -535,34 +561,31 @@ function categoricalForm(
   const cats = block.categories ?? [];
   const areaRows = plotAreaRows(block);
   const labels = cats.slice(0, areaRows);
-
-  let labelWidth = 0;
-  for (const l of labels) labelWidth = Math.max(labelWidth, cells(l, ctx.capabilities.ambiguousWidth));
-  const axed = block.axes === true;
-  const gutterWidth = axed ? Math.min(labelWidth, Math.floor(width / 3)) + AXIS_GUTTER : 0;
-  const areaWidth = Math.max(1, width - gutterWidth);
-  const labelCol = gutterWidth > 0 ? gutterWidth - AXIS_GUTTER : 0;
-  const layout: Layout = { gutter: gutterWidth, labelColumn: labelCol, areaWidth, areaRows, width };
+  const axedBlock = block.axes === true;
+  const layout = bandLayout(labels, width, axedBlock, areaRows, ctx.capabilities);
 
   const out: string[] = [];
   for (let i = 0; i < areaRows; i++) {
     const cat = labels[i] ?? "";
-    const label = i < labels.length ? truncate(cat, labelCol, ctx.capabilities) : ""; // cells-ok — a label count
-    const content = i < labels.length ? rowBuilder(cat, areaWidth, i) : ""; // cells-ok — a label count
+    const label = i < labels.length ? truncate(cat, layout.labelColumn, ctx.capabilities) : ""; // cells-ok — a label count
+    const content = i < labels.length ? rowBuilder(cat, layout.areaWidth, i) : ""; // cells-ok — a label count
     const gutter = gutterSpans(label, layout, ctx);
     const s = block.series[i] ?? block.series[0];
     const ref = s?.tone !== undefined ? `tone.${s.tone}` as ColourRef : (CATEGORY_REFS[i % CATEGORY_REFS.length] ?? "categorical.c1"); // cells-ok — a category index
     const styled = slot(ref, ctx.theme, ctx.capabilities);
     out.push(
       line(
-        [...gutter, { text: truncate(content, areaWidth, ctx.capabilities), style: styled }],
+        [
+          ...gutter,
+          { text: areaText(content, layout, ctx), style: styled },
+          ...rightBorder(layout, ctx),
+        ],
         layout,
         ctx,
       ),
     );
   }
-  if (axed) out.push(...axisRows(block, layout, ctx));
-  return out;
+  return axed(block, out, layout, ctx);
 }
 
 function positionalForm(
@@ -578,24 +601,18 @@ function positionalForm(
       ? data
       : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale).range;
   const layout =
-    layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked)
+    layoutFor(block, range ?? { min: 0, max: 1 }, width, stacked, ctx.capabilities)
     ?? { areaRows: plotAreaRows(block), width, gutter: 0, labelColumn: 0, areaWidth: width };
   if (range === null) return emptyRows(block, layout, ctx);
 
   const cursorIdx = ctx.cursorPositions?.[block.id];
-  const out = [
-    ...(stacked
-      ? stackedRows(block, range, layout, ctx)
-      : overlaidRows(block, range, layout, ctx, rasterise)),
-  ];
-  if (block.axes === true) {
-    if (cursorIdx !== undefined && Number.isFinite(cursorIdx)) {
-      out.push(...axisRowsWithCursor(block, cursorIdx, layout, ctx));
-    } else {
-      out.push(...axisRows(block, layout, ctx));
-    }
+  const area = stacked
+    ? stackedRows(block, range, layout, ctx)
+    : overlaidRows(block, range, layout, ctx, rasterise);
+  if (block.axes === true && cursorIdx !== undefined && Number.isFinite(cursorIdx)) {
+    return axedWithCursor(block, cursorIdx, area, layout, ctx);
   }
-  return out;
+  return axed(block, area, layout, ctx);
 }
 
 
@@ -620,13 +637,8 @@ function bandedForm(
   const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
   if (n === 0) return emptyRows(block, fallback, ctx);
 
-  let maxLabel = 0;
-  for (const l of cats) maxLabel = Math.max(maxLabel, cells(l, ctx.capabilities.ambiguousWidth));
-  const axed = block.axes === true;
-  const gutterWidth = axed ? Math.min(maxLabel, Math.floor(width / 3)) + AXIS_GUTTER : 0;
-  const areaWidth = Math.max(1, width - gutterWidth);
-  const labelCol = gutterWidth > 0 ? gutterWidth - AXIS_GUTTER : 0;
-  const layout: Layout = { gutter: gutterWidth, labelColumn: labelCol, areaWidth, areaRows, width };
+  const layout = bandLayout(cats, width, block.axes === true, areaRows, ctx.capabilities);
+  const areaWidth = layout.areaWidth;
 
   const rowsPer = Math.max(1, Math.floor(areaRows / n));
   const out: string[] = [];
@@ -643,12 +655,13 @@ function bandedForm(
     const styled = slot(refOf(sr ?? { values: [] }, ci), ctx.theme, ctx.capabilities);
 
     for (let r = 0; r < rowsPer && out.length < areaRows; r += 1) { // cells-ok — a row count
-      const label = r === labelRow ? truncate(cats[ci] ?? "", labelCol, ctx.capabilities) : "";
+      const label = r === labelRow ? truncate(cats[ci] ?? "", layout.labelColumn, ctx.capabilities) : "";
       out.push(
         line(
           [
             ...gutterSpans(label, layout, ctx),
-            { text: truncate(band[r] ?? " ".repeat(areaWidth), areaWidth, ctx.capabilities), style: styled },
+            { text: areaText(band[r] ?? " ".repeat(areaWidth), layout, ctx), style: styled },
+            ...rightBorder(layout, ctx),
           ],
           layout,
           ctx,
@@ -657,9 +670,10 @@ function bandedForm(
     }
   }
 
-  while (out.length < areaRows) out.push(line(gutterSpans("", layout, ctx), layout, ctx)); // cells-ok — a row count
-  if (axed) out.push(...axisRows(block, layout, ctx));
-  return out;
+  while (out.length < areaRows) { // cells-ok — a row count
+    out.push(line([...gutterSpans("", layout, ctx), ...rightBorder(layout, ctx)], layout, ctx));
+  }
+  return axed(block, out, layout, ctx);
 }
 
 const FORM_ROWS: Readonly<
@@ -973,51 +987,63 @@ const FORM_ROWS: Readonly<
     const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
     if (segs.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a segment count
     if (ctx.capabilities.unicode === "ascii") {
-      return waffleRows(segs, width, ctx.capabilities).map((r) => line([{ text: r }], layout, ctx));
+      return pieAsciiRows(segs, width, areaRows, ctx.capabilities).map((row) =>
+        line(markedSpans(row, categoryRef, ctx), layout, ctx),
+      );
     }
-    const fills: Layer[] = pieLayers(segs, width, areaRows).map((pl) => ({
+    const pie = pieRender(segs, width, areaRows, ctx.capabilities);
+    if (pie.layers.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
+    const fills: readonly Layer[] = pie.layers.map((pl) => ({
       glyphRows: pl.glyphRows,
-      ref: CATEGORY_REFS[pl.segmentIndex % CATEGORY_REFS.length] ?? "categorical.c1", // cells-ok — a segment index
+      ref: categoryRef(pl.segmentIndex),
     }));
-    // The boundary first, so it wins the cells it occupies: `mergedRow` resolves
-    // first-non-blank, and a crisp outline over a braille interior is the point.
-    const outline: readonly Layer[] =
-      ctx.capabilities.ambiguousWidth === "wide"
-        ? []
-        : [{ glyphRows: circleOutline(width, areaRows, block.plotCorners ?? "rounded"), ref: "tone.muted" }];
-    const layers: readonly Layer[] = [...outline, ...fills];
-    if (fills.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
+    // **No muted outline layer, and its absence is the finding.** `mergedRow`
+    // resolves a whole cell to the first layer that inks it, and a braille rim
+    // crosses about a third of the cells the disc occupies — so an outline drawn
+    // over the fill did not trace the circle, it ate it. The rim is the edge of
+    // each wedge's own dots now, in that wedge's own colour.
+    const discLayout: Layout = { ...layout, areaWidth: pie.discWidth };
     const out: string[] = [];
-    for (let r = 0; r < areaRows; r++) {
-      out.push(line(mergedRow(layers, r, layout, ctx), layout, ctx));
+    for (let r = 0; r < areaRows; r += 1) {
+      out.push(line(
+        [...mergedRow(fills, r, discLayout, ctx), ...markedSpans(pie.legend[r] ?? [], categoryRef, ctx)],
+        layout,
+        ctx,
+      ));
     }
     return out;
   },
   radar: (block, width, ctx) => {
     const cats = block.categories ?? [];
     const areaRows = plotAreaRows(block);
-    if (cats.length === 0 || block.series.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx); // cells-ok — a category count
+    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+    if (cats.length === 0 || block.series.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a category count
+    const seriesRef = (index: number): ColourRef => refOf(block.series[index] ?? { values: [] }, index);
     if (ctx.capabilities.unicode === "ascii") {
-      return radarAsciiRows(block.series, cats, width).map((r) =>
-        line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
+      return radarAsciiRows(block.series, cats, width, areaRows, ctx.capabilities).map((row) =>
+        line(markedSpans(row, seriesRef, ctx), layout, ctx),
       );
     }
-    const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
-    // One layer per series, each carrying its own palette slot — the radar was
-    // a single braille grid, so every series in it was one colour and one shape.
-    const corners = block.plotCorners ?? "rounded";
-    const series: readonly Layer[] = radarOutlines(
-      block.series, cats, width, areaRows, corners,
-    ).map((glyphRows, i) => ({ glyphRows, ref: refOf(block.series[i] ?? { values: [] }, i) }));
-    // The frame last, so a series wins any cell they share (`mergedRow` takes
-    // first-non-blank) — the scale is context, never the reading.
+    const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities);
+    if (radar.polygons.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
+    // **Labels first, frame last, series between them.** `mergedRow` takes the
+    // first layer to ink a cell, so the order is a priority: a word a polygon
+    // runs through is unreadable, and the scale is context rather than a
+    // reading — it may only have the cells nothing else wanted.
     const layers: readonly Layer[] = [
-      ...series,
-      { glyphRows: radarFrame(cats, width, areaRows, corners), ref: "tone.muted" },
+      { glyphRows: radar.labels, ref: "tone.muted" },
+      ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i) })),
+      { glyphRows: radar.frame, ref: "tone.muted" },
     ];
-    if (series.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
+    const discLayout: Layout = { ...layout, areaWidth: radar.discWidth };
     const out: string[] = [];
-    for (let r = 0; r < areaRows; r += 1) out.push(line(mergedRow(layers, r, layout, ctx), layout, ctx));
+    for (let r = 0; r < areaRows; r += 1) {
+      out.push(line(
+        [...mergedRow(layers, r, discLayout, ctx), ...markedSpans(radar.legend[r] ?? [], seriesRef, ctx)],
+        layout,
+        ctx,
+      ));
+    }
     return out;
   },
   horizon: (block, width, ctx) => {

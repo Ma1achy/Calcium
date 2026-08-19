@@ -23,6 +23,28 @@ export type PlotGeometry = Pick<Plot, "form" | "height" | "axes">;
 export const AXIS_ROWS = 2;
 
 /**
+ * The row the frame's **top** edge costs, above the plot area (§3f).
+ *
+ * **A constant and not a derivation**, which is I1 in one line: a box has a lid
+ * whatever the data does, so the row is declared here and `plotHeight` adds it
+ * without ever seeing a series. Separate from `AXIS_ROWS` rather than folded
+ * into a 3, because the matrix family spends `AXIS_ROWS` on x-labels and a
+ * legend and has no lid to pay for — §2's *a heatmap's two rows are not the
+ * line's two rows*, one row further along.
+ */
+export const FRAME_ROWS = 1;
+
+/**
+ * The cells the frame's **right** edge costs.
+ *
+ * The left edge is already paid for by `AXIS_GUTTER`; the right one is the new
+ * column, and it comes out of the plot area rather than out of the labels —
+ * T3.3's ladder is *labels, then furniture, then the curve*, and the curve is
+ * the only one of the three that can give up a single cell and still be itself.
+ */
+export const FRAME_RIGHT = 1;
+
+/**
  * The cells an axed plot spends left of the plot area, beside the y-labels: one
  * space and the `│` (C12 §2).
  *
@@ -82,7 +104,8 @@ const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
  * bound themselves — so the row pays for the scale legend, which is the only
  * thing that says what a cell means.
  */
-const axedFurniture = (plot: PlotGeometry): number => (plot.axes === true ? AXIS_ROWS : 0);
+const axedFurniture = (plot: PlotGeometry): number =>
+  plot.axes === true ? AXIS_ROWS + FRAME_ROWS : 0;
 const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 0,
   waffle: () => 0,
@@ -117,5 +140,5 @@ export function plotHeight(plot: PlotGeometry): number {
  */
 export function plotAreaWidth(width: number, yLabelWidth: number, axes: boolean): number {
   if (!axes) return Math.max(1, Math.floor(width));
-  return Math.max(1, Math.floor(width) - yLabelWidth - AXIS_GUTTER);
+  return Math.max(1, Math.floor(width) - yLabelWidth - AXIS_GUTTER - FRAME_RIGHT);
 }

@@ -3,7 +3,7 @@
  * Tests A1–A12 from the plan, plus S1–S8 for scale types.
  */
 import { describe, expect, it } from "vitest";
-import { niceAxis, axisFor, niceLogAxis, niceTimeAxis, niceSymlogAxis } from "../../src/presentation/plot/axes.js";
+import { niceAxis, axisFor, niceLogAxis, niceTimeAxis, niceSymlogAxis, yLabels } from "../../src/presentation/plot/axes.js";
 
 const pin = {};
 
@@ -150,5 +150,48 @@ describe("S8: scale on x only", () => {
     const xAxis = axisFor({ min: 1, max: 1000 }, 5, pin, "log");
     expect(yAxis.ticks).toContain(0);
     expect(xAxis.ticks).toContain(100);
+  });
+});
+
+describe("S9: the labels follow the scale, not just the range (C12 I15, C12 I22)", () => {
+  // **The two halves of one axis, disagreeing.** `axisFor` has answered for every
+  // scale since the scales landed, and `yLabels` reached straight past it for the
+  // linear arm — so `positionalForm` picked log ticks, read only `.range` off
+  // them, and the labels were then computed linearly from that range. Nothing
+  // failed, because the set nobody drew was the correct one.
+  //
+  // Asserted on `yLabels` rather than on `axisFor`, which is the distinction: the
+  // rows above already prove the log arm picks powers, and every one of them
+  // passed while a log plot was labelled `750 · 500 · 250`.
+  const range = { min: 1, max: 1000 };
+
+  it("a log axis is labelled at powers of the base", () => {
+    const text = yLabels(range, 9, undefined, pin, "log").map((l) => l.text);
+    // 200 is `2 × 10²` — a log subdivision. 750 is what dividing the *span* gives.
+    expect(text).toContain("200");
+    expect(text).not.toContain("750");
+  });
+
+  it("and the same range without a scale is still divided linearly", () => {
+    // The control, and it is the row that makes the one above about the scale
+    // travelling rather than about `200` being reachable at all.
+    const text = yLabels(range, 9, undefined, pin).map((l) => l.text);
+    expect(text).toContain("750");
+    expect(text).not.toContain("200");
+  });
+
+  it("a log axis does not snap its floor outward to zero", () => {
+    // `niceAxis` snaps a derived bound to a multiple of the step, which on this
+    // range is 0 — and 0 is not on a log scale at all. The log arm leaves the
+    // range where the data put it, and the label follows.
+    expect(yLabels(range, 9, undefined, pin, "log").map((l) => l.text)).toContain("1");
+    expect(yLabels(range, 9, undefined, pin).map((l) => l.text)).toContain("0");
+  });
+
+  it("log2 subdivides in twos and time in round intervals", () => {
+    expect(yLabels({ min: 1, max: 64 }, 9, undefined, pin, "log2").map((l) => l.text))
+      .toContain("32");
+    expect(yLabels({ min: 0, max: 3600 }, 9, undefined, pin, "time").map((l) => l.text))
+      .toContain("1800");
   });
 });

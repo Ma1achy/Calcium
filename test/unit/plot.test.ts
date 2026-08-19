@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { formatValue, labelWidth, niceAxis, xLabelRow, yLabels } from "../../src/presentation/plot/axes.js";
 import { curveRows } from "../../src/presentation/plot/curve.js";
 import { plotAreaWidth, plotHeight } from "../../src/presentation/plot/height.js";
+import { composeRows } from "../../src/presentation/plot/furniture.js";
 import {
   BRAILLE_DOTS,
   createGrid,
@@ -90,7 +91,8 @@ describe("C12 tier 1 — height", () => {
     expect(plotHeight({ form: "sparkline" })).toBe(1);
     expect(plotHeight({ form: "line", height: 8 })).toBe(8);
     expect(plotHeight({ form: "line", height: 8, axes: false })).toBe(8);
-    expect(plotHeight({ form: "line", height: 8, axes: true })).toBe(10);
+    // 8 + 3: the frame's lid, the axis rule, then the x-labels (§2, FRAME_ROWS).
+    expect(plotHeight({ form: "line", height: 8, axes: true })).toBe(11);
   });
 
   it("T1.1 (I1): and it is independent of the series, including empty", () => {
@@ -98,15 +100,41 @@ describe("C12 tier 1 — height", () => {
     // cannot reach it. This asserts the consequence a reader cares about: the
     // same three fields give the same answer whatever the data was.
     const geometry = { form: "line", height: 6, axes: true } as const;
-    expect(plotHeight(geometry)).toBe(8);
-    expect(plotHeight({ ...geometry })).toBe(8);
+    expect(plotHeight(geometry)).toBe(9);
+    expect(plotHeight({ ...geometry })).toBe(9);
   });
 
-  it("T1.1 (I1): the plot area is width − labels − 2, not − 3", () => {
+  it("T1.1b (I24): the compositor reconciles its rows against the declared height", () => {
+    // **A guard whose trigger has not fired, kept on the asymmetry** and given a
+    // test that constructs the state, because a mutation that fails nothing is a
+    // finding about the tests. No form routed through `composeRows` gets the
+    // count wrong today — the mutation pass swapping the clamp out killed
+    // nothing — and four forms outside it do: `radar` and `horizon` declare
+    // `axedFurniture` and draw none of it, measuring three rows more than they
+    // render, and `smallmultiples`/`pairplot` return whatever the facet layout
+    // produced. That is the state this exists for, one seam away.
+    //
+    // Padding rather than throwing: I2 says no series input throws, and the
+    // caller is a renderer. A short block is filled and a long one is cut, so
+    // the declared height is what ships whatever a form does.
+    expect(composeRows(5, ["top"], ["a", "b"], ["rule", "labels"])).toEqual([
+      "top", "a", "b", "rule", "labels",
+    ]);
+    // Short by two — the form forgot its furniture.
+    expect(composeRows(5, [], ["a", "b", "c"], [])).toEqual(["a", "b", "c", "", ""]);
+    // Long by two — the form spent rows it never declared, which is the failure
+    // that moves every block below it.
+    expect(composeRows(3, ["top"], ["a", "b"], ["rule", "labels"])).toEqual(["top", "a", "b"]);
+  });
+
+  it("T1.1 (I1): the plot area is width − labels − 2 − the frame's right edge", () => {
     // The gutter is a space and the `│`, with the data flush against the axis —
     // S04 §3 and S11 §2 both drew two cells and §2 declared three (HEIGHT_AUDIT,
-    // the fifth verdict). At width 48 with a 4-cell label column that is 42.
-    expect(plotAreaWidth(48, 4, true)).toBe(42);
+    // the fifth verdict). **The third cell is the frame's right edge and not a
+    // margin**, which is the distinction that verdict turned on: a margin is a
+    // habit from charts that have one, and a border is a mark. At width 48 with
+    // a 4-cell label column that is 41.
+    expect(plotAreaWidth(48, 4, true)).toBe(41);
     expect(plotAreaWidth(48, 4, false)).toBe(48);
   });
 });
@@ -892,7 +920,9 @@ describe("C12 I17 — the heatmap", () => {
     // Blank *cells* — the label and the axis bar are furniture and stay. What
     // has to be true is that nothing was drawn in the grid, and that a reader
     // can still see which row reported nothing.
-    expect(rows[0]).toMatch(/^stopped\s+│\s*$/u);
+    // The tick, not the plain border: the row is labelled, and §3f's rule is
+    // that a labelled row carries one wherever it is reached.
+    expect(rows[0]).toMatch(/^stopped\s+┤\s*$/u);
     expect(rows[1], "and the minimum is still visible").toContain(RAMP_DENSITY[0]);
   });
 
