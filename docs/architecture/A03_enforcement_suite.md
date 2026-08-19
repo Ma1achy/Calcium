@@ -411,6 +411,15 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 
 **SS38 is the hole SS31 leaves.** SS31 compares `package.json` against `DEPENDENCIES.md`, and both were clean while `src/` imported `highlight.js`, which was in neither: `lowlight` depends on it, npm hoisted it, the import resolved, and every gate passed. That is a **phantom dependency**, and its whole failure mode is that *it resolved, so it must be declared* is exactly the reasoning that does not hold. It breaks on someone else's release — the day the intermediate drops the dependency or a package manager stops hoisting — and in the meantime it is a package nobody reviewed, pinned or wrote a row for, executing in the product. Scoped to `src/`, which ships: a test may import `vitest`, and `src/` may not, because a consumer's install has no devDependencies.
 
+**SS39's blind spot, and its false positive, both measured.** The pattern is the *property*
+form — `glyph: "…"` — so a character reaching a glyph position through a variable, a function
+argument or a computed key is outside it; the rule makes the untokenised **literal** unwritable
+and does not make the position safe. And it matches more than that shape: a ternary whose
+true-branch identifier is named `glyph` reads as `glyph : "` to the pattern, which is how
+`lit >= half ? glyph : " "` was reported in `raster.ts` while taking its mark from a named slot.
+Renaming the local was the cheaper fix and the limit is the finding — a rule that cannot tell a
+property from a ternary will report the next one too.
+
 **SS39 is SS36's shape applied to glyphs.** C04 I6 closes `Glyph` to a vocabulary, and the type holds that inside the tree — but a `Notice` assembled with `as` is one cast away from compiling with a character in it, which is exactly how `colour: "#7faecf"` would have survived without SS36. The rule is what makes the untokenised form unwritable rather than merely discouraged. It matters more than the colour case in one respect: a wrong colour is visible to whoever wrote it, and a glyph that breaks the 1:1 rule is visible only under `LANG=C`, only to users who cannot easily say what they are seeing.
 
 **SS45 is C24 I5 reduced to the shape a table has.** C24 I5 says no builder infers a

@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -398,6 +398,8 @@ function plot(
      */
     xLabels?: Plot["xLabels"];
     plotStyle?: Plot["plotStyle"];
+    /** The interior of a shape, where the vocabulary can fill (C04 I59). */
+    plotFill?: Plot["plotFill"];
     /**
      * The candles (C04 I57, C12 I36).
      *
@@ -416,7 +418,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -465,16 +467,33 @@ function plot(
           `has nothing to draw, and "series" is the overlay rather than the candles`,
       );
     }
-    // The **resolved** form, because `b.plot` defaults it to `line` below and a
-    // check on the parameter would refuse the ordinary call that omits it.
+  }
+  // **One rule over the record, at this gate too** (C04 I59, C12 I43). This
+  // carried its own copy of *candlestick needs line or step* — a second
+  // sentence about one style, in the second place a style is refused, which is
+  // exactly the duplication `STYLE_ARMS` exists to remove. Every style a form
+  // has no arm for is refused here now, and by the same list the validator
+  // reads.
+  //
+  // The **resolved** form, because `b.plot` defaults it to `line` below and a
+  // check on the parameter would refuse the ordinary call that omits it.
+  if (plotStyle !== undefined && plotStyle !== "auto") {
     const drawn = form ?? "line";
-    if (drawn !== "line" && drawn !== "step") {
+    const arms = STYLE_ARMS[drawn] as readonly string[];
+    if (!arms.includes(plotStyle)) {
       throw new TypeError(
-        `b.plot: "plotStyle" is "candlestick" on form "${drawn}" (C04 I57) — a candlestick ` +
-          `is a curve style over the positional machinery (C12 I36), so the form is "line" ` +
-          `or "step"`,
+        `b.plot: "plotStyle" is "${plotStyle}" on form "${drawn}" (C04 I59) — that form has ` +
+          `${arms.length === 0 ? "no style arms" : `arms for ${arms.join(", ")}`}, and an ` +
+          `ignored member reads as one not yet implemented`,
       );
     }
+  }
+  if (plotFill === "solid" && plotStyle === "line") {
+    throw new TypeError(
+      `b.plot: "plotFill" is "solid" with "plotStyle" of "line" (C04 I59) — a box-drawing ` +
+        `outline has no interior vocabulary, so this would be an outline in one alphabet ` +
+        `around a body in another rather than the same figure filled`,
+    );
   }
   return finish<Plot>(
     {
@@ -484,6 +503,7 @@ function plot(
       series,
       height,
       ...(axes === undefined ? {} : { axes }),
+      ...(plotFill === undefined ? {} : { plotFill }),
       ...(xMin === undefined ? {} : { xMin }),
       ...(xMax === undefined ? {} : { xMax }),
       ...(xFormat === undefined ? {} : { xFormat }),

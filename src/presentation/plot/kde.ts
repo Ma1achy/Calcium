@@ -12,6 +12,7 @@ import { stripColumn, stripRow } from "./strip.js";
 import { cells } from "../text.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP, strokePolyline } from "./linedraw.js";
 import { glyphs } from "../blocks/glyphs.js";
+import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, setDot } from "./raster.js";
 import type { Range } from "./scale.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
@@ -576,6 +577,47 @@ export function rainColumns(
  * with one y-value each, which is the case the cell grid does draw well —
  * `circle.ts`'s header carries the distinction.
  */
+/**
+ * The box and the summary marks, on the spine (C12 I43, §3w).
+ *
+ * **Lifted out because both vocabularies place them identically.** A violin is
+ * a box plot that also shows the distribution, so this is not decoration — and
+ * the braille arm draws its outline in dots and its box in *cells*, because a
+ * quartile is a position and not a shape. One placer means the two arms cannot
+ * drift about where a median is.
+ */
+function boxOnSpine(
+  rows: readonly string[],
+  spineRow: number,
+  w: number,
+  gl: ReturnType<typeof glyphs>,
+  quartiles: QuartileSummary | undefined,
+  lo: number,
+  hi: number,
+  pad: number,
+): readonly string[] {
+  if (quartiles === undefined) return rows;
+  const line = [...(rows[spineRow] ?? " ".repeat(w))];
+  const span = hi - lo + 2 * pad;
+  const at = (v: number): number =>
+    Math.max(0, Math.min(w - 1, Math.round(((v - (lo - pad)) / (span || 1)) * (w - 1)))); // cells-ok — a column index
+  const put = (x: number, ch: string): void => {
+    if (x >= 0 && x < w) line[x] = ch; // cells-ok — a column index
+  };
+  put(at(quartiles.q1), gl.vertical);
+  put(at(quartiles.q3), gl.vertical);
+  put(at(quartiles.median), gl.teeDown);
+  // **When the mean lands on the median, say so.** Skipping the diamond avoided
+  // hiding the median tee, which was right, and left a band with no mean mark
+  // beside two that had one — so *they coincide* read as *it is missing*. A cell
+  // holds one glyph, so the glyph names both.
+  if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
+    const xm = at(quartiles.mean);
+    put(xm, xm === at(quartiles.median) ? gl.diamondTee : gl.diamond);
+  }
+  return rows.map((r, i) => (i === spineRow ? line.join("") : r));
+}
+
 export function violinRows(
   series: Series,
   areaWidth: number,
@@ -585,6 +627,10 @@ export function violinRows(
   corners: "rounded" | "sharp" = "rounded",
   adjust?: number,
   shared?: { min: number; max: number },
+  /** The outline strokes the dot grid rather than the line mask (C12 I43, §3w). */
+  braille = false,
+  /** The dots between the two edges are set. The braille arm's alone (C04 I59). */
+  fill = false,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const slot = Math.max(1, Math.floor(rowsPerCategory)); // cells-ok — a row count
@@ -678,11 +724,74 @@ export function violinRows(
   // the figure was a capped blob rather than a shape that tapers into the axis.
   // A violin's tails go to nothing and meet the centre line; they are not
   // stopped by a bar.
+  const gl = glyphs(caps);
+  const spineRow = spine;
+
+  // **The braille arm resamples, and that is where the smoothness is** (C12
+  // I43, §3w).
+  //
+  // Drawing the cell-resolution edges with dots instead of box glyphs is not a
+  // finer picture — it is the same staircase in a different alphabet, which the
+  // first form of this did and the frame showed: `edge()` answers in whole
+  // rows, so the outline stepped exactly where the line arm's did. The gain is
+  // 2×4 **per cell**, so the density is sampled at `2w` columns and the offset
+  // is computed in dot rows.
+  //
+  // The geometry above is untouched: the same support cut, the same spine, the
+  // same closing at each extreme. I39's odd extent and §3i's rungs are the
+  // figure's, not the vocabulary's.
+  if (braille) {
+    const dw = w * BRAILLE_DOTS.x; // cells-ok — a dot column count
+    const dh = n * BRAILLE_DOTS.y; // cells-ok — a dot row count
+    const dots = createGrid(dw, dh);
+    const spineDot = spineRow * BRAILLE_DOTS.y + Math.floor(BRAILLE_DOTS.y / 2); // cells-ok — a dot row
+    const halfDots = Math.max(1, Math.floor(dh / 2) - 1); // cells-ok — a dot row count
+
+    const fine: number[] = [];
+    for (let i = 0; i < dw; i += 1) { // cells-ok — a dot column
+      fine.push(lo - pad + ((hi - lo + 2 * pad) * i) / Math.max(1, dw - 1));
+    }
+    const fineD = kde(finite, fine, bw);
+    const fineMax = Math.max(...fineD, Number.MIN_VALUE);
+    const fineSupport = supported(fine, sorted, bw ?? silvermanBandwidth(finite));
+
+    // The rule itself, so the tails close onto it as they do in the line arm.
+    for (let x = 0; x < dw; x += 1) setDot(dots, x, spineDot); // cells-ok — a dot column
+
+    const from = Math.max(0, fineSupport.first - 1); // cells-ok — a dot column
+    const to = Math.min(dw - 1, fineSupport.last + 1); // cells-ok — a dot column
+    let prev: number | null = null;
+    for (let x = from; x <= to; x += 1) { // cells-ok — a dot column
+      const inside = x >= fineSupport.first && x <= fineSupport.last; // cells-ok — a dot column
+      // **A non-finite offset hangs the renderer, and the guard is not
+      // hypothetical.** `drawLine` stops on `x === ex` and `NaN` equals
+      // nothing, so one undefined density is an infinite loop — the class
+      // `niceAxis` records of itself and the reason it clamps its own span.
+      // Found by a mutation that *hung* rather than failing: a pass that stops
+      // producing output is evidence about the code, not about the harness.
+      const raw = inside ? (fineD[x] ?? 0) / fineMax : 0;
+      const off = Number.isFinite(raw) ? Math.round(raw * halfDots) : 0; // cells-ok — a dot row
+      // Joined to the column before it, so a fast rise is a stroke and not two
+      // dots with a gap between them — `drawLine`'s job, one column wide.
+      if (prev !== null) {
+        drawLine(dots, x - 1, spineDot - prev, x, spineDot - off);
+        drawLine(dots, x - 1, spineDot + prev, x, spineDot + off);
+      }
+      setDot(dots, x, spineDot - off); // cells-ok — a dot row
+      setDot(dots, x, spineDot + off); // cells-ok — a dot row
+      // **The whole span, not the edge's own column.** Filling at the sampled
+      // column alone set one dot column per cell and drew `⢸⢸⢸` — a hatch
+      // rather than a body.
+      if (fill) for (let y = spineDot - off; y <= spineDot + off; y += 1) setDot(dots, x, y); // cells-ok — a dot row
+      prev = off;
+    }
+
+    const rows = foldBraille(dots).map((r) => r.padEnd(w).slice(0, w));
+    return [...gap, ...boxOnSpine(rows, spineRow, w, gl, quartiles, lo, hi, pad)];
+  }
+
   strokePolyline(mask, upper, false);
   strokePolyline(mask, lower, false);
-
-  const spineRow = spine;
-  const gl = glyphs(caps);
 
   // **The spine is part of the mask, not a fill behind it.**
   //
@@ -708,30 +817,7 @@ export function violinRows(
     r.map((m) => glyphForMask(y === spineRow ? m | spineBits : m, corners, caps)),
   );
 
-  // The box, on the spine. A violin is a box plot that also shows the
-  // distribution, so this is not decoration — it is the other half of the form.
-  if (quartiles !== undefined) {
-    const span = hi - lo + 2 * pad;
-    const at = (v: number): number =>
-      Math.max(0, Math.min(w - 1, Math.round(((v - (lo - pad)) / (span || 1)) * (w - 1))));
-    const put = (x: number, ch: string): void => {
-      if (x >= 0 && x < w) grid[spineRow]![x] = ch;
-    };
-    put(at(quartiles.q1), gl.vertical);
-    put(at(quartiles.q3), gl.vertical);
-    put(at(quartiles.median), gl.teeDown);
-    // **When the mean lands on the median, say so.** Skipping the diamond
-    // avoided hiding the median tee, which was right, and left a band with no
-    // mean mark beside two bands that had one — so *they coincide* read as *it
-    // is missing*, and a reader has no way to tell those apart. A cell holds one
-    // glyph, so the glyph names both.
-    if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
-      const xm = at(quartiles.mean);
-      put(xm, xm === at(quartiles.median) ? gl.diamondTee : gl.diamond);
-    }
-  }
-
-  return [...gap, ...grid.map((r) => r.join(""))];
+  return [...gap, ...boxOnSpine(grid.map((r) => r.join("")), spineRow, w, gl, quartiles, lo, hi, pad)];
 }
 
 /**

@@ -1520,7 +1520,7 @@ a union in the same family, for the same reason those are.
 | violin `plotStyle: "braille"` | the outline is strokes in the **dot grid** — 2×4 per cell, which is where the smoothness comes from | **the geometry.** I39's odd extent, §3i's rungs and the budgets are the figure's, not the vocabulary's |
 | violin `plotFill: "solid"` | the dots between the two edges are set | the box and the summary marks, which stay cell-resolution and composite **over** the fill |
 | pie `plotStyle: "solid"` | wedges are `█` at cell resolution — coarser, and with no inter-dot gaps at all | the wedge arithmetic, the legend, the minimum-fraction rule |
-| radar `plotStyle: "line"` | polygons are strokes through `glyphForMask` — `╭─╮` at cell resolution | the rings, the spokes, the vertex marks' *purpose*; a corner is one glyph there rather than a 2×2 block |
+| radar `plotStyle: "line"` | **the whole figure** — polygons, boundary and spokes, all strokes through `glyphForMask` | the vertex marks' *purpose*; a corner is one glyph there rather than a 2×2 block |
 
 ### Two rulings the table does not carry
 
@@ -1545,7 +1545,31 @@ I40 unions the dots where two layers ink one cell, **and the union is braille's 
 The braille radar therefore draws both polygons where they cross and **the line-drawn one does
 not**: the nearer layer keeps the cell and the further loses it.
 
-That is the same trade the pie made in the other direction — a solid pie has no seams and a
+#### The frame follows the style, and finding that out is what the mix was for
+
+The first form left the rings and spokes in braille — *the polygons are the reading and the frame
+is the scale*, which is §3g's own rule and reads as an unfinished picture. **Half a figure in each
+alphabet is what a reader sees**, and they said so.
+
+Making the frame follow the style is right and the naive version of it is worse. Four value rings
+plus the boundary plus five spokes is **ten polylines at cell resolution in a seventeen-row disc**,
+and the figure came out a tangle the polygons could not be found in. The braille arm affords them
+because it *stipples* — `RING_STEP` is 4 and `SPOKE_DASH` is two-on-two-off — and **a solid `─`
+cannot be made lighter than itself.**
+
+So the line arm draws the **boundary and the spokes and no value rings**: what a reader needs to
+place a vertex is *this is the maximum* and *this direction is Speed*, and a value ring is a scale
+refinement, which is the first thing a crowded figure should spend. Colour does the rest — the
+frame is `tone.muted` and the polygons carry their series' slots, so one alphabet separates by
+weight rather than by kind.
+
+**And it staircases where the braille arm draws diagonals**, which is the bigger difference and
+was found by reading the frame rather than predicted. `strokePolyline` steps orthogonally, so a
+pentagon's edges — none of which is axis-aligned — come out as runs of right angles. What the arm
+buys is continuity and contrast: two polygons in `╭─╮` at cell resolution are two shapes a reader
+can separate at a glance, where the braille ones are two fields of dots.
+
+That is the same trade the pie makes in the other direction — a solid pie has no seams and a
 braille pie has no gaps — and it is why both are shipped rather than one being chosen. *Neither
 is better; they fail differently, and a reader who knows which failure they are looking at can
 pick.*

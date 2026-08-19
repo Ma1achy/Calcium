@@ -269,11 +269,15 @@ describe("C04 width arithmetic at the boundaries", () => {
     ).toThrow(/there is no "ohlc" \(C04 I57\)/u);
 
     // B9 — the style on a form it is not a style of.
-    expect(errors(candles({ form: "pie" }))).toMatch(/on form "pie" \(C04 I57\)/u);
+    // **The clause became a record and the citation moved with it** (C04 I59,
+    // C12 I43). `form !== "line" && form !== "step"` was a sentence about
+    // candlesticks; `STYLE_ARMS` is which arms each form has, and one rule over
+    // it refuses every style the same way. The refusal is the same refusal.
+    expect(errors(candles({ form: "pie" }))).toMatch(/on form "pie" \(C04 I59\)/u);
     expect(
       () => b.plot({ series: [], height: 8, form: "pie", plotStyle: "candlestick", ohlc: [bar] }),
       "the builder",
-    ).toThrow(/on form "pie" \(C04 I57\)/u);
+    ).toThrow(/on form "pie" \(C04 I59\)/u);
 
     // B11 — the wick that does not contain its body. **Not under the style**:
     // the bars are wrong wherever they are, so the refusal is on `ohlc` and

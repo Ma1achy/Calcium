@@ -2156,7 +2156,13 @@ const FORM_ROWS: Readonly<
       if (rung.rung === "rain" || rung.rung === "raindrop") {
         return rainRows(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw, ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth);
       }
-      return violinRows(sr, aw, spent, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
+      // The vocabulary, not the geometry (C12 I43, §3w) — every rung, budget
+      // and extent above is unchanged by which alphabet strokes the outline.
+      return violinRows(
+        sr, aw, spent, ctx.capabilities, qs[i] ?? summaryOf(sr),
+        block.plotCorners ?? "rounded", block.bandwidth, shared,
+        block.plotStyle === "braille", block.plotFill === "solid",
+      );
     });
   },
   ridgeline: (block, width, ctx) => {
@@ -2245,7 +2251,14 @@ const FORM_ROWS: Readonly<
         line(markedSpans(row, (i) => categoryRef(i), ctx), layout, ctx),
       );
     }
-    const pie = pieRender(segs, width, areaRows, ctx.capabilities);
+    // **A solid pie degrades to braille at one bit rather than refusing**
+    // (C12 I43, §3w). `CATEGORY_PATTERNS` is that depth's identity channel and
+    // a block glyph has no hatch to carry, so a solid pie there is an
+    // undifferentiated disc — I18's precedent: where the capability cannot
+    // spare what a figure needs, the honest answer is the thing that fits and
+    // not an error the caller could not have avoided.
+    const solid = block.plotStyle === "solid" && ctx.capabilities.colourDepth !== 1;
+    const pie = pieRender(segs, width, areaRows, ctx.capabilities, solid);
     if (pie.layers.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     const fills: readonly Layer[] = pie.layers.map((pl) => ({
       glyphRows: pl.glyphRows,
@@ -2278,7 +2291,10 @@ const FORM_ROWS: Readonly<
         line(markedSpans(row, seriesRef, ctx), layout, ctx),
       );
     }
-    const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities);
+    const radar = radarRender(
+      block.series, cats, width, areaRows, ctx.capabilities,
+      block.plotStyle === "line", block.plotCorners ?? "rounded",
+    );
     if (radar.polygons.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     // **Labels first, frame last, series between them.** `mergedRow` takes the
     // first layer to ink a cell, so the order is a priority: a word a polygon

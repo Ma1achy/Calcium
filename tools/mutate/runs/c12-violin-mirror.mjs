@@ -53,8 +53,11 @@ const results = runPass({
       // symmetric either way and the band's own label and tick are not on it.
       name: "the horizontal arm's spare row goes after the figure",
       file: KDE,
-      from: "  return [...gap, ...grid.map((r) => r.join(\"\"))];",
-      to: "  return [...grid.map((r) => r.join(\"\")), ...gap];",
+      // The box was lifted into `boxOnSpine` when the braille arm landed, so
+      // both vocabularies place a median identically (C12 I43); the return
+      // moved with it and the clause under test did not.
+      from: "  return [...gap, ...boxOnSpine(grid.map((r) => r.join(\"\")), spineRow, w, gl, quartiles, lo, hi, pad)];",
+      to: "  return [...boxOnSpine(grid.map((r) => r.join(\"\")), spineRow, w, gl, quartiles, lo, hi, pad), ...gap];",
       expect: "VM3",
     },
     {

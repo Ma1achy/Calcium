@@ -9657,3 +9657,61 @@ this is the second time in this arc that a `-u` would have laundered a defect in
 every layout renders the same picture and the shared-edge work moved no frame at all. *Green
 because it is right* and *green because it never ran* are the same colour. `two histograms, one
 edge set` is that corpus — grouped, stacked and vertical, at both capability sets and both widths.
+
+---
+
+## F194 — a mutation that hangs is evidence about the code ★★★★
+
+| | |
+|---|---|
+| **Surface** | the braille violin's outline, and any density it cannot sample |
+| **Reached for** | a mutation pass that stopped producing output and was killed at 420 s |
+| **Verdict** | **one non-finite offset is an infinite loop, because `drawLine` stops on `x === ex`** |
+| **Absorbed by** | the offset is guarded before it reaches the raster |
+
+The mutation was *the braille violin does not resample* — reuse the cell-resolution densities
+instead of the dot-resolution ones. Half the array is then `undefined`, `undefined / max` is `NaN`,
+and `drawLine` walks until `x === ex`, which `NaN` never satisfies.
+
+**`niceAxis` records this exact class about itself** — *`drawLine` compares `x === ex` to stop,
+`NaN` is equal to nothing, and the loop does not terminate* — and clamps its own span for it. The
+braille arm reached the same raster with no such clamp.
+
+**A pass that goes quiet is not a slow pass.** One run of that file takes **1.6 seconds**, so
+eleven of them is under twenty; a 420-second timeout is not a scheduling problem, it is a
+mechanism that does not return. Timing a single run is what separated the two, and it is cheaper
+than any amount of staring at the harness.
+
+### And it left a mutation in the tree
+
+The run was killed mid-mutation, so `kde.ts` still held `const fineD = densities` when control
+came back. **`make check` and the tests would have passed a commit with a mutation in it** — the
+guarded version renders, it just renders half a violin. Auditing every `to` string in the run
+against the working tree is what found it, and it is a step that belongs after any killed pass.
+
+---
+
+## F195 — three assertions that passed against the defect, and each was wrong about a different thing ★★★
+
+| | |
+|---|---|
+| **Surface** | the styling forks' own suite, at the moment the mutation pass first ran |
+| **Verdict** | **each was true of the mutated output, and measuring the mutation is what said how** |
+
+| the row | what it asserted | what the mutation did | why it passed |
+|---|---|---|---|
+| the braille violin resamples | *the outline is dots and has no `╭`* | collapsed the right half onto the spine | dots are still dots |
+| …second form | *both halves have more than ten inked cells* | left **99** cells against 241 | 99 > 10 |
+| a solid pie folds at half | *the same number of inked rows*, then *the same widest row* | grew the disc by its **rim** | the flanks are dense; only the rim holds part-covered cells, and neither the row count nor the widest row is a rim measurement |
+| the radar's polygons are line-drawn | *the figure contains box glyphs* | left the polygons in braille | **the frame is line-drawn too**, so the figure has box glyphs either way |
+
+**Guessing the sharper assertion failed twice.** What worked was applying each surviving mutation
+by hand and printing the numbers: 519 solid cells against 540 at height 18, 99 inked cells against
+241. The assertions are those relations now — *the solid disc is strictly smaller than the braille
+one, and within a tenth of it*; *the two halves are within a sixth of each other* — rather than
+thresholds chosen to be safely true.
+
+**The radar row is the one worth keeping.** Its assertion became false because of a change made in
+the same session for an unrelated reason: the frame started following the style, so *the figure
+contains box glyphs* stopped distinguishing anything. **An assertion can be sharpened out from
+under itself by a neighbouring fix**, and nothing but the pass would have said so.

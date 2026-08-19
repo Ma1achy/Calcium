@@ -703,7 +703,17 @@ export type Plot = Readonly<{
    * — and only the column's mark differs. So `form` stays `line` or `step`,
    * and the data it draws is `ohlc` rather than `series`.
    */
-  plotStyle?: "auto" | "braille" | "line" | "candlestick";
+  plotStyle?: "auto" | "braille" | "line" | "candlestick" | "solid";
+  /**
+   * Whether a shape's interior is drawn (C04 I59, C12 I43, §3w).
+   *
+   * **Refused where the vocabulary cannot fill.** A box-drawing outline has no
+   * interior alphabet: `█` inside `╭──╮` is an outline in one alphabet around a
+   * body in another, a third figure rather than the same one filled. So
+   * `"solid"` with `plotStyle: "line"` is a construction error and not an
+   * ignored member, which reads as one not yet implemented.
+   */
+  plotFill?: "none" | "solid";
   plotCorners?: "rounded" | "sharp";
   /**
    * Which axis a categorical or distribution form runs along (C12 §3j, C12 I30).
@@ -780,6 +790,54 @@ export type Plot = Readonly<{
    */
   plotFrame?: "box" | "corners" | "grid" | "rule";
 }> & Gap;
+
+/**
+ * Which `plotStyle` arms a form actually has (C12 I43, §3w).
+ *
+ * **The refusal was a clause naming `candlestick` and the form it needs** —
+ * right, and a special case: every style is one some forms draw and others do
+ * not, so a second style would have wanted a second clause. This is that shape
+ * as data, and the refusal is one rule over it.
+ *
+ * `"auto"` is every form's, and is left out of the lists rather than repeated
+ * into all thirty-five: it means *the renderer decides*, which every renderer
+ * can always do.
+ *
+ * Total over `PlotForm`, so the thirty-fifth form declares its arms or does not
+ * compile.
+ *
+ * **Here and not in `presentation/plot/`, because the validator needs it.**
+ * `SHARES_CELLS` and its siblings are rendering facts and live beside the
+ * renderer; which styles a form *has* is a fact about the contract, and L0
+ * cannot import L1 to ask (A02 §1). C12 reads it downward, which is the
+ * direction that is allowed.
+ */
+export type PlotStyleArm = NonNullable<Plot["plotStyle"]>;
+
+export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = Object.freeze({
+  // The positional family: braille dots or box-drawing strokes, and the two
+  // curve forms that can carry candles.
+  line: ["braille", "line", "candlestick"], step: ["braille", "line", "candlestick"],
+  scatter: ["braille", "line"], ecdf: ["braille", "line"], density: ["braille", "line"],
+  slope: ["braille", "line"], bubble: ["braille", "line"],
+  stackedarea: ["braille", "line"], streamgraph: ["braille", "line"],
+  // **The three forks §3w adds.** A violin's outline can be strokes in the dot
+  // grid; a pie's wedges can be block glyphs; a radar's polygons can be
+  // box-drawing.
+  violin: ["braille", "line"],
+  pie: ["braille", "solid"],
+  radar: ["braille", "line"],
+  // Runs, bands and mosaics: the vocabulary is the form's and there is nothing
+  // to choose. Stated rather than omitted — an empty list is an answer.
+  bar: [], histogram: [], boxplot: [], ridgeline: [], forest: [], dumbbell: [],
+  lollipop: [], dotplot: [], funnel: [], gantt: [], waterfall: [], timeline: [],
+  bullet: [], autocorrelation: [], waffle: [], utilisation: [],
+  heatmap: [], calendar: [], correlation: [], confusion: [],
+  spectrogram: [], latency: [], density2d: [],
+  flame: [], icicle: [], treemap: [],
+  sparkline: [], horizon: [],
+  smallmultiples: [], pairplot: [],
+});
 
 export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };
 

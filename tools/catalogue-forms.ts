@@ -644,6 +644,25 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     bimodal: { form: "density", height: 8, axes: true, series: [s([1, 1, 1, 1, 2, 3, 5, 5, 5, 5])] },
   },
   violin: {
+    // The three styling forks (C12 I43, §3w) — the vocabulary, not the geometry.
+    braille: {
+      form: "violin", height: 21, axes: true, plotStyle: "braille",
+      categories: ["tight", "wide", "skewed"],
+      series: [
+        s(Array.from({ length: 200 }, (_, i) => 40 + Math.sin(i * 1.7) * 5 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_, i) => 45 + Math.sin(i * 1.7) * 12 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_, i) => 38 + Math.sin(i * 1.7) * 8 + ((i * 7) % 11) - 5)),
+      ],
+    },
+    "braille-filled": {
+      form: "violin", height: 21, axes: true, plotStyle: "braille", plotFill: "solid",
+      categories: ["tight", "wide", "skewed"],
+      series: [
+        s(Array.from({ length: 200 }, (_, i) => 40 + Math.sin(i * 1.7) * 5 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_, i) => 45 + Math.sin(i * 1.7) * 12 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_, i) => 38 + Math.sin(i * 1.7) * 8 + ((i * 7) % 11) - 5)),
+      ],
+    },
     // **The rule of thumb's named failure**: two separated modes, which
     // Silverman widens the kernel until it fills in. The same data at
     // `bandwidth: 0.4` shows both.
@@ -812,6 +831,13 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   pie: {
+    solid: {
+      form: "pie", height: 18, series: [], plotStyle: "solid",
+      segments: [
+        { label: "Chrome", value: 65 }, { label: "Firefox", value: 15 },
+        { label: "Safari", value: 12 }, { label: "Other", value: 8 },
+      ],
+    },
     // Same argument as the radar's — `narrow-20` below keeps the small case.
     "default-40": { form: "pie", height: 18, series: [], segments: [...PIE_SEGMENTS] },
     "narrow-20": { form: "pie", height: 5, series: [], segments: [...PIE_SEGMENTS] },
@@ -826,6 +852,14 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   radar: {
+    line: {
+      form: "radar", height: 17, plotStyle: "line",
+      categories: ["Speed", "Power", "Range", "Defence", "HP"],
+      series: [
+        { ...s([8, 6, 7, 5, 9]), label: "alpha" },
+        { ...s([5, 9, 4, 8, 6]), label: "beta" },
+      ],
+    },
     // **Height is what sizes a circle**, because `rx = 2 · ry` is the cell
     // aspect and nothing can widen a disc past what its rows allow. At 10 the
     // figure was 20 columns in an 80-cell frame and two braille polygons

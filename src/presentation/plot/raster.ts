@@ -92,6 +92,45 @@ export function drawColumnSpan(grid: Grid, x: number, yTop: number, yBottom: num
 }
 
 /** The grid, as braille cells. */
+/**
+ * A dot grid folded to **whole cells** — the same geometry, one alphabet
+ * coarser (C12 I43, §3w).
+ *
+ * **The wedges are not recomputed, and that is the point.** A solid pie shares
+ * every part of the braille one — the angular test, the minimum fraction, the
+ * radial edges, the legend — and differs only in what a cell with ink in it
+ * draws. Folding rather than re-rasterising means the two can never disagree
+ * about where a boundary is.
+ *
+ * **Half the dots, because a cell is a claim about area.** At one dot the disc
+ * grows by a cell all the way round and its edge reads as ragged; at all eight
+ * it shrinks and the rim disappears. Four of eight is *this cell is more inside
+ * than out*, which is what a block glyph asserts.
+ */
+export function foldSolid(grid: Grid, mark: string): readonly string[] {
+  const cellsWide = Math.ceil(grid.dotWidth / BRAILLE_DOTS.x); // cells-ok — a cell count
+  const cellsHigh = Math.ceil(grid.dotHeight / BRAILLE_DOTS.y); // cells-ok — a cell count
+  const half = (BRAILLE_DOTS.x * BRAILLE_DOTS.y) / 2; // cells-ok — a dot count
+  const out: string[] = [];
+  for (let cy = 0; cy < cellsHigh; cy += 1) { // cells-ok — a cell row
+    let line = "";
+    for (let cx = 0; cx < cellsWide; cx += 1) { // cells-ok — a cell column
+      let lit = 0;
+      for (let dy = 0; dy < BRAILLE_DOTS.y; dy += 1) {
+        for (let dx = 0; dx < BRAILLE_DOTS.x; dx += 1) {
+          const x = cx * BRAILLE_DOTS.x + dx;
+          const y = cy * BRAILLE_DOTS.y + dy;
+          if (x >= grid.dotWidth || y >= grid.dotHeight) continue;
+          if (grid.dots[y * grid.dotWidth + x] === 1) lit += 1; // cells-ok — a dot count
+        }
+      }
+      line += lit >= half ? mark : " "; // cells-ok — a dot count
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 export function foldBraille(grid: Grid): readonly string[] {
   const cellsWide = Math.ceil(grid.dotWidth / BRAILLE_DOTS.x);
   const cellsHigh = Math.ceil(grid.dotHeight / BRAILLE_DOTS.y);

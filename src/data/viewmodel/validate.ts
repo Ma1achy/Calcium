@@ -22,6 +22,7 @@ import {
   type DocumentStatus,
   type Glyph,
   COLORMAP_NAMES,
+  STYLE_ARMS,
   type OHLC,
   type Plot,
   type PlotForm,
@@ -515,13 +516,34 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
             `has nothing to draw, and "series" is the overlay rather than the candles`,
         );
       }
-      if (form !== "line" && form !== "step") {
+    }
+    // **One rule over a total record, where there was a clause per style**
+    // (C04 I59, C12 I43, §3w). `candlestick on a form that is not line or step`
+    // was correct and was a special case: every style is one some forms draw
+    // and others do not, so a second style would have wanted a second clause.
+    if (ps !== undefined && ps !== "auto" && PLOT_STYLES.has(String(ps))) {
+      const arms = STYLE_ARMS[form as PlotForm] as readonly string[] | undefined;
+      if (arms !== undefined && !arms.includes(String(ps))) {
         e.push(
-          `${at}: "plotStyle" is "candlestick" on form "${String(form)}" (C04 I57) — a ` +
-            `candlestick is a curve style over the positional machinery (C12 I36), so the ` +
-            `form is "line" or "step"`,
+          `${at}: "plotStyle" is "${String(ps)}" on form "${String(form)}" (C04 I59) — that ` +
+            `form has ${arms.length === 0 ? "no style arms" : `arms for ${arms.join(", ")}`}, ` +
+            `and an ignored member reads as one not yet implemented`,
         );
       }
+    }
+    // **A fill is the braille arm's** (C04 I59). A box-drawing outline has no
+    // interior alphabet, so `█` inside `╭──╮` is a third figure rather than the
+    // same one filled.
+    const pf = b["plotFill"];
+    if (pf !== undefined && pf !== "none" && pf !== "solid") {
+      e.push(`${at}: "plotFill" must be "none" or "solid"`);
+    }
+    if (pf === "solid" && ps === "line") {
+      e.push(
+        `${at}: "plotFill" is "solid" with "plotStyle" of "line" (C04 I59) — a box-drawing ` +
+          `outline has no interior vocabulary, so this would be an outline in one alphabet ` +
+          `around a body in another rather than the same figure filled`,
+      );
     }
     const pc = b["plotCorners"];
     if (pc !== undefined && pc !== "rounded" && pc !== "sharp") {
@@ -749,6 +771,7 @@ const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 
 const PLOT_STYLE_MEMBERS = {
   auto: true, braille: true, line: true, candlestick: true,
+  solid: true,
 } satisfies Record<NonNullable<Plot["plotStyle"]>, true>;
 const PLOT_STYLES: ReadonlySet<string> = new Set(Object.keys(PLOT_STYLE_MEMBERS));
 

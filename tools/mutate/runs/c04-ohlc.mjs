@@ -70,10 +70,16 @@ const results = runPass({
       // A curve style on a form that has no curve. The renderer's form arm
       // takes precedence, so the style is simply ignored — a member that reads
       // as one not yet implemented.
+      //
+      // **The clause moved into a record** (C04 I59, C12 I43). It was `form !==
+      // "line" && form !== "step"` — a sentence about candlesticks — and every
+      // style is one some forms draw and others do not, so a second style would
+      // have wanted a second sentence. `STYLE_ARMS` is that shape as data and
+      // this is the one rule over it, which is what T3.25 now goes through.
       name: "the validator accepts `candlestick` on any form",
       file: VALIDATE,
-      from: '      if (form !== "line" && form !== "step") {',
-      to: "      if (false as boolean) {",
+      from: "      if (arms !== undefined && !arms.includes(String(ps))) {",
+      to: "      if (false) {",
       expect: "T3.25",
     },
     {
