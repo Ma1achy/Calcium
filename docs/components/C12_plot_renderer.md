@@ -1611,6 +1611,34 @@ are legible inside it; with one row there are no edges, and `┤    │    ├` 
 rule, and nothing saying those cells are the box.
 
 
+### A rung that spends less than its band, and the label two rows from its figure
+
+A rung below the top one draws fewer rows than the band holds, and the band's name sits at the
+band's middle row. **Two correct statements, and nothing put them in the same place.** At three
+categories in twelve rows a compact box draws on row 0 of each four-row band and its name sits
+on row 2 — pointing at blank space, with the box it names two rows above and unlabelled.
+
+Neither half is wrong on its own, and that is why nothing saw it. A figure starts at its band's
+first row because that is where a renderer starts. A name is centred because that is where a
+band's name belongs. Every count is right: the rows, the label's column, the figure. The
+mechanism that would catch it is reading the frame, and it is what did.
+
+**It is not new with the ladder.** `"compact"` has drawn it this way since the mode shipped, and
+`"auto"` draws the milder form — a three-row box in a five-row band puts the name on the box's
+floor rather than on its spine. What the ladder changes is the number of ways in: before it,
+one rung of two spent less than its band; after it, every rung but the top one does.
+
+**So the figure is centred in its band and the label follows it to the figure's middle row** —
+`offset + ⌊rows ÷ 2⌋` rather than `⌊band ÷ 2⌋`, which is the same expression wherever the
+figure fills its band. That is every scaling rung and every form outside this ladder, so the
+rule costs nothing where it changes nothing, and the frames that move are the ones that were
+already wrong.
+
+**The middle row and not the centre, because the figures are not all symmetric.** A box's
+middle row is its spine; a raincloud's is its box, which is its *last* row. Centring the
+figure and taking `⌊rows ÷ 2⌋` of it lands on both — where placing the label at the figure's
+geometric centre would put a raincloud's name on its density.
+
 **`plotDetail` selects a renderer inside the declared height; it never contributes to it.**
 That is forced, not chosen: rows-per-band times category count derives height from the data,
 which is precisely what I1 forbids. `bandedForm` keeps dividing the declared area by the
@@ -1657,7 +1685,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I25** — **Two things a reader must tell apart differ by mark or by name, never by tone alone.** *(The second disjunct is measured, not softening: nine forms give each category its own gutter-labelled row, and a rule demanding a distinct glyph there fails eight correct renderers. `SHARES_CELLS` is the partition, total over `PlotForm`, and §3g's legend reads the same one.)* I6 says this of multi-series plots and is satisfied by `pie`, `waffle`, stacked `bar` and `radar`, none of which is one — a pie has segments, a stacked bar has layers — and all four of which drew a single glyph for every category. **The marks are a ladder of eight and not the shade ramp**: `░ ▒ ▓` encode magnitude along an axis (I21), and spending them on identity is the vocabulary mismatch that cost two defects already. *Asserted as a sweep over every form at `colourDepth: 1`, because a rule remembered per form is a rule that lapses on the thirty-fifth.*
 - **I26** — **`plotFrame` chooses the shape of the furniture and `axes` chooses whether there is any.** Two fields because they answer two questions, and a single enum spelling `"none"` would make `axes: false, plotFrame: "box"` expressible and meaningless. Gridlines are appended last and resolve behind the data, for I23's reason exactly. **`"corners"` suppresses the tick row** rather than drawing ticks against an edge that is not there. **All four ship and the geometry is identical in every one** — same rows, same columns, same plot area — which is what makes this a glyph table rather than four renderers. `plotFrame` is structurally absent from `PlotGeometry`, so a style cannot reach `plotHeight` and a `"rule"` plot one row shorter than a `"box"` one is a compile error rather than a test. `"grid"` draws where a value is *written* — the rows the gutter labels, the columns the rule ticks — and anywhere else it is a texture.
 - **I27** — **A legend costs width or a row, and only the width-costing placements may enable themselves.** A row must declare its cost before the data is visible (I1); width is already data-dependent through the gutter, so it may not. That is why `"right"` is the default and `"above"`/`"below"` are opt-in — not a preference. **Skipped entirely at `colourDepth: 1`**, where a swatch carries nothing and still takes the row.
-- **I28** — **`plotDetail` selects a renderer inside the declared height and never contributes to it**, because rows-per-band times category count is a height derived from data (I1). `"auto"` is the richest renderer the quotient affords; an explicit `"full"` that does not fit degrades to `"compact"` and reports rather than overflowing its band.
+- **I28** — **`plotDetail` selects a renderer inside the declared height and never contributes to it**, because rows-per-band times category count is a height derived from data (I1). `"auto"` is the richest renderer the quotient affords; an explicit `"full"` that does not fit degrades to `"compact"` and reports rather than overflowing its band. **A rung that spends fewer rows than its band is centred in it and takes the label to its own middle row**, because a figure drawn from the band's first row and a name drawn at the band's centre are two correct placements that do not meet: a compact box at three categories in twelve rows had its name two rows below it, pointing at blank space. The offset is zero wherever the figure fills its band, so the rule is silent for every scaling rung and every form outside this ladder.
 - **I29** — **Colour carries magnitude where there is colour; the glyph is the fallback, never the lead.** A form that encodes magnitude paints the cell — a background-coloured space — at any depth that separates its values, and reaches for the density ramp only below it.
 - **I30** — **`orientation` chooses the axis, and the eighths vocabulary follows it.** Horizontal is the default because a cell is one wide by two tall and a category's name is text — a horizontal bar writes its label beside itself, a vertical one gets a column two cells wide to write it under. The partials are **left** eighths horizontally and **lower** eighths vertically; they look interchangeable, encode different axes, and the vertical arm reaches its through `ladderFor("height")` rather than naming a constant (I21). Both eighths sets are ambiguous-width, and the escapes are asymmetric: the vertical arm keeps seven partials on a wide terminal because braille fills bottom-up, and the horizontal arm has one because braille has no left-filling series. A form with no second axis refuses the field at construction rather than ignoring it.
 - **I31** — **A forest plot draws its interval, and nothing draws over it.** The ends of a confidence interval are the two numbers the reader came for; a box plot's body over them replaces the statistic rather than decorating it, and the two figures look alike enough that no count notices. `weight` sizes the estimate because *which study carried the result* is the plot's subject, and `pooled` is a field rather than a convention about the last row. The null reference is an `Annotation` (C04 §3e), which already means a claim about the ordinate drawn beside the data.
@@ -1751,6 +1779,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.67** (I33): the stub points toward the whisker in both arms — `├` at the min cap and `┤` at Q1 horizontally, `┬` at the max cap and `┴` at Q3 vertically — asserted as the *rule* over both tables rather than as two literal figures, so a table transcribed correctly from a wrong rule still fails.
 - **T1.68** (I33): a compact box is filled between Q1 and Q3 and a three-row box is hollow there, and a mean landing on the median draws `◈`.
 - **T1.69** (I34): `plotDetail: "auto"` picks the richest rung the declared height affords — 1, 2, 3 and 5 rows give the box, the raincloud, the jittered raincloud and the mirrored violin — and `"compact"` gives the *form's* lowest rung, which is 1 for a boxplot and 2 for a violin.
+- **T1.90** (I28): a compact box plot at three categories in twelve rows — each four-row band draws its figure on the band's middle row and the category's name on the same row. Asserted by finding the row the label is on and requiring the box's median glyph in it, not by matching a row index: an off-by-one in the offset passes an index assertion written against the offset.
 - **T1.88** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
 
@@ -1822,6 +1851,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 - **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
+- **T6.23** (I28): dropping the band offset so a short figure is drawn from the band's first row → T1.90 fails, and every rung below the top one has its category name pointing at a blank row. **The mutation that says why the label moves with the figure rather than the figure to the label**: centring the figure and leaving `⌊band ÷ 2⌋` alone fails it too, at three categories in twelve rows, by one.
 - **T6.22** (I34, I21): a vertical raincloud reaching for the height ladder → T1.70 fails, and the density draws a per-cell scale where the axis is a run. Arithmetically self-consistent — the levels are monotone and the row count is right — and wrong about how much of each cell a level fills.
 
 ---
