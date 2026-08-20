@@ -12,7 +12,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/plot.test.ts test/golden/states.test.ts";
+const CMD = "npx vitest run test/unit/plot.test.ts test/unit/plot-mutations.test.ts test/golden/states.test.ts";
 const ANN = "src/presentation/plot/annotate.ts";
 const DEF = "src/presentation/plot/definition.ts";
 const VAL = "src/data/viewmodel/validate.ts";
@@ -121,9 +121,70 @@ const results = runPass({
       // the thing that has to.
       name: "a reversed band is accepted, and it renders the same either way",
       file: VAL,
-      from: '        if (a["from"] > a["to"]) {',
-      to: "        if (false) {",
+      // Re-anchored when `checkAnnotations` became a record keyed on the kind;
+      // the clause is the same one, inside the `band` arm.
+      from: "    if (isFiniteNumber(from) && isFiniteNumber(to) && from > to) {",
+      to: "    if (false) {",
       expect: "T1.30",
+    },
+    {
+      // **The fill in the curve's own alphabet**, which is the request's own
+      // suggestion and the surviving half of C04 I52's refusal. Braille under
+      // braille is one alphabet in one cell — the frame still renders a band.
+      name: "the fill is drawn in braille, the curve's own alphabet",
+      file: ANN,
+      from: '  return "\\u2591";',
+      to: '  return "\\u2591" && "\\u2812";',
+      expect: "UB3",
+    },
+    {
+      // The two arms with no vocabulary draw anyway: at `wide` a shaded row
+      // occupies twice its declared cells, which is what `pairFor` already
+      // records finding in a reviewed golden.
+      name: "the shade is drawn on every arm, ambiguous width included",
+      file: ANN,
+      from: '  if (caps.ambiguousWidth === "wide") return null;',
+      to: "  if (false) return null;",
+      expect: "UB4",
+    },
+    {
+      // **The edges back to filtering samples**, which is the defect the frame
+      // read found: ink proportional to the sample count rather than the area,
+      // two cells at eight samples across fifty columns.
+      name: "the edge dashes where a sample lands rather than stepping the area",
+      file: ANN,
+      from: "  for (let dotCol = 0; dotCol < grid.dotWidth; dotCol += DASH_CELLS * BRAILLE_DOTS.x) { // cells-ok",
+      to: "  for (let dotCol = 0; dotCol < grid.dotWidth; dotCol += BRAILLE_DOTS.x) { // cells-ok\n    if (dotCol % (DASH_CELLS * BRAILLE_DOTS.x * 3) !== 0) continue;",
+      expect: "UB6",
+    },
+    {
+      // The fill wins its own layer's cell, so a shade lands on the edge dash
+      // it is supposed to sit behind — and the band loses the two statements
+      // that are the whole of what it says.
+      name: "the fill overwrites the edge inside the annotation's own layer",
+      file: ANN,
+      from: "      out += isBlank(e) && f !== \" \" ? f : e;",
+      to: "      out += f !== \" \" ? f : e;",
+      expect: "UB5b",
+    },
+    {
+      // **The ternary, restored**: `confidence` and `whiskers` carry no
+      // `value`, so both are refused at the boundary this check exists to be.
+      name: "THE REFUSAL: confidence is checked for a `value` it does not have",
+      file: VAL,
+      from: '  confidence: (a, e, at) => {\n    // Both edges are **required**',
+      to: '  confidence: (a, e, at) => {\n    requireEdge(a, "value", e, at);\n    // Both edges are **required**',
+      expect: "UB8",
+    },
+    {
+      // An unknown kind takes the `line` arm again, is checked for a `value`,
+      // and then draws nothing — `edgesOf` reads `annotation.value` and `drawn`
+      // filters it. Accepted, rendered blank, silent.
+      name: "an unknown kind falls back to the `line` check and draws nothing",
+      file: VAL,
+      from: "    const check = ANNOTATION_CHECKS[a[\"kind\"] as Annotation[\"kind\"]] as AnnotationCheck | undefined;",
+      to: "    const check = (ANNOTATION_CHECKS[a[\"kind\"] as Annotation[\"kind\"]] ?? ANNOTATION_CHECKS.line) as AnnotationCheck | undefined;",
+      expect: "UB10",
     },
   ],
 });

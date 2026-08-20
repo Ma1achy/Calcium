@@ -575,9 +575,18 @@ export type PlotForm =
  * calibration plot, a residual plot and a Bland–Altman are the same shape again.
  * None is a renderer, so none is a `PlotForm`.
  *
- * **A band is one statement drawn as two lines**, not a fill: a fill would
- * compete for the cells the curve occupies, and at one bit it would be
- * indistinguishable from the curve. The survey's own ruling.
+ * **A band is one statement with two edges, and the area between them.** The
+ * fill was refused — *a fill would compete for the cells the curve occupies, and
+ * at one bit it would be indistinguishable from the curve* — and the refusal was
+ * half right, which is why it survived being read. The competition has an owner:
+ * `mergedRow` takes the first layer that inked a cell and an annotation is last,
+ * so a curve draws over its own band by construction. The alphabet half stands,
+ * and it is exactly what the obvious fill would be — braille, which is the
+ * curve's own. So the fill is `░`, a block element, on a **narrow** unicode
+ * terminal and nowhere else: `░` doubles at `ambiguousWidth: "wide"`, and the
+ * only narrow substitutes the tree holds are braille and the ASCII ramp, both of
+ * which the curve is already drawn in. Where it cannot draw, the two dashed
+ * edges carry the band (C12 §3e).
  *
  * **`tone` is decoration here and never the carrier** (F34). The line is dashed
  * where a curve is continuous, so the distinction survives one bit and a
@@ -595,7 +604,25 @@ export type PlotForm =
 export type Annotation =
   | Readonly<{ kind: "line"; value: number; tone?: Tone }>
   | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone }>
-  | Readonly<{ kind: "confidence"; upper: readonly number[]; lower: readonly number[]; tone?: Tone }>
+  | Readonly<{
+      kind: "confidence";
+      upper: readonly number[];
+      lower: readonly number[];
+      tone?: Tone;
+      /**
+       * Whether the area between the edges is shaded (C12 §3e, I52).
+       *
+       * **Defaults on**, because a band drawn as two unconnected dashed lines is
+       * the reading a caller has to be told to want and `fill_between` is the
+       * one they arrive expecting. `false` keeps the two-edge frame byte for
+       * byte, which is what makes moving the default safe.
+       *
+       * Inert where the capabilities have no alphabet left — see the type's own
+       * note above. That is C12 I25's substitution ladder reaching its bottom
+       * rung, not a member with no arm (F207).
+       */
+      fill?: boolean;
+    }>
   | Readonly<{ kind: "whiskers"; points: readonly Readonly<{ x: number; y: number; err: number }>[]; tone?: Tone }>;
 
 export type Plot = Readonly<{

@@ -23,7 +23,7 @@ change is the signal.
 what both halves independently took before F183 and is why a *style* was
 uncomparable: a candlestick is `form: "line"`. The extras are `EXTRA_VARIANTS`
 in `export-fixtures.ts`. So this table ranks
-**45 of 142 catalogue variants**, and the rest are unread rather than passing —
+**45 of 146 catalogue variants**, and the rest are unread rather than passing —
 adding one means adding a reference renderer beside it.
 
 | form | grid | ink | extent |
@@ -45,13 +45,13 @@ adding one means adding a reference renderer beside it.
 | radar | 64x16 | 23.8% | — *fewer than two bands — ours 0, theirs 0* |
 | stackedarea | 64x16 | 23.5% | — *7 bands vs 9* |
 | autocorrelation | 64x16 | 23.4% | — *fewer than two bands — ours 0, theirs 2* |
+| horizon | 64x16 | 22.1% | — *2 bands vs 9* |
 | sparkline | 64x1 | 21.9% | — *fewer than two bands — ours 1, theirs 1* |
+| line.candlestick | 64x16 | 20.7% | — *fewer than two bands — ours 1, theirs 3* |
 | slope | 64x16 | 19.3% | 7.7% |
 | timeline | 64x16 | 18.8% | — *fewer than two bands — ours 1, theirs 1* |
 | forest | 64x16 | 17.9% | — *fewer than two bands — ours 1, theirs 0* |
-| horizon | 64x16 | 14.6% | — *13 bands vs 9* |
 | density | 64x16 | 13.7% | — *fewer than two bands — ours 2, theirs 1* |
-| line.candlestick | 64x16 | 12.9% | — *fewer than two bands — ours 1, theirs 3* |
 | dumbbell | 64x16 | 9.7% | — *fewer than two bands — ours 1, theirs 1* |
 | ecdf | 64x16 | 9.4% | — *fewer than two bands — ours 1, theirs 2* |
 | bubble | 64x16 | 9.0% | — *fewer than two bands — ours 1, theirs 1* |

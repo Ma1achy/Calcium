@@ -226,6 +226,38 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "line", height: 8, axes: true, series: [s(sin50)],
       annotations: [{ kind: "line", value: 50 }, { kind: "band", from: 30, to: 70 }],
     },
+    // **The corpus had `line` and `band` and neither of the other two kinds**,
+    // which is why a confidence band's edges could ink two cells across fifty
+    // columns through review and commit: nothing rendered one. Twelve samples,
+    // deliberately fewer than the area is wide — the defect was proportional to
+    // the sample count and invisible at any fixture with more readings than
+    // cells (C12 §3e).
+    confidence: {
+      form: "line", height: 8, axes: true, series: [s(sin(12), "obs")],
+      annotations: [{
+        kind: "confidence",
+        upper: sin(12).map((v, i) => v + 8 + i),
+        lower: sin(12).map((v, i) => v - 8 - i),
+        tone: "info",
+      }],
+    },
+    "confidence-unfilled": {
+      form: "line", height: 8, axes: true, series: [s(sin(12), "obs")],
+      annotations: [{
+        kind: "confidence", fill: false,
+        upper: sin(12).map((v, i) => v + 8 + i),
+        lower: sin(12).map((v, i) => v - 8 - i),
+        tone: "info",
+      }],
+    },
+    whiskers: {
+      form: "scatter", height: 8, axes: true, series: [s(sin(12), "obs")],
+      annotations: [{
+        kind: "whiskers",
+        points: sin(12).map((v, i) => ({ x: i, y: v, err: 4 + i })),
+        tone: "info",
+      }],
+    },
     "multi-series": {
       form: "line", height: 8, axes: true,
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],

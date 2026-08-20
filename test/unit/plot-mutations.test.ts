@@ -2569,3 +2569,194 @@ describe("C12 §3r — the candlestick", () => {
     expect(ink(up.flat), "and nothing is flat").toBe(" ".repeat(7 * 9));
   });
 });
+
+describe("C12 §3e — the confidence band's interior and its edges", () => {
+  const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" } as const;
+  const wave = (n: number): readonly number[] =>
+    Array.from({ length: n }, (_, i) => 50 + 30 * Math.sin(i / 3)); // cells-ok — a sample count
+  const banded = (
+    n: number,
+    over: Record<string, unknown> = {},
+    ann: Record<string, unknown> = {},
+  ): Plot => {
+    const base = wave(n);
+    return block({
+      kind: "plot", id: "ub", form: "line", height: 8, axes: false,
+      series: [{ label: "obs", values: base }],
+      annotations: [{
+        kind: "confidence",
+        upper: base.map((v) => v + 12),
+        lower: base.map((v) => v - 12),
+        ...ann,
+      }],
+      ...over,
+    } as unknown as Plot) as Plot;
+  };
+  const bare = (n: number, over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot", id: "ub", form: "line", height: 8, axes: false,
+      series: [{ label: "obs", values: wave(n) }],
+      ...over,
+    } as unknown as Plot) as Plot;
+  const framed = (b: Plot, caps: typeof FULL_CAPS = FULL_CAPS, width = 50): readonly string[] =>
+    measurable({ definitions: [plotDefinition], capabilities: caps }).renderToLines(b, width)
+      .map((l) => l.split(String.fromCharCode(27)).map((p, i) => (i === 0 ? p : p.slice(p.indexOf("m") + 1))).join(""));
+  const inked = (rows: readonly string[]): number =>
+    rows.join("").split("").filter((c) => c !== " " && c !== "⠀").length; // cells-ok — a cell count
+  const SHADE = "░";
+
+  it("UB1 (C04 I52, §3e): the fill covers between the edges and nowhere else", () => {
+    // A flat band from 40 to 60 on a range the series pins to 20..80, so the
+    // covered rows are computable rather than eyeballed.
+    const flat = block({
+      kind: "plot", id: "ub", form: "line", height: 9, axes: false, yMin: 0, yMax: 80,
+      series: [{ label: "obs", values: [0, 80] }],
+      annotations: [{ kind: "confidence", upper: [60, 60], lower: [40, 40] }],
+    } as unknown as Plot) as Plot;
+    const rows = framed(flat);
+    const shaded = rows.map((r, i) => (r.includes(SHADE) ? i : -1)).filter((i) => i >= 0); // cells-ok
+    expect(shaded.length).toBeGreaterThan(0); // cells-ok — a row count
+    // Contiguous, and strictly inside the area: a fill with a hole in it is not
+    // an interior, and one that reaches the frame is not a band.
+    for (let k = 1; k < shaded.length; k += 1) expect(shaded[k]).toBe(shaded[k - 1]! + 1); // cells-ok
+    expect(shaded[0]).toBeGreaterThan(0); // cells-ok — a row index
+    expect(shaded[shaded.length - 1]).toBeLessThan(rows.length - 1); // cells-ok — a row index
+  });
+
+  it("UB2 (§3e, §3u): the curve draws over the fill, never the other way", () => {
+    // Every cell the bare plot inks is still inked, and with the same glyph:
+    // the annotation is the last layer, so it cannot take a cell from a series.
+    const without = framed(bare(24));
+    const with_ = framed(banded(24));
+    without.forEach((row, y) => {
+      for (let x = 0; x < row.length; x += 1) { // cells-ok — a column index
+        const c = row[x]!;
+        if (c === " " || c === "⠀") continue;
+        expect(with_[y]?.[x]).toBe(c);
+      }
+    });
+  });
+
+  it("UB3 (C04 I52, §3e): the fill is not in the curve's alphabet, at every arm", () => {
+    // Asserted rather than assumed, which is the surviving half of the original
+    // refusal: braille under braille is one alphabet in one cell.
+    const braille = framed(banded(24, { plotStyle: "braille" }));
+    expect(braille.join("")).toContain(SHADE);
+    for (const ch of braille.join("")) {
+      const cp = ch.codePointAt(0)!;
+      if (cp >= 0x2800 && cp <= 0x28ff) continue; // the curve and the edges
+      expect(cp === 0x2591 || ch === " " || cp < 0x2800 || cp > 0x28ff).toBe(true);
+    }
+    // And the shade is never a braille code point, which is the whole rule.
+    expect(SHADE.codePointAt(0)! >= 0x2800 && SHADE.codePointAt(0)! <= 0x28ff).toBe(false);
+  });
+
+  it("UB4 (§3e): the fill draws on the narrow unicode arm and on no other", () => {
+    expect(framed(banded(24), FULL_CAPS).join("")).toContain(SHADE);
+    expect(framed(banded(24), MONO_UNICODE_CAPS).join("")).toContain(SHADE);
+    // `cells("░", "wide")` is 2, so a filled row would occupy twice its cells.
+    expect(framed(banded(24), WIDE_CAPS as typeof FULL_CAPS).join("")).not.toContain(SHADE);
+    // The ASCII ramp *is* the curve's alphabet on that arm.
+    expect(framed(banded(24), ASCII_CAPS).join("")).not.toContain(SHADE);
+    expect(cells(SHADE, "wide")).toBe(2); // cells-ok — the measurement the arm rests on
+  });
+
+  it("UB5 (§3e): `fill: false` draws the edges and no shade", () => {
+    const off = framed(banded(24, {}, { fill: false }));
+    expect(off.join("")).not.toContain(SHADE);
+    expect(inked(off)).toBeGreaterThan(inked(framed(bare(24)))); // cells-ok — the edges are still there
+  });
+
+  it("UB5b (§3e, §3u): the edge keeps its own cell once the fill is on", () => {
+    // **UB5 did not say this and a mutation is what said so.** Making the fill
+    // win inside the annotation's own layer survived every row above: the band
+    // still renders, the shade still appears, and the two dashed edges — the
+    // whole of what the band states — are quietly replaced by it.
+    const off = framed(banded(24, {}, { fill: false }));
+    const on = framed(banded(24, {}, { fill: true }));
+    off.forEach((row, y) => {
+      for (let x = 0; x < row.length; x += 1) { // cells-ok — a column index
+        const c = row[x]!;
+        if (c === " " || c === "⠀") continue;
+        expect(on[y]?.[x]).toBe(c);
+      }
+    });
+  });
+
+  it("UB6 (§3e): the edges' ink follows the area, not the sample count", () => {
+    // The defect this row exists for was proportional to *n*: two edges over a
+    // 50-column area inked two cells at eight samples and twenty-four at a
+    // hundred, because a dot was set where a sample's column happened to satisfy
+    // the dash. Measured as the annotation's own contribution.
+    const edgeInk = (n: number): number =>
+      inked(framed(banded(n, {}, { fill: false }))) - inked(framed(bare(n))); // cells-ok
+    const eight = edgeInk(8);
+    const hundred = edgeInk(100);
+    expect(eight).toBeGreaterThan(20); // cells-ok — it was 2
+    // Within a factor of two across a 12× change in sample count: the edges are
+    // a property of the area now. A ratio, because the exact counts move with
+    // the curve's shape and the assertion is about what they depend on.
+    expect(eight / hundred).toBeGreaterThan(0.5);
+    expect(eight / hundred).toBeLessThan(2);
+  });
+
+  it("UB7 (C04 I52): a gap in an edge leaves that column unfilled", () => {
+    const base = [10, 20, 30, 40, 50];
+    const withGap = block({
+      kind: "plot", id: "ub", form: "line", height: 9, axes: false, yMin: 0, yMax: 60,
+      series: [{ label: "obs", values: base }],
+      annotations: [{
+        kind: "confidence",
+        upper: [20, 30, null, 50, 60] as unknown as readonly number[],
+        lower: [0, 10, 20, 30, 40],
+      }],
+    } as unknown as Plot) as Plot;
+    const rows = framed(withGap);
+    // The middle of the area has a column with no shade in it at all, and the
+    // ends do: an interpolant with one end missing draws nothing.
+    const columns = (x: number): number =>
+      rows.filter((r) => r[x] === SHADE).length; // cells-ok — a row count
+    expect(columns(1)).toBeGreaterThan(0); // cells-ok — a row count
+    expect(columns(24)).toBe(0); // cells-ok — the gap's column
+  });
+});
+
+describe("C04 I52 — the annotation check dispatches per kind", () => {
+  const plot = (annotations: readonly unknown[]): unknown => ({
+    kind: "plot", id: "p", form: "line", height: 5,
+    series: [{ values: [1, 2, 3] }], annotations,
+  });
+
+  it("UB8 (C04 I52): `confidence` and `whiskers` pass the validator", () => {
+    // Both were built by `FigureBuilder`, drawn by `annotate.ts`, and refused
+    // here — by a message naming a `value` neither kind has.
+    expect(validateBlock(plot([{ kind: "confidence", upper: [2, 3], lower: [0, 1] }])).ok).toBe(true);
+    expect(validateBlock(plot([{ kind: "whiskers", points: [{ x: 0, y: 1, err: 0.5 }] }])).ok).toBe(true);
+  });
+
+  it("UB9 (C04 I52): `line` and `band` are unchanged, including the order rule", () => {
+    expect(validateBlock(plot([{ kind: "line", value: 5 }])).ok).toBe(true);
+    expect(validateBlock(plot([{ kind: "band", from: 1, to: 5 }])).ok).toBe(true);
+    expect(validateBlock(plot([{ kind: "line" }])).ok).toBe(false);
+    expect(validateBlock(plot([{ kind: "band", from: 5, to: 1 }])).ok).toBe(false);
+  });
+
+  it("UB10 (C04 I52): an unknown kind is refused rather than checked as a `line`", () => {
+    // It used to take the `else` arm, be checked for a `value`, and then draw
+    // nothing: `edgesOf` reads `annotation.value` and `drawn` filters it.
+    const r = validateBlock(plot([{ kind: "wibble", value: 5 }]));
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r)).toContain("wibble");
+  });
+
+  it("UB11 (C04 I52, I46a): a confidence edge is a numeric array, and null is its gap", () => {
+    expect(validateBlock(plot([{ kind: "confidence", upper: [1, null, 3], lower: [0, 0, 0] }])).ok).toBe(true);
+    expect(validateBlock(plot([{ kind: "confidence", upper: [1, "x"], lower: [0, 0] }])).ok).toBe(false);
+    expect(validateBlock(plot([{ kind: "confidence", lower: [0, 0] }])).ok).toBe(false);
+  });
+
+  it("UB12 (C04 I52): a whisker's half-width is not negative", () => {
+    expect(validateBlock(plot([{ kind: "whiskers", points: [{ x: 0, y: 1, err: -1 }] }])).ok).toBe(false);
+    expect(validateBlock(plot([{ kind: "whiskers", points: [{ x: 0, y: 1 }] }])).ok).toBe(false);
+  });
+});

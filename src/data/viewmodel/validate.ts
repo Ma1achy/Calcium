@@ -17,6 +17,7 @@ import {
   ACTION_KINDS,
   SCHEMA,
   type Action,
+  type Annotation,
   type Block,
   type BlockKind,
   type DocumentStatus,
@@ -133,6 +134,93 @@ function isFiniteNumber(v: unknown): v is number {
  * series validation below it for every plot that carries no annotation, meaning
  * *almost all of them*. The shape reads as a cheap exit and is a deletion.
  */
+/**
+ * One edge, which is a **position** and so must be a number (C04 I52).
+ *
+ * A `null` sample is absence and has a spelling (I46a); a `NaN` threshold is a
+ * claim about nowhere, and `rowOf` would place it at the top of the plot — a
+ * line saying *the limit is here* about a value that is not a value.
+ */
+function requireEdge(a: Readonly<Record<string, unknown>>, key: string, e: string[], at: string): void {
+  if (isFiniteNumber(a[key])) return;
+  e.push(
+    `${at}: annotation "${key}" must be a finite number (C04 I52) — ` +
+      `an annotation is a claim about where a value sits, and there is no such place`,
+  );
+}
+
+type AnnotationCheck = (a: Readonly<Record<string, unknown>>, e: string[], at: string) => void;
+
+/**
+ * The edge check, **per kind and total over `Annotation["kind"]`** (C04 I52).
+ *
+ * **It was a ternary and it refused two of the four kinds outright.** The line
+ * read `a["kind"] === "band" ? ["from", "to"] : ["value"]`, so `confidence` and
+ * `whiskers` — built by `FigureBuilder`, drawn by `annotate.ts`, and carrying no
+ * `value` between them — were rejected at the boundary this function exists to
+ * be, by a message naming a member they do not have and citing the invariant
+ * that declares them. I52's own prose said *two kinds* while the type said four,
+ * so two records held one belief and neither could correct the other.
+ *
+ * **A third defect fell out of the same line**: every kind that is not `"band"`
+ * took the `else`, so `kind: "wibble"` was checked for a `value` and otherwise
+ * accepted — and `edgesOf` reads `annotation.value` for it, giving `undefined`,
+ * which `drawn` filters. An unknown kind drew nothing and said nothing.
+ *
+ * A record rather than a switch, because a record is checked in **both**
+ * directions: a fifth kind does not compile without a row, and a row naming a
+ * kind that does not exist does not compile either.
+ */
+const ANNOTATION_CHECKS: Readonly<Record<Annotation["kind"], AnnotationCheck>> = Object.freeze({
+  line: (a, e, at) => {
+    requireEdge(a, "value", e, at);
+  },
+  band: (a, e, at) => {
+    requireEdge(a, "from", e, at);
+    requireEdge(a, "to", e, at);
+    // **Ordered, because a band is a range and the renderer draws two edges
+    // either way.** Reversed it renders identically, so nothing downstream can
+    // notice — and a document that says `from: 85, to: 60` means something its
+    // author did not check.
+    const from = a["from"];
+    const to = a["to"];
+    if (isFiniteNumber(from) && isFiniteNumber(to) && from > to) {
+      e.push(`${at}: annotation band "from" (${String(from)}) is above "to" (${String(to)}) (C04 I52)`);
+    }
+  },
+  confidence: (a, e, at) => {
+    // Both edges are **required** and `requireFiniteNumbers` returns silently on
+    // `undefined`, which is right for an optional array and wrong here.
+    for (const key of ["upper", "lower"]) {
+      if (a[key] === undefined) {
+        e.push(`${at}: a "confidence" annotation requires "${key}" (C04 I52)`);
+        continue;
+      }
+      requireFiniteNumbers(a[key], e, at, `annotation ${key}`);
+    }
+  },
+  whiskers: (a, e, at) => {
+    const points = a["points"];
+    if (!isArray(points)) {
+      e.push(`${at}: a "whiskers" annotation requires "points" to be an array (C04 I52)`);
+      return;
+    }
+    for (const [i, p] of points.entries()) {
+      if (!isRecord(p)) {
+        e.push(`${at}: annotation points[${String(i)}] must be an object with x, y and err (C04 I52)`);
+        continue;
+      }
+      // `err` is a half-width and negative is not a smaller bar, it is a
+      // reversed one — `y - err` above `y + err`, drawn either way.
+      for (const key of ["x", "y", "err"]) requireEdge(p, key, e, `${at}: annotation points[${String(i)}]`);
+      const err = p["err"];
+      if (isFiniteNumber(err) && err < 0) {
+        e.push(`${at}: annotation points[${String(i)}] "err" is negative (${String(err)}) (C04 I52)`);
+      }
+    }
+  },
+});
+
 function checkAnnotations(annotations: unknown, e: string[], at: string): void {
   if (annotations === undefined) return;
   if (!isArray(annotations)) {
@@ -140,29 +228,16 @@ function checkAnnotations(annotations: unknown, e: string[], at: string): void {
     return;
   }
   for (const a of annotations) {
-      if (!isRecord(a)) continue;
-      // **Every edge finite, because an edge is a *position*.** A `null` sample
-      // is absence and has a spelling (I46a); a `NaN` threshold is a claim about
-      // nowhere, and `rowOf` would place it at the top of the plot — a line
-      // saying *the limit is here* about a value that is not a value.
-      const edges = a["kind"] === "band" ? ["from", "to"] : ["value"];
-      for (const key of edges) {
-        if (!isFiniteNumber(a[key])) {
-          e.push(
-            `${at}: annotation "${key}" must be a finite number (C04 I52) — ` +
-              `an annotation is a claim about where a value sits, and there is no such place`,
-          );
-        }
-      }
-      if (a["kind"] === "band" && isFiniteNumber(a["from"]) && isFiniteNumber(a["to"])) {
-        // **Ordered, because a band is a range and the renderer draws two edges
-        // either way.** Reversed it renders identically, so nothing downstream
-        // can notice — and a document that says `from: 85, to: 60` means
-        // something its author did not check.
-        if (a["from"] > a["to"]) {
-          e.push(`${at}: annotation band "from" (${String(a["from"])}) is above "to" (${String(a["to"])}) (C04 I52)`);
-        }
-      }
+    if (!isRecord(a)) continue;
+    const check = ANNOTATION_CHECKS[a["kind"] as Annotation["kind"]] as AnnotationCheck | undefined;
+    if (check === undefined) {
+      e.push(
+        `${at}: annotation "kind" is ${JSON.stringify(a["kind"])}, which is not one of ` +
+          `${Object.keys(ANNOTATION_CHECKS).join(", ")} (C04 I52)`,
+      );
+      continue;
+    }
+    check(a, e, at);
   }
 }
 

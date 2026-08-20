@@ -22,6 +22,7 @@ import type { Annotation } from "../../data/viewmodel/index.js";
 import type { Range } from "./scale.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { BRAILLE_DOTS, createGrid, foldBraille, setDot } from "./raster.js";
+import { isBlank } from "./curve.js";
 import { rowOf } from "./scale.js";
 
 /**
@@ -80,7 +81,7 @@ export function annotationRows(
   const h = Math.max(1, Math.floor(areaRows));
 
   if (annotation.kind === "confidence") {
-    return confidenceRows(annotation.upper, annotation.lower, range, w, h, caps);
+    return confidenceRows(annotation, range, w, h, caps);
   }
   if (annotation.kind === "whiskers") {
     return whiskersRows(annotation.points, range, w, h, caps);
@@ -102,49 +103,178 @@ export function annotationRows(
   return foldBraille(grid);
 }
 
-function confidenceRows(
+/**
+ * The shade a confidence band's interior is filled with, or `null` (C12 §3e).
+ *
+ * **One arm of three has a vocabulary and the other two are stated rather than
+ * left to a fallback.** The fill must not be the curve's own alphabet — that is
+ * the surviving half of C04 I52's refusal, *indistinguishable from the curve at
+ * one bit* — and the curve is braille on every unicode terminal (`curve.ts`:
+ * *braille is narrow on both kinds*) and `RAMP_ASCII` below that.
+ *
+ * | unicode | ambiguousWidth | the fill |
+ * |---|---|---|
+ * | `full` / `bmp` | `narrow` | `░` U+2591 — a block element, neither alphabet |
+ * | `full` / `bmp` | `wide` | **none** — `cells("░", "wide")` is 2, and the tree's only narrow substitutes are braille |
+ * | `ascii` | any | **none** — the ramp *is* the curve's, and `-` is the edge's own dash |
+ *
+ * Where this returns `null` the two dashed edges carry the band, which is the
+ * frame that shipped before the fill existed: C12 I25's substitution ladder at
+ * its bottom rung rather than a member with no arm.
+ */
+function shadeFor(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): string | null {
+  if (caps.unicode === "ascii") return null;
+  if (caps.ambiguousWidth === "wide") return null;
+  return "\u2591";
+}
+
+/**
+ * The interior, one cell column at a time, **clamped where the edge is dropped**.
+ *
+ * C04 I52 drops an out-of-range *edge* because a threshold moved onto a scale it
+ * is outside says *the limit is here* about a place the limit is not. The
+ * interior says *the region covers here*, which stays true of every visible cell
+ * whatever the edge does — so a band whose upper edge is above the ceiling fills
+ * to the top row and draws no upper edge. Reading the two as one rule gives a
+ * dashed lower edge with no fill above it, which reads as *the band ended*.
+ *
+ * **Sampled by inverse mapping rather than by the edges' forward one.** The
+ * edges place sample *i* at column `round(i/(n−1)·(w−1))`, which leaves columns
+ * empty when there are fewer samples than cells; an interior with holes in it is
+ * not an interior. So each column asks which samples straddle it and
+ * interpolates — `fill_between`'s own reading.
+ */
+function fillRows(
   upper: readonly number[],
   lower: readonly number[],
   range: Range,
   w: number,
   h: number,
+  shade: string,
+): readonly string[] {
+  const n = Math.min(upper.length, lower.length); // cells-ok — a sample count
+  const grid: string[][] = Array.from({ length: h }, () => new Array<string>(w).fill(" ")); // cells-ok
+  if (n === 0) return grid.map((r) => r.join("")); // cells-ok — a sample count
+
+  for (let x = 0; x < w; x += 1) { // cells-ok — a column index
+    // A single sample has no span to interpolate across, so it covers the whole
+    // width: one reading of an interval is still an interval.
+    const t = w === 1 ? 0 : x / (w - 1); // cells-ok — a column index
+    const u = edgeAt(upper, t);
+    const l = edgeAt(lower, t);
+    if (u === null || l === null) continue;
+
+    // `rowOf` clamps to the grid, so an edge off the scale lands on the nearest
+    // row rather than outside the loop — which is the clamp this doc argues for.
+    const a = rowOf(Math.max(u, l), range, h);
+    const b = rowOf(Math.min(u, l), range, h);
+    for (let y = a; y <= b; y += 1) grid[y]![x] = shade; // cells-ok — a row index
+  }
+  return grid.map((r) => r.join("")); // cells-ok — a row of cells
+}
+
+/**
+ * An edge's value at a fractional position along it, or `null` across a gap.
+ *
+ * **The inverse of the placement the edges used to use, and it is what both the
+ * edge and the interior now walk.** The forward mapping puts sample *i* at
+ * column `round(i/(n−1)·(w−1))` and leaves the columns between two samples with
+ * no value at all, which is fine for a dot and wrong for a line and wrong for an
+ * area. Asking each column which samples straddle it answers for every column.
+ *
+ * `null` where either neighbour is a gap (C04 I46a) — a segment with one end
+ * missing has no interpolant, and inventing one draws data nobody sent.
+ */
+function edgeAt(values: readonly number[], t: number): number | null {
+  const n = values.length; // cells-ok — a sample count
+  if (n === 0) return null; // cells-ok — a sample count
+  const only = values[0];
+  if (n === 1) return only !== undefined && Number.isFinite(only) ? only : null; // cells-ok
+
+  const pos = Math.min(n - 1, Math.max(0, t * (n - 1))); // cells-ok — a sample index
+  const i0 = Math.min(n - 1, Math.floor(pos)); // cells-ok — a sample index
+  const a = values[i0];
+  const b = values[Math.min(n - 1, i0 + 1)]; // cells-ok — a sample index
+  if (a === undefined || b === undefined) return null;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return a + (b - a) * (pos - i0);
+}
+
+/**
+ * The braille edges over the shade, cell by cell — the edge wins its own cell.
+ *
+ * **`isBlank` and not a space test**, which is the defect this comment is
+ * standing on. `foldBraille` folds an empty cell to `⠀` U+2800 rather than to a
+ * space, so `cell !== " "` reads every cell of an untouched grid as inked and
+ * the fill never draws — a fill that renders nothing while every count agrees.
+ * The reader already exists in `curve.ts` and covers all three spellings; a
+ * second one written here would have carried the wrong premise with it.
+ *
+ * **An unfilled cell keeps the edge's own byte**, so `fill: false` and the two
+ * capability arms with no shade produce rows identical to the ones that shipped
+ * before this existed, rather than rows that merely render the same.
+ */
+function overlay(edges: readonly string[], fill: readonly string[], w: number): readonly string[] {
+  return edges.map((edge, y) => {
+    const row = fill[y] ?? "";
+    let out = "";
+    for (let x = 0; x < w; x += 1) { // cells-ok — a column index
+      const e = edge[x] ?? " ";
+      const f = row[x] ?? " ";
+      out += isBlank(e) && f !== " " ? f : e;
+    }
+    return out;
+  });
+}
+
+function confidenceRows(
+  annotation: Extract<Annotation, { kind: "confidence" }>,
+  range: Range,
+  w: number,
+  h: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): readonly string[] {
+  const { upper, lower } = annotation;
+  const shade = shadeFor(caps);
+  // **Defaults on** (C04 I52): `fill_between` is the figure a caller arrives
+  // expecting, and `fill: false` keeps the two-edge frame byte for byte.
+  const fill = (annotation.fill ?? true) && shade !== null
+    ? fillRows(upper, lower, range, w, h, shade)
+    : null;
+
   if (caps.unicode === "ascii") {
-    const grid: string[][] = Array.from({ length: h }, () => new Array(w).fill(" "));
-    const n = Math.max(upper.length, lower.length); // cells-ok — a sample count
-    for (let i = 0; i < n; i++) {
-      const col = n <= 1 ? Math.floor(w / 2) : Math.round((i / (n - 1)) * (w - 1));
-      if (col < 0 || col >= w) continue;
-      const u = upper[i];
-      const l = lower[i];
-      if (u !== undefined && Number.isFinite(u) && drawn(u, range)) {
-        const row = rowOf(u, range, h);
-        if (row >= 0 && row < h && col % DASH_CELLS === 0) grid[row]![col] = "-";
-      }
-      if (l !== undefined && Number.isFinite(l) && drawn(l, range)) {
-        const row = rowOf(l, range, h);
-        if (row >= 0 && row < h && col % DASH_CELLS === 0) grid[row]![col] = "-";
+    const grid: string[][] = Array.from({ length: h }, () => new Array<string>(w).fill(" ")); // cells-ok
+    // **The dash steps the columns; it does not filter the samples.** Stepping
+    // by `DASH_CELLS` inks every step, which is what `line` and `band` do one
+    // branch up. Testing a sample's own column against the dash inked seven
+    // cells whatever the sample count (C12 §3e).
+    for (let x = 0; x < w; x += DASH_CELLS) { // cells-ok — a column index
+      const t = w === 1 ? 0 : x / (w - 1); // cells-ok — a column index
+      for (const v of [edgeAt(upper, t), edgeAt(lower, t)]) {
+        if (v === null || !drawn(v, range)) continue;
+        const row = rowOf(v, range, h);
+        if (row >= 0 && row < h) grid[row]![x] = "-"; // cells-ok — a row index
       }
     }
     return grid.map((r) => r.join(""));
   }
 
   const grid = createGrid(w * BRAILLE_DOTS.x, h * BRAILLE_DOTS.y);
-  const n = Math.max(upper.length, lower.length); // cells-ok — a sample count
-  for (let i = 0; i < n; i++) {
-    const dotCol = n <= 1 ? Math.floor(grid.dotWidth / 2) : Math.round((i / (n - 1)) * (grid.dotWidth - 1));
-    if (dotCol < 0 || dotCol >= grid.dotWidth) continue;
-    const u = upper[i];
-    const l = lower[i];
-    if (u !== undefined && Number.isFinite(u) && drawn(u, range) && dotCol % (DASH_CELLS * BRAILLE_DOTS.x) === 0) {
-      setDot(grid, dotCol, rowOf(u, range, grid.dotHeight));
-    }
-    if (l !== undefined && Number.isFinite(l) && drawn(l, range) && dotCol % (DASH_CELLS * BRAILLE_DOTS.x) === 0) {
-      setDot(grid, dotCol, rowOf(l, range, grid.dotHeight));
+  // The same loop as the `line` edge two functions up — `x += DASH_CELLS *
+  // dots.x`, every step inked — with the row varying instead of held.
+  const span = Math.max(1, grid.dotWidth - 1); // cells-ok — a dot column
+  for (let dotCol = 0; dotCol < grid.dotWidth; dotCol += DASH_CELLS * BRAILLE_DOTS.x) { // cells-ok
+    const t = dotCol / span; // cells-ok — a dot column
+    for (const v of [edgeAt(upper, t), edgeAt(lower, t)]) {
+      if (v === null || !drawn(v, range)) continue;
+      setDot(grid, dotCol, rowOf(v, range, grid.dotHeight));
     }
   }
-  return foldBraille(grid);
+  const edges = foldBraille(grid);
+  // The edge wins its own cell inside this layer, and the *curve* wins it
+  // outside — `mergedRow` takes the first layer that inked a cell and the
+  // annotation is last (C12 §3e, §3u).
+  return fill === null ? edges : overlay(edges, fill, w);
 }
 
 function whiskersRows(
