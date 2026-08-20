@@ -675,6 +675,73 @@ them.
 | region — a highlighted x-range | no consumer; the x-axis is three declared strings (§3d), so there is nothing to place it against |
 | event mark | the same, plus a tick on the x-axis rule, which is furniture rather than raster |
 
+### Two kinds shipped without a spec, and one gate refuses them
+
+**The table above lists what is not built and is missing the two that are.** `Annotation` has
+**four** members — `line`, `band`, `confidence` and `whiskers`. C04 I52 enumerated two.
+`FigureBuilder` constructs all four, `annotate.ts` renders all four through `confidenceRows` and
+`whiskersRows`, and no line of either spec said what they draw or why they exist. They arrived
+with a renderer and without a ruling, which is §3q's shape arriving on a **type** rather than on
+a section.
+
+**The enumeration was load-bearing, and the validator held the same belief.** `checkAnnotations`
+reads
+
+```
+const edges = a["kind"] === "band" ? ["from", "to"] : ["value"];
+```
+
+so every kind that is not `band` must carry a finite `value` — and `confidence` carries `upper`
+and `lower`, `whiskers` carries `points`. Measured at both gates, on a block each builder method
+produces:
+
+| kind | builder | validator |
+|---|---|---|
+| `line` | ok | ok |
+| `band` | ok | ok |
+| `confidence` | ok | **refused** — *annotation "value" must be a finite number (C04 I52)* |
+| `whiskers` | ok | **refused** — the same message |
+
+**A block the builder makes and the renderer draws cannot cross the boundary C04 exists for**, and
+it is refused by a message naming a member it does not have, citing the invariant whose
+enumeration is the thing that is wrong. **Two records of one belief, and neither could correct the
+other** — the prose said *two kinds* and the `else` branch assumed *every kind has a value*, so
+each read as confirmation of the other.
+
+**Why nothing caught it, and it is the awkward answer.** An app calling `b.figure().confidence(…)`
+builds in process and renders; `validateBlock` is on the path a *document* takes. So the defect is
+invisible to every local consumer and fires only on the wire — the reader who sees this refusal is
+the one who did nothing wrong, which is `ask-who-sees-the-refusal` pointing the other way from
+usual.
+
+Ruled: **the edge check dispatches per kind and is total over `Annotation["kind"]`**, so a fifth
+member does not compile without a row. A `switch` rather than a ternary, for the reason every
+total record in this component exists.
+
+### How a band is filled, and the alphabet is the whole ruling
+
+C04 I52's refusal of the fill is half reversed and the surviving half decides the drawing:
+
+| | draws | why |
+|---|---|---|
+| the two edges | dashed, unchanged | F34 — the mark carries it and the tone does not |
+| the interior | the density ladder's **low rung**: `░` at unicode, `.` at ASCII | a *different alphabet* from the curve, which is what the refusal was right about |
+| at 1-bit | both, and they are still told apart | because the alphabets differ — asserted, never assumed |
+
+**Braille is the one thing the fill must not be**, and it is the obvious choice: the request that
+prompted this proposed it by name. A braille fill under a braille curve is one alphabet in one
+cell, which is precisely *indistinguishable from the curve at one bit*. The original refusal named
+the right mechanism and drew the wrong conclusion from it, so only one half reverses.
+
+**Layered as a `surface`**, which is what answers the other half. §3u's `Layer.kind` ranks
+`surface` below `curve`, so a curve draws over its own band with no rule about which wins — the
+contest the refusal assumed unresolvable has had an owner since §3u was written, and that is the
+whole of what changed.
+
+**`fill` defaults on.** A band drawn as two unconnected dashed lines is the reading a caller has to
+be told to want; matplotlib's `fill_between` is the one they arrive expecting. `fill: false` keeps
+the old frame byte-identical, which is what makes the default safe to move.
+
 **And there is no `label`, which is owed rather than forgotten.** The survey names one and it has
 nowhere to go: the gutter is sized from the y-labels and is a **scale**, so widening it for a
 string that is not one changes the plot area for text nothing measures with it; inside the area a
