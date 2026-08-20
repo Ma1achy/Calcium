@@ -73,7 +73,7 @@ describe("LM2 (C12 I40): the disc is fully covered whatever the segment count", 
   }
 });
 
-describe("LM3 (C12 I44): a radar's cells each belong to one layer", () => {
+describe("LM3 (C12 I44): a radar's cells hold one layer, or the layers that share them", () => {
   // **The first form of this row passed against the defect**, which is what
   // the row is here to catch: *the composed figure inks at least as many cells
   // as one polygon over the same frame* is true while the frame is being eaten,
@@ -123,6 +123,15 @@ describe("LM3 (C12 I44): a radar's cells each belong to one layer", () => {
     const composed = kit().renderToLines(RADAR, 80).map(plain);
     const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
     const layers = [...rendered.polygons, rendered.frame];
+    // **A cell two polygons share is `tone.muted` and holds both** (C12 I44),
+    // so containment against one layer is the wrong claim there — but only
+    // there. The escape is the union of the **peers**, not of every layer: a
+    // union that includes the frame is F199 again, and an escape spelled
+    // `layers.reduce(…)` waves it through, which is what the first form of this
+    // row did. Measured by fabricating it: every layer unioning left all
+    // fifteen rows green.
+    const peerUnion = (r: number, x: number): number =>
+      rendered.polygons.reduce((m, l) => m | bits([...(l[r] ?? "")][x] ?? " "), 0); // cells-ok — a cell column
     // **The figure's own columns, taken from the figure.** The legend's swatch
     // is braille too and belongs to no layer `radarRender` returns, so an
     // unbounded scan reports four cells at c72–73 that are not the subject —
@@ -136,10 +145,74 @@ describe("LM3 (C12 I44): a radar's cells each belong to one layer", () => {
         if (drawn === 0) return;
         // Some one layer must account for every dot in the cell.
         const owned = layers.some((l) => (bits([...(l[r] ?? "")][x] ?? " ") & drawn) === drawn);
-        if (!owned) foreign.push(`r${String(r)}c${String(x)} ${ch}`);
+        if (!owned && (drawn & peerUnion(r, x)) !== drawn) foreign.push(`r${String(r)}c${String(x)} ${ch}`);
       });
     });
     expect(foreign).toEqual([]);
+  });
+});
+
+describe("LM3b (C12 I44): context never tints a cell it does not own", () => {
+  // **The rule has three arms and two rows caught two of them.** Letting every
+  // layer union again is the third: the radar's frame joins a polygon's cell,
+  // the cell holds two `"curve"`s by that reading and goes `tone.muted`, and the
+  // polygon comes out as coloured fragments separated by grey. Both plain-text
+  // rows pass — the dots are all there and each cell's dots are some union.
+  //
+  // A `"context"` layer must not reach a cell's tone at all. Stated over the
+  // cells exactly one polygon owns, which is where it would show.
+  const CATS = ["Speed", "Power", "Range", "Defence", "HP"];
+  const SERIES = [
+    { values: [8, 6, 7, 5, 9], label: "alpha" },
+    { values: [5, 9, 4, 8, 6], label: "beta" },
+  ];
+  const RADAR = block({
+    kind: "plot", id: "lm3b", form: "radar", height: 17, categories: CATS, series: SERIES,
+  });
+
+  it("a cell only one polygon inks wears that polygon's slot", () => {
+    const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
+    const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS);
+    const composed = kit().renderToLines(RADAR, 80).map((l) => {
+      const out: { ch: string; slot: string }[] = [];
+      let slot = "";
+      for (const part of l.split(/\x1b\[/u)) {
+        const m = /^38;2;(\d+;\d+;\d+)m/u.exec(part);
+        if (m) slot = m[1]!;
+        for (const ch of m ? part.slice(m[0].length) : part.replace(/^[0-9;]*m/u, "")) out.push({ ch, slot });
+      }
+      return out;
+    });
+
+    // Each polygon's slot, tallied over the cells only it inks — the same
+    // derivation LM6 needs, and for the same reason: scraping every SGR out of
+    // a frame also collects the muted one, which is the answer under test.
+    const sole = (r: number, x: number): number | null => {
+      const own = rendered.polygons
+        .map((pg, i) => [i, bits([...(pg[r] ?? "")][x] ?? " ")] as const)
+        .filter(([, b]) => b !== 0);
+      return own.length === 1 ? own[0]![0] : null;
+    };
+    const tally = rendered.polygons.map(() => new Map<string, number>());
+    composed.forEach((row, r) => {
+      row.forEach((cell, x) => {
+        const k = sole(r, x);
+        if (k === null || cell.slot === "" || bits(cell.ch) === 0) return;
+        tally[k]!.set(cell.slot, (tally[k]!.get(cell.slot) ?? 0) + 1); // cells-ok — a cell count
+      });
+    });
+    const slots = tally.map((t) => [...t].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "");
+    expect(new Set(slots).size).toBe(2); // cells-ok — a polygon count
+
+    const tinted: string[] = [];
+    composed.forEach((row, r) => {
+      row.forEach((cell, x) => {
+        const k = sole(r, x);
+        if (k === null || bits(cell.ch) === 0) return;
+        if (cell.slot !== slots[k]) tinted.push(`r${String(r)}c${String(x)} ${cell.slot}`);
+      });
+    });
+    expect(tinted).toEqual([]);
   });
 });
 
@@ -215,25 +288,84 @@ describe("LM6 (C12 I44): curves occlude and surfaces union, on real figures", ()
   const slopeBlock = (series: readonly { values: readonly (number | null)[]; label: string }[]) =>
     block({ kind: "plot", id: "lm6", form: "slope", height: 10, axes: true, series, ...PIN });
 
-  it("no cell of a slope chart draws another series' ink", () => {
+  // **Both failures, as the two rows.** Occluding a peer and mistinting one are
+  // opposite errors and a suite that asserts only one licenses the other: the
+  // first form of this row asserted *no cell draws another series' ink*, which
+  // deleting the other series satisfies perfectly (C12 I44).
+  const cellsOf = (line: string): { ch: string; slot: string }[] => {
+    const out: { ch: string; slot: string }[] = [];
+    let slot = "";
+    for (const part of line.split(/\x1b\[/u)) {
+      const m = /^38;2;(\d+;\d+;\d+)m/u.exec(part);
+      if (m) slot = m[1]!;
+      for (const ch of m ? part.slice(m[0].length) : part.replace(/^[0-9;]*m/u, "")) out.push({ ch, slot });
+    }
+    return out;
+  };
+  const aloneRows = (k: number): readonly string[] =>
+    kit().renderToLines(
+      slopeBlock(SLOPE.map((sr, j) => (j === k ? sr : { ...sr, values: sr.values.map(() => null) }))),
+      80,
+    ).map(plain);
+
+  it("nothing is deleted — every dot a series draws alone is drawn in the composed frame", () => {
     const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
     const composed = kit().renderToLines(slopeBlock(SLOPE), 80).map(plain);
-    const alone = SLOPE.map((_s, k) =>
+    const lost: string[] = [];
+    SLOPE.forEach((sr, k) => {
+      aloneRows(k).forEach((row, r) => {
+        [...row].forEach((ch, x) => {
+          const mine = bits(ch);
+          if (mine === 0) return;
+          const drawn = bits([...(composed[r] ?? "")][x] ?? " ");
+          if ((drawn & mine) !== mine) lost.push(`${sr.label} r${String(r)}c${String(x)}`);
+        });
+      });
+    });
+    expect(lost).toEqual([]);
+  });
+
+  it("nothing is mistinted — a cell wearing a series' slot holds only that series' ink", () => {
+    const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
+    const composed = kit().renderToLines(slopeBlock(SLOPE), 80).map(cellsOf);
+    const alone = SLOPE.map((_s, k) => aloneRows(k));
+    // **The slot each series wears, taken from the cells it inks.** Scraping
+    // every SGR out of an alone render also collects the axis's muted slot, and
+    // the muted slot is the one a contested cell wears — so every row passed by
+    // naming the answer as one of the series' own.
+    const slotOfSeries = SLOPE.map((_s, k) => {
+      const tally = new Map<string, number>();
       kit().renderToLines(
         slopeBlock(SLOPE.map((sr, j) => (j === k ? sr : { ...sr, values: sr.values.map(() => null) }))),
         80,
-      ).map(plain));
+      ).map(cellsOf).forEach((row) => {
+        for (const c of row) {
+          if (!isBraille(c.ch) || bits(c.ch) === 0 || c.slot === "") continue;
+          tally.set(c.slot, (tally.get(c.slot) ?? 0) + 1); // cells-ok — a cell count
+        }
+      });
+      return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+    });
+    // Three series, three distinct slots — a fixture where two shared one would
+    // make the row below unfalsifiable.
+    expect(new Set(slotOfSeries).size).toBe(3); // cells-ok — a series count
 
-    const foreign: string[] = [];
+    const bled: string[] = [];
     composed.forEach((row, r) => {
-      [...row].forEach((ch, x) => {
-        const drawn = bits(ch);
-        if (drawn === 0) return;
-        const owned = alone.some((a) => (bits([...(a[r] ?? "")][x] ?? " ") & drawn) === drawn);
-        if (!owned) foreign.push(`r${String(r)}c${String(x)} ${ch}`);
+      row.forEach((cell, x) => {
+        const drawn = bits(cell.ch);
+        if (drawn === 0 || cell.slot === "") return;
+        // Which series claim ink here?
+        const owners = alone
+          .map((a, k) => [k, bits([...(a[r] ?? "")][x] ?? " ")] as const)
+          .filter(([, b]) => b !== 0);
+        if (owners.length < 2) return;
+        // Contested: the cell must name none of them (C12 I44, §3r's precedent).
+        const named = owners.some(([k]) => slotOfSeries[k] === cell.slot);
+        if (named) bled.push(`r${String(r)}c${String(x)} ${cell.slot}`);
       });
     });
-    expect(foreign).toEqual([]);
+    expect(bled).toEqual([]);
   });
 
   it("the fixture responds: the three series do share cells", () => {

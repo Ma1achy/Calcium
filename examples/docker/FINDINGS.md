@@ -9934,17 +9934,26 @@ carried the defect. *Stating a limit is not the same as measuring it.*
 against a pinned range and compare cell by cell — and a fabricated violation on each arm of the
 partition. Six mutations caught on the merge, four on the quadrant figure.
 
-## F200 — the golden corpus held the bleed in plain sight, twice ★★★
+## F200 — a golden frame is evidence about geometry and silent about identity ★★★
 
 `slope · full · 80` has sat in the corpus containing `⠭⠭⠝⠛⠛⠛⠛⠛⠛⠓` — a run of six- and
 seven-dot cells through the middle of a chart whose three curves are one and two dots thick
-everywhere else. `radar · full · 80` has `⣯`, `⠿`, `⣤`, `⡷` in a figure of thin strokes. Both
-are F199 drawn as text, both were readable without any tooling, and both went past review and
-commit.
+everywhere else. `radar · full · 80` has `⣯`, `⠿`, `⣤`, `⡷` in a figure of thin strokes.
 
-**This is the third instance of `-u` writing a record rather than checking one**, and the first
-where the defect was legible in the snapshot itself rather than needing a second frame to compare
-against. The corpus is not weak evidence — it caught F193's regression when the mutation pass
+**Half of that is retracted, by the instrument that filed it.** F203's amendment restores the
+dense run — the peers union again — and `⠭⠭⠝⠛⠛⠛⠛⠛⠛⠓` is now the **correct** frame. So the
+slope's glyphs were never evidence of the defect: they say *these cells hold more than one
+layer*, which is true before and after, and whether that is a lie is a fact about **colour**
+that a plain snapshot does not record. What was legible was a proxy for the defect and not the
+defect.
+
+The radar half stands — its frame's dots genuinely moved, and a glyph diff can see that.
+
+**This is the third instance of `-u` writing a record rather than checking one.** It read at
+first as the one where the defect was legible in the snapshot itself; it is not, and the
+correction is the more useful half — *assert the artefact, not a proxy*, arriving in the
+corpus. A golden frame records glyphs, so it is evidence about geometry and silent about
+identity, and a defect whose whole content is **which colour** is outside what it can hold. The corpus is not weak evidence — it caught F193's regression when the mutation pass
 structurally could not. It is that **a diff is read and a file is not**: the rows were correct on
 the day they were written, and nothing re-reads a green snapshot.
 
@@ -9988,4 +9997,50 @@ so a caller has something to call.
 tail brace balanced; both held, and the slice it cut discarded a function and its fourteen-line
 comment. *Reading the diff of a mechanical rewrite* is what caught it, one instrument along from
 the one that was supposed to.
+
+## F203 — the fix for a bleed was a deletion, and the third answer was available all along ★★★★★
+
+F199 replaced the union with occlusion and the reader's next words were *now the lines don't
+render where the bleeding was happening* — and, plainly: *you didn't fix it, you just deleted the
+parts that were broken.* Correct on both counts.
+
+**The measurement that let it through was too lenient by one word.** The probe asked whether a
+series' dots appear in the composed frame, and counted a dot as *shown* when it was drawn in
+**another series' colour** — so it reported south losing 5 columns of 67 and east 8, and the
+picture showed blue and green absent through the whole crossing. *An instrument that conflates
+presence-of-ink with presence-of-this-series cannot measure either failure.*
+
+**Four candidate rules, rendered and looked at rather than argued about:**
+
+| | ink | tone | what it looks like |
+|---|---|---|---|
+| union, first wins | complete | series 0 | the reported bleed — blue and green *become* orange |
+| union, tone by dot majority | complete | the denser | the same picture; orange is denser where it rises through a flat line |
+| occlude | **deleted** | correct | blue and green vanish through the crossing |
+| **union, neutral tone** | complete | **neither** | three lines converge into a grey braid and separate |
+
+**There was a third answer to *which series is this?* and it is *several*.** A `Span` carries one
+`ColourRef` and that was read as *it must name a series*. `tone.muted` names none, and the
+precedent was one section away the whole time: §3r's doji is muted rather than green **because
+the categories do not apply**. A cell holding two series is that same fact one form along.
+
+Measured on `slope-default`: **0 dots deleted, 0 dots drawn in another series' colour, 11 cells
+naming neither.**
+
+**And the neutral is wrong for a surface, which only the picture said.** Applied to a pie it does
+not draw a border — at ten segments the small wedges contest cells with *both* neighbours and a
+whole sector of `pie-many-segments` comes out grey. So the partition is three-way, not two:
+`"surface"` unions and keeps a wedge's tone, `"curve"` unions and goes neutral, `"context"` is
+occluded by whatever is in front. *The partition of a disc is arbitrary; the partition between
+two series is the reading.*
+
+**The suite licensed the deletion.** `LM6` asserted *no cell draws another series' ink*, which
+deleting the other series satisfies perfectly — one of two opposite failures asserted, and the
+other one free. The rows are now the two failures by name: **nothing is deleted** and **nothing
+is mistinted**, and a fabrication of each of the three wrong rules fails a different one.
+
+*And `LM3`'s escape was written too wide in the same sitting*: allowing a cell whose dots are the
+union of **any** layers waves through the frame joining a polygon, which is F199 again. Scoped to
+the peers, and shown to fail by fabricating it — with every layer unioning, all fifteen rows had
+been green.
 

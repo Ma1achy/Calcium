@@ -15,7 +15,9 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const DEFN = "src/presentation/plot/definition.ts";
 /** The guard the whole partition hangs on — spelled once (C12 I44). */
-const GUARD = '      if (dots === null || cellKind !== "surface" || layer.kind !== "surface") continue;';
+const GUARD = '      if (dots === null || cellKind !== layer.kind) continue;';
+/** The tone half of the same rule — two peers name neither of themselves. */
+const NEUTRAL = '      if (layer.kind === "curve") cellRef = "tone.muted";';
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -73,10 +75,10 @@ const results = runPass({
     {
       name: "the labels are composited under the polygons rather than over them",
       file: DEFN,
-      from: '      { glyphRows: radar.labels, ref: "tone.muted", kind: "curve" },\n'
+      from: '      { glyphRows: radar.labels, ref: "tone.muted", kind: "label" },\n'
         + '      ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i), kind: "curve" as const })),',
       to: '      ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i), kind: "curve" as const })),\n'
-        + '      { glyphRows: radar.labels, ref: "tone.muted", kind: "curve" },',
+        + '      { glyphRows: radar.labels, ref: "tone.muted", kind: "label" },',
       expect: "LM4",
     },
     {
@@ -90,20 +92,57 @@ const results = runPass({
     },
     {
       // **The ruling, inverted: every layer unions.** This is I40 as it shipped
-      // and read as correct for three commits — the pie's seams closed, and a
-      // curve's ink drawn in another curve's colour by the hundred (C12 I44).
-      name: "curves union with each other, as the pie's wedges do",
+      // and read as correct for three commits, and its surviving form is a
+      // `"context"` layer's dots drawn in a series' colour (C12 I44).
+      name: "every layer unions, context included",
       file: DEFN,
       from: GUARD,
       to: "      if (dots === null) continue;",
       expect: "LM3",
     },
     {
-      // The other half. A pie whose wedges occlude is the seam report again.
+      // **The other half of the same arm.** Peers occluding is what shipped
+      // between F199 and I44's amendment: nothing mistinted, and blue and green
+      // deleted through the crossing that is a slope chart's whole content.
+      name: "two peers occlude instead of unioning",
+      file: DEFN,
+      from: GUARD,
+      to: '      if (dots === null || cellKind !== layer.kind || layer.kind === "curve") continue;',
+      expect: "LM6",
+    },
+    {
+      // **The tone.** Peers union and the first one names the cell — which is
+      // the report the amendment came from, *the orange bleeds onto the blue
+      // and green lines*.
+      name: "the first peer names a cell two of them share",
+      file: DEFN,
+      from: NEUTRAL,
+      to: "",
+      expect: "LM6",
+    },
+    {
+      // And the converse: a wedge boundary greying. At ten segments the small
+      // wedges contest cells with both neighbours and a whole sector goes grey.
+      name: "a surface boundary names neither wedge",
+      file: DEFN,
+      from: NEUTRAL,
+      to: '      cellRef = "tone.muted";',
+      expect: "LM5",
+    },
+    // **Renaming every wedge to one other kind is an identity, and measuring is
+    // what says so.** The merge asks whether two layers share a kind, and a
+    // pie's fills are the only layers in their stack — so `"surface"` to
+    // `"context"` throughout leaves them peers and changes nothing but a word.
+    // The row survived, read as a gap in LM1, and is not one. *Recorded rather
+    // than deleted, because the next reader will reach for the same edit.*
+    //
+    // Making them differ *from each other* is what occludes them, and adjacent
+    // wedges are the pair that has to meet.
+    {
       name: "the pie's wedges occlude instead of unioning",
       file: DEFN,
       from: '      ref: categoryRef(pl.segmentIndex),\n      kind: "surface" as const,',
-      to: '      ref: categoryRef(pl.segmentIndex),\n      kind: "curve" as const,',
+      to: '      ref: categoryRef(pl.segmentIndex),\n      kind: (pl.segmentIndex % 2 === 0 ? "surface" : "context") as "surface" | "context",',
       expect: "LM1",
     },
   ],

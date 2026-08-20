@@ -128,22 +128,36 @@ type Layer = Readonly<{
   ref: ColourRef;
   /**
    * **What the layer is**, which decides what happens where two of them ink one
-   * cell (C12 I44).
+   * cell (C12 I44). Required rather than defaulted, so a ninth layer says.
+   *
+   * | | ink | tone |
+   * |---|---|---|
+   * | two `"surface"`s | union | the topmost's |
+   * | two `"curve"`s | union | **neutral** |
+   * | anything else | the topmost's — **occlude** | the topmost's |
    *
    * A `"surface"` is part of one filled figure — a pie's wedges, a stack's
-   * bands. The partition is arbitrary and the ink is not, so surfaces **union**
-   * their dots and the boundary cell takes the topmost one's tone: what the
-   * union removes is a hole in something solid by construction.
+   * bands. The partition is arbitrary and the ink is not, so the union removes
+   * a hole in something solid by construction, and the boundary keeps a wedge's
+   * tone because a neutral there would draw a border the data does not have.
+   * *Measured: at ten segments a neutral boundary greys a whole sector.*
    *
-   * A `"curve"` is an object with its own identity — a series, a radar polygon,
-   * the frame under them. Curves **occlude**: the topmost owns the cell outright
-   * and the rest draw nothing in it. Unioning them puts one series' ink on
-   * screen in another series' colour, which is not a seam a reader cannot see
-   * but a statement about which series it is, and a false one.
+   * A `"curve"` is a series or a radar polygon — a peer, and the subject. Two
+   * peers in one cell union, because deleting one answers *where did this series
+   * go* with **nowhere**; and the cell goes neutral, because answering it with
+   * *the other one* is worse. Neither owns the cell and the honest tone says so
+   * — `tone.muted` for the same reason a doji is muted rather than green
+   * (§3r): the categories do not apply here.
    *
-   * Required rather than defaulted, so a ninth layer says which it is.
+   * `"context"` is a radar's frame, an annotation's rule — drawn *behind*, and
+   * occluded by anything in front. Hiding a gridline under a line is what "in
+   * front" means and no reading is lost, because the frame is a regular shape a
+   * reader completes; drawing it in a series' colour is a false statement about
+   * which series it is.
+   *
+   * `"label"` is text, which shares with nothing in either direction.
    */
-  kind: "curve" | "surface";
+  kind: "label" | "curve" | "surface" | "context";
 }>;
 
 /**
@@ -506,10 +520,14 @@ function mergedRow(
         continue;
       }
       // Past the first inking layer, only braille contributes, only to a cell
-      // that is itself braille, and **only between two surfaces** (I44).
-      if (dots === null || cellKind !== "surface" || layer.kind !== "surface") continue;
+      // that is itself braille, and **only between two layers of one kind**
+      // (I44). Across kinds the topmost owns the cell outright.
+      if (dots === null || cellKind !== layer.kind) continue;
       bits |= dots;
       cell = String.fromCodePoint(BRAILLE_BASE + bits);
+      // Two peers in one cell: both sets of dots, and a tone that names
+      // neither. A surface's boundary keeps its tone — see `Layer.kind`.
+      if (layer.kind === "curve") cellRef = "tone.muted";
     }
     if (cellRef !== runRef) {
       flush();
@@ -864,7 +882,9 @@ function overlaidRows(
     ...(block.annotations ?? []).map((a) => ({
       glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
       ref: `tone.${a.tone ?? "muted"}` as ColourRef,
-      kind: "curve" as const,
+      // An annotation is a reference drawn behind the data (C04 I52), so the
+      // series occludes it rather than sharing a cell with it.
+      kind: "context" as const,
     })),
   ];
 
@@ -2327,9 +2347,9 @@ const FORM_ROWS: Readonly<
     // runs through is unreadable, and the scale is context rather than a
     // reading — it may only have the cells nothing else wanted.
     const layers: readonly Layer[] = [
-      { glyphRows: radar.labels, ref: "tone.muted", kind: "curve" },
+      { glyphRows: radar.labels, ref: "tone.muted", kind: "label" },
       ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i), kind: "curve" as const })),
-      { glyphRows: radar.frame, ref: "tone.muted", kind: "curve" },
+      { glyphRows: radar.frame, ref: "tone.muted", kind: "context" },
     ];
     const discLayout: Layout = { ...layout, areaWidth: radar.discWidth };
     const out: string[] = [];
