@@ -26,6 +26,7 @@ import { paint, rows, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
+import { columnsForAspect } from "./aspect.js";
 import { curveRows, isBlank } from "./curve.js";
 import { gridRow } from "./furniture.js";
 import { formatReadout, labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
@@ -2621,9 +2622,49 @@ const FORM_ROWS: Readonly<
   quiver: (block, width, ctx) => heatmapFormRows(block, width, ctx),
 };
 
+/**
+ * The cells the figure is drawn in, which is the frame unless the caller said
+ * otherwise (C04 I62, §3ab).
+ *
+ * **Clamped rather than refused**, because this is the first place the frame's
+ * width exists: C04 has no terminal, so a gate refusing a width wider than the
+ * screen would be asserting a fact it does not hold.
+ */
+export function drawnWidth(block: Plot, frame: number): number {
+  const cap = Math.max(1, Math.floor(frame)); // cells-ok — a cell count
+  if (block.width !== undefined && Number.isFinite(block.width)) {
+    return Math.min(cap, Math.max(1, Math.floor(block.width))); // cells-ok — a cell count
+  }
+  if (block.aspect !== undefined) {
+    return Math.min(cap, columnsForAspect(plotHeight(block), block.aspect)); // cells-ok
+  }
+  return cap;
+}
+
+/**
+ * The blank columns to the left of a narrowed figure (C04 I62, §3ab).
+ *
+ * `"left"` is the default and is today's behaviour, so a plot that declares
+ * neither `width` nor `aspect` pads by nothing and renders byte for byte as it
+ * did. **The leftover cell goes right at `"centre"`**, on `facetWidths`' own
+ * rule for the same arithmetic.
+ */
+export function alignPad(block: Plot, frame: number, drawn: number): number {
+  const slack = Math.max(0, Math.floor(frame) - drawn); // cells-ok — a cell count
+  if (slack === 0) return 0; // cells-ok — a cell count
+  if (block.align === "right") return slack; // cells-ok — a cell count
+  if (block.align === "centre") return Math.floor(slack / 2); // cells-ok — a cell count
+  return 0; // cells-ok — a cell count
+}
+
 const render = (block: Plot, ctx: RenderContext): ReactElement => {
-  const width = Math.max(1, Math.floor(ctx.width));
-  return rows([...FORM_ROWS[block.form](block, width, ctx)]);
+  const frame = Math.max(1, Math.floor(ctx.width));
+  const drawn = drawnWidth(block, frame);
+  const pad = alignPad(block, frame, drawn);
+  const body = FORM_ROWS[block.form](block, drawn, ctx);
+  // **A row is a string with its SGR already embedded**, so the pad is a leading
+  // run of blanks and cannot disturb a colour: a blank carries none (§3ab).
+  return rows(pad === 0 ? [...body] : body.map((r) => " ".repeat(pad) + r)); // cells-ok
 };
 
 export const plotDefinition: BlockDefinition<Plot> = {

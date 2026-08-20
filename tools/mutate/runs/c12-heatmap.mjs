@@ -107,13 +107,13 @@ const results = runPass({
       // height, with the right number of rows and the right width.
       name: "THE SWITCH: form dispatch falls back to the line arm",
       file: DEF,
-      from: "  return rows([...FORM_ROWS[block.form](block, width, ctx)]);",
+      // Re-anchored when `render` grew the narrowing seam (C12 §3ab); the
+      // dispatch is the same line, one variable along.
+      from: "  const body = FORM_ROWS[block.form](block, drawn, ctx);",
       to:
-        "  return rows([\n"
-        + "    ...(block.form === \"sparkline\"\n"
-        + "      ? FORM_ROWS.sparkline(block, width, ctx)\n"
-        + "      : FORM_ROWS.line(block, width, ctx)),\n"
-        + "  ]);",
+        "  const body = block.form === \"sparkline\"\n"
+        + "    ? FORM_ROWS.sparkline(block, drawn, ctx)\n"
+        + "    : FORM_ROWS.line(block, drawn, ctx);",
       expect: "T1.17",
     },
     {

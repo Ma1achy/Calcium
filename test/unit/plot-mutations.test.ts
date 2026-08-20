@@ -16,6 +16,7 @@ import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "../../src/presentation/plot/ramp.js";
 import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
+import { drawnWidth } from "../../src/presentation/plot/definition.js";
 import { cells } from "../../src/presentation/text.js";
 import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
@@ -28,6 +29,7 @@ import { fillHeight } from "../../src/presentation/plot/height.js";
 import { horizonBandT, horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
 import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
 import { validateBlock } from "../../src/data/viewmodel/index.js";
+import { b } from "../../src/shell/builders/index.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
 import { bandRows, stackBands } from "../../src/presentation/plot/stack.js";
@@ -2758,5 +2760,108 @@ describe("C04 I52 — the annotation check dispatches per kind", () => {
   it("UB12 (C04 I52): a whisker's half-width is not negative", () => {
     expect(validateBlock(plot([{ kind: "whiskers", points: [{ x: 0, y: 1, err: -1 }] }])).ok).toBe(false);
     expect(validateBlock(plot([{ kind: "whiskers", points: [{ x: 0, y: 1 }] }])).ok).toBe(false);
+  });
+});
+
+describe("C12 §3ab — width, aspect and align", () => {
+  const wave = Array.from({ length: 30 }, (_, i) => 50 + 30 * Math.sin(i / 4)); // cells-ok
+  const plot = (over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot", id: "sz", form: "line", height: 6, axes: true,
+      series: [{ label: "a", values: wave }], ...over,
+    } as unknown as Plot) as Plot;
+  const framed = (b: Plot, frame = 60): readonly string[] =>
+    measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS }).renderToLines(b, frame)
+      .map((l) => l.split(String.fromCharCode(27)).map((p, i) => (i === 0 ? p : p.slice(p.indexOf("m") + 1))).join(""));
+  const widest = (rows: readonly string[]): number =>
+    rows.reduce((m, r) => Math.max(m, cells(r.replace(/\s+$/u, ""))), 0); // cells-ok — a cell count
+  const indent = (rows: readonly string[]): number =>
+    rows.filter((r) => r.trim() !== "").reduce((m, r) => Math.min(m, r.length - r.trimStart().length), 99); // cells-ok
+
+  it("SZ1 (C04 I62, §3ab): a declared width renders at that width, left by default", () => {
+    const rows = framed(plot({ width: 30 }));
+    expect(widest(rows)).toBe(30); // cells-ok — a cell count
+    expect(indent(rows)).toBe(0); // cells-ok — a column index
+    // …and the height is untouched, which is the invariant a width could break.
+    expect(rows.length).toBe(framed(plot()).length); // cells-ok — a row count
+  });
+
+  it("SZ2 (§3ab): `aspect` derives a width through CELL_ASPECT, not through arithmetic here", () => {
+    const b = plot({ aspect: 1 });
+    const h = plotHeight(b);
+    expect(widest(framed(b))).toBe(squareColumns(h)); // cells-ok — a cell count
+    // A cell is 1 × 2, so a visually square figure is twice as many columns as
+    // rows — the assertion that would pass on a wrong constant is `=== h`.
+    expect(squareColumns(h)).toBe(h * 2); // cells-ok — a cell count
+    expect(widest(framed(plot({ aspect: 2 })))).toBe(squareColumns(h) * 2); // cells-ok
+  });
+
+  it("SZ3 (C04 I62): `width` with `aspect` is refused at both gates", () => {
+    expect(validateBlock({
+      kind: "plot", id: "p", form: "line", height: 5,
+      series: [{ values: [1, 2] }], width: 10, aspect: 1,
+    }).ok).toBe(false);
+    expect(() => b.plot({ form: "line", height: 5, series: [{ values: [1, 2] }], width: 10, aspect: 1 }))
+      .toThrow(/width.*aspect/u);
+  });
+
+  it("SZ4 (C04 I62): `align` with neither is refused at both gates", () => {
+    expect(validateBlock({
+      kind: "plot", id: "p", form: "line", height: 5,
+      series: [{ values: [1, 2] }], align: "centre",
+    }).ok).toBe(false);
+    expect(() => b.plot({ form: "line", height: 5, series: [{ values: [1, 2] }], align: "centre" }))
+      .toThrow(/align/u);
+    // …and legal with one, or the row above passes on a member nothing accepts.
+    expect(validateBlock({
+      kind: "plot", id: "p", form: "line", height: 5,
+      series: [{ values: [1, 2] }], align: "centre", width: 20,
+    }).ok).toBe(true);
+  });
+
+  it("SZ5 (§3ab): align places the figure, and the leftover cell goes right", () => {
+    const left = framed(plot({ width: 31 }));
+    const centre = framed(plot({ width: 31, align: "centre" }));
+    const right = framed(plot({ width: 31, align: "right" }));
+    expect(indent(left)).toBe(0); // cells-ok — a column index
+    // 60 − 31 = 29, so centre is 14 and the odd cell is on the right.
+    expect(indent(centre)).toBe(14); // cells-ok — a column index
+    expect(indent(right)).toBe(29); // cells-ok — a column index
+    // Placement is not size: all three are the same figure.
+    expect(centre.map((r) => r.trimStart())).toEqual(left.map((r) => r.trimStart()));
+    expect(right.map((r) => r.trimStart())).toEqual(left.map((r) => r.trimStart()));
+  });
+
+  it("SZ6 (§3ab, C12 I1): a plot declaring none of the three is byte-identical to before", () => {
+    // The default arm has to cost nothing, which is what makes moving to a
+    // narrowing `render` safe. `align: "left"` is the same frame stated.
+    expect(framed(plot({ align: "left", width: 60 }))).toEqual(framed(plot()));
+  });
+
+  it("SZ7 (§3ab, C12 I1): narrowing never overflows and never changes the row count", () => {
+    // Measured across the range where the gutter drops and then the frame's
+    // corners do: the declared height holds at every width down to one.
+    const tall = framed(plot()).length;
+    for (const w of [20, 12, 8, 6, 4, 2, 1]) { // cells-ok — a cell count
+      const rows = framed(plot({ width: w }));
+      expect(rows.length).toBe(tall); // cells-ok — a row count
+      expect(widest(rows)).toBeLessThanOrEqual(w); // cells-ok — a cell count
+    }
+  });
+
+  it("SZ8 (§3ab): a width wider than the frame clamps rather than being refused", () => {
+    // C04 has no terminal width, so this cannot be a gate — and a document that
+    // asks for 200 cells on a 60-cell terminal gets 60 rather than an error.
+    expect(validateBlock({
+      kind: "plot", id: "p", form: "line", height: 5, series: [{ values: [1, 2] }], width: 200,
+    }).ok).toBe(true);
+    // **`widest` cannot see this and a mutation is what said so.** Dropping the
+    // clamp survived a row asserting the rendered width was 60, because the
+    // harness clips to the frame regardless — the assertion was reading a
+    // guarantee a different mechanism makes. What distinguishes the two is the
+    // *content*: an unclamped 200-cell figure clipped to 60 is its left third.
+    expect(framed(plot({ width: 200 }))).toEqual(framed(plot()));
+    expect(drawnWidth(plot({ width: 200 }), 60)).toBe(60); // cells-ok — a cell count
+    expect(drawnWidth(plot({ width: 30 }), 60)).toBe(30); // cells-ok — a cell count
   });
 });

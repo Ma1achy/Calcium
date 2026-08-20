@@ -965,6 +965,48 @@ export type Plot = Readonly<{
    * `yAxis: "left"` is refused rather than quietly widening the axis.
    */
   yCallout?: "none" | "last";
+  /**
+   * The cells the figure is drawn in, narrower than the frame it sits in
+   * (C04 I62, C12 §3ab).
+   *
+   * **Clamped at render and not refused at construction**, because C04 has no
+   * terminal width: a validator refusing a width it cannot measure asserts a
+   * fact it does not hold. What the gates check is what a document can be wrong
+   * about on its own — finite, positive, integral.
+   *
+   * A width too narrow for the gutter and the area together reaches
+   * `layoutFor`'s existing `null` and draws *Too narrow.*, which is a rung that
+   * already existed reached by a new road.
+   */
+  width?: number;
+  /**
+   * Drawn width to drawn height, **visually** (C04 I62, C12 §3ab).
+   *
+   * **The member that knows a cell is not square**, which is the whole of why it
+   * is not arithmetic in the caller: `aspect.ts`'s argument is that exactly one
+   * file knows the ratio, and a caller deriving a width from a height has to.
+   * With a cell 1 × 2, `a = w / (h · CELL_ASPECT)`, so `a: 1` is a visually
+   * square figure and `a: 2` is twice as wide as it is tall.
+   *
+   * **The height is declared and the width derived**, never the other way:
+   * C12 I1 forbids a plot's height coming from anything but the caller. Mutually
+   * exclusive with `width` — two ways to say one number, and picking one quietly
+   * would be reading the caller's other statement.
+   */
+  aspect?: number;
+  /**
+   * Where a narrowed figure sits in its frame (C04 I62, C12 §3ab).
+   *
+   * **Refused without `width` or `aspect`**, and the refusal is what gives the
+   * member its necessity: aligning a figure that already fills its frame does
+   * nothing, and a member that does nothing reads as one not yet implemented
+   * (F207).
+   *
+   * **Not `matrixAnchor`.** That places a row shorter than the area inside a
+   * fixed area; this places an area narrower than the frame inside the frame.
+   * Two containers, two contents, and a caller setting both gets both.
+   */
+  align?: "left" | "centre" | "right";
 }> & Gap;
 
 /**

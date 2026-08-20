@@ -427,9 +427,12 @@ function plot(
     matrixAnchor?: Plot["matrixAnchor"];
     legend?: Plot["legend"];
     plotFrame?: Plot["plotFrame"];
+    width?: Plot["width"];
+    aspect?: Plot["aspect"];
+    align?: Plot["align"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -544,6 +547,20 @@ function plot(
         );
       }
     }
+    // **The three geometry members** (C04 I62, C12 §3ab). A width wider than the
+    // terminal is not checked here either — the builder has no terminal.
+    if (width !== undefined && aspect !== undefined) {
+      throw new TypeError(
+        `b.plot: "width" and "aspect" together (C04 I62) — two ways to say one number, and a ` +
+          `plot that picked one would be reading the caller's other statement`,
+      );
+    }
+    if (align !== undefined && width === undefined && aspect === undefined) {
+      throw new TypeError(
+        `b.plot: "align" with neither "width" nor "aspect" (C04 I62) — a figure that fills ` +
+          `its frame has nothing to align inside it`,
+      );
+    }
     if (vectors !== undefined && drawn !== "quiver") {
       throw new TypeError(
         `b.plot: "vectors" on form "${drawn}" (C04 I61) — only a quiver draws a vector ` +
@@ -613,6 +630,9 @@ function plot(
       ...(matrixAnchor === undefined ? {} : { matrixAnchor }),
       ...(legend === undefined ? {} : { legend }),
       ...(plotFrame === undefined ? {} : { plotFrame }),
+      ...(width === undefined ? {} : { width }),
+      ...(aspect === undefined ? {} : { aspect }),
+      ...(align === undefined ? {} : { align }),
     } as Plot,
     spec,
     true,

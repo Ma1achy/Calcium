@@ -646,6 +646,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     plotAxisErrors(b, e, at, form);
     plotFieldErrors(b, e, at, form);
     plotHorizonErrors(b, e, at, form);
+    plotSizeErrors(b, e, at);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -985,6 +986,44 @@ function plotFieldErrors(
     e.push(
       `${at}: "layers" names "quiver" and there are no "vectors" (C04 I61) — a layer ` +
         `with no data draws an empty area that reads as a field with nothing in it`,
+    );
+  }
+}
+
+/**
+ * `width`, `aspect` and `align` — **what a document can be wrong about on its
+ * own** (C04 I62, C12 §3ab).
+ *
+ * A width wider than the terminal is **not** here, and that is the seam rather
+ * than a gap: C04 has no terminal width, so refusing one would assert a fact
+ * this layer does not hold. `render` clamps it against the frame, which is the
+ * first place the frame exists.
+ */
+function plotSizeErrors(b: Record<string, unknown>, e: string[], at: string): void {
+  const width = b["width"];
+  const aspect = b["aspect"];
+  const align = b["align"];
+
+  if (width !== undefined && aspect !== undefined) {
+    e.push(
+      `${at}: "width" and "aspect" together (C04 I62) — two ways to say one number, and a ` +
+        `plot that picked one would be reading the caller's other statement`,
+    );
+  }
+  if (width !== undefined && (!isFiniteNumber(width) || width < 1 || !Number.isInteger(width))) {
+    e.push(`${at}: "width" must be a whole number of cells, 1 or more (C04 I62)`);
+  }
+  if (aspect !== undefined && (!isFiniteNumber(aspect) || aspect <= 0)) {
+    e.push(`${at}: "aspect" must be a finite number above zero (C04 I62)`);
+  }
+  if (align !== undefined && align !== "left" && align !== "centre" && align !== "right") {
+    e.push(`${at}: "align" must be "left", "centre" or "right" (C04 I62)`);
+  }
+  if (align !== undefined && width === undefined && aspect === undefined) {
+    e.push(
+      `${at}: "align" with neither "width" nor "aspect" (C04 I62) — a figure that fills its ` +
+        `frame has nothing to align inside it, and a member that does nothing reads as one ` +
+        `not yet implemented`,
     );
   }
 }

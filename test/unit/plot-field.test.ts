@@ -263,7 +263,7 @@ describe("LY — what is layered over a field (C12 I51)", () => {
     // at 3.71 against a floor of 4.5 and needs 0.45. Measured against the
     // colour the reader is shown rather than the one that was sampled.
     for (const name of ["viridis", "coolwarm", "inferno"] as const) {
-      const map = COLORMAPS[name];
+      const map = COLORMAPS[name]!;
       const f = dimFactorFor(map, true);
       for (let i = 0; i <= 20; i += 1) { // cells-ok — a sample count
         const c = dimColour(continuousColour(map, i / 20, { colourDepth: 8 })!, f);
@@ -271,8 +271,8 @@ describe("LY — what is layered over a field (C12 I51)", () => {
         expect(ratio(hex, "#ffffff")).toBeGreaterThanOrEqual(4.5);
       }
     }
-    expect(dimFactorFor(COLORMAPS.viridis, true)).toBeCloseTo(0.45, 5);
-    expect(dimFactorFor(COLORMAPS.viridis, false)).toBeCloseTo(0.5, 5);
+    expect(dimFactorFor(COLORMAPS.viridis!, true)).toBeCloseTo(0.45, 5);
+    expect(dimFactorFor(COLORMAPS.viridis!, false)).toBeCloseTo(0.5, 5);
   });
 
   it("LY6 (C12 I51): fieldDim `floor` clears 4.5:1 on every sample of three maps", () => {
