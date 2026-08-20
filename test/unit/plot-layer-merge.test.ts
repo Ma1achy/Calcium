@@ -1,5 +1,6 @@
 /**
- * LM1–LM5: a cell two layers ink carries both layers' dots (C12 I40, §3u).
+ * LM1–LM6: two surfaces meeting in a cell union their dots; two curves do not
+ * (C12 I40, C12 I44, §3u).
  *
  * **Asserted on the composed frame, not on the merge function.** The defect is
  * that every wedge is folded to braille *before* it reaches the merge, so a
@@ -72,12 +73,13 @@ describe("LM2 (C12 I40): the disc is fully covered whatever the segment count", 
   }
 });
 
-describe("LM3 (C12 I40): a radar's frame survives the polygons crossing it", () => {
+describe("LM3 (C12 I44): a radar's cells each belong to one layer", () => {
   // **The first form of this row passed against the defect**, which is what
   // the row is here to catch: *the composed figure inks at least as many cells
   // as one polygon over the same frame* is true while the frame is being eaten,
   // because the polygon inks the cells it takes. Counting ink cannot see a
-  // trade.
+  // trade — and neither can it see the trade the *second* form was making,
+  // which took three revisions of what this row is about (C12 I44).
   //
   // The claim is containment, so the assertion is containment: every cell the
   // frame inks on its own must be inked in the composed figure. `radarRender`
@@ -106,22 +108,38 @@ describe("LM3 (C12 I40): a radar's frame survives the polygons crossing it", () 
     expect(missing).toEqual([]);
   });
 
-  it("every dot the frame sets is set in the composed figure", () => {
-    // Containment of *cells* is the weaker half: a cell can survive with the
-    // frame's dots replaced by a polygon's. The dots are the claim.
+  it("no cell draws a dot belonging to a layer other than the one it is coloured", () => {
+    // **This row asserted the opposite and was right about the union it was
+    // written against** (C12 I44, §3u). Containment of the frame's *dots* is
+    // what the union gave, and what it cost was the frame's dots appearing in a
+    // series' colour: measured on this figure, 70 of 279 frame cells. Curves
+    // occlude now, so the frame loses the cells a polygon crosses — a gap that
+    // reads as depth — and the property left to assert is the one that made the
+    // trade worth taking.
+    //
+    // Every layer `radarRender` returns is compared against the composed frame,
+    // so no cell's owner has to be inferred.
     const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS);
     const composed = kit().renderToLines(RADAR, 80).map(plain);
     const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
-    let lost = 0;
-    rendered.frame.forEach((row, r) => {
+    const layers = [...rendered.polygons, rendered.frame];
+    // **The figure's own columns, taken from the figure.** The legend's swatch
+    // is braille too and belongs to no layer `radarRender` returns, so an
+    // unbounded scan reports four cells at c72–73 that are not the subject —
+    // and a hard-coded bound would be a second claim about the layout.
+    const figureWidth = Math.max(...layers.flatMap((l) => l.map((row) => [...row].length))); // cells-ok — a cell count
+    const foreign: string[] = [];
+    composed.forEach((row, r) => {
       [...row].forEach((ch, x) => {
-        const want = bits(ch);
-        if (want === 0) return;
-        const got = bits([...(composed[r] ?? "")][x] ?? " ");
-        if ((got & want) !== want) lost += 1; // cells-ok — a cell count
+        if (x >= figureWidth) return; // cells-ok — a cell column
+        const drawn = bits(ch);
+        if (drawn === 0) return;
+        // Some one layer must account for every dot in the cell.
+        const owned = layers.some((l) => (bits([...(l[r] ?? "")][x] ?? " ") & drawn) === drawn);
+        if (!owned) foreign.push(`r${String(r)}c${String(x)} ${ch}`);
       });
     });
-    expect(lost).toBe(0); // cells-ok — a cell count
+    expect(foreign).toEqual([]);
   });
 });
 
@@ -172,5 +190,80 @@ describe("LM5 (C12 I40): the colour is the first layer's, and the spec says so",
     // Four segments and the legend's own swatches — no cell resolves to a
     // colour that is not one of the four slots.
     expect(used.size).toBeLessThanOrEqual(4); // cells-ok — a colour count
+  });
+});
+
+describe("LM6 (C12 I44): curves occlude and surfaces union, on real figures", () => {
+  // **The report was `slope-default`, not the radar** — *the orange bleeds onto
+  // the blue and green lines* — and it is the same rule one form along, so the
+  // row is here rather than in a second file. Three series converge around
+  // x = 0.4 and 11 cells carry two of them; under the union, 25 of the dots
+  // drawn in those cells belonged to a series other than the one whose colour
+  // they wore, against 20 that belonged to it.
+  //
+  // **Each series is rendered alone against a pinned range**, so every render
+  // shares one layout and a cell can be compared without inferring an owner.
+  // Without the pin the alone-renders autoscale to their own extent and land in
+  // different rows, which reports every cell as foreign and passes for a reason
+  // that has nothing to do with the merge.
+  const SLOPE = [
+    { values: [12, 38], label: "north" },
+    { values: [31, 14], label: "south" },
+    { values: [22, 27], label: "east" },
+  ];
+  const PIN = { yMin: 12, yMax: 38 };
+  const slopeBlock = (series: readonly { values: readonly (number | null)[]; label: string }[]) =>
+    block({ kind: "plot", id: "lm6", form: "slope", height: 10, axes: true, series, ...PIN });
+
+  it("no cell of a slope chart draws another series' ink", () => {
+    const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
+    const composed = kit().renderToLines(slopeBlock(SLOPE), 80).map(plain);
+    const alone = SLOPE.map((_s, k) =>
+      kit().renderToLines(
+        slopeBlock(SLOPE.map((sr, j) => (j === k ? sr : { ...sr, values: sr.values.map(() => null) }))),
+        80,
+      ).map(plain));
+
+    const foreign: string[] = [];
+    composed.forEach((row, r) => {
+      [...row].forEach((ch, x) => {
+        const drawn = bits(ch);
+        if (drawn === 0) return;
+        const owned = alone.some((a) => (bits([...(a[r] ?? "")][x] ?? " ") & drawn) === drawn);
+        if (!owned) foreign.push(`r${String(r)}c${String(x)} ${ch}`);
+      });
+    });
+    expect(foreign).toEqual([]);
+  });
+
+  it("the fixture responds: the three series do share cells", () => {
+    // **The row above passes on a figure whose lines never meet**, which is the
+    // arrangement a convenient fixture picks. This one shows the crossing is
+    // there to be got wrong — `test/support/README.md`'s rule, and the two
+    // instances behind it.
+    const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
+    const alone = SLOPE.map((_s, k) =>
+      kit().renderToLines(
+        slopeBlock(SLOPE.map((sr, j) => (j === k ? sr : { ...sr, values: sr.values.map(() => null) }))),
+        80,
+      ).map(plain));
+    let shared = 0;
+    const rows = alone[0]?.length ?? 0; // cells-ok — a row count
+    for (let r = 0; r < rows; r += 1) { // cells-ok — a row count
+      const widest = Math.max(...alone.map((a) => [...(a[r] ?? "")].length)); // cells-ok — a cell count
+      for (let x = 0; x < widest; x += 1) { // cells-ok — a cell column
+        const inked = alone.filter((a) => bits([...(a[r] ?? "")][x] ?? " ") !== 0).length; // cells-ok — a layer count
+        if (inked >= 2) shared += 1; // cells-ok — a cell count
+      }
+    }
+    expect(shared).toBeGreaterThanOrEqual(8); // cells-ok — a cell count
+  });
+
+  it("a pie's wedges still union, which is the other arm of the same rule", () => {
+    // Classifying the pie's fills as `"curve"` reopens exactly the seams
+    // C12 I40 closed, so this is LM1's claim restated as the partition's other
+    // half:
+    // the union is not gone, it is scoped.
+    expect(partialsIn(kit().renderToLines(PIE, 80).map(plain))).toEqual([]);
   });
 });

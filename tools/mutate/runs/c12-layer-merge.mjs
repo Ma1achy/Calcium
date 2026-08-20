@@ -14,6 +14,8 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const DEFN = "src/presentation/plot/definition.ts";
+/** The guard the whole partition hangs on — spelled once (C12 I44). */
+const GUARD = '      if (dots === null || cellKind !== "surface" || layer.kind !== "surface") continue;';
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -32,8 +34,8 @@ const results = runPass({
   run,
   control: {
     file: DEFN,
-    from: "      if (dots === null) continue;\n      bits |= dots;",
-    to: "      if (dots === null) continue;\n      bits = 0;",
+    from: `${GUARD}\n      bits |= dots;`,
+    to: `${GUARD}\n      bits = 0;`,
     why: "a cell whose unioned bits are always zero draws U+2800 — blank — wherever two layers meet, so the disc is holes and the frame is gone; a run that cannot see that cannot see any row below",
   },
   mutations: [
@@ -41,7 +43,7 @@ const results = runPass({
       // **The shipped defect, exactly.** The whole cell to the first layer.
       name: "the first layer to ink a cell keeps the whole cell",
       file: DEFN,
-      from: "      if (dots === null) continue;\n      bits |= dots;\n      cell = String.fromCodePoint(BRAILLE_BASE + bits);",
+      from: `${GUARD}\n      bits |= dots;\n      cell = String.fromCodePoint(BRAILLE_BASE + bits);`,
       to: "      break;",
       expect: "LM1",
     },
@@ -54,14 +56,27 @@ const results = runPass({
       to: "      bits = dots;",
       expect: "LM1",
     },
+    // **The non-braille `break` survived being removed, and the reason is a
+    // second guard.** It says *a letter never shares a cell* and it used to be
+    // the only thing saying so; C12 I44's kind guard now refuses the union a
+    // step earlier, because the radar's labels are a `"curve"` and a curve
+    // unions with nothing. The arrangement that would still need the break is a
+    // `"surface"` drawing text beside a `"surface"` drawing braille, and no
+    // layer stack in the tree is that — the solid pie's wedges are all
+    // non-braille, so they meet on the guard's first clause instead.
+    //
+    // Kept on the asymmetry rather than the odds: it costs one comparison, it
+    // states an invariant that should not depend on the partition, and the
+    // defect it prevents is silent. What replaces it here is the mutation that
+    // *does* fire on the same row — the priority order §3u calls a ruling, and
+    // which nothing else turns over.
     {
-      // **The non-braille guard**, which is the clause that keeps a category
-      // name off a polygon. Without the break a later braille layer replaces
-      // the letter with a glyph made of its own dots.
-      name: "a letter is unioned with the polygons over it",
+      name: "the labels are composited under the polygons rather than over them",
       file: DEFN,
-      from: "        if (dots === null) break;\n        bits = dots;",
-      to: "        bits = dots ?? 0;",
+      from: '      { glyphRows: radar.labels, ref: "tone.muted", kind: "curve" },\n'
+        + '      ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i), kind: "curve" as const })),',
+      to: '      ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i), kind: "curve" as const })),\n'
+        + '      { glyphRows: radar.labels, ref: "tone.muted", kind: "curve" },',
       expect: "LM4",
     },
     {
@@ -69,9 +84,27 @@ const results = runPass({
       // first two drops it wherever two polygons already met.
       name: "the merge stops after two layers",
       file: DEFN,
-      from: "      if (dots === null) continue;\n      bits |= dots;",
-      to: "      if (dots === null || bits !== 0) continue;\n      bits |= dots;",
+      from: `${GUARD}\n      bits |= dots;`,
+      to: `${GUARD.replace("if (dots === null", "if (bits !== 0 || dots === null")}\n      bits |= dots;`,
       expect: "LM3",
+    },
+    {
+      // **The ruling, inverted: every layer unions.** This is I40 as it shipped
+      // and read as correct for three commits — the pie's seams closed, and a
+      // curve's ink drawn in another curve's colour by the hundred (C12 I44).
+      name: "curves union with each other, as the pie's wedges do",
+      file: DEFN,
+      from: GUARD,
+      to: "      if (dots === null) continue;",
+      expect: "LM3",
+    },
+    {
+      // The other half. A pie whose wedges occlude is the seam report again.
+      name: "the pie's wedges occlude instead of unioning",
+      file: DEFN,
+      from: '      ref: categoryRef(pl.segmentIndex),\n      kind: "surface" as const,',
+      to: '      ref: categoryRef(pl.segmentIndex),\n      kind: "curve" as const,',
+      expect: "LM1",
     },
   ],
 });

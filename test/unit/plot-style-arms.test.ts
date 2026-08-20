@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { block, validateBlock, STYLE_ARMS } from "../../src/data/viewmodel/index.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { quadrantGlyph } from "../../src/presentation/plot/linedraw.js";
 import { FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
@@ -241,6 +242,69 @@ describe("SA6 (C12 I43): a radar's line arm draws in the alphabet that connects"
     // 98 with the tone following the data; the frame takes most of them back
     // when it does not.
     expect(data).toBeGreaterThan(80); // cells-ok — a cell count
+  });
+
+  it("a cell draws only the sub-cells of the layer whose tone it wears", () => {
+    // **The count above was the whole of it, and a count cannot see this.** 80
+    // of those 98 cells are *frame* — a value ring and a data polygon are the
+    // same shape at different radii, so they run alongside each other rather
+    // than crossing at points, and keeping every quadrant paints the pentagon
+    // in a series slot for its whole length (C12 I44, §3w).
+    //
+    // Each layer is rendered alone by collapsing the others to the centre, so a
+    // cell's owner is read rather than inferred. `quadrantGlyph` supplies the
+    // inverse of its own table — a lookup written here would carry the premise
+    // it is meant to check.
+    const toMask = new Map(
+      Array.from({ length: 16 }, (_v, m) => [quadrantGlyph(m), m] as const), // cells-ok — a mask count
+    );
+    const mask = (c: string): number => toMask.get(c) ?? 0;
+    const hollowRaw = (keep: number): readonly string[] =>
+      kit().renderToLines(RADAR({
+        plotStyle: "line",
+        series: [{ values: [8, 6, 7, 5, 9], label: "alpha" }, { values: [5, 9, 4, 8, 6], label: "beta" }]
+          .map((sr, j) => (j === keep ? sr : { ...sr, values: sr.values.map(() => null) })),
+      }), 72);
+    const hollow = (keep: number): readonly string[] => hollowRaw(keep).map(plain);
+    // -1 keeps nothing, so every polygon collapses and what is left is the
+    // frame.
+    const layers = [hollow(-1), hollow(0), hollow(1)];
+
+    // **A collapsed polygon is not an absent one.** All-null values put every
+    // vertex at t = 0, so a hidden series draws a point *at the disc's centre*
+    // and — being data — occludes the spokes converging there. That one cell is
+    // the only place the isolation is not an isolation, and it reported the
+    // frame's own three quadrants as foreign. Derived from the colour of the
+    // fully collapsed render rather than named by position: any cell it draws
+    // in a series slot is an artefact of the collapse.
+    const MUTED_SLOT = "98;98;98";
+    const corrupted = new Set<string>();
+    hollowRaw(-1).forEach((l, r) => {
+      let slot = "";
+      let x = 0;
+      for (const part of l.split(/\x1b\[/u)) {
+        const m = /^38;2;(\d+;\d+;\d+)m/u.exec(part);
+        if (m) slot = m[1]!;
+        const text = m ? part.slice(m[0].length) : part.replace(/^[0-9;]*m/u, "");
+        for (const ch of text) {
+          if (slot !== "" && slot !== MUTED_SLOT && mask(ch) !== 0) corrupted.add(`${String(r)},${String(x)}`);
+          x += 1; // cells-ok — a cell column
+        }
+      }
+    });
+    expect(corrupted.size).toBeLessThan(4); // cells-ok — a cell count
+
+    const composed = kit().renderToLines(RADAR({ plotStyle: "line" }), 72).map(plain);
+    const foreign: string[] = [];
+    composed.forEach((row, r) => {
+      [...row].slice(0, 50).forEach((ch, x) => { // cells-ok — a column count
+        const drawn = mask(ch);
+        if (drawn === 0 || corrupted.has(`${String(r)},${String(x)}`)) return;
+        const owned = layers.some((l) => (mask([...(l[r] ?? "")][x] ?? " ") & drawn) === drawn);
+        if (!owned) foreign.push(`r${String(r)}c${String(x)} ${ch}`);
+      });
+    });
+    expect(foreign).toEqual([]);
   });
 
   it("the braille arm is unchanged and draws no blocks", () => {

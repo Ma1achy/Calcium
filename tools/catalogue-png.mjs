@@ -306,9 +306,18 @@ export function ansiToSvg(ansi) {
 // parsing and the braille dot map are exactly where a silent wrong answer
 // lives — this renderer shipped once drawing every catalogue frame in the
 // default foreground because `38;2;R;G;B` fell through, and nothing asked.
-const isMain = process.argv[1] !== undefined
-  && import.meta.url === new URL(`file://${process.argv[1]}`).href;
-if (isMain) {
+/**
+ * Every `.txt` in the catalogue to a `.png`, and the 24-bit ones to one sheet.
+ *
+ * **Exported rather than left inside the `isMain` guard**, for the reason this
+ * file already carries one floor down: a caller that cannot reach it writes its
+ * own loop, and then the catalogue has two renderers with one of them the one a
+ * reader looks at. The `node tools/catalogue-png.mjs` in the header only
+ * resolves under a runner that maps `.js` specifiers onto `.ts` sources, so a
+ * caller *is* how this normally runs.
+ */
+export async function renderCatalogueImages() {
+
 
 const txtFiles = readdirSync(CATALOGUE)
   .filter((f) => f.endsWith(".txt"))
@@ -376,3 +385,7 @@ if (contactParts.length > 0) {
 
 console.log(`Done: ${txtFiles.length} PNGs written to docs/catalogue/`);
 }
+
+const isMain = process.argv[1] !== undefined
+  && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (isMain) await renderCatalogueImages();

@@ -116,19 +116,32 @@ const results = runPass({
     },
     {
       // The frame's stipple, which answered a question about weight with holes.
+      // `arcDots` took the spacing as a parameter until every call site passed
+      // the same constant; the step is inside it now, so the mutation is there.
       name: "the rings and spokes are stippled again",
       file: CIRC,
-      from: "    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU, ARC_STEP);",
-      to: "    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU, 4);",
+      from: "  const step = 1 / radius;",
+      to: "  const step = 4 / radius;",
       expect: "SA6",
     },
     {
       // `furniture` is `series.length`, greater than every series index, so a
-      // max over a cell's owners gave the frame's tone to a polygon crossing it.
+      // max over a cell's owners gives the frame's tone to a polygon crossing
+      // it — which is what `rank` exists to invert (C12 I44).
       name: "the cell's tone is the largest owner in it",
       file: CIRC,
-      from: "        if (o < furniture) who = who < 0 || who >= furniture ? o : Math.max(who, o); // cells-ok — a series index\n        else if (who < 0) who = o; // cells-ok — a series index",
-      to: "        who = Math.max(who, o); // cells-ok — a series index",
+      from: "  const rank = (o: number): number => (o >= furniture ? -1 : o); // cells-ok — a series index",
+      to: "  const rank = (o: number): number => o; // cells-ok — a series index",
+      expect: "SA6",
+    },
+    {
+      // **The occlusion half.** The tone is chosen per cell and every other
+      // layer's sub-cells are dropped; keeping them is I40 generalised past the
+      // pie, and it draws the frame's quadrants in a series slot (C12 I44).
+      name: "a cell keeps every layer's quadrants and only its tone is chosen",
+      file: CIRC,
+      from: "        if (bits[y * sx + x] === 1 && owner[y * sx + x] === who) mask |= bit; // cells-ok — a sub-cell position",
+      to: "        if (bits[y * sx + x] === 1) mask |= bit; // cells-ok — a sub-cell position",
       expect: "SA6",
     },
   ],

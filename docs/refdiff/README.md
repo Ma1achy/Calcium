@@ -23,32 +23,32 @@ change is the signal.
 what both halves independently took before F183 and is why a *style* was
 uncomparable: a candlestick is `form: "line"`. The extras are `EXTRA_VARIANTS`
 in `export-fixtures.ts`. So this table ranks
-**43 of 106 catalogue variants**, and the rest are unread rather than passing —
+**43 of 112 catalogue variants**, and the rest are unread rather than passing —
 adding one means adding a reference renderer beside it.
 
 | form | grid | ink | extent |
 |---|---|---|---|
+| histogram | 64x16 | 69.3% | — *5 bands vs 6* |
 | waffle | 64x10 | 55.9% | — *fewer than two bands — ours 1, theirs 0* |
 | bar | 64x16 | 50.4% | — *3 bands vs 7* |
-| histogram | 64x16 | 46.3% | — *3 bands vs 8* |
 | ridgeline | 64x16 | 41.0% | — *fewer than two bands — ours 4, theirs 1* |
 | waterfall | 64x16 | 40.8% | — *fewer than two bands — ours 2, theirs 1* |
+| violin | 64x16 | 39.7% | — *fewer than two bands — ours 1, theirs 3* |
 | bullet | 64x16 | 39.6% | — *fewer than two bands — ours 1, theirs 3* |
 | boxplot | 64x16 | 35.6% | — *fewer than two bands — ours 0, theirs 1* |
 | funnel | 64x16 | 32.4% | — *fewer than two bands — ours 1, theirs 1* |
 | line | 64x16 | 27.1% | — *fewer than two bands — ours 2, theirs 1* |
-| pie | 64x16 | 27.1% | — *fewer than two bands — ours 0, theirs 0* |
 | lollipop | 64x16 | 26.8% | — *5 bands vs 4* |
+| pie | 64x16 | 26.6% | — *fewer than two bands — ours 0, theirs 0* |
 | gantt | 64x16 | 26.3% | — *fewer than two bands — ours 1, theirs 1* |
 | streamgraph | 64x16 | 25.8% | — *9 bands vs 8* |
-| radar | 64x16 | 25.5% | — *fewer than two bands — ours 0, theirs 0* |
+| radar | 64x16 | 23.8% | — *fewer than two bands — ours 0, theirs 0* |
 | stackedarea | 64x16 | 23.5% | — *7 bands vs 9* |
 | autocorrelation | 64x16 | 23.4% | — *fewer than two bands — ours 0, theirs 2* |
 | sparkline | 64x1 | 21.9% | — *fewer than two bands — ours 1, theirs 1* |
 | slope | 64x16 | 19.3% | 7.7% |
 | timeline | 64x16 | 18.8% | — *fewer than two bands — ours 1, theirs 1* |
 | forest | 64x16 | 17.9% | — *fewer than two bands — ours 1, theirs 0* |
-| violin | 64x16 | 17.4% | — *5 bands vs 3* |
 | horizon | 64x16 | 14.6% | — *13 bands vs 9* |
 | density | 64x16 | 13.7% | — *fewer than two bands — ours 2, theirs 1* |
 | line.candlestick | 64x16 | 12.9% | — *fewer than two bands — ours 1, theirs 3* |

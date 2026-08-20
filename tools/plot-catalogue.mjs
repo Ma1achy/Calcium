@@ -66,9 +66,6 @@ export function frameFor(spec, caps, width, id = "cat") {
   });
 }
 
-const isMain = process.argv[1] !== undefined
-  && import.meta.url === new URL(`file://${process.argv[1]}`).href;
-
 /**
  * **Cleared before writing, because a removed fixture leaves its frame behind.**
  *
@@ -95,7 +92,17 @@ export function clearGenerated(dir) {
   return removed;
 }
 
-if (isMain) {
+/**
+ * Every form x variant x capability set, written to `docs/catalogue/`.
+ *
+ * **Exported rather than left inside the `isMain` guard**, for the same reason
+ * `frameFor` is a function: a caller that cannot reach this writes the loop
+ * again, and then the frames a reader looks at came from the second copy. The
+ * header's `node tools/plot-catalogue.mjs` only resolves under a runner that
+ * maps `.js` specifiers onto `.ts` sources, so a caller is how this runs.
+ */
+export function renderCatalogue() {
+
 const outDir = join(import.meta.dirname, "..", "docs", "catalogue");
 mkdirSync(outDir, { recursive: true });
 const stale = clearGenerated(outDir);
@@ -121,3 +128,7 @@ for (const [formName, variants] of Object.entries(FORMS)) {
 
 console.log(`catalogue: ${totalFiles} files written to docs/catalogue/ (${stale} stale cleared first)`);
 }
+
+const isMain = process.argv[1] !== undefined
+  && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (isMain) renderCatalogue();

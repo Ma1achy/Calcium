@@ -9891,3 +9891,101 @@ quadrant arm** with it — `git checkout <path>` is a restore from the index, no
 repository's own notes record. Rebuilt from the edit scripts, then committed as a checkpoint
 *before* the next measurement rather than after. **A measurement that mutates the tree needs the
 tree committed first**, and copying the file aside is the cheaper habit.
+## F199 — a union measured on a pie, applied to every layer ★★★★★
+
+Three reports, and the reader who filed them saw three defects: *the grey radar lines are
+getting coloured blue and orange*, *the orange bleeds onto the blue and green lines* on the
+slope chart, and the quadrant radar's polygons reading as thick jogged masses. One mechanism.
+
+**I40's union is right, and its scope was inferred rather than measured.** It was written to
+close the pie's seams — two wedges meeting in a cell showed one wedge's dots and dropped the
+other's — and the paragraph that records it says the cost is *a seam a cell wide where the
+colour changes one cell early or late*. Every word of that is true **about layers that meet
+along a boundary**. Two wedges share a one-dimensional locus, so a cell is the whole of it.
+
+**Two curves have no such locus.** They run alongside each other, and the union then draws one
+series' ink in another series' colour for the whole length of the overlap:
+
+| figure | measured |
+|---|---|
+| `slope-default` | 11 cells carry two series; **25 of the dots drawn in them belong to a series other than the one whose colour they wear**, against 20 that belong to it |
+| `radar-default`, braille | **70 of 279 frame cells wear a series slot** |
+| `radar-line`, quadrants | **80 of the 98 cells wearing a series colour are frame**, and 53 carry a fuller glyph than the frame's own |
+
+**The radar is the worst of the three for a structural reason nobody had stated**: a value ring
+and a data polygon are *the same shape at different radii*. They do not cross at points, they run
+parallel — so there is no locus small enough for *a seam a cell wide* to describe, and 82% of what
+reads as "the polygon" is the pentagon recoloured.
+
+The fix is a partition by **what a layer is**, not by which form drew it. `Layer.kind` is
+required: a `"surface"` is part of one filled figure and unions; a `"curve"` has its own identity
+and occludes, the topmost owning the cell outright. **A gap and a lie are not the same cost** — a
+one-cell break where a line passes in front reads as depth and every plotting library draws it
+that way, while ink in the wrong colour is a false statement about which series it is that a
+reader has no way to detect.
+
+**The class**: *a true observation promoted to a general claim*, and the fifth instance. What
+makes this one worth its own number is that the promotion happened **in the same paragraph that
+carefully stated the limit** — "the colour is still one layer's, and that is a limit rather than
+an oversight" reads as exactly the sober caveat a reviewer wants, and it is the sentence that
+carried the defect. *Stating a limit is not the same as measuring it.*
+
+**Fixed.** Two probes, both premise-free from the public surface — render each series alone
+against a pinned range and compare cell by cell — and a fabricated violation on each arm of the
+partition. Six mutations caught on the merge, four on the quadrant figure.
+
+## F200 — the golden corpus held the bleed in plain sight, twice ★★★
+
+`slope · full · 80` has sat in the corpus containing `⠭⠭⠝⠛⠛⠛⠛⠛⠛⠓` — a run of six- and
+seven-dot cells through the middle of a chart whose three curves are one and two dots thick
+everywhere else. `radar · full · 80` has `⣯`, `⠿`, `⣤`, `⡷` in a figure of thin strokes. Both
+are F199 drawn as text, both were readable without any tooling, and both went past review and
+commit.
+
+**This is the third instance of `-u` writing a record rather than checking one**, and the first
+where the defect was legible in the snapshot itself rather than needing a second frame to compare
+against. The corpus is not weak evidence — it caught F193's regression when the mutation pass
+structurally could not. It is that **a diff is read and a file is not**: the rows were correct on
+the day they were written, and nothing re-reads a green snapshot.
+
+No remedy proposed. A rule that flags *unusually dense braille next to sparse braille* is a
+heuristic about drawings, and the honest note is that reading the corpus is a thing a person does
+deliberately or not at all.
+
+## F201 — a guard that two correct guards now share, found by a mutation that stopped firing ★★★
+
+`mergedRow`'s `if (dots === null) break` says *a letter never shares a cell*, and its mutation had
+been caught since I40 landed. After F199 it survived: the kind guard refuses the union one clause
+earlier, because the radar's labels are a `"curve"` and a curve unions with nothing.
+
+**The arrangement that would still need the break is a `"surface"` drawing text beside a
+`"surface"` drawing braille**, and no layer stack in the tree is that — the solid pie's wedges are
+all non-braille, so they meet on the guard's *first* clause instead. So the break protects nothing
+today.
+
+Kept, on the asymmetry rule rather than the odds: it costs one comparison, the defect it prevents
+is silent, and the invariant it states should not depend on a partition invented for another
+reason. What changed is the **mutation**, which now turns over the priority order §3u calls a
+ruling — labels over polygons over frame — and which nothing else had ever tested.
+
+*A mutation that stops firing is not always a stale anchor.* The anchor resolved; the subject had
+acquired a second guard.
+
+## F202 — the documented way to run two tools does not resolve ★★
+
+`tools/plot-catalogue.mjs` and `tools/catalogue-png.mjs` both carry `node tools/<file>.mjs` in
+their headers. Neither runs: they import `../src/**/index.js` and the sources are `.ts`, so plain
+node exits with `ERR_MODULE_NOT_FOUND` before the first frame. They only resolve under a runner
+that maps `.js` specifiers onto `.ts` sources, which is how `tools/instruments.mjs` covers them —
+by pairing each with a vitest fixture.
+
+Small, and it cost something anyway: reaching for the tool meant writing the loop again in a
+probe, which is the *second renderer* hazard the catalogue file already carries a comment about.
+Both main blocks are now exported functions — `renderCatalogue()` and `renderCatalogueImages()` —
+so a caller has something to call.
+
+**And the extraction ate `clearGenerated` whole.** The script asserted its anchor matched and the
+tail brace balanced; both held, and the slice it cut discarded a function and its fourteen-line
+comment. *Reading the diff of a mechanical rewrite* is what caught it, one instrument along from
+the one that was supposed to.
+

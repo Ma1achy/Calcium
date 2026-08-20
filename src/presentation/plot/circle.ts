@@ -51,15 +51,6 @@ const MIN_DISC_CELLS = 8;
 /** The rings a radar draws inside its outer one — matplotlib's 20/40/60/80. */
 const VALUE_RINGS: readonly number[] = Object.freeze([0.2, 0.4, 0.6, 0.8]);
 
-/**
- * Dots between plotted dots along an arc.
- *
- * `1` draws a continuous curve. The value rings are stippled instead, and the
- * numbers were read off a frame rather than chosen: a ring inks every cell it
- * crosses, the disc of a ten-row radar is about ninety cells, and four
- * continuous rings inside it is a grey wash where a scale was wanted.
- */
-const ARC_STEP = 1;
 
 /**
  * The smallest ring worth drawing, in dots.
@@ -116,10 +107,19 @@ function at(d: Disc, angle: number, t: number): readonly [number, number] {
   return [d.cx + d.r * t * Math.cos(angle), d.cy + d.r * t * Math.sin(angle)];
 }
 
-/** An arc, dot by dot, `spacing` dots apart along its length. */
-function arcDots(grid: Grid, d: Disc, t: number, from: number, to: number, spacing: number): void {
+/**
+ * An arc, dot by dot, one dot apart along its length.
+ *
+ * **The spacing was a parameter and the stipple it existed for is gone.** The
+ * value rings stepped every fourth dot on §3g's rule that a scale drawn as
+ * heavily as the data competes with it — an argument about weight answered by
+ * leaving holes, where `tone.muted` against the series' slots already separates
+ * them. A ring is continuous now, and a knob nothing turns is a knob the next
+ * reader has to check.
+ */
+function arcDots(grid: Grid, d: Disc, t: number, from: number, to: number): void {
   const radius = Math.max(1, d.r * t);
-  const step = spacing / radius;
+  const step = 1 / radius;
   for (let a = from; a <= to; a += step) {
     const [x, y] = at(d, a, t);
     setDot(grid, Math.round(x), Math.round(y));
@@ -456,7 +456,7 @@ export function pieRender(
     // at one bit the edges are what separates two hatches that meet.
     strokeDashed(grid, at(disc, angle, 0), at(disc, angle, 1), SOLID_DASH);
     strokeDashed(grid, at(disc, end, 0), at(disc, end, 1), SOLID_DASH);
-    arcDots(grid, disc, 1, angle, end, ARC_STEP);
+    arcDots(grid, disc, 1, angle, end);
     layers.push({
       glyphRows: solid ? foldSolid(grid, pairFor(caps).filled) : foldBraille(grid),
       segmentIndex: s.originalIndex,
@@ -574,9 +574,9 @@ function frameRows(d: Disc, categories: readonly string[]): readonly string[] {
   // stippled ring does not read as a lighter ring; it reads as a broken one.
   // The frame is `tone.muted` and the polygons carry their series' slots, so
   // the separation is already there and the scale can be a scale.
-  arcDots(grid, d, 1, 0, TAU, ARC_STEP);
+  arcDots(grid, d, 1, 0, TAU);
   for (const t of VALUE_RINGS) {
-    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU, ARC_STEP);
+    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU);
   }
   for (let i = 0; i < n; i += 1) {
     const a = START_ANGLE + (TAU * i) / n;
@@ -682,6 +682,10 @@ function radarQuadFigure(
   const bits = new Uint8Array(sx * sy);
   const owner = new Int16Array(sx * sy).fill(-1);
   const furniture = series.length; // cells-ok — a series count
+  // Furniture ranks below every series, so `>` is the priority order. That
+  // `furniture` is `series.length` — numerically the *largest* owner — is the
+  // trap a bare `Math.max` over owners falls into.
+  const rank = (o: number): number => (o >= furniture ? -1 : o); // cells-ok — a series index
 
   const mark = (x: number, y: number, who: number): void => {
     if (x < 0 || y < 0 || x >= sx || y >= sy) return; // cells-ok — a sub-cell position
@@ -732,20 +736,21 @@ function radarQuadFigure(
         [cx * 2, cy * 2, QUAD_TL], [cx * 2 + 1, cy * 2, QUAD_TR],
         [cx * 2, cy * 2 + 1, QUAD_BL], [cx * 2 + 1, cy * 2 + 1, QUAD_BR],
       ] as const;
-      let mask = 0;
+      // **A cell is one layer's, and draws only that layer's sub-cells.**
+      // Keeping every quadrant and choosing one tone reads as the frame wearing
+      // a series colour, because a value ring and a data polygon are *the same
+      // shape at different radii* — they run alongside one another for their
+      // whole length rather than crossing at points. So the topmost layer
+      // occludes the rest of its cell (C12 I44).
       let who = -1;
-      for (const [x, y, bit] of quads) {
+      for (const [x, y] of quads) {
         if (bits[y * sx + x] !== 1) continue; // cells-ok — a sub-cell position
-        mask |= bit;
         const o = owner[y * sx + x] ?? -1; // cells-ok — a sub-cell position
-        // **A cell holding any data takes that data's tone, and `Math.max` gave
-        // it the furniture's.** `furniture` is `series.length`, greater than
-        // every series index, so the largest owner in a cell was the frame
-        // wherever the frame touched it — and a polygon crossing a ring lost its
-        // colour cell by cell. The glyph keeps every quadrant either way; this
-        // decides only which of them the tone follows.
-        if (o < furniture) who = who < 0 || who >= furniture ? o : Math.max(who, o); // cells-ok — a series index
-        else if (who < 0) who = o; // cells-ok — a series index
+        if (who < 0 || rank(o) > rank(who)) who = o; // cells-ok — a series index
+      }
+      let mask = 0;
+      for (const [x, y, bit] of quads) {
+        if (bits[y * sx + x] === 1 && owner[y * sx + x] === who) mask |= bit; // cells-ok — a sub-cell position
       }
       const label = [...(labels[cy] ?? "")][cx]; // cells-ok — a cell column
       // The names last and whole, so a word a polygon crosses stays a word.

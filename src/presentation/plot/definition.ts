@@ -123,7 +123,28 @@ const MIN_AREA = 4;
 
 
 /** A rasterised series and the colour it carries. */
-type Layer = Readonly<{ glyphRows: readonly string[]; ref: ColourRef }>;
+type Layer = Readonly<{
+  glyphRows: readonly string[];
+  ref: ColourRef;
+  /**
+   * **What the layer is**, which decides what happens where two of them ink one
+   * cell (C12 I44).
+   *
+   * A `"surface"` is part of one filled figure — a pie's wedges, a stack's
+   * bands. The partition is arbitrary and the ink is not, so surfaces **union**
+   * their dots and the boundary cell takes the topmost one's tone: what the
+   * union removes is a hole in something solid by construction.
+   *
+   * A `"curve"` is an object with its own identity — a series, a radar polygon,
+   * the frame under them. Curves **occlude**: the topmost owns the cell outright
+   * and the rest draw nothing in it. Unioning them puts one series' ink on
+   * screen in another series' colour, which is not a seam a reader cannot see
+   * but a statement about which series it is, and a false one.
+   *
+   * Required rather than defaulted, so a ninth layer says which it is.
+   */
+  kind: "curve" | "surface";
+}>;
 
 /**
  * Which colour a series carries (roadmap 51).
@@ -469,6 +490,7 @@ function mergedRow(
   for (let x = 0; x < layout.areaWidth; x += 1) {
     let cell = " ";
     let cellRef: ColourRef | null = null;
+    let cellKind: Layer["kind"] | null = null;
     let bits = 0;
     for (const layer of layers) {
       const candidate = [...(layer.glyphRows[rowIndex] ?? "")][x] ?? " ";
@@ -477,14 +499,15 @@ function mergedRow(
       if (cellRef === null) {
         cell = candidate;
         cellRef = layer.ref;
+        cellKind = layer.kind;
         // A non-braille winner ends the cell: nothing may be OR-ed into a letter.
         if (dots === null) break;
         bits = dots;
         continue;
       }
-      // Past the first inking layer, only braille contributes — and only to a
-      // cell that is itself braille.
-      if (dots === null) continue;
+      // Past the first inking layer, only braille contributes, only to a cell
+      // that is itself braille, and **only between two surfaces** (I44).
+      if (dots === null || cellKind !== "surface" || layer.kind !== "surface") continue;
       bits |= dots;
       cell = String.fromCodePoint(BRAILLE_BASE + bits);
     }
@@ -720,7 +743,7 @@ function stackedRows(
 
     if (first !== undefined) {
       const glyphRows = curveRows(first, range, layout.areaWidth, curveHeight, ctx.capabilities);
-      const layer: Layer = { glyphRows, ref: refOf(first, 0) };
+      const layer: Layer = { glyphRows, ref: refOf(first, 0), kind: "curve" };
       for (let i = 0; i < curveHeight; i += 1) {
         out.push(
           line(
@@ -753,7 +776,7 @@ function stackedRows(
   series.forEach((s, index) => {
     const stripRows = heights[index] ?? 0;
     const glyphRows = curveRows(s, range, layout.areaWidth, stripRows, ctx.capabilities);
-    const layer: Layer = { glyphRows, ref: refOf(s, index) };
+    const layer: Layer = { glyphRows, ref: refOf(s, index), kind: "curve" };
     for (let i = 0; i < stripRows; i += 1) {
       out.push(
         line(
@@ -832,6 +855,7 @@ function overlaidRows(
     ...block.series.map((s, index) => ({
       glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
       ref: refOf(s, index),
+      kind: "curve" as const,
     })),
     // **The candles sit between**, because layers resolve first-non-blank: the
     // overlay series must win a shared cell (§3r — a moving average is drawn
@@ -840,6 +864,7 @@ function overlaidRows(
     ...(block.annotations ?? []).map((a) => ({
       glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
       ref: `tone.${a.tone ?? "muted"}` as ColourRef,
+      kind: "curve" as const,
     })),
   ];
 
@@ -890,12 +915,12 @@ function candleLayers(
     bars ?? [], range, layout.areaWidth, layout.areaRows, ctx.capabilities,
   );
   return [
-    { glyphRows: rising, ref: "tone.ok" },
-    { glyphRows: falling, ref: "tone.error" },
+    { glyphRows: rising, ref: "tone.ok", kind: "curve" },
+    { glyphRows: falling, ref: "tone.error", kind: "curve" },
     // **A doji is neither, so it is muted rather than green.** It rode in the
     // rising layer until a golden frame was read with colour on and drew a bar
     // that did not move in the up tone (§3r).
-    { glyphRows: flat, ref: "tone.muted" },
+    { glyphRows: flat, ref: "tone.muted", kind: "curve" },
   ];
 }
 
@@ -1286,6 +1311,9 @@ function stackedForm(
       markOf(i, ctx.capabilities),
     ),
     ref: refOf(block.series[i]!, i),
+    // A stack's bands are one filled figure cut into parts — the pie's case,
+    // one form along (I44).
+    kind: "surface" as const,
   }));
 
   const labels =
@@ -2263,6 +2291,7 @@ const FORM_ROWS: Readonly<
     const fills: readonly Layer[] = pie.layers.map((pl) => ({
       glyphRows: pl.glyphRows,
       ref: categoryRef(pl.segmentIndex),
+      kind: "surface" as const,
     }));
     // **No muted outline layer, and its absence is the finding.** `mergedRow`
     // resolves a whole cell to the first layer that inks it, and a braille rim
@@ -2298,9 +2327,9 @@ const FORM_ROWS: Readonly<
     // runs through is unreadable, and the scale is context rather than a
     // reading — it may only have the cells nothing else wanted.
     const layers: readonly Layer[] = [
-      { glyphRows: radar.labels, ref: "tone.muted" },
-      ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i) })),
-      { glyphRows: radar.frame, ref: "tone.muted" },
+      { glyphRows: radar.labels, ref: "tone.muted", kind: "curve" },
+      ...radar.polygons.map((glyphRows, i) => ({ glyphRows, ref: seriesRef(i), kind: "curve" as const })),
+      { glyphRows: radar.frame, ref: "tone.muted", kind: "curve" },
     ];
     const discLayout: Layout = { ...layout, areaWidth: radar.discWidth };
     const out: string[] = [];
