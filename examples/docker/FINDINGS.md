@@ -10247,3 +10247,65 @@ saturate. The row now asserts that its own fixture narrows — `the fixture's cl
 checked before the claim it enables — because a cloud that never narrows makes every direction
 assertion vacuous.
 
+
+## F210 — the axis was niced twice, and the spec's own table held the right answer ★★★★★
+
+`positionalForm` nices the data to get the range the curve is rasterised against. `yLabels` then
+niced **that** to get the range the gutter is labelled from. Two computations of one axis, and
+`niceAxis` is **not idempotent**: the second pass sees the widened span, reaches for a coarser
+step, and widens again.
+
+| series | data | the curve's axis | the gutter's axis |
+|---|---|---|---|
+| `bubble`, the form corpus | 1 … 30 | **0 … 30** | 0 … 40 |
+| `line`, the form corpus | 1 … 5 | **0 … 6** | 0 … 7.5 |
+| request rate, the golden frame | 392 … 960 | **250 … 1000** | 0 … 1000 |
+| −3.7 … 12.4 at 16 rows | −3.7 … 12.4 | **−5 … 12.5** | −5 … 15 |
+
+**The bubble row is the one with no quantisation in it.** The largest bubble is 30, it is drawn on
+the top area row because 30 is the axis maximum, and the gutter called that row **40**. Nothing was
+rounded and nothing was ambiguous: the number beside the mark was a third larger than the mark.
+
+**The spec already held the right answer.** §3d's cost table — written to measure what loose
+labelling spends in rows — lists *request rate · 392 … 960 · snapped 250 … 1000 · +24%*, and the
+shipped frame labelled that axis's floor `0`. The document and the frame disagreed for as long as
+both existed, and no instrument compares a table in prose to a number on screen.
+
+**Measured before it was believed**: 12 of 23 heights diverge for one ordinary series, and every
+divergent case is a range that spans zero or sits off the step grid. It moved **46 golden frames**,
+every one of them in the same direction — a narrower, truer axis.
+
+### The previous remedy is what built it
+
+The comment standing in `yLabels` recorded this class found once before, in the other axis: *a
+`yScale: "log"` plot picked log ticks in `positionalForm`, where only `.range` was read, and was
+then labelled linearly. The ticks were computed twice and the set nobody drew was the correct one.*
+
+The fix threaded the **scale** through so both nicings would agree. Two computations that agree
+about scale are still two computations, and nothing made them agree about **range**. So the remedy
+closed the instance and left the class, and the class came back on the axis the remedy had just
+been applied to.
+
+**`xTickRow` has the other half of the evidence.** It pins both ends — `axisFor(range, xTicksFor(w),
+{ yMin: range.min, yMax: range.max }, scale)` — so its second nicing cannot widen. One function,
+two consumers, one pinned and one not, and the pinned one was written later. The pin is a
+work-around for the second computation; it does not remove it, and it does not fix the **step**,
+which is what put `13` where `12.5` belongs when pinning alone was tried.
+
+### The shape to take from it
+
+**A remedy that makes two computations agree is weaker than one that removes the second.** Agreeing
+about one input leaves every other input free to disagree, and the next divergence looks nothing
+like the one that was fixed — it was a *scale* mismatch and came back as a *range* mismatch, in a
+function whose comment described the first.
+
+`yLabels` now takes an `Axis` and nices nothing. `positionalForm` computes it once, where the data
+is measured, and hands the same object to the rasteriser and to the gutter. Two parameters —
+`pin` and `scale` — went away with the second computation, which is the sign it was the right cut:
+they existed only to keep the copy in step.
+
+**And the instrument that found it was the frame, at a height nothing renders.** Both heights the
+catalogue and the goldens happen to use are in the agreeing set. The divergence was found by
+rendering the same series at every height from 2 to 24 and reading the two ranges side by side —
+which is the *walk the component by hand* rule applied to a function rather than a component, and
+`n = 8` and `n = 11` would both have said the code was right.

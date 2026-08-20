@@ -140,7 +140,7 @@ changes a label's width changes the plot area. The rename moves both arms' width
 who does not update, and that is the visible half of a breaking change taken deliberately
 before the freeze.
 
-**Axes.** Up to three y-labels — max, midpoint, min — formatted per `yFormat`, right-aligned in the label column, placed at the max, mid and min row indices of the plot area, each with a `┤` on the border beside it (§3f). **The tick values come from `axisFor` and therefore from `yScale`** — `yLabels` reached straight for the linear arm, so a log plot picked log ticks in `positionalForm`, where only the range was read, and was then labelled linearly. Two computations of one axis, disagreeing, and the set nobody drew was the correct one. **They collapse when the height cannot hold three**: at `height: 2` the max and the min, at `height: 1` the max alone. The midpoint goes first because the extremes bound the data and the midpoint is interpolation between them. Without this clause the section contradicted T3.2, which renders `height: 1` with axes.
+**Axes.** Up to three y-labels — max, midpoint, min — formatted per `yFormat`, right-aligned in the label column, placed at the max, mid and min row indices of the plot area, each with a `┤` on the border beside it (§3f). **The ticks and the range both arrive from the caller as one `Axis`** — `yLabels` computes no axis of its own. It niced a `Range` for itself once, which made two nicings of one axis: the log arm was reached in `positionalForm` and the labels were derived from the linear one, and after the scale was threaded through to settle that, the two remained free to disagree about *range*, which they did on 12 of 23 heights (§3d, F210). **They collapse when the height cannot hold three**: at `height: 2` the max and the min, at `height: 1` the max alone. The midpoint goes first because the extremes bound the data and the midpoint is interpolation between them. Without this clause the section contradicted T3.2, which renders `height: 1` with axes.
 
 The x-axis is a rule under the plot area; x-labels sit at left, centre and right of it.
 
@@ -481,6 +481,43 @@ can waste up to a step at each end, so fewer ticks means rounder labels and a lo
 rows the count is three, which is why the inflation is what it is. Recorded rather than tuned
 away: a reader who wants the tight fit back is reversing one ruling, and these are the figures it
 should rest on.
+
+### One axis per plot, and it is computed where the data is measured
+
+**The range the curve is rasterised against and the range the gutter is labelled from are the same
+object**, because two of them cannot be kept in step. `yLabels` takes an `Axis`; it does not take a
+`Range` and nice one for itself. `positionalForm` calls `axisFor` once and hands the result to the
+rasteriser and to the gutter.
+
+**`niceAxis` is not idempotent, and that is the whole mechanism** (F210). A second pass sees the
+already-snapped span, so `span / (ticks − 1)` is larger, so the step is coarser, so the ends snap
+further out. The table above is the first pass; a second one takes *request rate* from `250 … 1000`
+to `0 … 1000`, and that is the frame this component shipped — **the cost table said 250 and the
+gutter drew 0, for as long as both existed.**
+
+| series | data | the curve's axis | what a second nicing labelled it |
+|---|---|---|---|
+| `bubble` | 1 … 30 | 0 … 30 | 0 … **40** |
+| `line` | 1 … 5 | 0 … 6 | 0 … **7.5** |
+| request rate | 392 … 960 | 250 … 1000 | **0** … 1000 |
+
+The bubble row has no rounding in it: the largest bubble is the axis maximum, so it draws on the
+top area row, and the gutter called that row 40.
+
+**Pinning the second pass is not the fix, and trying it is what showed why.** Pinning both ends
+holds the range still and leaves the *step* coarse, so the end label takes the coarse step's
+precision — `13` on the row holding `12.5`. The range and the precision come from the same
+arithmetic, and only one call has all of it.
+
+**A stacked plot carries bounds rather than an axis**, and says so: its gutter holds series names
+(§5), so nothing is labelled against it, and nicing the bounds would move the ink for a scale no
+reader is given. The object it passes has the raw range, the two ends as ticks, and a step of zero.
+
+**The previous remedy is what built this one.** The same class was found once before on the same
+function — a log plot picked log ticks in `positionalForm` and was labelled linearly — and was
+fixed by threading the *scale* into the second nicing so the two would agree. **Two computations
+that agree about one input are still two computations**, and the next divergence was about a
+different input entirely. `pin` and `scale` were parameters of the copy; both went away with it.
 
 ### Precision is one per axis, from the step — and it is the step's own decimals
 
@@ -4041,7 +4078,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I12** — C12 registers through C09's public `register`; it is not privileged.
 - **I13** — Sparklines are exactly one row, at every width including 1, **and one cell per position rather than per sample**. A window of eight positions is eight cells whether or not every position has a reading. **Fewer positions than cells pad on the right**, so a row fills from the left and only begins to scroll once it is full (§B3).
 - **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise. *Composition (§3): under downsampling the join runs from a column's last sample to the next column's first, which is what keeps I5's span-fill connected.*
-- **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`. **A labelled row carries a tick on the border and an unlabelled one does not** — one rule rather than a flag per form, and the same rule a categorical axis, a band and a matrix row each resolve correctly under. **The tick values follow `yScale`**, because `yLabels` dispatches through `axisFor` rather than reaching for the linear arm.
+- **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`. **A labelled row carries a tick on the border and an unlabelled one does not** — one rule rather than a flag per form, and the same rule a categorical axis, a band and a matrix row each resolve correctly under. **The ticks, the range and the precision all come from the one `Axis` the caller rasterised against** — `yLabels` nices nothing. A second nicing is not idempotent, so it labelled a `bubble` whose largest mark is 30 with a `40` on the row that mark is drawn on (§3d, F210).
 - **I16** — **Every step of every ramp is visible, and no ramp's lowest step is the character its padding uses.** Eight steps, monotone in ink. The braille arm shipped with `U+2800` — BRAILLE PATTERN BLANK — as step 0, so a sparkline at `ambiguousWidth: "wide"` drew its minimum as whitespace, which the right-anchor already uses to mean *fewer samples than cells*: one character, two meanings, in the arm nothing renders in a golden frame. *This is a property of the constant, not of a call, so it is asserted over the ramps themselves.*
 - **I17** — **A heatmap draws one cell per position per row, against a range shared by the whole matrix, with magnitude carried by ink density and an absent cell left blank.** The shared range is what makes it a matrix rather than a stack of unrelated sparklines. **The ramp is `RAMP_DENSITY` and never the sparkline's**: the latter fills bottom-up, which encodes height, and a grid cell has no vertical axis to encode it on. Blank is absence rather than `?` because a grid has no padding for a blank to be confused with, and the lowest step has ink. Rows are drawn in the order the block declares them and the renderer never sorts. **Colour carries magnitude where there is colour, and the glyph is what stands in where there is not** — which is the inverse of what this clause used to say, and the correction is a measured one. It read *density survives 1-bit, so a magnitude colour would add rather than carry alone*, which made ink density the permanent carrier and colour an optional garnish. Rendered, that is a field of dithered speckle: a matrix drawn in foreground glyphs on unpainted cells reads as noise, and no palette applied over it fixes that, because the glyph is still the thing occupying the cell. **A heatmap with colour available paints the cell** — a background-coloured space, no glyph — and reads as the continuous field it is. Granite is the reference and the difference is not subtle. The density ramp is then exactly what the name says: the **fallback**, reached when `colourDepth` cannot separate the values, and the reason the 1-bit picture is unchanged is that it is the only picture that still needs the ramp. *A ragged matrix is refused at construction (C04 I50b).*
 - **I18** — **A heatmap spends width on columns first, then truncates its labels, and never draws an unlabelled matrix.** Row labels are the ordinate: a matrix with no names beside it is a picture of numbers. Where the width cannot spare a cell for a label beside a minimum plot area the block draws a centred notice at its declared height instead — I1 holds, and the reader is told rather than shown something they cannot read. *The line form keeps T3.3's opposite ladder, because a y-label is a scale and a row label is an identity.*
