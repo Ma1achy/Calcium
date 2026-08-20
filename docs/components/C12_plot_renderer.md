@@ -799,8 +799,37 @@ alternative is worse and it is the one that follows from reading the rule as one
 lower edge with no fill above it reads as *the band ended*.
 
 **`fill` defaults on.** A band drawn as two unconnected dashed lines is the reading a caller has to
-be told to want; matplotlib's `fill_between` is the one they arrive expecting. `fill: false` keeps
-the old frame byte-identical, which is what makes the default safe to move.
+be told to want; matplotlib's `fill_between` is the one they arrive expecting.
+
+**And `fill: false` does *not* keep the old frame, because reading the frame found the old frame
+was wrong.** The draft claimed byte-identity and it was the safety argument for moving the default.
+Measured on a 50-column area with two edges — which should ink about 25 cells at `DASH_CELLS = 2` —
+the edges ink **seven**, and they ink seven at 8 samples, at 24, and at 100:
+
+| samples | inked cells |
+|---|---|
+| 8 | 7 |
+| 12 | 7 |
+| 24 | 7 |
+| 50 | 7 |
+| 100 | 7 |
+
+**The invariance is the finding, not the count.** A figure whose ink does not respond to the data
+is not drawing the data. The cause is one clause: a dot is set where a *sample's* dot column
+satisfies the dash test, `dotCol % (DASH_CELLS · BRAILLE_DOTS.x) === 0` — an intersection of *where
+a sample lands* with *where a dash is allowed*, which is nearly nowhere and gets rarer as the area
+widens. **The dash is a property of the drawn line and not a filter on the samples**, which is how
+`line` and `band` already draw theirs: `for (x = 0; x < dotWidth; x += DASH_CELLS · dots.x)`, every
+step inked, the row constant.
+
+So a confidence edge walks that same loop with the row varying — the value at each dashed column
+interpolated between the samples that straddle it, which is the inverse mapping the interior needed
+anyway. One helper, two callers, and the edges and the fill agree about where the band is by
+construction rather than by two rules that match.
+
+*This is why the frame read is scheduled rather than optional. The edges were specified, built,
+rendered, reviewed and committed, and the member that made anyone look at them was a different
+one.*
 
 **And there is no `label`, which is owed rather than forgotten.** The survey names one and it has
 nowhere to go: the gutter is sized from the y-labels and is a **scale**, so widening it for a
