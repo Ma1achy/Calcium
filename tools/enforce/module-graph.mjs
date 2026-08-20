@@ -1589,6 +1589,22 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // deleting the row is how the fact would otherwise disappear — the rule's own
   // sentence, *an exemption that outlives its reason is how the list stops being
   // read*, applied to the thing the exemption was about.
+  //
+  // **`VerbRatio.ratio` is the second instance and it widens the surface.** The
+  // first was a member cleared by another *member* — one real name colliding
+  // with another. This one was cleared by a **function parameter**: adding
+  // `columnsForAspect(rows, ratio)` to `plot/aspect.ts`, a file that publishes
+  // no member called `ratio` and consumes nothing, made this arm demand the
+  // exemption's deletion. So the surface is not *other published members*, it is
+  // *any identifier in `src/`* — and the gated arm asks for a **deletion**,
+  // which is the direction that costs something: a false positive here does not
+  // annoy, it instructs you to remove a guard that is working.
+  //
+  // `construct.ts:403` had already measured the same member matching a `ratio`
+  // in `theme/index.ts` and refused the widened arm because of it. **The
+  // mechanism was known and its effect on the reverse arm was not**, which is
+  // the shape worth naming: a limit recorded about one direction of a rule says
+  // nothing about the other until someone points it there.
   // **`Colormap.kind` is deliberately not here**, and the staleness arm is what
   // said so: MG24 matches member names across `src/` without regard to owner
   // (F136), and `kind` is on nearly every block type, so a `Colormap.kind` entry

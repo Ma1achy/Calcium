@@ -2740,10 +2740,21 @@ because a plan claiming to close it is exactly how a deferral gets marked done a
 asserts a fact it does not hold; the frame's width arrives at `render` and nowhere earlier, so the
 clamp lives there and the gate checks what a document can be wrong about on its own.
 
-**A narrowed plot that no longer fits its furniture is already answered.** `layoutFor` returns
-`null` where the gutter and the area cannot both fit and the renderer draws *Too narrow.* — so
-`width: 4` on a plot with a five-cell gutter says so rather than drawing a frame with no scale.
-That is an existing rung, reached by a new road.
+**A narrowed plot that no longer fits its furniture is already answered, and the two families
+answer differently.** Measured on a `height: 6` plot narrowed step by step:
+
+| | `line` | matrix |
+|---|---|---|
+| 20, 12 | frame and gutter, narrowed | the same |
+| 8 | **gutter dropped**, frame kept | *Too narrow.* |
+| 6, 4, 2, 1 | frame corners dropped, a rule at the declared width | *Too narrow.*, truncated to fit |
+
+**Neither overflows and both keep the declared row count** — nine rows at every width down to one,
+which is C12 I1 holding under a member that could have broken it. The matrix's `layoutFor` returns
+`null` where the gutter and the area cannot both fit; the line family has no such gate and does not
+need one, because its gutter is optional in a way a matrix's row labels are not (I18: a matrix's row
+label *is* its ordinate). *Two rungs, both pre-existing, reached by a new road — and the table is
+here because the first draft of this paragraph claimed the matrix's answer for both.*
 
 
 ## 3q. One value axis across the bands, and the record it never had
