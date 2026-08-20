@@ -2492,17 +2492,31 @@ length and the ladder has nothing to index.
 figure needs are what `extentRun` already returns at width 2 with one partial:
 
 ```
-leftward   ⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿
-rightward  ⠀⠀ · ⡇⠀ · ⣿⠀ · ⣿⡇ · ⣿⣿      what `extentFor`'s wide arm draws today
+leftward   ⠀⠀ · ⠀▐ · ⠀█ · ▐█ · ██      blocks at narrow, braille at wide
+rightward  ⠀⠀ · ⡇⠀ · ⣿⠀ · ⣿⡇ · ⣿⣿      what `extentFor`'s wide arm draws
 ```
 
-**The leftward arm is braille at every width, and that is a limit rather than a choice.**
-`extentFor`'s narrow arm uses the left-eighths `▏▎▍▌▋▊▉` — seven fractions growing from the
-left. Unicode has no matching set growing from the right: `▕` and `▐` are the only two, an
-eighth and a half, and both are `East_Asian_Width=Ambiguous`. Braille is `Neutral`
-throughout and `⢸` is the right dot-column, which is the one fraction the block can express
-sideways — the same trade `extentFor` already records for its wide arm, arriving from the
-other direction.
+**The leftward arm was braille at every width, and the argument for it does not
+distinguish.** It ran: `extentFor`'s narrow arm uses the left-eighths `▏▎▍▌▋▊▉`, seven
+fractions growing from the left; Unicode offers no matching set growing from the right, only
+`▕` and `▐`, an eighth and a half, and both are `East_Asian_Width=Ambiguous` where braille is
+`Neutral`.
+
+**Every clause is true and the conclusion is not, because `█` and the left-eighths are
+Ambiguous too** — measured: one cell at `narrow`, two at `wide`, the same as `▐`. That is what
+`extentFor`'s `ambiguousWidth === "wide"` branch is *for*, and the narrow arm has always drawn
+blocks in the teeth of it. The ambiguity clause separates nothing.
+
+**What the seven-fractions clause settles is resolution, and there the two are equal.** A
+leftward run is `⣿` with one partial — two states a cell — and blocks give `█` with `▐`, also
+two. Braille bought nothing and cost the vocabulary: *the vertical compact violin drew dots
+where the horizontal one drew a solid ladder, one rung of one figure in two alphabets.* So
+leftward is `█` with `▐` at narrow width, braille at wide, which is the same branch every other
+extent takes.
+
+*This is the shape MG24's scope had* — a correct sentence attached to the wrong decision, which
+survives being read carefully because the reader checks whether it is **true** and not whether it
+**decides**.
 
 That is why the vertical budget is three columns and not two: two would be four dot-columns
 for the density *and* the box.
