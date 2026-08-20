@@ -594,6 +594,31 @@ disk    ▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁
 **It was invented for dense dashboards on limited displays** — which is a terminal exactly, and
 `sys-tui` is its consumer. **Nothing in the survey has one.**
 
+### The correction — the colour axis was charged for and never delivered
+
+**The entry above is right and the thing built from it is missing both of its channels.** This
+text says *split the range into N bands, stack them, and colour by depth*, and the sketch says
+`colour = which band`. What shipped carries depth on `ladderFor("density")` — a **glyph** ramp —
+and `DEFAULT_COLORMAP.horizon` is `null`. `horizon.ts`'s own header states the price in the same
+breath as the benefit: *that is what buys the compression … paid for in a colour axis the reader
+has to learn.* **The price is charged and the goods never arrive.**
+
+**And the second channel is spent paying for the first.** Within-band height is
+`max(1, round(within × h))` — whole rows — so at `height: 1`, the canonical horizon and the one
+this entry advertises, every inked column is exactly one row and the position inside the band is
+gone. `docs/catalogue/horizon-folded-1x3-24bit.plain` is that frame: one row, and the only
+variation in it is the glyph. The sketch above is `▁▂▃▅▇█` — **vertical eighths**, which is the
+ladder that channel needs and which depth is currently occupying.
+
+**Two channels, one alphabet, and the fix is to stop sharing it.** Reversed in C12 §3z: depth is
+**colour** and height is **eighths**. Below `CONTINUOUS_FLOOR = 8` there is no colour and the
+design is back to one channel for two data — which is a frame-read question and is ruled there,
+not here.
+
+**What is not corrected**: *nothing in the survey has one* still holds, and so does the reason
+this form is the one to notice. The survey was right about which chart to build and about what it
+is for; the implementation took the compression and left the axis that pays for it.
+
 **`flame graph` — nested horizontal bars, and it is a real tool.** Stack depth is the y-axis,
 time is the width, and **it is bars all the way down** — no raster, no curves.
 
