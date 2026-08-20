@@ -2218,7 +2218,11 @@ const FORM_ROWS: Readonly<
         if (rung.rung === "rain" || rung.rung === "raindrop") {
           return rainColumns(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth);
         }
-        return violinColumn(sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr), block.plotCorners ?? "rounded", block.bandwidth, shared);
+        return violinColumn(
+          sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr),
+          block.plotCorners ?? "rounded", block.bandwidth, shared,
+          block.plotStyle === "braille", block.plotFill === "solid",
+        );
       });
     }
     // **The violin routes through the same chooser as the boxplot**, which is

@@ -461,3 +461,87 @@ describe("SA9 (C12 I45): the radar's grid is a polygon or a circle, and it is de
     expect(fig("polygon")).not.toBe(fig("circle"));
   });
 });
+
+describe("SA10 (C12 I43): every violin routine answers for the style, one way or the other", () => {
+  // **The row that was missing, and its absence is the whole finding.** SA3
+  // asserted the braille arm on the *horizontal full-density* violin and
+  // `STYLE_ARMS` said `violin` has a braille arm — both true, and three of the
+  // form's five drawing routines accepted `plotStyle` and changed nothing.
+  //
+  // A record keyed by `PlotForm` cannot ask this question, so the table is
+  // over **routines**, and each row says which of the three answers that
+  // routine gives: honour, degrade, or nothing (§3w).
+  const D = (c: number, sp: number): number[] =>
+    Array.from({ length: 200 }, (_v, i) => c + Math.sin(i * 1.7) * sp + ((i * 7) % 11) - 5); // cells-ok — a sample count
+  const S = [{ values: D(40, 5) }, { values: D(45, 12) }, { values: D(38, 8) }];
+  const draw = (extra: object): string =>
+    kit().renderToLines(block({
+      kind: "plot", id: "sa10", form: "violin", axes: true,
+      categories: ["tight", "wide", "skewed"], series: S, ...extra,
+    }), 72).map(plain).join("\n");
+
+  // `honours` is the claim; the raincloud rungs degrade to the block ladder,
+  // which C12 I43 rules is the *finer* vocabulary there — eight levels in a
+  // one-row cloud against braille's four dot rows.
+  const ROUTINES: readonly { name: string; at: object; honours: boolean }[] = [
+    { name: "horizontal, full density", at: { height: 21 }, honours: true },
+    { name: "vertical, full density", at: { height: 14, orientation: "vertical" }, honours: true },
+    { name: "horizontal raincloud", at: { height: 6, plotDetail: "compact" }, honours: false },
+    { name: "vertical raincloud", at: { height: 14, orientation: "vertical", plotDetail: "compact" }, honours: false },
+    { name: "raindrop", at: { height: 9 }, honours: false },
+  ];
+
+  for (const { name, at, honours } of ROUTINES) {
+    it(`${name}: ${honours ? "the style changes the figure" : "the style degrades to the ladder, unchanged"}`, () => {
+      const off = draw(at);
+      const on = draw({ ...at, plotStyle: "braille" });
+      const filled = draw({ ...at, plotStyle: "braille", plotFill: "solid" });
+      expect(on !== off, `braille on ${name}`).toBe(honours);
+      expect(filled !== on, `fill on ${name}`).toBe(honours);
+    });
+  }
+
+  it("the vocabulary changes and the extent does not — every arm", () => {
+    // **`it changed` and `it is braille` are both true of a violin drawn to a
+    // quarter of its length**, which is what a mutation of the resample
+    // produces and what survived a run of this file. §3w's claim is that the
+    // fork changes the *vocabulary and not the geometry*, so the assertion is
+    // the geometry: the rows and columns the figure inks are the same set.
+    // **The bounding box is not enough, measured**: a violin whose body is
+    // drawn to a quarter of its length still inks the full extent, because the
+    // *spine* runs the whole way. Where the mass sits is the geometry, so the
+    // statistic is the ink's centroid — which the truncation moves and the
+    // change of alphabet does not.
+    const ink = (c: string): boolean => c !== " " && c !== "\u2800";
+    const centroid = (frame: string): { row: number; col: number } => {
+      const rows = frame.split("\n");
+      let n = 0;
+      let sr = 0;
+      let sc = 0;
+      rows.forEach((r, y) => [...r].forEach((c, x) => {
+        if (!ink(c)) return;
+        n += 1; sr += y; sc += x; // cells-ok — a cell count
+      }));
+      return { row: sr / Math.max(1, n), col: sc / Math.max(1, n) };
+    };
+    for (const { name, at } of ROUTINES) {
+      const a = centroid(draw(at));
+      const b = centroid(draw({ ...at, plotStyle: "braille" }));
+      expect(b.row, `${name} row centroid ${b.row.toFixed(2)} vs ${a.row.toFixed(2)}`).toBeCloseTo(a.row, 0);
+      expect(b.col, `${name} col centroid ${b.col.toFixed(2)} vs ${a.col.toFixed(2)}`).toBeCloseTo(a.col, 0);
+    }
+  });
+
+  it("the braille arms are braille and the degraded ones are the ladder", () => {
+    // **Asserting only *it changed* lets any change pass**, which is how the
+    // first form of a fork's row goes wrong: the vocabulary is the claim.
+    for (const { name, at, honours } of ROUTINES) {
+      const on = draw({ ...at, plotStyle: "braille" });
+      const cells = [...on];
+      const hasBraille = cells.some(isBraille);
+      const hasLadder = cells.some((c) => "▁▂▃▄▅▆▇█".includes(c));
+      if (honours) expect(hasBraille, `${name} draws dots`).toBe(true);
+      else expect(hasLadder, `${name} keeps the height ladder`).toBe(true);
+    }
+  });
+});

@@ -10149,3 +10149,62 @@ grid's mechanism alone, so the row that kills it renders `plotGrid: "circle"` on
 mutation whose target is only reachable through a non-default option is a mutation that quietly
 stops testing when the default changes.*
 
+## F207 — a total record that answers at the wrong granularity ★★★★★
+
+*There is no braille version of the vertical violin plot or of the compact ones, I don't think
+anyway.* There is not, and `STYLE_ARMS` says there is.
+
+`STYLE_ARMS` is `Record<PlotForm, readonly PlotStyle[]>` — total, so the thirty-fifth form must
+declare, and it says `violin` has a braille arm. **A violin has five drawing routines and one of
+them had it.** Measured by rendering each with and without the style and asking whether the frame
+changed at all:
+
+| the routine | `plotStyle: "braille"` | `plotFill: "solid"` |
+|---|---|---|
+| horizontal, full density | honoured | honoured |
+| **vertical, full density** | **ignored** | **ignored** |
+| horizontal raincloud (`compact`) | ignored | ignored |
+| vertical raincloud | ignored | ignored |
+| raindrop | ignored | ignored |
+
+**Accepted at construction and ignored at render is the worst of the three answers** — worse
+than refusing, which tells the caller, and worse than degrading, which tells the reader. And the
+record could not have caught it: the arm belongs to a **routine** and the key is a **form**, so a
+record that is total over its key reads as a complete answer to a question it cannot ask.
+
+*The totality is what makes it convincing.* `SP1`-style pairing, a `Record` the compiler checks,
+a test asserting every form declares — all green, all true, and three-fifths of one form's
+surface unreachable.
+
+**The vertical arm is now the transpose.** `violinRows` samples at `2w` dot columns and offsets
+in dot rows; stood up, the value axis is sampled at `4n` dot rows and the width offset at 2 a
+cell. **§3w had said only "smoothness"** and the two arms gain different things — lying down the
+finer axis is the *offset*, so the outline's shape sharpens; standing up it is the *sampling*.
+
+**The raincloud rungs degrade, and that is a ruling.** Their cloud is one cell row drawn with
+`ladderFor("height")` — `▁▂▃▄▅▆▇█`, **eight levels**, against braille's **four** dot rows. A
+braille cloud there is half the resolution in another alphabet. Degrade rather than refuse
+because the rung comes from a height construction cannot see (C04 I56) — I18's precedent, and
+the solid pie's at one bit.
+
+## F208 — a new call site moved in above a mutation's anchor ★★★
+
+`the braille violin does not resample` had been caught since the fork landed. Adding the vertical
+arm put a second `const fineD = kde(finite, fine, bw)` in the file **above** the one it named,
+and `apply` replaces the first — so the mutation silently changed subject to a routine `SA3` does
+not render, and survived.
+
+**F201 said a survivor is not always a stale anchor. This is the third disposition**: the anchor
+resolved, the subject was replaced. `tools/mutate/anchors.mjs` cannot see it — the string is
+present, so the anchor is not missing; it is *no longer unique*, which nothing checks.
+
+And when it was re-anchored to the arm it names, **it still survived**. `SA10` asserted *the
+style changes the figure* and *the figure is braille*, both of which are true of a violin drawn
+to a quarter of its length — F195's class, third instance. Even the bounding box passes, because
+the **spine** runs the figure's whole length whatever the body does. What catches it is the ink's
+**centroid**: §3w's claim is that the fork changes the vocabulary and not the geometry, and where
+the mass sits is the geometry.
+
+*An anchor that is present but not unique is a mutation testing something else, and it reads
+exactly like one that is passing.*
+

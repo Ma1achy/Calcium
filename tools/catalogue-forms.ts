@@ -678,6 +678,28 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       series: [s([...Array.from({ length: 25 }, (_, i) => 10 + (i % 5) * 0.4),
                   ...Array.from({ length: 25 }, (_, i) => 30 + (i % 5) * 0.4)])],
     },
+    // The vertical arm's braille fork (C12 I43, §3w). Standing the figure up
+    // swaps which axis gains: the value axis is sampled at four dot rows a cell
+    // instead of the width being offset at four.
+    "vertical-braille": {
+      form: "violin", height: 14, axes: true, orientation: "vertical", plotStyle: "braille",
+      categories: ["control", "dose-a", "dose-b"],
+      series: [
+        s(Array.from({ length: 40 }, (_v, i) => 30 + Math.sin(i * 0.7) * 9)),
+        s(Array.from({ length: 40 }, (_v, i) => 45 + Math.sin(i * 0.5) * 6)),
+        s(Array.from({ length: 40 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12)),
+      ],
+    },
+    "vertical-braille-filled": {
+      form: "violin", height: 14, axes: true, orientation: "vertical",
+      plotStyle: "braille", plotFill: "solid",
+      categories: ["control", "dose-a", "dose-b"],
+      series: [
+        s(Array.from({ length: 40 }, (_v, i) => 30 + Math.sin(i * 0.7) * 9)),
+        s(Array.from({ length: 40 }, (_v, i) => 45 + Math.sin(i * 0.5) * 6)),
+        s(Array.from({ length: 40 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12)),
+      ],
+    },
     // C12 §3j — the conventional orientation, and one shared value axis.
     vertical: {
       form: "violin", height: 14, axes: true, orientation: "vertical",

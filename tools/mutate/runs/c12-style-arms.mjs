@@ -54,11 +54,25 @@ const results = runPass({
     {
       // **The whole point of the braille arm.** Drawing the cell-resolution
       // edges with dots is the same staircase in a finer alphabet.
-      name: "the braille violin does not resample",
+      // **Anchored on the loop above it, because the string is no longer
+      // unique.** The vertical arm added a second `const fineD = kde(...)` and
+      // `apply` takes the first — so this mutation silently changed subject to
+      // a routine SA3 does not render, and survived. *A mutation that stops
+      // firing is not always a stale anchor: sometimes a new call site moved in
+      // above it* (F201, one turn along).
+      name: "the horizontal braille violin does not resample",
       file: KDE,
-      from: "    const fineD = kde(finite, fine, bw);",
-      to: "    const fineD = densities;",
+      from: "      fine.push(lo - pad + ((hi - lo + 2 * pad) * i) / Math.max(1, dw - 1));\n    }\n    const fineD = kde(finite, fine, bw);",
+      to: "      fine.push(lo - pad + ((hi - lo + 2 * pad) * i) / Math.max(1, dw - 1));\n    }\n    const fineD = densities;",
       expect: "SA3",
+    },
+    {
+      // The same for the arm that moved in above it.
+      name: "the vertical braille violin does not resample",
+      file: KDE,
+      from: "      fine.push(hi + pad - ((hi - lo + 2 * pad) * i) / Math.max(1, dh - 1));\n    }\n    const fineD = kde(finite, fine, bw);",
+      to: "      fine.push(hi + pad - ((hi - lo + 2 * pad) * i) / Math.max(1, dh - 1));\n    }\n    const fineD = densities;",
+      expect: "SA10",
     },
     {
       // The first form of the fill: one dot column per cell, a hatch.
@@ -124,6 +138,25 @@ const results = runPass({
       from: "  const step = 1 / radius;",
       to: "  const step = 4 / radius;",
       expect: "SA6",
+    },
+    {
+      // **The vertical arm's braille fork, which did not exist**: `violinColumn`
+      // had no `braille` parameter at all, so `plotStyle` reached it and
+      // nothing happened. Unwiring it is the shipped state (C12 I43, §3w).
+      name: "the vertical violin ignores plotStyle again",
+      file: DEFN,
+      from: '          block.plotStyle === "braille", block.plotFill === "solid",\n        );',
+      to: "          false, false,\n        );",
+      expect: "SA10",
+    },
+    {
+      // And the arm itself, rather than its wiring: the transposed resample is
+      // where the finer sampling comes from.
+      name: "the vertical braille arm falls through to the line mask",
+      file: KDE,
+      from: "  if (braille) {\n    const dw = w * BRAILLE_DOTS.x; // cells-ok — a dot column count\n    const dh = n * BRAILLE_DOTS.y; // cells-ok — a dot row count\n    const dots = createGrid(dw, dh);\n    const spineDot = spineCol * BRAILLE_DOTS.x",
+      to: "  if (false) {\n    const dw = w * BRAILLE_DOTS.x; // cells-ok — a dot column count\n    const dh = n * BRAILLE_DOTS.y; // cells-ok — a dot row count\n    const dots = createGrid(dw, dh);\n    const spineDot = spineCol * BRAILLE_DOTS.x",
+      expect: "SA10",
     },
     {
       // The grid fork itself: a field that is read decides nothing if the

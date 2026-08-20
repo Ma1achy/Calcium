@@ -308,6 +308,10 @@ export function violinColumn(
   corners: "rounded" | "sharp" = "rounded",
   adjust?: number,
   shared?: { min: number; max: number },
+  /** The outline strokes the dot grid rather than the line mask (C12 I43, §3w). */
+  braille = false,
+  /** The dots between the two edges are set. The braille arm's alone (C04 I59). */
+  fill = false,
 ): readonly string[] {
   const slot = Math.max(1, Math.floor(colWidth)); // cells-ok — a column count
   const w = mirrorable(slot); // cells-ok — a column count
@@ -374,6 +378,61 @@ export function violinColumn(
   // looks like.
   const above = Math.max(0, support.first - 1); // cells-ok — a row index
   const below = Math.min(n - 1, support.last + 1); // cells-ok — a row index
+
+  // **The braille arm, transposed** (C12 I43, §3w). `violinRows` samples the
+  // density at `2w` dot columns and offsets in dot rows; standing the figure up
+  // swaps them — the value axis runs down the band, so it is sampled at `4n`
+  // dot rows, and the width is offset in dot columns at 2 per cell.
+  //
+  // **The two arms gain different things and the spec says only *smoothness*.**
+  // Lying down, the finer axis is the offset: 4 dot rows per cell of width, so
+  // the outline's *shape* is what sharpens. Standing up, the finer axis is the
+  // sampling: 4 dot rows per cell of value, so what sharpens is how often the
+  // density is asked. Both are the same trade read from the other end, and
+  // neither touches the geometry — I39's extent and §3i's rungs are the
+  // figure's.
+  if (braille) {
+    const dw = w * BRAILLE_DOTS.x; // cells-ok — a dot column count
+    const dh = n * BRAILLE_DOTS.y; // cells-ok — a dot row count
+    const dots = createGrid(dw, dh);
+    const spineDot = spineCol * BRAILLE_DOTS.x + Math.floor(BRAILLE_DOTS.x / 2); // cells-ok — a dot column
+    const halfDots = Math.max(1, Math.floor(dw / 2) - 1); // cells-ok — a dot column count
+
+    const fine: number[] = [];
+    for (let i = 0; i < dh; i += 1) { // cells-ok — a dot row
+      fine.push(hi + pad - ((hi - lo + 2 * pad) * i) / Math.max(1, dh - 1));
+    }
+    const fineD = kde(finite, fine, bw);
+    const fineMax = Math.max(...fineD, Number.MIN_VALUE);
+    const fineSupport = supported(fine, sorted, bw ?? silvermanBandwidth(finite));
+
+    for (let y = 0; y < dh; y += 1) setDot(dots, spineDot, y); // cells-ok — a dot row
+
+    const from = Math.max(0, fineSupport.first - 1); // cells-ok — a dot row
+    const to = Math.min(dh - 1, fineSupport.last + 1); // cells-ok — a dot row
+    let prev: number | null = null;
+    for (let y = from; y <= to; y += 1) { // cells-ok — a dot row
+      const inside = y >= fineSupport.first && y <= fineSupport.last; // cells-ok — a dot row
+      // The non-finite guard `violinRows` needs for the same reason: `drawLine`
+      // stops on equality and `NaN` equals nothing, so one undefined density is
+      // a renderer that does not return (F194).
+      const raw = inside ? (fineD[y] ?? 0) / fineMax : 0;
+      const off = Number.isFinite(raw) ? Math.round(raw * halfDots) : 0; // cells-ok — a dot column
+      if (prev !== null) {
+        drawLine(dots, spineDot - prev, y - 1, spineDot - off, y);
+        drawLine(dots, spineDot + prev, y - 1, spineDot + off, y);
+      }
+      setDot(dots, spineDot - off, y); // cells-ok — a dot column
+      setDot(dots, spineDot + off, y); // cells-ok — a dot column
+      if (fill) for (let x = spineDot - off; x <= spineDot + off; x += 1) setDot(dots, x, y); // cells-ok — a dot column
+      prev = off;
+    }
+
+    const folded = foldBraille(dots).map((r) => r.padEnd(w).slice(0, w));
+    return boxOnSpineColumn(folded, spineCol, n, glyphs(caps), quartiles, lo, hi, pad)
+      .map((r) => gap + r);
+  }
+
   leftEdge.push([spineCol, above]);
   rightEdge.push([spineCol, above]);
   for (let r = support.first; r <= support.last; r += 1) {
@@ -586,6 +645,42 @@ export function rainColumns(
  * quartile is a position and not a shape. One placer means the two arms cannot
  * drift about where a median is.
  */
+/**
+ * The summary marks on a vertical violin's spine — `boxOnSpine` stood up.
+ *
+ * Separate rather than parameterised on an axis: the two write different
+ * glyphs (`─` and `├` against `│` and `┬`), and a function that took the pair
+ * would be a table of two rows with a lookup in front of it.
+ */
+function boxOnSpineColumn(
+  rows: readonly string[],
+  spineCol: number,
+  n: number,
+  gl: ReturnType<typeof glyphs>,
+  quartiles: QuartileSummary | undefined,
+  lo: number,
+  hi: number,
+  pad: number,
+): readonly string[] {
+  if (quartiles === undefined) return rows;
+  const span = hi - lo + 2 * pad;
+  const at = (v: number): number =>
+    Math.max(0, Math.min(n - 1, n - 1 - Math.round(((v - (lo - pad)) / (span || 1)) * (n - 1)))); // cells-ok — a row index
+  const out = rows.map((r) => [...r]);
+  const put = (r: number, ch: string): void => {
+    const row = out[r];
+    if (row !== undefined && spineCol < row.length) row[spineCol] = ch; // cells-ok — a column index
+  };
+  put(at(quartiles.q1), gl.horizontal);
+  put(at(quartiles.q3), gl.horizontal);
+  put(at(quartiles.median), gl.teeRight);
+  if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
+    const rm = at(quartiles.mean);
+    if (rm !== at(quartiles.median)) put(rm, gl.diamond);
+  }
+  return out.map((r) => r.join(""));
+}
+
 function boxOnSpine(
   rows: readonly string[],
   spineRow: number,
