@@ -782,6 +782,46 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // is deliberate and coprime to nothing — but the *frame* is what this
     // fixture is for, and the rung is reached by declaring three rows a band
     // rather than by naming it (C12 §3i, I34).
+    // The compact rungs' braille arm, both orientations (C12 I43, §3w) — the
+    // same eight sub-cells the ladder spends on magnitude, split two by four.
+    "compact-braille": {
+      form: "violin", height: 6, axes: true, plotStyle: "braille",
+      categories: ["tight", "wide", "skewed"],
+      series: [
+        s(Array.from({ length: 200 }, (_v, i) => 40 + Math.sin(i * 1.7) * 5 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_v, i) => 45 + Math.sin(i * 1.7) * 12 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_v, i) => 38 + Math.sin(i * 1.7) * 8 + ((i * 7) % 11) - 5)),
+      ],
+    },
+    "compact-braille-filled": {
+      form: "violin", height: 6, axes: true, plotStyle: "braille", plotFill: "solid",
+      categories: ["tight", "wide", "skewed"],
+      series: [
+        s(Array.from({ length: 200 }, (_v, i) => 40 + Math.sin(i * 1.7) * 5 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_v, i) => 45 + Math.sin(i * 1.7) * 12 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_v, i) => 38 + Math.sin(i * 1.7) * 8 + ((i * 7) % 11) - 5)),
+      ],
+    },
+    "compact-vertical-braille": {
+      form: "violin", height: 14, axes: true, orientation: "vertical",
+      plotDetail: "compact", plotStyle: "braille",
+      categories: ["control", "dose-a", "dose-b"],
+      series: [
+        s(Array.from({ length: 40 }, (_v, i) => 30 + Math.sin(i * 0.7) * 9)),
+        s(Array.from({ length: 40 }, (_v, i) => 45 + Math.sin(i * 0.5) * 6)),
+        s(Array.from({ length: 40 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12)),
+      ],
+    },
+    "compact-vertical-braille-filled": {
+      form: "violin", height: 14, axes: true, orientation: "vertical",
+      plotDetail: "compact", plotStyle: "braille", plotFill: "solid",
+      categories: ["control", "dose-a", "dose-b"],
+      series: [
+        s(Array.from({ length: 40 }, (_v, i) => 30 + Math.sin(i * 0.7) * 9)),
+        s(Array.from({ length: 40 }, (_v, i) => 45 + Math.sin(i * 0.5) * 6)),
+        s(Array.from({ length: 40 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12)),
+      ],
+    },
     raindrop: {
       form: "violin", height: 9, axes: true, categories: ["tight", "wide", "skewed"],
       series: [

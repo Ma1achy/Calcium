@@ -234,6 +234,10 @@ export function rainRows(
   seriesIndex: number,
   rain: boolean,
   adjust?: number,
+  /** The cloud is dots rather than the height ladder (C12 I43, §3w). */
+  braille = false,
+  /** The dots under the curve are set. The braille arm's alone (C04 I59). */
+  fill = false,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const blank = " ".repeat(w);
@@ -267,6 +271,39 @@ export function rainRows(
   // **The axis, not a ramp** (I21). A cloud cell is a column of a vertical
   // axis — the band is thin in *height*, so the resolution is inside one cell
   // and a ladder is the only shape that fits.
+  if (braille) {
+    // **The same eight sub-cells, spent on the other axis** (C12 I43, §3w).
+    // The ladder puts them all in magnitude — eight levels, one sample a cell.
+    // Braille splits them two by four: half the levels and **twice the
+    // sampling** along the value axis. *Not a downgrade, which is what a
+    // comparison of the vertical axis alone said.*
+    const dw = w * BRAILLE_DOTS.x; // cells-ok — a dot column count
+    const dots = createGrid(dw, BRAILLE_DOTS.y);
+    const fine = Array.from(
+      { length: dw }, // cells-ok — a dot column count
+      (_v, i) => min + (span * i) / Math.max(1, dw - 1),
+    );
+    const fineD = kde(finite, fine, bw);
+    const fineMax = Math.max(...fineD, Number.MIN_VALUE);
+    const fineSupport = supported(fine, sorted, bw ?? silvermanBandwidth(finite));
+    const floorRow = BRAILLE_DOTS.y - 1; // cells-ok — a dot row
+    let prev: number | null = null;
+    for (let x = fineSupport.first; x <= fineSupport.last; x += 1) { // cells-ok — a dot column
+      const raw = (fineD[x] ?? 0) / fineMax;
+      const h = Number.isFinite(raw) ? Math.round(raw * floorRow) : 0; // cells-ok — a dot row count
+      // Joined to the column before it, so a fast rise is a stroke rather than
+      // two dots with a gap — `violinRows`' braille arm's rule, one edge.
+      if (prev !== null) drawLine(dots, x - 1, floorRow - prev, x, floorRow - h);
+      setDot(dots, x, floorRow - h); // cells-ok — a dot row
+      // **The cloud grows from the box**, so a fill runs down to the floor and
+      // not out from a spine: the ladder it replaces is bottom-anchored and the
+      // two rungs of one figure must anchor the same way.
+      if (fill) for (let y = floorRow - h; y <= floorRow; y += 1) setDot(dots, x, y); // cells-ok — a dot row
+      prev = h;
+    }
+    return rows((foldBraille(dots)[0] ?? blank).padEnd(w).slice(0, w));
+  }
+
   const ladder = [...ladderFor("height", caps).steps];
   const top = ladder.length - 1; // cells-ok — a ladder length
   const cloud = points.map((_p, i) => {
@@ -520,6 +557,10 @@ export function rainColumns(
   seriesIndex: number,
   rain: boolean,
   adjust?: number,
+  /** The cloud is dots rather than the width ladder (C12 I43, §3w). */
+  braille = false,
+  /** The dots under the curve are set. The braille arm's alone (C04 I59). */
+  fill = false,
 ): readonly string[] {
   const slot = Math.max(1, Math.floor(colWidth));
   const n = Math.max(1, Math.floor(rows));
@@ -601,6 +642,38 @@ export function rainColumns(
   // handed rightward glyphs draws its tip on the wrong end — a picture correct
   // in every count and reversed — so `extentFor` carries it and the pairing is
   // unspellable.
+  if (braille) {
+    // **The horizontal arm's cloud stood up** (C12 I43, §3w). The run of cells
+    // with one partial resolves `2 · cloudW + 1` levels along the *width*; in
+    // braille the same columns carry `2 · cloudW` dot columns of magnitude and
+    // **four dot rows per cell of value**, so what the fork buys standing up is
+    // the sampling — the same trade `violinColumn`'s arm makes.
+    const dw = cloudW * BRAILLE_DOTS.x; // cells-ok — a dot column count
+    const dh = n * BRAILLE_DOTS.y; // cells-ok — a dot row count
+    const dots = createGrid(dw, dh);
+    const fine = Array.from(
+      { length: dh }, // cells-ok — a dot row count
+      (_v, i) => min + (span * (dh - 1 - i)) / Math.max(1, dh - 1),
+    );
+    const fineD = kde(finite, fine, bw);
+    const fineMax = Math.max(...fineD, Number.MIN_VALUE);
+    const fineSupport = supported(fine, sorted, bw ?? silvermanBandwidth(finite));
+    // The cloud grows **leftward** from the box, so the run is anchored on the
+    // right edge — `extentFor(caps, "leftward")`'s direction, in dots.
+    const anchor = dw - 1; // cells-ok — a dot column
+    let prev: number | null = null;
+    for (let y = fineSupport.first; y <= fineSupport.last; y += 1) { // cells-ok — a dot row
+      const raw = (fineD[y] ?? 0) / fineMax;
+      const len = Number.isFinite(raw) ? Math.round(raw * anchor) : 0; // cells-ok — a dot column count
+      if (prev !== null) drawLine(dots, anchor - prev, y - 1, anchor - len, y);
+      setDot(dots, anchor - len, y); // cells-ok — a dot column
+      if (fill) for (let x = anchor - len; x <= anchor; x += 1) setDot(dots, x, y); // cells-ok — a dot column
+      prev = len;
+    }
+    const folded = foldBraille(dots).map((r) => r.padEnd(cloudW).slice(0, cloudW));
+    return Array.from({ length: n }, (_v, r) => beside(r, folded[r] ?? ""));
+  }
+
   const ext = extentFor(caps, "leftward");
   return points.map((_p, r) =>
     beside(r, r < support.first || r > support.last ? "" : extentRun(densities[r]! / maxD, cloudW, ext)),

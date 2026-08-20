@@ -10,6 +10,7 @@ import { block, validateBlock, STYLE_ARMS } from "../../src/data/viewmodel/index
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { radarRender } from "../../src/presentation/plot/circle.js";
+import { rainColumns } from "../../src/presentation/plot/kde.js";
 import { quadrantGlyph } from "../../src/presentation/plot/linedraw.js";
 import { FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 
@@ -480,24 +481,27 @@ describe("SA10 (C12 I43): every violin routine answers for the style, one way or
       categories: ["tight", "wide", "skewed"], series: S, ...extra,
     }), 72).map(plain).join("\n");
 
-  // `honours` is the claim; the raincloud rungs degrade to the block ladder,
-  // which C12 I43 rules is the *finer* vocabulary there — eight levels in a
-  // one-row cloud against braille's four dot rows.
-  const ROUTINES: readonly { name: string; at: object; honours: boolean }[] = [
-    { name: "horizontal, full density", at: { height: 21 }, honours: true },
-    { name: "vertical, full density", at: { height: 14, orientation: "vertical" }, honours: true },
-    { name: "horizontal raincloud", at: { height: 6, plotDetail: "compact" }, honours: false },
-    { name: "vertical raincloud", at: { height: 14, orientation: "vertical", plotDetail: "compact" }, honours: false },
-    { name: "raindrop", at: { height: 9 }, honours: false },
+  // **Every routine, and none of them exempt.** The `honours: false` column this
+  // table used to have was the finding's other half: three rungs were listed as
+  // *degrading to the ladder* on the argument that a one-row cloud has eight
+  // ladder levels against braille's four — which compares the vertical axis
+  // alone. A cell is eight dots as 2 × 4, so the budgets are equal and the
+  // split differs (C12 I43, §3w).
+  const ROUTINES: readonly { name: string; at: object }[] = [
+    { name: "horizontal, full density", at: { height: 21 } },
+    { name: "vertical, full density", at: { height: 14, orientation: "vertical" } },
+    { name: "horizontal raincloud", at: { height: 6, plotDetail: "compact" } },
+    { name: "vertical raincloud", at: { height: 14, orientation: "vertical", plotDetail: "compact" } },
+    { name: "raindrop", at: { height: 9 } },
   ];
 
-  for (const { name, at, honours } of ROUTINES) {
-    it(`${name}: ${honours ? "the style changes the figure" : "the style degrades to the ladder, unchanged"}`, () => {
+  for (const { name, at } of ROUTINES) {
+    it(`${name}: the style and the fill each change the figure`, () => {
       const off = draw(at);
       const on = draw({ ...at, plotStyle: "braille" });
       const filled = draw({ ...at, plotStyle: "braille", plotFill: "solid" });
-      expect(on !== off, `braille on ${name}`).toBe(honours);
-      expect(filled !== on, `fill on ${name}`).toBe(honours);
+      expect(on, `braille on ${name}`).not.toBe(off);
+      expect(filled, `fill on ${name}`).not.toBe(on);
     });
   }
 
@@ -524,24 +528,71 @@ describe("SA10 (C12 I43): every violin routine answers for the style, one way or
       }));
       return { row: sr / Math.max(1, n), col: sc / Math.max(1, n) };
     };
+    // **The row centroid, and not the column.** An outline and a fill differ
+    // legitimately along the axis the density is drawn *on* — a braille cloud
+    // strokes the curve where the ladder fills under it, so the vertical
+    // raincloud's column centroid moves a full cell and should. What no change
+    // of alphabet may move is where the mass sits along the **value** axis,
+    // which is the axis the truncation this row exists for moves.
     for (const { name, at } of ROUTINES) {
       const a = centroid(draw(at));
       const b = centroid(draw({ ...at, plotStyle: "braille" }));
       expect(b.row, `${name} row centroid ${b.row.toFixed(2)} vs ${a.row.toFixed(2)}`).toBeCloseTo(a.row, 0);
-      expect(b.col, `${name} col centroid ${b.col.toFixed(2)} vs ${a.col.toFixed(2)}`).toBeCloseTo(a.col, 0);
     }
   });
 
-  it("the braille arms are braille and the degraded ones are the ladder", () => {
+  it("a raincloud's cloud still grows from the box, in either vocabulary", () => {
+    // **The direction is on the vocabulary and not on the call** — `kde.ts`
+    // says so about `extentFor(caps, "leftward")`, and the braille arm has to
+    // carry it in dots. A cloud anchored on the wrong edge leaves a gap between
+    // itself and the box and reads as a floating bar.
+    //
+    // **Asserted on `rainColumns` and not on the composed frame**, which is
+    // where three attempts went wrong: a chart has three bands side by side, so
+    // the leftmost ink in a row belongs to the *first* band and the rightmost
+    // to the last band's box — neither moves when a middle band's cloud flips.
+    // The whole-figure centroid is worse still: these clouds saturate their
+    // four cells for most of their length, and mirroring a full run changes
+    // nothing. One band, one row at a time, is what can see it.
+    const one = { values: Array.from({ length: 60 }, (_v, i) => 30 + 15 * Math.tan(((i + 0.5) / 60 - 0.5) * 2.4)) }; // cells-ok — a sample count
+    const q = { min: 5, q1: 22, median: 30, q3: 38, max: 55 };
+    const rc = (braille: boolean): readonly string[] =>
+      rainColumns(one, q, 0, 60, 6, 14, FULL_CAPS, 0, false, undefined, braille, braille);
+    const leftmost = (row: string): number | null => {
+      const xs = [...row].flatMap((c, x) => (c !== " " && c !== "\u2800" ? [x] : [])); // cells-ok — a cell column
+      return xs.length === 0 ? null : xs[0]!; // cells-ok — a cell column
+    };
+    const a = rc(false).map(leftmost);
+    const b = rc(true).map(leftmost);
+    // The tails are the rows that can differ; a saturated row is the same run
+    // in either direction, so a fixture whose cloud never narrows proves
+    // nothing. This one narrows: the leftmost column varies across its rows.
+    expect(new Set(a.filter((v) => v !== null)).size, "the fixture's cloud narrows").toBeGreaterThan(2); // cells-ok — a cell column
+    // **Within a cell, because the two vocabularies quantise differently** — a
+    // ladder step is one of eight, a braille run is one of five over twice the
+    // samples, so a run can land a cell either side. A flipped anchor moves the
+    // left end by the cloud's whole width, which is four.
+    a.forEach((v, i) => {
+      const w = b[i];
+      if (v === null || w === null || w === undefined) return;
+      expect(Math.abs(w - v), `row ${String(i)}: left end ${String(w)} against ${String(v)}`)
+        .toBeLessThanOrEqual(1); // cells-ok — a cell column
+    });
+  });
+
+  it("the vocabulary is dots, and the ladder is gone from the figure", () => {
     // **Asserting only *it changed* lets any change pass**, which is how the
     // first form of a fork's row goes wrong: the vocabulary is the claim.
-    for (const { name, at, honours } of ROUTINES) {
+    for (const { name, at } of ROUTINES) {
       const on = draw({ ...at, plotStyle: "braille" });
-      const cells = [...on];
-      const hasBraille = cells.some(isBraille);
-      const hasLadder = cells.some((c) => "▁▂▃▄▅▆▇█".includes(c));
-      if (honours) expect(hasBraille, `${name} draws dots`).toBe(true);
-      else expect(hasLadder, `${name} keeps the height ladder`).toBe(true);
+      // **A count, because presence is already true of one of them.** The
+      // vertical raincloud's default draws braille — its *rain strip* is jitter
+      // in dots — so *the figure contains braille* says nothing there. What the
+      // fork does is put the **cloud** in dots too, which is strictly more of
+      // them.
+      const dots = (t: string): number => [...t].filter(isBraille).length; // cells-ok — a cell count
+      expect(dots(on), `${name}: ${String(dots(on))} dots against ${String(dots(draw(at)))}`)
+        .toBeGreaterThan(dots(draw(at)));
     }
   });
 });

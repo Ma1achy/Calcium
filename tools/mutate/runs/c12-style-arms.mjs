@@ -159,6 +159,44 @@ const results = runPass({
       expect: "SA10",
     },
     {
+      // **The compact rungs' braille cloud, both orientations.** They were
+      // listed as *degrading to the ladder* on an argument that compared the
+      // vertical axis alone; a cell is eight dots as 2 x 4, so the budgets are
+      // equal (C12 I43, §3w).
+      name: "the horizontal raincloud keeps the height ladder",
+      file: DEFN,
+      from: '          ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n          block.plotStyle === "braille", block.plotFill === "solid",\n        );',
+      to: '          ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n          false, false,\n        );',
+      expect: "SA10",
+    },
+    {
+      name: "the vertical raincloud keeps the width ladder",
+      file: DEFN,
+      from: '            ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n            block.plotStyle === "braille", block.plotFill === "solid",\n          );',
+      to: '            ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n            false, false,\n          );',
+      expect: "SA10",
+    },
+    {
+      // The cloud grows from the box, so a fill runs to the floor. Filling out
+      // from the curve instead is the anchor the two rungs must share.
+      name: "the horizontal cloud's fill is not anchored to the floor",
+      file: KDE,
+      from: "      if (fill) for (let y = floorRow - h; y <= floorRow; y += 1) setDot(dots, x, y); // cells-ok — a dot row",
+      to: "      if (fill) setDot(dots, x, floorRow - h); // cells-ok — a dot row",
+      expect: "SA10",
+    },
+    {
+      // And the vertical cloud's direction: anchored right, growing left.
+      // **The anchor, not just the joining stroke.** Flipping `drawLine` alone
+      // left `setDot` and the fill anchored right, so the figure barely moved
+      // and the row survived — a mutation of a third of a rule.
+      name: "the vertical cloud grows rightward from the left edge",
+      file: KDE,
+      from: "      if (prev !== null) drawLine(dots, anchor - prev, y - 1, anchor - len, y);\n      setDot(dots, anchor - len, y); // cells-ok — a dot column\n      if (fill) for (let x = anchor - len; x <= anchor; x += 1) setDot(dots, x, y); // cells-ok — a dot column",
+      to: "      if (prev !== null) drawLine(dots, prev, y - 1, len, y);\n      setDot(dots, len, y); // cells-ok — a dot column\n      if (fill) for (let x = 0; x <= len; x += 1) setDot(dots, x, y); // cells-ok — a dot column",
+      expect: "SA10",
+    },
+    {
       // The grid fork itself: a field that is read decides nothing if the
       // branch it selects is the same either way.
       name: "the grid is a circle whatever the block asked for",

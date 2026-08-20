@@ -2216,7 +2216,11 @@ const FORM_ROWS: Readonly<
           return boxplotColumn(qs[i] ?? summaryOf(sr) ?? EMPTY_SUMMARY, shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities);
         }
         if (rung.rung === "rain" || rung.rung === "raindrop") {
-          return rainColumns(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth);
+          return rainColumns(
+            sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows,
+            ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,
+            block.plotStyle === "braille", block.plotFill === "solid",
+          );
         }
         return violinColumn(
           sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr),
@@ -2242,7 +2246,11 @@ const FORM_ROWS: Readonly<
       // same budget: `"compact"` takes the floor at any height, so a raincloud
       // and a mirrored violin both arrive here with rows to spare.
       if (rung.rung === "rain" || rung.rung === "raindrop") {
-        return rainRows(sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw, ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth);
+        return rainRows(
+          sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw,
+          ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,
+          block.plotStyle === "braille", block.plotFill === "solid",
+        );
       }
       // The vocabulary, not the geometry (C12 I43, §3w) — every rung, budget
       // and extent above is unchanged by which alphabet strokes the outline.

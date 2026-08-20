@@ -10159,13 +10159,13 @@ declare, and it says `violin` has a braille arm. **A violin has five drawing rou
 them had it.** Measured by rendering each with and without the style and asking whether the frame
 changed at all:
 
-| the routine | `plotStyle: "braille"` | `plotFill: "solid"` |
+| the routine | before | after |
 |---|---|---|
 | horizontal, full density | honoured | honoured |
-| **vertical, full density** | **ignored** | **ignored** |
-| horizontal raincloud (`compact`) | ignored | ignored |
-| vertical raincloud | ignored | ignored |
-| raindrop | ignored | ignored |
+| **vertical, full density** | **ignored** | honoured |
+| **horizontal raincloud** (`compact`) | **ignored** | honoured |
+| **vertical raincloud** | **ignored** | honoured |
+| **raindrop** | **ignored** | honoured |
 
 **Accepted at construction and ignored at render is the worst of the three answers** — worse
 than refusing, which tells the caller, and worse than degrading, which tells the reader. And the
@@ -10181,11 +10181,21 @@ in dot rows; stood up, the value axis is sampled at `4n` dot rows and the width 
 cell. **§3w had said only "smoothness"** and the two arms gain different things — lying down the
 finer axis is the *offset*, so the outline's shape sharpens; standing up it is the *sampling*.
 
-**The raincloud rungs degrade, and that is a ruling.** Their cloud is one cell row drawn with
-`ladderFor("height")` — `▁▂▃▄▅▆▇█`, **eight levels**, against braille's **four** dot rows. A
-braille cloud there is half the resolution in another alphabet. Degrade rather than refuse
-because the rung comes from a height construction cannot see (C04 I56) — I18's precedent, and
-the solid pie's at one bit.
+**The raincloud rungs were ruled out on an argument that compared one axis, and that was
+wrong.** Their cloud is one cell row drawn with `ladderFor("height")` — `▁▂▃▄▅▆▇█`, **eight
+levels** — against braille's **four dot rows**, which reads as half the resolution and is not. A
+cell holds eight braille dots as **2 × 4**: the ladder spends all eight on magnitude at one
+sample a cell, braille spends them as five magnitude levels at **twice the sampling** along the
+value axis. **Equal budgets, different split.**
+
+*Reading one axis and calling the result a downgrade is the same error as reading a limit off
+the case that produced it* — and the ruling it produced said `degrade` where the repo's own rule
+for a styling fork says **ship every variant**. All five routines honour both fields now.
+
+The horizontal cloud is a bottom-anchored stroke over `2w` dot columns, filled to the floor
+rather than out from a spine, because the ladder it replaces is bottom-anchored and two rungs of
+one figure must anchor the same way. The vertical cloud is that stood up — anchored on the right
+edge and growing left, which is `extentFor(caps, "leftward")`'s direction expressed in dots.
 
 ## F208 — a new call site moved in above a mutation's anchor ★★★
 
@@ -10207,4 +10217,33 @@ the mass sits is the geometry.
 
 *An anchor that is present but not unique is a mutation testing something else, and it reads
 exactly like one that is passing.*
+
+## F209 — four attempts at one assertion, each defeated by the fixture rather than the code ★★★★
+
+The vertical raincloud's cloud grows **leftward**, out from the box. Flipping that anchor is a
+one-line mutation and it survived **four** forms of the row meant to catch it. Each failure is a
+different way a fixture answers for the code:
+
+| the assertion | why it could not see the flip |
+|---|---|
+| whole-figure **column centroid** | the clouds run near the full four cells for most of their length, and **mirroring a saturated run changes nothing** |
+| per-row **leftmost ink** | a chart has three bands side by side, so a row's leftmost ink belongs to the **first** band and never moves |
+| per-row **rightmost ink** | the same, from the other end — the last band's **box** is the rightmost thing in every row |
+| **inked-cell disagreement** | 3.6% correct against 9.9% flipped — a real separation, and picking a number between them is a threshold chosen to be safely true |
+
+**What worked was dropping to the unit.** `rainColumns` for one band, leftmost inked column per
+row, tolerance one cell — because the two vocabularies quantise a run differently (one of eight
+ladder steps against one of five over twice the samples) while a flipped anchor moves the left
+end by the cloud's whole width.
+
+**Three of the four failures are the same shape: a neighbour answered.** The composed frame has
+three bands and a box and a strip, and every whole-row statistic is dominated by whichever of
+them is furthest out. *A figure with more than one band in it cannot answer a question about one
+band's geometry*, and the fix is not a sharper statistic but a smaller subject.
+
+And the first of the four is the fixture rule again, one turn after it was applied to the
+mutation itself: **a fixture must be shown to respond to the thing under test.** These clouds
+saturate. The row now asserts that its own fixture narrows — `the fixture's cloud narrows`,
+checked before the claim it enables — because a cloud that never narrows makes every direction
+assertion vacuous.
 
