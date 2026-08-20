@@ -3053,7 +3053,7 @@ structural half.
 | | the two rules | ruling |
 |---|---|---|
 | **A1** | the frame draws a border on four sides · the cross draws two rules inside | both draw. The cross is a mark in the plot area and not a relocation of the frame |
-| **A2** | `"grid"` draws `┊` at tick columns and `┄` at labelled rows · the cross draws a rule at the zero column and row | one cell, two claims. **The cross wins and it is solid where the grid is dashed** — see 3ad.4 |
+| **A2** | `"grid"` draws `┊` at tick columns and `┄` at labelled rows · the cross draws a rule at the zero column and row | **the same alphabet, and they agree in the cells they share** — the grid draws where a value is written and zero is a value. The cross is composed over the grid, so the junction mark wins its one cell. **The walk ruled the opposite and a frame disproved it** — 3ad.4 |
 | **A3** | `"corners"` draws no left rule and no bottom rule · the cross is interior | unchanged. **Its value is that it forbids an argument**: A4 must not rest on *the frame already draws that edge*, because here it does not |
 | **A4** | zero is in range · its row is the area's first or last | **not drawn**. At the boundary `"zero"` and `"edge"` name the same place, so `"zero"` has nothing to add — and a rule at area column 0 abuts the gutter's border and reads as a doubled frame |
 | **A5** | zero is outside the range · an axis has to go somewhere | **not drawn, never clamped to the nearest edge.** This is **C04 I52's** disposition — *an annotation moved onto a scale it is outside says the limit is somewhere it is not* — and **not C04 I29's**, which clamps *data* because pressing a reading against a ceiling is honest. C04 I62 cites C04 I29 *in the mirror*; the mirror is right about the error and C04 I52 is the invariant that already rules the case |
@@ -3073,21 +3073,44 @@ be checked anyway; this one says a single check is two checks, and it is invisib
 rule alone — `rowOf`'s centring is correct (T1.5 depends on it) and *draw where zero is* is
 correct, and the defect lives only where they meet.
 
-### 3ad.4 — Solid, and §3k's own sentence is the objection
+### 3ad.4 — Dashed, and the walk ruled the other way
 
-`dashedVertical` exists because *a solid rule through a figure reads as part of it: a forest
-plot's null line crossing five intervals looks like a sixth interval unless it is visibly not
-one*. That sentence is about this exactly, and it rules the other way.
+**The walk ruled solid and the frame disproved it**, which is the third time the implementation
+has falsified this component's own artefact and the first time a *frame* did it rather than a
+compile error.
 
-**It does not apply, and the distinction is annotation against furniture.** A null line is a claim
-laid **over** a figure and must be visibly not part of it. An axis is the coordinate system the
-figure is drawn **in**, and the frame's own left border is a solid `│` that no reader has ever
-taken for a series. A crossing axis is that border, moved inside — so it takes the border's
-alphabet, and A2 resolves itself: solid against the grid's dashed, with the difference carrying
-the meaning rather than needing a rule about which wins.
+The ruling was: `dashedVertical` exists because *a solid rule through a figure reads as part of
+it* (§3k, the forest plot's null line), and that is about an **annotation** laid over data, where
+an axis is the coordinate system the data is drawn **in** — so it takes the frame's alphabet, and
+*the frame's own left border is a solid `│` that no reader has ever taken for a series.*
 
-The cell where the two halves meet needs a glyph the set does not have. `crossing` — `┼`, and `+`
-at ASCII — beside `candleCross`, which is a different mark for a different job (I36).
+**Every sentence of that is true and the last one is the analogy that breaks.** The frame's border
+is never in a row the data occupies. A crossing axis always is. Drawn solid, the zero row reads:
+
+    0 ┤───────│────────────┼─│─────────╭────╯───│
+
+and the curve is resolved *behind* it (I23), so the cells the series occupies show the series —
+in the same glyph. A reader sees one continuous line and cannot tell where the curve crosses zero,
+**which is the single thing the axis was drawn to show.** Dashed:
+
+    0 ┤┄┄┄┄┄┄┄│┄┄┄┄┄┄┄┄┄┄┄┄┼┄│┄┄┄┄┄┄┄┄┄╭────╯┄┄┄│
+
+and the `╭────╯` is unmistakably the curve. The vertical half is the same argument transposed: `┊`
+in the middle of a plot area is furniture and `│` is a segment of some series.
+
+**So §3k's sentence rules this case after all**, and the distinction it turns on is not annotation
+against furniture but *shares a row with the data* against *does not*. The forest plot's null line
+and this are the same object under that test, which is why one sentence covers both.
+
+**A2 resolves the other way with it, and costs nothing.** The cross and the grid are now the same
+alphabet, so under `plotFrame: "grid"` the crossing axis adds only the junction mark — and that is
+correct rather than a loss: the grid draws where a value is written, zero is a value, and the two
+are saying the same thing in the cells they share. Where zero is *not* on a labelled row or a tick
+column, the cross draws a line the grid does not have.
+
+The junction still needs a mark the set lacks: `crossing` — `┼`, and `+` at ASCII — beside
+`candleCross`, which is `┿`, a heavy stem through a light rule for a body shorter than one cell
+(I36). A junction drawn with a body's weight would read as data.
 
 ### 3ad.5 — The sequence trace: what happens between the passes
 

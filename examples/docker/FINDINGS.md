@@ -10309,3 +10309,62 @@ catalogue and the goldens happen to use are in the agreeing set. The divergence 
 rendering the same series at every height from 2 to 24 and reading the two ranges side by side —
 which is the *walk the component by hand* rule applied to a function rather than a component, and
 `n = 8` and `n = 11` would both have said the code was right.
+
+## F211 — the grid drew from the captions arm, so a numeric abscissa got no vertical lines ★★★★
+
+C12 I26: *a gridline exists to carry the eye from a mark to a value, so it belongs exactly where
+there is a value written — the rows the gutter labels and the columns the bottom rule ticks.*
+
+The horizontal half honours it. The vertical half was blank on every plot with a numeric x axis,
+because `overlaidRows` took its tick columns from `xAxis(block.xLabels, …)` — the **captions** arm
+alone — while the rule three rows below took its own from `xRowFor`, which dispatches to
+`xTickRow` when there are no captions. With no `xLabels`, `xAxis(undefined, …)` returns an empty
+tick set, and the grid drew nothing.
+
+    grid, xLabels: ["a","b","c"]        grid, numeric x axis
+    7.5 ┤┊┄┄┄┄┄┄┄┊┄┄┄┄┄┄┄┊│             7.5 ┤┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄│
+        └┬───────┬───────┬┘                 └┬──────┬──────┬───┘
+         a       b       c                   0      1      2
+
+Same style, same rule below, and one of them has the lines the style is named for.
+
+**The one fixture the corpus renders at `grid` declares `xLabels`.** So every committed frame,
+every golden and the catalogue all exercise the arm that works. A style member with two arms and a
+corpus that only walks one is the shape to watch for — it is F210's *both heights the corpus
+renders are in the agreeing set*, one member along and found the same way.
+
+**Fixed as a consequence rather than as a repair**, which is worth recording. `axisCross` needs
+the column the value 0 lands in, which is `xRowFor`'s to know and is needed while the *area* is
+composed — so the axis had to be computed once in `positionalForm` and handed to both halves. Once
+it is a parameter, the grid using anything else is obviously wrong. **The defect was invisible
+while the value was re-derived and became unmissable the moment it was passed.**
+
+## F212 — the ASCII contract is correct and its fixture has no plot in it ★★★★★
+
+`styleRasteriser` chooses line-drawing on **`ambiguousWidth`**:
+
+    const useLineDraw = ps === "line" || (auto && caps.ambiguousWidth !== "wide");
+
+`ambiguousWidth` answers *how many cells does an ambiguous character occupy*. Whether the terminal
+can draw `╭` at all is `unicode`. So at `unicode: "ascii"` with `ambiguousWidth: "narrow"` a line
+plot renders `╭────╯` and `│` into a terminal that has told the framework it cannot show them —
+inside a frame whose own borders correctly degraded to `+`, `-` and `|`.
+
+**Two fixtures conceal it and they conceal it in different ways.**
+
+`test/contract/expect-document.test.ts` has the row that would catch it — every codepoint under
+128 at `unicode: "ascii"`, with the *fixture responds* control beside it — and its document is a
+rule, a notice and a table. **The contract is right, the control is right, and no plot has ever
+been through it.**
+
+The catalogue's ASCII arm is `ascii-wide`: `unicode: "ascii"` **and** `ambiguousWidth: "wide"`
+together. Every ASCII frame in the corpus is also a wide frame, so the wide arm answers for the
+ASCII one and the case that separates them — ascii · narrow — is rendered by nothing.
+
+**Two capabilities varied together in every fixture cannot be told apart by any number of frames.**
+That is the reusable shape, and it is why the count of frames is not the measure of coverage: 312
+goldens, 1208 catalogue files and a contract row asserting exactly this, and the combination is
+absent from all three.
+
+Not fixed here — it is a defect in `styleRasteriser`'s condition and unrelated to the change that
+found it, and folding it into a large diff is how a repair stops being readable.
