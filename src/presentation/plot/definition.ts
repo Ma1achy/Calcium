@@ -41,9 +41,13 @@ import {
   legendWidth,
   frameTop,
   furnitureFor,
+  hasYLabels,
   line,
   plotRow,
+  rightGutterWidth,
+  yAxisSides,
   xLabelRowFor,
+  type Callout,
   type Layout,
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
@@ -766,6 +770,138 @@ function cursorReadout(
 }
 
 /**
+ * The last finite sample of a series, which is what a callout names (I48).
+ *
+ * **Finite and not merely last.** A series ending in `null` is a gap: `I4` says
+ * the line breaks across it rather than spanning it, so the last thing *drawn*
+ * is the last finite sample — and the number written beside it has to be the
+ * same sample or the label names a value the figure does not show.
+ */
+function lastFinite(values: readonly (number | null)[]): number | null {
+  for (let i = values.length - 1; i >= 0; i -= 1) { // cells-ok — a sample index
+    const v = values[i];
+    if (v !== null && v !== undefined && Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+/**
+ * The row a series' ink ends on — read from the glyphs, never recomputed (I48).
+ *
+ * **`curveRows` rasterises at dot resolution and folds; `lineDrawRows` and
+ * `candleRows` map at cell resolution, and the two disagree for one value in
+ * six** (15.7–21.0% over heights 6, 8, 12 and 20), worst at the ends of the
+ * range — which is where a live chart's newest value sits when something has
+ * just gone wrong. Recomputing here would pick one of those mappings and be
+ * silently wrong wherever the other drew. This is I37's ruling on the other
+ * axis: the form owns which position lands where.
+ *
+ * **The far end of the last column's stroke, and the walk said its midpoint.**
+ * The final column is rarely one cell: `drawLine` joins the previous sample to
+ * this one, so the column carries the tail of that approach as well as the
+ * sample itself — and the sample is at whichever end of the stroke is *further*
+ * from where the line came in. Measured on a descending braille curve ending at
+ * 7.2 of 0..100 in eight rows: the stroke spans rows 6 and 7, the sample's dot
+ * is in 7, and the midpoint answers **6** — which is exactly the row the
+ * cell-resolution shortcut gives. *A ruling that lands on the wrong answer and
+ * on the shortcut's answer at once cannot be told from the shortcut*, so the
+ * midpoint would have been unfalsifiable as well as wrong.
+ *
+ * With several samples in the last column no ink-only rule is exact — the
+ * stroke is the figure's end and the number is one sample's — and the far end
+ * is inside it, which is all a label needs.
+ */
+function inkSpanAt(rows: readonly (readonly string[])[], x: number): { top: number; bottom: number } | null {
+  let top = -1, bottom = -1; // cells-ok — a row index
+  for (let r = 0; r < rows.length; r += 1) { // cells-ok — a row index
+    if (isBlank(rows[r]?.[x] ?? " ")) continue;
+    if (top < 0) top = r; // cells-ok — a row index
+    bottom = r; // cells-ok — a row index
+  }
+  return top < 0 ? null : { top, bottom };
+}
+
+function lastInkRow(glyphRows: readonly string[], areaWidth: number): number | null {
+  const rows = glyphRows.map((r) => [...r]);
+  const widest = rows.reduce((m, r) => Math.max(m, r.length), 0); // cells-ok — a column count
+  const right = Math.min(Math.max(0, Math.floor(areaWidth)), widest) - 1; // cells-ok — a column index
+  for (let x = right; x >= 0; x -= 1) { // cells-ok — a column index
+    const here = inkSpanAt(rows, x);
+    if (here === null) continue;
+    if (here.top === here.bottom) return here.top; // cells-ok — a row index
+    // The column the line came in from, which is what says which end is the
+    // sample. Absent — a one-column series — nothing points, so the midpoint is
+    // the only answer left.
+    let prior: { top: number; bottom: number } | null = null;
+    for (let p = x - 1; p >= 0 && prior === null; p -= 1) prior = inkSpanAt(rows, p); // cells-ok — a column index
+    if (prior === null) return Math.floor((here.top + here.bottom) / 2); // cells-ok — a row index
+    const from = (prior.top + prior.bottom) / 2; // cells-ok — a row index
+    return Math.abs(here.top - from) >= Math.abs(here.bottom - from) ? here.top : here.bottom; // cells-ok — a row index
+  }
+  return null;
+}
+
+/** A layout carrying the callouts, or the same layout where there are none. */
+function withCallouts(layout: Layout, callouts: ReadonlyMap<number, Callout>): Layout {
+  return callouts.size === 0 ? layout : { ...layout, callouts }; // cells-ok — a callout count
+}
+
+/**
+ * The cells a callout column needs, known **before** the layout exists (I48).
+ *
+ * The text is `formatReadout` of a sample, which is a property of the series and
+ * not of the width — so the column is sized here and the *rows* are resolved
+ * from the ink afterwards, and there is no second pass. The shared mark is one
+ * cell and only reachable with a second series to lose one.
+ */
+function calloutWidth(block: Plot, ambiguous: AmbiguousWidth): number {
+  if (block.yCallout !== "last") return 0;
+  let widest = 0; // cells-ok — a cell width
+  for (const s of block.series) {
+    const v = lastFinite(s.values);
+    if (v === null) continue;
+    widest = Math.max(widest, cells(formatReadout(v, block.yFormat), ambiguous)); // cells-ok — a cell width
+  }
+  return widest === 0 ? 0 : widest + (block.series.length > 1 ? 1 : 0); // cells-ok — a series count
+}
+
+/**
+ * One callout per series, at the row that series' ink ends on (I48).
+ *
+ * `offset` is the strip's first row for the 1-bit stacked arm, where each series
+ * is rasterised into its own band — **which is the capability the field would
+ * otherwise be ignored at.** A multi-series positional plot below the colour
+ * floor stops overlaying and stacks, so a callout map built only in the overlaid
+ * arm would accept `yCallout` and draw nothing at one bit, on the exact
+ * terminals where a reader most needs the number spelled out.
+ */
+function calloutInto(
+  into: Map<number, Callout>,
+  block: Plot,
+  glyphRows: readonly string[],
+  seriesIndex: number,
+  layout: Layout,
+  offset = 0,
+): void {
+  if (block.yCallout !== "last" || (layout.rightColumn ?? 0) === 0) return;
+  const s = block.series[seriesIndex];
+  if (s === undefined) return;
+  const v = lastFinite(s.values);
+  if (v === null) return;
+  const row = lastInkRow(glyphRows, layout.areaWidth);
+  if (row === null) return;
+  const at = row + offset; // cells-ok — a row index
+  // **The later series wins and the row says so** (I8). Not two rows, which
+  // would change the count and break I1, and not a count, which cannot be
+  // sized before the layout it is being sized for (§3x).
+  into.set(at, {
+    text: formatReadout(v, block.yFormat),
+    ref: refOf(s, seriesIndex),
+    shared: into.has(at),
+  });
+}
+
+/**
  * The stacked form (I6, I7). One strip per series, sharing the x-axis, with each
  * series' label in the y-label column beside its strip rather than above it — a
  * label on a row of its own would push the total past `height`, which is the trap
@@ -800,6 +936,7 @@ function stackedRows(
       for (let i = 0; i < curveHeight; i += 1) {
         out.push(
           plotRow(
+            i,
             i === 0 ? (first.label ?? "") : "",
             mergedRow([layer], i, layout, ctx),
             layout,
@@ -811,6 +948,7 @@ function stackedRows(
 
     out.push(
       plotRow(
+        curveHeight,
         "",
         [{ text: areaText(legend, layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) }],
         layout,
@@ -820,16 +958,33 @@ function stackedRows(
     return out;
   }
 
-  series.forEach((s, index) => {
-    const stripRows = heights[index] ?? 0;
-    const glyphRows = curveRows(s, range, layout.areaWidth, stripRows, ctx.capabilities);
-    const layer: Layer = { glyphRows, ref: refOf(s, index), kind: "curve" };
-    for (let i = 0; i < stripRows; i += 1) {
+  // **Rasterised first, composed second**, because the callout map has to exist
+  // before the first row is drawn and a strip's callout row is only known once
+  // its band is rasterised.
+  const strips = series.map((s, index) => ({
+    layer: {
+      glyphRows: curveRows(s, range, layout.areaWidth, heights[index] ?? 0, ctx.capabilities),
+      ref: refOf(s, index),
+      kind: "curve" as const,
+    },
+    rows: heights[index] ?? 0,
+  }));
+  const callouts = new Map<number, Callout>();
+  let base = 0; // cells-ok — a row index
+  strips.forEach((strip, index) => {
+    calloutInto(callouts, block, strip.layer.glyphRows, index, layout, base);
+    base += strip.rows; // cells-ok — a row count
+  });
+  const withRight = withCallouts(layout, callouts);
+
+  strips.forEach((strip, index) => {
+    for (let i = 0; i < strip.rows; i += 1) {
       out.push(
         plotRow(
-          i === 0 ? (s.label ?? "") : "",
-          mergedRow([layer], i, layout, ctx),
-          layout,
+          out.length, // cells-ok — a row index
+          i === 0 ? (series[index]?.label ?? "") : "",
+          mergedRow([strip.layer], i, withRight, ctx),
+          withRight,
           ctx,
         ),
       );
@@ -887,10 +1042,9 @@ function overlaidRows(
   // and the labels were measured against a default `ambiguousWidth` by
   // `labelWidth` while `gutterSpans` padded against another — the two defects
   // §3f names, in one call.
-  const labels =
-    layout.labelColumn === 0
-      ? []
-      : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale);
+  const labels = hasYLabels(layout)
+    ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
+    : [];
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   // `"grid"` draws its lines where there is a value written — the rows the
   // gutter labels and the columns the bottom rule ticks (C12 I26).
@@ -914,16 +1068,24 @@ function overlaidRows(
     })),
   ];
 
+  const callouts = new Map<number, Callout>();
+  block.series.forEach((_s, index) => {
+    const rows = layers[index]?.glyphRows;
+    if (rows !== undefined) calloutInto(callouts, block, rows, index, layout);
+  });
+  const withRight = withCallouts(layout, callouts);
+
   const cursor = cursorRule(cursorAt, layout, ctx);
   return Array.from({ length: layout.areaRows }, (_, i) =>
     plotRow(
+      i,
       byRow.get(i) ?? "",
       behind(
-        overlay(gridRow(layout, gridTicks, ctx, byRow.has(i)), cursor),
-        mergedRow(layers, i, layout, ctx),
+        overlay(gridRow(withRight, gridTicks, ctx, byRow.has(i)), cursor),
+        mergedRow(layers, i, withRight, ctx),
         ctx,
       ),
-      layout,
+      withRight,
       ctx,
     ),
   );
@@ -1037,21 +1199,51 @@ function layoutFor(
   // y-labels regardless is what pushed `train │` one cell past the width and left a
   // `…` on the first row of every stacked frame. Two different sets of strings, one
   // column: it has to be measured from whichever set will be drawn.
-  const wanted = stacked || block.form === "heatmap"
-    ? seriesLabelWidth(block.series, caps.ambiguousWidth)
-    : labelWidth(
-        yLabels(range, areaRows, block.yFormat, block, block.yScale),
-        caps.ambiguousWidth,
-      );
+  const sides = yAxisSides(block);
+  const wanted = !sides.left && !sides.right
+    ? 0 // cells-ok — a cell width
+    : stacked || block.form === "heatmap"
+      ? seriesLabelWidth(block.series, caps.ambiguousWidth)
+      : labelWidth(
+          yLabels(range, areaRows, block.yFormat, block, block.yScale),
+          caps.ambiguousWidth,
+        );
+  // **One set of labels, sized once and drawn on whichever sides asked** (I47).
+  // Measuring the right column separately would let `"both"` render two axes
+  // that disagree about their own width.
+  const left = sides.left ? wanted : 0; // cells-ok — a cell width
+  // **The right column budgets for the callouts too, and the left does not.**
+  // One set of *labels* is drawn on both sides (I47); a callout is written only
+  // on the right, so sizing the left column for it would waste the cells at
+  // every width. Same content, two widths, one measurement each.
+  const right = sides.right // cells-ok — a cell width
+    ? Math.max(wanted, calloutWidth(block, caps.ambiguousWidth))
+    : 0;
   // **The frame's right edge is furniture and pays before the curve**, which is
   // the same rung it has always been: labels, then furniture, then the plot
   // area. A cell narrower is a curve; a cell narrower still is a `…`.
-  if (width - wanted - AXIS_GUTTER - FRAME_RIGHT >= MIN_AREA) {
+  if (width - left - AXIS_GUTTER - rightGutterWidth(right) >= MIN_AREA) {
     return {
       ...base,
-      gutter: wanted + AXIS_GUTTER,
-      labelColumn: wanted,
-      areaWidth: width - wanted - AXIS_GUTTER - FRAME_RIGHT,
+      gutter: left + AXIS_GUTTER,
+      labelColumn: left,
+      rightColumn: right,
+      areaWidth: width - left - AXIS_GUTTER - rightGutterWidth(right),
+      frame: true,
+    };
+  }
+
+  // **The right column goes before the left one does** (I47). At `"both"` it is
+  // a copy of the left and therefore the cheapest thing in the frame to lose;
+  // at `"right"` losing it lands on the unlabelled rung below, which is where a
+  // left axis of the same width already sits. *So this rung changes no cell at
+  // `"right"` and is named for what it does at `"both"`* (§6c.2).
+  if (right > 0 && width - left - AXIS_GUTTER - FRAME_RIGHT >= MIN_AREA) {
+    return {
+      ...base,
+      gutter: left + AXIS_GUTTER,
+      labelColumn: left,
+      areaWidth: width - left - AXIS_GUTTER - FRAME_RIGHT,
       frame: true,
     };
   }
@@ -1125,7 +1317,7 @@ function categoricalForm(
   const areaRows = plotAreaRows(block);
   const labels = cats.slice(0, areaRows);
   const axedBlock = block.axes === true;
-  const layout = reserving(bandLayout(labels, usableWidth(block, width, ctx), axedBlock, areaRows, ctx.capabilities), block, width, ctx);
+  const layout = reserving(bandLayout(labels, usableWidth(block, width, ctx), axedBlock, areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
 
   const out: string[] = [];
   for (let i = 0; i < areaRows; i++) {
@@ -1153,7 +1345,7 @@ function categoricalForm(
     const body: readonly Span[] = typeof built === "string"
       ? [{ text: areaText(content, layout, ctx), style: slot(ref, ctx.theme, ctx.capabilities) }]
       : ownedSpans(areaText(content, layout, ctx), built.owners, (k) => refOf(block.series[k] ?? { values: [] }, k), ctx);
-    out.push(plotRow(label, body, layout, ctx));
+    out.push(plotRow(i, label, body, layout, ctx));
   }
   return axed(block, out, layout, ctx);
 }
@@ -1233,9 +1425,9 @@ function categoricalColumnForm(
   // one implementation of *which row carries which label*, and the scale and the
   // capability both passed, which is the pair §3f names.
   const byRow = new Map(
-    (layout.labelColumn === 0
-      ? []
-      : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
+    (hasYLabels(layout)
+      ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
+      : []
     ).map((l) => [l.row, l.text]),
   );
 
@@ -1249,7 +1441,7 @@ function categoricalColumnForm(
         ?? refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? i : 0); // cells-ok — a column index
       spans.push({ text: col[r] ?? " ".repeat(widths[i]!), style: slot(ref, ctx.theme, ctx.capabilities) });
     }
-    out.push(plotRow(byRow.get(r) ?? "", spans, layout, ctx));
+    out.push(plotRow(r, byRow.get(r) ?? "", spans, layout, ctx));
   }
   if (block.axes !== true) return composeRows(plotHeight(block), [], out, []);
   // The frame composed here rather than through `axed`, because `furnitureFor`
@@ -1351,15 +1543,15 @@ function stackedForm(
     kind: "surface" as const,
   }));
 
-  const labels =
-    layout.labelColumn === 0
-      ? []
-      : yLabels(range, layout.areaRows, block.yFormat, block, block.yScale);
+  const labels = hasYLabels(layout)
+    ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
+    : [];
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
 
   const ticks = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities).tickColumns;
   const area = Array.from({ length: layout.areaRows }, (_, i) =>
     plotRow(
+      i,
       byRow.get(i) ?? "",
       behind(gridRow(layout, ticks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
       layout,
@@ -1571,7 +1763,7 @@ function bandedForm(
   const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
   if (n === 0) return emptyRows(block, fallback, ctx);
 
-  const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities), block, width, ctx);
+  const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
   const areaWidth = layout.areaWidth;
 
   const rowsPer = Math.max(1, Math.floor(areaRows / n));
@@ -1613,6 +1805,7 @@ function bandedForm(
       const label = r === labelRow ? truncate(cats[ci] ?? "", layout.labelColumn, ctx.capabilities) : "";
       out.push(
         plotRow(
+          out.length, // cells-ok — a row index
           label,
           [{ text: areaText(band[r - offset] ?? " ".repeat(areaWidth), layout, ctx), style: styled }],
           layout,
@@ -1631,6 +1824,7 @@ function bandedForm(
   // frames wide. PC12 is named for the border and checked only the left.
   while (out.length < areaRows) { // cells-ok — a row count
     out.push(plotRow(
+      out.length, // cells-ok — a row index
       "",
       [{ text: areaText(" ".repeat(Math.max(0, layout.areaWidth)), layout, ctx) }],
       layout,
@@ -2244,7 +2438,7 @@ const FORM_ROWS: Readonly<
     const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
     if (block.series.length === 0) return emptyRows(block, fallback, ctx); // cells-ok — a series count
 
-    const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities), block, width, ctx);
+    const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
     const { rows, baselines, owners } = ridgelineArea(
       block.series, layout.areaWidth, areaRows, ctx.capabilities, block.bandwidth, block.plotCorners ?? "rounded",
     );
@@ -2263,7 +2457,7 @@ const FORM_ROWS: Readonly<
         (i) => refOf(block.series[i] ?? { values: [] }, i),
         ctx,
       );
-      return plotRow(label, runs, layout, ctx);
+      return plotRow(r, label, runs, layout, ctx);
     });
     return axed(block, out, layout, ctx);
   },

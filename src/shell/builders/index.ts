@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_Y_GUTTER, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -402,6 +402,8 @@ function plot(
     plotFill?: Plot["plotFill"];
     /** The radar's ring shape (C12 I45, §3w). */
     plotGrid?: Plot["plotGrid"];
+    yAxis?: Plot["yAxis"];
+    yCallout?: Plot["yCallout"];
     /** A compact box plot's interquartile run (C12 I46, §3i). */
     plotBox?: Plot["plotBox"];
     /**
@@ -422,7 +424,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -492,6 +494,39 @@ function plot(
       );
     }
   }
+  // **The same rule over the same two records the validator reads** (C04 I60,
+  // C12 I47, C12 I48), on the **resolved** form for `plotStyle`'s reason: the
+  // parameter is optional and defaults to `line` below.
+  {
+    const drawn = form ?? "line";
+    if (yAxis !== undefined && yAxis !== "left" && !HAS_Y_GUTTER[drawn]) {
+      throw new TypeError(
+        `b.plot: "yAxis" is "${String(yAxis)}" on form "${drawn}" (C04 I60) — that form draws ` +
+          `no y gutter, so there is no column for the labels to move to; a facet declares ` +
+          `its own`,
+      );
+    }
+    if (yAxis === false && drawn === "heatmap") {
+      throw new TypeError(
+        `b.plot: "yAxis" is false on a heatmap (C04 I60) — a row label is the ordinate here, ` +
+          `so a matrix without them is a picture of numbers with no way to tell which row ` +
+          `is which`,
+      );
+    }
+    if (yCallout === "last" && !HAS_CALLOUT[drawn]) {
+      throw new TypeError(
+        `b.plot: "yCallout" is "last" on form "${drawn}" (C04 I60) — a callout names where ` +
+          `one series ends, and that form draws no per-series curve to end`,
+      );
+    }
+    if (yCallout === "last" && (yAxis === undefined || yAxis === "left" || yAxis === false)) {
+      throw new TypeError(
+        `b.plot: "yCallout" is "last" with "yAxis" of ` +
+          `"${yAxis === undefined ? "left" : String(yAxis)}" (C04 I60) — a callout is written ` +
+          `in the right gutter and there is none; widen "yAxis" to "right" or "both"`,
+      );
+    }
+  }
   if (plotFill === "solid" && plotStyle === "line") {
     throw new TypeError(
       `b.plot: "plotFill" is "solid" with "plotStyle" of "line" (C04 I59) — a box-drawing ` +
@@ -510,6 +545,8 @@ function plot(
       ...(plotFill === undefined ? {} : { plotFill }),
       ...(plotGrid === undefined ? {} : { plotGrid }),
       ...(plotBox === undefined ? {} : { plotBox }),
+      ...(yAxis === undefined ? {} : { yAxis }),
+      ...(yCallout === undefined ? {} : { yCallout }),
       ...(xMin === undefined ? {} : { xMin }),
       ...(xMax === undefined ? {} : { xMax }),
       ...(xFormat === undefined ? {} : { xFormat }),

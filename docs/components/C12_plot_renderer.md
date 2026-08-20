@@ -1131,8 +1131,9 @@ mediates. Taking the table alone because a layout looks static is how the sequen
 unexamined — and the ladder is sequential by construction, since rung *N* is reached only
 because rung *N* − 1 failed.
 
-Eight findings, all of them before any code. Six are cells where two correct statements overlap
-and two come from the trace.
+Ten findings. Eight are before any code — six cells where two correct statements overlap, two
+from the trace — and **two arrived afterwards, from the two instruments a walk cannot be**: one
+from running the code against the ruling and one from reading the frame it drew.
 
 ### 6c.1 The table — rules that both hold at rest
 
@@ -1146,7 +1147,7 @@ and two come from the trace.
 | `yCallout` × `colourDepth: 1` | *the callout is highlighted* meets *`MONO.emphasised` is `{ bold: true }`* | **6** — the highlight channel is already spoken for at the one depth it was chosen for. The carrier is a mark (I25, §3b). |
 | `yAxis: false` × the matrix family | *`false` removes the y labels* meets *a matrix's row labels are its ordinate* | **7** — refused, which is C04 I50b's argument for refusing `axes: false` there, arriving on the second field able to express the same thing. |
 | `yCallout` × a trailing `null` | *the callout names the last value* meets *the line breaks at a gap* | no conflict: the last **finite** sample is both the value named and the last ink drawn, so the two halves agree without being reconciled (I4). |
-| `yCallout` × `plotStyle: "line"` | *the callout reads ink* meets *a different rasteriser drew it* | no conflict, and it is the reason the placement reads ink at all — §3x's measurement is what this cell produced. |
+| `yCallout` × `plotStyle: "line"` | *the callout reads ink* meets *a different rasteriser drew it* | no conflict, and it is the reason the placement reads ink at all — §3x's measurement is what this cell produced. **And it is the cell the first test row got wrong**: a `line` renders through `lineDrawRows` by default, which maps at *cell* resolution, so a row written without `plotStyle: "braille"` asserts against the arithmetic it is trying to rule out and agrees with it. |
 | `yAxis` × legend placement | *both want the right edge* | no rule needed: `reservedFor` narrows the row before `layoutFor` runs, so the gutter is inside `layout.width` and `axed` appends the legend outside it. The legend sits outside the axis because it cannot do anything else. |
 
 ### 6c.2 The trace — the ladder, width by width
@@ -1169,6 +1170,15 @@ Three readings, two of them findings:
 - **8 — `"right"` keeps its labels one cell later than `"left"`.** An unlabelled left gutter
   still spends the cell that separates a label from its border, so the two sides do not cost the
   same for the same label. Ruled in §3x and kept with both figures rather than equalised.
+- **9 — the ruling on a spanning column was wrong, and only the code could say so.** Neither
+  artefact indexes *what else is in the cell the answer is read from*, because the ink is not a
+  rule; the walk chose the span's midpoint and the implementation put it on the row the
+  cell-resolution shortcut gives. Corrected to the far end in §3x, with the measurement.
+- **10 — a label reaches a zero-wide column and `padStart` will not cut it**, so the frame's lid
+  sat one column left of every row it enclosed. Found by reading the frame, which is the third
+  consequence of findings 1 and 2's conflation — and the first form of the *fix* asked about the
+  label where it should have asked about the column, which cost every unlabelled row its padding
+  and was caught by PC12. *The same conflation three times, once inside its own repair.*
 - **Rung 2 is a no-op at `"right"`** — dropping the right column there produces exactly what
   rung 3 produces, because there is no left column to fall back to. Recorded rather than
   special-cased: the rung is named for what it does at `"both"`, and a second arm to make the
@@ -1861,10 +1871,23 @@ written beside the first agrees at the widths a fixture happens to use.
 
 So the callout reads the series' own rasterised rows: its row is the row of that series' ink in
 its last inked column. Exact for every rasteriser and every capability by construction, and it
-needs no table of sub-cell heights that a rasteriser added later could fail to join. **Where
-that column spans several rows the callout takes the span's midpoint** — the number is one
-sample's and the span is several, no row in it is wrong, and the midpoint is the only choice
-that does not imply a direction the data did not have.
+needs no table of sub-cell heights that a rasteriser added later could fail to join.
+
+**Where that column spans several rows the callout takes the end furthest from the previous
+column — and this section said *midpoint* until the code was run.** The final column is rarely
+one cell: `drawLine` joins the previous sample to this one, so the column carries the tail of
+that approach as well as the sample, and the sample is at whichever end is further from where
+the line came in. Measured on a descending braille curve ending at 7.2 of 0..100 in eight rows:
+the stroke spans rows 6 and 7, the sample's dot is in 7, and the midpoint answers **6** — which
+is exactly the row the cell-resolution shortcut gives. *A ruling that lands on the wrong answer
+and on the shortcut's answer at once cannot be told apart from the shortcut*, so the midpoint
+was unfalsifiable as well as wrong, and the mutation written against it would have survived.
+With several samples in the last column no ink-only rule is exact — the stroke is the figure's
+end and the number is one sample's — and the far end is inside it, which is all a label needs.
+
+**The walk ruled the shape and the implementation is the first thing that could disprove it**,
+which is what that step is for: no row of either artefact indexes *what else is in the cell the
+answer is read from*, because the ink is not a rule.
 
 **The value is the last *finite* one, and the ink it made.** A series ending in `null` breaks
 its line there (I4), so the last inked column is the last finite sample's column and the two
@@ -3032,7 +3055,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I45** — **A radar's grid is a polygon by default and a circle by option, and the two arms had silently chosen differently.** The braille arm drew its value rings with `arcDots` — circles — and the quadrant arm drew them as *n*-gons through the data's own vertices, so one form rendered two figures and neither the spec nor a test said which was meant. `plotGrid?: "polygon" | "circle"` makes it a decision. **Polygon is the default because the grid is a ruler for the shape measured against it**: at three categories a circular ring behind a triangular polygon is two figures in one frame, and a ring the data can touch at only three points answers *is this axis further out than that one* worse than one it meets along its whole length. At ten categories the two are within a dot, so the default costs nothing where its argument is weakest. **`"circle"` ships too** — it is matplotlib's default and what `make refdiff` compares against. *Neither is inferred from the category count: a figure that changes shape at a threshold is two figures with one name* (§3w).
 - **I46** — **A compact box's interquartile run is filled or heavier, and the caller says which.** With one row a box has no lid or floor, so a blank interior leaves `┤    │    ├` — two tees, a rule, and nothing saying those cells are the box; the interior has to carry the range. **That is an argument for a *run*, and it was read as an argument for a *fill*.** `━` is not the whisker either, and it leaves the summary a line drawing. `plotBox?: "solid" | "line"`, `"solid"` by default. *Which one reads depends on what is behind it: against a raincloud's filled ladder the solid box competes for the same weight, where a heavier line reads as the summary of the shape rather than a second shape.* Standing up it is `┃` against a leftward `█` run, by the same argument. **`heavyHorizontal` and `heavyVertical` are new named slots** rather than a reuse of `candleFilled`, which is already `┃` — a name that lied about its use would be the defect SS47 exists for (§3i).
 - **I47** — **The y gutter can be drawn on either side or both, and the right one writes what the left one was given.** At eighty columns a row cannot be tracked back to a label seventy cells away, which is why every financial and monitoring TUI mirrors its axis. `yAxis?: "left" | "right" | "both" | false`, `"left"` by default; it costs **width and never a row**, so I1 is untouched and the sizing is I27's data-dependent kind rather than its declared kind. **One label, two consumers** — `"both"` renders the same ticks on both sides by construction rather than by a second `yLabels` call, and a dual-*scale* right axis is refused because two ranges on one figure assert a correlation the data does not have. **The tick belongs to the side that draws the label**, which the tree spelled as *the label is non-empty*: every caller blanked the label when `labelColumn` was 0, so *a label exists* and *this column draws it* were one statement until a right axis separated them and the left border drew a stub pointing at nothing. Three callers gate `yLabels` on the same predicate, so a right axis computed no labels at all and `"grid"` lost its horizontal rules with them (I26). **The mirror is of the left gutter's shape and not of its glyphs** — `plotFrame: "rule"` has a left rule and no right one, which is what that style *is*, so the two `bare` predicates differ on purpose. **The right column is dropped before the left**, being a copy of it at `"both"` and landing on the existing unlabelled rung at `"right"`; `bandLayout`'s `⌊width ÷ 3⌋` cap becomes a cap on the pair. *A right axis reaches that degradation one cell before a left one, because `AXIS_GUTTER` spends the label-to-border space whether or not a label uses it — kept with both figures rather than equalised, since equalising moves every narrow frame for one cell at one width* (§3x, §6c).
-- **I48** — **A callout names a series' last finite value at that series' own row, and its row is read from ink rather than recomputed.** `yCallout?: "none" | "last"`, `"none"` by default and named for the case it serves: on a static chart the last value is at the end of the line, and on a live one it is the number that matters most and the hardest to read off a line still moving. **Recomputing the row from the value is wrong about one value in six** — `curveRows` rasterises at dot resolution and folds where `lineDrawRows` and `candleRows` map at cell resolution, and the two disagree for 15.7–21.0% of values at heights 6, 8, 12 and 20, clustered at the ends of the range where a live chart's newest value sits when something has gone wrong. *That is I37's class on the other axis.* Reading the series' own rasterised rows is exact for every rasteriser and capability by construction; where the last inked column spans several rows the callout takes the span's **midpoint**, since no row in it is wrong and the midpoint implies no direction the data did not have. **It displaces the right gutter's content on its row and never the left's** — the *your data is here* argument reaches only the gutter it is written in. **Two on one row: the later wins and a one-cell `+` says so** (I8), not `+N`, whose count needs the ink that needs the width that needs the column being sized, and not a second row, which would change the count and break I1. **The carrier at one bit is a mark and cannot be bold**, because a series slot resolves through `MONO` there and `emphasised` *is* `{ bold: true }` — so a heavier edge glyph carries it and colour and weight ride above (I25, §3b). **A callout does not replace the legend**: it names a value where a legend names an identity, and only together do they say which line is which and what each reads (§3x, §6c).
+- **I48** — **A callout names a series' last finite value at that series' own row, and its row is read from ink rather than recomputed.** `yCallout?: "none" | "last"`, `"none"` by default and named for the case it serves: on a static chart the last value is at the end of the line, and on a live one it is the number that matters most and the hardest to read off a line still moving. **Recomputing the row from the value is wrong about one value in six** — `curveRows` rasterises at dot resolution and folds where `lineDrawRows` and `candleRows` map at cell resolution, and the two disagree for 15.7–21.0% of values at heights 6, 8, 12 and 20, clustered at the ends of the range where a live chart's newest value sits when something has gone wrong. *That is I37's class on the other axis.* Reading the series' own rasterised rows is exact for every rasteriser and capability by construction; where the last inked column spans several rows — the tail of the line that reached it, drawn into the same column — the callout takes the end **furthest from the previous column**, which is where the sample is. *The walk ruled `midpoint` and running the code disproved it: on a descending braille curve ending at 7.2 of 0..100 in eight rows the stroke spans 6 and 7, the sample is in 7, and the midpoint answers 6 — the very row the shortcut gives, so the ruling was unfalsifiable as well as wrong.* **It displaces the right gutter's content on its row and never the left's** — the *your data is here* argument reaches only the gutter it is written in. **Two on one row: the later wins and a one-cell `+` says so** (I8), not `+N`, whose count needs the ink that needs the width that needs the column being sized, and not a second row, which would change the count and break I1. **The carrier at one bit is a mark and cannot be bold**, because a series slot resolves through `MONO` there and `emphasised` *is* `{ bold: true }` — so a heavier edge glyph carries it and colour and weight ride above (I25, §3b). **A callout does not replace the legend**: it names a value where a legend names an identity, and only together do they say which line is which and what each reads (§3x, §6c).
 
 ## 8. Commitments
 
@@ -3089,6 +3112,7 @@ Six tiers. No state machine — C12 is pure over the block.
 
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.
 - **YA2** (I47): `yAxis: "right"` draws no left label column and the plot area starts where the border does; the labels are the same strings `"left"` puts on the other side, at the same rows.
+- **YA2b** (I47): at `yAxis: "right"` the left border is `│` on every row and never `┤`, with the converse asserted on the same fixture with the axis left. **The row the mutation pass asked for**: YA2 compares the gutters' *contents*, which are empty on that side either way, so it passes against a border still drawing a stub that points out at a column zero cells wide.
 - **YA3** (I47, I1): `plotHeight` is identical across all four `yAxis` values at every form that has a gutter. Width only, and the row that would fail if a mirrored gutter ever took a row.
 - **YA4** (I47, §3f): at `ambiguousWidth: "wide"` both axis columns stay straight, asserted on a label carrying an ambiguous-width character — the case §3f's four gutters got wrong on one side and would now get wrong on two.
 - **YA5** (I47, I27): `yAxis: "both"` with `legend: "right"` puts the legend **outside** the axis, and the frame's own rows line up with the area rows beside them.
@@ -3102,6 +3126,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **YC6** (I48): the value goes through `formatReadout` and honours `yFormat` — asserted on a percentage and a byte count, which a bare-number assertion agrees with.
 - **YC7** (I48): the refusals, at **both** gates and each with its converse — `yCallout` with `yAxis: "left"`, on a form outside `HAS_CALLOUT`, a non-`"left"` `yAxis` with `axes: false`, and `yAxis: false` on a matrix.
 - **YC8** (I48, I25): at `colourDepth: 1` a callout's row differs from a tick's by **mark**, asserted on the colour-stripped row and against a series whose mono class is `emphasised` — the case where bold says nothing because the series is already bold.
+- **YC8b** (I48): at `colourDepth: 1` with two series the plot stacks into labelled strips, and **each strip still carries its callout** — the gutter is asserted to hold the series names first, so the row is shown to have reached the stacked arm at all. **The arm, not the mark**: YC8 calls the mechanism and passes on the day nothing calls it, which is what the mutation pass found by deleting the stacked arm's resolution and watching YC8 stay green. This is the capability `yCallout` would otherwise have been accepted at and ignored at.
 - **YC9** (I48, I4): a series ending in `null` puts its callout on the last **finite** sample's ink, and names that sample's value.
 - **T1.1** (I1): height for each form and axes combination — sparkline 1, line 8, axed line 10 — independent of series length, including empty.
 - **T1.2**: braille encoding — each of the eight dot positions sets the documented bit; a full cell is `U+28FF`, an empty one `U+2800`.
@@ -3216,7 +3241,10 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.35** (I47): sizing the right column from the tick labels alone → the callout truncates, and YC1's value assertion fails while every geometry row still passes.
 - **T6.36** (I47): mirroring the left gutter's `bare` predicate into the right gutter → YA7 fails, and `plotFrame: "rule"` grows the right rule that style exists not to have.
 - **T6.37** (I48, I25): carrying the callout at one bit with `bold` instead of a mark → YC8 fails, and a callout in an `emphasised` slot is typographically identical to the series it names.
-- **T6.38** (I47): keeping `gutterSpans`' tick rule as *the label is non-empty* → YA2 fails, and a right axis draws a left-hand stub pointing out at a column that is zero cells wide.
+- **T6.38** (I47): keeping `gutterSpans`' tick rule as *the label is non-empty* → **YA2b** fails and YA2 does not, which is why YA2b exists.
+- **T6.39** (I48): the walk's own ruling — a spanning last column takes its **midpoint** → YC2 fails, and the callout lands on the row the cell-resolution shortcut gives. *Two wrong answers that coincide*, so the ruling could not have been told apart from the thing it was written to rule out.
+- **T6.40** (I48): deleting the stacked arm's callout resolution → **YC8b** fails and YC8 does not. The wiring mutation, and the capability it hides at: above one series at one bit the positional family stops overlaying and stacks.
+- **T6.41** (I8, I48): the *earlier* series keeping a contested row → YC4 fails, and the loss moves to the other series while every count still agrees.
 - **T6.1** (I1): deriving height from series length → T1.1 fails and streaming plots start shifting the viewport.
 - **T6.2** (I3): dividing by the range without guarding a constant series → T1.5 fails with `NaN` output.
 - **T6.3** (I4): letting `NaN` reach the grid → T1.8 fails.

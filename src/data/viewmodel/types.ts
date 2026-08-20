@@ -813,6 +813,31 @@ export type Plot = Readonly<{
    * a style field rather than a choice the framework makes for the caller.
    */
   plotFrame?: "box" | "corners" | "grid" | "rule";
+  /**
+   * Which side of the plot area the y labels sit on (C12 I47, §3x).
+   *
+   * At eighty columns a reader cannot track a row back to a label seventy cells
+   * away, which is why every financial and monitoring TUI mirrors its axis.
+   * `"both"` draws the **same** ticks on both sides — a second *scale* on the
+   * right is a different feature and is refused, because two ranges on one
+   * figure assert a correlation the data does not have.
+   *
+   * It costs **width and never a row**, so C12 I1 is untouched: this is the
+   * vertical legend's data-dependent kind (C12 I27) and not its declared kind.
+   * `false` removes the labels and keeps the frame and the x axis, which is
+   * what `axes: false` cannot say on its own.
+   */
+  yAxis?: "left" | "right" | "both" | false;
+  /**
+   * A reading at the right edge, on the row each series ends at (C12 I48, §3x).
+   *
+   * **Named for the case it serves.** On a static chart the last value is at the
+   * end of the line and the callout is clutter; on a live one it is the number
+   * that matters most and the hardest to read off a line still moving. So it is
+   * opt-in, and it needs a right gutter to write in — `yCallout` with
+   * `yAxis: "left"` is refused rather than quietly widening the axis.
+   */
+  yCallout?: "none" | "last";
 }> & Gap;
 
 /**
@@ -836,6 +861,81 @@ export type Plot = Readonly<{
  * cannot import L1 to ask (A02 §1). C12 reads it downward, which is the
  * direction that is allowed.
  */
+/**
+ * Which forms draw a y gutter at all — the set `yAxis` can move (C12 I47, C12 §3x).
+ *
+ * **Measured, not reasoned.** Every catalogue fixture was rendered at
+ * `axes: true` and asked whether any row carries an edge glyph at a column
+ * past the first: thirty-two do and ten do not. The measurement corrected one
+ * guess in each direction — `smallmultiples` and `pairplot` *look* gutter-ed
+ * because a facet's own gutter shows in the frame, and the outer block draws
+ * none. A facet is a `Plot` and declares its own `yAxis`, which is the same
+ * answer `HAS_POSITION_AXIS` gives for the same reason.
+ *
+ * A non-`"left"` `yAxis` on a form with no gutter is **refused** rather than
+ * ignored. F207 is what ignoring costs: a field accepted on a form that has no
+ * arm for it tells the caller nothing and the reader nothing.
+ *
+ * **Here and not in `presentation/plot/`, for `STYLE_ARMS`' reason**: the
+ * validator needs it and L0 cannot import L1 to ask (A02 §1). `SHARES_CELLS`
+ * and its siblings stay beside the renderer because they are facts about
+ * drawing; which sides a form *has* is a fact about the contract.
+ */
+export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // A scale in the gutter, one label per labelled row.
+  line: true, scatter: true, step: true, ecdf: true, density: true,
+  slope: true, bubble: true, stackedarea: true, streamgraph: true,
+  // A name in the gutter, one per row or band.
+  bar: true, histogram: true, boxplot: true, violin: true, ridgeline: true,
+  forest: true, dumbbell: true, lollipop: true, dotplot: true, funnel: true,
+  gantt: true, waterfall: true, timeline: true, bullet: true, autocorrelation: true,
+  // A matrix's row labels *are* its ordinate (C12 I18), which is why
+  // `yAxis: false` is refused here and only here.
+  heatmap: true, calendar: true, correlation: true, confusion: true,
+  spectrogram: true, latency: true, density2d: true, utilisation: true,
+  // One row, or a figure that bounds itself: no gutter to put a label beside.
+  sparkline: false, horizon: false, waffle: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false,
+  // Composition: the facets carry the gutters and each declares its own.
+  smallmultiples: false, pairplot: false,
+});
+
+/**
+ * Which forms rasterise a **per-series curve** into the plot area — the set a
+ * callout can name (C12 I48, C12 §3x).
+ *
+ * A callout needs ink belonging to *one* series, which is what `positionalForm`
+ * produces and what a band, a mosaic and a matrix do not: a stacked area's rows
+ * are one figure cut into parts, so *where does this series end* has no answer
+ * a row can carry.
+ *
+ * **Not `HAS_POSITION_AXIS`, which was the obvious reuse.** That record says
+ * whether the *abscissa* is a position — a question about the other axis — and
+ * it answers `true` for `stackedarea` and `streamgraph`, which have no per-series
+ * ink at all. A total record over forms reads as a complete answer to a question
+ * it cannot ask, which is C12 I43's finding one field along.
+ */
+export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // Everything `positionalForm` renders, including the two that derive a block
+  // first — an ECDF's last value is its own last reading, and a density's is the
+  // estimate at the right edge, which is what the figure draws in both cases.
+  line: true, scatter: true, step: true, ecdf: true, density: true,
+  slope: true, bubble: true,
+  // Bands, not curves: one figure cut into parts.
+  stackedarea: false, streamgraph: false, ridgeline: false,
+  // A row or a column per category; the gutter already names each one.
+  bar: false, histogram: false, boxplot: false, violin: false,
+  forest: false, dumbbell: false, lollipop: false, dotplot: false, funnel: false,
+  gantt: false, waterfall: false, timeline: false, bullet: false, autocorrelation: false,
+  // A matrix has no per-series row, and no scale in its gutter to write beside.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  // No cartesian area, or one row, or a composition.
+  sparkline: false, horizon: false, waffle: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false,
+  smallmultiples: false, pairplot: false,
+});
+
 export type PlotStyleArm = NonNullable<Plot["plotStyle"]>;
 
 export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = Object.freeze({

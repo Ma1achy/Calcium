@@ -22,7 +22,7 @@ import { formatValue } from "./axes.js";
 import { tone } from "../blocks/paint.js";
 import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
-import { labelColumnWidth, line, plotRow, type Layout } from "./furniture.js";
+import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Layout } from "./furniture.js";
 
 const HEATMAP_ABSENT = " ";
 const MIN_AREA = 4;
@@ -129,12 +129,34 @@ function layoutFor(block: Plot, width: number, caps: Pick<TerminalCapabilities, 
   const base = { areaRows, width };
   const wanted = labelColumnWidth(block.series.map((s) => s.label ?? ""), caps.ambiguousWidth);
 
-  if (width - wanted - AXIS_GUTTER >= MIN_AREA) {
+  // **The matrix's right gutter brings its own edge glyph** (I47). §2 says a
+  // matrix has no *frame* because its cells bound themselves — the `│` in its
+  // left gutter is the **axis**, not the frame, so the mirror of that axis is a
+  // second `│` and not a border this form declined.
+  const sides = yAxisSides(block);
+  const left = sides.left ? wanted : 0; // cells-ok — a cell width
+  const right = sides.right ? wanted : 0; // cells-ok — a cell width
+  const rightEdge = right > 0 ? rightGutterWidth(right) : 0; // cells-ok — a cell width
+
+  if (width - left - AXIS_GUTTER - rightEdge >= MIN_AREA) {
     return {
       ...base,
-      gutter: wanted + AXIS_GUTTER,
-      labelColumn: wanted,
-      areaWidth: width - wanted - AXIS_GUTTER,
+      gutter: left + AXIS_GUTTER,
+      labelColumn: left,
+      rightColumn: right,
+      areaWidth: width - left - AXIS_GUTTER - rightEdge,
+      ...(right > 0 ? { frame: true } : {}),
+    };
+  }
+
+  // The right column goes whole before the left one shrinks: it is a copy, and
+  // I18's ladder is about the labels a matrix cannot do without.
+  if (right > 0 && width - left - AXIS_GUTTER >= MIN_AREA) {
+    return {
+      ...base,
+      gutter: left + AXIS_GUTTER,
+      labelColumn: left,
+      areaWidth: width - left - AXIS_GUTTER,
     };
   }
 
@@ -298,6 +320,7 @@ function matrixRows(
     if (s === undefined) continue;
     out.push(
       plotRow(
+        i,
         s.label ?? "",
         heatSpans(s, range, layout, map, style, ctx, matrixLayout),
         layout,
@@ -310,6 +333,7 @@ function matrixRows(
     const omitted = block.series.slice(visible).map((s, i) => s.label ?? `row ${String(visible + i + 1)}`); // cells-ok
     out.push(
       plotRow(
+        visible,
         "",
         [{
           text: truncate(
@@ -327,7 +351,7 @@ function matrixRows(
 
   const blanks = Math.max(0, layout.areaRows - out.length); // cells-ok — a row count
   for (let i = 0; i < blanks; i += 1) {
-    out.push(plotRow("", [], layout, ctx));
+    out.push(plotRow(out.length, "", [], layout, ctx)); // cells-ok — a row index
   }
   return out;
 }

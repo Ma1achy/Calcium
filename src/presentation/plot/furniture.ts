@@ -58,6 +58,17 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
  * `{ gutter: 0, … }` and wants no border on either side. The left border is
  * already inside `gutter`, so this flag governs the one column that is new.
  */
+/**
+ * One series' last reading, at the row its ink ends on (I48).
+ *
+ * `shared` is *another series ends on this row and lost it* — a single cell
+ * rather than a count, because a count needs to know which rows collide, which
+ * needs the rasterised ink, which needs the area width, which needs the column
+ * this number is being sized for. I8 asks that the loss not be silent; it does
+ * not ask how many (§3x).
+ */
+export type Callout = Readonly<{ text: string; ref: ColourRef; shared: boolean }>;
+
 export type Layout = Readonly<{
   gutter: number;
   labelColumn: number;
@@ -67,6 +78,28 @@ export type Layout = Readonly<{
   frame?: boolean;
   /** Which of I26's four shapes the furniture takes. `"box"` when absent. */
   style?: FrameStyle;
+  /**
+   * The label cells the **right** gutter holds (I47). Absent or 0 is every
+   * layout that shipped before it existed: the right edge is the frame's border
+   * and nothing else.
+   *
+   * `labelColumn`'s mirror, and the two are sized from one set of labels — one
+   * label, two consumers, so `"both"` cannot draw two axes that disagree. The
+   * edge glyph is the frame's right border rather than a column beside it,
+   * which is what makes the right gutter cost `AXIS_GUTTER + n` exactly as the
+   * left one does.
+   */
+  rightColumn?: number;
+  /**
+   * What the right gutter writes **instead of** the mirrored label, by area row
+   * (I48).
+   *
+   * **On the layout rather than passed per row**, so no call site can supply a
+   * label to one gutter and a callout to neither. `plotRow` takes the row index
+   * and looks it up here, which is the same argument that collapsed thirteen
+   * row compositions into one.
+   */
+  callouts?: ReadonlyMap<number, Callout>;
   /**
    * Cells held back for a vertical legend, outside `width`.
    *
@@ -114,25 +147,121 @@ function leftGutterSpans(label: string, layout: Layout, ctx: RenderContext): rea
   // every other style, so the column the data starts in never moves with the
   // style. That is what makes these four interchangeable at a glance.
   const bare = (layout.style ?? "box") === "corners";
-  const edge = bare ? " " : label === "" ? g.vertical : g.teeRight;
+  // **A tick belongs to the side that draws the label** (I47). This used to
+  // read `label === ""`, which was correct and untested: every caller blanked
+  // the label when `labelColumn` was 0, so *a label exists* and *this column
+  // draws it* were one statement. `yAxis: "right"` separates them, and the old
+  // rule drew a stub here pointing out at a column zero cells wide.
+  const drawsLabel = label !== "" && layout.labelColumn > 0;
+  const edge = bare ? " " : drawsLabel ? g.teeRight : g.vertical;
   return [
-    { text: padStart(label, layout.labelColumn, ctx.capabilities.ambiguousWidth), style: muted },
+    // **A zero-wide column draws nothing, and `padStart` will not say so.** It
+    // pads a string up to a width and never cuts one down to it, so a label
+    // handed to a column of 0 came out at full length and pushed the row past
+    // its own width — the frame's lid sat one column left of every row it was
+    // supposed to enclose. `yAxis: "right"` is the first layout that keeps a
+    // label it does not draw, which is why the padding had never been asked.
+    //
+    // **The column, not the label** — and the first form of this line asked
+    // `drawsLabel` and cost every *unlabelled* row its four spaces of column,
+    // which PC12 caught as a left border sitting in column 1 where its corner
+    // was at 4. Padding is a question about the column and the tick is a
+    // question about the row: the same conflation, a third time, in the fix
+    // for the first two.
+    { text: layout.labelColumn === 0 ? "" : padStart(label, layout.labelColumn, ctx.capabilities.ambiguousWidth), style: muted },
     { text: ` ${edge}`, style: muted },
   ];
 }
 
-/** The frame's right edge, on an area row. Nothing when the layout has none. */
-function rightGutterSpans(layout: Layout, ctx: RenderContext): readonly Span[] {
-  if (layout.frame !== true) return [];
-  const style = layout.style ?? "box";
-  // `"rule"` has a left rule and a bottom rule and no right one — it is what
-  // shipped before `plotFrame` existed. The *column* is still spent, so the plot
-  // area is the same width in all four styles.
-  const bare = style === "corners" || style === "rule";
-  return [{
-    text: bare ? " " : glyphs(ctx.capabilities).vertical,
-    style: tone("muted", ctx.theme, ctx.capabilities),
-  }];
+/**
+ * The right-hand edge of an area row: the border, and the label beside it (I47).
+ *
+ * **The mirror is of the left gutter's shape and not of its glyphs**, which is
+ * why `bare` is computed here rather than shared with `leftGutterSpans`.
+ * `"rule"` has a left rule and a bottom rule and *no right one* — that is what
+ * the style is — so mirroring the left edge's glyph would grow the rule this
+ * style exists not to have. The *column* is still spent either way, so the plot
+ * area is the same width in all four styles.
+ */
+function rightGutterSpans(
+  row: number,
+  label: string,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly Span[] {
+  const column = layout.rightColumn ?? 0;
+  const bare = BARE_RIGHT_EDGE.has(layout.style ?? "box");
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  if (column === 0) {
+    if (layout.frame !== true) return [];
+    return [{ text: bare ? " " : glyphs(ctx.capabilities).vertical, style: muted }];
+  }
+  const g = glyphs(ctx.capabilities);
+  const amb = ctx.capabilities.ambiguousWidth;
+  // **A callout displaces the mirrored label and never the left gutter's**
+  // (I48). *This row is 5200* and *your data is here* are both readings, and
+  // the second is the more specific — but that argument reaches only the gutter
+  // it is written in, so at `"both"` the tick survives on the other side.
+  const callout = layout.callouts?.get(row);
+  if (callout !== undefined) {
+    const text = callout.shared ? `${callout.text}+` : callout.text;
+    return [
+      { text: `${bare ? " " : g.calloutTee} `, style: muted },
+      {
+        text: pad(truncate(text, column, ctx.capabilities), column, amb),
+        // Bold **and** the mark, in that order of reliance: the mark is what
+        // survives the colour floor and the weight is what reads above it.
+        style: { ...slot(callout.ref, ctx.theme, ctx.capabilities), bold: true },
+      },
+    ];
+  }
+  // `teeLeft` and not `teeRight`: the stub points **out** at the label it joins,
+  // which on this side is outward to the right. §3f's own note about termplot
+  // drawing `tick_right` on a left border is this rule read from the other end.
+  const edge = bare ? " " : label === "" ? g.vertical : g.teeLeft;
+  return [
+    { text: `${edge} `, style: muted },
+    { text: pad(truncate(label, column, ctx.capabilities), column, amb), style: muted },
+  ];
+}
+
+/** The two frame styles with nothing drawn at the right edge (I26). */
+const BARE_RIGHT_EDGE: ReadonlySet<FrameStyle> = new Set<FrameStyle>(["corners", "rule"]);
+
+/**
+ * The cells the right gutter costs — its edge, its space and its labels (I47).
+ *
+ * **`AXIS_GUTTER + n`, the left gutter's own arithmetic mirrored**, because the
+ * edge glyph *is* the frame's right border rather than a column beside it.
+ * Where there is no right column the cost is `FRAME_RIGHT`, which is the same
+ * cell doing the same job under its older name.
+ *
+ * That leaves the two sides costing differently for one label — `n + 2 + 1` on
+ * the left against `2 + 2 + n` on the right — because an unlabelled left gutter
+ * still spends the cell that separates a label from its border. Measured at a
+ * four-cell label: a left axis keeps its labels from width 11 and a right one
+ * from 12. Kept rather than equalised (§3x).
+ */
+export function rightGutterWidth(rightColumn: number): number {
+  return rightColumn > 0 ? AXIS_GUTTER + rightColumn : FRAME_RIGHT;
+}
+
+/** Which sides of the plot area carry y labels (I47). */
+export function yAxisSides(block: Pick<Plot, "yAxis">): { left: boolean; right: boolean } {
+  const y = block.yAxis ?? "left";
+  return { left: y === "left" || y === "both", right: y === "right" || y === "both" };
+}
+
+/**
+ * Whether **either** gutter has room to write a y label (I47).
+ *
+ * The callers used to ask `layout.labelColumn === 0`, which is the same
+ * conflation the tick rule carried: with the labels on the right, that test
+ * computes no labels at all — and takes `"grid"`'s horizontal rules with them,
+ * since those are drawn on exactly the rows the gutter labels (I26).
+ */
+export function hasYLabels(layout: Layout): boolean {
+  return layout.labelColumn > 0 || (layout.rightColumn ?? 0) > 0;
 }
 
 /**
@@ -150,13 +279,14 @@ function rightGutterSpans(layout: Layout, ctx: RenderContext): readonly Span[] {
  * byte-identical fourth copy of `line` for its three rows; it goes here too.
  */
 export function plotRow(
+  row: number,
   label: string,
   body: readonly Span[],
   layout: Layout,
   ctx: RenderContext,
 ): string {
   return line(
-    [...leftGutterSpans(label, layout, ctx), ...body, ...rightGutterSpans(layout, ctx)],
+    [...leftGutterSpans(label, layout, ctx), ...body, ...rightGutterSpans(row, label, layout, ctx)],
     layout,
     ctx,
   );
@@ -199,12 +329,33 @@ export function bandLayout(
   axed: boolean,
   areaRows: number,
   caps: Pick<TerminalCapabilities, "ambiguousWidth">,
+  sides: { left: boolean; right: boolean } = { left: true, right: false },
 ): Layout {
   if (!axed) return { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
-  const gutter = Math.min(labelColumnWidth(labels, caps.ambiguousWidth), Math.floor(width / 3)) + AXIS_GUTTER;
-  const frame = width - gutter - FRAME_RIGHT >= 1;
-  const areaWidth = Math.max(1, width - gutter - (frame ? FRAME_RIGHT : 0));
-  return { gutter, labelColumn: gutter - AXIS_GUTTER, areaWidth, areaRows, width, frame };
+  // **The third is a cap on the pair and not one per side** (I47), or two
+  // gutters at a third each leave a third for the data.
+  const wanted = sides.left && sides.right
+    ? Math.floor(width / 6) // cells-ok — a cell width
+    : Math.floor(width / 3); // cells-ok — a cell width
+  const capped = Math.min(labelColumnWidth(labels, caps.ambiguousWidth), wanted); // cells-ok — a cell width
+  const gutter = (sides.left ? capped : 0) + AXIS_GUTTER; // cells-ok — a cell width
+  // The right column goes before the frame's border does, so a width that
+  // cannot hold both keeps the border — which is the same order `layoutFor`
+  // takes and for the same reason: the right labels are the copy.
+  const wide = sides.right && width - gutter - rightGutterWidth(capped) >= 1; // cells-ok — a cell width
+  const rightColumn = wide ? capped : 0; // cells-ok — a cell width
+  const edge = rightGutterWidth(rightColumn); // cells-ok — a cell width
+  const frame = width - gutter - edge >= 1; // cells-ok — a cell width
+  const areaWidth = Math.max(1, width - gutter - (frame ? edge : 0)); // cells-ok — a cell width
+  return {
+    gutter,
+    labelColumn: gutter - AXIS_GUTTER,
+    rightColumn: frame ? rightColumn : 0,
+    areaWidth,
+    areaRows,
+    width,
+    frame,
+  };
 }
 
 /**

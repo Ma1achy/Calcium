@@ -125,6 +125,20 @@ export type GlyphSet = Readonly<{
   diamondTee: string;
   teeLeft: string;
   teeRight: string;
+  /**
+   * The tick a **callout** hangs on, against `teeLeft`'s ordinary one (C12 I48).
+   *
+   * **A mark and not a weight, because weight is spoken for.** A callout is
+   * drawn in its series' colour and bold above the colour floor; at
+   * `colourDepth: 1` a series slot resolves through `MONO`, where `emphasised`
+   * *is* `{ bold: true }` — so a bold callout in an already-bold slot is
+   * typographically identical to the series it names. C12 I25's rule is that
+   * two things a reader must tell apart differ by mark, and this is the mark.
+   *
+   * ASCII has no heavy tee, so it takes a glyph that is at least *different*
+   * from the `+` every box-drawing junction collapses to.
+   */
+  calloutTee: string;
 
 
   // Status — steps, notices, cells.
@@ -181,6 +195,7 @@ const UNICODE: GlyphSet = Object.freeze({
   diamondTee: "◈",
   teeLeft: "├",
   teeRight: "┤",
+  calloutTee: "┣",
 
   tick: "✓",
   cross: "✗",
@@ -222,6 +237,7 @@ const ASCII: GlyphSet = Object.freeze({
   diamondTee: "X",
   teeLeft: "+",
   teeRight: "+",
+  calloutTee: "#",
 
   tick: "+",
   cross: "x",

@@ -119,6 +119,28 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "line", height: 8, axes: true,
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
     },
+    // C12 I47 — the gutter on both sides, and `false` for neither.
+    "yaxis-both": {
+      form: "line", height: 8, axes: true, legend: false, yAxis: "both",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],
+    },
+    "yaxis-right": {
+      form: "line", height: 8, axes: true, legend: false, yAxis: "right",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],
+    },
+    "yaxis-none": {
+      form: "line", height: 8, axes: true, legend: false, yAxis: false,
+      series: [s(sin50, "alpha")],
+    },
+    // C12 I48 — one series' last reading, and three that contend for rows.
+    "callout-single": {
+      form: "line", height: 8, axes: true, legend: false, yAxis: "right", yCallout: "last",
+      series: [s(sin50, "alpha")],
+    },
+    "callout-multiseries": {
+      form: "line", height: 8, axes: true, legend: "right", yAxis: "both", yCallout: "last",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
+    },
     "legend-left": {
       form: "line", height: 8, axes: true, legend: "left",
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],

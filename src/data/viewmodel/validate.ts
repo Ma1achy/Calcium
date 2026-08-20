@@ -22,6 +22,8 @@ import {
   type DocumentStatus,
   type Glyph,
   COLORMAP_NAMES,
+  HAS_CALLOUT,
+  HAS_Y_GUTTER,
   STYLE_ARMS,
   type OHLC,
   type Plot,
@@ -561,6 +563,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (pb !== undefined && pb !== "solid" && pb !== "line") {
       e.push(`${at}: "plotBox" must be "solid" or "line"`);
     }
+    plotAxisErrors(b, e, at, form);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -727,6 +730,62 @@ function checkAlign(b: Record<string, unknown>, e: string[], at: string): void {
     if (entry !== "top" && entry !== "middle" && entry !== "bottom") {
       e.push(`${at}.align[${String(i)}]: one of top, middle, bottom`);
     }
+  }
+}
+
+/**
+ * `yAxis` and `yCallout`, and the four refusals (C04 I60, C12 I47, C12 I48).
+ *
+ * **Refused rather than ignored, which is the whole shape of these two fields.**
+ * A `yAxis` a form has no gutter for and a `yCallout` with no gutter to write in
+ * both *look* honoured — the block constructs, the chart renders, and the field
+ * did nothing. That is F207 and C12 I43's finding: an arm accepted where there
+ * is none tells the caller nothing and the reader nothing.
+ */
+function plotAxisErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const ya = b["yAxis"];
+  const yc = b["yCallout"];
+  const known = ya === "left" || ya === "right" || ya === "both" || ya === false;
+  if (ya !== undefined && !known) {
+    e.push(`${at}: "yAxis" must be "left", "right", "both" or false`);
+  }
+  if (yc !== undefined && yc !== "none" && yc !== "last") {
+    e.push(`${at}: "yCallout" must be "none" or "last"`);
+  }
+  if (ya !== undefined && known && ya !== "left" && HAS_Y_GUTTER[form as PlotForm] === false) {
+    e.push(
+      `${at}: "yAxis" is "${String(ya)}" on form "${String(form)}" (C04 I60) — that form ` +
+        `draws no y gutter, so there is no column for the labels to move to; a facet ` +
+        `declares its own`,
+    );
+  }
+  // **A matrix's row labels *are* its ordinate** (C12 I18), which is the same
+  // argument I50b makes for refusing `axes: false` one field along.
+  if (ya === false && form === "heatmap") {
+    e.push(
+      `${at}: "yAxis" is false on a heatmap (C04 I60) — a row label is the ordinate ` +
+        `here, so a matrix without them is a picture of numbers with no way to tell ` +
+        `which row is which`,
+    );
+  }
+  if (yc !== "last") return;
+  if (HAS_CALLOUT[form as PlotForm] === false) {
+    e.push(
+      `${at}: "yCallout" is "last" on form "${String(form)}" (C04 I60) — a callout names ` +
+        `where one series ends, and that form draws no per-series curve to end`,
+    );
+  }
+  if (ya === undefined || ya === "left" || ya === false) {
+    e.push(
+      `${at}: "yCallout" is "last" with "yAxis" of "${ya === undefined ? "left" : String(ya)}" ` +
+        `(C04 I60) — a callout is written in the right gutter and there is none; widen ` +
+        `"yAxis" to "right" or "both"`,
+    );
   }
 }
 
