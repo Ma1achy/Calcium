@@ -725,13 +725,52 @@ C04 I52's refusal of the fill is half reversed and the surviving half decides th
 | | draws | why |
 |---|---|---|
 | the two edges | dashed, unchanged | F34 — the mark carries it and the tone does not |
-| the interior | the density ladder's **low rung**: `░` at unicode, `.` at ASCII | a *different alphabet* from the curve, which is what the refusal was right about |
-| at 1-bit | both, and they are still told apart | because the alphabets differ — asserted, never assumed |
+| the interior | `░` U+2591, on a **narrow** unicode terminal and there alone | block elements — a *different alphabet* from the curve's braille, which is what the refusal was right about |
+| at 1-bit | both, and they are still told apart | the alphabets differ, so no colour is needed to separate them — asserted, never assumed |
 
 **Braille is the one thing the fill must not be**, and it is the obvious choice: the request that
 prompted this proposed it by name. A braille fill under a braille curve is one alphabet in one
 cell, which is precisely *indistinguishable from the curve at one bit*. The original refusal named
 the right mechanism and drew the wrong conclusion from it, so only one half reverses.
+
+**The first draft of this table had three cells and all three were wrong, which is what the walk is
+for.** It read *the density ladder's low rung: `░` at unicode, `.` at ASCII*, and none of it
+survives measurement:
+
+| the claim | measured |
+|---|---|
+| `░` is the density ladder's low rung | `RAMP_DENSITY[0]` is **`⠄` U+2804, a braille glyph**. The sentence names braille as the substitute in the same breath as forbidding braille, and reads as consistent because *density* and *shade* are the same word in English and two vocabularies here. `░` is `pairFor`'s `empty` — the **fill** Pair, a different type on purpose (§3c: *a ladder maps one value to one glyph; a fill maps one value to a count of two*) |
+| `.` at ASCII is a different alphabet from the curve | **`.` is `RAMP_ASCII[0]`** — the curve's own first rung. `curve.ts` folds the ASCII grid through `ladderFor("height", caps).steps`, and `line-annotated-ascii-wide.plain` shows it: the last area row reads `@#++=-:...:` and the `.` and `:` in it are curve ink |
+| the unicode arm is one arm | it is two. `cells("░", "wide")` is **2** by the framework's own measurer, so on `ambiguousWidth: "wide"` a filled row occupies twice its declared cells — `pairFor` records exactly this failure, found in a golden that had been reviewed and committed |
+
+**So the fill draws on one arm of three, and the other two are stated rather than left to a
+fallback:**
+
+| unicode | ambiguousWidth | the curve draws in | the fill |
+|---|---|---|---|
+| `full` / `bmp` | `narrow` | braille U+2800–28FF | **`░` U+2591** |
+| `full` / `bmp` | **`wide`** | braille (narrow on both kinds — `curve.ts` says so) | **none** — `░` doubles, and every narrow substitute the tree has is braille, which is the curve's |
+| `ascii` | any | `.:-=+*#@` | **none** — the ramp *is* the curve's alphabet, and `-` is the annotation's own dash |
+
+**Where the fill does not draw, the two dashed edges carry the band** — the figure that ships today,
+so the degradation is a frame that was already complete rather than a hole. *That is the difference
+between a capability arm with no vocabulary and a member that does nothing (F207): one is C12 I25's
+substitution ladder reaching its bottom rung, the other is an unimplemented field.*
+
+**The tempting third option is a punctuation mark and it is refused.** `` ` ``, `~` and `,` are all
+narrow, all outside both alphabets, and all *text* — a plot area sown with apostrophes reads as
+noise rather than as area, and F34's rule is that a mark carries meaning or is not drawn.
+
+**And the width table is over-broad by eleven code points, which is recorded and not fixed here.**
+`isAmbiguous` sweeps U+2580–U+259F whole, on the reason *block elements — the height ladder lives
+here*, and the reason is exact about the ladder: U+2581–U+2588 are all `A`. Measured against
+UCD 14.0.0, **eleven of the block's thirty-two are `N`** — U+2590, **U+2591**, and the ten pure
+quadrants U+2596–U+259F. An exact table would let the fill draw on the wide arm. It would **not**
+unblock the radar's quadrant alphabet, which is the other thing that would seem to follow: four of
+`QUADRANTS`' sixteen entries are the half-blocks U+2580, U+2584, U+258C and U+2588, and those are
+genuinely `A`. So the sweep is over-broad and right where it matters, and the asymmetry decides it
+— reading a narrow glyph as wide declines to draw, reading a wide one as narrow corrupts the
+geometry of every figure in the framework.
 
 **Layered as a `surface`**, which is what answers the other half. §3u's `Layer.kind` ranks
 `surface` below `curve`, so a curve draws over its own band with no rule about which wins — the
