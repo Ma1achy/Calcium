@@ -2757,6 +2757,182 @@ label *is* its ordinate). *Two rungs, both pre-existing, reached by a new road �
 here because the first draft of this paragraph claimed the matrix's answer for both.*
 
 
+## 3ac. `origin` — four corners, and the measurement C04 §3 refused to guess
+
+C04 §3 declared the member and left its refusal set owed: *"inventing it here is the error
+`HAS_Y_GUTTER` records … the record lands with the render pass that can measure it, and `origin`
+lands with the record."* This is that record. **The measurement corrected the guess in both
+directions**, and it corrected the *shape* of the guess as well: the question is not which forms
+have a corner, it is **which machinery places the data**, and that is a partition the type could
+not see.
+
+### 3ac.1 Three probes, and each one indicted the one before it
+
+**Probe 1 — the scale core's reach.** `rowOf` and `columnsOf` given a flip behind a module flag,
+every form and every catalogue variant rendered at 24-bit and 80 cells under all four settings,
+frames diffed.
+
+| moves | count | forms |
+|---|---|---|
+| both directions | 8 | `density` `ecdf` `line` `pairplot` `scatter` `slope` `smallmultiples` `step` |
+| the vertical only | 7 | `bar` `boxplot` `bubble` `histogram` `stackedarea` `streamgraph` `violin` |
+| neither | 29 | the rest |
+
+**And this measures the probe's reach, not the forms' geometry.** A heatmap has a corner —
+which cell holds row 0, column 0 — and does not go through `rowOf`; it appears under *neither*
+because the flip was not wired to it, which is a fact about the patch. Reading that column as the
+refusal set would have defined the answer as *whatever the mechanism I happened to write touches*,
+which is the same circularity as reasoning it, wearing a number.
+
+**Probe 2 — reverse the input, machinery-independent.** Every ordered axis of every fixture
+reversed — samples, categories, bars, vectors — and the frame diffed against the original.
+Reversal is inert for nine forms: `density` `ecdf` `histogram` `pairplot` `pie` `ridgeline`
+`smallmultiples` `treemap` `waffle`. **And inert is not direction-free**: a histogram bins, an
+ECDF sorts, a waffle is a proportion, a treemap ranks. Seven of the nine are order-independent
+*statistics*, which have an abscissa and simply do not take it from the input order.
+
+**The first run of probe 2 was wrong, and the way it was wrong is the reusable part.** It compared
+frames with the SGR stripped and reported *seventeen* inert, the whole matrix family among them —
+because a colour wash has no glyph variation and its direction is entirely in the paint. *An
+instrument that strips the channel a form draws in reports the form as blank.* That is LY8b's
+finding one probe along, and it would have produced a refusal set with `heatmap` in it, measured,
+with a number beside it.
+
+**Probe 3 — is a flip a transform of the picture?** It would be one seam for all forty-four forms:
+reverse each area row for the horizontal, reverse the row order for the vertical, and no renderer
+changes. It does not survive contact, and the figures are the reason.
+
+| | the row as drawn | the row reversed as a string |
+|---|---|---|
+| `line` | 60 cells | **138 cells** |
+| `heatmap` | 60 cells | **971 cells** |
+| `bar` | 60 cells | **111 cells** |
+
+The escape sequences reverse into text — `\x1b[38;2;98;98;98m` becomes `m89;89;89;2;83[\x1b` — and
+`cells()` counts what is no longer a control sequence. **This is `axed()`'s recorded defect
+arriving from the other side**: the legend column measured a painted row at about twice its width,
+was truncated, and left `[38;2;98;98;98m` on screen as text. One mechanism, two symptoms, and the
+second one was predicted by the comment already in the tree.
+
+The alphabet fails independently of the paint. **Ten of fifteen box-drawing glyphs need a mirror
+map** — `┌┐└┘├┤╭╮╰╯` — and braille needs something a lookup table is the wrong shape for: a cell is
+a 2 × 4 dot matrix, so a horizontal mirror is the bit permutation 1↔4, 2↔5, 3↔6, 7↔8. `⠆` is dots
+2 and 3 and mirrors to `⠰`, dots 5 and 6. Correct, expressible, and **not a character operation**.
+
+**So the ruling is: a flip is a transform of the placement, never of the picture.** The cheap seam
+is refused with a number rather than with an intuition, and the dot-level flip belongs in
+`columnsOf` and `rowOf`, which already work in dot coordinates.
+
+### 3ac.2 The partition, which is what actually decides the refusal set
+
+Every form's arm in `FORM_ROWS`, grouped by the machinery it delegates to:
+
+| machinery | forms | where the direction lives |
+|---|---|---|
+| **positional** | 7 — `bubble` `density` `ecdf` `line` `scatter` `slope` `step` | `rowOf` · `columnsOf` — **two functions** |
+| **matrix** | 10 — `calendar` `confusion` `contour` `correlation` `density2d` `heatmap` `latency` `quiver` `spectrogram` `utilisation` | `columnMap` · `matrixRows`' loop — **two places** |
+| **facet** | 2 — `pairplot` `smallmultiples` | **nowhere — a facet is a whole `Plot` and carries its own** |
+| **categorical** | 11 — `autocorrelation` `bar` `bullet` `dotplot` `dumbbell` `forest` `funnel` `gantt` `lollipop` `timeline` `waterfall` | the row order in one place; **the bar's own direction in eleven row builders** |
+| **own renderer** | 14 — `boxplot` `flame` `histogram` `horizon` `icicle` `pie` `radar` `ridgeline` `sparkline` `stackedarea` `streamgraph` `treemap` `violin` `waffle` | fourteen places, or nowhere |
+
+**`origin` is honoured on the positional and matrix families and refused on the other three —
+seventeen forms of forty-four.** The line is drawn by cost and by whether both halves of the member can move, and the
+three refusals C04 guessed all survive, none of them for the reason guessed:
+
+- **`pie`** — refused because it is its own renderer, and *separately* because it has no corner.
+  Probe 1 and probe 2 both say inert, which is the only refusal in the set with two independent
+  measurements behind it.
+- **`sparkline`** — refused because it is its own renderer, and the guessed reason is the sharper
+  one: **one row, so the vertical half of the member cannot move at all.** A form that can honour
+  half of `origin` is the case the member must not have.
+- **`flame` and `icicle`** — refused as own renderers. The guess that they are *one renderer
+  differing by a vertical flip* is true and is **an argument about those two forms, not about this
+  member**: `origin` on `flame` would be a second spelling of `icicle`, which is a reason to
+  refuse it here and to leave the two forms alone.
+
+**The twenty-two that were not guessed are the measurement's actual product**, and `bar` is the one
+worth naming: the most ordinary chart in the catalogue refuses the member, because its rows come
+from `categoricalForm` in one place and each bar's direction from its own row builder in eleven.
+**The condition is a symbol, so a grep finds it**: `origin` reaches the categorical family the day
+`categoricalForm` takes a shared span builder for the row body rather than a `rowBuilder` per form.
+
+### 3ac.3 `ORIGIN_DEFAULT` — one total record carries the gate and the default together
+
+The two families' defaults are **not the same corner**, and that is not a wrinkle to hide:
+
+- a curve's first sample is at the **left** and its value grows **upward** — `"bottom-left"`;
+- a matrix's `series[0]`, `values[0]` is at the **top** left, because a row index grows downward.
+
+A single default would move every shipped matrix frame or every shipped curve. So the record is
+
+```ts
+ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>>   // null — the form refuses `origin`
+```
+
+**one total record, read in both directions, carrying the acceptance set *and* the default.** A
+separate `HAS_ORIGIN` beside a `DEFAULT_ORIGIN` would be two records that must agree, and
+`FURNITURE_ROWS`' argument is that the agreement should be the thing that ships. It lives in C04
+because the validator needs it and L0 cannot import L1 (A02 §1) — `HAS_Y_GUTTER`'s placement, for
+`HAS_Y_GUTTER`'s reason.
+
+**The flip is threaded, never global, and the parameter is required.** `rowOf` and `columnsOf` take
+a `Facing` as a fourth argument with no default: an optional one is a flip a call site forgets
+silently, and probe 1 measured exactly that failure — `bar`, `boxplot`, `bubble`, `histogram`,
+`stackedarea`, `streamgraph` and `violin` all reach `rowOf` and place their own columns, so a
+module-level flag flipped seven refused forms halfway. Twenty calls across six files, and the
+compiler names every one.
+
+### 3ac.4 The classification table — structural interactions, two rules holding at rest
+
+| # | rules that meet | ruling |
+|---|---|---|
+| A1 | `origin` reverses the y direction × `axes.ts` writes the gutter's ends as `[0 → range.max, h−1 → range.min]` **literally**, and only the interior ticks through `rowOf` | **The ends are computed, not written.** A flip threaded into `rowOf` alone moves the interior ticks and leaves `max` at the top — a gutter that disagrees with its own plot, in the one place a reader goes to resolve a disagreement. The two ends become `rowOf(range.max)` and `rowOf(range.min)`. |
+| A2 | `origin` × `yAxis: "right"` — both move the labels | **They move different labels and compose.** `yAxis` picks *which side the gutter is on*; `origin` picks *which end of it holds the maximum*. `origin: "bottom-right"` with `yAxis: "right"` is a plot whose data grows leftward with its scale on the right, and it is expressible. The failure to watch for is applying the horizontal flip to the gutter's *side*, which is the "labels move twice" defect OR2 asserts against. |
+| A3 | `origin` × `matrixAnchor` — one places columns, one places the fringe | **Reversing `columnMap`'s output does both, and correctly.** With `matrixAnchor: "left"` and a right-facing origin, the data starts at the right and the blank fringe lands on the left, which is what §3o's ruling says a fringe is. No second rule. |
+| A4 | `origin` × a facet — `facets` is `readonly Plot[]`, so each one is a whole block | **The container refuses and each facet declares its own, because they are two members sharing a word.** `origin` on a `smallmultiples` would mean *which corner the first facet sits in*, and on its facets *which corner the data grows from*. C04 §3's test for one member or two answers this without a measurement: they are not the same question, and a container that accepted the word would silently answer the other one. A facet is validated on its own `form` because it is a `Plot` — **and nothing validates facets at all today**, which is a gap this ruling names and does not close. |
+| A5 | `origin` × `width`/`aspect`/`align` (§3ab) | **Independent, and the order is fixed.** `drawnWidth` decides how many cells the form gets; `origin` decides which end of them the data starts at; `alignPad` decides where the drawn block sits in the frame. A right-facing origin in a left-aligned narrow plot is data flush to the **right edge of the drawn area**, not of the frame. |
+| A6 | `origin` × a single sample — `columnsOf` puts a lone sample at `floor((w−1)/2)` | **The centre is its own mirror at odd widths and is not at even ones.** `floor((w−1)/2)` mirrors to `w−1−floor((w−1)/2)`, which differs by one cell when `w` is even. Flipping the column *after* the placement is what makes a one-sample plot twitch sideways under a member that should not be able to move it. **The single-sample column is computed from the facing, not mirrored after the fact.** |
+| A7 | `origin` × a constant series — `rowOf` returns `floor(last/2)` before the range is consulted | **Same shape as A6 and the same remedy.** The early return means the flip is never reached, which is correct here for the opposite reason: a flat line has no direction to reverse, so the centre row is the answer under all four origins. Asserted rather than assumed, because A6's remedy would otherwise be applied here too. |
+
+### 3ac.5 The sequence trace — event-mediated, where a second reader disagrees with the first
+
+The events are the passes, and every row is a place where **something else computes the same
+placement**.
+
+| # | sequence | ruling |
+|---|---|---|
+| B1 | place columns → draw the curve → **the crosshair asks for a column** | `cursorColumn` re-derives `columnsOf`'s arithmetic in `definition.ts` and its comment says so. Under a horizontal flip it must reverse or the crosshair points at the mirror sample — **the frame stays plausible and the readout is wrong**, which is the worst available failure. |
+| B2 | place bars → aggregate → **the crosshair asks for a candle** | `candleColumn` is the same defect one style along, and §3r's placement work already made these two share an expression. The flip goes into the shared one. |
+| B3 | place columns → **the x tick row numbers them** | `xTickRow` maps `t ∈ [0,1]` to a column independently of `columnsOf`. A flip that reaches the data and not the ticks produces a plot that reads right-to-left under a left-to-right axis, and **the axis is what a reader trusts to resolve it**. |
+| B4 | caller supplies `xLabels` → **the captions are placed** | `xAxis(block.xLabels, …)` is the caller's own strings, and they reverse with the data. A caption naming the sample it is under is the whole of what a caption is. |
+| B5 | annotate → **a reference line is drawn at a value** | `annotate.ts` reaches `rowOf` ten times. A vertical flip that misses one of them puts a threshold line at the mirror value — and the band's two edges are drawn by two separate calls, so a half-flip **inverts a confidence band about its own curve** rather than moving it. |
+
+### 3ac.6 What the refusal leaves behind
+
+On C13 `settle`'s precedent, and it is short here: **both gates refuse before anything is placed.**
+`origin` is validated against `ORIGIN_DEFAULT` at document construction and at the builder, so a
+refused form never reaches a renderer holding one, and there is no partially-flipped frame to
+leave. The rejection is a `TypeError` naming the form and the member, which is the same shape the
+other five geometry members already refuse with (§3ab, F207) — and the reader who sees it is the
+caller, at build time, not a reader looking at a frame.
+
+### 3ac.7 Tests
+
+    OR1  each of the four corners places the first sample in that corner
+    OR2  origin with yAxis "right" — the labels move once, not twice (A2)
+    OR5  the x tick order and the y label order follow the origin (A1, B3)
+    OR6  every form whose ORIGIN_DEFAULT row is non-null moves under both flips —
+         rendered, diffed, and a form that accepts the member and does not move fails
+    OR7  every form whose row is null is refused at both gates
+    OR8  a single sample does not move sideways at an even width (A6)
+    OR9  a constant series draws the same row under all four origins (A7)
+    OR10 a confidence band's two edges flip together, and the band is not inverted (B5)
+
+**OR6 is the one that closes the class.** It is the measurement made permanent: the probe that
+produced this record, run as an assertion, so a form added to the accepted set without a working
+flip fails rather than shipping a member that silently does nothing.
+
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
