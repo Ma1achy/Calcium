@@ -138,20 +138,35 @@ export function extentFor(caps: Caps, grows: "rightward" | "leftward" = "rightwa
       encodes: "extent", grows, solid: "#", partials: Object.freeze([]), absent: "-",
     } as const);
   }
-  // **Leftward is braille at every width, and that is a limit rather than a
-  // choice.** The narrow arm below uses the left-eighths `▏▎▍▌▋▊▉` — seven
-  // fractions growing from the left. Unicode has no matching set growing from
-  // the right: `▕` and `▐` are the only two it offers, an eighth and a half, and
-  // both are `East_Asian_Width=Ambiguous`. Braille is `Neutral` throughout and
-  // `⢸` is the right dot-column, the one fraction the block can express
-  // sideways — the same trade the wide arm already takes, from the other side.
-  if (grows === "leftward" || caps.ambiguousWidth === "wide") {
+  // **Braille where an ambiguous glyph would be two cells**, and that is the
+  // whole of what the width buys. Every block element here — `█`, the
+  // left-eighths, `▐` — is `East_Asian_Width=Ambiguous`, measured: one cell at
+  // `narrow` and two at `wide`. Braille is `Neutral` throughout.
+  if (caps.ambiguousWidth === "wide") {
     return Object.freeze({
       encodes: "extent",
       grows,
       solid: "\u28ff",
       partials: Object.freeze([grows === "leftward" ? "\u28b8" : "\u2847"]),
       absent: "-",
+    } as const);
+  }
+  // **Leftward is blocks too, and it was braille on an argument that does not
+  // distinguish.** The reason recorded was that `▕` and `▐` are the only
+  // right-anchored fractions Unicode offers and both are Ambiguous — true, and
+  // *`█` and the left-eighths are Ambiguous as well*, which is why the branch
+  // above exists. What the seven-fraction argument actually settles is
+  // resolution, and there the two are equal: `⣿` with one partial is two states
+  // a cell and `█` with `▐` is two states a cell. Braille bought nothing and
+  // cost the vocabulary — the vertical compact violin drew dots where the
+  // horizontal one drew a solid ladder, one rung in two alphabets (C12 §3i).
+  if (grows === "leftward") {
+    return Object.freeze({
+      encodes: "extent",
+      grows,
+      solid: "\u2588",
+      partials: Object.freeze(["\u2590"]),
+      absent: "\u2014",
     } as const);
   }
   return Object.freeze({

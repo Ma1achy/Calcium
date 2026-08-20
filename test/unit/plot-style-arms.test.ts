@@ -596,3 +596,51 @@ describe("SA10 (C12 I43): every violin routine answers for the style, one way or
     }
   });
 });
+
+describe("SA11 (C12 I46): a compact box's run is filled or heavier", () => {
+  // **The reason the compact box is filled is a reason for a *run*.** One row
+  // has no lid or floor, so a blank interior leaves `┤    │    ├` and says
+  // nothing about where the box is — and `━` is not the whisker either. This
+  // asserts the fork on both orientations and, more importantly, that the two
+  // arms of the fork still say *box*: the run's glyph is not the whisker's.
+  const D = Array.from({ length: 60 }, (_v, i) => 30 + 15 * Math.tan(((i + 0.5) / 60 - 0.5) * 2.4)); // cells-ok — a sample count
+  const at = (extra: object) => block({
+    kind: "plot", id: "sa11", form: "violin", axes: true, plotDetail: "compact",
+    categories: ["a", "b"], series: [{ values: D }, { values: D.map((v) => v * 0.6) }], ...extra,
+  });
+  const draw = (extra: object): string =>
+    kit().renderToLines(at(extra), 60).map(plain).join("\n");
+
+  for (const [name, o] of [
+    ["horizontal", { height: 6 }],
+    ["vertical", { height: 14, orientation: "vertical" }],
+  ] as const) {
+    it(`${name}: the fork changes the run and not the whisker`, () => {
+      const solid = draw({ ...o, plotBox: "solid" });
+      const line = draw({ ...o, plotBox: "line" });
+      expect(line).not.toBe(solid);
+      // The run is a run in both — the same cells carry ink, and only the glyph
+      // in them changes. A `"line"` box that dropped its interior would be the
+      // `┤    ├` the compact arm exists to avoid.
+      const ink = (t: string): number => [...t].filter((c) => c !== " " && c !== "\n").length; // cells-ok — a cell count
+      expect(ink(line), `${name}: the run is still drawn`).toBe(ink(solid));
+      // And the heavy glyph is not the whisker's, or the box would vanish into
+      // the line it sits on.
+      const heavy = name === "horizontal" ? "━" : "┃";
+      expect(line, `${name}: the run is heavier`).toContain(heavy);
+      expect(solid).not.toContain(heavy);
+    });
+  }
+
+  it("the default is solid, and a form with no box ignores the field", () => {
+    expect(draw({ height: 6 })).toBe(draw({ height: 6, plotBox: "solid" }));
+    // A line chart has no box; the member is accepted and changes nothing,
+    // which is `plotCorners`' precedent and not the silent-ignore F207 names —
+    // there is no arm here to have honoured it.
+    const line = (extra: object) => kit().renderToLines(block({
+      kind: "plot", id: "sa11b", form: "line", height: 8, axes: true,
+      series: [{ values: [1, 4, 2, 8, 5] }], ...extra,
+    }), 60).map(plain).join("\n");
+    expect(line({ plotBox: "line" })).toBe(line({}));
+  });
+});

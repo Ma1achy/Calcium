@@ -106,6 +106,20 @@ export type GlyphSet = Readonly<{
   candleHollow: string;
   candleFilled: string;
   candleCross: string;
+  /**
+   * A run drawn **heavier than the line beside it** (C12 I46, §3i).
+   *
+   * A compact box plot is one row: its interquartile range is a filled run
+   * because a blank interior between two tees says nothing about where the box
+   * is. Filled is not the only thing a run can be that a whisker is not — a
+   * heavier stroke says *box* against `─` while staying a line, which is what a
+   * reader after the summary's shape rather than its weight wants.
+   *
+   * ASCII has one width of rule, so both collapse to a glyph that is at least
+   * *different* from `-` and `|`.
+   */
+  heavyHorizontal: string;
+  heavyVertical: string;
   diamond: string;
   /** Mean and median in one cell, so *they coincide* never reads as *it is missing* (C12 I33). */
   diamondTee: string;
@@ -161,6 +175,8 @@ const UNICODE: GlyphSet = Object.freeze({
   candleHollow: "▯",
   candleFilled: "┃",
   candleCross: "┿",
+  heavyHorizontal: "━",
+  heavyVertical: "┃",
   diamond: "◆",
   diamondTee: "◈",
   teeLeft: "├",
@@ -199,6 +215,8 @@ const ASCII: GlyphSet = Object.freeze({
   cursorMark: "^",
   candleHollow: "=",
   candleFilled: "#",
+  heavyHorizontal: "=",
+  heavyVertical: "H",
   candleCross: "+",
   diamond: "x",
   diamondTee: "X",

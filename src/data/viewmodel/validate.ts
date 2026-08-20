@@ -555,6 +555,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (pg !== undefined && pg !== "polygon" && pg !== "circle") {
       e.push(`${at}: "plotGrid" must be "polygon" or "circle"`);
     }
+    // C12 I46 — the compact box's run. Ignored where a form has no box, as
+    // `plotCorners` and `plotGrid` are: the union is the claim.
+    const pb = b["plotBox"];
+    if (pb !== undefined && pb !== "solid" && pb !== "line") {
+      e.push(`${at}: "plotBox" must be "solid" or "line"`);
+    }
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);

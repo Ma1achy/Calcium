@@ -728,6 +728,16 @@ export type Plot = Readonly<{
    * figure that changes shape at a threshold is two figures with one name.
    */
   plotGrid?: "polygon" | "circle";
+  /**
+   * A compact box plot's interquartile run (C12 I46, §3i).
+   *
+   * At one row a box has no top and bottom edge, so its interior carries the
+   * range: a blank one leaves `┤    ├` and says nothing about where the box
+   * begins. **Filled is not the only run a whisker is not** — `"line"` draws it
+   * a stroke heavier than the whisker instead, which keeps the summary a line
+   * drawing where `"solid"` gives it mass against a density behind it.
+   */
+  plotBox?: "solid" | "line";
   plotCorners?: "rounded" | "sharp";
   /**
    * Which axis a categorical or distribution form runs along (C12 §3j, C12 I30).

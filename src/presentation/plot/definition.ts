@@ -1872,14 +1872,14 @@ const FORM_ROWS: Readonly<
       return categoricalColumnForm(boxed, width, ctx, (i, cw, rows, low, high) => {
         const q = qs[i];
         return q
-          ? boxplotColumn(q, low, high, cw, rows, ctx.capabilities)
+          ? boxplotColumn(q, low, high, cw, rows, ctx.capabilities, block.plotBox ?? "solid")
           : Array.from({ length: rows }, () => " ".repeat(cw));
       });
     }
     return bandedForm(block, cats, width, ctx, (_sr, aw, rows, i) => {
       const q = qs[i];
       return q
-        ? boxplotBand(q, lo, hi, aw, rungRows(rungFor(block, "boxplot", rows, "rows", 0), rows), ctx.capabilities)
+        ? boxplotBand(q, lo, hi, aw, rungRows(rungFor(block, "boxplot", rows, "rows", 0), rows), ctx.capabilities, block.plotBox ?? "solid")
         : Array.from({ length: rows }, () => " ".repeat(aw));
     });
   },
@@ -2213,13 +2213,14 @@ const FORM_ROWS: Readonly<
         // and the remainder is what decides which bands are a cell wider.
         const rung = rungFor(block, "violin", narrowest, "columns", finiteCount(sr));
         if (!rung.density) {
-          return boxplotColumn(qs[i] ?? summaryOf(sr) ?? EMPTY_SUMMARY, shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities);
+          return boxplotColumn(qs[i] ?? summaryOf(sr) ?? EMPTY_SUMMARY, shared?.min ?? 0, shared?.max ?? 1, cw, rows, ctx.capabilities, block.plotBox ?? "solid");
         }
         if (rung.rung === "rain" || rung.rung === "raindrop") {
           return rainColumns(
             sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows,
             ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,
             block.plotStyle === "braille", block.plotFill === "solid",
+            block.plotBox ?? "solid",
           );
         }
         return violinColumn(
@@ -2240,7 +2241,7 @@ const FORM_ROWS: Readonly<
         const q = qs[i] ?? summaryOf(sr);
         return q === undefined
           ? Array.from({ length: rows }, () => " ".repeat(aw))
-          : boxplotBand(q, shared?.min ?? 0, shared?.max ?? 1, aw, spent, ctx.capabilities);
+          : boxplotBand(q, shared?.min ?? 0, shared?.max ?? 1, aw, spent, ctx.capabilities, block.plotBox ?? "solid");
       }
       // **The rung, not the row count**, because two rungs can be handed the
       // same budget: `"compact"` takes the floor at any height, so a raincloud
@@ -2250,6 +2251,7 @@ const FORM_ROWS: Readonly<
           sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw,
           ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,
           block.plotStyle === "braille", block.plotFill === "solid",
+          block.plotBox ?? "solid",
         );
       }
       // The vocabulary, not the geometry (C12 I43, §3w) — every rung, budget

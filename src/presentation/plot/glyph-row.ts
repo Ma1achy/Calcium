@@ -172,11 +172,15 @@ export function boxplotColumn(
   width: number,
   rows: number,
   caps: Caps,
+  /** The compact box's interquartile run: a filled block or a heavier line (C12 I46). */
+  box: "solid" | "line" = "solid",
 ): readonly string[] {
   const slot = Math.max(1, Math.floor(width));
   const n = Math.max(1, Math.floor(rows));
   const g = glyphs(caps);
-  const fill = pairFor(caps).filled;
+  // `boxplotBand`'s ruling stood up (C12 I46) — a one-column box has no sides,
+  // so its interior is a run, and a heavier rule is a run.
+  const fill = box === "line" ? g.heavyVertical : pairFor(caps).filled;
 
   // **The box is narrower than its column, and that is the figure rather than
   // taste.** Drawn to the full slot the four categories touched — three boxes
@@ -293,6 +297,8 @@ export function boxplotBand(
   width: number,
   rows: number,
   caps: Caps,
+  /** The compact box's interquartile run: a filled block or a heavier line (C12 I46). */
+  box: "solid" | "line" = "solid",
 ): readonly string[] {
   const w = Math.max(1, Math.floor(width));
   const n = Math.max(1, Math.floor(rows));
@@ -315,7 +321,13 @@ export function boxplotBand(
 
   // The interquartile run's ink, for the compact arm. `pairFor` is the gauge
   // vocabulary and this *is* a gauge: a span of the axis that is filled or not.
-  const fill = pairFor(caps).filled;
+  //
+  // **Or a heavier line, which is the same claim at less weight** (C12 I46).
+  // What the compact arm needs is a run that is *not the whisker*; filled says
+  // so loudest and `━` says so too, leaving the figure a line drawing. The
+  // choice is the caller's because it is about what the reader is after — the
+  // summary's shape, or its mass against a density behind it.
+  const fill = box === "line" ? g.heavyHorizontal : pairFor(caps).filled;
   const compact = n < 3; // cells-ok — a row count
 
   // **No whisker, no stub** (I33). The cap and the box edge are two writes to

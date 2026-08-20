@@ -627,8 +627,9 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     // dot-column of daylight between the cloud and the box it belongs to, and
     // it survived the alignment assertion untouched.
     //
-    // The two arms share no glyph (T1.88), so this is about direction and not
-    // about a count: `⢸` is the right dot-column and `⡇` the left.
+    // The two arms share their *solid* and not their partials (T1.88), so this
+    // is about direction and not about a count: `▐` fills a cell's right where
+    // the rightward eighths fill its left.
     const left = extentFor(FULL_CAPS, "leftward");
     const right = extentFor(FULL_CAPS, "rightward");
     let tips = 0; // cells-ok — a cell count
@@ -693,15 +694,19 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     // **The raindrop's split at its own budget: two of cloud, one of box, one
     // of rain.** Served strip-first the cloud gets one column at exactly the
     // width the ladder was written for — three levels of density where the
-    // budget promises five — and every column is still accounted for. The box
-    // is where the split shows: it is the only part of the figure drawn from
-    // named glyphs rather than braille, so its column is readable off the row.
+    // budget promises five — and every column is still accounted for.
+    //
+    // **The box's column is read off its own glyphs and not off *not braille*.**
+    // It was the second: the cloud was braille and the box was named glyphs, so
+    // *anything that is not a dot* located it — a proxy that held only while the
+    // leftward extent was braille, and stopped the day it became `█` and `▐`.
+    // The box draws from `glyphs(caps)` and nothing else in the figure does.
     const drop = rainColumns({ values }, summary(values), 0, 100, 4, ROWS, FULL_CAPS, 0, true); // cells-ok — a column budget
-    const braille = (c: string): boolean => c >= "\u2800" && c <= "\u28ff";
+    const boxGlyphs = new Set([..."\u2502\u251c\u2524\u252c\u2534\u253c\u2500\u25c6\u25c8"]);
     const boxAt: number[] = []; // cells-ok — a column index
     for (const row of drop) {
       for (const [i, c] of [...row].entries()) {
-        if (c !== " " && !braille(c)) boxAt.push(i); // cells-ok — a column index
+        if (boxGlyphs.has(c)) boxAt.push(i); // cells-ok — a column index
       }
     }
     expect(boxAt.length, "the box is drawn").toBeGreaterThan(0); // cells-ok — a cell count
@@ -806,19 +811,22 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
         })
         .join(" ");
     };
-    expect(levels("leftward")).toBe("\u2800\u2800 \u2800\u28b8 \u2800\u28ff \u28b8\u28ff \u28ff\u28ff");
+    expect(levels("leftward")).toBe("\u2800\u2800 \u2800\u2590 \u2800\u2588 \u2590\u2588 \u2588\u2588");
 
     // **The direction is on the vocabulary, so the pairing cannot be wrong.**
-    // Leftward is braille at every width because Unicode has no left-growing
-    // eighths — `▕` and `▐` are the only two and both are Ambiguous — while
-    // rightward at narrow is the block set. The two arms therefore share no
-    // glyph, which is what makes the assertion above about direction and not
-    // about a repeat count.
+    // *This row asserted that the two arms share no glyph*, which was true while
+    // leftward was braille and is not now: both solids are `█`. The reason
+    // leftward was braille — that `▕` and `▐` are Ambiguous where braille is
+    // Neutral — is true of `█` and the left-eighths as well, so it separated
+    // nothing; and the resolution is two states a cell either way. What still
+    // distinguishes the arms is the **partial**, which is where the direction
+    // lives: `▐` fills a cell's right and `▏▎▍▌▋▊▉` its left.
     const left = extentFor(FULL_CAPS, "leftward");
     const right = extentFor(FULL_CAPS, "rightward");
     expect(left.grows).toBe("leftward");
     expect(right.grows).toBe("rightward");
-    expect([...left.partials, left.solid].some((g) => [...right.partials, right.solid].includes(g)))
+    expect(left.solid, "the solid is shared, and says nothing about direction").toBe(right.solid);
+    expect(left.partials.some((g) => right.partials.includes(g)), "the partials are not")
       .toBe(false);
 
     // The tip is on the growing end. At `t` between two whole cells the partial

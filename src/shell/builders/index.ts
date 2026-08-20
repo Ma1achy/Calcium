@@ -402,6 +402,8 @@ function plot(
     plotFill?: Plot["plotFill"];
     /** The radar's ring shape (C12 I45, §3w). */
     plotGrid?: Plot["plotGrid"];
+    /** A compact box plot's interquartile run (C12 I46, §3i). */
+    plotBox?: Plot["plotBox"];
     /**
      * The candles (C04 I57, C12 I36).
      *
@@ -420,7 +422,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -507,6 +509,7 @@ function plot(
       ...(axes === undefined ? {} : { axes }),
       ...(plotFill === undefined ? {} : { plotFill }),
       ...(plotGrid === undefined ? {} : { plotGrid }),
+      ...(plotBox === undefined ? {} : { plotBox }),
       ...(xMin === undefined ? {} : { xMin }),
       ...(xMax === undefined ? {} : { xMax }),
       ...(xFormat === undefined ? {} : { xFormat }),

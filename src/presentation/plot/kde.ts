@@ -238,19 +238,21 @@ export function rainRows(
   braille = false,
   /** The dots under the curve are set. The braille arm's alone (C04 I59). */
   fill = false,
+  /** The box's interquartile run: a filled block or a heavier line (C12 I46). */
+  box: "solid" | "line" = "solid",
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const blank = " ".repeat(w);
   // The box is `boxplotBand`'s compact arm and not a second drawing of one —
   // the rung ladder is one figure gaining parts, not four figures.
-  const box = quartiles === undefined ? blank : boxplotBand(quartiles, min, max, w, 1, caps)[0] ?? blank;
+  const summaryRow = quartiles === undefined ? blank : boxplotBand(quartiles, min, max, w, 1, caps, box)[0] ?? blank;
   // **The rain falls below the box, which is where the form's name comes from**
   // (Allen et al. 2019): the cloud above, the summary between, the raw readings
   // beneath. The third rung is the only part of the figure that is the data —
   // an estimate and five numbers between them cannot say how many readings
   // there were or that two of them coincide.
   const rows = (cloud: string): readonly string[] =>
-    rain ? [cloud, box, stripRow(series.values, min, max, w, caps, seriesIndex)] : [cloud, box];
+    rain ? [cloud, summaryRow, stripRow(series.values, min, max, w, caps, seriesIndex)] : [cloud, summaryRow];
 
   const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
   if (finite.length === 0) return rows(blank); // cells-ok — a sample count
@@ -561,6 +563,8 @@ export function rainColumns(
   braille = false,
   /** The dots under the curve are set. The braille arm's alone (C04 I59). */
   fill = false,
+  /** The box's interquartile run: a filled block or a heavier line (C12 I46). */
+  box: "solid" | "line" = "solid",
 ): readonly string[] {
   const slot = Math.max(1, Math.floor(colWidth));
   const n = Math.max(1, Math.floor(rows));
@@ -600,9 +604,9 @@ export function rainColumns(
   // **The compact vertical box is one column wide**, which `boxplotColumn`
   // already draws — below five cells it takes its slot whole, and at one cell
   // its interior is inked because there are no sides to enclose it (I33).
-  const box = quartiles === undefined
+  const summaryCol = quartiles === undefined
     ? Array.from({ length: n }, () => " ")
-    : boxplotColumn(quartiles, min, max, 1, n, caps); // cells-ok — a column budget
+    : boxplotColumn(quartiles, min, max, 1, n, caps, box); // cells-ok — a column budget
   // **The cloud is served first and that is the budget's own split.** Four
   // columns is two of cloud, one of box, one of rain — five levels of density
   // and two of jitter — so a strip taking its ceiling before the cloud has its
@@ -616,10 +620,10 @@ export function rainColumns(
   const beside = (r: number, run: string): string =>
     " ".repeat(padL) +
     " ".repeat(Math.max(0, cloudW - cells(run, caps.ambiguousWidth))) +
-    run + (box[r] ?? " ") + (rainCells[r] ?? "") + " ".repeat(padR);
+    run + (summaryCol[r] ?? " ") + (rainCells[r] ?? "") + " ".repeat(padR);
   const blank = (): readonly string[] => Array.from({ length: n }, (_v, r) => beside(r, ""));
 
-  if (cloudW < 1) return boxplotColumn(quartiles ?? { min, q1: min, median: min, q3: min, max }, min, max, slot, n, caps); // cells-ok — a column count
+  if (cloudW < 1) return boxplotColumn(quartiles ?? { min, q1: min, median: min, q3: min, max }, min, max, slot, n, caps, box); // cells-ok — a column count
   const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
   if (finite.length === 0) return blank(); // cells-ok — a sample count
 

@@ -12,6 +12,7 @@ const VAL = "src/data/viewmodel/validate.ts";
 const KDE = "src/presentation/plot/kde.ts";
 const CIRC = "src/presentation/plot/circle.ts";
 const DEFN = "src/presentation/plot/definition.ts";
+const KDE_ROW = "src/presentation/plot/glyph-row.ts";
 const RAST = "src/presentation/plot/raster.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -165,15 +166,15 @@ const results = runPass({
       // equal (C12 I43, §3w).
       name: "the horizontal raincloud keeps the height ladder",
       file: DEFN,
-      from: '          ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n          block.plotStyle === "braille", block.plotFill === "solid",\n        );',
-      to: '          ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n          false, false,\n        );',
+      from: '          block.plotStyle === "braille", block.plotFill === "solid",\n          block.plotBox ?? "solid",\n        );',
+      to: '          false, false,\n          block.plotBox ?? "solid",\n        );',
       expect: "SA10",
     },
     {
       name: "the vertical raincloud keeps the width ladder",
       file: DEFN,
-      from: '            ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n            block.plotStyle === "braille", block.plotFill === "solid",\n          );',
-      to: '            ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,\n            false, false,\n          );',
+      from: '            block.plotStyle === "braille", block.plotFill === "solid",\n            block.plotBox ?? "solid",\n          );',
+      to: '            false, false,\n            block.plotBox ?? "solid",\n          );',
       expect: "SA10",
     },
     {
@@ -195,6 +196,34 @@ const results = runPass({
       from: "      if (prev !== null) drawLine(dots, anchor - prev, y - 1, anchor - len, y);\n      setDot(dots, anchor - len, y); // cells-ok — a dot column\n      if (fill) for (let x = anchor - len; x <= anchor; x += 1) setDot(dots, x, y); // cells-ok — a dot column",
       to: "      if (prev !== null) drawLine(dots, prev, y - 1, len, y);\n      setDot(dots, len, y); // cells-ok — a dot column\n      if (fill) for (let x = 0; x <= len; x += 1) setDot(dots, x, y); // cells-ok — a dot column",
       expect: "SA10",
+    },
+    {
+      // **The box fork, both arms.** A field that is read decides nothing if
+      // both branches return the same glyph (C12 I46).
+      name: "a line box is filled anyway",
+      file: KDE_ROW,
+      from: 'const fill = box === "line" ? g.heavyHorizontal : pairFor(caps).filled;',
+      to: "const fill = pairFor(caps).filled;",
+      expect: "SA11",
+    },
+    {
+      name: "a vertical line box is filled anyway",
+      file: KDE_ROW,
+      from: 'const fill = box === "line" ? g.heavyVertical : pairFor(caps).filled;',
+      to: "const fill = pairFor(caps).filled;",
+      expect: "SA11",
+    },
+    {
+      // And the wiring: the block's field has to reach the compact rungs, which
+      // is a different path from the boxplot form's own.
+      name: "the violin's compact box ignores plotBox",
+      file: DEFN,
+      // **Twelve spaces, because ten is the horizontal arm's** — the two call
+      // sites differ only in indentation and `apply` takes the first match,
+      // which is F208 exactly one turn after it was written down.
+      from: '            block.plotStyle === "braille", block.plotFill === "solid",\n            block.plotBox ?? "solid",\n          );',
+      to: '            block.plotStyle === "braille", block.plotFill === "solid",\n            "solid",\n          );',
+      expect: "SA11",
     },
     {
       // The grid fork itself: a field that is read decides nothing if the

@@ -802,6 +802,27 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         s(Array.from({ length: 200 }, (_v, i) => 38 + Math.sin(i * 1.7) * 8 + ((i * 7) % 11) - 5)),
       ],
     },
+    // The box's run, filled or heavier (C12 I46) — against a filled cloud the
+    // solid box competes for the same weight.
+    "compact-line-box": {
+      form: "violin", height: 6, axes: true, plotBox: "line",
+      categories: ["tight", "wide", "skewed"],
+      series: [
+        s(Array.from({ length: 200 }, (_v, i) => 40 + Math.sin(i * 1.7) * 5 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_v, i) => 45 + Math.sin(i * 1.7) * 12 + ((i * 7) % 11) - 5)),
+        s(Array.from({ length: 200 }, (_v, i) => 38 + Math.sin(i * 1.7) * 8 + ((i * 7) % 11) - 5)),
+      ],
+    },
+    "compact-vertical-line-box": {
+      form: "violin", height: 14, axes: true, orientation: "vertical",
+      plotDetail: "compact", plotBox: "line",
+      categories: ["control", "dose-a", "dose-b"],
+      series: [
+        s(Array.from({ length: 40 }, (_v, i) => 30 + Math.sin(i * 0.7) * 9)),
+        s(Array.from({ length: 40 }, (_v, i) => 45 + Math.sin(i * 0.5) * 6)),
+        s(Array.from({ length: 40 }, (_v, i) => 38 + Math.cos(i * 0.9) * 12)),
+      ],
+    },
     "compact-vertical-braille": {
       form: "violin", height: 14, axes: true, orientation: "vertical",
       plotDetail: "compact", plotStyle: "braille",
