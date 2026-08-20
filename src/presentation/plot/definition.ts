@@ -2291,10 +2291,7 @@ const FORM_ROWS: Readonly<
         line(markedSpans(row, seriesRef, ctx), layout, ctx),
       );
     }
-    const radar = radarRender(
-      block.series, cats, width, areaRows, ctx.capabilities,
-      block.plotStyle === "line", block.plotCorners ?? "rounded",
-    );
+    const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities);
     if (radar.polygons.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     // **Labels first, frame last, series between them.** `mergedRow` takes the
     // first layer to ink a cell, so the order is a priority: a word a polygon

@@ -112,6 +112,7 @@ export type GlyphSet = Readonly<{
   teeLeft: string;
   teeRight: string;
 
+
   // Status — steps, notices, cells.
   tick: string;
   cross: string;

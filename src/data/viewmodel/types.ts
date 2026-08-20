@@ -826,7 +826,13 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   // box-drawing.
   violin: ["braille", "line"],
   pie: ["braille", "solid"],
-  radar: ["braille", "line"],
+  // **`radar` has no line arm, and three attempts is what established that**
+  // (C12 I43, §3w). A polygon's every edge is oblique, box drawing's two
+  // diagonals do not reach their cell corners, and a run of them renders as
+  // dashes — so the shape a radar exists to show cannot be drawn at cell
+  // resolution. Braille's eight sub-cell dots can, and they union where two
+  // layers meet (C12 I40), which cell glyphs cannot.
+  radar: ["braille"],
   // Runs, bands and mosaics: the vocabulary is the form's and there is nothing
   // to choose. Stated rather than omitted — an empty list is an answer.
   bar: [], histogram: [], boxplot: [], ridgeline: [], forest: [], dumbbell: [],

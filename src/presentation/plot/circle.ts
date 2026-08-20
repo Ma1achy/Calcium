@@ -32,7 +32,6 @@ import { glyphs } from "../blocks/glyphs.js";
 import { pad, padStart } from "../blocks/paint.js";
 import { cells, truncate } from "../text.js";
 import { extentFor, extentRun, pairFor } from "./ramp.js";
-import { glyphForMask, strokePolyline } from "./linedraw.js";
 import { niceAxis } from "./axes.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
@@ -564,55 +563,6 @@ function radarCeiling(series: readonly Series[]): number {
  * boundary and the rings inside it are a scale, and a scale drawn as heavily as
  * the data is a scale that competes with it.
  */
-/**
- * The frame in the same alphabet as the polygons over it (C12 I43, §3w).
- *
- * **Its stipple is tuned against braille polygons and reads as noise under line
- * ones.** The value rings step every fourth dot and the spokes dash two-on
- * two-off, both so the scale sits *under* data made of the same dots — §3g's
- * rule, that a scale drawn as heavily as the data competes with it. Put a crisp
- * `╭─╮` polygon over that and the frame stops being a lighter version of the
- * data and becomes a scatter behind it.
- *
- * **And a radar's grid is polygonal, not circular.** The rings are n-gons
- * through the same vertices the data uses, which is what the classic spider
- * recipe draws and what makes a ring readable as *the same shape at a smaller
- * radius*. The braille arm approximates circles because it can; at cell
- * resolution a circle is a lumpy ring and an n-gon is exact.
- */
-function frameLineRows(d: Disc, categories: readonly string[], corners: "rounded" | "sharp", caps: Caps): readonly string[] {
-  const cols = Math.ceil(d.dotWidth / BRAILLE_DOTS.x); // cells-ok — a column count
-  const rows = Math.ceil(d.dotHeight / BRAILLE_DOTS.y); // cells-ok — a row count
-  const mask: number[][] = Array.from({ length: rows }, () => new Array<number>(cols).fill(0)); // cells-ok — a cell count
-  const n = Math.max(1, categories.length); // cells-ok — a category count
-  const cell = (angle: number, t: number): [number, number] => {
-    const [x, y] = at(d, angle, t);
-    return [
-      Math.max(0, Math.min(cols - 1, Math.round(x / BRAILLE_DOTS.x))), // cells-ok — a column index
-      Math.max(0, Math.min(rows - 1, Math.round(y / BRAILLE_DOTS.y))), // cells-ok — a row index
-    ];
-  };
-  const ngon = (t: number): void => {
-    const pts = Array.from({ length: n }, (_p, i) => cell(START_ANGLE + (TAU * i) / n, t)); // cells-ok — a vertex count
-    strokePolyline(mask, [...pts, pts[0]!], false);
-  };
-  // **The boundary and the spokes, and no value rings** — measured, not chosen.
-  // Four rings plus the outer plus five spokes is ten polylines at cell
-  // resolution in a seventeen-row disc, and the frame came out a tangle the
-  // polygons could not be found in. The braille arm affords them because it
-  // stipples; a solid `─` cannot be made lighter than itself.
-  //
-  // What is kept is what a reader needs to place a vertex: the boundary that
-  // says *this is the maximum* and the spokes that say *this direction is
-  // Speed*. The value rings are a scale refinement and they are the first thing
-  // a crowded figure should spend.
-  ngon(1);
-  for (let i = 0; i < n; i += 1) { // cells-ok — a vertex count
-    strokePolyline(mask, [cell(0, 0), cell(START_ANGLE + (TAU * i) / n, 1)], false);
-  }
-  return mask.map((r) => r.map((m) => glyphForMask(m, corners, caps)).join(""));
-}
-
 function frameRows(d: Disc, categories: readonly string[]): readonly string[] {
   const grid = createGrid(d.dotWidth, d.dotHeight);
   const n = categories.length; // cells-ok — a category count
@@ -693,9 +643,6 @@ export function radarRender(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
-  /** Polygons as box-drawing strokes rather than braille dots (C12 I43, §3w). */
-  lineDraw = false,
-  corners: "rounded" | "sharp" = "rounded",
 ): RadarRender {
   const w = Math.max(0, Math.floor(areaWidth));
   const h = Math.max(0, Math.floor(areaRows));
@@ -760,18 +707,6 @@ export function radarRender(
     // What it buys is continuity and contrast: two polygons at cell resolution
     // are two shapes a reader separates at a glance, where the braille ones are
     // two fields of dots. Shipped beside it rather than instead of it.
-    if (lineDraw) {
-      const cols = Math.ceil(disc.dotWidth / BRAILLE_DOTS.x); // cells-ok — a column count
-      const rows = Math.ceil(disc.dotHeight / BRAILLE_DOTS.y); // cells-ok — a row count
-      const mask: number[][] = Array.from({ length: rows }, () => new Array<number>(cols).fill(0)); // cells-ok — a cell count
-      const cell = (pt: readonly [number, number]): [number, number] => [
-        Math.max(0, Math.min(cols - 1, Math.round(pt[0] / BRAILLE_DOTS.x))), // cells-ok — a column index
-        Math.max(0, Math.min(rows - 1, Math.round(pt[1] / BRAILLE_DOTS.y))), // cells-ok — a row index
-      ];
-      const ring = points.map(cell);
-      strokePolyline(mask, [...ring, ring[0]!], false);
-      return mask.map((r) => r.map((m) => glyphForMask(m, corners, caps)).join(""));
-    }
     const dash = dashFor(si, caps);
     for (let i = 0; i < n; i += 1) {
       strokeDashed(grid, points[i]!, points[(i + 1) % n]!, dash);
@@ -786,7 +721,7 @@ export function radarRender(
 
   return {
     polygons,
-    frame: lineDraw ? frameLineRows(disc, categories, corners, caps) : frameRows(disc, categories),
+    frame: frameRows(disc, categories),
     labels: labelRows(disc, categories, discWidth, h, caps),
     legend: withLegend ? legend.lines : Array.from({ length: h }, () => []),
     discWidth,

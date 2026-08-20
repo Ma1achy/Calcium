@@ -99,10 +99,13 @@ const results = runPass({
       expect: "SA7",
     },
     {
-      name: "the radar's polygons stay braille under a line style",
-      file: CIRC,
-      from: "    if (lineDraw) {",
-      to: "    if (false) {",
+      // The record is the refusal now: three attempts established that a
+      // radar's polygons cannot be drawn at cell resolution, so `line` is not
+      // one of its arms.
+      name: "the radar is given a line arm again",
+      file: TYPES,
+      from: '  radar: ["braille"],',
+      to: '  radar: ["braille", "line"],',
       expect: "SA6",
     },
   ],

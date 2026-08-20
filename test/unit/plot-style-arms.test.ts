@@ -181,41 +181,39 @@ describe("SA5 (C12 I43): a solid pie folds the same geometry", () => {
   });
 });
 
-describe("SA6 (C12 I43): a line-drawn radar strokes at cell resolution", () => {
-  const radar = (extra: object) => kit().renderToLines(block({
-    kind: "plot", id: "sa6", form: "radar", height: 17,
-    categories: ["Speed", "Power", "Range", "Defence", "HP"],
-    series: [{ values: [8, 6, 7, 5, 9], label: "alpha" }, { values: [5, 9, 4, 8, 6], label: "beta" }],
-    ...extra,
-  }), 72).map(plain);
-
-  it("the polygons are box glyphs, read by their own colour", () => {
-    // **The frame follows the style too, so *the figure has box glyphs* is
-    // true with the polygons left in braille** — which is what the mutation
-    // proved. The polygons carry their series' slots and the frame carries
-    // `tone.muted`, so the claim is about box glyphs in a *series* colour.
-    const raw = kit().renderToLines(block({
-      kind: "plot", id: "sa6c", form: "radar", height: 17,
-      categories: ["Speed", "Power", "Range", "Defence", "HP"],
-      series: [{ values: [8, 6, 7, 5, 9], label: "alpha" }, { values: [5, 9, 4, 8, 6], label: "beta" }],
-      plotStyle: "line",
-    }), 72);
-    const MUTED = "98;98;98";
-    let coloured = 0;
-    for (const l of raw) {
-      let slot = "";
-      for (const part of l.split(/\x1b\[/u)) {
-        const m = /^38;2;(\d+;\d+;\d+)m/u.exec(part);
-        if (m) { slot = m[1]!; }
-        const text = m ? part.slice(m[0].length) : part.replace(/^[0-9;]*m/u, "");
-        if (slot !== "" && slot !== MUTED) coloured += [...text].filter((c) => /[╭╮╯╰─│┬┴├┤┼]/u.test(c)).length; // cells-ok — a cell count
-      }
-    }
-    expect(coloured).toBeGreaterThan(20); // cells-ok — a cell count
+describe("SA6 (C12 I43): a radar has no line arm, and the reason is measured", () => {
+  // **Three attempts established this rather than one opinion.**
+  //
+  //   1. The polygons drawn with `strokePolyline` — orthogonal only, so a
+  //      pentagon came back a staircase and the shape was unrecoverable.
+  //   2. Diagonal glyphs added and a per-cell stroke written: a pentagon drawn
+  //      *in isolation* is clean. The composed figure was rubble, because
+  //      `mergedRow` unions braille and resolves everything else first-wins —
+  //      C12 I40's stated limit, arriving.
+  //   3. One grid with an owner per cell, `ridgelineArea`'s mechanism, so there
+  //      is no merge at all. Still dashes: `╱` and `╲` do not reach their cell
+  //      corners, so a run of them never connects.
+  //
+  // The third is a property of the alphabet and not of this code. Braille has
+  // eight sub-cell dots, connects, and unions — so it is the radar's vocabulary
+  // and the record says so.
+  it("the style is refused at construction", () => {
+    const bad = validateBlock({
+      kind: "plot", id: "sa6", form: "radar", height: 17,
+      categories: ["a", "b", "c"], series: [{ values: [1, 2, 3] }], plotStyle: "line",
+    });
+    expect(bad.ok).toBe(false);
+    expect(JSON.stringify(bad)).toContain("arms for braille");
   });
 
-  it("the braille arm has no box glyphs at all", () => {
-    expect(radar({}).join("")).not.toMatch(/[╭╮╯╰]/u);
+  it("and the braille arm draws no box glyphs", () => {
+    const rows = kit().renderToLines(block({
+      kind: "plot", id: "sa6b", form: "radar", height: 17,
+      categories: ["Speed", "Power", "Range", "Defence", "HP"],
+      series: [{ values: [8, 6, 7, 5, 9], label: "alpha" }, { values: [5, 9, 4, 8, 6], label: "beta" }],
+    }), 72).map(plain);
+    expect(rows.join("")).not.toMatch(/[╭╮╯╰╱╲]/u);
+    expect([...rows.join("")].some(isBraille)).toBe(true);
   });
 });
 

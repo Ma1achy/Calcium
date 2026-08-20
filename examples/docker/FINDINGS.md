@@ -9776,3 +9776,53 @@ which is `C12 §3q`'s shape and what the rule exists for. And a stray-digit clas
 mark; each needs its author's intent, and guessing would resolve a citation against the wrong
 thing, which is the one failure `docs/COMMITMENT_INVARIANT_AUDIT.md` argues no mechanism should
 automate.
+
+---
+
+## F197 — a fork built three times and removed, because the limit is the alphabet ★★★★
+
+| | |
+|---|---|
+| **Surface** | `radar` with `plotStyle: "line"` — shipped in the previous commit and visibly broken |
+| **Reached for** | a user: *the entire shape of the plot is broken* |
+| **Verdict** | **the algorithm was right at every step and a polygon cannot be drawn in box glyphs** |
+| **Absorbed by** | `STYLE_ARMS.radar` is `["braille"]`; the style is refused at construction |
+
+**It shipped wrong, and the previous commit's own words are the reason it did.** That message said
+the arm *staircases where the braille arm draws diagonals* and called it a trade — *blocky and
+legible*. It is not legible; the shape is unrecoverable, and describing a broken picture as a
+trade-off is how it got past a frame-read that had already seen it.
+
+### Three attempts, each fixing a real defect, none of them the last one
+
+| attempt | what it fixed | what it left |
+|---|---|---|
+| `strokePolyline` | — | steps orthogonally, and every edge of a pentagon is oblique: a staircase |
+| `diagUp` / `diagDown` slots and a per-cell stroke | the shape — **a pentagon in isolation is clean** | composed, it is rubble |
+| one grid with an owner per cell | the composition — no merge at all | still dashes |
+
+**The second attempt's failure is I40's stated limit arriving.** `mergedRow` unions braille and
+resolves everything else first-wins, so at cell resolution the labels, the two polygons and the
+frame each took cells from the others. Rendering one polygon on its own showed a clean pentagon
+while the composed figure showed fragments — **the same input, two answers, and only running both
+separated the stroke from the merge.**
+
+**The third failure is not this component's.** `╱` U+2571 and `╲` U+2572 do not reach their cell
+corners, so a run of them renders as a row of dashes whatever is upstream. No amount of correct
+geometry survives an alphabet that cannot draw a connected diagonal.
+
+### What braille has that cell glyphs do not, stated once
+
+Eight sub-cell dots, which **connect**; and a bit-per-dot encoding, which **unions** when two
+layers meet a cell (I40). A radar is a figure of oblique edges that cross each other, so it needs
+both. That is why it is the radar's vocabulary and why the pie keeps *both* arms — a solid pie has
+no seams and a braille pie has no gaps, and neither loses the shape.
+
+### The prompt was a real defect and pursuing it is what produced the measurement
+
+The user's first question was *why are some of the lines braille and others not* — the polygons had
+been line-drawn while the rings stayed stippled braille. That was right to flag: half a figure in
+each alphabet reads as unfinished, and §3g's *a scale drawn as heavily as the data competes with it*
+is an argument about **weight**, not about kind. Fixing it is what forced the whole figure into cell
+glyphs, and that is what made the alphabet's limit visible. **The fork that survives a frame-read is
+not always the one that was asked for.**
