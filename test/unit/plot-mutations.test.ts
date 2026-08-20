@@ -22,13 +22,13 @@ import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../.
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
 import { aggregate, candleColumn, candleLeft, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
 import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
-import { formatReadout, readoutSet } from "../../src/presentation/plot/axes.js";
+import { formatReadout, readoutSet, xTickRow } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
 import { horizonBandT, horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
 import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
-import { validateBlock, ORIGIN_DEFAULT, type PlotForm } from "../../src/data/viewmodel/index.js";
+import { validateBlock, HONOURS_AXIS_CROSS, ORIGIN_DEFAULT, type PlotForm } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
@@ -1749,8 +1749,15 @@ describe("GROUP 6m: four frame shapes over one geometry", () => {
     // looking for a curve glyph anywhere in the row is satisfied by the border
     // — and under the mutation every area cell is gridline while the border
     // still stands. Second version of this row for that reason.
+    // **The first boundary glyph, not the later one.** `max` lands on the right
+    // border of a labelled row carrying no curve `│` and returns the empty
+    // string — which reads as *no ink*. It happened to be right here only
+    // because this fixture's labelled rows all hold a curve segment; AC2 is
+    // where the same helper produced a wrong answer.
     const areaOf = (r: string): string => {
-      const from = Math.max(r.indexOf("┤"), r.indexOf("│"));
+      const tee = r.indexOf("┤");
+      const bar = r.indexOf("│");
+      const from = tee < 0 ? bar : bar < 0 ? tee : Math.min(tee, bar);
       return from < 0 ? "" : r.slice(from + 1, r.lastIndexOf("│"));
     };
     const curveOn = rows.filter((r) => r.includes(g.dashedHorizontal) && /[─╭╮╰╯]/u.test(areaOf(r)));
@@ -3119,5 +3126,230 @@ it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and ca
     // defect is the band **vanishing**, which is what an unordered fill loop
     // does under a downward facing, and that is what the two bounds above catch.
     expect(Math.abs(up - down)).toBeLessThanOrEqual(4); // cells-ok — a cell count
+  });
+});
+
+/**
+ * AC1–AC12: `axisCross: "zero"` (C12 §3ad, C04 I62).
+ *
+ * **Rows follow §3ad.3's classification table**, which is the artefact this was
+ * designed from — the structural half. The sequence trace's B-rows are covered
+ * by YA1 (one axis per plot) and by the frame reads here, because every one of
+ * them is about two passes naming one object.
+ */
+describe("C12 §3ad — axisCross, and the two conditions that are not one condition", () => {
+  const kitted = kit();
+  const draw = (spec: Record<string, unknown>, w = 46, caps?: Parameters<typeof kit>[0]): readonly string[] =>
+    (caps === undefined ? kitted : kit(caps))
+      .renderToLines(block({ kind: "plot", id: "x", form: "line", height: 9, axes: true, legend: false, ...spec } as unknown as Plot), w)
+      .map((r) => r.replace(/\x1b\[[0-9;]*m/g, ""));
+
+  /** Nine readings that cross zero four times, so no half is trivially absent. */
+  const V = [-4, -1, 2, 6, 3, -2, -5, 1, 5];
+  const g = glyphs(FULL_CAPS);
+
+  /**
+   * The plot-area slice of a row — never the gutter, never the border.
+   *
+   * **The *first* of the two boundary glyphs, not the later one.** A labelled
+   * row is `0 ┤…│` and an unlabelled one is `  │…│`, so the opening boundary is
+   * whichever appears first; taking the later one lands on the right border of
+   * any labelled row that happens to hold no curve `│`, and returns the empty
+   * string. That reads as *no ink in the area*, which is a fixture answering for
+   * the code — the shape `test/support/README.md` records.
+   */
+  const area = (r: string): string => {
+    const tee = r.indexOf("┤");
+    const bar = r.indexOf("│");
+    const from = tee < 0 ? bar : bar < 0 ? tee : Math.min(tee, bar);
+    return from < 0 ? "" : r.slice(from + 1, r.lastIndexOf("│"));
+  };
+  const rowsWith = (rows: readonly string[], ch: string): readonly number[] =>
+    rows.map((r, i) => (area(r).includes(ch) ? i : -1)).filter((i) => i >= 0); // cells-ok — a row index
+
+  it("AC1 (§3ad): a series spanning zero draws one horizontal rule, on the zero row", () => {
+    const off = draw({ series: [{ values: V }] });
+    const on = draw({ series: [{ values: V }], axisCross: "zero" });
+    expect(rowsWith(off, g.dashedHorizontal), "no rule without the member").toEqual([]);
+    const marked = rowsWith(on, g.dashedHorizontal);
+    expect(marked.length, "exactly one rule").toBe(1); // cells-ok — a row count
+    // **On the row the gutter calls 0**, which is the claim — not merely
+    // somewhere. The gutter and the rule are placed from one axis (F210), and
+    // this is the row that says the two agree.
+    expect((on[marked[0] ?? 0] ?? "").split("┤")[0]?.trim()).toBe("0");
+  });
+
+  it("AC2 (§3ad): a declared domain spanning zero draws the vertical half, and they meet in one cell", () => {
+    const on = draw({ series: [{ values: V }], axisCross: "zero", xMin: -4, xMax: 4 });
+    const junction = on.filter((r) => area(r).includes(g.crossing));
+    expect(junction.length, "one junction").toBe(1); // cells-ok — a row count
+    const vertical = on.filter((r) => area(r).includes(g.dashedVertical));
+    expect(vertical.length, "the vertical half runs the height of the area")
+      .toBeGreaterThan(3); // cells-ok — a row count
+    // The junction sits in the vertical half's column and on the horizontal
+    // half's row — one cell, and it is the cell both halves claim.
+    const col = area(junction[0] ?? "").indexOf(g.crossing);
+    const anyVertical = area(vertical[0] ?? "").indexOf(g.dashedVertical);
+    expect(col).toBe(anyVertical);
+  });
+
+  it("AC3 (§3ad A5, C04 I52): a range excluding zero draws no rule, and never one at the nearest edge", () => {
+    const on = draw({ series: [{ values: [3, 6, 4, 9, 5] }], axisCross: "zero" });
+    expect(rowsWith(on, g.dashedHorizontal), "dropped, not clamped").toEqual([]);
+  });
+
+  it("AC4 (§3ad A4): zero at the range's end draws nothing, by whichever test reaches it first", () => {
+    // **Two arms, because each test masks the other on one of them** and a
+    // single arm makes the mutation for the other unobservable.
+    //
+    // `yMin: 0` — the *range* test excludes it: `0 < 0` is false. Its row would
+    // be the area's last, so the interior test would too, and a fixture with
+    // only this arm cannot tell which one is doing the work.
+    expect(rowsWith(draw({ series: [{ values: [0, 4, 2, 9, 5] }], axisCross: "zero", yMin: 0 }), g.dashedHorizontal))
+      .toEqual([]);
+    // `yMin: -0.001` — the range test *passes* (the floor is below zero) and
+    // only the interior test excludes it, because zero rounds onto the bottom
+    // row. This is the arm that separates them.
+    expect(rowsWith(draw({ series: [{ values: [-0.001, 4, 2, 10, 5] }], axisCross: "zero", yMin: -0.001 }), g.dashedHorizontal))
+      .toEqual([]);
+  });
+
+  it("AC5 (§3ad A15): a constant series draws nothing, though `rowOf` centres it", () => {
+    // **The row the table was written for.** `rowOf` returns the centre row for
+    // *every* value of a degenerate range — that is T1.5's rule and it is right
+    // — so an interior test alone puts a zero axis through a plot of fives. The
+    // range test is `min < 0 && max > 0`, strictly, and it is a second test.
+    // **The gaps are the whole fixture.** An ungapped constant series draws a
+    // flat line across the centre row — the same row a mis-derived zero axis
+    // lands on — and the curve is resolved in front of it (C12 I23), so it covers
+    // every cell the spurious rule would have. The defect is real and the
+    // obvious fixture is the one case that cannot see it.
+    const on = draw({ series: [{ values: [5, null, 5, null, 5] }], axisCross: "zero" });
+    expect(rowsWith(on, g.dashedHorizontal)).toEqual([]);
+    // **And a series of zeros, which is the arm that makes the test strict.**
+    // `min <= 0 && max >= 0` admits a degenerate range sitting *on* zero, and
+    // `rowOf` then centres it — a crossing axis through a plot with no extent,
+    // whose gutter reads `0` on every labelled row. There is no scale for an
+    // origin to be the origin of.
+    const zeros = draw({ series: [{ values: [0, null, 0, null, 0] }], axisCross: "zero" });
+    expect(rowsWith(zeros, g.dashedHorizontal)).toEqual([]);
+    // And the fixture responds: the same shape over a spanning range does draw.
+    const spans = draw({ series: [{ values: [-5, null, 5, null, -5] }], axisCross: "zero" });
+    expect(rowsWith(spans, g.dashedHorizontal).length).toBe(1); // cells-ok — a row count
+  });
+
+  it("AC6 (§3ad A10): an undeclared index domain draws no vertical half, and the horizontal one is untouched", () => {
+    // An index runs `0 … n − 1`, so its zero is sample 0 — the area's first
+    // column, where a rule abuts the gutter's border. `0 < 0` is false, and no
+    // declared-versus-inferred distinction is needed to say so.
+    const on = draw({ series: [{ values: V }], axisCross: "zero" });
+    expect(on.some((r) => area(r).includes(g.dashedVertical)), "no vertical half").toBe(false);
+    expect(rowsWith(on, g.dashedHorizontal).length, "the horizontal half is unaffected").toBe(1); // cells-ok — a row count
+    // **And a declared domain whose zero rounds onto column 0**, which the range
+    // test admits and only the interior test excludes — the column's half of
+    // AC4's pair, and without it the mutation for one of the two is invisible.
+    const edge = draw({ series: [{ values: V }], axisCross: "zero", xMin: -0.001, xMax: 10 });
+    expect(edge.some((r) => area(r).includes(g.dashedVertical)), "nor at the area's first column").toBe(false);
+  });
+
+  it("AC7 (§3ad A7): captions replace the numeric axis, and only the vertical half goes", () => {
+    const on = draw({ series: [{ values: V }], axisCross: "zero", xMin: -4, xMax: 4, xLabels: ["a", "b", "c"] });
+    expect(on.some((r) => area(r).includes(g.crossing)), "no junction").toBe(false);
+    expect(rowsWith(on, g.dashedHorizontal).length, "the horizontal half stays").toBe(1); // cells-ok — a row count
+  });
+
+  it("AC8 (§3ad A2): under `grid` the cross shares the grid's alphabet and adds the junction", () => {
+    const plain = draw({ series: [{ values: V }], plotFrame: "grid", xMin: -4, xMax: 4 });
+    const crossed = draw({ series: [{ values: V }], plotFrame: "grid", xMin: -4, xMax: 4, axisCross: "zero" });
+    expect(plain.some((r) => area(r).includes(g.crossing)), "no junction without it").toBe(false);
+    expect(crossed.some((r) => area(r).includes(g.crossing)), "and one with it").toBe(true);
+  });
+
+  it("AC9 (§3ad A8, §3d.1): a candlestick's zero column is a candle's column, not the curve's rule", () => {
+    // **Measured, and the margin is one cell.** §3r's placement change made
+    // bodies span the area, so the candle mapping and the curve's rule now agree
+    // almost everywhere and separate only by rounding — 117 of 160 combinations
+    // over `n × width × domain`, every one of them by exactly one column. A
+    // tolerance here would pass against the defect it is written for.
+    //
+    // 32 bars over an area of 54 with a domain of −2 … 1: the candle placement
+    // puts zero at column 36 and the curve's rule at 35.
+    const bars = Array.from({ length: 32 }, () => ({ open: 1, high: 2, low: 0, close: 1.5 })); // cells-ok — a bar count
+    const caps = { unicode: "full" as const, ambiguousWidth: "narrow" as const };
+    const asCandles = xTickRow({ min: -2, max: 1 }, 54, undefined, caps, undefined, FACING_DEFAULT,
+      (t) => candleColumn(bars, Math.round(t * 31), 54, FACING_DEFAULT)); // cells-ok — a bar index
+    const asCurve = xTickRow({ min: -2, max: 1 }, 54, undefined, caps, undefined, FACING_DEFAULT);
+    expect(asCandles.zeroColumn, "the candle's column").toBe(36); // cells-ok — a column index
+    expect(asCurve.zeroColumn, "and the curve's rule is not it").toBe(35); // cells-ok — a column index
+  });
+
+  it("AC10 (§3ad A6): the cross follows `origin` at all four corners", () => {
+    const at = (origin: string): number => {
+      const rows = draw({ series: [{ values: V }], axisCross: "zero", origin });
+      return rowsWith(rows, g.dashedHorizontal)[0] ?? -1; // cells-ok — a row index
+    };
+    const up = at("bottom-left");
+    const down = at("top-left");
+    expect(up, "a zero row exists at all").toBeGreaterThan(0); // cells-ok — a row index
+    // A vertical flip moves the zero row to the other side of the area's middle.
+    expect(down).not.toBe(up);
+    expect(at("bottom-right"), "a horizontal flip does not move the zero *row*").toBe(up);
+    expect(at("top-right")).toBe(down);
+  });
+
+  it("AC11 (§3ad A14): every form outside the seven refuses at both gates", () => {
+    const forms = Object.keys(HONOURS_AXIS_CROSS) as PlotForm[];
+    const refused = forms.filter((f) => !HONOURS_AXIS_CROSS[f]);
+    expect(refused.length, "37 of 44").toBe(37); // cells-ok — a form count
+    for (const form of refused) {
+      const bad = validateBlock({
+        kind: "plot", id: "r", form, height: 5,
+        series: [{ values: [1, 2] }], categories: ["x", "y"], axisCross: "zero",
+      });
+      expect(bad.ok, `${form} refused by the validator`).toBe(false);
+      expect(() => b.plot({ series: [{ values: [1, 2] }], height: 4, form, axisCross: "zero" }),
+        `${form} refused by the builder`).toThrow(/axisCross/u);
+    }
+    // And the seven are accepted, or the rows above pass against a gate that
+    // refuses everything.
+    for (const form of forms.filter((f) => HONOURS_AXIS_CROSS[f])) {
+      expect(validateBlock({
+        kind: "plot", id: "k", form, height: 5, series: [{ values: [1, 2] }], axisCross: "zero",
+      }).ok, `${form} accepted`).toBe(true);
+    }
+  });
+
+  it("AC13 (C12 I26, F211): the grid's columns are the rule's ticks, on a numeric abscissa too", () => {
+    // I26: *a gridline belongs where there is a value written — the rows the
+    // gutter labels and the columns the bottom rule ticks.* The vertical half
+    // was blank on every plot without `xLabels`, because the grid took its
+    // columns from the captions arm while the rule took its own from the full
+    // dispatch. **The one `grid` fixture in the corpus declares `xLabels`**, so
+    // no committed frame walks the arm that was broken.
+    const numeric = draw({ series: [{ values: V }], plotFrame: "grid" });
+    const columns = (r: string): readonly number[] =>
+      [...area(r)].map((ch, i) => (ch === g.dashedVertical ? i : -1)).filter((i) => i >= 0); // cells-ok — a column index
+    const gridColumns = columns(numeric.find((r) => area(r).includes(g.dashedVertical)) ?? "");
+    expect(gridColumns.length, "the grid has vertical lines").toBeGreaterThan(2); // cells-ok — a column count
+    // And they are the rule's ticks, not some other spacing: the tee marks on
+    // the bottom rule sit in the same area columns.
+    // **The rule's own boundary glyphs, not `area`'s.** The bottom rule carries
+    // `└` and `┘` where an area row carries `┤`/`│`, so the general slicer finds
+    // no boundary and returns the empty string — which reads as *no ticks*, and
+    // an empty set compares equal to nothing but itself.
+    const rule = numeric[numeric.length - 2] ?? "";
+    const inRule = rule.slice(rule.indexOf("└") + 1, rule.lastIndexOf("┘"));
+    const ticks = [...inRule].map((ch, i) => (ch === "┬" ? i : -1)).filter((i) => i >= 0); // cells-ok — a column index
+    expect(ticks.length, "the rule has ticks at all").toBeGreaterThan(2); // cells-ok — a column count
+    expect(gridColumns, "one placement, two consumers").toEqual(ticks);
+  });
+
+  it("AC12 (§3ad A13): at one bit with two series nothing is drawn, and the frame is unchanged", () => {
+    // The form routes to the stacked arm — one strip per series, each with its
+    // own row mapping — so there is no single ordinate for a rule to cross.
+    const two = { series: [{ values: V }, { values: V.map((v) => -v) }] };
+    const off = draw(two, 46, MONO_CAPS);
+    const on = draw({ ...two, axisCross: "zero" }, 46, MONO_CAPS);
+    expect(on.join("\n")).toBe(off.join("\n"));
   });
 });

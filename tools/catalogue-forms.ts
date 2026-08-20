@@ -235,6 +235,19 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // **The four corners, on one series** (C12 §3ac). Read side by side these
     // are the whole member: the same eight readings, the same eight columns, and
     // the gutter and the tick row following the data rather than staying put.
+    // **A crossing axis needs both halves visible**, so the ordinate straddles
+    // zero and the abscissa is *declared* to (C12 §3ad). An index domain runs
+    // `0 … n − 1`, and its zero is the area's first column.
+    "axis-cross": {
+      form: "line", height: 10, axes: true, axisCross: "zero",
+      xMin: -6, xMax: 6,
+      series: [s([-4, -1, 2, 6, 3, -2, -5, 1, 5, 2, -3, -1, 4], "obs")],
+    },
+    "axis-cross-corners": {
+      form: "line", height: 10, axes: true, axisCross: "zero", plotFrame: "corners",
+      xMin: -6, xMax: 6,
+      series: [s([-4, -1, 2, 6, 3, -2, -5, 1, 5, 2, -3, -1, 4], "obs")],
+    },
     "origin-bottom-left": {
       form: "line", height: 8, axes: true, series: [s(sin(14), "obs")],
       xLabels: ["first", "mid", "last"],

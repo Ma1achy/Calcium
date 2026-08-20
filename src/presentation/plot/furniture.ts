@@ -498,6 +498,41 @@ export function gridRow(
   ).join("");
 }
 
+/**
+ * The crossing axes' reference row for area row `i` (C12 §3ad, I23).
+ *
+ * **`gridRow`'s sibling, and resolved the same way** — a string of area cells
+ * merged *behind* the data, so a curve keeps every cell it occupies. Where the
+ * grid and the cross both claim a cell the cross wins, and it needs no rule to
+ * do so: it is composed over the grid and it is solid where the grid is dashed
+ * (§3ad A2).
+ *
+ * **Solid because it is furniture and not an annotation.** §3k's argument for
+ * `dashedVertical` — *a solid rule through a figure reads as part of it* — is
+ * about a claim laid over the data. An axis is the coordinate system the data
+ * is drawn in, and the frame's own border is already a solid `│`.
+ *
+ * `row` and `column` are the area positions, already tested and already `null`
+ * where there is nothing to draw. **This function does not decide** — the two
+ * conditions live where the range and the domain are (§3ad A15), and a second
+ * copy of them here is the divergence F210 is about.
+ */
+export function crossRow(
+  layout: Layout,
+  i: number,
+  row: number | null,
+  column: number | null,
+  ctx: RenderContext,
+): string {
+  const w = Math.max(0, layout.areaWidth);
+  if (row === null && column === null) return " ".repeat(w);
+  const g = glyphs(ctx.capabilities);
+  const on = i === row;
+  return Array.from({ length: w }, (_, x) =>
+    x === column ? (on ? g.crossing : g.dashedVertical) : on ? g.dashedHorizontal : " ", // cells-ok — a column index
+  ).join("");
+}
+
 /** The x-labels, offset to the plot area. Empty when the block declares none. */
 export function xLabelRowFor(
   labels: string,
@@ -563,7 +598,7 @@ function sampleCount(block: Plot): number {
  * chose and the numeric axis is inferred from the data; overriding the first
  * with the second is the wrong direction, and both want the same row.
  */
-function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAxis {
+export function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAxis {
   // **`FACING_DEFAULT` and no matrix arm, because a matrix never arrives
   // here** — `furnitureFor` is reached from `axed`, and `heatmapFormRows`
   // composes `matrixFurniture` itself. The first version branched on
@@ -589,13 +624,22 @@ function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAxis {
   return xTickRow(domain, areaWidth, block.xFormat, ctx.capabilities, block.xScale, facing, columnAt);
 }
 
+/**
+ * The three furniture rows, from an axis the caller already has.
+ *
+ * **The axis is a parameter and not computed here** (C12 §3ad B2). A crossing
+ * axis needs the column the value 0 lands in, which is `xRowFor`'s to know, and
+ * it is needed while the *area* is being composed — before this runs. One
+ * computation handed to both is the only arrangement in which the vertical rule
+ * and the `0` caption cannot end up in different cells, which is F210's lesson
+ * on the other axis.
+ */
 export function furnitureFor(
-  block: Plot,
   layout: Layout,
+  axis: XAxis,
   ctx: RenderContext,
   cursorAt: number | null = null,
 ): Furniture {
-  const axis = xRowFor(block, layout.areaWidth, ctx);
   return {
     top: frameTop(layout, ctx),
     bottom: [

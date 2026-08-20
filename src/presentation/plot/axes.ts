@@ -553,7 +553,26 @@ export function xLabelRow(
  * two would have shared a name in a component that converts between them all
  * day. MG24 found it as a name collision; it is a conflation either way.
  */
-export type XAxis = Readonly<{ text: string; tickColumns: readonly number[] }>;
+export type XAxis = Readonly<{
+  text: string;
+  tickColumns: readonly number[];
+  /**
+   * The area column the value **0** lands in, or `null` where the abscissa has
+   * no such column (C12 §3ad B2).
+   *
+   * **Returned here rather than computed by the consumer**, because a crossing
+   * axis and the `0` caption must be in the same cell and there is exactly one
+   * placement that can put them there. It is the same expression the ticks go
+   * through, including `columnAt` — so a candlestick's zero column is a candle's
+   * column and not the curve's rule (§3d.1, §3ad A8).
+   *
+   * `null` for the captions arm (three words have no domain), for a domain that
+   * does not strictly straddle zero, and where the column is not strictly
+   * interior to the area — at the edge, `"zero"` and `"edge"` name the same
+   * place (§3ad A4, A7, A10).
+   */
+  zeroColumn: number | null;
+}>;
 
 /**
  * The same row, **with the columns the ticks belong on** (§3f).
@@ -579,7 +598,7 @@ export function xAxis(
   facing: Facing = FACING_DEFAULT,
 ): XAxis {
   const w = Math.max(0, Math.floor(width));
-  if (labels === undefined || w === 0) return { text: "", tickColumns: [] };
+  if (labels === undefined || w === 0) return { text: "", tickColumns: [], zeroColumn: null };
 
   const third = Math.max(1, Math.floor(w / 3));
   // **The caller's own three captions reverse with the data** (§3ac B4). A
@@ -613,7 +632,10 @@ export function xAxis(
   );
   place(right ?? "", w - cells(right ?? "", caps.ambiguousWidth), (wide) => wide - 1);
 
-  return { text: row.join("").replace(/\s+$/, ""), tickColumns };
+  // **No zero column: three captions are not a scale** (§3ad A7). The
+  // horizontal half of a crossing axis is unaffected — the halves are
+  // independent, which is what makes this a `null` rather than a refusal.
+  return { text: row.join("").replace(/\s+$/, ""), tickColumns, zeroColumn: null };
 }
 
 /**
@@ -706,7 +728,7 @@ export function xTickRow(
 ): XAxis {
   const w = Math.max(0, Math.floor(width));
   if (w === 0 || !Number.isFinite(range.min) || !Number.isFinite(range.max)) {
-    return { text: "", tickColumns: [] };
+    return { text: "", tickColumns: [], zeroColumn: null };
   }
   const axis = axisFor(range, xTicksFor(w), { yMin: range.min, yMax: range.max }, scale);
   // **`stepDecimals` and not `decimalsFor`**, which is §3d's own rule — *one
@@ -745,7 +767,20 @@ export function xTickRow(
     free = start + wide + 1; // cells-ok — a column position
   }
 
-  return { text: row.join("").replace(/\s+$/u, ""), tickColumns };
+  // **The zero column, through the same expression the ticks took** (§3ad B2).
+  // Two conditions and they are not one condition: the domain must *strictly*
+  // straddle zero — `min < 0 && max > 0` excludes an index domain, whose zero is
+  // sample 0, and a degenerate one — and the column must be strictly inside the
+  // area, because at the edge `"zero"` and `"edge"` name the same place and a
+  // rule at column 0 abuts the gutter's border (§3ad A4, A10, A15).
+  const straddles = axis.range.min < 0 && axis.range.max > 0;
+  const zero = straddles
+    ? columnAt?.(xPositionOf(0, axis.range, scale))
+      ?? Math.round((facing.x === "left" ? 1 - xPositionOf(0, axis.range, scale) : xPositionOf(0, axis.range, scale)) * (w - 1)) // cells-ok — a column index
+    : null;
+  const zeroColumn = zero !== null && zero !== undefined && zero > 0 && zero < w - 1 ? zero : null; // cells-ok — a column index
+
+  return { text: row.join("").replace(/\s+$/u, ""), tickColumns, zeroColumn };
 }
 
 // --- log / time / symlog axes -----------------------------------------------

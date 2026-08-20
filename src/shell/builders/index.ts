@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_Y_GUTTER, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_Y_GUTTER, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -431,9 +431,10 @@ function plot(
     aspect?: Plot["aspect"];
     align?: Plot["align"];
     origin?: Plot["origin"];
+    axisCross?: Plot["axisCross"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -572,6 +573,24 @@ function plot(
           `itself and has no direction to reverse`,
       );
     }
+    // **The same shape one member along, and one clause the record cannot
+    // carry** (C04 I62, C12 §3ad). `HONOURS_AXIS_CROSS` refuses by form; a
+    // *declared* range that excludes zero is refused here too, because the
+    // caller stated it. The realised range is the renderer's to judge — it comes
+    // from `seriesRange`, which is L1 — and its half is dropped, not refused.
+    if (axisCross === "zero" && !HONOURS_AXIS_CROSS[facingForm]) {
+      throw new TypeError(
+        `b.plot: "axisCross" on form "${facingForm}" (C04 I62, C12 §3ad) — a crossing axis needs ` +
+          `a numeric ordinate and a numeric abscissa, and this form has no zero for them to meet at`,
+      );
+    }
+    if (axisCross === "zero" && yMin !== undefined && yMax !== undefined && (yMin > 0 || yMax < 0)) {
+      throw new TypeError(
+        `b.plot: "axisCross": "zero" with a declared range of ${yMin}..${yMax} (C04 I62, C04 I29) — ` +
+          `the range excludes zero, and an axis drawn at the nearest edge would say the origin is ` +
+          `somewhere it is not`,
+      );
+    }
     if (vectors !== undefined && drawn !== "quiver") {
       throw new TypeError(
         `b.plot: "vectors" on form "${drawn}" (C04 I61) — only a quiver draws a vector ` +
@@ -645,6 +664,7 @@ function plot(
       ...(aspect === undefined ? {} : { aspect }),
       ...(align === undefined ? {} : { align }),
       ...(origin === undefined ? {} : { origin }),
+      ...(axisCross === undefined ? {} : { axisCross }),
     } as Plot,
     spec,
     true,

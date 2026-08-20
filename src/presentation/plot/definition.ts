@@ -28,8 +28,8 @@ import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
 import { curveRows, isBlank } from "./curve.js";
-import { gridRow } from "./furniture.js";
-import type { Axis } from "./axes.js";
+import { crossRow, gridRow, xRowFor } from "./furniture.js";
+import type { Axis, XAxis } from "./axes.js";
 import { formatReadout, labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
 import {
   areaText,
@@ -53,7 +53,7 @@ import {
   type Layout,
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
-import { FACING_DEFAULT, facingOf, seriesRange, type Facing, type Range } from "./scale.js";
+import { FACING_DEFAULT, facingOf, rowOf, seriesRange, type Facing, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
 import { ROW_IS_AN_IDENTITY, markOf, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
@@ -616,6 +616,7 @@ function axed(
   area: readonly string[],
   layout: Layout,
   ctx: RenderContext,
+  xaxis: XAxis,
 ): readonly string[] {
   const placement = legendPlacement(block, ctx.capabilities);
   const entries = placement === null ? [] : legendEntries(block, ctx);
@@ -660,10 +661,10 @@ function axed(
   const horizontal = placement === "above" || placement === "below"
     ? [" ".repeat(layout.gutter) + legendRow(entries, layout.areaWidth, ctx)]
     : [];
-  const top = block.axes === true ? [indent(furnitureFor(block, layout, ctx).top)] : [];
-  const bottom = block.axes === true
-    ? furnitureFor(block, layout, ctx).bottom.map(indent)
-    : [];
+  // **Composed once**, where it used to be built twice for its two halves.
+  const furniture = block.axes === true ? furnitureFor(layout, xaxis, ctx) : null;
+  const top = furniture === null ? [] : [indent(furniture.top)];
+  const bottom = furniture === null ? [] : furniture.bottom.map(indent);
   return composeRows(
     plotHeight(block),
     placement === "above" ? [...horizontal, ...top] : top,
@@ -685,8 +686,9 @@ function axedWithCursor(
   area: readonly string[],
   layout: Layout,
   ctx: RenderContext,
+  xaxis: XAxis,
 ): readonly string[] {
-  const furniture = furnitureFor(block, layout, ctx, at);
+  const furniture = furnitureFor(layout, xaxis, ctx, at);
   return composeRows(plotHeight(block), [furniture.top], area, [
     furniture.bottom[0] ?? "",
     cursorReadout(block, cursorIdx, layout, ctx),
@@ -1042,6 +1044,7 @@ function overlaidRows(
   axis: Axis,
   layout: Layout,
   ctx: RenderContext,
+  xaxis: XAxis,
   rasterise: Rasteriser = curveRows,
   under: readonly Layer[] = [],
   cursorAt: number | null = null,
@@ -1058,7 +1061,26 @@ function overlaidRows(
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   // `"grid"` draws its lines where there is a value written — the rows the
   // gutter labels and the columns the bottom rule ticks (C12 I26).
-  const gridTicks = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities).tickColumns;
+  //
+  // **From the axis the rule is drawn from, which it was not** (F211). This
+  // reached for `xAxis(block.xLabels, …)` — the *captions* arm alone — so a plot
+  // with a numeric abscissa got an empty tick set and drew no vertical
+  // gridlines at all, while the rule three rows below it carried five ticks.
+  // I26's horizontal half was honoured and its vertical half was blank, and the
+  // one fixture the corpus renders at `grid` declares `xLabels`.
+  const gridTicks = xaxis.tickColumns;
+
+  // **The crossing axes, and the two conditions are two conditions** (§3ad A15).
+  // The range must *strictly* straddle zero — `rowOf` centres a degenerate range
+  // by construction, so a constant series of 5s would otherwise take a zero axis
+  // through its middle — and the row must be strictly inside the area, because
+  // at the edge `"zero"` and `"edge"` name the same place.
+  const crossing = block.axisCross === "zero";
+  const straddles = crossing && range.min < 0 && range.max > 0;
+  const zeroAt = straddles ? rowOf(0, range, layout.areaRows, facing) : null;
+  const zeroRow = zeroAt !== null && zeroAt > 0 && zeroAt < layout.areaRows - 1 ? zeroAt : null; // cells-ok — a row index
+  const zeroColumn = crossing ? xaxis.zeroColumn : null;
+
   const layers: readonly Layer[] = [
     ...block.series.map((s, index) => ({
       glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing),
@@ -1091,7 +1113,15 @@ function overlaidRows(
       i,
       byRow.get(i) ?? "",
       behind(
-        overlay(gridRow(withRight, gridTicks, ctx, byRow.has(i)), cursor),
+        // **The cross over the grid over the cursor.** The cross shares the
+        // grid's alphabet and they agree in the cells they share — the grid
+        // draws where a value is written and zero is a value — so the order
+        // decides only the junction mark (§3ad A2). Grid-over-cursor is where
+        // it was.
+        overlay(
+          crossRow(withRight, i, zeroRow, zeroColumn, ctx),
+          overlay(gridRow(withRight, gridTicks, ctx, byRow.has(i)), cursor),
+        ),
         mergedRow(layers, i, withRight, ctx),
         ctx,
       ),
@@ -1355,7 +1385,7 @@ function categoricalForm(
       : ownedSpans(areaText(content, layout, ctx), built.owners, (k) => refOf(block.series[k] ?? { values: [] }, k), ctx);
     out.push(plotRow(i, label, body, layout, ctx));
   }
-  return axed(block, out, layout, ctx);
+  return axed(block, out, layout, ctx, xRowFor(block, layout.areaWidth, ctx));
 }
 
 /**
@@ -1566,7 +1596,7 @@ function stackedForm(
       ctx,
     ),
   );
-  return axed(block, area, layout, ctx);
+  return axed(block, area, layout, ctx, xRowFor(block, layout.areaWidth, ctx));
 }
 
 /**
@@ -1762,13 +1792,18 @@ function positionalForm(
   const cursorIdx = ctx.cursorPositions?.[block.id];
   const marked = block.axes === true && cursorIdx !== undefined && Number.isFinite(cursorIdx);
   const at = marked ? cursorColumn(block, cursorIdx, layout.areaWidth) : null;
+  // **One x axis, computed here and handed to both halves** (§3ad B2). The
+  // crossing axis's column is on it, and it is needed while the area is composed
+  // — before the furniture exists. Two calls would be two chances for the
+  // vertical rule and the `0` caption to land in different cells.
+  const xaxis = xRowFor(block, layout.areaWidth, ctx);
   const area = stacked
     ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, axis, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx, facingOf(block, FACING_DEFAULT)), at);
+    : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, facingOf(block, FACING_DEFAULT)), at);
   if (marked) {
-    return axedWithCursor(block, cursorIdx, at, area, layout, ctx);
+    return axedWithCursor(block, cursorIdx, at, area, layout, ctx, xaxis);
   }
-  return axed(block, area, layout, ctx);
+  return axed(block, area, layout, ctx, xaxis);
 }
 
 
@@ -1861,7 +1896,7 @@ function bandedForm(
       ctx,
     ));
   }
-  return axed(block, out, layout, ctx);
+  return axed(block, out, layout, ctx, xRowFor(block, layout.areaWidth, ctx));
 }
 
 const FORM_ROWS: Readonly<
@@ -2489,7 +2524,7 @@ const FORM_ROWS: Readonly<
       );
       return plotRow(r, label, runs, layout, ctx);
     });
-    return axed(block, out, layout, ctx);
+    return axed(block, out, layout, ctx, xRowFor(block, layout.areaWidth, ctx));
   },
   smallmultiples: (block, width, ctx) => {
     const facets = block.facets ?? [];

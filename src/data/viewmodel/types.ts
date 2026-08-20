@@ -1024,10 +1024,35 @@ export type Plot = Readonly<{
    * left, because a row index grows downward and a value does not.
    */
   origin?: Origin;
+  /**
+   * Where the axes are drawn: at the plot area's edges, or crossing at zero
+   * (C04 I62, C12 §3ad). `"edge"` when absent, which is what every frame drew
+   * before this existed.
+   *
+   * **A separate field from `origin`, on `plotFrame`'s test.** One enum spelling
+   * `"centre"` beside the four corners would make `origin: "top-right"` with a
+   * crossing axis inexpressible, and the two answer different questions — which
+   * corner the data grows from, and where the axes meet.
+   *
+   * **This is gnuplot's `set zeroaxis` and not matplotlib's moved spine**: the
+   * gutter keeps the scale and the captions keep their row, and the crossing
+   * axes are two rules inside the plot area. `plotFrame: "corners"` composes to
+   * give the other picture.
+   *
+   * **Honoured on seven forms and dropped rather than refused where the data
+   * cannot place it.** The acceptance set is `HONOURS_AXIS_CROSS`; the two
+   * conditions on each half — a range that strictly straddles zero, and a
+   * position strictly inside the area — are the renderer's, because no gate can
+   * see a realised range from L0 (A02 §1).
+   */
+  axisCross?: AxisCross;
 }> & Gap;
 
 /** Which corner of a plot area the data grows from (C04 I62, C12 §3ac). */
 export type Origin = "bottom-left" | "bottom-right" | "top-left" | "top-right";
+
+/** Where a plot's axes are drawn (C04 I62, C12 §3ad). */
+export type AxisCross = "edge" | "zero";
 
 /**
  * Which forms honour `origin`, and what each one defaults to (C04 I62, C12 §3ac).
@@ -1089,6 +1114,54 @@ export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.
 
   // Facet containers — each facet is a `Plot` and declares its own.
   smallmultiples: null, pairplot: null,
+});
+
+/**
+ * Which forms honour `axisCross` (C04 I62, C12 §3ad).
+ *
+ * **A strict subset of `ORIGIN_DEFAULT`'s fifteen, and the difference is the
+ * matrix family.** A matrix has a corner and no zero: `origin` asks which way
+ * the axes run, and this asks where they meet, so it needs a numeric ordinate
+ * *and* a numeric abscissa. Seven of forty-four.
+ *
+ * **A plain boolean where `origin` carries a default, because there is nothing
+ * to default to.** `"edge"` means *draw no rule inside the area*, which is
+ * exactly what a refusing form does — so a per-form default would be the same
+ * value in all forty-four rows and would say nothing.
+ *
+ * **Not `HAS_POSITION_AXIS`, for the third time** (C12 I43's finding; C12 §3ac
+ * records the second). That record holds `stackedarea` and `streamgraph`, which
+ * have their own composers, and `contour` and `quiver`, which the matrix
+ * renderer draws — eleven forms answering *does the abscissa carry positions*,
+ * where this one asks *who composes the area*.
+ *
+ * Measured by instrumenting `overlaidRows` and rendering the whole corpus, not
+ * reasoned from the shape of the forms (C12 §3ad.2).
+ */
+export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // The positional family — `overlaidRows` composes the area, and a crossing
+  // axis is a reference row merged behind the data there.
+  line: true, scatter: true, step: true, ecdf: true, slope: true,
+  bubble: true, density: true,
+
+  // Matrix — a corner, and no zero to cross at.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  contour: false, quiver: false,
+
+  // Categorical — one row or column per category; the abscissa is a set of
+  // names and has no origin.
+  bar: false, forest: false, dumbbell: false, lollipop: false, dotplot: false,
+  funnel: false, gantt: false, waterfall: false, timeline: false, bullet: false,
+  autocorrelation: false,
+
+  // Own renderer — a disc, a mosaic, a tree, a band, a single row.
+  boxplot: false, flame: false, histogram: false, horizon: false, icicle: false,
+  pie: false, radar: false, ridgeline: false, sparkline: false, stackedarea: false,
+  streamgraph: false, treemap: false, violin: false, waffle: false,
+
+  // Facet containers — each facet is a `Plot` and declares its own.
+  smallmultiples: false, pairplot: false,
 });
 
 /**

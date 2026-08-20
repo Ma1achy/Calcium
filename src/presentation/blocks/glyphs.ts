@@ -107,6 +107,22 @@ export type GlyphSet = Readonly<{
   candleFilled: string;
   candleCross: string;
   /**
+   * Where a crossing axis's two halves meet (C12 §3ad).
+   *
+   * **Its own slot rather than `candleCross`**, which is `┿` — a heavy stem
+   * through a light rule, drawn for a body shorter than one cell (C12 I36).
+   * This is two light rules meeting, and borrowing the candle's mark would put
+   * a body's weight on an axis.
+   *
+   * **The arms are `dashedVertical` and `dashedHorizontal`, and only the
+   * junction is solid.** A crossing axis shares rows with the data, and drawn
+   * solid its horizontal half and the curve are the same glyph — so the zero
+   * row reads as one continuous line and where the series crosses zero, the one
+   * thing the axis is drawn to show, is unreadable. §3k's sentence about a
+   * solid rule through a figure turns out to cover this too (C12 §3ad.4).
+   */
+  crossing: string;
+  /**
    * A run drawn **heavier than the line beside it** (C12 I46, §3i).
    *
    * A compact box plot is one row: its interquartile range is a filled run
@@ -189,6 +205,7 @@ const UNICODE: GlyphSet = Object.freeze({
   candleHollow: "▯",
   candleFilled: "┃",
   candleCross: "┿",
+  crossing: "┼",
   heavyHorizontal: "━",
   heavyVertical: "┃",
   diamond: "◆",
@@ -233,6 +250,7 @@ const ASCII: GlyphSet = Object.freeze({
   heavyHorizontal: "=",
   heavyVertical: "H",
   candleCross: "+",
+  crossing: "+",
   diamond: "x",
   diamondTee: "X",
   teeLeft: "+",

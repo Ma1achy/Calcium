@@ -25,6 +25,7 @@ import {
   COLORMAP_NAMES,
   HAS_CALLOUT,
   HAS_Y_GUTTER,
+  HONOURS_AXIS_CROSS,
   ORIGIN_DEFAULT,
   IS_FIELD_FORM,
   IS_MATRIX,
@@ -649,6 +650,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     plotHorizonErrors(b, e, at, form);
     plotSizeErrors(b, e, at);
   plotOriginErrors(b, e, at, form);
+    plotAxisCrossErrors(b, e, at, form);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -1059,6 +1061,54 @@ function plotOriginErrors(
       `${at}: "origin" on form "${String(form)}" (C04 I62, C12 §3ac) — this form places its ` +
         `data itself and has no direction to reverse, and a member accepted where nothing ` +
         `honours it reads as one not yet implemented`,
+    );
+  }
+}
+
+/**
+ * `axisCross`, and the two halves of the refusal that belong at different layers
+ * (C04 I62, C12 §3ad).
+ *
+ * **Refused by form and by a *declared* range, and no further.** The condition
+ * the renderer applies — the realised range strictly straddles zero — cannot be
+ * checked here: it comes from `seriesRange`, which is L1, and L0 does not import
+ * L1 (A02 §1). C04 I62 said *refused where the range excludes zero, at both
+ * gates* and named an operation this layer does not have.
+ *
+ * **What it can see is the case a caller actually gets wrong**: `yMin` and
+ * `yMax` both above zero or both below is a stated intention to exclude the
+ * origin, beside a request to draw one. Values the caller never declared are
+ * the renderer's to drop (C04 I52).
+ */
+function plotAxisCrossErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const cross = b["axisCross"];
+  if (cross === undefined) return;
+  if (cross !== "edge" && cross !== "zero") {
+    e.push(`${at}: "axisCross" must be "edge" or "zero" (C04 I62)`);
+    return;
+  }
+  if (cross === "edge") return;
+  if (!HONOURS_AXIS_CROSS[form as PlotForm]) {
+    e.push(
+      `${at}: "axisCross" on form "${String(form)}" (C04 I62, C12 §3ad) — a crossing axis needs ` +
+        `a numeric ordinate and a numeric abscissa, and this form has no zero for them to meet ` +
+        `at; a member accepted where nothing honours it reads as one not yet implemented`,
+    );
+    return;
+  }
+  const lo = b["yMin"];
+  const hi = b["yMax"];
+  if (typeof lo !== "number" || typeof hi !== "number") return;
+  if (lo > 0 || hi < 0) {
+    e.push(
+      `${at}: "axisCross": "zero" with a declared range of ${lo}..${hi} (C04 I62, C04 I29) — ` +
+        `the range excludes zero, and an axis drawn at the nearest edge would say the origin is ` +
+        `somewhere it is not`,
     );
   }
 }
