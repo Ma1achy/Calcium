@@ -1481,32 +1481,48 @@ completes. Hiding a *series* under another series answers **where did this one g
 which is the one part of a slope chart that is the content. *A gap and a lie are not the same
 cost, and neither is the price that has to be paid.*
 
-**The third answer to "which series is this?" is "several", and a `Span` can carry it.** Two
-peers in one cell union their dots — so no series' ink is ever deleted — and the cell resolves to
-`tone.muted`, which names neither. **The precedent is one section over**: §3r's doji is muted
-rather than green because *the categories do not apply*, and a cell holding two series is that
-same fact one form along. Measured on `slope-default`: **0 dots deleted, 0 dots drawn in another
-series' colour, 11 cells naming neither.**
+**A cell holds one colour, and that never meant a *region* holds one colour.** Both wrong answers
+came from reading the constraint at the wrong scale: occlusion gave all eleven contested cells to
+one series, and a neutral tone gave them to none. **Which peer owns a contested cell turns with
+the column.** Each cell then holds one series' dots in that series' own slot, and each line runs
+through the overlap as a dash instead of a hole or a grey patch.
 
-**A surface's boundary keeps a wedge's tone, and that is measured rather than assumed.** A
-neutral there draws a border the data does not have, and at ten segments it is not a border but a
-**region** — the small wedges contest cells with both neighbours, and a whole sector of
-`pie-many-segments` comes out grey. The partition of a disc is arbitrary; the partition between
-two series is the reading.
+| rule | ink | tone | `slope-default` |
+|---|---|---|---|
+| union, first wins | complete | series 0 | **25 dots wearing another series' colour** — the reported bleed |
+| union, tone by dot majority | complete | the denser | the same picture; a rising line is denser than a flat one |
+| occlude by layer order | **deleted** | true | south and east absent through the crossing |
+| union, neutral tone | complete | **names neither** | 11 grey cells; no line identifiable there |
+| **rotate by column** | a dash each | **true** | **125 / 119 / 122 of 134 dots kept in their own colour · 0 mistinted · longest absence 3 columns** |
+
+*Three lines genuinely occupy those cells — at 10 rows over a range of 26 they are inside two dot
+rows of each other — so something has to give. What gives is a third of the cells each, and not a
+line.*
+
+**A surface's boundary does not rotate, and that is measured rather than assumed.** A wedge is
+not a line whose continuity matters — it is a region, and its neighbour's ink is the same
+substance. Turning the boundary cell between them draws a stipple along every seam, and the
+neutral it replaced was worse: at ten segments the small wedges contest cells with *both*
+neighbours and a whole sector of `pie-many-segments` comes out grey. Surfaces union and the
+boundary keeps the topmost wedge's tone. *The partition of a disc is arbitrary; the partition
+between two series is the reading.*
 
 **The frame no longer survives a polygon crossing it, and that is the ruling and not a
 regression.** `LM3`'s dot-containment row asserted the opposite and was right about the union it
 was written against. What replaces it is the pair of properties this rule actually has, and they
 are the two failures stated as assertions:
 
-- **nothing is deleted** — every dot a peer draws alone is drawn in the composed figure;
-- **nothing is mistinted** — a cell wearing a series' slot holds that series' ink and no other's.
+- **nothing is mistinted** — a cell wearing a series' slot holds that series' ink and no other's;
+- **no peer is dropped from a contested region** — where *n* peers contend over a run of cells,
+  each is drawn in roughly one in *n* of them, so none is absent from the run.
 
-*If it is orange, it is north; and north is everywhere north goes.*
+*If it is orange, it is north — and north is somewhere in every stretch north goes.*
 
-**The known cost, stated because it is real**: on a radar a contested data cell is muted and so
-is the frame, so two polygons crossing look for one cell like frame. It is the honest reading —
-neither polygon is there alone — and the alternative is naming one of them.
+**The known cost, stated because it is real**: a line is dashed through an overlap, at a duty
+cycle of one over the number of lines sharing it. **The first of those two rows is what the
+suite was missing**, and its absence is what licensed a deletion: `LM6` asserted *no cell draws
+another series' ink*, which deleting the other series satisfies perfectly. One of two opposite
+failures asserted leaves the other one free.
 
 **The priority order is what the ref still expresses**, which is why it is worth keeping rather
 than replacing with *the layer owning the most dots*: the radar's order is a ruling — labels over
@@ -2719,7 +2735,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I41** — **The positional family's x axis is nice numbers over a declared domain, and the sample index is what it falls back to.** `Plot` gains `xMin` / `xMax` / `xFormat` mirroring the y axis — the same `axisFor`, the same precision, the same formatter — and absent them the domain is `[0, n − 1]`, which is what the data has when nothing else was said. *Measured: `ax.plot(y)` over 24 samples ticks 0 5 10 15 20.* **The row it draws in was already reserved**: `axes: true` adds `AXIS_ROWS + FRAME_ROWS` to the declared height rather than taking it, and with no `xLabels` the third of those rows rendered as `""` — so every axed positional plot had been spending a row on an x-label row it never filled, and filling it costs nothing against I1. **`xLabels` wins where both are present**, because a caption is the caller's words and a scale is inferred, and overriding the first with the second is the wrong direction. A label that cannot keep its one-cell gap is dropped **with its tick**, `plotFrame: "corners"` draws the labels and no ticks — a tick is a mark on an edge and there is no edge, where a label is still a reading — and a log or time scale is labelled through `axisFor` or the two halves of one axis disagree. **The form owns the index-to-column mapping** (I37): a candlestick's ticks come from its own pitch, and the curve's rule would place them between candles at every width where the two separate (§3d.1).
 - **I42** — **A histogram bins every series on one shared edge set, and `layout: "overlap"` cannot mean *draw the first one*.** Binned on its own extent each series fills the width, so two distributions of different spreads draw the same picture and the comparison is gone — I35's argument one form along, and the reference's answer: `ax.hist([a, b], bins=8)` returns one edge array over the union and a count array per dataset. **The strategy's inputs are the union's too**, because the edges are: a bin *count* chosen from one series' `n` and spread belongs to edges that are not that series'. *The default layout dropped every series after the first and the legend named them all, so the picture asserted a series it did not draw — I8's rule, in the arm beside the one whose comment records being fixed for it.* **There is no overlapping picture a bar can draw** — two runs superimposed in one row of cells is one run — so `overlap` with more than one series means **grouped**, for the bar and the histogram alike, which is also what `ax.hist([a, b])` draws. Binned, a histogram *is* a bar chart of counts, so all four layouts arrive from the bar rather than being invented. **The vertical arm needed the `refFor` its transpose already had**, or N×S column bands draw in one colour under a legend naming S; and a series with no finite values keeps its bands, because dropping it renumbers the groups and the bin a reader is looking at holds different series in different bins (§3v).
 - **I43** — **Which styles a form has an arm for is a total record, and a fill is the braille arm's.** `plotStyle` was a shared union with `candlestick` refused on the wrong form by a clause naming that style — right, and a special case: every style is one some forms draw and others do not, and a second would want a second clause. `STYLE_ARMS` is `Record<PlotForm, readonly PlotStyle[]>`, total, and the refusal is one rule over it. **A braille violin changes the vocabulary and not the geometry** — the outline strokes the dot grid at 2×4 a cell, which is where the smoothness comes from, while I39's odd extent and §3i's rungs stay the figure's; the box and the summary marks remain cell-resolution and composite over the fill. **`plotFill` is refused on the line arm** rather than ignored, because a box-drawing outline has no interior vocabulary and putting `█` inside `╭──╮` is a third figure rather than the same one filled. **A solid pie degrades to braille at one bit and does not refuse** — the hatch ladder is that depth's identity channel and a block glyph has no hatch, so I18's precedent applies: where the capability cannot spare what a figure needs the honest answer is the thing that fits, not an error the caller could not have avoided. **And a radar's line arm took four alphabets**, which is §3c proving itself: `plotStyle` names *draw this as a connected line* and the glyphs are the renderer's. `strokePolyline` steps orthogonally and a pentagon's every edge is oblique; `╱`/`╲` draw a clean pentagon *in isolation* and compose to rubble, because I40's union is braille's alone and the labels, polygons and frame each take cells from the others; one grid with an owner per cell fixes that and **still renders as dashes**, because those two glyphs are strokes inside a box and do not reach their corners. **Quadrant blocks are filled sub-cells and connect.** Half braille's vertical resolution and the same horizontal, traded for coverage — the right trade for a *shape* where braille's is right for a *curve*. **And the frame is continuous**: stippling answered a question about weight by leaving holes, and a stippled ring reads as a broken one rather than a light one, where `tone.muted` against the series' slots already separates them. *The pie keeps both its arms for the complementary reason — a solid pie has no seams and a braille pie has no gaps, and neither loses the shape* (§3w).
-- **I44** — **A layer declares what it is, and that decides both the ink and the tone where two of them meet.** I40's union was measured against a pie, whose wedges meet along a **boundary**, and generalised to every layer — but two curves run *alongside* one another, and there the union draws one series' ink in another's colour by the hundred. *Measured: `slope-default` drew 25 foreign dots against 20 own; the braille radar gave 70 of 279 frame cells a series slot; the quadrant radar, 80 of 98 coloured cells were frame.* **The radar is worst for a structural reason — a value ring and a data polygon are the same shape at different radii, so there is no locus small enough for *a seam a cell wide* to describe.** **Occlusion is right across kinds and wrong within one**: `"context"` under `"curve"` is a gridline behind a line and nothing is lost, while a series under a series answers *where did this one go* with **nowhere**. So two peers **union their dots and resolve to `tone.muted`** — the third answer, *several*, and §3r's precedent exactly, where a doji is muted because the categories do not apply. *`slope-default`: 0 dots deleted, 0 mistinted, 11 cells naming neither.* **A surface's boundary keeps its wedge's tone**, because a neutral draws a border the data does not have and at ten segments greys a whole sector — the partition of a disc is arbitrary and the partition between two series is the reading. *The same ruling governs the quadrant figure at 2×2, where it matters more because a quadrant is a filled rectangle and a braille dot is not* (§3u, §3w).
+- **I44** — **A layer declares what it is, and where two peers contend the cell goes to one of them by turn.** I40's union was measured against a pie, whose wedges meet along a **boundary**, and generalised to every layer — but two curves run *alongside* one another, and the union then draws one series' ink in another's colour by the hundred *(`slope-default`: 25 foreign dots against 20 own; the braille radar, 70 of 279 frame cells wearing a series slot; the quadrant radar, 80 of 98)*. **The radar is worst for a structural reason — a value ring and a data polygon are the same shape at different radii, so there is no locus small enough for *a seam a cell wide* to describe.** **Occlusion is right across kinds and wrong within one**: `"context"` under `"curve"` is a gridline behind a line and nothing is lost, while a series under a series answers *where did this one go* with **nowhere**. **And a cell holding one colour never meant a region holding one colour** — occluding gave all eleven contested cells to one series, a neutral tone gave them to none, and turning the owner with the column gives each a third: *125 / 119 / 122 of 134 dots kept in their own slot, nothing mistinted, no line absent for more than three columns.* **A surface does not rotate**, because a wedge is a region rather than a line and turning its boundary stipples every seam — surfaces union and the boundary keeps the topmost tone. *The same ruling governs the quadrant figure at 2×2, where it matters more because a quadrant is a filled rectangle and a braille dot is not* (§3u, §3w).
 
 ## 8. Commitments
 
@@ -2760,7 +2776,7 @@ orientation — and belongs in the classification table as its own rows.
 35. **The positional family has an x axis** — nice numbers over a declared domain, the sample index where none is declared, in the row `axes: true` was already reserving; the caller's captions win it where they exist, and the form owns which column a tick lands on (I41, §3d.1).
 36. **A histogram is every series binned on one edge set** — the union's, with the strategy's inputs taken from the union too, drawn through the bar's four layouts, and `overlap` meaning grouped because there is no overlapping picture and I8 forbids the alternative (I42, §3v).
 37. **A form declares which styles it has an arm for** — a total record, one refusal over it, a braille violin that changes vocabulary and not geometry, a fill the line arm refuses, and a solid pie that degrades at one bit rather than refusing (I43, §3w).
-38. **A layer says what it is, and a cell two peers share names neither** — surfaces union and keep a wedge's tone because their partition is arbitrary; peers union and go `tone.muted`, because deleting one says *nowhere* and naming one says *the other*; context is occluded by whatever is in front of it (I44, §3u).
+38. **A layer says what it is, and a contested cell turns between the peers that want it** — surfaces union and keep a wedge's tone because their partition is arbitrary; peers take one cell in *n* each, because giving the region to one says the rest are nowhere and giving it to none says nothing is there; context is occluded by whatever is in front (I44, §3u).
 
 ---
 
