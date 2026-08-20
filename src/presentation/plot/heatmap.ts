@@ -28,8 +28,8 @@ import { slot } from "../blocks/paint.js";
 import { refOf } from "./marks.js";
 import {
   contourCellRows, contourDotRows, contourLevels, dimColour, dimFactorFor, fieldSampler,
-  arrowsFor, glyphLayerOrder, magnitudeAt, magnitudeSeries, mergeFieldLayers, overlayGlyphs,
-  paintsField, quiverRows,
+  arrowsFor, fieldPaintsUnder, glyphLayerOrder, magnitudeAt, magnitudeSeries, mergeFieldLayers,
+  overlayGlyphs, quiverRows,
   type FieldLayer,
 } from "./field.js";
 
@@ -338,7 +338,7 @@ function matrixRows(
   // safe fallback rather than `window`: a form with no entry is one nobody
   // decided about, and blanking most of the width is not a neutral answer.
   const matrixLayout = block.matrixAnchor ?? MATRIX_LAYOUT[block.form] ?? "stretch";
-  const painted = paintsField(block);
+  const painted = fieldPaintsUnder(block, overlay, ctx.capabilities);
   const dim = block.fieldDim === "floor" && map !== undefined ? dimFactorFor(map) : 1;
   const glyphInk = block.glyphInk ?? "own";
   const out: string[] = [];
@@ -576,9 +576,50 @@ function fieldLayers(
             block.plotCorners ?? "rounded", ctx.capabilities,
           ),
       ref: refOf(0),
+      ramplike: true,
     });
   }
   return out;
+}
+
+/**
+ * A field's own axes, derived from the grid (C12 I49, §3y).
+ *
+ * **A matrix's rows are identities and a field's are positions**, which is the
+ * distinction I18 draws and which `ROW_IS_AN_IDENTITY` now records for these two
+ * forms. Read as a matrix, a field came out with `row0 … row5` down the gutter
+ * and no x axis at all — the caller was being asked to caption a domain the
+ * renderer already knows.
+ *
+ * So the labels are derived where the caller named none, and a caller who names
+ * one still wins: an explicit `label` on a row, or an explicit `xLabels`, is a
+ * caller saying their rows and columns mean something the index does not.
+ *
+ * The domain is `xMin`–`xMax` where declared and the sample index otherwise.
+ * There is no `yMin`/`yMax` arm: on a field those two pin the **value** range —
+ * the levels and the colour scale — and spending them on the ordinate as well
+ * would give one pair of members two meanings on one form.
+ */
+function fieldAxes(block: Plot): Plot {
+  if (!IS_FIELD_FORM[block.form]) return block;
+  const cols = block.series.reduce((n, r) => Math.max(n, r.values.length), 0); // cells-ok
+  const named = block.series.some((r) => r.label !== undefined && r.label !== "");
+  const at = (i: number, n: number): number => {
+    const lo = block.xMin ?? 0;
+    const hi = block.xMax ?? Math.max(0, n - 1);
+    return n <= 1 ? lo : lo + (i / (n - 1)) * (hi - lo);
+  };
+  const series = named
+    ? block.series
+    : block.series.map((r, i) => ({ ...r, label: formatValue(i, block.yFormat) }));
+  const xLabels: readonly [string, string, string] | undefined = block.xLabels ?? (cols === 0
+    ? undefined
+    : [
+        formatValue(at(0, cols), block.xFormat),
+        formatValue(at(Math.floor((cols - 1) / 2), cols), block.xFormat),
+        formatValue(at(cols - 1, cols), block.xFormat),
+      ]);
+  return { ...block, series, ...(xLabels === undefined ? {} : { xLabels }) };
 }
 
 /**
@@ -596,9 +637,10 @@ export function heatmapFormRows(
   // that separates a fast cell from a slow one. Substituted here rather than in
   // `matrixRows`, so the range, the gutter labels, the legend and the overflow
   // row all see one series list.
-  const block: Plot = raw.form === "quiver" && raw.series.length === 0 && raw.vectors !== undefined // cells-ok — a series count
+  const withField: Plot = raw.form === "quiver" && raw.series.length === 0 && raw.vectors !== undefined // cells-ok — a series count
     ? { ...raw, series: magnitudeSeries(raw.vectors) }
     : raw;
+  const block = fieldAxes(withField);
   const range = seriesRange(block.series, block);
   const layout = layoutFor(block, width, ctx.capabilities);
 
@@ -615,7 +657,7 @@ export function heatmapFormRows(
 
   if (range === null) return emptyRows(block, layout, ctx);
   return [
-    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx, block !== raw)),
+    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx, withField !== raw)),
     ...matrixFurniture(block, range, layout, ctx),
   ];
 }

@@ -200,7 +200,11 @@ export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.fre
   // A matrix labels its rows and its columns from `categories`, not from a scale.
   heatmap: false, calendar: false, correlation: false, confusion: false,
   spectrogram: false, latency: false, density2d: false, utilisation: false,
-  contour: false, quiver: false,
+  // **A field is sampled over a domain, not a set of categories** (C12 I49).
+  // These were `false` on the matrix's row and it was the wrong reason: a
+  // heatmap's columns come from `categories`, and a field's column *is* a
+  // position along an axis, so it has one and it is drawn.
+  contour: true, quiver: true,
   // No cartesian abscissa at all — a disc, a polygon, a mosaic, a tree.
   pie: false, radar: false, waffle: false, flame: false, icicle: false, treemap: false,
   // One row, no furniture.
@@ -227,7 +231,12 @@ export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.fr
   streamgraph: true, stackedarea: true, slope: true, bubble: true,
   heatmap: true, calendar: true, correlation: true, confusion: true,
   spectrogram: true, latency: true, density2d: true,
-  contour: true, quiver: true,
+  // **And the two field forms, for the same reason one rung along.** A field
+  // row is a slice of the ordinate — a position — where a matrix row is a
+  // thing the caller named. These were `true` on the matrix's row, and the
+  // frame is what said otherwise: the y gutter read `row0 … row5` where a
+  // reader wanted a scale, and there was no x axis at all (C12 I49).
+  contour: false, quiver: false,
   sparkline: true, horizon: true,
   smallmultiples: true, pairplot: true,
 });

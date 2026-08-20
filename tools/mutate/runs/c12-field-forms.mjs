@@ -107,6 +107,28 @@ const results = runPass({
       expect: "QV9",
     },
     {
+      // **The ruling the frame corrected.** Keeping the field painted below the
+      // colour floor puts the density ramp and the contour in one alphabet —
+      // braille at unicode, punctuation at ASCII — and the 1-bit frame becomes an
+      // even wash of speckle. No assertion saw it: LY5 as first written filtered
+      // for `░▒▓█` and the ramp below the floor is braille, so it held over an
+      // empty set.
+      name: "the field still paints below the colour floor",
+      file: FIELD,
+      from: "  if (caps.colourDepth >= FIELD_COLOUR_FLOOR) return true;\n  return !layers.some((l) => l.ramplike === true);",
+      to: "  return true;",
+      expect: "LY5",
+    },
+    {
+      // The other half: a quiver is *not* ramplike, so yielding for every layer
+      // costs it the field it can legibly keep.
+      name: "the field yields to any layer, not only a ramplike one",
+      file: FIELD,
+      from: "  return !layers.some((l) => l.ramplike === true);",
+      to: "  return layers.length === 0;",
+      expect: "LY5",
+    },
+    {
       // `layers` is a draw order and `mergeFieldLayers` takes a priority order.
       // **The seam, not the array**: mutating the public field's order fails
       // nothing, because the caller declared it.

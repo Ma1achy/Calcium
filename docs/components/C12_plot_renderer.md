@@ -2185,11 +2185,57 @@ all** and degrades to the density ramp — a glyph. `layers: ["field", "contour"
 over a wash at 24-bit and **two glyph layers** at 4-bit, which is the sharpest interaction in
 this section and is invisible in every frame above the floor.
 
-**The ramp yields and the contour draws**, with the legend carrying the scale. A contour with
-the field's ramp punched through it is neither reading: the ramp is a *redundant* encoding of
-the same scalar the contour is drawing, so what is lost is resolution on a quantity still
-present, where the alternative loses the line. `fieldDim` is inert here — there is no background
-to dim — and saying so is cheaper than a reader discovering it from an unchanged frame.
+**The field yields, and the first ruling here said the ramp did.** That was right about the
+*cell* contention — the interaction §6d.1 row 10 found — and wrong about the remedy, because it
+assumed the two glyphs were distinguishable. They are not: the density ramp is braille at unicode
+and `.:-=+*#@` at ASCII, and a contour is braille at unicode and box-drawing punctuation at ASCII.
+**At every capability below the floor the two are the same alphabet**, so deciding which of them
+owns a cell leaves a reader unable to tell field from contour anywhere.
+
+*The frame is what said so.* The 1-bit contour came out as an even wash of braille speckle, and
+the identical fixture with `layers: ["contour"]` came out as five clean nested rings. No assertion
+could see it — and the row that was supposed to, LY5, compared against a ramp character set
+containing no braille and was **vacuous**.
+
+So a layer declares whether it is drawn in the ramp's alphabet, and the field does not paint
+beneath one. The contour is the reading that survives: it is the more specific statement and it
+names its levels in the legend, where the ramp below the floor names nothing a reader can map back
+to a number. A quiver is **not** ramplike — an arrow is a distinct mark at both capabilities — so
+it keeps its field, and a sparse quiver shows the ramp between its arrows.
+
+**This is CLAUDE.md's *correct about the interaction, wrong about a mechanism it assumed* arriving
+on a walk artefact rather than on prose.** No index by rule interaction reaches it, because the
+flaw is not between two rules — it is between two **alphabets**, which is not a statement either
+artefact records.
+
+`fieldDim` is inert here regardless — there is no background to dim — and saying so is cheaper
+than a reader discovering it from an unchanged frame.
+
+### A field's axes are positions, and the matrix's are identities
+
+**Both records were answered from the heatmap's row and both were wrong.** `ROW_IS_AN_IDENTITY`
+was `true` and `HAS_POSITION_AXIS` was `false`, which is correct for a matrix — I18's *a row
+label is the ordinate* — and it is the opposite of what a field is. A heatmap's rows are things
+the caller named and its columns come from `categories`; a field is **sampled over a domain**, so
+a row is a slice of the ordinate and a column is a position along the abscissa.
+
+*The frame is what said so, and a reader said it first*: the gutter read `row0 … row5` where a
+scale belonged, and there was no x axis at all. Neither walk artefact reaches it — a total record
+read as a complete answer to a question it cannot ask is I43's finding, and here it arrived by
+**copying a neighbouring row instead of re-deriving the reason**, which is the one failure mode a
+total record does not prevent: it forces an entry and cannot force a thought.
+
+So a field derives both axes from its grid: the row index down the gutter, three captions across
+the bottom over the column domain — `xMin`–`xMax` where declared and the sample index otherwise.
+**A caller who names one still wins**: an explicit row `label` or an explicit `xLabels` is a
+caller saying their rows and columns mean something the index does not. The catalogue's own
+fixtures carried `row0 … row5` and so suppressed the derived scale, which is the fixture-cannot-
+respond rule arriving a third time in this section.
+
+**There is no `yMin`/`yMax` arm.** On a field those two pin the *value* range — the levels and
+the colour scale — so spending them on the ordinate as well would give one pair of members two
+meanings on one form.
+
 
 ### Where each field applies, and what is refused
 
@@ -2228,6 +2274,8 @@ an **ordering**, which is not a rule that holds at rest.
 | 8 | the grid is *G × H* points · the plot area is `areaWidth × areaRows` cells | the family's existing resampling (`matrixAnchor`), and a contour is computed **after** it, on the cells actually drawn — computing before and resampling the glyphs would resample a stroke |
 | 9 | `levels` is declared · a level lies outside the field's range | kept in the legend, drawn nowhere; dropping it silently makes an empty area indistinguishable from a constant field |
 | 10 | at one bit levels separate by dash · dashes are dot-space | the braille arm carries them and the `"line"` arm has **no** level channel at one bit — stated at the fork |
+| 10b | below 8-bit the field is a ramp glyph · a contour is drawn in the ramp's own alphabet | **the field yields, not the ramp** — this row first ruled the other way, which settles the cell contention and leaves both layers in one vocabulary. The flaw is between two *alphabets* and neither artefact records one; only the frame did |
+| 13 | a matrix's row label is its ordinate (I18) · a field is sampled over a domain | **positions, not identities** — both total records were answered from the heatmap's row, and a reader reading the frame is what found it |
 | 11 | a matrix form has no per-series row (`HAS_Y_GUTTER: false`) · a contour's levels want naming | the legend, never the gutter — which is ruling 2 arriving from the other side |
 | 12 | `quiver` at one bit: direction is a mark · magnitude is a mark ladder (I25) | the mark is spent on direction; magnitude has **no** channel, and that is a loss stated rather than a gap to fill |
 
@@ -3346,9 +3394,9 @@ orientation — and belongs in the classification table as its own rows.
 - **I47** — **The y gutter can be drawn on either side or both, and the right one writes what the left one was given.** At eighty columns a row cannot be tracked back to a label seventy cells away, which is why every financial and monitoring TUI mirrors its axis. `yAxis?: "left" | "right" | "both" | false`, `"left"` by default; it costs **width and never a row**, so I1 is untouched and the sizing is I27's data-dependent kind rather than its declared kind. **One label, two consumers** — `"both"` renders the same ticks on both sides by construction rather than by a second `yLabels` call, and a dual-*scale* right axis is refused because two ranges on one figure assert a correlation the data does not have. **The tick belongs to the side that draws the label**, which the tree spelled as *the label is non-empty*: every caller blanked the label when `labelColumn` was 0, so *a label exists* and *this column draws it* were one statement until a right axis separated them and the left border drew a stub pointing at nothing. Three callers gate `yLabels` on the same predicate, so a right axis computed no labels at all and `"grid"` lost its horizontal rules with them (I26). **The mirror is of the left gutter's shape and not of its glyphs** — `plotFrame: "rule"` has a left rule and no right one, which is what that style *is*, so the two `bare` predicates differ on purpose. **The right column is dropped before the left**, being a copy of it at `"both"` and landing on the existing unlabelled rung at `"right"`; `bandLayout`'s `⌊width ÷ 3⌋` cap becomes a cap on the pair. *A right axis reaches that degradation one cell before a left one, because `AXIS_GUTTER` spends the label-to-border space whether or not a label uses it — kept with both figures rather than equalised, since equalising moves every narrow frame for one cell at one width* (§3x, §6c).
 - **I48** — **A callout names a series' last finite value at that series' own row, and its row is read from ink rather than recomputed.** `yCallout?: "none" | "last"`, `"none"` by default and named for the case it serves: on a static chart the last value is at the end of the line, and on a live one it is the number that matters most and the hardest to read off a line still moving. **Recomputing the row from the value is wrong about one value in six** — `curveRows` rasterises at dot resolution and folds where `lineDrawRows` and `candleRows` map at cell resolution, and the two disagree for 15.7–21.0% of values at heights 6, 8, 12 and 20, clustered at the ends of the range where a live chart's newest value sits when something has gone wrong. *That is I37's class on the other axis.* Reading the series' own rasterised rows is exact for every rasteriser and capability by construction; where the last inked column spans several rows — the tail of the line that reached it, drawn into the same column — the callout takes the end **furthest from the previous column**, which is where the sample is. *The walk ruled `midpoint` and running the code disproved it: on a descending braille curve ending at 7.2 of 0..100 in eight rows the stroke spans 6 and 7, the sample is in 7, and the midpoint answers 6 — the very row the shortcut gives, so the ruling was unfalsifiable as well as wrong.* **It displaces the right gutter's content on its row and never the left's** — the *your data is here* argument reaches only the gutter it is written in. **Two on one row: the later wins and a one-cell `+` says so** (I8), not `+N`, whose count needs the ink that needs the width that needs the column being sized, and not a second row, which would change the count and break I1. **The carrier at one bit is a mark and cannot be bold**, because a series slot resolves through `MONO` there and `emphasised` *is* `{ bold: true }` — so a heavier edge glyph carries it and colour and weight ride above (I25, §3b). **A callout does not replace the legend**: it names a value where a legend names an identity, and only together do they say which line is which and what each reads (§3x, §6c).
 
-- **I49** — **A contour's glyph is derived from its cell's four corners, and the derivation is the curve renderer's own table.** An edge is crossed exactly when its two corners disagree; the mask is `(top?UP)|(right?RIGHT)|(bottom?DOWN)|(left?LEFT)` and the glyph is `glyphForMask`'s. All sixteen marching-squares cases land on entries that already exist — zero new glyphs, eight distinct masks — so adjacent cells agree **by construction**: a shared edge has the same two grid corners on both sides and the strokes join with nothing joining them. Levels union their masks in one cell, which is the only way `┤ ├ ┴ ┬` can be emitted. **Both saddle cases give mask 15**, so the centre-value resolution is observable on the braille arm and collapses to `┼` on `"line"` — the default is braille so that the ruling has a subject (§3y). Levels are named in the legend and never on the line: there is no gap-cutting vocabulary, and a label over a contour is the contour with a hole in it.
+- **I49** — **A contour's glyph is derived from its cell's four corners, and the derivation is the curve renderer's own table.** An edge is crossed exactly when its two corners disagree; the mask is `(top?UP)|(right?RIGHT)|(bottom?DOWN)|(left?LEFT)` and the glyph is `glyphForMask`'s. All sixteen marching-squares cases land on entries that already exist — zero new glyphs, eight distinct masks — so adjacent cells agree **by construction**: a shared edge has the same two grid corners on both sides and the strokes join with nothing joining them. Levels union their masks in one cell, which is the only way `┤ ├ ┴ ┬` can be emitted. **Both saddle cases give mask 15**, so the centre-value resolution is observable on the braille arm and collapses to `┼` on `"line"` — the default is braille so that the ruling has a subject (§3y). Levels are named in the legend and never on the line: there is no gap-cutting vocabulary, and a label over a contour is the contour with a hole in it. **A field's own axes are positions**: the row index down the gutter and three captions over the column domain, derived where the caller named none, because a field is sampled over a domain where a matrix is a set of named rows — `ROW_IS_AN_IDENTITY` and `HAS_POSITION_AXIS` are both the opposite of the matrix family's answer.
 - **I50** — **A quiver's direction is its glyph and its magnitude is its colour, and a cell with no flow draws nothing.** Eight directions, with the ASCII arm required at `unicode: "ascii"` **and** at `ambiguousWidth: "wide"` — every arrow in U+2190–21FF is `East_Asian_Width=Ambiguous`, so a wide terminal draws the field at double width, and this is that switch's third consumer after `art.ts` and `mermaid.ts`. **One datum, one channel.** Magnitude is the arrow's colour where the field carries something else, and the *field's* colour where the caller named no scalar — colouring the arrow by magnitude over a magnitude field paints it in its own background, measured at `38;2;33;145;141` on `48;2;33;145;141` and invisible at full colour depth while every assertion passed. **Magnitude dies below `colourDepth: 8`**, not below one bit: `continuousColour` returns `undefined` under `CONTINUOUS_FLOOR`, and I25's mark ladder cannot carry it because the mark is already spent on direction. A zero-magnitude cell is blank rather than an arrow of arbitrary direction, and the field beneath it still reads (§3y).
-- **I51** — **`layers` is a draw order the caller reads and a priority order the merge takes, reversed at one documented seam.** `layers` says what is drawn; `Layer.kind` (I44) says how two inked cells resolve, and both a contour and a quiver are `"curve"`. **`field`'s membership is load-bearing and its position is inert** — a background cannot occlude, so the two orderings render byte-identical. `fieldDim` and `glyphInk` are two fields because they answer two questions: `"floor"` dims per colormap by measurement rather than by a constant (viridis and coolwarm at 50%, inferno at 40%) and costs viridis 78% of its luminance spread; `"contrast"` picks black or white per cell and costs a quiver its magnitude channel. Below `colourDepth: 8` the field is a ramp **glyph** rather than a wash, so two glyph layers meet: the ramp yields, the contour draws, and `fieldDim` is inert (§3y).
+- **I51** — **`layers` is a draw order the caller reads and a priority order the merge takes, reversed at one documented seam.** `layers` says what is drawn; `Layer.kind` (I44) says how two inked cells resolve, and both a contour and a quiver are `"curve"`. **`field`'s membership is load-bearing and its position is inert** — a background cannot occlude, so the two orderings render byte-identical. `fieldDim` and `glyphInk` are two fields because they answer two questions: `"floor"` dims per colormap by measurement rather than by a constant (viridis and coolwarm at 50%, inferno at 40%) and costs viridis 78% of its luminance spread; `"contrast"` picks black or white per cell and costs a quiver its magnitude channel. Below `colourDepth: 8` the field is a ramp **glyph** rather than a wash, so two glyph layers meet — and **the field yields where the layer over it is drawn in the ramp's own alphabet**, which a contour is at every capability and an arrow is at none. Ruling the other way settles the cell contention and leaves both layers in one vocabulary, which no assertion can see and the frame shows at once. `fieldDim` is inert below the floor regardless (§3y).
 
 ## 8. Commitments
 
@@ -3444,7 +3492,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **LY2** (I51): `["field","contour"]` and `["contour","field"]` are **byte-identical**; `["contour"]` differs from both. Membership is load-bearing and position is inert, and the second half is what makes the first an assertion rather than a tautology.
 - **LY3** (I51, I44): a contour under a quiver shows wherever no arrow lands.
 - **LY4** (I51): `layers: []` renders the field alone.
-- **LY5** (I51): below `colourDepth: 8` the field is a ramp glyph and yields to the contour — asserted at 4-bit, where the interaction exists and every frame above the floor is silent about it.
+- **LY5** (I51): below `colourDepth: 8` the field yields to a contour entirely — asserted at 4-bit, where the interaction exists and every frame above the floor is silent about it. **The first version of this row was vacuous**: it compared against a ramp character set containing no braille, and the ramp below the floor *is* braille, so *no cell carries both* held over an empty set.
 - **LY6** (I51): `fieldDim: "floor"` clears 4.5 : 1 on **every** sample of viridis, inferno and coolwarm — run against the shipped dimming rather than the constants, because the per-map figures are the claim.
 - **LY7** (I51): `glyphInk: "contrast"` picks black or white per cell against that cell's own background, and QV2's magnitude reading is gone — the price asserted beside the remedy.
 - **LY8** (I51): `fieldDim: "floor"` below `colourDepth: 8` changes nothing, because there is no background to dim.

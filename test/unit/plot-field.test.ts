@@ -238,16 +238,23 @@ describe("LY — what is layered over a field (C12 I51)", () => {
     expect(area({ layers: [] }).join("").replace(/[\s⠀]/gu, "")).toBe("");
   });
 
-  it("LY5 (C12 I51): below colourDepth 8 the field is a ramp glyph and yields to the contour", () => {
-    // Asserted at 4-bit, where the interaction exists. Every frame above the
-    // floor is silent about it, because there the field is a background.
-    const four = area({}, 60, { ...FULL_CAPS, colourDepth: 4 as const });
-    const braille = four.join("").split("").filter((c) => c >= "⠁" && c <= "⣿").length; // cells-ok
-    expect(braille).toBeGreaterThan(0);
-    // The ramp is not drawn *through* the contour: no cell carries both.
-    const ramp = new Set([..."░▒▓█▁▂▃▄▅▆▇"]);
-    const contended = four.join("").split("").filter((c) => ramp.has(c) && c >= "⠁");
-    expect(contended).toEqual([]);
+  it("LY5 (C12 I51): below colourDepth 8 the field yields to a contour entirely", () => {
+    // **The first version of this row was vacuous.** It asserted *no cell
+    // carries both the ramp and the contour* against a ramp character set of
+    // `░▒▓█▁▂▃▄▅▆▇` — and the density ramp below the floor is **braille**, so the
+    // set it filtered on was empty and the claim held over nothing. The 1-bit
+    // frame was an even wash of speckle the whole time.
+    //
+    // What the ruling actually says is testable directly: below the floor a
+    // contour over a field is the *same frame* as a contour over no field.
+    const four = { ...FULL_CAPS, colourDepth: 4 as const };
+    expect(bare({}, 60, four)).toEqual(bare({ layers: ["contour"] }, 60, four));
+    // …and above it they differ, or the row above is satisfied by a field that
+    // never paints at any depth.
+    expect(rows({})).not.toEqual(rows({ layers: ["contour"] }));
+    // A quiver is not drawn in the ramp's alphabet, so it keeps its field.
+    const sparseQ = { layers: ["field", "quiver"] as const };
+    expect(qbare(sparseQ, 60, four)).not.toEqual(qbare({ layers: ["quiver"] }, 60, four));
   });
 
   it("LY6 (C12 I51): fieldDim `floor` clears 4.5:1 on every sample of three maps", () => {

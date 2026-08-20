@@ -310,6 +310,23 @@ export type FieldLayer = Readonly<{
   glyphRows: readonly string[];
   ref: ColourRef;
   cellColour?: (row: number, x: number) => ColourValue | undefined;
+  /**
+   * Whether this layer is drawn in the **density ramp's own alphabet** (I51).
+   *
+   * Below `colourDepth: 8` the field has no background and falls back to the
+   * ramp — braille at unicode, `.:-=+*#@` at ASCII. A contour is braille at
+   * unicode and punctuation at ASCII, so at every capability below the floor the
+   * two are the *same alphabet* and a reader cannot tell field from contour
+   * anywhere. An arrow is a distinct mark at both and does not collide.
+   *
+   * §6d.1 row 10's ruling was *the ramp yields and the contour draws*, which
+   * resolves the **cell** contention the table found and does nothing about the
+   * vocabulary. The frame is what said so: the 1-bit contour came out as mush
+   * and the same fixture with `layers: ["contour"]` came out perfectly legible.
+   * **The artefact was right about the interaction and wrong about the remedy**,
+   * because it assumed the two glyphs were distinguishable.
+   */
+  ramplike?: boolean;
 }>;
 
 /** Braille is `U+2800 + bits`, which is what makes the union below an OR. */
@@ -497,6 +514,28 @@ export function layersOf(block: Pick<Plot, "form" | "layers">): readonly ("field
 /** Whether the field itself is painted — membership, never position. */
 export function paintsField(block: Pick<Plot, "form" | "layers">): boolean {
   return layersOf(block).includes("field");
+}
+
+/** The depth at or above which the field is a background rather than a ramp. */
+const FIELD_COLOUR_FLOOR = 8;
+
+/**
+ * Whether the field paints, **given what is drawn over it** (I51).
+ *
+ * Below the floor the field is a ramp *glyph*, and a layer drawn in the ramp's
+ * own alphabet makes the two indistinguishable — so the field yields rather than
+ * the ramp. It is the redundant one: a contour encodes the same scalar and names
+ * its levels in the legend, where the ramp below the floor names nothing a
+ * reader can map back to a number.
+ */
+export function fieldPaintsUnder(
+  block: Pick<Plot, "form" | "layers">,
+  layers: readonly FieldLayer[],
+  caps: Pick<TerminalCapabilities, "colourDepth">,
+): boolean {
+  if (!paintsField(block)) return false;
+  if (caps.colourDepth >= FIELD_COLOUR_FLOOR) return true;
+  return !layers.some((l) => l.ramplike === true);
 }
 
 /**

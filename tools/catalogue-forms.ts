@@ -125,18 +125,20 @@ const matrix = (rows: number, cols: number, step = 0.3): Series[] =>
  * the answer. `test/support/README.md`'s rule — a fixture is shown to respond to
  * the thing under test before it is asserted against.
  */
+/**
+ * **Unlabelled**, and that is the fixture responding to a second thing. A field's
+ * rows are positions rather than identities (C12 I49), so the gutter derives a
+ * scale — and a row carrying `row0` suppresses it, which is what these fixtures
+ * did until the frame was looked at.
+ */
 const field = (rows: number, cols: number, freq = 0.6): Series[] =>
   Array.from({ length: rows }, (_, r) =>
-    s(
-      Array.from({ length: cols }, (_, c) => Math.sin(r * freq) * Math.sin(c * freq) * 50 + 50),
-      `row${String(r)}`,
-    ),
+    s(Array.from({ length: cols }, (_, c) => Math.sin(r * freq) * Math.sin(c * freq) * 50 + 50)),
   );
 
 /** A rotational vector field, so all eight directions are present. */
 const swirl = (rows: number, cols: number): VectorSeries[] =>
   Array.from({ length: rows }, (_v, r) => ({ // cells-ok — a row count
-    label: `row${String(r)}`,
     values: Array.from({ length: cols }, (_w, c) => { // cells-ok — a column count
       const [dx, dy] = [c - (cols - 1) / 2, r - (rows - 1) / 2];
       return [-dy, dx] as const;
@@ -341,9 +343,18 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     still: {
       form: "quiver", height: 4, axes: true, series: [],
       vectors: Array.from({ length: 4 }, (_v, r) => ({ // cells-ok — a row count
-        label: `row${String(r)}`,
         values: Array.from({ length: 12 }, (_w, c) => (c % 3 === 0 ? [0, 0] as const : [c - 6, r - 2] as const)), // cells-ok
       })),
+    },
+    // **The contrast remedy reaches the quiver too** (C12 I51) — `glyphInk` is a
+    // field-family member, not a contour one, and an arrow over the bright end
+    // of a ramp is exactly the cell it is for.
+    "ink-contrast": {
+      form: "quiver", height: 6, axes: true, glyphInk: "contrast", series: [], vectors: swirl(6, 24),
+    },
+    // And the field dimmed instead, which is the other remedy on the same frame.
+    "dim-floor": {
+      form: "quiver", height: 6, axes: true, fieldDim: "floor", series: [], vectors: swirl(6, 24),
     },
     // A contour and a quiver over one field: both glyph layers, and §3u decides
     // the contested cells (C12 I51).
