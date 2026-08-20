@@ -86,10 +86,62 @@ export function continuousColour(
     return { kind: "ansi256", index: lut[index] ?? 16 };
   }
   // Fallback: sample and convert
-  const hex = sample(map, t);
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return { kind: "ansi256", index: 16 + 36 * Math.round(r / 255 * 5) + 6 * Math.round(g / 255 * 5) + Math.round(b / 255 * 5) };
+  return { kind: "ansi256", index: nearestAnsi256(sample(map, t)) };
+}
+
+/**
+ * The 256-palette's colour cube, which **three places had a copy of**.
+ *
+ * `resolve.ts` builds it for the theme's constraint solver, `continuousColour`
+ * inlined the quantisation above, and `dimColour` needed the inverse and had
+ * neither — which is how `fieldDim: "floor"` came to be silently inert at 8-bit
+ * (C12 §3y). One definition and three callers rather than a fourth copy.
+ *
+ * **The levels are not evenly spaced and that is the cube, not a choice.**
+ * Scaling a colour by a factor and requantising therefore compresses the dark
+ * end harder than the light: halving 215 lands on 175, halving 95 lands on 0.
+ * A dimmed map's lowest band goes to black at 8-bit where it stays coloured at
+ * 24, and that is a property of the palette rather than of the remedy.
+ */
+export const CUBE_LEVELS = [0, 95, 135, 175, 215, 255] as const;
+
+/** The nearest cube index to a hex colour — the greyscale ramp is not searched. */
+export function nearestAnsi256(hex: string): number {
+  const at = (i: number): number => {
+    const c = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+    let best = 0;
+    for (let k = 1; k < CUBE_LEVELS.length; k += 1) { // cells-ok — a cube axis
+      if (Math.abs(CUBE_LEVELS[k]! - c) < Math.abs(CUBE_LEVELS[best]! - c)) best = k; // cells-ok
+    }
+    return best;
+  };
+  return 16 + 36 * at(0) + 6 * at(1) + at(2); // cells-ok — a palette index
+}
+
+/**
+ * A cube or greyscale index as hex, or `null` for the sixteen system colours.
+ *
+ * **`null` rather than a guess for 0–15**, because those are the terminal's own
+ * palette and their values are the reader's theme: a framework that named them
+ * would be asserting a colour it cannot see (C10 I21's argument, one index set
+ * along).
+ */
+export function ansi256Hex(index: number): string | null {
+  const i = Math.round(index);
+  const hex = (r: number, g: number, b: number): string =>
+    `#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+  if (i >= 16 && i <= 231) {
+    const n = i - 16;
+    return hex(
+      CUBE_LEVELS[Math.floor(n / 36)] ?? 0,
+      CUBE_LEVELS[Math.floor(n / 6) % 6] ?? 0,
+      CUBE_LEVELS[n % 6] ?? 0,
+    );
+  }
+  if (i >= 232 && i <= 255) {
+    const v = 8 + (i - 232) * 10;
+    return hex(v, v, v);
+  }
+  return null;
 }
 

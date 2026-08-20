@@ -2197,9 +2197,33 @@ cube is 6 × 6 × 6 over levels `0 · 95 · 135 · 175 · 215 · 255`, so an ind
 dims, and requantises. The conversion is **already written twice** — `resolve.ts` builds the cube
 for the theme's constraint solver and `colormap.ts` inlines the quantisation in
 `continuousColour`'s fallback — so the remedy is one definition and three callers rather than a
-fourth copy. *The cost is stated because it is real and it is not the 24-bit cost: the cube's levels
-are unevenly spaced, so halving 215 lands on 175 and halving 95 lands on 0. Dimming at 8-bit
-compresses the dark end harder than the light, and a map's lowest band goes to black.*
+fourth copy.
+
+**And the obvious remedy does not honour the member's own guarantee, which measuring is what
+showed.** `fieldDim: "floor"` promises *dims until every sample clears*. Scaling the channels and
+requantising is not a dim, it is a **compression** — halved, four of the six levels land on the
+same one:
+
+| level | × 0.5 | requantised |
+|---|---|---|
+| 0 | 0 | **0** |
+| 95 | 48 | **95** |
+| 135 | 68 | **95** |
+| 175 | 88 | **95** |
+| 215 | 108 | **95** |
+| 255 | 128 | **135** |
+
+So the darkest coloured band does not move at all, and quantising after the dim can carry a sample
+back **over** the floor: viridis at its 24-bit factor of 0.50 leaves **one of twenty-one samples at
+3.71** against a floor of 4.5. A remedy that dims and still fails the contract is the same defect
+one level down.
+
+**`dimFactorFor` therefore searches against the colour the reader is shown, not the one that was
+sampled**, and takes the arm as an argument. viridis needs `0.45` at 8-bit where 24-bit takes
+`0.50`; coolwarm and inferno are unchanged at `0.50` and `0.45`. All three then clear on every one
+of twenty-one samples at both depths. *The figures are what the search produces and not what this
+paragraph reads — `dimFactorFor`'s own doc is explicit that a tabulated constant is a constant that
+fails the fourth map, and a factor tabulated per depth would fail the third arm.*
 
 ## 3y. Two more readings of a field — iso-lines and arrows
 

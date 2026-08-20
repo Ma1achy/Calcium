@@ -27,6 +27,7 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
 import type { ColourRef, ColourValue, Style } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
+import { ansi256Hex, nearestAnsi256 } from "../theme/colormap.js";
 import { DEFAULT_FLOOR, luminance, ratio } from "../theme/contrast.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille } from "./raster.js";
@@ -409,31 +410,51 @@ export function mergeFieldLayers(
 const DIM_FACTORS = new Map<string, number>();
 const WHITE = "#ffffff";
 
-export function dimFactorFor(map: Colormap): number {
-  const known = DIM_FACTORS.get(map.name);
+export function dimFactorFor(map: Colormap, indexed = false): number {
+  const key = indexed ? `${map.name}@256` : map.name;
+  const known = DIM_FACTORS.get(key);
   if (known !== undefined) return known;
   let factor = 1;
   for (let k = 20; k >= 1; k -= 1) { // cells-ok — a search step count
     const f = k / 20;
     const ok = map.data.every((c) => {
       const hex = `#${[c[0], c[1], c[2]].map((v) => Math.round(v * f).toString(16).padStart(2, "0")).join("")}`;
-      return ratio(WHITE, hex) >= DEFAULT_FLOOR;
+      // **What the terminal shows is what has to clear** (C12 §3y). At 8-bit
+      // the dimmed colour is quantised to the nearest cube index afterwards,
+      // and the cube's levels are far enough apart that quantising can carry a
+      // sample back *over* the floor: scaling viridis by the 24-bit factor
+      // leaves one of twenty-one at 3.71 against a floor of 4.5. Searching
+      // against the continuous colour answers a question about a colour the
+      // reader never sees.
+      const shown = indexed ? ansi256Hex(nearestAnsi256(hex)) ?? hex : hex;
+      return ratio(WHITE, shown) >= DEFAULT_FLOOR;
     });
     if (ok) { factor = f; break; }
   }
-  DIM_FACTORS.set(map.name, factor);
+  DIM_FACTORS.set(key, factor);
   return factor;
 }
 
 /** A colour dimmed by a factor, in whatever encoding it arrived in. */
 export function dimColour(colour: ColourValue, factor: number): ColourValue {
-  if (colour.kind !== "rgb" || factor >= 1) return colour;
-  const n = (i: number): number =>
-    Math.round(parseInt(colour.hex.slice(1 + i * 2, 3 + i * 2), 16) * factor);
-  return {
-    kind: "rgb",
-    hex: `#${[0, 1, 2].map((i) => n(i).toString(16).padStart(2, "0")).join("")}`,
+  if (factor >= 1) return colour;
+  const scale = (hex: string): string => {
+    const n = (i: number): number => Math.round(parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) * factor);
+    return `#${[0, 1, 2].map((i) => n(i).toString(16).padStart(2, "0")).join("")}`;
   };
+  if (colour.kind === "rgb") return { kind: "rgb", hex: scale(colour.hex) };
+  // **The 8-bit arm, which returned its argument** (C12 §3y). `continuousColour`
+  // gives `ansi256` below 24-bit, so `fieldDim: "floor"` was applied, ignored
+  // and silent on every terminal between the colour floor and true colour —
+  // while the member's own doc said it was inert only *below* the floor.
+  if (colour.kind === "ansi256") {
+    const hex = ansi256Hex(colour.index);
+    // 0\u201315 are the terminal's own palette and have no value we can read, so
+    // there is nothing to scale: returning the argument is the honest answer
+    // here and was the wrong one above.
+    return hex === null ? colour : { kind: "ansi256", index: nearestAnsi256(scale(hex)) };
+  }
+  return colour;
 }
 
 /** Black or white, whichever clears the floor against this background (I51). */

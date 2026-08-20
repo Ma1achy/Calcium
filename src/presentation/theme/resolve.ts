@@ -19,6 +19,7 @@ import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { channels, floorFor, isHex, luminance, ratio } from "./contrast.js";
 import { MUST_STAY_DISTINCT } from "./four-bit.js";
+import { CUBE_LEVELS } from "./colormap.js";
 import {
   NO_STYLE,
   type ColourRef,
@@ -48,7 +49,7 @@ type Caps = Readonly<Pick<TerminalCapabilities, "colourDepth">>;
  * quantising into them would make an 8-bit result depend on a user's terminal
  * configuration while presenting itself as a measured nearest neighbour.
  */
-const CUBE_LEVELS = [0, 95, 135, 175, 215, 255] as const;
+// `CUBE_LEVELS` is `colormap.ts`'s — one definition, three callers (C12 §3y).
 
 function buildCube(): readonly Readonly<{ index: number; hex: string; lab: readonly [number, number, number]; lum: number }>[] {
   const entries: { index: number; hex: string; lab: readonly [number, number, number]; lum: number }[] = [];

@@ -165,6 +165,27 @@ const results = runPass({
       expect: "LY7",
     },
     {
+      // **`dimColour` back to rgb only**, which is where it was: at 8-bit
+      // `continuousColour` returns an `ansi256` and the dim returned its
+      // argument — applied, ignored, silent, on every terminal between the
+      // colour floor and true colour (C12 §3y).
+      name: "the dim is applied only to an rgb colour, so 8-bit gets none",
+      file: FIELD,
+      from: '  if (colour.kind === "ansi256") {',
+      to: "  if (false) {",
+      expect: "LY8b",
+    },
+    {
+      // **The factor searched against the sampled colour rather than the shown
+      // one.** Quantising after the dim carries a sample back over the floor:
+      // viridis at the 24-bit factor leaves one of twenty-one at 3.71.
+      name: "the dim factor ignores the arm, so 8-bit takes the 24-bit number",
+      file: FIELD,
+      from: "      const shown = indexed ? ansi256Hex(nearestAnsi256(hex)) ?? hex : hex;",
+      to: "      const shown = hex;",
+      expect: "LY6b",
+    },
+    {
       // Levels derived from the ends inward, so a level sits at the minimum and
       // crosses nothing — *no contour* where the caller asked for one.
       name: "the derived levels include the range's ends",

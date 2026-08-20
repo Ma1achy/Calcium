@@ -348,7 +348,12 @@ function matrixRows(
   // decided about, and blanking most of the width is not a neutral answer.
   const matrixLayout = block.matrixAnchor ?? MATRIX_LAYOUT[block.form] ?? "stretch";
   const painted = fieldPaintsUnder(block, overlay, ctx.capabilities);
-  const dim = block.fieldDim === "floor" && map !== undefined ? dimFactorFor(map) : 1;
+  // The second argument is *which colour the reader will see*: below 24-bit
+  // `continuousColour` quantises to the 256-cube, and the factor has to clear
+  // the floor against the quantised colour rather than the sampled one.
+  const dim = block.fieldDim === "floor" && map !== undefined
+    ? dimFactorFor(map, ctx.capabilities.colourDepth < 24)
+    : 1;
   const glyphInk = block.glyphInk ?? "own";
   const out: string[] = [];
 

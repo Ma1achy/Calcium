@@ -17,11 +17,11 @@ import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import {
-  arrowFor, arrowsFor, contourLevels, dimFactorFor, fieldSampler, glyphLayerOrder,
+  arrowFor, arrowsFor, contourLevels, dimColour, dimFactorFor, fieldSampler, glyphLayerOrder,
   magnitudeSeries, marchingMask, saddleJoinsTopLeft,
 } from "../../src/presentation/plot/field.js";
 import { glyphForMask } from "../../src/presentation/plot/linedraw.js";
-import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
+import { COLORMAPS, ansi256Hex, continuousColour, nearestAnsi256 } from "../../src/presentation/theme/colormap.js";
 import { DEFAULT_FLOOR, ratio } from "../../src/presentation/theme/contrast.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
 
@@ -257,6 +257,24 @@ describe("LY — what is layered over a field (C12 I51)", () => {
     expect(qbare(sparseQ, 60, four)).not.toEqual(qbare({ layers: ["quiver"] }, 60, four));
   });
 
+  it("LY6b (C12 I51, §3y): and it clears at 8-bit too, where the factor differs", () => {
+    // **The 24-bit factor does not carry**: quantising after the dim can lift a
+    // sample back over the floor, so viridis at 0.50 leaves one of twenty-one
+    // at 3.71 against a floor of 4.5 and needs 0.45. Measured against the
+    // colour the reader is shown rather than the one that was sampled.
+    for (const name of ["viridis", "coolwarm", "inferno"] as const) {
+      const map = COLORMAPS[name];
+      const f = dimFactorFor(map, true);
+      for (let i = 0; i <= 20; i += 1) { // cells-ok — a sample count
+        const c = dimColour(continuousColour(map, i / 20, { colourDepth: 8 })!, f);
+        const hex = c.kind === "rgb" ? c.hex : ansi256Hex(c.index)!;
+        expect(ratio(hex, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    expect(dimFactorFor(COLORMAPS.viridis, true)).toBeCloseTo(0.45, 5);
+    expect(dimFactorFor(COLORMAPS.viridis, false)).toBeCloseTo(0.5, 5);
+  });
+
   it("LY6 (C12 I51): fieldDim `floor` clears 4.5:1 on every sample of three maps", () => {
     // **Run against the shipped dimming**, not the constants — the per-map
     // figures are the claim, and a test naming 0.5 would agree with a constant.
@@ -289,6 +307,42 @@ describe("LY — what is layered over a field (C12 I51)", () => {
     expect(bare({ fieldDim: "floor" }, 60, four)).toEqual(bare({ fieldDim: "none" }, 60, four));
     // …and is not inert above it, or the row above passes on a field nothing dims.
     expect(rows({ fieldDim: "floor" })).not.toEqual(rows({ fieldDim: "none" }));
+  });
+
+  it("LY8b (C12 I51, §3y): and it is not inert *at* 8, which is what the doc says", () => {
+    // **The row above says *below* and asserted only 4 and 24.** `dimColour`
+    // opened with `if (colour.kind !== "rgb") return colour` and
+    // `continuousColour` returns `ansi256` at 8, so the dim was applied,
+    // returned its argument, and said nothing — on every terminal between the
+    // colour floor and true colour. LY8 passed throughout.
+    // `rows` and not `bare`: a dim is a colour change and `bare` strips SGR,
+    // so the stripped frames are identical by construction — the same shape
+    // LY5's first version had, asserted against a set it had emptied.
+    const eight = { ...FULL_CAPS, colourDepth: 8 as const };
+    expect(rows({ fieldDim: "floor" }, 60, eight)).not.toEqual(rows({ fieldDim: "none" }, 60, eight));
+    expect(bare({ fieldDim: "floor" }, 60, eight)).toEqual(bare({ fieldDim: "none" }, 60, eight));
+  });
+
+  it("LY8c (§3y): dimming an indexed colour lands on a darker index, and 0–15 are left alone", () => {
+    const dimmed = dimColour({ kind: "ansi256", index: 231 }, 0.5); // 231 is #ffffff
+    expect(dimmed.kind).toBe("ansi256");
+    expect((dimmed as { index: number }).index).not.toBe(231);
+    // 255 * 0.5 = 128, and the nearest cube level to 128 is 135 rather than 175.
+    expect(ansi256Hex((dimmed as { index: number }).index)).toBe("#878787");
+    // The sixteen system colours are the reader's own palette and have no value
+    // we can read, so there is nothing to scale.
+    expect(dimColour({ kind: "ansi256", index: 4 }, 0.5)).toEqual({ kind: "ansi256", index: 4 });
+    expect(ansi256Hex(4)).toBe(null);
+    // **The cube compresses rather than dims, and that is why the factor has to
+    // be measured against the quantised colour.** Halved and requantised, four
+    // of the six levels land on the same one:
+    const halved = (L: number): string | null => {
+      const h = `#${Math.round(L * 0.5).toString(16).padStart(2, "0").repeat(3)}`;
+      return ansi256Hex(nearestAnsi256(h));
+    };
+    expect([0, 95, 135, 175, 215, 255].map(halved)).toEqual([
+      "#000000", "#5f5f5f", "#5f5f5f", "#5f5f5f", "#5f5f5f", "#878787",
+    ]);
   });
 });
 
