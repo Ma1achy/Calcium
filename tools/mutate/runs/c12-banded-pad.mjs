@@ -36,8 +36,8 @@ const results = runPass({
   run,
   control: {
     file: DEFN,
-    from: "        { text: areaText(\" \".repeat(Math.max(0, layout.areaWidth)), layout, ctx) },",
-    to: "        { text: \"\" },",
+    from: "      [{ text: areaText(\" \".repeat(Math.max(0, layout.areaWidth)), layout, ctx) }],",
+    to: "      [{ text: \"\" }],",
     why: "PC12's right-border arm reads a padded row's closing column; a padding row with no area at all is the defect it was widened to catch, so a run where this survives cannot see a kill",
   },
   mutations: [
@@ -46,8 +46,8 @@ const results = runPass({
       // left border is still in the right column.
       name: "the padding row omits its plot area",
       file: DEFN,
-      from: "        { text: areaText(\" \".repeat(Math.max(0, layout.areaWidth)), layout, ctx) },\n",
-      to: "",
+      from: "      [{ text: areaText(\" \".repeat(Math.max(0, layout.areaWidth)), layout, ctx) }],",
+      to: "      [],",
       expect: "PC12",
     },
     // **A one-cell-short padding row is not a mutation**, and measuring it is

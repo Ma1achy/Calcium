@@ -82,8 +82,8 @@ const results = runPass({
       // taking a glyph string and started reading one column map for both
       // channels. The subject has never moved — the range handed to a row is
       // the matrix's, or it is the row's own and the comparison is gone.
-      from: "...heatSpans(s, range, layout, map, style, ctx, matrixLayout)",
-      to: "...heatSpans(s, rowRange(s), layout, map, style, ctx, matrixLayout)",
+      from: "        heatSpans(s, range, layout, map, style, ctx, matrixLayout),",
+      to: "        heatSpans(s, rowRange(s), layout, map, style, ctx, matrixLayout),",
       expect: "T1.18",
       also: [
         {
@@ -144,8 +144,8 @@ const results = runPass({
       // Re-anchored: C12 I29 made the legend a run of spans rather than one
       // truncated string, so aligning it to the plot area is now prepending the
       // gutter — `clampSpans` cuts the tail, which is the upper bound.
-      from: "  return [labelRow, linePaint(legend, layout, ctx)];",
-      to: "  return [labelRow, linePaint([{ text: \" \".repeat(layout.gutter) }, ...legend], layout, ctx)];",
+      from: "  return [labelRow, line(legend, layout, ctx)];",
+      to: "  return [labelRow, line([{ text: \" \".repeat(layout.gutter) }, ...legend], layout, ctx)];",
       expect: "T1.23",
     },
     {

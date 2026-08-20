@@ -106,7 +106,7 @@ export function line(spans: readonly Span[], layout: Layout, ctx: RenderContext)
  * scale, one per row on a categorical axis, one per band on a violin, and none
  * at all where the width left no room for labels and `labelColumn` is 0.
  */
-export function gutterSpans(label: string, layout: Layout, ctx: RenderContext): readonly Span[] {
+function leftGutterSpans(label: string, layout: Layout, ctx: RenderContext): readonly Span[] {
   if (layout.gutter === 0) return [];
   const g = glyphs(ctx.capabilities);
   const muted = tone("muted", ctx.theme, ctx.capabilities);
@@ -122,7 +122,7 @@ export function gutterSpans(label: string, layout: Layout, ctx: RenderContext): 
 }
 
 /** The frame's right edge, on an area row. Nothing when the layout has none. */
-export function rightBorder(layout: Layout, ctx: RenderContext): readonly Span[] {
+function rightGutterSpans(layout: Layout, ctx: RenderContext): readonly Span[] {
   if (layout.frame !== true) return [];
   const style = layout.style ?? "box";
   // `"rule"` has a left rule and a bottom rule and no right one — it is what
@@ -133,6 +133,33 @@ export function rightBorder(layout: Layout, ctx: RenderContext): readonly Span[]
     text: bare ? " " : glyphs(ctx.capabilities).vertical,
     style: tone("muted", ctx.theme, ctx.capabilities),
   }];
+}
+
+/**
+ * One area row: the left gutter, the body, and the right-hand edge.
+ *
+ * **The three were composed at thirteen call sites and the label reached one of
+ * them.** That was fine while the right edge was a border — a `│` needs to know
+ * nothing about the row it ends — and it stops being fine the moment the right
+ * edge can hold a *reading* (I47). A thirteenth site that mirrored the label and
+ * a fourteenth that did not would be the four-gutter defect this file exists
+ * about, arriving on the other side of the plot area.
+ *
+ * So the pairing is structural rather than conventional: a row is given its
+ * label once, and which sides draw it is a layout decision. `heatmap.ts` had a
+ * byte-identical fourth copy of `line` for its three rows; it goes here too.
+ */
+export function plotRow(
+  label: string,
+  body: readonly Span[],
+  layout: Layout,
+  ctx: RenderContext,
+): string {
+  return line(
+    [...leftGutterSpans(label, layout, ctx), ...body, ...rightGutterSpans(layout, ctx)],
+    layout,
+    ctx,
+  );
 }
 
 /**

@@ -19,10 +19,10 @@ import { ladderFor } from "./ramp.js";
 import { cells, truncate } from "../text.js";
 import { seriesRange } from "./scale.js";
 import { formatValue } from "./axes.js";
-import { clampSpans, paint, tone } from "../blocks/paint.js";
+import { tone } from "../blocks/paint.js";
 import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
-import { gutterSpans, labelColumnWidth, type Layout } from "./furniture.js";
+import { labelColumnWidth, line, plotRow, type Layout } from "./furniture.js";
 
 const HEATMAP_ABSENT = " ";
 const MIN_AREA = 4;
@@ -115,10 +115,6 @@ const DEFAULT_COLORMAP: Readonly<Record<PlotForm, ColormapName | null>> = Object
   smallmultiples: null, pairplot: null, pie: null, radar: null, horizon: null,
   slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,
 });
-
-function linePaint(spans: readonly Span[], layout: Layout, ctx: RenderContext): string {
-  return paint(clampSpans(spans, layout.width, ctx.capabilities));
-}
 
 /**
  * **No frame, and §2 is why.** A matrix's cells bound themselves, so there is
@@ -301,8 +297,9 @@ function matrixRows(
     const s = block.series[i];
     if (s === undefined) continue;
     out.push(
-      linePaint(
-        [...gutterSpans(s.label ?? "", layout, ctx), ...heatSpans(s, range, layout, map, style, ctx, matrixLayout)],
+      plotRow(
+        s.label ?? "",
+        heatSpans(s, range, layout, map, style, ctx, matrixLayout),
         layout,
         ctx,
       ),
@@ -312,18 +309,16 @@ function matrixRows(
   if (overflow) {
     const omitted = block.series.slice(visible).map((s, i) => s.label ?? `row ${String(visible + i + 1)}`); // cells-ok
     out.push(
-      linePaint(
-        [
-          ...gutterSpans("", layout, ctx),
-          {
-            text: truncate(
-              `+${String(omitted.length)} more · ${omitted.join(" · ")}`, // cells-ok — a row count
-              layout.areaWidth,
-              ctx.capabilities,
-            ),
-            style: tone("warn", ctx.theme, ctx.capabilities),
-          },
-        ],
+      plotRow(
+        "",
+        [{
+          text: truncate(
+            `+${String(omitted.length)} more · ${omitted.join(" · ")}`, // cells-ok — a row count
+            layout.areaWidth,
+            ctx.capabilities,
+          ),
+          style: tone("warn", ctx.theme, ctx.capabilities),
+        }],
         layout,
         ctx,
       ),
@@ -332,7 +327,7 @@ function matrixRows(
 
   const blanks = Math.max(0, layout.areaRows - out.length); // cells-ok — a row count
   for (let i = 0; i < blanks; i += 1) {
-    out.push(linePaint(gutterSpans("", layout, ctx), layout, ctx));
+    out.push(plotRow("", [], layout, ctx));
   }
   return out;
 }
@@ -348,7 +343,7 @@ function matrixFurniture(
   const labelRow =
     labels === ""
       ? ""
-      : linePaint([{ text: " ".repeat(layout.gutter) }, { text: labels, style: muted }], layout, ctx);
+      : line([{ text: " ".repeat(layout.gutter) }, { text: labels, style: muted }], layout, ctx);
 
   const longest = block.series.reduce((n, s) => Math.max(n, s.values.length), 0); // cells-ok — a position count
   const dropped = Math.max(0, longest - layout.areaWidth);
@@ -400,7 +395,7 @@ function matrixFurniture(
   ];
   const legend = rungs.find((r) => spanCells(r, ctx.capabilities.ambiguousWidth) <= layout.width) ?? [];
 
-  return [labelRow, linePaint(legend, layout, ctx)];
+  return [labelRow, line(legend, layout, ctx)];
 }
 
 function emptyRows(block: Plot, layout: Layout, ctx: RenderContext): readonly string[] {
@@ -409,7 +404,7 @@ function emptyRows(block: Plot, layout: Layout, ctx: RenderContext): readonly st
   const middle = Math.floor((total - 1) / 2);
   const centred =
     " ".repeat(Math.max(0, Math.floor((layout.width - cells(message, ctx.capabilities.ambiguousWidth)) / 2))) + message;
-  const styled = linePaint(
+  const styled = line(
     [{ text: centred, style: tone("muted", ctx.theme, ctx.capabilities) }],
     layout,
     ctx,

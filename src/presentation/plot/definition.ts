@@ -41,9 +41,8 @@ import {
   legendWidth,
   frameTop,
   furnitureFor,
-  gutterSpans,
   line,
-  rightBorder,
+  plotRow,
   xLabelRowFor,
   type Layout,
 } from "./furniture.js";
@@ -800,12 +799,9 @@ function stackedRows(
       const layer: Layer = { glyphRows, ref: refOf(first, 0), kind: "curve" };
       for (let i = 0; i < curveHeight; i += 1) {
         out.push(
-          line(
-            [
-              ...gutterSpans(i === 0 ? (first.label ?? "") : "", layout, ctx),
-              ...mergedRow([layer], i, layout, ctx),
-              ...rightBorder(layout, ctx),
-            ],
+          plotRow(
+            i === 0 ? (first.label ?? "") : "",
+            mergedRow([layer], i, layout, ctx),
             layout,
             ctx,
           ),
@@ -814,12 +810,9 @@ function stackedRows(
     }
 
     out.push(
-      line(
-        [
-          ...gutterSpans("", layout, ctx),
-          { text: areaText(legend, layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) },
-          ...rightBorder(layout, ctx),
-        ],
+      plotRow(
+        "",
+        [{ text: areaText(legend, layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) }],
         layout,
         ctx,
       ),
@@ -833,12 +826,9 @@ function stackedRows(
     const layer: Layer = { glyphRows, ref: refOf(s, index), kind: "curve" };
     for (let i = 0; i < stripRows; i += 1) {
       out.push(
-        line(
-          [
-            ...gutterSpans(i === 0 ? (s.label ?? "") : "", layout, ctx),
-            ...mergedRow([layer], i, layout, ctx),
-            ...rightBorder(layout, ctx),
-          ],
+        plotRow(
+          i === 0 ? (s.label ?? "") : "",
+          mergedRow([layer], i, layout, ctx),
           layout,
           ctx,
         ),
@@ -926,16 +916,13 @@ function overlaidRows(
 
   const cursor = cursorRule(cursorAt, layout, ctx);
   return Array.from({ length: layout.areaRows }, (_, i) =>
-    line(
-      [
-        ...gutterSpans(byRow.get(i) ?? "", layout, ctx),
-        ...behind(
-          overlay(gridRow(layout, gridTicks, ctx, byRow.has(i)), cursor),
-          mergedRow(layers, i, layout, ctx),
-          ctx,
-        ),
-        ...rightBorder(layout, ctx),
-      ],
+    plotRow(
+      byRow.get(i) ?? "",
+      behind(
+        overlay(gridRow(layout, gridTicks, ctx, byRow.has(i)), cursor),
+        mergedRow(layers, i, layout, ctx),
+        ctx,
+      ),
       layout,
       ctx,
     ),
@@ -1146,7 +1133,6 @@ function categoricalForm(
     const label = i < labels.length ? truncate(cat, layout.labelColumn, ctx.capabilities) : ""; // cells-ok — a label count
     const built = i < labels.length ? rowBuilder(cat, layout.areaWidth, i) : ""; // cells-ok — a label count
     const content = typeof built === "string" ? built : built.text;
-    const gutter = gutterSpans(label, layout, ctx);
     // **Colour names an identity** (C12 I38, §3t). A named row keeps its slot;
     // a row the renderer cut from a continuous axis — a histogram's bin, a
     // correlogram's lag — has nothing for a slot to name, and eight of them
@@ -1167,13 +1153,7 @@ function categoricalForm(
     const body: readonly Span[] = typeof built === "string"
       ? [{ text: areaText(content, layout, ctx), style: slot(ref, ctx.theme, ctx.capabilities) }]
       : ownedSpans(areaText(content, layout, ctx), built.owners, (k) => refOf(block.series[k] ?? { values: [] }, k), ctx);
-    out.push(
-      line(
-        [...gutter, ...body, ...rightBorder(layout, ctx)],
-        layout,
-        ctx,
-      ),
-    );
+    out.push(plotRow(label, body, layout, ctx));
   }
   return axed(block, out, layout, ctx);
 }
@@ -1261,7 +1241,7 @@ function categoricalColumnForm(
 
   const out: string[] = [];
   for (let r = 0; r < areaRows; r += 1) {
-    const spans: Span[] = [...gutterSpans(byRow.get(r) ?? "", layout, ctx)];
+    const spans: Span[] = [];
     for (const [i, col] of columns.entries()) {
       // C12 I38 stood up: a named column keeps its slot, a vertical
       // histogram's bins are one distribution and take one colour.
@@ -1269,8 +1249,7 @@ function categoricalColumnForm(
         ?? refOf(block.series[0] ?? { values: [] }, ROW_IS_AN_IDENTITY[block.form] ? i : 0); // cells-ok — a column index
       spans.push({ text: col[r] ?? " ".repeat(widths[i]!), style: slot(ref, ctx.theme, ctx.capabilities) });
     }
-    spans.push(...rightBorder(layout, ctx));
-    out.push(line(spans, layout, ctx));
+    out.push(plotRow(byRow.get(r) ?? "", spans, layout, ctx));
   }
   if (block.axes !== true) return composeRows(plotHeight(block), [], out, []);
   // The frame composed here rather than through `axed`, because `furnitureFor`
@@ -1380,12 +1359,9 @@ function stackedForm(
 
   const ticks = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities).tickColumns;
   const area = Array.from({ length: layout.areaRows }, (_, i) =>
-    line(
-      [
-        ...gutterSpans(byRow.get(i) ?? "", layout, ctx),
-        ...behind(gridRow(layout, ticks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
-        ...rightBorder(layout, ctx),
-      ],
+    plotRow(
+      byRow.get(i) ?? "",
+      behind(gridRow(layout, ticks, ctx, byRow.has(i)), mergedRow(layers, i, layout, ctx), ctx),
       layout,
       ctx,
     ),
@@ -1636,12 +1612,9 @@ function bandedForm(
     for (let r = 0; r < rowsPer && out.length < areaRows; r += 1) { // cells-ok — a row count
       const label = r === labelRow ? truncate(cats[ci] ?? "", layout.labelColumn, ctx.capabilities) : "";
       out.push(
-        line(
-          [
-            ...gutterSpans(label, layout, ctx),
-            { text: areaText(band[r - offset] ?? " ".repeat(areaWidth), layout, ctx), style: styled },
-            ...rightBorder(layout, ctx),
-          ],
+        plotRow(
+          label,
+          [{ text: areaText(band[r - offset] ?? " ".repeat(areaWidth), layout, ctx), style: styled }],
           layout,
           ctx,
         ),
@@ -1657,12 +1630,9 @@ function bandedForm(
   // never drawn a row; the first one that did not divide showed `││` three
   // frames wide. PC12 is named for the border and checked only the left.
   while (out.length < areaRows) { // cells-ok — a row count
-    out.push(line(
-      [
-        ...gutterSpans("", layout, ctx),
-        { text: areaText(" ".repeat(Math.max(0, layout.areaWidth)), layout, ctx) },
-        ...rightBorder(layout, ctx),
-      ],
+    out.push(plotRow(
+      "",
+      [{ text: areaText(" ".repeat(Math.max(0, layout.areaWidth)), layout, ctx) }],
       layout,
       ctx,
     ));
@@ -2293,11 +2263,7 @@ const FORM_ROWS: Readonly<
         (i) => refOf(block.series[i] ?? { values: [] }, i),
         ctx,
       );
-      return line(
-        [...gutterSpans(label, layout, ctx), ...runs, ...rightBorder(layout, ctx)],
-        layout,
-        ctx,
-      );
+      return plotRow(label, runs, layout, ctx);
     });
     return axed(block, out, layout, ctx);
   },
