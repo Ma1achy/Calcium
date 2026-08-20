@@ -36,8 +36,9 @@ const MAX_CANDLE = 5;
  * stops saying anything more.
  *
  * **Uniform across the chart**, which is why it divides by `n` and not by a
- * slot: the remainder becomes gap (see `slotsFor`), and a candle wider than its
- * neighbours would read as a datum (§6b B15).
+ * slot: the remainder becomes gap (see `candleLeft`), and a candle wider than
+ * its neighbours would read as a datum (§6b B15). The citation here named
+ * `slotsFor`, which is a function this file has never had.
  */
 /**
  * The bars this block draws, or none (C12 §6b B1, I36).
@@ -69,27 +70,45 @@ export function candleWidth(areaWidth: number, n: number): number {
 }
 
 /**
- * The pitch from one candle to the next — **uniform, and the leftover is on the
- * right** (C12 §3r, §6b B15).
+ * The column candle `index` of `count` begins at — **the one placement, and it
+ * fills the area** (C12 §3r, §3s, §6b B15).
  *
- * The first form of this spread the remainder a cell at a time, which is what
- * `categoricalColumnForm` does and is wrong here: four bars in forty-four
- * columns came out spread across the whole area, one candle every eleven cells.
- * **§3r already rules that case** — fewer candles than columns is left-aligned
- * and padded right, because a series four bars in reads as *four bars so far,
- * growing rightward* rather than as a chart that will change shape as it fills.
- * A spread layout says the four samples span the window, which is a claim about
- * the data.
+ * **This used to be a uniform integer pitch with the leftover on the right, on a
+ * citation to I13.** I13 is about a *sparkline*, where one cell is one position,
+ * and that fixed cell-per-position is the whole of what left-anchoring buys
+ * there — §B3 is the measurement. A candlestick derives its pitch from the bar
+ * count, so the property I13 protects does not exist here and the citation
+ * carried the disposition without the geometry that earns it.
  *
- * B15's concern — a candle several cells wider than its neighbours reading as a
- * datum — is answered by the pitch being uniform, not by distributing the
- * leftover. The remedy was the wrong half of the ruling.
+ * Measured the way §B3 measured the sparkline, at 74 columns across every bar
+ * count from 2 to 80: the drawn extent **shrinks at five of seventy-nine
+ * arrivals**, worst at `n = 37 → 38` where 73 columns become 38 — one more bar
+ * taking thirty-five of the seventy-four away. The blank fringe ran 0 % to 69 %
+ * and was not monotone in `n`, so a reader watching a feed fill saw the chart
+ * shrink as data arrived. *Growing rightward* is what the anchor was chosen for
+ * and it is the thing that measurement falsifies.
+ *
+ * `round(index × (areaWidth − cw) ÷ (count − 1))` puts the first body at column
+ * 0 and the last flush with the right edge, so the extent is exactly the area
+ * width at every `n`. **Gaps then differ by at most one cell and bodies never
+ * differ at all**, which is what §6b B15 asks for — distributing the remainder
+ * into the *pitch* was the wrong half of that ruling and this is the right one.
+ *
+ * **One function because two callers must agree.** `candleRows` draws here and
+ * `candleColumn` inverts here, and the x-axis ticks go through `candleColumn`
+ * (`furniture.ts:xRowFor`) — so a second copy would let the ticks and the
+ * candles disagree about the same bar, in a frame where every count still adds
+ * up.
  */
-function pitchFor(areaWidth: number, n: number): number {
-  const total = Math.max(0, Math.floor(areaWidth)); // cells-ok — a cell width
-  const count = Math.max(1, Math.floor(n)); // cells-ok — a candle count
-  const base = Math.floor(total / count); // cells-ok — a cell width
-  return Math.max(1, Math.min(base, candleWidth(total, count) + 1)); // cells-ok — a cell width
+export function candleLeft(index: number, count: number, areaWidth: number): number {
+  const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
+  const n = Math.max(1, Math.floor(count)); // cells-ok — a candle count
+  const cw = candleWidth(w, n); // cells-ok — a cell width
+  // A single candle sits at the left rather than at `w − cw`: the divisor is
+  // zero and the two ends coincide, so there is no placement to interpolate and
+  // the left edge is the one that does not move when a second bar arrives.
+  if (n <= 1) return 0; // cells-ok — a candle count
+  return Math.round((index * (w - cw)) / (n - 1)); // cells-ok — a column index
 }
 
 /**
@@ -102,9 +121,10 @@ function pitchFor(areaWidth: number, n: number): number {
  * show, and a chart whose spike disappears when the window narrows is worse than
  * one that is coarse.
  *
- * Fewer bars than columns returns them unchanged; the caller left-aligns, which
- * is I13's ruling — time runs left to right and the right-hand end has not
- * happened yet.
+ * Fewer bars than columns returns them unchanged; the caller spreads them
+ * across the area (`candleLeft`). **This said *the caller left-aligns, which is
+ * I13's ruling*** — and I13 is about a sparkline's fixed cell-per-position,
+ * which a form that derives its pitch from the bar count does not have (§3r).
  */
 export function aggregate(bars: readonly OHLC[], columns: number): readonly OHLC[] {
   const n = Math.max(1, Math.floor(columns)); // cells-ok — a column count
@@ -174,7 +194,7 @@ export function candleColumn(
   if (bars.length === 0 || index < 0 || index >= bars.length) return null; // cells-ok — a bar count
   const drawn = Math.min(bars.length, w); // cells-ok — a bar count
   const bucket = Math.min(drawn - 1, Math.floor((index * drawn) / bars.length)); // cells-ok — a bar index
-  const column = bucket * pitchFor(w, drawn) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index
+  const column = candleLeft(bucket, drawn, w) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index
   return column < w ? column : null; // cells-ok — a column index
 }
 
@@ -225,10 +245,9 @@ export function candleRows(
   const g = glyphs(caps);
   const drawn = aggregate(bars, w);
   const cw = candleWidth(w, drawn.length); // cells-ok — a bar count
-  const pitch = pitchFor(w, drawn.length); // cells-ok — a bar count
 
   for (const [i, bar] of drawn.entries()) {
-    const left = i * pitch; // cells-ok — a column index
+    const left = candleLeft(i, drawn.length, w); // cells-ok — a column index
     if (left >= w) break; // cells-ok — a column index
     // **Left of centre at an even width**, `⌊(w − 1) ÷ 2⌋`, which is the
     // rounding `boxplotColumn` already uses for its spine. One rule in the

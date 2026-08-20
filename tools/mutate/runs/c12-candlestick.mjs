@@ -63,13 +63,27 @@ const results = runPass({
       expect: "CS9",
     },
     {
-      // **B15 as the walk first ruled it** — four bars one every eleven cells,
-      // a layout asserting that four samples span the window.
-      name: "the pitch divides the whole area instead of being uniform",
+      // **The layout §3r struck**, restored exactly: a uniform integer pitch
+      // with the whole leftover on the right, on a citation to C12 I13. That
+      // what shipped, what the catalogue frame drew, and what got reported —
+      // ten blank columns of seventy-four, and an extent that fell by 35 at
+      // `n = 37 → 38`.
+      name: "the placement returns to a uniform integer pitch, leftover on the right",
       file: CANDLES,
-      from: "  return Math.max(1, Math.min(base, candleWidth(total, count) + 1)); // cells-ok — a cell width",
-      to: "  return Math.max(1, base); // cells-ok — a cell width",
-      expect: "CS3b",
+      from: "  return Math.round((index * (w - cw)) / (n - 1)); // cells-ok — a column index",
+      to: "  return index * Math.max(1, Math.min(Math.floor(w / n), cw + 1)); // cells-ok — a column index",
+      expect: "CD1",
+    },
+    {
+      // **The two callers disagreeing**, which is the defect one shared
+      // placement exists to prevent — and the x ticks are a third caller
+      // reaching the axis through `candleColumn` (`furniture.ts:xRowFor`), so
+      // this is a frame where the ticks point at bars the candles do not draw.
+      name: "`candleColumn` computes its own placement again",
+      file: CANDLES,
+      from: "  const column = candleLeft(bucket, drawn, w) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index",
+      to: "  const column = bucket * Math.max(1, Math.min(Math.floor(w / drawn), candleWidth(w, drawn) + 1)) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index",
+      expect: "CD4",
     },
     {
       // The gap taken after the body rather than before it: two rising candles

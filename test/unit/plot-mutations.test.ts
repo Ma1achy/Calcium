@@ -19,7 +19,7 @@ import { plotHeight } from "../../src/presentation/plot/height.js";
 import { cells } from "../../src/presentation/text.js";
 import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
-import { aggregate, candleColumn, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
+import { aggregate, candleColumn, candleLeft, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
 import { seriesRange } from "../../src/presentation/plot/scale.js";
 import { formatReadout, readoutSet } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
@@ -2081,21 +2081,91 @@ describe("C12 §3r — the candlestick", () => {
       .toBeDefined();
   });
 
-  it("CS3b (C12 I36, §6b B15): fewer bars than columns are left-aligned, not spread", () => {
-    // **C12 I13's ruling** — four bars read as *four bars so far, growing
-    // rightward*, and a layout that spreads them across the window asserts that
-    // the four samples span it. The first form of B15 spread the remainder a
-    // cell at a time, which put one candle every eleven cells in a 44-column
-    // area, and no arithmetic assertion could see it.
-    const rows = candleRows(walk([3, -2, 5, -1]), { min: 90, max: 115 }, 44, 8, FULL_CAPS);
-    const merged = rows.rising.map((r, i) =>
-      [...r].map((c, j) => (c === " " ? rows.falling[i]![j]! : c)).join(""));
-    const rightmost = Math.max(...merged.map((r) => r.trimEnd().length)); // cells-ok — a column index
-    // Four candles at a pitch of `candleWidth + 1`, so the ink ends well before
-    // the right edge and the remainder is blank rather than gap.
-    expect(candleWidth(44, 4), "the clamp binds at 5").toBe(5);
-    expect(rightmost, "4 × 6 − 1 columns of ink, then nothing").toBe(4 * 6 - 1);
-    for (const r of merged) expect(r.slice(4 * 6).trim(), "the right is empty").toBe("");
+  // The merged ink of a candlestick, rising over falling over flat.
+  const inkOf = (
+    bars: readonly { open: number; high: number; low: number; close: number }[],
+    w: number,
+  ): readonly string[] => {
+    const rows = candleRows(bars, { min: 80, max: 130 }, w, 8, FULL_CAPS);
+    return rows.rising.map((r, i) =>
+      [...r].map((c, j) => {
+        if (c !== " ") return c;
+        const f = rows.falling[i]![j]!;
+        return f !== " " ? f : rows.flat[i]![j]!;
+      }).join(""));
+  };
+  const extentOf = (
+    bars: readonly { open: number; high: number; low: number; close: number }[],
+    w: number,
+  ): number => Math.max(...inkOf(bars, w).map((r) => r.trimEnd().length)); // cells-ok — a column index
+
+  it("CD1 (C12 I36, §3r): the shipped frame's 32 bars fill their 74 columns", () => {
+    // **The measurement this started from.** `line-candlestick-24bit` is 32 bars
+    // in a 74-cell area, and it drew 64 — ten blank columns, 14% of the plot.
+    // This row is written about that number rather than about the expression, so
+    // a second way of getting the pitch wrong fails it too.
+    const bars = walk(Array.from({ length: 32 }, (_u, i) => [3, -2, 5, -1][i % 4]!));
+    expect(extentOf(bars, 74), "the last body's right edge is the last column").toBe(74);
+  });
+
+  it("CD2 (C12 I36, §3r): four bars fill 74 columns too — the cap, not only the remainder", () => {
+    // **Two causes and one expression fixes both.** The remainder shortfall is
+    // at most `n − 1`; `MAX_CANDLE` is unbounded — above `⌊w ÷ n⌋ > 6` the old
+    // pitch capped at 6 and the extent was `6n` however wide the area, so four
+    // bars in 74 columns drew 23 and left 69% blank. A row asserting only the
+    // remainder passes against that.
+    expect(candleWidth(74, 4), "the clamp binds at 5").toBe(5);
+    expect(extentOf(walk([3, -2, 5, -1]), 74), "still the full width").toBe(74);
+  });
+
+  it("CD3 (C12 I36, §6b B15): bodies never differ, gaps differ by at most one", () => {
+    // B15's concern is a candle wider than its neighbours reading as a datum.
+    // The remedy the old code took — distributing the remainder into the pitch —
+    // was the wrong half of it: the *body* must be uniform and the *gap* is what
+    // absorbs the leftover.
+    for (const [w, n] of [[74, 12], [74, 25], [74, 32], [44, 4], [80, 7]] as const) {
+      const lefts = Array.from({ length: n }, (_u, i) => candleLeft(i, n, w)); // cells-ok — a column index
+      const cw = candleWidth(w, n); // cells-ok — a cell width
+      const gaps = lefts.slice(1).map((l, i) => l - (lefts[i]! + cw)); // cells-ok — a cell width
+      expect(Math.max(...gaps) - Math.min(...gaps), `gaps at ${String(w)}×${String(n)}`)
+        .toBeLessThanOrEqual(1);
+      expect(lefts[n - 1]! + cw, `extent at ${String(w)}×${String(n)}`).toBe(w);
+    }
+  });
+
+  it("CD3b (C12 I36, §3r): the extent never shrinks when a bar arrives", () => {
+    // **The measured falsification of *growing rightward*.** Left-anchored, the
+    // drawn extent fell at five of seventy-nine arrivals over `n = 2…80` at 74
+    // columns — worst at `n = 37 → 38`, where 73 columns became 38. A reader
+    // watching a feed fill saw the chart shrink as data arrived, which is the
+    // property the anchor was chosen to give and the one it did not.
+    const w = 74;
+    let previous = 0; // cells-ok — a column index
+    const shrank: number[] = [];
+    for (let n = 2; n <= 80; n += 1) { // cells-ok — a candle count
+      const extent = candleLeft(n - 1, n, w) + candleWidth(w, n); // cells-ok — a column index
+      if (extent < previous) shrank.push(n); // cells-ok — a candle count
+      previous = extent;
+    }
+    expect(shrank, "no arrival takes chart away").toEqual([]);
+  });
+
+  it("CD4 (C12 I37, §3s): the cursor's column is where the candle's ink is", () => {
+    // **Two callers of one placement, and the x ticks are the third.**
+    // `furniture.ts:xRowFor` reaches the axis through `candleColumn`, so a
+    // second copy of the arithmetic lets the ticks and the candles disagree
+    // about the same bar in a frame where every count still adds up. Asserted as
+    // *the column candleColumn names carries this candle's ink*, which is the
+    // claim a reader depends on, rather than as equality of two expressions.
+    for (const [w, n] of [[74, 32], [74, 4], [44, 8], [60, 60]] as const) {
+      const bars = walk(Array.from({ length: n }, (_u, i) => [3, -2, 5, -1][i % 4]!));
+      const ink = inkOf(bars, w);
+      for (const i of [0, Math.floor(n / 2), n - 1]) { // cells-ok — a bar index
+        const col = candleColumn(bars, i, w); // cells-ok — a column index
+        expect(col, `bar ${String(i)} of ${String(n)} at ${String(w)}`).not.toBeNull();
+        expect(ink.some((r) => (r[col!] ?? " ") !== " "), `ink at column ${String(col)}`).toBe(true);
+      }
+    }
   });
 
   it("CS4 (C12 I36, §6b B12): more bars than columns aggregate, and the extreme survives", () => {
@@ -2323,24 +2393,26 @@ describe("C12 §3r — the candlestick", () => {
     // The aggregation, inverted: bar `i` is drawn in bucket `⌊i × n ÷ len⌋`.
     const many = walk(Array.from({ length: 120 }, (_u, i) => [3, -2, 5, -1][i % 4]!));
     const drawn = Math.min(many.length, w);
-    const pitch = Math.min(Math.floor(w / drawn), candleWidth(w, drawn) + 1);
     const wick = Math.floor((candleWidth(w, drawn) - 1) / 2);
     for (const i of [0, 1, 59, 60, 61, 119]) {
       expect(candleColumn(many, i, w), `bar ${String(i)}`)
-        .toBe(Math.floor((i * drawn) / many.length) * pitch + wick);
+        .toBe(candleLeft(Math.floor((i * drawn) / many.length), drawn, w) + wick);
     }
 
-    // **Where the two rules actually separate, measured rather than assumed.**
-    // The dense end is where they *agree* — one cell per candle filling the
-    // area lands both on the same column. What separates them is the sparse
-    // end, because a candle sits at a fixed pitch and is left-aligned (C12 I13)
-    // where a curve stretches across the whole width.
+    // **Where the two rules separate, re-measured when §3r changed the layout.**
+    // This read *what separates them is the sparse end, a candle sits at a fixed
+    // pitch and is left-aligned* — a correct measurement of a layout that is now
+    // struck. The separation does not vanish with it: it falls to the wick's
+    // offset **inside its own body**, `⌈(cw − 1) ÷ 2⌉` at the last bar, so the
+    // invariant survives its own justification being falsified and the figure it
+    // has to cover drops from 23 cells to 2.
     expect(candleColumn(many, 60, w), "120 bars: they meet").toBe(curve(60, many.length));
     const few = walk([1, 2, 3, 4]);
-    expect(candleColumn(few, 3, w), "4 bars: the candle").toBe(20);
-    expect(curve(3, 4), "4 bars: the curve's rule points into blank space").toBe(43);
+    expect(candleWidth(w, 4), "a five-cell body").toBe(5);
+    expect(candleColumn(few, 3, w), "4 bars: the candle, two short of the edge").toBe(41);
+    expect(curve(3, 4), "4 bars: the curve's rule is the edge itself").toBe(43);
     const eight = walk([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(candleColumn(eight, 7, w)).toBe(36);
+    expect(candleColumn(eight, 7, w), "8 bars: the same two cells").toBe(41);
     expect(curve(7, 8)).toBe(43);
 
     expect(candleColumn(few, 0, w)).toBe(Math.floor((candleWidth(w, 4) - 1) / 2));
