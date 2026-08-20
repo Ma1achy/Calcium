@@ -10099,3 +10099,53 @@ modelled rather than rendered, and that inconsistency is where the error hid.**
 not truncated, not fabricated from nothing, but **real bytes reassembled by a wrong model**. The
 glyphs were right, the colours were right, the geometry was a guess nobody had measured.
 
+## F205 — a rotation key that is constant down a vertical run ★★★★
+
+F203's turn — *which peer owns a contested cell turns with the column* — was measured on
+`slope-default`, whose three lines run roughly horizontally. **`x % peers.length` does not change
+down a column**, so wherever two curves overlap on a *vertical* stretch the same peer takes every
+cell of it and the other is deleted, which is precisely the failure the turn was introduced to
+fix.
+
+Found by asking whether the radar works at 3, 4, 5, 6 axes. It does — the split is even at every
+count from 3 to 10. **At two axes both polygons lie on one vertical line and one series took 9 of
+9 contested cells.** Two axes is a degenerate radar and nobody would draw one; the defect it
+exposes is not degenerate, and it fires wherever two polygons meet on a spoke.
+
+**No positional key fixes it.** Alternating on all of (1,0), (0,1) and (1,1) modulo two is the
+checkerboard and has no solution, so `x + y` fails on diagonals and `x + y + ink` was measured
+worse still — it un-starved two axes and starved three, four and seven.
+
+**A counter is not positional.** The turn now counts contested cells in scan order and resets
+each row: a horizontal run advances on the counter, a vertical run on the row index, and a
+diagonal on the row index with the counter back at zero. Every run advances by one per cell.
+*Measured at 2 through 10 axes: closest split 7/7, furthest 5/7, and nothing starved.*
+
+**And the probe that found it was wrong twice first.** Collapsing a radar series to nulls leaves
+the **frame** in the alone-render, so every cell inside the disc counted as contested and the
+first run reported one series holding *zero* at every count — a fabricated catastrophe. Reading
+against `radarRender`'s own polygon layers is what gave the real numbers. *Second time in this
+arc that an isolation-by-collapse probe answered about the wrong layer.*
+
+## F206 — one form drew two figures, and the difference was which routine each arm reached for ★★★
+
+The radar's braille arm drew its value rings with `arcDots` — circles. The quadrant arm drew them
+as *n*-gons through the data's own vertices. **Same form, same spec, two figures**, and nothing
+chose: each arm reached for the routine nearest to hand and the spec was silent, so there was no
+statement for a test to disagree with.
+
+Invisible to every instrument in the repo. Both arms render; both are internally consistent; no
+invariant mentions the ring's shape; the golden corpus records each arm's own output, so both are
+"correct" against themselves. **A difference between two implementations of one rule is only
+findable by putting them side by side**, and nothing schedules that.
+
+Surfaced by a reader asking for the thing the *other* arm already did — *at 3 can you make it so
+there's an option to render it as a triangle instead of a circle.*
+
+`plotGrid?: "polygon" | "circle"` (I45), polygon by default: the grid is a ruler for the shape
+measured against it, and at three axes a circular ring behind a triangle is two figures in one
+frame. **The default moved a mutation's subject with it** — `arcDots`'s stipple is now the circle
+grid's mechanism alone, so the row that kills it renders `plotGrid: "circle"` on purpose. *A
+mutation whose target is only reachable through a non-default option is a mutation that quietly
+stops testing when the default changes.*
+

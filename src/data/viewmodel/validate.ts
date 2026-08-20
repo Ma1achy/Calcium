@@ -549,6 +549,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (pc !== undefined && pc !== "rounded" && pc !== "sharp") {
       e.push(`${at}: "plotCorners" must be "rounded" or "sharp"`);
     }
+    // C12 I45 — the radar's ring shape. A member on a form that has no rings is
+    // ignored rather than refused, as `plotCorners` is: the union is the claim.
+    const pg = b["plotGrid"];
+    if (pg !== undefined && pg !== "polygon" && pg !== "circle") {
+      e.push(`${at}: "plotGrid" must be "polygon" or "circle"`);
+    }
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);

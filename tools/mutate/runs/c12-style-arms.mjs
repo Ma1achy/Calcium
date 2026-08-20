@@ -101,8 +101,8 @@ const results = runPass({
     {
       name: "the radar's line arm is not wired",
       file: DEFN,
-      from: 'const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities, block.plotStyle === "line");',
-      to: "const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities);",
+      from: '      block.plotStyle === "line", block.plotGrid ?? "polygon",',
+      to: '      false, block.plotGrid ?? "polygon",',
       expect: "SA6",
     },
     {
@@ -116,13 +116,40 @@ const results = runPass({
     },
     {
       // The frame's stipple, which answered a question about weight with holes.
-      // `arcDots` took the spacing as a parameter until every call site passed
-      // the same constant; the step is inside it now, so the mutation is there.
-      name: "the rings and spokes are stippled again",
+      // **`arcDots` is only the circle grid's mechanism now** (C12 I45), so the
+      // row this kills renders `plotGrid: "circle"` on purpose — on the default
+      // the rings are `strokeDashed` polygons and this mutation has no subject.
+      name: "the circle grid's rings are stippled again",
       file: CIRC,
       from: "  const step = 1 / radius;",
       to: "  const step = 4 / radius;",
       expect: "SA6",
+    },
+    {
+      // The grid fork itself: a field that is read decides nothing if the
+      // branch it selects is the same either way.
+      name: "the grid is a circle whatever the block asked for",
+      file: CIRC,
+      from: '    if (gridShape === "circle" || n < 3) { // cells-ok — a category count',
+      to: "    if (true) {",
+      expect: "SA9",
+    },
+    {
+      // And the fallback below three axes, which is silent: two vertices are a
+      // line and one is a point, so there is no ring to draw.
+      name: "a polygon ring is attempted below three axes",
+      file: CIRC,
+      from: '    if (gridShape === "circle" || n < 3) { // cells-ok — a category count',
+      to: '    if (gridShape === "circle") {',
+      expect: "SA9",
+    },
+    {
+      // The quadrant arm's half of the same field.
+      name: "the quadrant arm ignores the grid shape",
+      file: CIRC,
+      from: '    if (values === undefined && gridShape === "circle") {',
+      to: "    if (false) {",
+      expect: "SA9",
     },
     {
       // `furniture` is `series.length`, greater than every series index, so a

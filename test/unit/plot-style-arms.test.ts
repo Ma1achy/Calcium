@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { block, validateBlock, STYLE_ARMS } from "../../src/data/viewmodel/index.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { radarRender } from "../../src/presentation/plot/circle.js";
 import { quadrantGlyph } from "../../src/presentation/plot/linedraw.js";
 import { FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
 
@@ -324,7 +325,12 @@ describe("SA6 (C12 I43): a radar's line arm draws in the alphabet that connects"
     // crosses a row in one run, and a run with holes in it is what a reader
     // sees. So the row that the outer ring passes through horizontally must be
     // continuous across it.
-    const rows = kit().renderToLines(RADAR({}), 72).map(plain).map((r) => r.slice(0, 50)); // cells-ok — a column count
+    // **Explicitly the circle grid, because the default moved out from under
+    // this row** (C12 I45). `arcDots` is the mechanism that stippled, and a
+    // polygon grid does not call it — so on the default the stipple mutation
+    // has no subject and this row would be asserting continuity of something
+    // that was never at risk. The `20` below is the circle's.
+    const rows = kit().renderToLines(RADAR({ plotGrid: "circle" }), 72).map(plain).map((r) => r.slice(0, 50)); // cells-ok — a column count
     const runs = rows.map((r) => {
       const cs = [...r];
       let best = 0;
@@ -361,5 +367,97 @@ describe("SA8 (C12 I43): the forks leave the untouched arms alone", () => {
     const before = kit().renderToLines(violin({}), 72).map(plain).join("\n");
     expect(before).toContain("╭");
     expect([...before].some(isBraille)).toBe(false);
+  });
+});
+
+describe("SA9 (C12 I45): the radar's grid is a polygon or a circle, and it is declared", () => {
+  // **The two arms had already chosen differently and neither said so** — the
+  // braille arm's rings came from `arcDots`, the quadrant arm's from the data's
+  // own vertices. Asserted on the *frame layer* rather than on the composed
+  // figure, so a polygon a data series happens to trace cannot answer for the
+  // grid.
+  const CATS3 = ["Speed", "Power", "Range"];
+  const S3 = [{ values: [80, 60, 90], label: "alpha" }, { values: [50, 85, 45], label: "beta" }];
+  const frameOf = (grid?: "polygon" | "circle") =>
+    radarRender(S3, CATS3, 80, 16, FULL_CAPS, false, grid ?? "polygon").frame;
+
+  /** Columns the frame inks on a row — a triangle's widest row is its base. */
+  const inked = (row: string): number[] =>
+    [...row].flatMap((c, i) => (c >= "⠁" && c <= "⣿" ? [i] : [])); // cells-ok — a cell column
+
+  it("a triangle grid is asymmetric top to bottom and a circle is not", () => {
+    // **Counting ink cannot tell them apart** — both rings enclose about the
+    // same area — and *the widest row* is nearly as bad: the triangle's base
+    // and its lowest inked row differ by one, which is a rounding fact rather
+    // than a shape fact, and it is what the first form of this row asserted.
+    //
+    // The property that is actually about shape: a circle is its own
+    // reflection about the horizontal, and a triangle with a vertex up is not.
+    const profile = (rows: readonly string[]): number[] => {
+      const p = rows.map((r) => inked(r).length); // cells-ok — a cell count
+      const first = p.findIndex((v) => v > 0); // cells-ok — a cell row
+      let last = -1;
+      p.forEach((v, i) => { if (v > 0) last = i; }); // cells-ok — a cell row
+      return p.slice(first, last + 1); // cells-ok — a cell row
+    };
+    const asymmetry = (rows: readonly string[]): number => {
+      const p = profile(rows);
+      return p.reduce((m, v, i) => m + Math.abs(v - (p[p.length - 1 - i] ?? 0)), 0) // cells-ok — a cell row
+        / p.reduce((m, v) => m + v, 1); // cells-ok — a cell count
+    };
+    // **A relation, not two thresholds.** The circle is not symmetric either —
+    // three spokes at 90°, 210° and 330° are not a mirror of themselves, and
+    // they are in the frame — so it measures 0.11 rather than 0. Picking a
+    // constant just above that is a number chosen to be safely true; the claim
+    // is that the *ring* adds asymmetry, so the comparison is between them.
+    const circ = asymmetry(frameOf("circle"));
+    const poly = asymmetry(frameOf("polygon"));
+    expect(poly, `polygon ${poly.toFixed(2)} vs circle ${circ.toFixed(2)}`).toBeGreaterThan(circ * 3);
+  });
+
+  it("a polygon ring is unbroken along its base, as a circle is along its widest row", () => {
+    // The continuity claim, for the ring shape that does not go through
+    // `arcDots`. A triangle's base is one horizontal edge, so the row it lands
+    // on is a single run — a dash pattern anywhere in `strokeDashed`'s path
+    // would break it.
+    const longestRun = (rows: readonly string[]): number => {
+      let best = 0;
+      for (const row of rows) {
+        let cur = 0;
+        for (const c of row) {
+          if (c >= "⠁" && c <= "⣿") { cur += 1; best = Math.max(best, cur); } // cells-ok — a cell count
+          else cur = 0;
+        }
+      }
+      return best;
+    };
+    // Both shapes give a long unbroken run; the numbers differ because a
+    // triangle's base is shorter than a circle's diameter, which is geometry
+    // rather than a property under test.
+    expect(longestRun(frameOf("polygon"))).toBeGreaterThan(10); // cells-ok — a cell count
+    expect(longestRun(frameOf("circle"))).toBeGreaterThan(10); // cells-ok — a cell count
+  });
+
+  it("the default is the polygon, and the field is what changes it", () => {
+    expect(frameOf().join("\n")).toBe(frameOf("polygon").join("\n"));
+    expect(frameOf().join("\n")).not.toBe(frameOf("circle").join("\n"));
+  });
+
+  it("below three axes there is no polygon, so the circle is drawn either way", () => {
+    // Two vertices are a line and one is a point — neither is a ring. Stated
+    // here because the fallback is silent, and a silent fallback nothing
+    // asserts is a branch that can be deleted with the suite still green.
+    for (const cats of [["Speed"], ["Speed", "Power"]]) {
+      const s = cats.map(() => ({ values: cats.map(() => 5) }));
+      const poly = radarRender(s, cats, 80, 16, FULL_CAPS, false, "polygon").frame;
+      const circ = radarRender(s, cats, 80, 16, FULL_CAPS, false, "circle").frame;
+      expect(poly.join("\n")).toBe(circ.join("\n"));
+    }
+  });
+
+  it("the quadrant arm honours it too, which is where the two disagreed", () => {
+    const fig = (grid: "polygon" | "circle") =>
+      JSON.stringify(radarRender(S3, CATS3, 80, 16, FULL_CAPS, true, grid).figure);
+    expect(fig("polygon")).not.toBe(fig("circle"));
   });
 });

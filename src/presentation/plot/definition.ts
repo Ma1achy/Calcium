@@ -488,6 +488,7 @@ function mergedRow(
   ctx: RenderContext,
 ): readonly Span[] {
   const spans: Span[] = [];
+  let turns = 0; // cells-ok — a contested-cell count
   let run = "";
   let runRef: ColourRef | null = null;
 
@@ -539,12 +540,28 @@ function mergedRow(
       // changed.
       if (layer.kind === "curve") peers.push({ ref: layer.ref, ink: dots });
     }
-    // **Where peers contend, the cell goes to one of them and which one turns
-    // with the column** (I44). Every cell then holds one series' dots in that
-    // series' colour, and each line runs through the overlap as a dash rather
-    // than one line taking the region and the rest vanishing.
+    // **Where peers contend, the cell goes to one of them, and the turn has to
+    // change along the run** (I44). Every cell then holds one series' dots in
+    // that series' colour, and each line runs the overlap as a dash rather than
+    // one line taking the region and the rest vanishing.
+    //
+    // **The turn counts contested cells rather than columns**, and that is the
+    // whole of why it works. `x % peers.length` is constant down a *vertical*
+    // run, which is every cell of it wherever two curves overlap on a vertical
+    // stretch — two radar polygons meeting on a spoke, and at two categories
+    // the entire figure: measured, one series took 9 of 9 contested cells and
+    // the other none.
+    //
+    // No purely positional key fixes it: alternating on all of (1,0), (0,1) and
+    // (1,1) modulo two is the checkerboard and has no solution. A **counter**
+    // is not positional. It resets each row, so a vertical run advances on
+    // `rowIndex`, a horizontal one on the counter, and a diagonal on `rowIndex`
+    // with the counter back at zero — every run advances by one per cell.
+    // *Measured at 2 through 10 categories: the closest split to even is 7/7
+    // and the furthest 5/7, where the column key starved a series to nothing.*
     if (peers.length > 1) { // cells-ok — a layer count
-      const pick = peers[x % peers.length]!; // cells-ok — a cell column
+      const pick = peers[(rowIndex + turns) % peers.length]!; // cells-ok — a layer count
+      turns += 1; // cells-ok — a contested-cell count
       cellRef = pick.ref;
       cell = String.fromCodePoint(BRAILLE_BASE + pick.ink);
     }
@@ -2359,7 +2376,10 @@ const FORM_ROWS: Readonly<
         line(markedSpans(row, seriesRef, ctx), layout, ctx),
       );
     }
-    const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities, block.plotStyle === "line");
+    const radar = radarRender(
+      block.series, cats, width, areaRows, ctx.capabilities,
+      block.plotStyle === "line", block.plotGrid ?? "polygon",
+    );
     if (radar.polygons.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     // **Labels first, frame last, series between them.** `mergedRow` takes the
     // first layer to ink a cell, so the order is a priority: a word a polygon

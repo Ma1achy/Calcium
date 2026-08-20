@@ -563,9 +563,35 @@ function radarCeiling(series: readonly Series[]): number {
  * boundary and the rings inside it are a scale, and a scale drawn as heavily as
  * the data is a scale that competes with it.
  */
-function frameRows(d: Disc, categories: readonly string[]): readonly string[] {
+function frameRows(
+  d: Disc,
+  categories: readonly string[],
+  /** The ring shape (C12 I45, §3w) — an *n*-gon through the axes, or a circle. */
+  gridShape: "polygon" | "circle" = "polygon",
+): readonly string[] {
   const grid = createGrid(d.dotWidth, d.dotHeight);
   const n = categories.length; // cells-ok — a category count
+
+  /**
+   * One value ring, at `t` of the radius.
+   *
+   * **The polygon runs through the same vertices the data does**, so the ring
+   * is a ruler the shape can be read against along its whole length rather than
+   * at *n* points. Below three axes there is no polygon to draw — two vertices
+   * are a line and one is a point — so the circle is the only ring available
+   * and the shape falls back to it.
+   */
+  const ringAt = (t: number): void => {
+    if (gridShape === "circle" || n < 3) { // cells-ok — a category count
+      arcDots(grid, d, t, 0, TAU);
+      return;
+    }
+    for (let i = 0; i < n; i += 1) { // cells-ok — a vertex count
+      const a = START_ANGLE + (TAU * i) / n;
+      const b = START_ANGLE + (TAU * ((i + 1) % n)) / n; // cells-ok — a vertex count
+      strokeDashed(grid, at(d, a, t), at(d, b, t), SOLID_DASH);
+    }
+  };
 
   // **Continuous, and the weight is carried by colour** (C12 I43, §3w). The
   // rings stepped every fourth dot and the spokes dashed two-on-two-off, on
@@ -574,9 +600,9 @@ function frameRows(d: Disc, categories: readonly string[]): readonly string[] {
   // stippled ring does not read as a lighter ring; it reads as a broken one.
   // The frame is `tone.muted` and the polygons carry their series' slots, so
   // the separation is already there and the scale can be a scale.
-  arcDots(grid, d, 1, 0, TAU);
+  ringAt(1);
   for (const t of VALUE_RINGS) {
-    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU);
+    if (d.r * t >= MIN_RING_DOTS) ringAt(t);
   }
   for (let i = 0; i < n; i += 1) {
     const a = START_ANGLE + (TAU * i) / n;
@@ -674,6 +700,7 @@ function radarQuadFigure(
   series: readonly Series[],
   ceiling: number,
   labels: readonly string[],
+  gridShape: "polygon" | "circle" = "polygon",
 ): readonly (readonly MarkedText[])[] {
   const cols = Math.ceil(d.dotWidth / BRAILLE_DOTS.x); // cells-ok — a column count
   const rows = Math.ceil(d.dotHeight / BRAILLE_DOTS.y); // cells-ok — a row count
@@ -710,6 +737,19 @@ function radarQuadFigure(
   };
   const n = Math.max(1, categories.length); // cells-ok — a category count
   const ring = (t: number, who: number, values?: readonly (number | null)[]): void => {
+    // **A circular grid is sampled rather than jointed** (C12 I45). The data is
+    // always a polygon — it has a vertex per axis and nothing between them — so
+    // this arm only takes the arc for the furniture.
+    if (values === undefined && gridShape === "circle") {
+      const steps = Math.max(8, Math.round(TAU * d.r * t)); // cells-ok — a sample count
+      let prev = sub(START_ANGLE, t);
+      for (let i = 1; i <= steps; i += 1) { // cells-ok — a sample count
+        const next = sub(START_ANGLE + (TAU * i) / steps, t);
+        run(prev, next, who);
+        prev = next;
+      }
+      return;
+    }
     const pts = Array.from({ length: n }, (_p, i) => { // cells-ok — a vertex count
       const v = values?.[i];
       const at01 = values === undefined
@@ -774,6 +814,8 @@ export function radarRender(
   caps: Caps,
   /** A connected figure in quadrant blocks rather than braille dots (C12 I43, §3w). */
   lineDraw = false,
+  /** The value rings' shape (C12 I45, §3w). */
+  gridShape: "polygon" | "circle" = "polygon",
 ): RadarRender {
   const w = Math.max(0, Math.floor(areaWidth));
   const h = Math.max(0, Math.floor(areaRows));
@@ -854,10 +896,15 @@ export function radarRender(
     // **One figure and no merge for the line arm** — the layers below are the
     // braille arm's, and at cell resolution they eat each other (I40).
     ...(lineDraw
-      ? { figure: radarQuadFigure(disc, categories, series, ceiling, labelRows(disc, categories, discWidth, h, caps)) }
+      ? {
+          figure: radarQuadFigure(
+            disc, categories, series, ceiling,
+            labelRows(disc, categories, discWidth, h, caps), gridShape,
+          ),
+        }
       : {}),
     polygons,
-    frame: frameRows(disc, categories),
+    frame: frameRows(disc, categories, gridShape),
     labels: labelRows(disc, categories, discWidth, h, caps),
     legend: withLegend ? legend.lines : Array.from({ length: h }, () => []),
     discWidth,

@@ -870,6 +870,18 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "radar", height: 18, categories: ["Speed", "Power", "Range", "Defence", "HP"],
       series: [s([80, 60, 90, 40, 70], "alpha"), s([50, 85, 45, 75, 55], "beta")],
     },
+    // **Three axes is where the grid's shape stops being cosmetic** (C12 I45).
+    // A circular ring behind a triangle is two figures in one frame; the
+    // polygon is a ruler the shape can be read against along its length.
+    triangle: {
+      form: "radar", height: 16, categories: ["Speed", "Power", "Range"],
+      series: [s([80, 60, 90], "alpha"), s([50, 85, 45], "beta")],
+    },
+    "triangle-circle": {
+      form: "radar", height: 16, plotGrid: "circle",
+      categories: ["Speed", "Power", "Range"],
+      series: [s([80, 60, 90], "alpha"), s([50, 85, 45], "beta")],
+    },
   },
   horizon: {
     "bands-2": { form: "horizon", height: 2, series: [s(sin50)], bands: 2 },

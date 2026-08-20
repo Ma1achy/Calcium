@@ -714,6 +714,20 @@ export type Plot = Readonly<{
    * ignored member, which reads as one not yet implemented.
    */
   plotFill?: "none" | "solid";
+  /**
+   * The shape of a radar's value rings and outer bound (C12 I45, §3w).
+   *
+   * **A default rather than an inference.** The two arms had already chosen
+   * differently — braille drew circles through `arcDots`, the quadrant arm drew
+   * *n*-gons through the data's own vertices — and neither said so. `"polygon"`
+   * is the default because the grid is a ruler for the shape measured against
+   * it: at three categories a circular ring behind a triangular polygon is two
+   * figures in one frame. At ten the two are within a dot.
+   *
+   * **Not chosen from the category count**, which is the tempting rule — a
+   * figure that changes shape at a threshold is two figures with one name.
+   */
+  plotGrid?: "polygon" | "circle";
   plotCorners?: "rounded" | "sharp";
   /**
    * Which axis a categorical or distribution form runs along (C12 §3j, C12 I30).

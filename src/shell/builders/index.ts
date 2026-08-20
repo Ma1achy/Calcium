@@ -400,6 +400,8 @@ function plot(
     plotStyle?: Plot["plotStyle"];
     /** The interior of a shape, where the vocabulary can fill (C04 I59). */
     plotFill?: Plot["plotFill"];
+    /** The radar's ring shape (C12 I45, §3w). */
+    plotGrid?: Plot["plotGrid"];
     /**
      * The candles (C04 I57, C12 I36).
      *
@@ -418,7 +420,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -504,6 +506,7 @@ function plot(
       height,
       ...(axes === undefined ? {} : { axes }),
       ...(plotFill === undefined ? {} : { plotFill }),
+      ...(plotGrid === undefined ? {} : { plotGrid }),
       ...(xMin === undefined ? {} : { xMin }),
       ...(xMax === undefined ? {} : { xMax }),
       ...(xFormat === undefined ? {} : { xFormat }),
