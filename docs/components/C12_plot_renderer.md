@@ -772,10 +772,31 @@ genuinely `A`. So the sweep is over-broad and right where it matters, and the as
 — reading a narrow glyph as wide declines to draw, reading a wide one as narrow corrupts the
 geometry of every figure in the framework.
 
-**Layered as a `surface`**, which is what answers the other half. §3u's `Layer.kind` ranks
-`surface` below `curve`, so a curve draws over its own band with no rule about which wins — the
-contest the refusal assumed unresolvable has had an owner since §3u was written, and that is the
-whole of what changed.
+**The layer already exists and it is not the one this sentence first named.** The draft read
+*layered as a `surface`, and §3u's `Layer.kind` ranks `surface` below `curve`* — two errors in one
+clause, and reading the mechanism is what found them. An annotation is `kind: "context"` and has
+been since it was written, which is exactly the disposition the fill wants: *drawn behind, and
+occluded by anything in front*. And **`Layer.kind` does not rank**. Order does — `mergedRow` takes
+the first layer that inked a cell, and `layers` is `[…series, …under, …annotations]`, so the
+annotation is last and loses by construction. `kind` decides something else: whether two
+contending layers **union or occlude**. Moving annotations to `"surface"` would have changed two
+overlapping bands from occluding to unioning, which is a behaviour nobody asked for and which
+would have moved frames.
+
+**So the contest the original refusal assumed unresolvable was already owned, and by a mechanism
+one word away from the one named.** The union is per dot and applies where *every* candidate is
+braille (§3u); `░` is a block element, so a cell where the curve and the fill both want ink
+cannot union and falls to first-wins — the curve. *The fill is safe from the curve by
+construction rather than by a rule, and the two dashed edges keep unioning with it as they do
+today.*
+
+**The interior clamps where the edge is dropped, and the two rules do not conflict because they
+say different things.** C04 I52 drops an out-of-range edge because a threshold clamped onto a
+scale it is outside says *the limit is here* about a place the limit is not. The interior says
+*the region covers here*, which stays true of every visible cell whatever the edge does — so a
+band whose upper edge is above the ceiling fills to the top row and draws no upper edge. The
+alternative is worse and it is the one that follows from reading the rule as one rule: a dashed
+lower edge with no fill above it reads as *the band ended*.
 
 **`fill` defaults on.** A band drawn as two unconnected dashed lines is the reading a caller has to
 be told to want; matplotlib's `fill_between` is the one they arrive expecting. `fill: false` keeps
