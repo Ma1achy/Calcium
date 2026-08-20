@@ -798,9 +798,48 @@ function plotFieldErrors(
         `iso-lines, and a level on anything else names nothing`,
     );
   }
+  const vectors = b["vectors"];
+  if (vectors !== undefined && form !== "quiver") {
+    e.push(
+      `${at}: "vectors" on form "${String(form)}" (C04 I61) — only a quiver draws a ` +
+        `vector field, and two numbers per cell mean nothing to any other form`,
+    );
+  }
+  if (form === "quiver" && vectors === undefined) {
+    e.push(
+      `${at}: form "quiver" has no "vectors" (C04 I61) — a vector field is what it ` +
+        `draws, and "series" carries one number per cell`,
+    );
+  }
+  if (vectors !== undefined) {
+    if (!Array.isArray(vectors)) {
+      e.push(`${at}: "vectors" must be an array of rows`);
+    } else {
+      // **Rectangular, on the matrix family's own rule** (C04 I50b): rows of
+      // different lengths stretch to a common width, so column k means a
+      // different position in every row — self-consistent and wrong.
+      const widths = new Set<number>();
+      for (const row of vectors as readonly Record<string, unknown>[]) {
+        const vals = row?.["values"];
+        if (!Array.isArray(vals)) { e.push(`${at}: a "vectors" row has no "values" array`); continue; }
+        widths.add(vals.length); // cells-ok — a position count
+        for (const p of vals) {
+          if (p === null) continue;
+          const ok = Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number"); // cells-ok — a pair length
+          if (!ok) { e.push(`${at}: a "vectors" entry is not a [u, v] pair or null`); break; }
+        }
+      }
+      if (widths.size > 1) { // cells-ok — a distinct-width count
+        e.push(
+          `${at}: "vectors" rows differ in length (C04 I61) — a short row stretches to ` +
+            `the common width, so column k is a different position in every row`,
+        );
+      }
+    }
+  }
   // **A layer with no data is refused at the gate**, because the alternative is
   // an empty plot area that reads as a field with nothing in it.
-  if (Array.isArray(layers) && layers.includes("quiver") && b["vectors"] === undefined) {
+  if (Array.isArray(layers) && layers.includes("quiver") && vectors === undefined) {
     e.push(
       `${at}: "layers" names "quiver" and there are no "vectors" (C04 I61) — a layer ` +
         `with no data draws an empty area that reads as a field with nothing in it`,
@@ -907,7 +946,7 @@ const PLOT_FORM_MEMBERS = {
   smallmultiples: true, pairplot: true,
   pie: true, radar: true,
   horizon: true,
-  contour: true,
+  contour: true, quiver: true,
 } satisfies Record<PlotForm, true>;
 const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 

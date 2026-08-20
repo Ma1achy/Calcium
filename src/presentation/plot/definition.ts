@@ -2603,6 +2603,7 @@ const FORM_ROWS: Readonly<
   // legend are all the matrix's, and the only new thing is what goes over the
   // cells.
   contour: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  quiver: (block, width, ctx) => heatmapFormRows(block, width, ctx),
 };
 
 const render = (block: Plot, ctx: RenderContext): ReactElement => {

@@ -41,7 +41,7 @@ describe("P3: height is declared", () => {
     bar: false, histogram: false, lollipop: false, dotplot: false,
     funnel: false, gantt: false, waterfall: false, flame: false, icicle: false,
     boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
-    heatmap: false, contour: false, calendar: false, correlation: false, confusion: false,
+    heatmap: false, contour: false, quiver: false, calendar: false, correlation: false, confusion: false,
     spectrogram: false, latency: false, density2d: false,
     streamgraph: false, stackedarea: false, treemap: false, smallmultiples: false, pairplot: false,
     slope: false, bubble: false, autocorrelation: false, timeline: false, bullet: false, utilisation: false,

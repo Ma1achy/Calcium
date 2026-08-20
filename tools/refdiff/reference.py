@@ -423,6 +423,9 @@ SKIPPED = {
     # Recorded here as well, because a form absent from both halves is the gap
     # RD5 exists for.
     "contour": "unisolable — C04 I50b refuses the `axes: false` arm the mask needs",
+    # And a quiver twice over: an ink mask reduces an arrow to *a cell is inked*,
+    # which discards the direction that is the whole reading.
+    "quiver": "unisolable — and an ink mask keeps none of what an arrow says",
     "icicle": "same as flame, inverted",
 }
 

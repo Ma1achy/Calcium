@@ -200,7 +200,7 @@ export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.fre
   // A matrix labels its rows and its columns from `categories`, not from a scale.
   heatmap: false, calendar: false, correlation: false, confusion: false,
   spectrogram: false, latency: false, density2d: false, utilisation: false,
-  contour: false,
+  contour: false, quiver: false,
   // No cartesian abscissa at all — a disc, a polygon, a mosaic, a tree.
   pie: false, radar: false, waffle: false, flame: false, icicle: false, treemap: false,
   // One row, no furniture.
@@ -227,7 +227,7 @@ export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.fr
   streamgraph: true, stackedarea: true, slope: true, bubble: true,
   heatmap: true, calendar: true, correlation: true, confusion: true,
   spectrogram: true, latency: true, density2d: true,
-  contour: true,
+  contour: true, quiver: true,
   sparkline: true, horizon: true,
   smallmultiples: true, pairplot: true,
 });
@@ -256,7 +256,8 @@ export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // rows.** A contour names each row in its gutter, which is what §3t says this
   // partition turns on; the level ladder is a different question and I25
   // answers it with a dash rather than with a mark from here.
-  contour: false,
+  // A quiver's arrows sit one per cell in a labelled row, same answer.
+  contour: false, quiver: false,
   // A single series, no categories to separate.
   sparkline: false, horizon: false,
   // Composition: each facet is its own figure and answers this itself.

@@ -96,6 +96,7 @@ const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
   waffle: false,
   // A field declares its rows like every other matrix form (C12 I49).
   contour: true,
+  quiver: true,
   line: true,
   heatmap: true,
   scatter: true, step: true, ecdf: true,
@@ -242,7 +243,7 @@ function checkPlotFormat(plot: Plot): void {
 const ORIENTABLE: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
   bar: true, histogram: true, boxplot: true, violin: true,
   // The matrix family's reason: two real axes already, and neither is a choice.
-  contour: false,
+  contour: false, quiver: false,
   // Not built: each needs its own column renderer and none was asked for.
   lollipop: false, dotplot: false, funnel: false, dumbbell: false, forest: false,
   ridgeline: false,

@@ -21,7 +21,7 @@
  * fixture over-fills its width (90 readings into ~72 cells) and therefore cannot
  * show the right-anchoring blank fringe, which is the defect actually reported.
  */
-import type { OHLC, Plot, PlotForm, Series } from "../src/data/viewmodel/index.js";
+import type { OHLC, Plot, PlotForm, Series, VectorSeries } from "../src/data/viewmodel/index.js";
 
 /** A plot with its identity removed — the catalogue supplies `kind` and `id`. */
 /**
@@ -132,6 +132,23 @@ const field = (rows: number, cols: number, freq = 0.6): Series[] =>
       `row${String(r)}`,
     ),
   );
+
+/** A rotational vector field, so all eight directions are present. */
+const swirl = (rows: number, cols: number): VectorSeries[] =>
+  Array.from({ length: rows }, (_v, r) => ({ // cells-ok — a row count
+    label: `row${String(r)}`,
+    values: Array.from({ length: cols }, (_w, c) => { // cells-ok — a column count
+      const [dx, dy] = [c - (cols - 1) / 2, r - (rows - 1) / 2];
+      return [-dy, dx] as const;
+    }),
+  }));
+
+/** Every `nth` vector kept, the rest stilled — so something shows underneath. */
+const sparse = (rows: readonly VectorSeries[], nth: number): VectorSeries[] =>
+  rows.map((r, ri) => ({
+    ...r,
+    values: r.values.map((p, ci) => ((ri + ci) % nth === 0 ? p : [0, 0] as const)),
+  }));
 
 const PIE_SEGMENTS = [
   { label: "Chrome", value: 65 },
@@ -310,6 +327,37 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     levels: { form: "contour", height: 6, axes: true, levels: [25, 50, 75, 500], series: field(6, 24) },
     // A constant field crosses nothing: no contour, and not a full grid.
     flat: { form: "contour", height: 4, axes: true, series: matrix(4, 16, 0) },
+  },
+  quiver: {
+    // A rotational field — `[-sin, cos]` around the centre — so every one of the
+    // eight directions appears and the picture is one a reader can check.
+    default: { form: "quiver", height: 6, axes: true, series: [], vectors: swirl(6, 24) },
+    // Arrows on an unpainted area (C12 I51): direction alone, no magnitude.
+    "arrows-only": {
+      form: "quiver", height: 6, axes: true, layers: ["quiver"], series: [], vectors: swirl(6, 24),
+    },
+    // **A still cell draws nothing** (C12 I50) — not an arrow of arbitrary
+    // direction, which is what `atan2(0, 0) === 0` would give.
+    still: {
+      form: "quiver", height: 4, axes: true, series: [],
+      vectors: Array.from({ length: 4 }, (_v, r) => ({ // cells-ok — a row count
+        label: `row${String(r)}`,
+        values: Array.from({ length: 12 }, (_w, c) => (c % 3 === 0 ? [0, 0] as const : [c - 6, r - 2] as const)), // cells-ok
+      })),
+    },
+    // A contour and a quiver over one field: both glyph layers, and §3u decides
+    // the contested cells (C12 I51).
+    //
+    // **The vectors are sparse and that is the fixture responding.** A dense
+    // swirl fills every cell, the quiver is last in draw order and therefore
+    // first in priority, and the contour beneath it is drawn nowhere — correct
+    // by §3u and a picture that shows nothing about layering. LY3's claim is
+    // *the contour shows wherever no arrow lands*, so the fixture has to leave
+    // somewhere for it to land.
+    "with-contour": {
+      form: "quiver", height: 6, axes: true, layers: ["field", "contour", "quiver"],
+      series: field(6, 24), vectors: sparse(swirl(6, 24), 4),
+    },
   },
   bar: {
     // **C12 §3j's case for the field**: ordered categories along the bottom.

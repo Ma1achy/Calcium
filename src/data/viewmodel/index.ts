@@ -57,6 +57,7 @@ export type {
   Result,
   Rule,
   Series,
+  VectorSeries,
   Steps,
   Table,
   TableRow,

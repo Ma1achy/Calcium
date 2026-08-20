@@ -28,7 +28,8 @@ import { slot } from "../blocks/paint.js";
 import { refOf } from "./marks.js";
 import {
   contourCellRows, contourDotRows, contourLevels, dimColour, dimFactorFor, fieldSampler,
-  glyphLayerOrder, mergeFieldLayers, overlayGlyphs, paintsField,
+  arrowsFor, glyphLayerOrder, magnitudeAt, magnitudeSeries, mergeFieldLayers, overlayGlyphs,
+  paintsField, quiverRows,
   type FieldLayer,
 } from "./field.js";
 
@@ -65,6 +66,9 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
   // A contour interpolates across whatever the map leaves visible, so a window
   // would contour part of the field and say nothing about it (§6d.1 row 8).
   contour: "stretch",
+  // The arrows resample nearest, so a window would show real readings; a
+  // vector field has no time axis to anchor to and stretches like the rest.
+  quiver: "stretch",
   spectrogram: "stretch",
   latency: "stretch",
   confusion: "stretch",
@@ -108,6 +112,8 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
 const DEFAULT_COLORMAP: Readonly<Record<PlotForm, ColormapName | null>> = Object.freeze({
   heatmap: "viridis",
   contour: "viridis",
+  // Magnitude reads as *more*, and a perceptual ramp is what says so.
+  quiver: "viridis",
   spectrogram: "viridis",
   latency: "viridis",
   confusion: "viridis",
@@ -358,8 +364,18 @@ function matrixRows(
           ? field
           : overlayGlyphs(
               field, merged.glyphs, merged.owners,
-              (owner) => slot(overlay[owner]!.ref, ctx.theme, ctx.capabilities),
+              (owner, r, x) => {
+                const layer = overlay[owner]!;
+                // **The layer's own datum wins where it has one** (I50): a
+                // quiver's arrow is coloured by its magnitude, a contour's
+                // stroke by its level's slot.
+                const c = layer.cellColour?.(r, x);
+                return c === undefined
+                  ? slot(layer.ref, ctx.theme, ctx.capabilities)
+                  : { colour: c };
+              },
               glyphInk,
+              i,
             ),
         layout,
         ctx,
@@ -497,6 +513,7 @@ function fieldLayers(
   range: Range,
   layout: Layout,
   ctx: RenderContext,
+  ownField: boolean,
 ): readonly FieldLayer[] {
   if (!IS_FIELD_FORM[block.form]) return [];
   const order = glyphLayerOrder(block);
@@ -510,7 +527,47 @@ function fieldLayers(
 
   const out: FieldLayer[] = [];
   for (const kind of order) {
-    if (kind !== "contour") continue;
+    if (kind === "quiver") {
+      // **One glyph per cell, nearest-resampled** — a contour runs *between*
+      // readings and an arrow *is* one, so interpolating two vectors that point
+      // opposite ways gives a still cell where the field is most active (I50).
+      if (block.vectors !== undefined) {
+        /**
+         * **One datum, one channel — and which channel depends on whether there
+         * is a second datum** (I50).
+         *
+         * Magnitude is the arrow's colour *where the field carries something
+         * else*. Where the caller named no scalar the field **is** the
+         * magnitude, so colouring the arrow by it too paints the glyph in
+         * exactly its own cell's background: measured on the golden frame,
+         * `38;2;33;145;141` on `48;2;33;145;141`, an invisible arrow at full
+         * colour depth.
+         *
+         * Every assertion passed — the field painted, the arrows were there,
+         * and more than two distinct colours appeared. **Only the frame showed
+         * it**, and it is not low contrast but zero contrast, guaranteed by
+         * construction rather than by a ramp's luminance.
+         */
+        const mag = magnitudeSeries(block.vectors);
+        const mrange = ownField ? null : seriesRange(mag, {});
+        const map = colormapFor(block);
+        const read = magnitudeAt(block.vectors, layout.areaWidth, layout.areaRows);
+        out.push({
+          glyphRows: quiverRows(block.vectors, layout.areaWidth, layout.areaRows, arrowsFor(ctx.capabilities)),
+          ref: refOf(0),
+          ...(map === undefined || mrange === null ? {} : {
+            cellColour: (r: number, x: number): ColourValue | undefined => {
+              const v = read(r, x);
+              const s = mrange.max - mrange.min;
+              return v === null
+                ? undefined
+                : continuousColour(map, s <= 0 ? 0.5 : (v - mrange.min) / s, ctx.capabilities);
+            },
+          }),
+        });
+      }
+      continue;
+    }
     out.push({
       glyphRows: braille
         ? contourDotRows(sample, span, layout.areaWidth, layout.areaRows, levels)
@@ -529,10 +586,19 @@ function fieldLayers(
  * difference is axis semantics (handled by the caller's field choices).
  */
 export function heatmapFormRows(
-  block: Plot,
+  raw: Plot,
   width: number,
   ctx: RenderContext,
 ): readonly string[] {
+  // **The field under a quiver is the vectors' own magnitude** where the caller
+  // named no scalar (I50). It is the only scalar a vector field has, and the
+  // alternative — an unpainted area with arrows on it — throws away the channel
+  // that separates a fast cell from a slow one. Substituted here rather than in
+  // `matrixRows`, so the range, the gutter labels, the legend and the overflow
+  // row all see one series list.
+  const block: Plot = raw.form === "quiver" && raw.series.length === 0 && raw.vectors !== undefined // cells-ok — a series count
+    ? { ...raw, series: magnitudeSeries(raw.vectors) }
+    : raw;
   const range = seriesRange(block.series, block);
   const layout = layoutFor(block, width, ctx.capabilities);
 
@@ -549,7 +615,7 @@ export function heatmapFormRows(
 
   if (range === null) return emptyRows(block, layout, ctx);
   return [
-    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx)),
+    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx, block !== raw)),
     ...matrixFurniture(block, range, layout, ctx),
   ];
 }

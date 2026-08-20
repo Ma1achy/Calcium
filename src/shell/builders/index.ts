@@ -404,6 +404,7 @@ function plot(
     plotGrid?: Plot["plotGrid"];
     yAxis?: Plot["yAxis"];
     yCallout?: Plot["yCallout"];
+    vectors?: Plot["vectors"];
     levels?: Plot["levels"];
     layers?: Plot["layers"];
     fieldDim?: Plot["fieldDim"];
@@ -428,7 +429,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -543,6 +544,18 @@ function plot(
         );
       }
     }
+    if (vectors !== undefined && drawn !== "quiver") {
+      throw new TypeError(
+        `b.plot: "vectors" on form "${drawn}" (C04 I61) — only a quiver draws a vector ` +
+          `field, and two numbers per cell mean nothing to any other form`,
+      );
+    }
+    if (drawn === "quiver" && vectors === undefined) {
+      throw new TypeError(
+        `b.plot: form "quiver" has no "vectors" (C04 I61) — a vector field is what it ` +
+          `draws, and "series" carries one number per cell`,
+      );
+    }
     if (levels !== undefined && drawn !== "contour") {
       throw new TypeError(
         `b.plot: "levels" on form "${drawn}" (C04 I61) — only a contour draws iso-lines, ` +
@@ -576,6 +589,7 @@ function plot(
       ...(plotBox === undefined ? {} : { plotBox }),
       ...(yAxis === undefined ? {} : { yAxis }),
       ...(yCallout === undefined ? {} : { yCallout }),
+      ...(vectors === undefined ? {} : { vectors }),
       ...(levels === undefined ? {} : { levels }),
       ...(layers === undefined ? {} : { layers }),
       ...(fieldDim === undefined ? {} : { fieldDim }),

@@ -472,6 +472,32 @@ export type Events = Readonly<{
   events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
 }> & Gap;
 
+/**
+ * A row of a **vector** field — `Series`' shape, with two numbers per position
+ * (C04 I61, C12 I50).
+ *
+ * **The one shape on `Plot` that could not be reused.** A contour takes the
+ * matrix family's `series` unchanged; a quiver needs `u` and `v` per cell and
+ * nothing here carried two numbers at a position. Beside `ohlc`, `hierarchy`
+ * and `segments`, which are the other form-specific shapes.
+ *
+ * `null` is a gap and never `NaN`, on I46a's argument unchanged: `JSON.stringify`
+ * writes `NaN` as `null` regardless, so the declared form should be the persisted
+ * one. **A gap is distinct from a still cell** — a still cell has a reading and
+ * it is zero, and C12 I50 draws neither, so the two are told apart by whether
+ * the field beneath them paints.
+ *
+ * `v` is **north-positive**, the data convention rather than the screen's; the
+ * renderer flips it, so no caller has to know which way the rows run.
+ *
+ * No `tone` and no `marker`: a quiver's colour is its magnitude (C12 I50), so a
+ * per-row tone would be a second claim on the one channel the form has.
+ */
+export type VectorSeries = Readonly<{
+  values: readonly (readonly [number, number] | null)[];
+  label?: string;
+}>;
+
 export type Series = Readonly<{
   /**
    * The readings, oldest first. **`null` is a gap** — a position that produced
@@ -535,7 +561,7 @@ export type PlotForm =
   | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
   | "slope" | "bubble" | "autocorrelation" | "timeline" | "bullet" | "utilisation"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
-  | "contour"
+  | "contour" | "quiver"
   | "density" | "violin" | "ridgeline"
   | "smallmultiples" | "pairplot"
   | "pie" | "radar"
@@ -842,6 +868,14 @@ export type Plot = Readonly<{
   /** The tree `flame`, `icicle` and `treemap` are drawn from (C04 I54, C12 §3n). */
   hierarchy?: HierarchyNode;
   /**
+   * The vector field a `quiver` draws (C04 I61, C12 I50).
+   *
+   * Required on that form and refused on every other. Where `series` is empty
+   * the field beneath the arrows is the vectors' own **magnitude**, which is the
+   * only scalar a vector field has unless the caller names another.
+   */
+  vectors?: readonly VectorSeries[];
+  /**
    * Where a matrix puts a row shorter than its width (C12 §3o).
    *
    * `"stretch"` spreads the readings across the area, `"window"` keeps the
@@ -961,7 +995,7 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   spectrogram: true, latency: true, density2d: true, utilisation: true,
   // **A contour is a matrix by the same argument** (I49): its rows are the
   // field's rows, and a field with no names beside it is a picture of numbers.
-  contour: true,
+  contour: true, quiver: true,
   // One row, or a figure that bounds itself: no gutter to put a label beside.
   sparkline: false, horizon: false, waffle: false,
   pie: false, radar: false, flame: false, icicle: false, treemap: false,
@@ -999,7 +1033,7 @@ export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // A matrix has no per-series row, and no scale in its gutter to write beside.
   heatmap: false, calendar: false, correlation: false, confusion: false,
   spectrogram: false, latency: false, density2d: false, utilisation: false,
-  contour: false,
+  contour: false, quiver: false,
   // No cartesian area, or one row, or a composition.
   sparkline: false, horizon: false, waffle: false,
   pie: false, radar: false, flame: false, icicle: false, treemap: false,
@@ -1035,6 +1069,7 @@ export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
 export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   heatmap: true, calendar: true, correlation: true, confusion: true,
   spectrogram: true, latency: true, density2d: true, utilisation: true,
+  quiver: true,
   // **A contour is a matrix and I50b binds**: its rows are the field's rows, so
   // `axes: false` would take the row labels *and* the level legend, and the
   // legend is the only thing that says which line is which level (C12 I49).
@@ -1050,7 +1085,7 @@ export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
 });
 
 export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze({
-  contour: true,
+  contour: true, quiver: true,
   // Every other matrix form paints its cells and draws nothing over them. They
   // are *fields* in the survey's sense and not in this one: `layers` on a
   // `spectrogram` has no second thing to order.
@@ -1099,6 +1134,10 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   // the two segments part, so `"auto"` picks braille — the arm on which the
   // ruling has a subject.
   contour: ["braille", "line"],
+  // **An arrow is a whole-cell glyph and there is nothing to choose.** Stated
+  // rather than omitted — an empty list is an answer, and the vocabulary here
+  // is the form's own.
+  quiver: [],
   flame: [], icicle: [], treemap: [],
   sparkline: [], horizon: [],
   smallmultiples: [], pairplot: [],

@@ -32,6 +32,7 @@ export const UNISOLABLE: ReadonlyMap<string, string> = new Map([
   ["density2d", "C04 I50b — as heatmap"],
   ["utilisation", "C04 I50b — as heatmap; the refusal reaches it now"],
   ["contour", "C04 I50b — as heatmap; its rows are the field's rows and the legend names the levels"],
+  ["quiver", "C04 I50b — as heatmap; and its glyph is the whole cell, so an ink mask says only *an arrow landed here*"],
 ]);
 
 export const COLS = 64;

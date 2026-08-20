@@ -22,7 +22,7 @@
  * with nothing joining them — which is the reason to derive rather than tabulate,
  * and it is asserted rather than assumed (CN6).
  */
-import type { Plot, Series } from "../../data/viewmodel/index.js";
+import type { Plot, Series, VectorSeries } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
 import type { ColourRef, ColourValue, Style } from "../theme/types.js";
@@ -296,8 +296,21 @@ function cornerReader(
 
 // --- composition (§6d.2) ----------------------------------------------------
 
-/** One glyph layer and the colour it carries. §3u's `Layer`, for this family. */
-export type FieldLayer = Readonly<{ glyphRows: readonly string[]; ref: ColourRef }>;
+/**
+ * One glyph layer and the colour it carries. §3u's `Layer`, for this family.
+ *
+ * **`cellColour` is the quiver's, and the layer model had no room for it.** A
+ * contour's colour is the layer's — every stroke of one level is one thing — so
+ * a single `ref` was the obvious shape and it is wrong for the other form:
+ * I50 makes magnitude *the* second channel and a quiver drawn in one slot has
+ * only direction. Found by reading the frame, where every arrow wore the same
+ * orange whatever it was doing.
+ */
+export type FieldLayer = Readonly<{
+  glyphRows: readonly string[];
+  ref: ColourRef;
+  cellColour?: (row: number, x: number) => ColourValue | undefined;
+}>;
 
 /** Braille is `U+2800 + bits`, which is what makes the union below an OR. */
 const BRAILLE_BASE = 0x2800;
@@ -431,8 +444,9 @@ export function overlayGlyphs(
   field: readonly Span[],
   glyphs: string,
   owners: readonly (number | null)[],
-  inkFor: (owner: number) => Style,
+  inkFor: (owner: number, row: number, x: number) => Style,
   glyphInk: "own" | "contrast",
+  row = 0,
 ): readonly Span[] {
   const chars = [...glyphs];
   const out: Span[] = [];
@@ -454,7 +468,7 @@ export function overlayGlyphs(
         ? span.style
         : glyphInk === "contrast"
           ? { ...(background === undefined ? {} : { background }), colour: contrastInk(background) }
-          : { ...inkFor(owner), ...(background === undefined ? {} : { background }) };
+          : { ...inkFor(owner, row, x), ...(background === undefined ? {} : { background }) };
       if (next !== runStyle) {
         flush();
         runStyle = next;
@@ -476,7 +490,8 @@ export function overlayGlyphs(
  */
 export function layersOf(block: Pick<Plot, "form" | "layers">): readonly ("field" | "contour" | "quiver")[] {
   if (block.layers !== undefined) return block.layers;
-  return block.form === "contour" ? ["field", "contour"] : ["field"];
+  if (block.form === "contour") return ["field", "contour"];
+  return block.form === "quiver" ? ["field", "quiver"] : ["field"];
 }
 
 /** Whether the field itself is painted — membership, never position. */
@@ -494,4 +509,131 @@ export function paintsField(block: Pick<Plot, "form" | "layers">): boolean {
 export function glyphLayerOrder(block: Pick<Plot, "form" | "layers">): readonly ("contour" | "quiver")[] {
   const drawn = layersOf(block).filter((l): l is "contour" | "quiver" => l !== "field");
   return [...drawn].reverse();
+}
+
+// --- the quiver (I50) -------------------------------------------------------
+
+/**
+ * Eight directions, **E first and anticlockwise**, so the index is
+ * `round(atan2(v, u) ÷ 45°)` with no table between the angle and the glyph.
+ *
+ * East, north-east, north, north-west, west, south-west, south, south-east —
+ * as escapes because SS47 forbids a mark in a `src/` string literal, and
+ * `ramp.ts` spells its ladders the same way. **The comment said this before the
+ * code did**, which is the class the scan exists to catch: a literal that reads
+ * as compliant because the sentence beside it is.
+ */
+const ARROWS_UNICODE = "\u2192\u2197\u2191\u2196\u2190\u2199\u2193\u2198";
+
+/**
+ * The ASCII arm — `> / ^ \ < / v \`, **and the diagonals reuse**.
+ *
+ * A terminal has no glyph that reads as *north-east* in ASCII; `/` reads as a
+ * slope and carries both diagonals on its own line. That is a real loss of
+ * resolution and it is the honest one: inventing `7` or `'` for north-east
+ * would keep eight distinct marks and none of them would be read as a direction.
+ */
+const ARROWS_ASCII = ">/^\\</v\\";
+
+/**
+ * Which arm, and **the second conjunct is the one that is easy to drop** (I50).
+ *
+ * Every arrow in U+2190–21FF is `East_Asian_Width=Ambiguous`, so a terminal
+ * declaring `ambiguousWidth: "wide"` draws the field at double width — and a
+ * quiver whose cells double is not a quiver. That is the sentence `art.ts`
+ * makes about a wordmark and `mermaid.ts` makes about box drawing; **this is
+ * the switch's third consumer**, and unlike a frame it leaves no visible seam:
+ * the arrows are simply twice as wide as the grid they describe.
+ */
+export function arrowsFor(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): readonly string[] {
+  return [...(caps.unicode === "ascii" || caps.ambiguousWidth === "wide" ? ARROWS_ASCII : ARROWS_UNICODE)];
+}
+
+/**
+ * The arrow for a vector, or `null` where there is no flow.
+ *
+ * **A zero-magnitude cell draws nothing** (I50). Not an arrow of arbitrary
+ * direction: a cell with no flow has no direction, and `atan2(0, 0)` is `0`, so
+ * the natural implementation draws a field of still cells as a field of eastward
+ * flow — with every magnitude assertion still passing.
+ *
+ * `v` is **north-positive**, the data convention, and the row axis runs the
+ * other way; the flip is here so no caller has to know it.
+ */
+export function arrowFor(
+  u: number,
+  v: number,
+  arrows: readonly string[],
+): string | null {
+  if (!Number.isFinite(u) || !Number.isFinite(v)) return null;
+  if (u === 0 && v === 0) return null;
+  const eighth = Math.round(Math.atan2(v, u) / (Math.PI / 4));
+  return arrows[((eighth % 8) + 8) % 8] ?? null; // cells-ok — a direction count
+}
+
+/** The magnitude of each vector, as a `Series` per row. */
+export function magnitudeSeries(vectors: readonly VectorSeries[]): readonly Series[] {
+  return vectors.map((row) => ({
+    values: row.values.map((p) => (p === null ? null : Math.hypot(p[0], p[1]))),
+    ...(row.label === undefined ? {} : { label: row.label }),
+  }));
+}
+
+/**
+ * The arrows, one glyph per cell, resampled onto the area (I50).
+ *
+ * **Nearest rather than bilinear**, which is the opposite of the contour's
+ * choice and for the reason that settles it: a contour runs *between* readings
+ * and an arrow *is* one. Interpolating two vectors that point opposite ways
+ * gives a short vector pointing nowhere — a still cell where the field is at its
+ * most active.
+ */
+export function quiverRows(
+  vectors: readonly VectorSeries[],
+  areaWidth: number,
+  areaRows: number,
+  arrows: readonly string[],
+): readonly string[] {
+  const w = Math.max(0, Math.floor(areaWidth));
+  const h = Math.max(0, Math.floor(areaRows));
+  const cols = vectors[0]?.values.length ?? 0; // cells-ok — a column count
+  const out: string[] = [];
+  for (let y = 0; y < h; y += 1) {
+    let row = "";
+    const src = vectors[Math.min(vectors.length - 1, Math.floor((y / Math.max(1, h)) * vectors.length))]; // cells-ok
+    for (let x = 0; x < w; x += 1) {
+      const p = src?.values[Math.min(cols - 1, Math.floor((x / Math.max(1, w)) * cols))]; // cells-ok
+      row += p === null || p === undefined ? " " : (arrowFor(p[0], p[1], arrows) ?? " ");
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+/**
+ * The magnitude at a rendered cell, resampled exactly as `quiverRows` does.
+ *
+ * **One resampling read twice, not two derivations** — `heatmap.ts`'s own
+ * finding, where the glyph path and the colour path derived the window
+ * separately and a mutation that left-anchored one failed nothing. An arrow's
+ * colour and an arrow's direction must come from the same vector or the frame
+ * says a cell is fast while pointing where its neighbour points.
+ */
+export function magnitudeAt(
+  vectors: readonly VectorSeries[],
+  areaWidth: number,
+  areaRows: number,
+): (row: number, x: number) => number | null {
+  const w = Math.max(1, Math.floor(areaWidth));
+  const h = Math.max(1, Math.floor(areaRows));
+  const cols = vectors[0]?.values.length ?? 0; // cells-ok — a column count
+  return (row, x) => {
+    const src = vectors[Math.min(vectors.length - 1, Math.floor((row / h) * vectors.length))]; // cells-ok
+    const p = src?.values[Math.min(cols - 1, Math.floor((x / w) * cols))]; // cells-ok — a column index
+    if (p === null || p === undefined) return null;
+    const m = Math.hypot(p[0], p[1]);
+    return m === 0 ? null : m;
+  };
 }

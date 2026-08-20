@@ -17,8 +17,8 @@ import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import {
-  contourLevels, dimFactorFor, fieldSampler, glyphLayerOrder, marchingMask,
-  saddleJoinsTopLeft,
+  arrowFor, arrowsFor, contourLevels, dimFactorFor, fieldSampler, glyphLayerOrder,
+  magnitudeSeries, marchingMask, saddleJoinsTopLeft,
 } from "../../src/presentation/plot/field.js";
 import { glyphForMask } from "../../src/presentation/plot/linedraw.js";
 import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
@@ -126,6 +126,35 @@ describe("CN — the contour (C12 I49)", () => {
       values: Array.from({ length: 16 }, () => 50), label: `row${String(r)}` })); // cells-ok
     const drawn = area({ height: 4, series: flat }).join("").replace(/[\s⠀]/gu, "");
     expect(drawn).toBe("");
+  });
+
+  it("CN9 (C12 I49): a gap makes a cell uncrossable, and draws no rim", () => {
+    // **The survivor's row.** CN4 uses a constant field, which has no levels at
+    // all, so a mutation treating an absent corner as *below the level* changed
+    // nothing there and survived a run of eleven.
+    //
+    // A hole in a uniformly-high region is what separates the two readings: with
+    // absence read as zero, the rim between the hole and its neighbours crosses
+    // every level and a contour ring appears around nothing.
+    const holed = Array.from({ length: 6 }, (_v, r) => ({ // cells-ok — a row count
+      values: Array.from({ length: 24 }, (_w, c) => // cells-ok — a column count
+        (r >= 2 && r <= 3 && c >= 18 && c <= 20 ? null : c < 12 ? (c / 11) * 100 : 100)),
+      label: `row${String(r)}`,
+    }));
+    // **Both arms**, because they guard it in different places: `contourDotRows`
+    // re-checks for a null after taking the mask, so `marchingMask`'s own guard
+    // is redundant there and load-bearing on the cell arm, which does not. A row
+    // written against the default alone survived the mutation that removes it.
+    for (const style of [undefined, "line"] as const) {
+      const extra = { series: holed, ...(style === undefined ? {} : { plotStyle: style }) };
+      const cells = area(extra);
+      // The ramp is the left half and carries the contour…
+      const left = cells.map((l) => l.slice(0, 26)).join("").replace(/[\s\u2800]/gu, "");
+      expect(left, `${String(style)}: the fixture responds`).not.toBe("");
+      // …and the flat region with the hole in it carries none.
+      const right = cells.map((l) => l.slice(30)).join("").replace(/[\s\u2800]/gu, "");
+      expect(right, `${String(style)}: no rim around the hole`).toBe("");
+    }
   });
 
   it("CN5 (C12 I49): levels not declared come from niceAxis, interior only", () => {
@@ -293,5 +322,135 @@ describe("the gates (C04 I61)", () => {
     expect(() => b.plot({ form: "line", height: 4, series: [{ values: [1] }], levels: [1] } as never)).toThrow(/C04 I61/u);
     expect(() => b.plot({ form: "contour", height: 4, series: [{ values: [1] }], layers: ["contour", "contour"] } as never)).toThrow(/drawn once/u);
     expect(() => b.plot({ form: "contour", height: 4, series: [{ values: [1] }], yAxis: false } as never)).toThrow(/C04 I60/u);
+  });
+});
+
+/** A row of vectors, `[u, v]` with `v` north-positive. */
+const vec = (values: readonly (readonly [number, number] | null)[], label: string) => ({ values, label });
+
+function qrows(extra: object, w = 60, caps = FULL_CAPS): readonly string[] {
+  return kit(caps).renderToLines(block({
+    kind: "plot", id: "qv", form: "quiver", height: 3, axes: true, series: [],
+    vectors: [
+      vec([[1, 0], [1, 1], [0, 1], [-1, 1]], "a"),
+      vec([[-1, 0], [-1, -1], [0, -1], [1, -1]], "b"),
+      vec([[2, 0], [0, 0], [4, 0], null], "c"),
+    ],
+    ...extra,
+  }), w);
+}
+const qbare = (extra: object, w = 60, caps = FULL_CAPS): string[] => qrows(extra, w, caps).map(plain);
+const qarea = (extra: object, w = 60, caps = FULL_CAPS): string[] =>
+  qbare(extra, w, caps).slice(0, 3).map((l) => l.replace(/^[^┤+]*[┤+]/u, ""));
+
+describe("QV — the quiver (C12 I50)", () => {
+  it("QV1 (C12 I50): eight directions map to eight glyphs", () => {
+    const arrows = arrowsFor(FULL_CAPS);
+    const dirs: readonly (readonly [number, number])[] = [
+      [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1],
+    ];
+    const got = dirs.map(([u, v]) => arrowFor(u, v, arrows));
+    expect(got).toEqual([...arrows]);
+    expect(new Set(got).size).toBe(8); // cells-ok — a direction count
+  });
+
+  it("QV2 (C12 I50): magnitude maps through the continuous palette, per cell", () => {
+    // **Per cell** — one colour for the whole layer satisfies *the arrows are
+    // coloured* exactly, and that is what shipped until the frame was read.
+    //
+    // **Asserted where the field carries something else**, which is where the
+    // ruling puts magnitude in the arrow. Written against the default it was
+    // asserting the double encoding QV9 forbids, and it passed.
+    const styled = qrows({
+      series: [
+        { values: [1, 2, 3, 4], label: "a" },
+        { values: [4, 3, 2, 1], label: "b" },
+        { values: [2, 2, 3, 3], label: "c" },
+      ],
+    }).join("");
+    const inks = new Set([...styled.matchAll(/38;2;(\d+;\d+;\d+)m\u001b\[48;2;/gu)].map((m) => m[1]));
+    expect(inks.size, "the arrows carry magnitude when the field does not").toBeGreaterThan(1); // cells-ok — a colour count
+  });
+
+  it("QV3 (C12 I50): a zero-magnitude cell draws no arrow, and the field beneath still reads", () => {
+    const cells = qarea({});
+    // Row `c` is [2,0] · [0,0] · [4,0] · null — the still cell is blank…
+    expect(cells[2]).toMatch(/[→>]\s+[→>]/u);
+    // …and it is *not* an eastward arrow, which is what atan2(0, 0) would give.
+    const eastRun = /^[→]+$/u.test(cells[2] ?? "");
+    expect(eastRun).toBe(false);
+  });
+
+  it("QV4 (C12 I50, C12 I9): the ASCII arm renders all eight directions", () => {
+    const arrows = arrowsFor({ ...FULL_CAPS, unicode: "ascii" as const });
+    expect(arrows.join("")).toBe(">/^\\</v\\");
+    // Six distinct marks for eight directions: the diagonals reuse, and that is
+    // a stated loss rather than an invented glyph nobody reads as a direction.
+    expect(new Set(arrows).size).toBe(6); // cells-ok — a mark count
+  });
+
+  it("QV5 (C12 I50): at colourDepth 4 AND 1, direction survives and magnitude does not", () => {
+    // Asserted at **both**, because the claim was written about one depth and
+    // holds at two: `continuousColour` returns undefined below CONTINUOUS_FLOOR.
+    for (const depth of [4, 1] as const) {
+      const caps = { ...FULL_CAPS, colourDepth: depth };
+      const cells = qarea({}, 60, caps).join("");
+      expect(/[→↗↑↖←↙↓↘]/u.test(cells)).toBe(true);
+      const colours = new Set([...qrows({}, 60, caps).join("").matchAll(/38;2;(\d+;\d+;\d+)/gu)]);
+      expect(colours.size, `depth ${String(depth)}: no rgb magnitude`).toBe(0); // cells-ok — a colour count
+    }
+  });
+
+  it("QV6 (C12 I50, C02 I9): ambiguousWidth `wide` takes the ASCII arm on a unicode terminal", () => {
+    // **The conjunct that is easy to drop.** Every arrow in U+2190–21FF is
+    // `East_Asian_Width=Ambiguous`, so a wide terminal draws the field at double
+    // width — `art.ts:eligible()`'s third consumer, and the only one that leaves
+    // no visible seam.
+    const wide = { ...FULL_CAPS, unicode: "full" as const, ambiguousWidth: "wide" as const };
+    expect(arrowsFor(wide).join("")).toBe(">/^\\</v\\");
+    expect(/[→↗↑↖←↙↓↘]/u.test(qarea({}, 60, wide).join(""))).toBe(false);
+  });
+
+  it("QV7 (C12 I50): a null vector is a gap and draws nothing", () => {
+    const arrows = arrowsFor(FULL_CAPS);
+    expect(arrowFor(0, 0, arrows)).toBeNull();
+    expect(arrowFor(Number.NaN, 1, arrows)).toBeNull();
+    // A gap and a still cell are both blank; what tells them apart is the field
+    // beneath, which has a reading for one and none for the other.
+    const mag = magnitudeSeries([vec([[0, 0], null], "z")]);
+    expect(mag[0]?.values).toEqual([0, null]);
+  });
+
+  it("QV8 (C12 I50): the field beneath a quiver is the vectors' magnitude when no scalar is named", () => {
+    // The legend's bounds are the magnitudes', not 0–1 or the arrows' components.
+    expect(qbare({}).at(-1)).toMatch(/\b4\b/u);
+  });
+
+  it("QV9 (C12 I50): an arrow is never drawn in its own cell's background colour", () => {
+    // **The defect only the frame could show.** Where the caller names no
+    // scalar the field *is* the magnitude, so colouring the arrow by magnitude
+    // too painted it in exactly its own background — `38;2;33;145;141` on
+    // `48;2;33;145;141`, an invisible arrow at full colour depth. Every other
+    // assertion passed: the field painted, the arrows were there, and QV2 saw
+    // more than two distinct colours.
+    //
+    // One datum, one channel. Asserted on the SGR because both readings produce
+    // the same stripped frame.
+    for (const spec of [{}, { layers: ["field", "quiver"] as const }]) {
+      for (const row of qrows(spec)) {
+        for (const m of row.matchAll(/38;2;(\d+;\d+;\d+)m\u001b\[48;2;(\d+;\d+;\d+)m/gu)) {
+          expect(m[1], "arrow drawn in its own background").not.toBe(m[2]);
+        }
+      }
+    }
+  });
+
+  it("the gates: vectors off quiver, and a quiver with none", () => {
+    const r = validateDocument({
+      version: 1,
+      blocks: [{ kind: "plot", id: "g", form: "line", height: 4, series: [{ values: [1] }], vectors: [] }],
+    });
+    expect(r.ok ? [] : r.error.filter((m) => /vectors/u.test(m))).not.toEqual([]);
+    expect(() => b.plot({ form: "quiver", height: 3, series: [] } as never)).toThrow(/vectors/u);
   });
 });

@@ -33,6 +33,15 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
       { values: [2, 2, 3, 3], label: "c" },
     ],
   }),
+  quiver: block({
+    kind: "plot", id: "form-quiver", form: "quiver", height: 3, axes: true,
+    series: [],
+    vectors: [
+      { values: [[1, 0], [0, 1], [-1, 0], [0, -1]], label: "a" },
+      { values: [[1, 1], [-1, 1], [-1, -1], [1, -1]], label: "b" },
+      { values: [[2, 0], [0, 0], [0, 2], [1, 1]], label: "c" },
+    ],
+  }),
   scatter: block({
     kind: "plot", id: "form-scatter", form: "scatter", height: 5, axes: true,
     series: [s([1, 3, 2, 5, 4])],

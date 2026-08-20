@@ -23,7 +23,7 @@ change is the signal.
 what both halves independently took before F183 and is why a *style* was
 uncomparable: a candlestick is `form: "line"`. The extras are `EXTRA_VARIANTS`
 in `export-fixtures.ts`. So this table ranks
-**43 of 127 catalogue variants**, and the rest are unread rather than passing —
+**45 of 140 catalogue variants**, and the rest are unread rather than passing —
 adding one means adding a reference renderer beside it.
 
 | form | grid | ink | extent |
@@ -59,6 +59,8 @@ adding one means adding a reference renderer beside it.
 | step | 64x16 | 4.0% | — *fewer than two bands — ours 1, theirs 1* |
 | dotplot | 64x16 | 1.9% | — *fewer than two bands — ours 1, theirs 1* |
 | heatmap | — | — | *C04 I50b — no `axes: false`; lifts with furniture.ts `AreaContent`* |
+| contour | — | — | *C04 I50b — as heatmap; its rows are the field's rows and the legend names the levels* |
+| quiver | — | — | *C04 I50b — as heatmap; and its glyph is the whole cell, so an ink mask says only *an arrow landed here** |
 | flame | — | — | *no reference renderer — see reference.py SKIPPED* |
 | icicle | — | — | *no reference renderer — see reference.py SKIPPED* |
 | utilisation | — | — | *C04 I50b — as heatmap; the refusal reaches it now* |
