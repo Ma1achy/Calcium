@@ -32,6 +32,7 @@ import { glyphs } from "../blocks/glyphs.js";
 import { pad, padStart } from "../blocks/paint.js";
 import { cells, truncate } from "../text.js";
 import { extentFor, extentRun, pairFor } from "./ramp.js";
+import { QUAD_BL, QUAD_BR, QUAD_TL, QUAD_TR, quadrantGlyph } from "./linedraw.js";
 import { niceAxis } from "./axes.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
@@ -59,7 +60,6 @@ const VALUE_RINGS: readonly number[] = Object.freeze([0.2, 0.4, 0.6, 0.8]);
  * continuous rings inside it is a grey wash where a scale was wanted.
  */
 const ARC_STEP = 1;
-const RING_STEP = 4;
 
 /**
  * The smallest ring worth drawing, in dots.
@@ -70,8 +70,6 @@ const RING_STEP = 4;
  */
 const MIN_RING_DOTS = 4;
 
-/** The spokes, and they are a guide rather than a reading (C12 I23's instinct). */
-const SPOKE_DASH: Dash = Object.freeze({ on: 2, off: 2 });
 
 // --- geometry ---------------------------------------------------------------
 
@@ -537,6 +535,8 @@ export type RadarRender = Readonly<{
   labels: readonly string[];
   legend: readonly (readonly MarkedText[])[];
   discWidth: number;
+  /** The line arm's composed figure, owners and all — absent for braille. */
+  figure?: readonly (readonly MarkedText[])[];
 }>;
 
 /** The scale a radar is read against — a round ceiling, so the rings are round. */
@@ -567,13 +567,20 @@ function frameRows(d: Disc, categories: readonly string[]): readonly string[] {
   const grid = createGrid(d.dotWidth, d.dotHeight);
   const n = categories.length; // cells-ok — a category count
 
+  // **Continuous, and the weight is carried by colour** (C12 I43, §3w). The
+  // rings stepped every fourth dot and the spokes dashed two-on-two-off, on
+  // §3g's rule that a scale drawn as heavily as the data competes with it —
+  // which is an argument about *weight* and was answered by leaving holes. A
+  // stippled ring does not read as a lighter ring; it reads as a broken one.
+  // The frame is `tone.muted` and the polygons carry their series' slots, so
+  // the separation is already there and the scale can be a scale.
   arcDots(grid, d, 1, 0, TAU, ARC_STEP);
   for (const t of VALUE_RINGS) {
-    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU, RING_STEP);
+    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU, ARC_STEP);
   }
   for (let i = 0; i < n; i += 1) {
     const a = START_ANGLE + (TAU * i) / n;
-    strokeDashed(grid, [d.cx, d.cy], at(d, a, 1), SPOKE_DASH);
+    strokeDashed(grid, [d.cx, d.cy], at(d, a, 1), SOLID_DASH);
   }
   return foldBraille(grid);
 }
@@ -637,12 +644,131 @@ function markVertex(grid: Grid, point: readonly [number, number]): void {
   }
 }
 
+/**
+ * The line-drawn radar: **one figure, quadrant blocks, an owner per sub-cell**
+ * (C12 I43, §3w).
+ *
+ * Three alphabets were tried and refused before this one, and each failure is a
+ * different thing.
+ *
+ * **`strokePolyline` steps orthogonally** and every edge of a pentagon is
+ * oblique, so the figure was a staircase. **`╱` and `╲` per cell** draw a clean
+ * pentagon *in isolation* and compose to rubble, because `mergedRow` unions
+ * braille and resolves everything else first-wins (I40) — the labels, the
+ * polygons and the frame each took cells from the others. **One grid with an
+ * owner per cell** fixes that and still renders as dashes: those two glyphs are
+ * strokes inside a box and do not reach their corners.
+ *
+ * The quadrant blocks are **filled sub-cells**, so consecutive cells touch. Half
+ * braille's vertical resolution and the same horizontal, traded for coverage —
+ * the right trade for a *shape*, where braille's is right for a *curve*.
+ *
+ * The composition is the third attempt's, kept: one grid, no merge, an owner per
+ * sub-cell. A cell can carry two shapes in different quadrants while its tone is
+ * one layer's — I40's limit again, biting less at 2×2 than at 1×1 because the
+ * glyph keeps both and only the tone is chosen.
+ */
+function radarQuadFigure(
+  d: Disc,
+  categories: readonly string[],
+  series: readonly Series[],
+  ceiling: number,
+  labels: readonly string[],
+): readonly (readonly MarkedText[])[] {
+  const cols = Math.ceil(d.dotWidth / BRAILLE_DOTS.x); // cells-ok — a column count
+  const rows = Math.ceil(d.dotHeight / BRAILLE_DOTS.y); // cells-ok — a row count
+  const sx = cols * 2; // cells-ok — a sub-cell column count
+  const sy = rows * 2; // cells-ok — a sub-cell row count
+  const bits = new Uint8Array(sx * sy);
+  const owner = new Int16Array(sx * sy).fill(-1);
+  const furniture = series.length; // cells-ok — a series count
+
+  const mark = (x: number, y: number, who: number): void => {
+    if (x < 0 || y < 0 || x >= sx || y >= sy) return; // cells-ok — a sub-cell position
+    bits[y * sx + x] = 1;
+    owner[y * sx + x] = who; // cells-ok — a sub-cell position
+  };
+  // A straight run in sub-cells. Every sample is one sub-cell apart, so the
+  // stroke is connected by construction rather than by a glyph choice.
+  const run = (a: readonly [number, number], b: readonly [number, number], who: number): void => {
+    const steps = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])); // cells-ok — a sub-cell count
+    if (steps === 0) { mark(a[0], a[1], who); return; }
+    for (let i = 0; i <= steps; i += 1) { // cells-ok — a sub-cell count
+      mark(Math.round(a[0] + ((b[0] - a[0]) * i) / steps), Math.round(a[1] + ((b[1] - a[1]) * i) / steps), who);
+    }
+  };
+  const sub = (angle: number, t: number): [number, number] => {
+    const [x, y] = at(d, angle, t);
+    return [
+      Math.max(0, Math.min(sx - 1, Math.round((x / BRAILLE_DOTS.x) * 2))), // cells-ok — a sub-cell column
+      Math.max(0, Math.min(sy - 1, Math.round((y / BRAILLE_DOTS.y) * 2))), // cells-ok — a sub-cell row
+    ];
+  };
+  const n = Math.max(1, categories.length); // cells-ok — a category count
+  const ring = (t: number, who: number, values?: readonly (number | null)[]): void => {
+    const pts = Array.from({ length: n }, (_p, i) => { // cells-ok — a vertex count
+      const v = values?.[i];
+      const at01 = values === undefined
+        ? t
+        : v !== null && v !== undefined && Number.isFinite(v) ? Math.max(0, Math.min(1, v / ceiling)) : 0;
+      return sub(START_ANGLE + (TAU * i) / n, at01);
+    });
+    for (let i = 0; i < pts.length; i += 1) run(pts[i]!, pts[(i + 1) % pts.length]!, who); // cells-ok — a vertex count
+  };
+
+  // Furniture first, so the data paints over it.
+  ring(1, furniture);
+  for (const t of VALUE_RINGS) if (d.r * t >= MIN_RING_DOTS) ring(t, furniture);
+  for (let i = 0; i < n; i += 1) { // cells-ok — a vertex count
+    run(sub(0, 0), sub(START_ANGLE + (TAU * i) / n, 1), furniture);
+  }
+  series.forEach((sr, si) => { ring(1, si, sr.values); });
+
+  const gridRows: (readonly MarkedText[])[] = [];
+  for (let cy = 0; cy < rows; cy += 1) { // cells-ok — a cell row
+    const out: MarkedText[] = [];
+    for (let cx = 0; cx < cols; cx += 1) { // cells-ok — a cell column
+      const quads = [
+        [cx * 2, cy * 2, QUAD_TL], [cx * 2 + 1, cy * 2, QUAD_TR],
+        [cx * 2, cy * 2 + 1, QUAD_BL], [cx * 2 + 1, cy * 2 + 1, QUAD_BR],
+      ] as const;
+      let mask = 0;
+      let who = -1;
+      for (const [x, y, bit] of quads) {
+        if (bits[y * sx + x] !== 1) continue; // cells-ok — a sub-cell position
+        mask |= bit;
+        const o = owner[y * sx + x] ?? -1; // cells-ok — a sub-cell position
+        // **A cell holding any data takes that data's tone, and `Math.max` gave
+        // it the furniture's.** `furniture` is `series.length`, greater than
+        // every series index, so the largest owner in a cell was the frame
+        // wherever the frame touched it — and a polygon crossing a ring lost its
+        // colour cell by cell. The glyph keeps every quadrant either way; this
+        // decides only which of them the tone follows.
+        if (o < furniture) who = who < 0 || who >= furniture ? o : Math.max(who, o); // cells-ok — a series index
+        else if (who < 0) who = o; // cells-ok — a series index
+      }
+      const label = [...(labels[cy] ?? "")][cx]; // cells-ok — a cell column
+      // The names last and whole, so a word a polygon crosses stays a word.
+      const named = label !== undefined && label !== " ";
+      const text = named ? label : quadrantGlyph(mask);
+      const index = named ? furniture : who;
+      const prev = out[out.length - 1]; // cells-ok — a piece count
+      if (prev !== undefined && prev.index === index) out[out.length - 1] = { text: prev.text + text, index }; // cells-ok — a piece count
+      else out.push({ text, index });
+    }
+    gridRows.push(out);
+  }
+  return gridRows;
+}
+
 export function radarRender(
   series: readonly Series[],
   categories: readonly string[],
   areaWidth: number,
   areaRows: number,
   caps: Caps,
+  /** A connected figure in quadrant blocks rather than braille dots (C12 I43, §3w). */
+  lineDraw = false,
 ): RadarRender {
   const w = Math.max(0, Math.floor(areaWidth));
   const h = Math.max(0, Math.floor(areaRows));
@@ -720,6 +846,11 @@ export function radarRender(
   });
 
   return {
+    // **One figure and no merge for the line arm** — the layers below are the
+    // braille arm's, and at cell resolution they eat each other (I40).
+    ...(lineDraw
+      ? { figure: radarQuadFigure(disc, categories, series, ceiling, labelRows(disc, categories, discWidth, h, caps)) }
+      : {}),
     polygons,
     frame: frameRows(disc, categories),
     labels: labelRows(disc, categories, discWidth, h, caps),

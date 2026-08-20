@@ -99,13 +99,36 @@ const results = runPass({
       expect: "SA7",
     },
     {
-      // The record is the refusal now: three attempts established that a
-      // radar's polygons cannot be drawn at cell resolution, so `line` is not
-      // one of its arms.
-      name: "the radar is given a line arm again",
-      file: TYPES,
-      from: '  radar: ["braille"],',
-      to: '  radar: ["braille", "line"],',
+      name: "the radar's line arm is not wired",
+      file: DEFN,
+      from: 'const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities, block.plotStyle === "line");',
+      to: "const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities);",
+      expect: "SA6",
+    },
+    {
+      // **The alphabet, which is the whole finding.** `╱` and `╲` are strokes
+      // inside a box and miss their corners; a quadrant is a filled sub-cell.
+      name: "the quadrant fold gives back a box-drawing stroke",
+      file: "src/presentation/plot/linedraw.ts",
+      from: "  return QUADRANTS[mask & 0xf] ?? \" \";",
+      to: "  return mask === 0 ? \" \" : \"\\u2571\";",
+      expect: "SA6",
+    },
+    {
+      // The frame's stipple, which answered a question about weight with holes.
+      name: "the rings and spokes are stippled again",
+      file: CIRC,
+      from: "    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU, ARC_STEP);",
+      to: "    if (d.r * t >= MIN_RING_DOTS) arcDots(grid, d, t, 0, TAU, 4);",
+      expect: "SA6",
+    },
+    {
+      // `furniture` is `series.length`, greater than every series index, so a
+      // max over a cell's owners gave the frame's tone to a polygon crossing it.
+      name: "the cell's tone is the largest owner in it",
+      file: CIRC,
+      from: "        if (o < furniture) who = who < 0 || who >= furniture ? o : Math.max(who, o); // cells-ok — a series index\n        else if (who < 0) who = o; // cells-ok — a series index",
+      to: "        who = Math.max(who, o); // cells-ok — a series index",
       expect: "SA6",
     },
   ],

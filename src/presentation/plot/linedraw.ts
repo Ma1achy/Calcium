@@ -247,3 +247,37 @@ export function strokePolyline(
     stepTo(last[0], last[1], first[0], first[1]);
   }
 }
+
+/**
+ * The quadrant alphabet — a 2×2 sub-cell mask to a glyph (C12 I43, §3w).
+ *
+ * **`glyphForMask`'s question in the other alphabet, and the reason it exists is
+ * a measurement.** Box drawing has exactly two diagonals and neither reaches
+ * its cell corners, so a run of `╱` renders as dashes and a polygon drawn from
+ * them has no recoverable shape. The quadrant blocks U+2596–U+259F are *filled*
+ * sub-cells: consecutive cells touch, because each is a solid rectangle rather
+ * than a stroke inside a box.
+ *
+ * Half braille's vertical resolution and the same horizontal, traded for
+ * coverage — which is the right trade for a **shape**, where braille's is right
+ * for a *curve*. A radar is oblique edges that cross, and it needs the one that
+ * connects.
+ *
+ * **Unicode only, and the caller must not reach it below that** — a radar
+ * degrades to `radarAsciiRows` before this, so there is no ASCII rung to state
+ * rather than one omitted.
+ */
+export const QUAD_TL = 1;
+export const QUAD_TR = 2;
+export const QUAD_BL = 4;
+export const QUAD_BR = 8;
+
+const QUADRANTS: readonly string[] = Object.freeze([
+  " ", "\u2598", "\u259d", "\u2580", "\u2596", "\u258c", "\u259e", "\u259b",
+  "\u2597", "\u259a", "\u2590", "\u259c", "\u2584", "\u2599", "\u259f", "\u2588",
+]);
+
+/** The glyph for a 2×2 mask of filled quadrants. */
+export function quadrantGlyph(mask: number): string {
+  return QUADRANTS[mask & 0xf] ?? " ";
+}

@@ -1520,7 +1520,7 @@ a union in the same family, for the same reason those are.
 | violin `plotStyle: "braille"` | the outline is strokes in the **dot grid** — 2×4 per cell, which is where the smoothness comes from | **the geometry.** I39's odd extent, §3i's rungs and the budgets are the figure's, not the vocabulary's |
 | violin `plotFill: "solid"` | the dots between the two edges are set | the box and the summary marks, which stay cell-resolution and composite **over** the fill |
 | pie `plotStyle: "solid"` | wedges are `█` at cell resolution — coarser, and with no inter-dot gaps at all | the wedge arithmetic, the legend, the minimum-fraction rule |
-| radar `plotStyle: "line"` | **nothing — the arm was built, measured and removed** | see below; braille is the radar's vocabulary and the record says so |
+| radar `plotStyle: "line"` | **the whole figure** — boundary, rings, spokes and polygons, in **quadrant blocks** | the geometry, the ceiling, the legend; and `plotStyle` still names *what*, never the alphabet |
 
 ### Two rulings the table does not carry
 
@@ -1545,30 +1545,43 @@ I40 unions the dots where two layers ink one cell, **and the union is braille's 
 The braille radar therefore draws both polygons where they cross and **the line-drawn one does
 not**: the nearer layer keeps the cell and the further loses it.
 
-#### The radar's line arm was built three times and removed, and the reason is the alphabet
+#### The radar's line arm took four alphabets, and the fourth is the one that connects
 
-**Asked for, attempted, and refused on measurement** — recorded here rather than left as a gap,
-because *why not* is the useful half.
+**§3c's rule is what this ended up proving**: *a renderer names an axis, never a vocabulary*.
+`plotStyle: "line"` says **draw this as a connected line**; which glyphs do it is the renderer's,
+and three of them could not.
 
-1. **`strokePolyline`, which steps orthogonally.** Every edge of a pentagon is oblique, so the
-   figure came back a staircase whose shape a reader cannot recover.
-2. **Diagonal glyph slots and a per-cell stroke.** A pentagon drawn *in isolation* is clean — the
-   algorithm is right. The composed figure was rubble, because `mergedRow` unions braille and
-   resolves everything else first-wins: I40's stated limit, arriving. The labels, two polygons and
-   the frame each ate the others.
-3. **One grid with an owner per cell** — `ridgelineArea`'s mechanism, so there is no merge at all.
-   Still dashes. `╱` and `╲` do not reach their cell corners, so a run of them never connects.
+| attempt | what it fixed | what it left |
+|---|---|---|
+| `strokePolyline` | — | steps orthogonally, and every edge of a pentagon is oblique: a staircase |
+| `╱` / `╲` slots and a per-cell stroke | the shape — **a pentagon in isolation is clean** | composed, rubble |
+| one grid, an owner per cell | the composition — no merge at all | **still dashes** |
+| **quadrant blocks** U+2596–U+259F | the alphabet | — |
 
-The third is a property of the **alphabet**, not of this component, and nothing here can fix it.
-Braille has eight sub-cell dots, they connect, and they union where two layers meet — so it is the
-radar's vocabulary, `STYLE_ARMS.radar` is `["braille"]`, and asking for `line` is refused at
-construction rather than drawn badly.
+**The second failure is I40's stated limit arriving.** `mergedRow` unions braille and resolves
+everything else first-wins, so the labels, the polygons and the frame each took cells from the
+others. *A clean pentagon rendered alone beside fragments rendered together* is what separated the
+stroke from the merge — the same input, two answers.
 
-**A frame in one alphabet and data in another is what prompted this**, and it was a real defect:
-the polygons had been line-drawn while the rings stayed stippled braille, which reads as an
-unfinished picture. Making the frame follow the style was right, and pursuing it is what produced
-the three measurements above. *The fork that survives a frame-read is not always the one that was
-asked for.*
+**The third is the one that settles the alphabet.** `╱` U+2571 and `╲` U+2572 are *strokes inside a
+box* and do not reach their cell corners, so a run of them renders as dashes whatever the geometry
+upstream does. The quadrant blocks are **filled sub-cells**: consecutive cells touch because each
+is a solid rectangle. Half braille's vertical resolution and the same horizontal, traded for
+coverage — which is the right trade for a **shape**, where braille's is right for a *curve*.
+
+The composition stays the third attempt's: one grid, an owner per sub-cell, no merge. **A cell can
+carry two shapes in different quadrants while its tone is one layer's** — I40's limit again, and it
+bites less at 2×2 than at 1×1, because the glyph keeps both and only the tone is chosen. *Data
+takes the tone over furniture, and `Math.max` gave it the frame:* `furniture` is `series.length`,
+greater than every series index, so a polygon crossing a ring lost its colour cell by cell.
+
+#### The frame is continuous, and the stipple was answering the wrong question
+
+The rings stepped every fourth dot and the spokes dashed two-on-two-off, on §3g's rule that *a
+scale drawn as heavily as the data competes with it*. That is an argument about **weight** and it
+was answered by leaving **holes** — and a stippled ring does not read as a lighter ring, it reads
+as a broken one. The frame is `tone.muted` and the polygons carry their series' slots, so the
+separation is already there and the scale can be a scale.
 
 That is the same trade the pie makes in the other direction — a solid pie has no seams and a
 braille pie has no gaps — and it is why both are shipped rather than one being chosen. *Neither
@@ -2620,7 +2633,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I40** — **Where two layers ink one cell the merge is per dot, and the colour is the first layer's.** `mergedRow` resolved the whole cell to the first layer that inked it, and every figure that composites — a pie's wedges, a radar's polygons over its frame — is folded to braille *before* it arrives, so the second layer's dots were dropped. *A pie's disc is fully covered by construction and `pie-default-40` had seven cells flanked by a full cell on each side that were not themselves full; the radar had it twice, its polygons eating each other and its frame drawn only in the cells nothing else wanted — which reads as dashed strokes and is not, because `dashFor` is solid at any depth above one bit.* A braille cell is `U+2800 + bits`, so the union is `0x2800 | (bitsA | bitsB)`; where any candidate is **not** braille the first-wins rule stands, because a letter and a polygon cannot share a cell. **The colour remains one layer's and that is a limit of the span model, not an oversight** — two wedges meeting in a cell draw both sets of dots in the first wedge's colour, so what the union removes is the gap and not the boundary's exactness, and saying *the gaps are fixed* would imply a per-dot colour a `Span` cannot carry. **The priority order stays the ref's** rather than becoming the densest layer's, because that order is a ruling — labels over polygons over frame — and a dot count would overturn it wherever the frame was denser (§3u).
 - **I41** — **The positional family's x axis is nice numbers over a declared domain, and the sample index is what it falls back to.** `Plot` gains `xMin` / `xMax` / `xFormat` mirroring the y axis — the same `axisFor`, the same precision, the same formatter — and absent them the domain is `[0, n − 1]`, which is what the data has when nothing else was said. *Measured: `ax.plot(y)` over 24 samples ticks 0 5 10 15 20.* **The row it draws in was already reserved**: `axes: true` adds `AXIS_ROWS + FRAME_ROWS` to the declared height rather than taking it, and with no `xLabels` the third of those rows rendered as `""` — so every axed positional plot had been spending a row on an x-label row it never filled, and filling it costs nothing against I1. **`xLabels` wins where both are present**, because a caption is the caller's words and a scale is inferred, and overriding the first with the second is the wrong direction. A label that cannot keep its one-cell gap is dropped **with its tick**, `plotFrame: "corners"` draws the labels and no ticks — a tick is a mark on an edge and there is no edge, where a label is still a reading — and a log or time scale is labelled through `axisFor` or the two halves of one axis disagree. **The form owns the index-to-column mapping** (I37): a candlestick's ticks come from its own pitch, and the curve's rule would place them between candles at every width where the two separate (§3d.1).
 - **I42** — **A histogram bins every series on one shared edge set, and `layout: "overlap"` cannot mean *draw the first one*.** Binned on its own extent each series fills the width, so two distributions of different spreads draw the same picture and the comparison is gone — I35's argument one form along, and the reference's answer: `ax.hist([a, b], bins=8)` returns one edge array over the union and a count array per dataset. **The strategy's inputs are the union's too**, because the edges are: a bin *count* chosen from one series' `n` and spread belongs to edges that are not that series'. *The default layout dropped every series after the first and the legend named them all, so the picture asserted a series it did not draw — I8's rule, in the arm beside the one whose comment records being fixed for it.* **There is no overlapping picture a bar can draw** — two runs superimposed in one row of cells is one run — so `overlap` with more than one series means **grouped**, for the bar and the histogram alike, which is also what `ax.hist([a, b])` draws. Binned, a histogram *is* a bar chart of counts, so all four layouts arrive from the bar rather than being invented. **The vertical arm needed the `refFor` its transpose already had**, or N×S column bands draw in one colour under a legend naming S; and a series with no finite values keeps its bands, because dropping it renumbers the groups and the bin a reader is looking at holds different series in different bins (§3v).
-- **I43** — **Which styles a form has an arm for is a total record, and a fill is the braille arm's.** `plotStyle` was a shared union with `candlestick` refused on the wrong form by a clause naming that style — right, and a special case: every style is one some forms draw and others do not, and a second would want a second clause. `STYLE_ARMS` is `Record<PlotForm, readonly PlotStyle[]>`, total, and the refusal is one rule over it. **A braille violin changes the vocabulary and not the geometry** — the outline strokes the dot grid at 2×4 a cell, which is where the smoothness comes from, while I39's odd extent and §3i's rungs stay the figure's; the box and the summary marks remain cell-resolution and composite over the fill. **`plotFill` is refused on the line arm** rather than ignored, because a box-drawing outline has no interior vocabulary and putting `█` inside `╭──╮` is a third figure rather than the same one filled. **A solid pie degrades to braille at one bit and does not refuse** — the hatch ladder is that depth's identity channel and a block glyph has no hatch, so I18's precedent applies: where the capability cannot spare what a figure needs the honest answer is the thing that fits, not an error the caller could not have avoided. **And a radar has no line arm at all, which was built three times before it was refused**: `strokePolyline` steps orthogonally and a pentagon's every edge is oblique; diagonal glyphs and a per-cell stroke draw a clean pentagon *in isolation* and compose to rubble, because I40's union is braille's alone and the labels, the polygons and the frame each take cells from the others; and one grid with an owner per cell — `ridgelineArea`'s mechanism, no merge at all — still renders as dashes, because `╱` and `╲` do not reach their cell corners. **The last is a property of the alphabet and not of this component.** Braille has eight sub-cell dots, they connect and they union, so `STYLE_ARMS.radar` is `["braille"]` and `line` is refused rather than drawn badly. *The pie keeps both arms for the opposite reason — a solid pie has no seams and a braille pie has no gaps, and neither loses the shape* (§3w).
+- **I43** — **Which styles a form has an arm for is a total record, and a fill is the braille arm's.** `plotStyle` was a shared union with `candlestick` refused on the wrong form by a clause naming that style — right, and a special case: every style is one some forms draw and others do not, and a second would want a second clause. `STYLE_ARMS` is `Record<PlotForm, readonly PlotStyle[]>`, total, and the refusal is one rule over it. **A braille violin changes the vocabulary and not the geometry** — the outline strokes the dot grid at 2×4 a cell, which is where the smoothness comes from, while I39's odd extent and §3i's rungs stay the figure's; the box and the summary marks remain cell-resolution and composite over the fill. **`plotFill` is refused on the line arm** rather than ignored, because a box-drawing outline has no interior vocabulary and putting `█` inside `╭──╮` is a third figure rather than the same one filled. **A solid pie degrades to braille at one bit and does not refuse** — the hatch ladder is that depth's identity channel and a block glyph has no hatch, so I18's precedent applies: where the capability cannot spare what a figure needs the honest answer is the thing that fits, not an error the caller could not have avoided. **And a radar's line arm took four alphabets**, which is §3c proving itself: `plotStyle` names *draw this as a connected line* and the glyphs are the renderer's. `strokePolyline` steps orthogonally and a pentagon's every edge is oblique; `╱`/`╲` draw a clean pentagon *in isolation* and compose to rubble, because I40's union is braille's alone and the labels, polygons and frame each take cells from the others; one grid with an owner per cell fixes that and **still renders as dashes**, because those two glyphs are strokes inside a box and do not reach their corners. **Quadrant blocks are filled sub-cells and connect.** Half braille's vertical resolution and the same horizontal, traded for coverage — the right trade for a *shape* where braille's is right for a *curve*. **And the frame is continuous**: stippling answered a question about weight by leaving holes, and a stippled ring reads as a broken one rather than a light one, where `tone.muted` against the series' slots already separates them. *The pie keeps both its arms for the complementary reason — a solid pie has no seams and a braille pie has no gaps, and neither loses the shape* (§3w).
 
 ## 8. Commitments
 

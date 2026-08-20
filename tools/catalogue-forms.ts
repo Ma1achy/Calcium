@@ -852,6 +852,16 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   radar: {
+    // The line arm, in quadrant blocks (C12 I43, §3w) — connected where box
+    // drawing's diagonals are not.
+    line: {
+      form: "radar", height: 17, plotStyle: "line",
+      categories: ["Speed", "Power", "Range", "Defence", "HP"],
+      series: [
+        { ...s([8, 6, 7, 5, 9]), label: "alpha" },
+        { ...s([5, 9, 4, 8, 6]), label: "beta" },
+      ],
+    },
     // **Height is what sizes a circle**, because `rx = 2 · ry` is the cell
     // aspect and nothing can widen a disc past what its rows allow. At 10 the
     // figure was 20 columns in an 80-cell frame and two braille polygons

@@ -9826,3 +9826,68 @@ each alphabet reads as unfinished, and §3g's *a scale drawn as heavily as the d
 is an argument about **weight**, not about kind. Fixing it is what forced the whole figure into cell
 glyphs, and that is what made the alphabet's limit visible. **The fork that survives a frame-read is
 not always the one that was asked for.**
+
+---
+
+## F198 — four alphabets for one line, and the stipple that answered the wrong question ★★★★
+
+| | |
+|---|---|
+| **Surface** | the radar — its frame in braille, and its line arm in three vocabularies that could not draw a polygon |
+| **Reached for** | a user: *the braille lines have gaps* and *try it again with other chars* |
+| **Verdict** | **`plotStyle` names what to draw and the alphabet is the renderer's — §3c proving itself** |
+| **Absorbed by** | quadrant blocks for the line arm; a continuous frame for both |
+
+### The line arm, four times
+
+| attempt | fixed | left |
+|---|---|---|
+| `strokePolyline` | — | steps orthogonally; every edge of a pentagon is oblique, so it staircases |
+| `╱` / `╲` slots, per-cell stroke | **the shape** — a pentagon in isolation is clean | composed, rubble |
+| one grid, an owner per cell | **the composition** — no merge at all | **still dashes** |
+| **quadrant blocks** U+2596–U+259F | **the alphabet** | — |
+
+**The second failure is I40's stated limit arriving.** `mergedRow` unions braille and resolves
+everything else first-wins, so the labels, the polygons and the frame each took cells from the
+others. *A clean pentagon rendered alone beside fragments rendered together* — the same input, two
+answers — is what separated the stroke from the merge, and neither reading was available from the
+composed frame on its own.
+
+**The third settles it.** `╱` U+2571 and `╲` U+2572 are *strokes inside a box*: they do not reach
+their cell corners, so a run of them renders as dashes whatever the geometry upstream does. The
+quadrant blocks are **filled sub-cells** — consecutive cells touch because each is a solid
+rectangle. Half braille's vertical resolution and the same horizontal, traded for coverage, which
+is the right trade for a **shape** where braille's is right for a **curve**.
+
+**And §3c is what the answer turned out to be.** *A renderer names an axis, never a vocabulary* —
+`plotStyle: "line"` says *draw this as a connected line*, and which glyphs do it is the renderer's.
+The previous commit removed the arm and justified it with *box drawing has no connecting diagonal*,
+which is true and is a fact about **one** alphabet rather than about the fork.
+
+### The frame's gaps were deliberate and were the wrong answer
+
+The value rings stepped every fourth dot and the spokes dashed two-on-two-off, on §3g's *a scale
+drawn as heavily as the data competes with it*. **That is an argument about weight and it was
+answered by leaving holes.** A stippled ring does not read as a lighter ring; it reads as a broken
+one — which is what the user saw. The frame is `tone.muted` and the polygons carry their series'
+slots, so the separation was already there.
+
+### Two measurements that changed the tests
+
+**The total ink is not the signal.** Stippling takes the figure from 289 inked cells to 266 — 7%,
+which no honest threshold separates. What a reader sees is a *ring crossing a row*, so the
+assertion is the **longest unbroken run**: 25 continuous against 15 stippled on the bare fixture,
+20 against less on the labelled one.
+
+**And `Math.max` gave the frame's tone to the data.** `furniture` is `series.length`, greater than
+every series index, so the largest owner in a cell was the frame wherever the frame touched it — a
+polygon crossing a ring lost its colour cell by cell. **The glyph keeps every quadrant either way**,
+so only a colour row can see it, and there was none until the mutation pass asked.
+
+### And a `git checkout` destroyed the work mid-measurement
+
+Restoring `circle.ts` to compare a stippled render against a continuous one took the **uncommitted
+quadrant arm** with it — `git checkout <path>` is a restore from the index, not an undo, which this
+repository's own notes record. Rebuilt from the edit scripts, then committed as a checkpoint
+*before* the next measurement rather than after. **A measurement that mutates the tree needs the
+tree committed first**, and copying the file aside is the cheaper habit.

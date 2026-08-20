@@ -181,39 +181,102 @@ describe("SA5 (C12 I43): a solid pie folds the same geometry", () => {
   });
 });
 
-describe("SA6 (C12 I43): a radar has no line arm, and the reason is measured", () => {
-  // **Three attempts established this rather than one opinion.**
+describe("SA6 (C12 I43): a radar's line arm draws in the alphabet that connects", () => {
+  // **Four alphabets, and §3c is what the answer turned out to be**: a renderer
+  // names an axis, never a vocabulary. `plotStyle: "line"` says *draw this as a
+  // connected line*; which glyphs do it is the renderer's, and three could not.
   //
-  //   1. The polygons drawn with `strokePolyline` — orthogonal only, so a
-  //      pentagon came back a staircase and the shape was unrecoverable.
-  //   2. Diagonal glyphs added and a per-cell stroke written: a pentagon drawn
-  //      *in isolation* is clean. The composed figure was rubble, because
-  //      `mergedRow` unions braille and resolves everything else first-wins —
-  //      C12 I40's stated limit, arriving.
-  //   3. One grid with an owner per cell, `ridgelineArea`'s mechanism, so there
-  //      is no merge at all. Still dashes: `╱` and `╲` do not reach their cell
-  //      corners, so a run of them never connects.
-  //
-  // The third is a property of the alphabet and not of this code. Braille has
-  // eight sub-cell dots, connects, and unions — so it is the radar's vocabulary
-  // and the record says so.
-  it("the style is refused at construction", () => {
-    const bad = validateBlock({
-      kind: "plot", id: "sa6", form: "radar", height: 17,
-      categories: ["a", "b", "c"], series: [{ values: [1, 2, 3] }], plotStyle: "line",
-    });
-    expect(bad.ok).toBe(false);
-    expect(JSON.stringify(bad)).toContain("arms for braille");
+  //   1. `strokePolyline` — orthogonal only, so a pentagon is a staircase.
+  //   2. `╱` / `╲` per cell — a clean pentagon *in isolation*, rubble composed,
+  //      because I40's union is braille's alone and every layer ate the others.
+  //   3. One grid with an owner per cell — no merge, and **still dashes**:
+  //      those two glyphs are strokes inside a box and miss their corners.
+  //   4. Quadrant blocks — *filled* sub-cells, so consecutive cells touch.
+  const RADAR = (extra: object) => block({
+    kind: "plot", id: "sa6", form: "radar", height: 17,
+    categories: ["Speed", "Power", "Range", "Defence", "HP"],
+    series: [{ values: [8, 6, 7, 5, 9], label: "alpha" }, { values: [5, 9, 4, 8, 6], label: "beta" }],
+    ...extra,
+  });
+  const isQuad = (c: string): boolean => c >= "\u2580" && c <= "\u259f";
+
+  it("the figure is quadrant blocks, and no braille and no box drawing", () => {
+    const fig = kit().renderToLines(RADAR({ plotStyle: "line" }), 72).map(plain).join("");
+    expect([...fig].some(isQuad)).toBe(true);
+    expect(fig).not.toMatch(/[╭╮╯╰╱╲]/u);
+    // The legend's swatches are the braille arm's dash marks, so the disc is
+    // read rather than the whole row.
+    const disc = kit().renderToLines(RADAR({ plotStyle: "line" }), 72).map(plain)
+      .map((r) => r.slice(0, 50)).join(""); // cells-ok — a column count
+    expect([...disc].some((c) => c >= "⠁" && c <= "⣿")).toBe(false);
   });
 
-  it("and the braille arm draws no box glyphs", () => {
-    const rows = kit().renderToLines(block({
-      kind: "plot", id: "sa6b", form: "radar", height: 17,
-      categories: ["Speed", "Power", "Range", "Defence", "HP"],
-      series: [{ values: [8, 6, 7, 5, 9], label: "alpha" }, { values: [5, 9, 4, 8, 6], label: "beta" }],
-    }), 72).map(plain);
-    expect(rows.join("")).not.toMatch(/[╭╮╯╰╱╲]/u);
-    expect([...rows.join("")].some(isBraille)).toBe(true);
+  it("a run of them connects — no blank cell between two inked ones on a row", () => {
+    // The property the first three alphabets failed. A stroke that renders as
+    // dashes has gaps *inside* its own run; a filled sub-cell run does not.
+    const rows = kit().renderToLines(RADAR({ plotStyle: "line" }), 72).map(plain);
+    const longest = rows
+      .map((r) => [...r.slice(0, 50)].filter(isQuad).length) // cells-ok — a cell count
+      .reduce((m, n) => Math.max(m, n), 0); // cells-ok — a cell count
+    expect(longest).toBeGreaterThan(20); // cells-ok — a cell count
+  });
+
+  it("a polygon keeps its own tone where it crosses the frame", () => {
+    // **`furniture` is `series.length`, greater than every series index**, so a
+    // cell's largest owner was the *frame* wherever the frame touched it — and
+    // a polygon crossing a ring lost its colour, cell by cell. The glyph keeps
+    // every quadrant either way, which is why only a colour row can see this.
+    const lines = kit().renderToLines(RADAR({ plotStyle: "line" }), 72);
+    const MUTED = "98;98;98";
+    let data = 0;
+    for (const l of lines) {
+      let slot = "";
+      for (const part of l.split(/\x1b\[/u)) {
+        const m = /^38;2;(\d+;\d+;\d+)m/u.exec(part);
+        if (m) slot = m[1]!;
+        const text = m ? part.slice(m[0].length) : part.replace(/^[0-9;]*m/u, "");
+        if (slot !== "" && slot !== MUTED) data += [...text].filter(isQuad).length; // cells-ok — a cell count
+      }
+    }
+    // 98 with the tone following the data; the frame takes most of them back
+    // when it does not.
+    expect(data).toBeGreaterThan(80); // cells-ok — a cell count
+  });
+
+  it("the braille arm is unchanged and draws no blocks", () => {
+    const fig = kit().renderToLines(RADAR({}), 72).map(plain).join("");
+    expect([...fig].some(isQuad)).toBe(false);
+    expect([...fig].some(isBraille)).toBe(true);
+  });
+
+  it("the frame is continuous, where it used to be stippled", () => {
+    // The rings stepped every fourth dot and the spokes dashed two-on-two-off,
+    // on §3g's *a scale drawn as heavily as the data competes with it* — an
+    // argument about weight, answered by leaving holes. A stippled ring reads
+    // as a broken ring. Colour is what carries the weight.
+    // **Asserted on a ring's own row, not on the total.** Stippling every fourth
+    // dot takes the whole figure from 289 inked cells to 266 — a 7% change that
+    // no threshold separates honestly. A *ring* is the thing that broke: it
+    // crosses a row in one run, and a run with holes in it is what a reader
+    // sees. So the row that the outer ring passes through horizontally must be
+    // continuous across it.
+    const rows = kit().renderToLines(RADAR({}), 72).map(plain).map((r) => r.slice(0, 50)); // cells-ok — a column count
+    const runs = rows.map((r) => {
+      const cs = [...r];
+      let best = 0;
+      let cur = 0;
+      for (const c of cs) {
+        if (isBraille(c) && c !== "⠀") { cur += 1; best = Math.max(best, cur); } // cells-ok — a cell count
+        else cur = 0;
+      }
+      return best;
+    });
+    // The widest unbroken run of ink anywhere in the figure. Continuous, a ring
+    // crossing a row gives a long one; stippled at every fourth dot it cannot.
+    // Measured both ways on this fixture: 20 continuous, and stippling every
+    // fourth dot cannot reach it. The *total* ink only moves 289 → 266, which
+    // is why the run and not the total.
+    expect(Math.max(...runs)).toBeGreaterThan(18); // cells-ok — a cell count
   });
 });
 

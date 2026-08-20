@@ -2291,7 +2291,7 @@ const FORM_ROWS: Readonly<
         line(markedSpans(row, seriesRef, ctx), layout, ctx),
       );
     }
-    const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities);
+    const radar = radarRender(block.series, cats, width, areaRows, ctx.capabilities, block.plotStyle === "line");
     if (radar.polygons.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     // **Labels first, frame last, series between them.** `mergedRow` takes the
     // first layer to ink a cell, so the order is a priority: a word a polygon
@@ -2304,9 +2304,18 @@ const FORM_ROWS: Readonly<
     ];
     const discLayout: Layout = { ...layout, areaWidth: radar.discWidth };
     const out: string[] = [];
+    // **One figure and no merge for the line arm** (C12 I43, §3w). At cell
+    // resolution `mergedRow`'s layers eat each other — I40's union is
+    // braille's alone — so the quadrant arm composes a single owned grid, which
+    // is `ridgelineArea`'s mechanism for curves that overlap by construction.
+    const figureRef = (i: number): ColourRef =>
+      i >= block.series.length ? "tone.muted" : seriesRef(i); // cells-ok — a series count
     for (let r = 0; r < areaRows; r += 1) {
+      const body = radar.figure !== undefined
+        ? markedSpans(radar.figure[r] ?? [], figureRef, ctx)
+        : mergedRow(layers, r, discLayout, ctx);
       out.push(line(
-        [...mergedRow(layers, r, discLayout, ctx), ...markedSpans(radar.legend[r] ?? [], seriesRef, ctx)],
+        [...body, ...markedSpans(radar.legend[r] ?? [], seriesRef, ctx)],
         layout,
         ctx,
       ));
