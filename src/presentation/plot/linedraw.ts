@@ -15,7 +15,7 @@
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Series } from "../../data/viewmodel/index.js";
-import { finiteSamples, columnsOf, rowOf, type Range } from "./scale.js";
+import { finiteSamples, columnsOf, rowOf, type Facing, type Range } from "./scale.js";
 
 /** Where the curve turns between two readings. */
 export type Interpolation = "linear" | "step";
@@ -82,6 +82,7 @@ export function lineDrawRows(
   areaWidth: number,
   areaRows: number,
   corners: "rounded" | "sharp",
+  facing: Facing,
   interpolation: Interpolation = "linear",
 ): readonly string[] {
   const w = Math.max(0, Math.floor(areaWidth));
@@ -93,9 +94,9 @@ export function lineDrawRows(
   );
 
   const samples = finiteSamples(series.values);
-  const columns = columnsOf(samples, series.values.length, w); // cells-ok — a sample count
+  const columns = columnsOf(samples, series.values.length, w, facing); // cells-ok — a sample count
   const y = (v: number): number => {
-    const r = rowOf(v, range, h);
+    const r = rowOf(v, range, h, facing);
     return r < 0 ? 0 : r >= h ? h - 1 : r;
   };
 

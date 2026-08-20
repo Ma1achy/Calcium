@@ -13,7 +13,7 @@ import { cells } from "../text.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP, strokePolyline } from "./linedraw.js";
 import { glyphs } from "../blocks/glyphs.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, setDot } from "./raster.js";
-import type { Range } from "./scale.js";
+import type { Facing, Range } from "./scale.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
@@ -124,8 +124,9 @@ export function densityRows(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
+  facing: Facing,
 ): readonly string[] {
-  return curveRows(series, range, areaWidth, areaRows, caps);
+  return curveRows(series, range, areaWidth, areaRows, caps, facing);
 }
 
 /**

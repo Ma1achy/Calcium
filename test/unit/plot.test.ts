@@ -27,7 +27,7 @@ import {
   RAMP_STEPS,
   RAMP_UNICODE,
 } from "../../src/presentation/plot/ramp.js";
-import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
+import { columnsOf, finiteSamples, rowOf, seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { valueBar } from "../../src/presentation/plot/bar.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
@@ -173,7 +173,7 @@ describe("C12 tier 1 — braille encoding", () => {
 
   it("T1.3: a horizontal run produces a continuous row of identical cells", () => {
     const series = { values: Array.from({ length: 40 }, () => 5) };
-    const glyphRows = curveRows(series, { min: 0, max: 10 }, 20, 1, FULL_CAPS);
+    const glyphRows = curveRows(series, { min: 0, max: 10 }, 20, 1, FULL_CAPS, FACING_DEFAULT);
     const line = glyphRows[0] ?? "";
 
     expect([...new Set([...line])]).toHaveLength(1);
@@ -194,7 +194,7 @@ describe("C12 tier 1 — braille encoding", () => {
 
   it("T1.4 (I14): and a steep *series* has no interior gap", () => {
     const series = { values: [0, 100, 0, 100, 0, 100] };
-    expect(interiorGaps(curveRows(series, { min: 0, max: 100 }, 20, 4, FULL_CAPS))).toEqual([]);
+    expect(interiorGaps(curveRows(series, { min: 0, max: 100 }, 20, 4, FULL_CAPS, FACING_DEFAULT))).toEqual([]);
   });
 });
 
@@ -205,10 +205,10 @@ describe("C12 tier 1 — degenerate series", () => {
     if (range === null) throw new Error("unreachable");
 
     // 16 dot rows, so the centre is 7 — and no division by a zero range.
-    expect(rowOf(3, range, 16)).toBe(7);
-    expect(Number.isNaN(rowOf(3, range, 16))).toBe(false);
+    expect(rowOf(3, range, 16, FACING_DEFAULT)).toBe(7);
+    expect(Number.isNaN(rowOf(3, range, 16, FACING_DEFAULT))).toBe(false);
 
-    const glyphRows = curveRows({ values: [3, 3, 3, 3] }, range, 12, 4, FULL_CAPS);
+    const glyphRows = curveRows({ values: [3, 3, 3, 3] }, range, 12, 4, FULL_CAPS, FACING_DEFAULT);
     expect(glyphRows.join("")).not.toContain("NaN");
     // One row of ink, in the middle of four.
     const inked = glyphRows.map((line) => [...line].some((c) => c !== "⠀"));
@@ -224,7 +224,7 @@ describe("C12 tier 1 — degenerate series", () => {
     const range = seriesRange([{ values: [7] }], {});
     if (range === null) throw new Error("unreachable");
 
-    const glyphRows = curveRows({ values: [7] }, range, 12, 4, FULL_CAPS);
+    const glyphRows = curveRows({ values: [7] }, range, 12, 4, FULL_CAPS, FACING_DEFAULT);
     const inked = inkedColumns(glyphRows);
     expect(inked).toHaveLength(1);
 
@@ -235,7 +235,7 @@ describe("C12 tier 1 — degenerate series", () => {
 
   it("T1.7: an empty series has no samples and no columns", () => {
     expect(finiteSamples([])).toEqual([]);
-    expect(columnsOf([], 0, 40)).toEqual([]);
+    expect(columnsOf([], 0, 40, FACING_DEFAULT)).toEqual([]);
     expect(seriesRange([], {})).toBeNull();
     expect(seriesRange([{ values: [] }], {})).toBeNull();
   });
@@ -251,7 +251,7 @@ describe("C12 tier 1 — degenerate series", () => {
     // The break is the assertion: the removed sample's column carries no ink and
     // no Bresenham segment spans it. A filter that dropped the index instead
     // would close the gap and pass every other test in this file.
-    const gaps = interiorGaps(curveRows({ values }, range, 20, 4, FULL_CAPS));
+    const gaps = interiorGaps(curveRows({ values }, range, 20, 4, FULL_CAPS, FACING_DEFAULT));
     expect(gaps.length).toBeGreaterThan(0);
   });
 
@@ -268,7 +268,7 @@ describe("C12 tier 1 — degenerate series", () => {
   it("T1.10 (I5): a spike survives downsampling from 10,000 points", () => {
     const values = Array.from({ length: 10_000 }, (_, i) => (i === 5_000 ? 99 : 1));
     const samples = finiteSamples(values);
-    const columns = columnsOf(samples, values.length, 112);
+    const columns = columnsOf(samples, values.length, 112, FACING_DEFAULT);
 
     // The column holding the spike keeps it as its maximum. Averaging would give
     // that column ~1.9, and every-nth sampling would miss index 5,000 entirely —
@@ -278,7 +278,7 @@ describe("C12 tier 1 — degenerate series", () => {
 
     const range = seriesRange([{ values }], {});
     if (range === null) throw new Error("unreachable");
-    const glyphRows = curveRows({ values }, range, 56, 8, FULL_CAPS);
+    const glyphRows = curveRows({ values }, range, 56, 8, FULL_CAPS, FACING_DEFAULT);
     // Top row inked: the spike reaches the ceiling of the plot area.
     expect([...(glyphRows[0] ?? "")].some((c) => c !== "⠀")).toBe(true);
   });
@@ -288,18 +288,18 @@ describe("C12 tier 1 — degenerate series", () => {
     // its neighbours; `min` and `max` are what I5 preserves. Dropping either pair
     // breaks the other invariant, and this is the assertion that says so.
     const values = [5, 1, 9, 3];
-    const columns = columnsOf(finiteSamples(values), 4, 1);
+    const columns = columnsOf(finiteSamples(values), 4, 1, FACING_DEFAULT);
     expect(columns).toEqual([{ x: 0, first: 5, min: 1, max: 9, last: 3, iFirst: 0, iLast: 3 }]);
   });
 
   it("T1.11: three points spread across the full width and join", () => {
     const values = [1, 5, 2];
-    const columns = columnsOf(finiteSamples(values), 3, 112);
+    const columns = columnsOf(finiteSamples(values), 3, 112, FACING_DEFAULT);
     expect(columns.map((c) => c.x)).toEqual([0, 56, 111]);
 
     const range = seriesRange([{ values }], {});
     if (range === null) throw new Error("unreachable");
-    expect(interiorGaps(curveRows({ values }, range, 56, 8, FULL_CAPS))).toEqual([]);
+    expect(interiorGaps(curveRows({ values }, range, 56, 8, FULL_CAPS, FACING_DEFAULT))).toEqual([]);
   });
 });
 
@@ -615,8 +615,8 @@ describe("C12 tier 1 — pinned range", () => {
 
     // Clamped, not dropped: a series that briefly exceeds its ceiling shows
     // pressed against the ceiling, not as a hole where it was.
-    expect(rowOf(1.6, range, 16)).toBe(0);
-    expect(rowOf(-0.4, range, 16)).toBe(15);
+    expect(rowOf(1.6, range, 16, FACING_DEFAULT)).toBe(0);
+    expect(rowOf(-0.4, range, 16, FACING_DEFAULT)).toBe(15);
   });
 
   it("T1.14: a reversed pin collapses to constant rather than throwing (I2)", () => {

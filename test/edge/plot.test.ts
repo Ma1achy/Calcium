@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { plotAreaRows, plotHeight } from "../../src/presentation/plot/height.js";
-import { columnsOf, finiteSamples, seriesRange } from "../../src/presentation/plot/scale.js";
+import { columnsOf, finiteSamples, seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { curveRows } from "../../src/presentation/plot/curve.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
@@ -97,7 +97,7 @@ describe("C12 tier 3 — extreme series", () => {
     // The curve spans the plot area vertically rather than sitting on a zero line
     // that is not in the data.
     const range = { min: -5, max: -1 };
-    const glyphRows = curveRows({ values }, range, 20, 4, FULL_CAPS);
+    const glyphRows = curveRows({ values }, range, 20, 4, FULL_CAPS, FACING_DEFAULT);
     const inked = glyphRows.map((r) => [...r].some((c) => c !== "⠀"));
     expect(inked[0]).toBe(true);
     expect(inked[3]).toBe(true);
@@ -117,7 +117,7 @@ describe("C12 tier 3 — extreme series", () => {
     // noise floor this drew a full-height curve out of the last bit of three
     // doubles, which is the most misleading thing this component can produce
     // because nothing about it looks degenerate.
-    const glyphRows = curveRows({ values }, range, 20, 4, FULL_CAPS);
+    const glyphRows = curveRows({ values }, range, 20, 4, FULL_CAPS, FACING_DEFAULT);
     const inkedRows = glyphRows.filter((r) => [...r].some((c) => c !== "⠀"));
     expect(inkedRows).toHaveLength(1);
   });
@@ -134,7 +134,7 @@ describe("C12 tier 3 — extreme series", () => {
 
   it("T3.13: exactly `width × 2` points is one per dot column, no downsampling", () => {
     const values = Array.from({ length: 40 }, (_, i) => i);
-    const columns = columnsOf(finiteSamples(values), 40, 40);
+    const columns = columnsOf(finiteSamples(values), 40, 40, FACING_DEFAULT);
     expect(columns).toHaveLength(40);
     for (const column of columns) {
       expect(column.first).toBe(column.last);

@@ -20,7 +20,7 @@ import type { OHLC, Plot } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { readoutSet } from "./axes.js";
 import { glyphs } from "../blocks/glyphs.js";
-import { rowOf, type Range } from "./scale.js";
+import { rowOf, type Facing, type Range } from "./scale.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
@@ -189,12 +189,19 @@ export function candleColumn(
   bars: readonly OHLC[],
   index: number,
   areaWidth: number,
+  facing: Facing,
 ): number | null {
   const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
   if (bars.length === 0 || index < 0 || index >= bars.length) return null; // cells-ok — a bar count
   const drawn = Math.min(bars.length, w); // cells-ok — a bar count
   const bucket = Math.min(drawn - 1, Math.floor((index * drawn) / bars.length)); // cells-ok — a bar index
-  const column = candleLeft(bucket, drawn, w) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index
+  // **The bucket is flipped, not the column** (§3ac B2, and A6's rule one form
+  // along). `candleLeft` spreads the bodies so the last is flush with the right
+  // edge; mirroring its answer would put the first body's *left* edge where the
+  // last body's left edge was, a body-width off. Reversing which bucket is
+  // asked for lands on the placement the bars were actually drawn at.
+  const faced = facing.x === "left" ? drawn - 1 - bucket : bucket; // cells-ok — a bar index
+  const column = candleLeft(faced, drawn, w) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index
   return column < w ? column : null; // cells-ok — a column index
 }
 
@@ -228,6 +235,7 @@ export function candleRows(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
+  facing: Facing,
 ): Readonly<{ rising: readonly string[]; falling: readonly string[]; flat: readonly string[] }> {
   const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
   const rows = Math.max(1, Math.floor(areaRows)); // cells-ok — a row count
@@ -247,7 +255,8 @@ export function candleRows(
   const cw = candleWidth(w, drawn.length); // cells-ok — a bar count
 
   for (const [i, bar] of drawn.entries()) {
-    const left = candleLeft(i, drawn.length, w); // cells-ok — a column index
+    const at = facing.x === "left" ? drawn.length - 1 - i : i; // cells-ok — a bar index
+    const left = candleLeft(at, drawn.length, w); // cells-ok — a column index
     if (left >= w) break; // cells-ok — a column index
     // **Left of centre at an even width**, `⌊(w − 1) ÷ 2⌋`, which is the
     // rounding `boxplotColumn` already uses for its spine. One rule in the
@@ -256,10 +265,10 @@ export function candleRows(
 
     const bodyTop = Math.max(bar.open, bar.close);
     const bodyBot = Math.min(bar.open, bar.close);
-    const rTop = rowOf(bodyTop, range, rows); // cells-ok — a row index
-    const rBot = rowOf(bodyBot, range, rows); // cells-ok — a row index
-    const rHigh = rowOf(bar.high, range, rows); // cells-ok — a row index
-    const rLow = rowOf(bar.low, range, rows); // cells-ok — a row index
+    const rTop = rowOf(bodyTop, range, rows, facing); // cells-ok — a row index
+    const rBot = rowOf(bodyBot, range, rows, facing); // cells-ok — a row index
+    const rHigh = rowOf(bar.high, range, rows, facing); // cells-ok — a row index
+    const rLow = rowOf(bar.low, range, rows, facing); // cells-ok — a row index
 
     const flat = bar.close === bar.open;
     const rising = bar.close > bar.open;

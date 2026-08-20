@@ -1007,7 +1007,89 @@ export type Plot = Readonly<{
    * Two containers, two contents, and a caller setting both gets both.
    */
   align?: "left" | "centre" | "right";
+  /**
+   * Which corner of the plot area the data grows from (C04 I62, C12 §3ac).
+   *
+   * **Refused where `ORIGIN_DEFAULT` says `null`** — 27 of the 44 forms — and
+   * the set was measured rather than reasoned. The question this type first
+   * asked was *does the form have two reversible directions*, and it is the
+   * wrong question: what decides it is **which machinery places the data**.
+   * Seven positional forms carry their direction in two functions and ten matrix
+   * forms in two places; eleven categorical forms carry each bar's direction in
+   * its own row builder, and fourteen forms are their own renderer.
+   *
+   * **The default is not one corner**, which is why `ORIGIN_DEFAULT` is a record
+   * rather than a constant: a curve's first sample is at the left with its value
+   * growing upward, and a matrix's `series[0]`, `values[0]` is at the *top*
+   * left, because a row index grows downward and a value does not.
+   */
+  origin?: Origin;
 }> & Gap;
+
+/** Which corner of a plot area the data grows from (C04 I62, C12 §3ac). */
+export type Origin = "bottom-left" | "bottom-right" | "top-left" | "top-right";
+
+/**
+ * Which forms honour `origin`, and what each one defaults to (C04 I62, C12 §3ac).
+ *
+ * **`null` is the refusal, so one total record carries the acceptance set and
+ * the default together** — `FURNITURE_ROWS`' argument, which is that two records
+ * obliged to agree should be one record whose agreement is the thing that ships.
+ * It lives here rather than beside the renderer for `STYLE_ARMS`' reason: the
+ * validator needs it and L0 cannot import L1 to ask (A02 §1).
+ *
+ * **Measured, not reasoned** (C12 §3ac). The rows are the placement machinery:
+ * `"bottom-left"` for the seven positional forms, `"top-left"` for the ten
+ * matrix forms whose row index grows downward, and `null` for the eleven
+ * categorical forms, the fourteen own renderers and the two facet containers.
+ *
+ * **`bar` is the refusal worth naming**, because it is the most ordinary chart
+ * in the catalogue and was not among the three this record was guessed to
+ * contain. Its rows come from `categoricalForm` in one place and each bar's
+ * direction from its own row builder in eleven. **The condition is a symbol so a
+ * grep finds it**: `origin` reaches the categorical family the day
+ * `categoricalForm` takes a shared span builder for the row body instead of a
+ * `rowBuilder` per form.
+ *
+ * **A facet container refuses because its `origin` would name a different
+ * thing** — which corner the first *facet* sits in, not which corner the data
+ * grows from. `facets` is `readonly Plot[]`, so each facet declares its own.
+ */
+export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.freeze({
+  // Positional — the direction is `rowOf` and `columnsOf`.
+  line: "bottom-left", scatter: "bottom-left", step: "bottom-left",
+  ecdf: "bottom-left", slope: "bottom-left", bubble: "bottom-left",
+  density: "bottom-left",
+
+  // Matrix — the direction is `columnMap` and `matrixRows`' loop, and a row
+  // index grows downward, so the first datum is already in the top-left corner.
+  heatmap: "top-left", calendar: "top-left", correlation: "top-left",
+  confusion: "top-left", spectrogram: "top-left", latency: "top-left",
+  density2d: "top-left", utilisation: "top-left",
+
+  // **The two field forms refuse, and the code is what said so** (C12 §3ac).
+  // A `contour`'s isolines and a `quiver`'s arrows are rasterised into *area*
+  // coordinates by `fieldLayers`, a second placement inside the matrix — so a
+  // flip reaching the wash and not the field draws isolines over the wrong
+  // cells, and mirroring the rasterised row instead is the braille dot
+  // permutation probe 3 ruled out. **The condition is a symbol**: they join the
+  // day a `FieldLayer` is sampled in `columnMap`'s space rather than the area's.
+  contour: null, quiver: null,
+
+  // Categorical (11) — `categoricalForm` orders the rows in one place and each
+  // form's own `rowBuilder` draws the bar's direction.
+  autocorrelation: null, bar: null, bullet: null, dotplot: null, dumbbell: null,
+  forest: null, funnel: null, gantt: null, lollipop: null, timeline: null,
+  waterfall: null,
+
+  // Their own renderer (14).
+  boxplot: null, flame: null, histogram: null, horizon: null, icicle: null,
+  pie: null, radar: null, ridgeline: null, sparkline: null, stackedarea: null,
+  streamgraph: null, treemap: null, violin: null, waffle: null,
+
+  // Facet containers — each facet is a `Plot` and declares its own.
+  smallmultiples: null, pairplot: null,
+});
 
 /**
  * Which `plotStyle` arms a form actually has (C12 I43, §3w).

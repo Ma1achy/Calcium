@@ -32,7 +32,7 @@ const results = runPass({
   run,
   control: {
     file: FURN,
-    from: "  return xTickRow(domain, areaWidth, block.xFormat, ctx.capabilities, block.xScale, columnAt);",
+    from: "  return xTickRow(domain, areaWidth, block.xFormat, ctx.capabilities, block.xScale, facing, columnAt);",
     to: "  return xAxis(undefined, areaWidth, ctx.capabilities);",
     why: "a positional form with no numeric row at all fails every row about what the row says; a run that cannot see that cannot see any row below",
   },
@@ -64,7 +64,7 @@ const results = runPass({
     {
       name: "the inferred scale beats the caller's captions",
       file: FURN,
-      from: "  if (block.xLabels !== undefined) return xAxis(block.xLabels, areaWidth, ctx.capabilities);",
+      from: "  if (block.xLabels !== undefined) return xAxis(block.xLabels, areaWidth, ctx.capabilities, facing);",
       to: "",
       expect: "XA3",
     },
@@ -95,7 +95,7 @@ const results = runPass({
       // §3d.1's last row: two correct mappings from the same index.
       name: "the curve's rule places a candlestick's ticks",
       file: FURN,
-      from: "    : (t: number): number | null => candleColumn(bars, Math.round(t * Math.max(0, n - 1)), areaWidth); // cells-ok — a bar index",
+      from: "    : (t: number): number | null => candleColumn(bars, Math.round(t * Math.max(0, n - 1)), areaWidth, facing); // cells-ok — a bar index",
       to: "    : undefined;",
       expect: "XA7",
     },

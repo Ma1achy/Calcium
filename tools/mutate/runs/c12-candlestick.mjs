@@ -81,7 +81,7 @@ const results = runPass({
       // this is a frame where the ticks point at bars the candles do not draw.
       name: "`candleColumn` computes its own placement again",
       file: CANDLES,
-      from: "  const column = candleLeft(bucket, drawn, w) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index",
+      from: "  const column = candleLeft(faced, drawn, w) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index",
       to: "  const column = bucket * Math.max(1, Math.min(Math.floor(w / drawn), candleWidth(w, drawn) + 1)) + Math.floor((candleWidth(w, drawn) - 1) / 2); // cells-ok — a column index",
       expect: "CD4",
     },
@@ -208,7 +208,7 @@ const results = runPass({
       // area, which is why a row written at the dense end sees nothing.
       name: "the cursor column uses the curve's placement for candles too",
       file: DEFN,
-      from: "  if (bars !== undefined) return candleColumn(bars, cursorIdx, areaWidth);",
+      from: "  if (bars !== undefined) return candleColumn(bars, cursorIdx, areaWidth, facing);",
       to: "  if (bars !== undefined && false) return candleColumn(bars, cursorIdx, areaWidth);",
       expect: "T1.99",
     },

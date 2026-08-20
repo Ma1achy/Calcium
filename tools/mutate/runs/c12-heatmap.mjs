@@ -85,7 +85,7 @@ const results = runPass({
       // Re-anchored a third time, onto the `const field =` binding that C12
       // §3y's pass 5/6 split introduced. The subject is still the range: the
       // matrix's, or the row's own with the comparison gone.
-      from: "    const field = heatSpans(s, range, layout, map, style, ctx, matrixLayout, dim, painted);",
+      from: "    const field = heatSpans(s, range, layout, map, style, ctx, matrixLayout, dim, painted, facing);",
       to: "    const field = heatSpans(s, rowRange(s), layout, map, style, ctx, matrixLayout, dim, painted);",
       expect: "T1.18",
       also: [

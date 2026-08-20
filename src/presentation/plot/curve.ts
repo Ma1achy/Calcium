@@ -15,7 +15,7 @@
  * strategies above some threshold.
  */
 import { BRAILLE_DOTS, createGrid, drawColumnSpan, drawLine, foldBraille, foldRamp, RAMP_DOTS } from "./raster.js";
-import { columnsOf, finiteSamples, rowOf, type Range } from "./scale.js";
+import { columnsOf, finiteSamples, rowOf, type Facing, type Range } from "./scale.js";
 import { ladderFor } from "./ramp.js";
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -42,14 +42,15 @@ export function curveRows(
   areaWidth: number,
   areaRows: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing,
 ): readonly string[] {
   const ascii = caps.unicode === "ascii";
   const dots = ascii ? RAMP_DOTS : BRAILLE_DOTS;
   const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
 
   const samples = finiteSamples(series.values);
-  const columns = columnsOf(samples, series.values.length, grid.dotWidth); // cells-ok — a sample count
-  const y = (v: number): number => rowOf(v, range, grid.dotHeight);
+  const columns = columnsOf(samples, series.values.length, grid.dotWidth, facing); // cells-ok — a sample count
+  const y = (v: number): number => rowOf(v, range, grid.dotHeight, facing);
 
   columns.forEach((column, index) => {
     // I5: the whole vertical extent of what this column held. A single sample

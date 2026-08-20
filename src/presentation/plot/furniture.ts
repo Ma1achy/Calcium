@@ -38,6 +38,7 @@ import type { XAxis } from "./axes.js";
 import { HAS_POSITION_AXIS } from "./marks.js";
 import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
+import { FACING_DEFAULT, facingOf } from "./scale.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import { SHARES_CELLS, markOf, refOf } from "./marks.js";
@@ -563,7 +564,14 @@ function sampleCount(block: Plot): number {
  * with the second is the wrong direction, and both want the same row.
  */
 function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAxis {
-  if (block.xLabels !== undefined) return xAxis(block.xLabels, areaWidth, ctx.capabilities);
+  // **`FACING_DEFAULT` and no matrix arm, because a matrix never arrives
+  // here** — `furnitureFor` is reached from `axed`, and `heatmapFormRows`
+  // composes `matrixFurniture` itself. The first version branched on
+  // `IS_MATRIX` and a mutation survived it: **a distinction that cannot be
+  // violated reads exactly like one that is obeyed**, which is A03 §2's vacuity
+  // class arriving in a guard rather than in a sentence.
+  const facing = facingOf(block, FACING_DEFAULT);
+  if (block.xLabels !== undefined) return xAxis(block.xLabels, areaWidth, ctx.capabilities, facing);
   if (block.axes !== true || !HAS_POSITION_AXIS[block.form]) {
     return xAxis(undefined, areaWidth, ctx.capabilities);
   }
@@ -577,8 +585,8 @@ function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAxis {
   const n = sampleCount(block);
   const columnAt = bars === undefined
     ? undefined
-    : (t: number): number | null => candleColumn(bars, Math.round(t * Math.max(0, n - 1)), areaWidth); // cells-ok — a bar index
-  return xTickRow(domain, areaWidth, block.xFormat, ctx.capabilities, block.xScale, columnAt);
+    : (t: number): number | null => candleColumn(bars, Math.round(t * Math.max(0, n - 1)), areaWidth, facing); // cells-ok — a bar index
+  return xTickRow(domain, areaWidth, block.xFormat, ctx.capabilities, block.xScale, facing, columnAt);
 }
 
 export function furnitureFor(

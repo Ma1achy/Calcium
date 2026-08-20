@@ -2830,13 +2830,13 @@ Every form's arm in `FORM_ROWS`, grouped by the machinery it delegates to:
 | machinery | forms | where the direction lives |
 |---|---|---|
 | **positional** | 7 — `bubble` `density` `ecdf` `line` `scatter` `slope` `step` | `rowOf` · `columnsOf` — **two functions** |
-| **matrix** | 10 — `calendar` `confusion` `contour` `correlation` `density2d` `heatmap` `latency` `quiver` `spectrogram` `utilisation` | `columnMap` · `matrixRows`' loop — **two places** |
+| **matrix** | 10 — `calendar` `confusion` `contour` `correlation` `density2d` `heatmap` `latency` `quiver` `spectrogram` `utilisation` | `columnMap` · `matrixRows`' loop — **two places**, and **`contour` and `quiver` have a third** |
 | **facet** | 2 — `pairplot` `smallmultiples` | **nowhere — a facet is a whole `Plot` and carries its own** |
 | **categorical** | 11 — `autocorrelation` `bar` `bullet` `dotplot` `dumbbell` `forest` `funnel` `gantt` `lollipop` `timeline` `waterfall` | the row order in one place; **the bar's own direction in eleven row builders** |
 | **own renderer** | 14 — `boxplot` `flame` `histogram` `horizon` `icicle` `pie` `radar` `ridgeline` `sparkline` `stackedarea` `streamgraph` `treemap` `violin` `waffle` | fourteen places, or nowhere |
 
-**`origin` is honoured on the positional and matrix families and refused on the other three —
-seventeen forms of forty-four.** The line is drawn by cost and by whether both halves of the member can move, and the
+**`origin` is honoured on the positional family and on eight of the ten matrix forms —
+fifteen of forty-four.** The other two are §3ac.2a, below, and they were found by writing the code. The line is drawn by cost and by whether both halves of the member can move, and the
 three refusals C04 guessed all survive, none of them for the reason guessed:
 
 - **`pie`** — refused because it is its own renderer, and *separately* because it has no corner.
@@ -2855,6 +2855,26 @@ worth naming: the most ordinary chart in the catalogue refuses the member, becau
 from `categoricalForm` in one place and each bar's direction from its own row builder in eleven.
 **The condition is a symbol, so a grep finds it**: `origin` reaches the categorical family the day
 `categoricalForm` takes a shared span builder for the row body rather than a `rowBuilder` per form.
+
+### 3ac.2a The implementation falsified the walk, and it took two forms with it
+
+The record above said seventeen. **`contour` and `quiver` refuse, and nothing in either walk
+artefact could have said so** — the finding needed the code, which is the recorded order: the walk
+rules the shape and the implementation is the first thing that can disprove it.
+
+Both are `IS_FIELD_FORM`, and a field form is the matrix renderer **plus a second placement**.
+`fieldLayers` rasterises isolines and arrows into `glyphRows` indexed by **area** column, while
+`columnMap` works in *reading* indices — two coordinate spaces that coincide today and separate the
+moment either is reversed. A flip reaching the wash and not the field draws a contour over the wrong
+cells, with the frame still looking like a contour plot.
+
+**And mirroring the rasterised row instead is the thing probe 3 already refuted**, arriving inside
+the matrix family: those glyph rows are braille and box-drawing, so reversing them is the dot
+permutation and the ten-glyph mirror map, not a string operation. The refutation was written about
+the whole-frame seam and it turns out to be about any seam that mirrors a *drawn* row.
+
+**The condition is a symbol, so a grep finds it**: `contour` and `quiver` take `origin` the day a
+`FieldLayer` is sampled in `columnMap`'s space rather than the area's.
 
 ### 3ac.3 `ORIGIN_DEFAULT` — one total record carries the gate and the default together
 
@@ -2888,7 +2908,7 @@ compiler names every one.
 |---|---|---|
 | A1 | `origin` reverses the y direction × `axes.ts` writes the gutter's ends as `[0 → range.max, h−1 → range.min]` **literally**, and only the interior ticks through `rowOf` | **The ends are computed, not written.** A flip threaded into `rowOf` alone moves the interior ticks and leaves `max` at the top — a gutter that disagrees with its own plot, in the one place a reader goes to resolve a disagreement. The two ends become `rowOf(range.max)` and `rowOf(range.min)`. |
 | A2 | `origin` × `yAxis: "right"` — both move the labels | **They move different labels and compose.** `yAxis` picks *which side the gutter is on*; `origin` picks *which end of it holds the maximum*. `origin: "bottom-right"` with `yAxis: "right"` is a plot whose data grows leftward with its scale on the right, and it is expressible. The failure to watch for is applying the horizontal flip to the gutter's *side*, which is the "labels move twice" defect OR2 asserts against. |
-| A3 | `origin` × `matrixAnchor` — one places columns, one places the fringe | **Reversing `columnMap`'s output does both, and correctly.** With `matrixAnchor: "left"` and a right-facing origin, the data starts at the right and the blank fringe lands on the left, which is what §3o's ruling says a fringe is. No second rule. |
+| A3 | `origin` × `matrixAnchor` — one places columns, one places the fringe | **Reversing `columnMap`'s output does both, and correctly.** With `matrixAnchor: "left"` and a right-facing origin, the data starts at the right and the blank fringe lands on the left, which is what §3o's ruling says a fringe is. No second rule — and the ruling that makes it work is **`origin` never changes *which* data is shown, only where it is drawn**: reversing the *values* instead would have made a `window` anchor select the oldest readings rather than the newest. The same rule fixes the matrix's overflow — the visible slice is `series[0 … visible − 1]` under all four corners, so `+N more` names the same set whichever way the grid faces, and the notice keeps the last row because it is furniture. |
 | A4 | `origin` × a facet — `facets` is `readonly Plot[]`, so each one is a whole block | **The container refuses and each facet declares its own, because they are two members sharing a word.** `origin` on a `smallmultiples` would mean *which corner the first facet sits in*, and on its facets *which corner the data grows from*. C04 §3's test for one member or two answers this without a measurement: they are not the same question, and a container that accepted the word would silently answer the other one. A facet is validated on its own `form` because it is a `Plot` — **and nothing validates facets at all today**, which is a gap this ruling names and does not close. |
 | A5 | `origin` × `width`/`aspect`/`align` (§3ab) | **Independent, and the order is fixed.** `drawnWidth` decides how many cells the form gets; `origin` decides which end of them the data starts at; `alignPad` decides where the drawn block sits in the frame. A right-facing origin in a left-aligned narrow plot is data flush to the **right edge of the drawn area**, not of the frame. |
 | A6 | `origin` × a single sample — `columnsOf` puts a lone sample at `floor((w−1)/2)` | **The centre is its own mirror at odd widths and is not at even ones.** `floor((w−1)/2)` mirrors to `w−1−floor((w−1)/2)`, which differs by one cell when `w` is even. Flipping the column *after* the placement is what makes a one-sample plot twitch sideways under a member that should not be able to move it. **The single-sample column is computed from the facing, not mirrored after the fact.** |

@@ -7,7 +7,7 @@
  * **ecdf** sorts the values, computes the cumulative fraction, then steps.
  */
 import { BRAILLE_DOTS, createGrid, drawColumnSpan, drawLine, foldBraille, foldRamp, RAMP_DOTS, setDot } from "./raster.js";
-import { columnsOf, finiteSamples, rowOf, type Range } from "./scale.js";
+import { columnsOf, finiteSamples, rowOf, type Facing, type Range } from "./scale.js";
 import { ladderFor } from "./ramp.js";
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -26,14 +26,15 @@ export function scatterRows(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
+  facing: Facing,
 ): readonly string[] {
   const ascii = caps.unicode === "ascii";
   const dots = ascii ? RAMP_DOTS : BRAILLE_DOTS;
   const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
 
   const samples = finiteSamples(series.values);
-  const columns = columnsOf(samples, series.values.length, grid.dotWidth); // cells-ok — a sample count
-  const y = (v: number): number => rowOf(v, range, grid.dotHeight);
+  const columns = columnsOf(samples, series.values.length, grid.dotWidth, facing); // cells-ok — a sample count
+  const y = (v: number): number => rowOf(v, range, grid.dotHeight, facing);
 
   for (const column of columns) {
     if (column.min === column.max) {
@@ -58,14 +59,15 @@ export function stepRows(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
+  facing: Facing,
 ): readonly string[] {
   const ascii = caps.unicode === "ascii";
   const dots = ascii ? RAMP_DOTS : BRAILLE_DOTS;
   const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
 
   const samples = finiteSamples(series.values);
-  const columns = columnsOf(samples, series.values.length, grid.dotWidth); // cells-ok — a sample count
-  const y = (v: number): number => rowOf(v, range, grid.dotHeight);
+  const columns = columnsOf(samples, series.values.length, grid.dotWidth, facing); // cells-ok — a sample count
+  const y = (v: number): number => rowOf(v, range, grid.dotHeight, facing);
 
   columns.forEach((column, index) => {
     drawColumnSpan(grid, column.x, y(column.max), y(column.min));
@@ -121,6 +123,7 @@ export function bubbleRows(
   width: number,
   rows: number,
   _caps: Caps,
+  facing: Facing,
 ): readonly string[] {
   // **The grid is in dots, not cells** — `createGrid(w, h)` made a grid one dot
   // per cell, so six of seven bubbles landed on the same four dots and two marks
@@ -136,8 +139,12 @@ export function bubbleRows(
 
   for (const [i, v] of vals.entries()) {
     if (v === null || !Number.isFinite(v)) continue;
-    const x = vals.length <= 1 ? 0 : Math.round((i / (vals.length - 1)) * (w - 1)); // cells-ok — a dot column
-    const y = rowOf(v, range, h); // cells-ok — a dot row
+    // **This form places its own columns**, which is why the facing enters
+    // here as well as in `rowOf` — probe 1 measured exactly this: `bubble`
+    // moved under a vertical flip and not a horizontal one (C12 §3ac).
+    const at = facing.x === "left" ? vals.length - 1 - i : i; // cells-ok — a sample index
+    const x = vals.length <= 1 ? 0 : Math.round((at / (vals.length - 1)) * (w - 1)); // cells-ok — a dot column
+    const y = rowOf(v, range, h, facing); // cells-ok — a dot row
     const s = sv[i];
     const radius = s === null || s === undefined || !Number.isFinite(s)
       ? 0

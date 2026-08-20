@@ -25,6 +25,7 @@ import {
   COLORMAP_NAMES,
   HAS_CALLOUT,
   HAS_Y_GUTTER,
+  ORIGIN_DEFAULT,
   IS_FIELD_FORM,
   IS_MATRIX,
   STYLE_ARMS,
@@ -647,6 +648,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     plotFieldErrors(b, e, at, form);
     plotHorizonErrors(b, e, at, form);
     plotSizeErrors(b, e, at);
+  plotOriginErrors(b, e, at, form);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -1024,6 +1026,39 @@ function plotSizeErrors(b: Record<string, unknown>, e: string[], at: string): vo
       `${at}: "align" with neither "width" nor "aspect" (C04 I62) — a figure that fills its ` +
         `frame has nothing to align inside it, and a member that does nothing reads as one ` +
         `not yet implemented`,
+    );
+  }
+}
+
+/**
+ * `origin` — refused by name where the form has no arm for it (C04 I62).
+ *
+ * **One record answers both halves**, which is why there is no second lookup:
+ * `ORIGIN_DEFAULT` maps a form to its default corner or to `null`, and `null`
+ * *is* the refusal. A separate acceptance set beside a default table would be
+ * two records obliged to agree.
+ */
+function plotOriginErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const origin = b["origin"];
+  if (origin === undefined) return;
+  const known = origin === "bottom-left" || origin === "bottom-right"
+    || origin === "top-left" || origin === "top-right";
+  if (!known) {
+    e.push(
+      `${at}: "origin" must be "bottom-left", "bottom-right", "top-left" or "top-right" (C04 I62)`,
+    );
+    return;
+  }
+  if (ORIGIN_DEFAULT[form as PlotForm] === null) {
+    e.push(
+      `${at}: "origin" on form "${String(form)}" (C04 I62, C12 §3ac) — this form places its ` +
+        `data itself and has no direction to reverse, and a member accepted where nothing ` +
+        `honours it reads as one not yet implemented`,
     );
   }
 }

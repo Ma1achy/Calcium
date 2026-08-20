@@ -23,7 +23,7 @@ import type { Range } from "./scale.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { BRAILLE_DOTS, createGrid, foldBraille, setDot } from "./raster.js";
 import { isBlank } from "./curve.js";
-import { rowOf } from "./scale.js";
+import { rowOf, type Facing } from "./scale.js";
 
 /**
  * Cells between dashes, and the frame is what set it.
@@ -76,28 +76,31 @@ export function annotationRows(
   areaWidth: number,
   areaRows: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const h = Math.max(1, Math.floor(areaRows));
 
   if (annotation.kind === "confidence") {
-    return confidenceRows(annotation, range, w, h, caps);
+    return confidenceRows(annotation, range, w, h, caps, facing);
   }
   if (annotation.kind === "whiskers") {
-    return whiskersRows(annotation.points, range, w, h, caps);
+    return whiskersRows(annotation.points, range, w, h, caps, facing);
   }
 
   const edges = edgesOf(annotation).filter((v) => drawn(v, range));
 
   if (caps.unicode === "ascii") {
-    const rows = new Set(edges.map((v) => rowOf(v, range, h)));
+    // **Only the vertical half reaches here**: a rule spanning the width is its
+    // own horizontal mirror, so `facing.x` has nothing to move (§3ac).
+    const rows = new Set(edges.map((v) => rowOf(v, range, h, facing)));
     const dashes = Array.from({ length: w }, (_, x) => (x % DASH_CELLS === 0 ? "-" : " ")).join("");
     return Array.from({ length: h }, (_, i) => (rows.has(i) ? dashes : ""));
   }
 
   const grid = createGrid(w * BRAILLE_DOTS.x, h * BRAILLE_DOTS.y);
   for (const value of edges) {
-    const y = rowOf(value, range, grid.dotHeight);
+    const y = rowOf(value, range, grid.dotHeight, facing);
     for (let x = 0; x < grid.dotWidth; x += DASH_CELLS * BRAILLE_DOTS.x) setDot(grid, x, y);
   }
   return foldBraille(grid);
@@ -151,6 +154,7 @@ function fillRows(
   w: number,
   h: number,
   shade: string,
+  facing: Facing,
 ): readonly string[] {
   const n = Math.min(upper.length, lower.length); // cells-ok — a sample count
   const grid: string[][] = Array.from({ length: h }, () => new Array<string>(w).fill(" ")); // cells-ok
@@ -159,16 +163,20 @@ function fillRows(
   for (let x = 0; x < w; x += 1) { // cells-ok — a column index
     // A single sample has no span to interpolate across, so it covers the whole
     // width: one reading of an interval is still an interval.
-    const t = w === 1 ? 0 : x / (w - 1); // cells-ok — a column index
+    const t = along(w === 1 ? 0 : x / (w - 1), facing); // cells-ok — a column index
     const u = edgeAt(upper, t);
     const l = edgeAt(lower, t);
     if (u === null || l === null) continue;
 
     // `rowOf` clamps to the grid, so an edge off the scale lands on the nearest
     // row rather than outside the loop — which is the clamp this doc argues for.
-    const a = rowOf(Math.max(u, l), range, h);
-    const b = rowOf(Math.min(u, l), range, h);
-    for (let y = a; y <= b; y += 1) grid[y]![x] = shade; // cells-ok — a row index
+    // **Ordered after the flip, not before it** (§3ac B5). Under a downward
+    // facing `rowOf(max)` is the *larger* row index, so a loop from `a` to `b`
+    // runs backwards and fills nothing — the band vanishes rather than inverts,
+    // which is the failure that looks like the member working.
+    const a = rowOf(Math.max(u, l), range, h, facing);
+    const b = rowOf(Math.min(u, l), range, h, facing);
+    for (let y = Math.min(a, b); y <= Math.max(a, b); y += 1) grid[y]![x] = shade; // cells-ok — a row index
   }
   return grid.map((r) => r.join("")); // cells-ok — a row of cells
 }
@@ -185,6 +193,20 @@ function fillRows(
  * `null` where either neighbour is a gap (C04 I46a) — a segment with one end
  * missing has no interpolant, and inventing one draws data nobody sent.
  */
+/**
+ * A column's position **along the data**, which is not its position across the
+ * area once the facing reverses (C12 §3ac).
+ *
+ * The interpolated edges walk `t ∈ [0, 1]` across the cells and ask `edgeAt`
+ * for the value there; under a left-facing origin the leftmost cell holds the
+ * *last* reading. One conversion at the boundary, rather than `edgeAt` learning
+ * about origins — it is the inverse of a placement and has no opinion about
+ * which end the placement started from.
+ */
+function along(t: number, facing: Facing): number {
+  return facing.x === "left" ? 1 - t : t;
+}
+
 function edgeAt(values: readonly number[], t: number): number | null {
   const n = values.length; // cells-ok — a sample count
   if (n === 0) return null; // cells-ok — a sample count
@@ -233,13 +255,14 @@ function confidenceRows(
   w: number,
   h: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing,
 ): readonly string[] {
   const { upper, lower } = annotation;
   const shade = shadeFor(caps);
   // **Defaults on** (C04 I52): `fill_between` is the figure a caller arrives
   // expecting, and `fill: false` keeps the two-edge frame byte for byte.
   const fill = (annotation.fill ?? true) && shade !== null
-    ? fillRows(upper, lower, range, w, h, shade)
+    ? fillRows(upper, lower, range, w, h, shade, facing)
     : null;
 
   if (caps.unicode === "ascii") {
@@ -249,10 +272,10 @@ function confidenceRows(
     // branch up. Testing a sample's own column against the dash inked seven
     // cells whatever the sample count (C12 §3e).
     for (let x = 0; x < w; x += DASH_CELLS) { // cells-ok — a column index
-      const t = w === 1 ? 0 : x / (w - 1); // cells-ok — a column index
+      const t = along(w === 1 ? 0 : x / (w - 1), facing); // cells-ok — a column index
       for (const v of [edgeAt(upper, t), edgeAt(lower, t)]) {
         if (v === null || !drawn(v, range)) continue;
-        const row = rowOf(v, range, h);
+        const row = rowOf(v, range, h, facing);
         if (row >= 0 && row < h) grid[row]![x] = "-"; // cells-ok — a row index
       }
     }
@@ -264,10 +287,10 @@ function confidenceRows(
   // dots.x`, every step inked — with the row varying instead of held.
   const span = Math.max(1, grid.dotWidth - 1); // cells-ok — a dot column
   for (let dotCol = 0; dotCol < grid.dotWidth; dotCol += DASH_CELLS * BRAILLE_DOTS.x) { // cells-ok
-    const t = dotCol / span; // cells-ok — a dot column
+    const t = along(dotCol / span, facing); // cells-ok — a dot column
     for (const v of [edgeAt(upper, t), edgeAt(lower, t)]) {
       if (v === null || !drawn(v, range)) continue;
-      setDot(grid, dotCol, rowOf(v, range, grid.dotHeight));
+      setDot(grid, dotCol, rowOf(v, range, grid.dotHeight, facing));
     }
   }
   const edges = foldBraille(grid);
@@ -283,16 +306,18 @@ function whiskersRows(
   w: number,
   h: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing,
 ): readonly string[] {
   if (caps.unicode === "ascii") {
     const grid: string[][] = Array.from({ length: h }, () => new Array(w).fill(" "));
     const n = points.length; // cells-ok — a point count
     for (let i = 0; i < n; i++) {
       const p = points[i]!;
-      const col = n <= 1 ? Math.floor(w / 2) : Math.round((i / (n - 1)) * (w - 1));
+      const at = facing.x === "left" ? n - 1 - i : i; // cells-ok — a point index
+      const col = n <= 1 ? Math.floor(w / 2) : Math.round((at / (n - 1)) * (w - 1));
       if (col < 0 || col >= w) continue;
-      const yTop = rowOf(p.y + p.err, range, h);
-      const yBot = rowOf(p.y - p.err, range, h);
+      const yTop = rowOf(p.y + p.err, range, h, facing);
+      const yBot = rowOf(p.y - p.err, range, h, facing);
       const top = Math.min(yTop, yBot);
       const bot = Math.max(yTop, yBot);
       for (let r = top; r <= bot; r++) {
@@ -305,12 +330,13 @@ function whiskersRows(
   const grid = createGrid(w * BRAILLE_DOTS.x, h * BRAILLE_DOTS.y);
   for (let i = 0; i < points.length; i++) { // cells-ok — a point count
     const p = points[i]!;
+    const at = facing.x === "left" ? points.length - 1 - i : i; // cells-ok — a point index
     const dotCol = points.length <= 1 // cells-ok — a point count
       ? Math.floor(grid.dotWidth / 2)
-      : Math.round((i / (points.length - 1)) * (grid.dotWidth - 1)); // cells-ok — a point count
+      : Math.round((at / (points.length - 1)) * (grid.dotWidth - 1)); // cells-ok — a point count
     if (dotCol < 0 || dotCol >= grid.dotWidth) continue;
-    const yTop = rowOf(p.y + p.err, range, grid.dotHeight);
-    const yBot = rowOf(p.y - p.err, range, grid.dotHeight);
+    const yTop = rowOf(p.y + p.err, range, grid.dotHeight, facing);
+    const yBot = rowOf(p.y - p.err, range, grid.dotHeight, facing);
     const top = Math.min(yTop, yBot);
     const bot = Math.max(yTop, yBot);
     for (let r = top; r <= bot; r++) setDot(grid, dotCol, r);

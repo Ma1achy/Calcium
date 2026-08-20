@@ -52,7 +52,7 @@ import {
   type Layout,
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
-import { seriesRange, type Range } from "./scale.js";
+import { FACING_DEFAULT, facingOf, seriesRange, type Facing, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
 import { ROW_IS_AN_IDENTITY, markOf, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
@@ -702,16 +702,22 @@ function axedWithCursor(
  * as soon as the bars aggregate.
  */
 function cursorColumn(block: Plot, cursorIdx: number, areaWidth: number): number | null {
+  const facing = facingOf(block, FACING_DEFAULT);
   const bars = candlesOf(block);
-  if (bars !== undefined) return candleColumn(bars, cursorIdx, areaWidth);
+  if (bars !== undefined) return candleColumn(bars, cursorIdx, areaWidth, facing);
   const n = block.series.reduce((most, sr) => Math.max(most, sr.values.length), 0); // cells-ok — a sample count
   if (n === 0 || cursorIdx < 0 || cursorIdx >= n) return null; // cells-ok — a sample count
   const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
   const span = Math.max(0, n - 1); // cells-ok — a sample count
-  // `columnsOf`'s placement, which is what put the sample in that column.
+  // `columnsOf`'s placement, which is what put the sample in that column —
+  // **including its facing** (§3ac B1). A crosshair that does not flip with the
+  // data points at the mirror sample and the readout beside it names a value
+  // the reader is not looking at: the frame stays plausible and the number is
+  // wrong, which is the worst failure available here.
+  const at = facing.x === "left" ? span - cursorIdx : cursorIdx; // cells-ok — a sample index
   return span === 0 || w === 1
     ? Math.floor((w - 1) / 2) // cells-ok — a column index
-    : Math.round((cursorIdx / span) * (w - 1)); // cells-ok — a column index
+    : Math.round((at / span) * (w - 1)); // cells-ok — a column index
 }
 
 /**
@@ -932,7 +938,7 @@ function stackedRows(
     const curveHeight = Math.max(1, layout.areaRows - 1);
 
     if (first !== undefined) {
-      const glyphRows = curveRows(first, range, layout.areaWidth, curveHeight, ctx.capabilities);
+      const glyphRows = curveRows(first, range, layout.areaWidth, curveHeight, ctx.capabilities, facingOf(block, FACING_DEFAULT));
       const layer: Layer = { glyphRows, ref: refOf(first, 0), kind: "curve" };
       for (let i = 0; i < curveHeight; i += 1) {
         out.push(
@@ -964,7 +970,7 @@ function stackedRows(
   // its band is rasterised.
   const strips = series.map((s, index) => ({
     layer: {
-      glyphRows: curveRows(s, range, layout.areaWidth, heights[index] ?? 0, ctx.capabilities),
+      glyphRows: curveRows(s, range, layout.areaWidth, heights[index] ?? 0, ctx.capabilities, facingOf(block, FACING_DEFAULT)),
       ref: refOf(s, index),
       kind: "curve" as const,
     },
@@ -1002,6 +1008,7 @@ type Rasteriser = (
   areaWidth: number,
   areaRows: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing,
 ) => readonly string[];
 
 function styleRasteriser(
@@ -1025,8 +1032,8 @@ function styleRasteriser(
   // carried the hold-then-jump and the replacement knew only how to slope, so
   // `step` and `line` drew the same frame. The form owns the rule, so the form
   // names it here.
-  return (series, range, areaWidth, areaRows, _caps) =>
-    lineDrawRows(series, range, areaWidth, areaRows, corners, interpolation);
+  return (series, range, areaWidth, areaRows, _caps, facing) =>
+    lineDrawRows(series, range, areaWidth, areaRows, corners, facing, interpolation);
 }
 
 function overlaidRows(
@@ -1043,8 +1050,9 @@ function overlaidRows(
   // and the labels were measured against a default `ambiguousWidth` by
   // `labelWidth` while `gutterSpans` padded against another — the two defects
   // §3f names, in one call.
+  const facing = facingOf(block, FACING_DEFAULT);
   const labels = hasYLabels(layout)
-    ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
+    ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale, facing)
     : [];
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   // `"grid"` draws its lines where there is a value written — the rows the
@@ -1052,7 +1060,7 @@ function overlaidRows(
   const gridTicks = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities).tickColumns;
   const layers: readonly Layer[] = [
     ...block.series.map((s, index) => ({
-      glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
+      glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing),
       ref: refOf(s, index),
       kind: "curve" as const,
     })),
@@ -1061,7 +1069,7 @@ function overlaidRows(
     // *over* the candles) and the annotations must lose it (C04 I52).
     ...under,
     ...(block.annotations ?? []).map((a) => ({
-      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),
+      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing),
       ref: `tone.${a.tone ?? "muted"}` as ColourRef,
       // An annotation is a reference drawn behind the data (C04 I52), so the
       // series occludes it rather than sharing a cell with it.
@@ -1115,10 +1123,11 @@ function candleLayers(
   range: Range,
   layout: Layout,
   ctx: RenderContext,
+  facing: Facing,
 ): readonly Layer[] {
   if (!hasBars(bars)) return [];
   const { rising, falling, flat } = candleRows(
-    bars ?? [], range, layout.areaWidth, layout.areaRows, ctx.capabilities,
+    bars ?? [], range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing,
   );
   return [
     { glyphRows: rising, ref: "tone.ok", kind: "curve" },
@@ -1735,7 +1744,7 @@ function positionalForm(
   const at = marked ? cursorColumn(block, cursorIdx, layout.areaWidth) : null;
   const area = stacked
     ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, range, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx), at);
+    : overlaidRows(block, range, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx, facingOf(block, FACING_DEFAULT)), at);
   if (marked) {
     return axedWithCursor(block, cursorIdx, at, area, layout, ctx);
   }
@@ -2196,12 +2205,12 @@ const FORM_ROWS: Readonly<
    * is why this is not two bar charts side by side. Drawn on the same dot grid
    * as `line`, with the series' first and last readings as the two columns.
    */
-  slope: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps) => {
+  slope: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps, facing) => {
     const vals = sr.values.filter((v): v is number => v !== null && Number.isFinite(v));
     const ends = vals.length >= 2 // cells-ok — a sample count
       ? { values: [vals[0]!, vals[vals.length - 1]!] } // cells-ok — a sample index
       : { values: vals };
-    return curveRows(ends, range, aw, rows, caps);
+    return curveRows(ends, range, aw, rows, caps, facing);
   }),
 
   /**
@@ -2211,8 +2220,8 @@ const FORM_ROWS: Readonly<
    * is the smallest mark there is, so size is spent on *how many cells* rather
    * than on a radius. Two series, read as (position, magnitude).
    */
-  bubble: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps) =>
-    bubbleRows(sr, block.series[1], range, aw, rows, caps)),
+  bubble: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps, facing) =>
+    bubbleRows(sr, block.series[1], range, aw, rows, caps, facing)),
 
   /**
    * An autocorrelation plot — one bar per lag, with a confidence band.

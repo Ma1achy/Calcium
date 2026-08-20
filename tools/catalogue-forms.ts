@@ -232,6 +232,25 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // deliberately fewer than the area is wide — the defect was proportional to
     // the sample count and invisible at any fixture with more readings than
     // cells (C12 §3e).
+    // **The four corners, on one series** (C12 §3ac). Read side by side these
+    // are the whole member: the same eight readings, the same eight columns, and
+    // the gutter and the tick row following the data rather than staying put.
+    "origin-bottom-left": {
+      form: "line", height: 8, axes: true, series: [s(sin(14), "obs")],
+      xLabels: ["first", "mid", "last"],
+    },
+    "origin-bottom-right": {
+      form: "line", height: 8, axes: true, series: [s(sin(14), "obs")],
+      xLabels: ["first", "mid", "last"], origin: "bottom-right",
+    },
+    "origin-top-left": {
+      form: "line", height: 8, axes: true, series: [s(sin(14), "obs")],
+      xLabels: ["first", "mid", "last"], origin: "top-left",
+    },
+    "origin-top-right": {
+      form: "line", height: 8, axes: true, series: [s(sin(14), "obs")],
+      xLabels: ["first", "mid", "last"], origin: "top-right",
+    },
     confidence: {
       form: "line", height: 8, axes: true, series: [s(sin(12), "obs")],
       annotations: [{
@@ -336,6 +355,10 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     sparse: { form: "heatmap", height: 5, axes: true, series: matrix(5, 20) },
     palette: { form: "heatmap", height: 5, axes: true, colormap: "viridis", series: matrix(5, 90) },
     empty: { form: "heatmap", height: 3, axes: true, series: [s([], "empty")] },
+    // **The matrix half of `origin`, and its default is the other corner**
+    // (C12 §3ac): `series[0]`, `values[0]` is at the *top* left because a row
+    // index grows downward. `bottom-right` is therefore both flips at once.
+    origin: { form: "heatmap", height: 5, axes: true, colormap: "viridis", series: matrix(5, 20), origin: "bottom-right" },
   },
   contour: {
     // **The braille arm, which is the default and the one the saddle is visible

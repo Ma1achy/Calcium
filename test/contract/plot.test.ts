@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { curveRows } from "../../src/presentation/plot/curve.js";
-import { seriesRange } from "../../src/presentation/plot/scale.js";
+import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { PLOT_CORPUS, lossCurve } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
@@ -101,11 +101,11 @@ describe("C12 tier 2 — totality", () => {
       const range = seriesRange([{ values }], {}) ?? { min: 0, max: 1 };
       for (let width = 1; width <= 200; width += 1) {
         expect(
-          () => curveRows({ values }, range, width, 5, FULL_CAPS),
+          () => curveRows({ values }, range, width, 5, FULL_CAPS, FACING_DEFAULT),
           `braille[${String(values.length)}] at width ${String(width)}`, // cells-ok — a sample count
         ).not.toThrow();
         expect(
-          () => curveRows({ values }, range, width, 5, ASCII_CAPS),
+          () => curveRows({ values }, range, width, 5, ASCII_CAPS, FACING_DEFAULT),
           `ramp[${String(values.length)}] at width ${String(width)}`, // cells-ok — a sample count
         ).not.toThrow();
         expect(() => sparkline(values, width, FULL_CAPS)).not.toThrow();

@@ -10,14 +10,14 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
 import { spanCells, wash } from "../blocks/paint.js";
 import type { RenderContext } from "../blocks/types.js";
-import type { Range } from "./scale.js";
+import type { Facing, Range } from "./scale.js";
 import type { ColourValue } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
 import type { ColormapName } from "../../data/colormaps/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { ladderFor } from "./ramp.js";
 import { cells, truncate } from "../text.js";
-import { seriesRange } from "./scale.js";
+import { FACING_MATRIX, facingOf, seriesRange } from "./scale.js";
 import { formatValue } from "./axes.js";
 import { tone } from "../blocks/paint.js";
 import { plotAreaRows, AXIS_GUTTER } from "./height.js";
@@ -208,16 +208,35 @@ function layoutFor(block: Plot, width: number, caps: Pick<TerminalCapabilities, 
  * nothing, because every fixture had exactly as many readings as cells. The
  * duplication is what made that possible, so it is gone rather than guarded.
  */
-function columnMap(count: number, width: number, layout: MatrixLayout): readonly (number | null)[] {
+/**
+ * Which reading each column holds, **and `origin` reverses the answer rather
+ * than the question** (C12 §3ac A3).
+ *
+ * The anchor decides *which* readings are shown — `window` keeps the last `w`,
+ * `left` keeps the oldest and scrolls — and the facing decides which end they
+ * are drawn from. Reversing the map composes the two correctly and needs no
+ * second rule: a right-facing origin with `matrixAnchor: "left"` puts the oldest
+ * reading at the right and the blank fringe on the left, which is what §3o says
+ * a fringe is. **Reversing the values instead would have changed which readings
+ * a window selects**, and `origin` never changes what is shown.
+ */
+function columnMap(
+  count: number,
+  width: number,
+  layout: MatrixLayout,
+  facing: Facing,
+): readonly (number | null)[] {
   const w = Math.max(0, Math.floor(width));
   const out: (number | null)[] = [];
   if (w === 0 || count <= 0) return out;
+  const faced = (m: readonly (number | null)[]): readonly (number | null)[] =>
+    facing.x === "left" ? [...m].reverse() : m;
 
   if (layout === "stretch") {
     // Every column belongs to a reading; a reading spans as many columns as it
     // takes to fill the area, so the matrix is a grid rather than a fringe.
     for (let x = 0; x < w; x += 1) out.push(Math.min(count - 1, Math.floor((x * count) / w)));
-    return out;
+    return faced(out);
   }
 
   if (layout === "left") {
@@ -225,7 +244,7 @@ function columnMap(count: number, width: number, layout: MatrixLayout): readonly
     // the *oldest* column is the fixed one.
     const from = Math.max(0, count - w);
     for (let x = 0; x < w; x += 1) out.push(x < count - from ? from + x : null); // cells-ok — a column index
-    return out;
+    return faced(out);
   }
 
   // "window": the last `w` readings, right-anchored. **Correct for a live feed
@@ -235,7 +254,7 @@ function columnMap(count: number, width: number, layout: MatrixLayout): readonly
   const start = Math.max(0, count - w);
   const pad = Math.max(0, w - count);
   for (let x = 0; x < w; x += 1) out.push(x < pad ? null : start + (x - pad));
-  return out;
+  return faced(out);
 }
 
 function heatSpans(
@@ -248,9 +267,10 @@ function heatSpans(
   matrixLayout: MatrixLayout,
   dim: number,
   painted: boolean,
+  facing: Facing,
 ): readonly Span[] {
   const w = Math.max(0, Math.floor(layout.areaWidth));
-  const columns = columnMap(series.values.length, w, matrixLayout); // cells-ok — a position count
+  const columns = columnMap(series.values.length, w, matrixLayout, facing); // cells-ok — a position count
   const ramp = [...style.ramp];
   const steps = ramp.length; // cells-ok — a ramp length
   const span = range.max - range.min;
@@ -360,19 +380,33 @@ function matrixRows(
   const overflow = block.series.length > layout.areaRows; // cells-ok — a row count
   const visible = overflow ? Math.max(0, layout.areaRows - 1) : block.series.length; // cells-ok
 
-  for (let i = 0; i < visible; i += 1) {
+  // **`origin` moves where a row is drawn and never which rows are shown**
+  // (C12 §3ac). The visible slice is `series[0 … visible − 1]` under all four
+  // corners, so a matrix too tall for its area hides the same rows whichever way
+  // it faces and `+N more` names the same set — the alternative is an origin
+  // that silently changes the data.
+  const facing = facingOf(block, FACING_MATRIX);
+  for (let r = 0; r < visible; r += 1) {
+    const i = facing.y === "up" ? visible - 1 - r : r; // cells-ok — a row index
     const s = block.series[i];
     if (s === undefined) continue;
-    const field = heatSpans(s, range, layout, map, style, ctx, matrixLayout, dim, painted);
+    const field = heatSpans(s, range, layout, map, style, ctx, matrixLayout, dim, painted, facing);
     // **Pass 5 then pass 6** (§6d.2). The merge cannot see the background and
     // the ink pass needs both, which is why the second one runs here rather than
     // inside either rasteriser.
+    // **The field overlay is rasterised in area coordinates**, so its row index
+    // is the visual one — and `contour` and `quiver` are the two forms that
+    // refuse `origin` for exactly that reason (§3ac): flipping the wash without
+    // re-sampling the field would draw isolines over the wrong cells, and
+    // mirroring the rasterised row is the braille dot permutation probe 3 ruled
+    // out. With those two refused, `r` and `i` coincide wherever `overlay` is
+    // non-empty.
     const merged = overlay.length === 0 // cells-ok — a layer count
       ? null
-      : mergeFieldLayers(overlay, i, layout.areaWidth);
+      : mergeFieldLayers(overlay, r, layout.areaWidth);
     out.push(
       plotRow(
-        i,
+        r,
         s.label ?? "",
         merged === null
           ? field
@@ -389,7 +423,7 @@ function matrixRows(
                   : { colour: c };
               },
               glyphInk,
-              i,
+              r,
             ),
         layout,
         ctx,
@@ -399,6 +433,11 @@ function matrixRows(
 
   if (overflow) {
     const omitted = block.series.slice(visible).map((s, i) => s.label ?? `row ${String(visible + i + 1)}`); // cells-ok
+    // **The notice keeps the last row under all four origins**, because it is
+    // furniture rather than data and furniture does not flip — the same reason
+    // the bottom rule stays at the bottom and only the order of its tick labels
+    // follows the facing (§3ac B3). The rows above it hold the data, growing
+    // downward from the lid or upward from just above this line.
     out.push(
       plotRow(
         visible,
@@ -431,7 +470,11 @@ function matrixFurniture(
   ctx: RenderContext,
 ): readonly string[] {
   const muted = tone("muted", ctx.theme, ctx.capabilities);
-  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities);
+  // **The matrix's captions come through here and not `xRowFor`**, which is a
+  // third caption builder and the reason a surviving mutation was right about a
+  // remedy in the wrong file: `furnitureFor` is reached from `axed`, and a
+  // matrix composes its own furniture. OR12's heatmap arm is what said so.
+  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities, facingOf(block, FACING_MATRIX));
   const labelRow =
     labels === ""
       ? ""

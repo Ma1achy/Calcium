@@ -97,10 +97,22 @@ describe("XA6 (C12 I41): a form without a position axis gets no numeric row", ()
 
 describe("XA7 (C12 I41): the form owns which column a tick lands in", () => {
   // **§3d.1's last row, and the one that would have shipped wrong.** A curve
-  // spreads its samples across the width; a candlestick left-aligns them at a
-  // fixed pitch. I37 measured that the two agree at the dense end and separate
-  // at the sparse one — four bars in forty-four columns put the last candle at
+  // spreads its samples across the width; a candlestick places its bodies at its
+  // own pitch. I37 measured that the two agree at the dense end and separate at
+  // the sparse one — four bars in forty-four columns put the last candle at
   // column 20 and the curve's rule at 43.
+  //
+  // **That measurement is now stale in the direction that matters, and a
+  // surviving mutation is what said so.** §3r's placement change made the bodies
+  // span the whole area, so the last body ends *at* the right edge: the curve's
+  // rule lands at column 43, inside the last candle rather than ten cells past
+  // it, and *every tick has a candle in its column* is satisfied by both
+  // mappings. The claim did not stop being true — it stopped being able to fail.
+  //
+  // What `columnAt` still buys is the **wick**, which is where a tick means
+  // *this bar* rather than *somewhere in this bar*, so that is what is asserted
+  // below. The old row is kept beside it because it is the weaker claim and
+  // still worth holding.
   //
   // **Both rows here were rewritten after surviving their mutations**, and each
   // failed in a different way worth naming. The first called `xTickRow` with a
@@ -116,6 +128,22 @@ describe("XA7 (C12 I41): the form owns which column a tick lands in", () => {
   const CANDLES = block({
     kind: "plot", id: "xa7", form: "line", height: 8, axes: true,
     plotStyle: "candlestick", series: [], ohlc: BARS,
+  });
+
+  it("every tick lands on a candle's wick, not merely inside its body", () => {
+    // `candleColumn` answers *the centre column of bar i*; the curve's rule
+    // answers *the fraction of the width sample i sits at*. With four bodies
+    // filling forty-four cells the two differ by two columns, which is a tick
+    // under a body's edge rather than under its wick.
+    const rows = kit().renderToLines(CANDLES, 44).map(plain);
+    const ruleAt = rows.findIndex((r) => r.includes("└")); // cells-ok — a row index
+    const ticks = [...(rows[ruleAt] ?? "")].flatMap((c, i) => (c === "┬" ? [i] : [])); // cells-ok
+    const area = rows.slice(1, ruleAt);
+    const wicks = new Set(
+      area.flatMap((r) => [...r].flatMap((c, i) => (c === "│" ? [i] : []))), // cells-ok — a column index
+    );
+    expect(ticks.length).toBeGreaterThan(1); // cells-ok — a tick count
+    expect(ticks.filter((x) => wicks.has(x))).toEqual(ticks);
   });
 
   it("every tick has a candle in its column", () => {

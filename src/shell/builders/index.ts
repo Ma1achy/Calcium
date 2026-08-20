@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_Y_GUTTER, IS_FIELD_FORM, IS_MATRIX, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_Y_GUTTER, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -430,9 +430,10 @@ function plot(
     width?: Plot["width"];
     aspect?: Plot["aspect"];
     align?: Plot["align"];
+    origin?: Plot["origin"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -561,6 +562,16 @@ function plot(
           `its frame has nothing to align inside it`,
       );
     }
+    // **`origin` is refused by the same record that defaults it** (C04 I62,
+    // C12 §3ac) — `null` is the refusal, so there is no second table to keep in
+    // step with this one.
+    const facingForm = form ?? "line";
+    if (origin !== undefined && ORIGIN_DEFAULT[facingForm] === null) {
+      throw new TypeError(
+        `b.plot: "origin" on form "${facingForm}" (C04 I62, C12 §3ac) — this form places its data ` +
+          `itself and has no direction to reverse`,
+      );
+    }
     if (vectors !== undefined && drawn !== "quiver") {
       throw new TypeError(
         `b.plot: "vectors" on form "${drawn}" (C04 I61) — only a quiver draws a vector ` +
@@ -633,6 +644,7 @@ function plot(
       ...(width === undefined ? {} : { width }),
       ...(aspect === undefined ? {} : { aspect }),
       ...(align === undefined ? {} : { align }),
+      ...(origin === undefined ? {} : { origin }),
     } as Plot,
     spec,
     true,

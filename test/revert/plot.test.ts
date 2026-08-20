@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
-import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
+import { columnsOf, finiteSamples, rowOf, seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { curveRows } from "../../src/presentation/plot/curve.js";
 import { createGrid, drawLine, foldBraille, setDot } from "../../src/presentation/plot/raster.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
@@ -45,11 +45,11 @@ describe("C12 tier 6 — fail-on-revert", () => {
     const range = seriesRange([{ values: [3, 3, 3] }], {});
     if (range === null) throw new Error("unreachable");
 
-    const row = rowOf(3, range, 16);
+    const row = rowOf(3, range, 16, FACING_DEFAULT);
     expect(Number.isNaN(row)).toBe(false);
     expect(row).toBe(7);
 
-    const glyphRows = curveRows({ values: [3, 3, 3] }, range, 12, 4, FULL_CAPS);
+    const glyphRows = curveRows({ values: [3, 3, 3] }, range, 12, 4, FULL_CAPS, FACING_DEFAULT);
     expect(glyphRows.some((r) => [...r].some((c) => c !== "⠀"))).toBe(true);
   });
 
@@ -61,7 +61,7 @@ describe("C12 tier 6 — fail-on-revert", () => {
     const values = [1, 2, Number.NaN, 4, 5];
     expect(finiteSamples(values).map((s) => s.i)).toEqual([0, 1, 3, 4]);
 
-    const columns = columnsOf(finiteSamples(values), values.length, 10);
+    const columns = columnsOf(finiteSamples(values), values.length, 10, FACING_DEFAULT);
     const joinable = columns.filter((c, i) => {
       const next = columns[i + 1];
       return next !== undefined && next.iFirst === c.iLast + 1;
@@ -75,7 +75,7 @@ describe("C12 tier 6 — fail-on-revert", () => {
     // spike at index 5,000 is not on any stride that lands on a column boundary, so
     // it disappears — and a loss curve with a spike is *about* the spike.
     const values = Array.from({ length: 10_000 }, (_, i) => (i === 5_000 ? 99 : 1));
-    const columns = columnsOf(finiteSamples(values), values.length, 112);
+    const columns = columnsOf(finiteSamples(values), values.length, 112, FACING_DEFAULT);
     expect(columns.filter((c) => c.max === 99)).toHaveLength(1);
 
     // And every-nth would also have given the column a single value, so `min` and

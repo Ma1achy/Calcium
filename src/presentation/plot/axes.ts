@@ -10,7 +10,7 @@ import type { AmbiguousWidth } from "../text.js";
 import { cells, truncate } from "../text.js";
 import type { Plot, ScaleType } from "../../data/viewmodel/index.js";
 import type { Range } from "./scale.js";
-import { rowOf } from "./scale.js";
+import { rowOf, FACING_DEFAULT, type Facing } from "./scale.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /** A y-label and the plot-area row it sits on. */
@@ -406,6 +406,7 @@ export function yLabels(
   format: Plot["yFormat"],
   pin: Pick<Plot, "yMin" | "yMax"> = {},
   scale?: ScaleType,
+  facing: Facing = FACING_DEFAULT,
 ): readonly YLabel[] {
   const h = Math.max(1, Math.floor(rows));
   // **Through the dispatcher, not straight to the linear arm.** `axisFor` has
@@ -436,13 +437,23 @@ export function yLabels(
   // eight rows cannot evenly host five ticks. Two labels touching read as one
   // two-line label, and dropping the interior one loses nothing the ends do not
   // already bound.
+  // **The gutter labels both ends of the area, and the facing swaps which
+  // value each end carries** (C12 §3ac A1). Row 0 held the maximum and row
+  // `h − 1` the minimum as literals, with only the interior ticks through
+  // `rowOf` — so a downward facing drew a scale whose ends disagreed with its
+  // own ticks, in the one place a reader goes to settle a disagreement.
+  //
+  // **Asking `rowOf` for the two rows is the other repair and it is wrong**:
+  // a constant range collapses both to the centre row, and the map keyed on the
+  // row then holds one label where I3 requires three. T1.5 is what said so. The
+  // rows are the area's ends by definition; only the values move.
   const taken: number[] = [0, h - 1];
   const byRow = new Map<number, string>([
-    [0, at(axis.range.max)],
-    [h - 1, at(axis.range.min)],
+    [0, at(facing.y === "down" ? axis.range.min : axis.range.max)],
+    [h - 1, at(facing.y === "down" ? axis.range.max : axis.range.min)],
   ]);
   for (const v of axis.ticks) {
-    const row = rowOf(v, axis.range, h);
+    const row = rowOf(v, axis.range, h, facing);
     if (taken.some((t) => Math.abs(t - row) < MIN_LABEL_GAP)) continue;
     taken.push(row);
     byRow.set(row, at(v));
@@ -523,8 +534,9 @@ export function xLabelRow(
   labels: readonly [string, string, string] | undefined,
   width: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing = FACING_DEFAULT,
 ): string {
-  return xAxis(labels, width, caps).text;
+  return xAxis(labels, width, caps, facing).text;
 }
 
 /**
@@ -558,12 +570,18 @@ export function xAxis(
   labels: readonly [string, string, string] | undefined,
   width: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing = FACING_DEFAULT,
 ): XAxis {
   const w = Math.max(0, Math.floor(width));
   if (labels === undefined || w === 0) return { text: "", tickColumns: [] };
 
   const third = Math.max(1, Math.floor(w / 3));
-  const [left, centre, right] = labels.map((l) => truncate(l, third, caps));
+  // **The caller's own three captions reverse with the data** (§3ac B4). A
+  // caption names the samples it sits under, and leaving them put under a
+  // reversed curve is the one furniture defect a reader cannot detect from the
+  // frame: both halves look right and only their pairing is wrong.
+  const faced = facing.x === "left" ? [labels[2], labels[1], labels[0]] : labels;
+  const [left, centre, right] = faced.map((l) => truncate(l, third, caps));
 
   const row: string[] = Array.from({ length: w }, () => " ");
   const tickColumns: number[] = [];
@@ -669,6 +687,7 @@ export function xTickRow(
   format: Plot["yFormat"],
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
   scale?: ScaleType,
+  facing: Facing = FACING_DEFAULT,
   /**
    * Where a normalised position lands, **because the form owns that** (C12 I37,
    * I41). A curve spreads its samples across the width; a candlestick
@@ -700,7 +719,11 @@ export function xTickRow(
     const text = formatValue(value, format, decimals);
     const wide = cells(text, caps.ambiguousWidth); // cells-ok — a label width
     const t = xPositionOf(value, axis.range, scale);
-    const at = columnAt?.(t) ?? Math.round(t * (w - 1)); // cells-ok — a column index
+    // **`columnAt` gets the unflipped position and flips inside** (§3ac B3).
+    // It maps a position to a *bar*, and `candleColumn` already faces its own
+    // placement — handing it `1 − t` as well would flip the axis twice and draw
+    // it the way it started.
+    const at = columnAt?.(t) ?? Math.round((facing.x === "left" ? 1 - t : t) * (w - 1)); // cells-ok — a column index
     if (at === null || at < 0) continue; // cells-ok — a column index
     // Centred on its own tick, then held inside the row and clear of its
     // neighbour — the same three clamps `xAxis` applies to its three captions.

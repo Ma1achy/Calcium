@@ -21,14 +21,14 @@ import { cells } from "../../src/presentation/text.js";
 import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
 import { aggregate, candleColumn, candleLeft, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
-import { seriesRange } from "../../src/presentation/plot/scale.js";
+import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { formatReadout, readoutSet } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
 import { horizonBandT, horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
 import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
-import { validateBlock } from "../../src/data/viewmodel/index.js";
+import { validateBlock, ORIGIN_DEFAULT, type PlotForm } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
@@ -1537,6 +1537,7 @@ describe("GROUP 6j: the six that had no renderer", () => {
     // against 4. Two points at opposite ends, and each half counted.
     const pair = bubbleRows(
       { values: [50, 50] }, { values: [1, 100] }, { min: 0, max: 100 }, 30, 8, FULL_CAPS,
+    FACING_DEFAULT,
     );
     const half = (rs: readonly string[], left: boolean): number =>
       ink(rs.map((r) => (left ? r.slice(0, 15) : r.slice(15)))); // cells-ok — a column index
@@ -1547,6 +1548,7 @@ describe("GROUP 6j: the six that had no renderer", () => {
       { values: [10, 20, 30, 40, 50, 60, 70] },
       { values: [5, 5, 5, 5, 5, 5, 5] },
       { min: 0, max: 80 }, 40, 8, FULL_CAPS,
+    FACING_DEFAULT,
     );
     expect(ink(seven), "every point drawn").toBeGreaterThanOrEqual(7); // cells-ok — a cell count
   });
@@ -1942,8 +1944,8 @@ describe("step holds value horizontally", () => {
   it("step output differs from scatter output", () => {
     const series = { values: [0, 10, 0] as (number | null)[] };
     const range = { min: 0, max: 10 };
-    const stepResult = stepRows(series, range, 20, 5, FULL_CAPS);
-    const scatterResult = scatterRows(series, range, 20, 5, FULL_CAPS);
+    const stepResult = stepRows(series, range, 20, 5, FULL_CAPS, FACING_DEFAULT);
+    const scatterResult = scatterRows(series, range, 20, 5, FULL_CAPS, FACING_DEFAULT);
     expect(stepResult.join("\n")).not.toBe(scatterResult.join("\n"));
   });
 });
@@ -2196,7 +2198,7 @@ describe("C12 §3r — the candlestick", () => {
     // mutation to `Math.ceil` passed it. Area 3 gives `cw = 2`, where floor is
     // 0 and ceil is 1 — the only widths that can see the rule are the even ones.
     expect(candleWidth(3, 1), "the fixture is an even candle").toBe(2);
-    const even = candleRows(walk([4]), { min: 90, max: 110 }, 3, 9, FULL_CAPS);
+    const even = candleRows(walk([4]), { min: 90, max: 110 }, 3, 9, FULL_CAPS, FACING_DEFAULT);
     const wickRow = even.rising.find((r) => r.trimEnd() === glyphs(FULL_CAPS).vertical);
     expect(wickRow, "a wick-only row exists to read").toBeDefined();
     expect(wickRow?.indexOf(glyphs(FULL_CAPS).vertical), "cw=2 → the left cell").toBe(0);
@@ -2204,7 +2206,7 @@ describe("C12 §3r — the candlestick", () => {
     // And an odd width centres it, or the rule above is a statement about one
     // parity rather than about rounding.
     expect(candleWidth(4, 1)).toBe(3);
-    const odd = candleRows(walk([4]), { min: 90, max: 110 }, 4, 9, FULL_CAPS);
+    const odd = candleRows(walk([4]), { min: 90, max: 110 }, 4, 9, FULL_CAPS, FACING_DEFAULT);
     expect(odd.rising.find((r) => r.trimEnd() === ` ${glyphs(FULL_CAPS).vertical}`), "cw=3 → centred")
       .toBeDefined();
   });
@@ -2214,7 +2216,7 @@ describe("C12 §3r — the candlestick", () => {
     bars: readonly { open: number; high: number; low: number; close: number }[],
     w: number,
   ): readonly string[] => {
-    const rows = candleRows(bars, { min: 80, max: 130 }, w, 8, FULL_CAPS);
+    const rows = candleRows(bars, { min: 80, max: 130 }, w, 8, FULL_CAPS, FACING_DEFAULT);
     return rows.rising.map((r, i) =>
       [...r].map((c, j) => {
         if (c !== " ") return c;
@@ -2289,7 +2291,7 @@ describe("C12 §3r — the candlestick", () => {
       const bars = walk(Array.from({ length: n }, (_u, i) => [3, -2, 5, -1][i % 4]!));
       const ink = inkOf(bars, w);
       for (const i of [0, Math.floor(n / 2), n - 1]) { // cells-ok — a bar index
-        const col = candleColumn(bars, i, w); // cells-ok — a column index
+        const col = candleColumn(bars, i, w, FACING_DEFAULT); // cells-ok — a column index
         expect(col, `bar ${String(i)} of ${String(n)} at ${String(w)}`).not.toBeNull();
         expect(ink.some((r) => (r[col!] ?? " ") !== " "), `ink at column ${String(col)}`).toBe(true);
       }
@@ -2345,7 +2347,7 @@ describe("C12 §3r — the candlestick", () => {
     // A wick reaching no row beyond the body: `┿` carries both, because the
     // body wins the overlap and the wick would simply vanish.
     const tight = [{ open: 100, high: 110, low: 99.5, close: 108 }];
-    const wide9 = candleRows(tight, { min: 90, max: 112 }, 9, 10, FULL_CAPS);
+    const wide9 = candleRows(tight, { min: 90, max: 112 }, 9, 10, FULL_CAPS, FACING_DEFAULT);
     expect(ink(wide9.rising), "the lower wick shares the body's end cell")
       .toContain(glyphs(FULL_CAPS).candleCross);
 
@@ -2357,7 +2359,7 @@ describe("C12 §3r — the candlestick", () => {
     const g = glyphs(FULL_CAPS);
     expect(ink(rows), "rising is visible").toContain(g.candleHollow);
     expect(ink(rows), "falling is visible").toContain(g.candleFilled);
-    const packed = candleRows(dense, { min: 50, max: 250 }, 44, 8, FULL_CAPS);
+    const packed = candleRows(dense, { min: 50, max: 250 }, 44, 8, FULL_CAPS, FACING_DEFAULT);
     const marks = [...ink([...packed.rising, ...packed.falling])].filter((c) => c !== " ");
     expect(marks.filter((c) => c === g.candleCross).length, "no cross at one cell wide").toBe(0);
   });
@@ -2523,7 +2525,7 @@ describe("C12 §3r — the candlestick", () => {
     const drawn = Math.min(many.length, w);
     const wick = Math.floor((candleWidth(w, drawn) - 1) / 2);
     for (const i of [0, 1, 59, 60, 61, 119]) {
-      expect(candleColumn(many, i, w), `bar ${String(i)}`)
+      expect(candleColumn(many, i, w, FACING_DEFAULT), `bar ${String(i)}`)
         .toBe(candleLeft(Math.floor((i * drawn) / many.length), drawn, w) + wick);
     }
 
@@ -2534,18 +2536,18 @@ describe("C12 §3r — the candlestick", () => {
     // offset **inside its own body**, `⌈(cw − 1) ÷ 2⌉` at the last bar, so the
     // invariant survives its own justification being falsified and the figure it
     // has to cover drops from 23 cells to 2.
-    expect(candleColumn(many, 60, w), "120 bars: they meet").toBe(curve(60, many.length));
+    expect(candleColumn(many, 60, w, FACING_DEFAULT), "120 bars: they meet").toBe(curve(60, many.length));
     const few = walk([1, 2, 3, 4]);
     expect(candleWidth(w, 4), "a five-cell body").toBe(5);
-    expect(candleColumn(few, 3, w), "4 bars: the candle, two short of the edge").toBe(41);
+    expect(candleColumn(few, 3, w, FACING_DEFAULT), "4 bars: the candle, two short of the edge").toBe(41);
     expect(curve(3, 4), "4 bars: the curve's rule is the edge itself").toBe(43);
     const eight = walk([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(candleColumn(eight, 7, w), "8 bars: the same two cells").toBe(41);
+    expect(candleColumn(eight, 7, w, FACING_DEFAULT), "8 bars: the same two cells").toBe(41);
     expect(curve(7, 8)).toBe(43);
 
-    expect(candleColumn(few, 0, w)).toBe(Math.floor((candleWidth(w, 4) - 1) / 2));
-    expect(candleColumn(few, 9, w), "out of range").toBeNull();
-    expect(candleColumn([], 0, w), "no bars").toBeNull();
+    expect(candleColumn(few, 0, w, FACING_DEFAULT)).toBe(Math.floor((candleWidth(w, 4) - 1) / 2));
+    expect(candleColumn(few, 9, w, FACING_DEFAULT), "out of range").toBeNull();
+    expect(candleColumn([], 0, w, FACING_DEFAULT), "no bars").toBeNull();
   });
 
   it("CS-B5 (§6b B5): a doji draws the flat mark, and an overlay through it draws the same", () => {
@@ -2554,7 +2556,7 @@ describe("C12 §3r — the candlestick", () => {
     // statements are true of the cell, and the readout is what disambiguates —
     // which is what makes it load-bearing rather than a convenience.
     const doji = [{ open: 100, high: 104, low: 96, close: 100 }];
-    const rows = candleRows(doji, { min: 90, max: 110 }, 7, 9, FULL_CAPS);
+    const rows = candleRows(doji, { min: 90, max: 110 }, 7, 9, FULL_CAPS, FACING_DEFAULT);
     expect(ink(rows.flat), "the doji is the flat mark").toContain(glyphs(FULL_CAPS).horizontal);
 
     // **In neither direction's layer, which is a claim about the tone.** It rode
@@ -2566,7 +2568,7 @@ describe("C12 §3r — the candlestick", () => {
 
     // And a rising bar is still in the rising layer, or the row passes against
     // a renderer that puts everything in `flat`.
-    const up = candleRows([{ open: 100, high: 104, low: 96, close: 103 }], { min: 90, max: 110 }, 7, 9, FULL_CAPS);
+    const up = candleRows([{ open: 100, high: 104, low: 96, close: 103 }], { min: 90, max: 110 }, 7, 9, FULL_CAPS, FACING_DEFAULT);
     expect(ink(up.rising)).toContain(glyphs(FULL_CAPS).candleHollow);
     expect(ink(up.flat), "and nothing is flat").toBe(" ".repeat(7 * 9));
   });
@@ -2863,5 +2865,253 @@ describe("C12 §3ab — width, aspect and align", () => {
     expect(framed(plot({ width: 200 }))).toEqual(framed(plot()));
     expect(drawnWidth(plot({ width: 200 }), 60)).toBe(60); // cells-ok — a cell count
     expect(drawnWidth(plot({ width: 30 }), 60)).toBe(30); // cells-ok — a cell count
+  });
+});
+
+describe("C12 §3ac — origin, and the record that carries its refusal", () => {
+  const kitted = kit();
+  const bare = (spec: Record<string, unknown>, w = 44): readonly string[] =>
+    kitted
+      .renderToLines(block({ kind: "plot", id: "o", height: 8, ...spec } as unknown as Plot), w)
+      .map((r) => r.replace(/\x1b\[[0-9;]*m/g, ""));
+
+  /** Three series of eight varied readings — enough for both axes to move. */
+  const data = {
+    series: [
+      { values: [1, 5, 2, 9, 3, 7, 4, 8], label: "a" },
+      { values: [8, 2, 6, 1, 9, 3, 7, 2], label: "b" },
+      { values: [4, 9, 1, 6, 2, 8, 5, 3], label: "c" },
+    ],
+    categories: ["a", "b", "c"],
+  };
+
+  const inked = (row: string): readonly number[] =>
+    [...row].map((ch, i) => (ch.trim() === "" ? -1 : i)).filter((i) => i >= 0); // cells-ok — a column index
+
+  it("OR1 (§3ac): each corner places the extreme sample in that corner", () => {
+    // One spike at the last sample: where it lands names the corner the data
+    // grew *to*, and the first sample is at the opposite one.
+    const one = { series: [{ values: [0, 0, 0, 0, 9] }], form: "scatter", height: 5, axes: false };
+    const spike = (origin: string): { row: number; col: number } => {
+      const rows = bare({ ...one, origin });
+      // The spike is the lone extreme, so it is the only cell on its own row.
+      for (let r = 0; r < rows.length; r += 1) { // cells-ok — a row index
+        const cols = inked(rows[r] ?? "");
+        if (cols.length === 1) return { row: r, col: cols[0]! }; // cells-ok — a column count
+      }
+      return { row: -1, col: -1 };
+    };
+    const bl = spike("bottom-left");
+    const br = spike("bottom-right");
+    const tl = spike("top-left");
+    const tr = spike("top-right");
+    // Vertical: the maximum is at the top under a bottom origin, the bottom
+    // under a top one. Horizontal: the last sample is at the right under a
+    // left origin, and at the left under a right one.
+    expect(bl.row).toBe(0); // cells-ok — a row index
+    expect(tl.row).toBe(4); // cells-ok — a row index
+    expect(br.col).toBeLessThan(bl.col); // cells-ok — a column index
+    expect(tr.row).toBe(tl.row); // cells-ok — a row index
+    expect(tr.col).toBe(br.col); // cells-ok — a column index
+  });
+
+  it('OR2 (§3ac A2): origin with yAxis "right" moves the labels once, not twice', () => {
+    // Two rules meet at rest: yAxis picks the side the gutter sits on, origin
+    // picks which end of it holds the maximum. Applying the horizontal half to
+    // the gutter's side as well would move it back.
+    const right = bare({ ...data, form: "line", yAxis: "right", origin: "bottom-right" });
+    const left = bare({ ...data, form: "line", yAxis: "right", origin: "bottom-left" });
+    const gutterAtEnd = (rows: readonly string[]): boolean =>
+      rows.filter((r) => /[0-9]/.test(r)).every((r) => /[0-9]\s*$/.test(r.trimEnd()));
+    expect(gutterAtEnd(right)).toBe(true);
+    expect(gutterAtEnd(left)).toBe(true);
+    expect(right).not.toEqual(left);
+  });
+
+  it("OR5 (§3ac A1, B3): the y label order and the x tick order follow the origin", () => {
+    const up = bare({ ...data, form: "line", axes: true, origin: "bottom-left" });
+    const down = bare({ ...data, form: "line", axes: true, origin: "top-left" });
+    // A1 — the gutter's two ends were literals: row 0 is the maximum, row h − 1
+    // the minimum, with only the interior ticks through rowOf. Computed, they
+    // swap ends with the flip.
+    const topLabel = (rows: readonly string[]): string =>
+      rows.map((r) => r.match(/^\s*([0-9.]+)/)?.[1]).find((v) => v !== undefined) ?? "";
+    expect(topLabel(up)).not.toBe(topLabel(down));
+    expect(topLabel(up)).not.toBe("");
+    // B3 — the ticks number the columns the data now occupies.
+    const leftward = bare({ ...data, form: "line", axes: true, origin: "bottom-right" });
+    expect(leftward[leftward.length - 1]).not.toBe(up[up.length - 1]);
+  });
+
+  it("OR6 (§3ac): every form ORIGIN_DEFAULT accepts moves under both flips", () => {
+    // **The measurement made permanent.** This is the probe that produced the
+    // record, run as an assertion: a form added to the accepted set without a
+    // working flip fails here rather than shipping a member that does nothing.
+    const accepted = (Object.keys(ORIGIN_DEFAULT) as PlotForm[]).filter(
+      (f) => ORIGIN_DEFAULT[f] !== null,
+    );
+    expect(accepted.length).toBe(15); // cells-ok — a form count
+    const still: string[] = [];
+    // **Painted, not stripped.** A matrix at 24-bit is a colour wash whose
+    // glyphs are all the same cell, so a frame with the SGR removed is identical
+    // under every origin — the instrument would report the whole matrix family
+    // as honouring nothing. Probe 2's first run made exactly this mistake and
+    // put eight forms in the refusal set with a number beside them (§3ac.1).
+    const painted = (spec: Record<string, unknown>): string =>
+      kitted.renderToLines(block({ kind: "plot", id: "o", height: 8, ...spec } as unknown as Plot), 44).join("\n");
+    for (const form of accepted) {
+      const at = (origin: string): string => painted({ ...data, form, origin });
+      const base = ORIGIN_DEFAULT[form]!;
+      const flipX = base.includes("-left")
+        ? base.replace("-left", "-right")
+        : base.replace("-right", "-left");
+      const flipY = base.startsWith("bottom")
+        ? base.replace("bottom", "top")
+        : base.replace("top", "bottom");
+      if (at(flipX) === at(base)) still.push(`${form}: horizontal`);
+      if (at(flipY) === at(base)) still.push(`${form}: vertical`);
+    }
+    expect(still).toEqual([]);
+  });
+
+it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and candle", () => {
+    // Two passes agree on a placement and only one of them is columnsOf:
+    // cursorColumn re-derives the arithmetic and candleColumn has its own. A
+    // flip that misses either points at the mirror sample while the readout
+    // beside it names a value the reader is not looking at — the frame stays
+    // plausible and the number is wrong.
+    const withCursor = (spec: Record<string, unknown>, idx: number): readonly string[] =>
+      measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS, cursorPositions: { c: idx } })
+        .renderToLines(block({ kind: "plot", id: "c", height: 6, axes: true, ...spec } as unknown as Plot), 44)
+        .map((r) => r.replace(/\x1b\[[0-9;]*m/g, ""));
+    const mark = (rows: readonly string[]): number => {
+      // The cursor rule is a dashed vertical behind the data; take its column
+      // from the row that carries one and nothing else.
+      for (const r of rows) {
+        const cols = [...r].map((ch, i) => (ch === "╎" || ch === "┆" || ch === "┊" ? i : -1)).filter((i) => i >= 0); // cells-ok — a column index
+        if (cols.length === 1) return cols[0]!; // cells-ok — a column count
+      }
+      return -1;
+    };
+    const curve = { series: [{ values: [1, 4, 2, 8, 3, 6, 5, 7] }], form: "line" };
+    const left = mark(withCursor({ ...curve, origin: "bottom-left" }, 1));
+    const right = mark(withCursor({ ...curve, origin: "bottom-right" }, 1));
+    expect(left).toBeGreaterThanOrEqual(0); // cells-ok — a column index
+    expect(right).toBeGreaterThan(left); // cells-ok — a column index
+    // The candlestick places its bars itself, so it is a second mapping.
+    const bars = Array.from({ length: 6 }, (_, i) => ({
+      open: 100 + i, high: 104 + i, low: 96 + i, close: 102 + i,
+    }));
+    const bl = mark(withCursor({ series: [], ohlc: bars, form: "line", plotStyle: "candlestick", origin: "bottom-left" }, 0));
+    const br = mark(withCursor({ series: [], ohlc: bars, form: "line", plotStyle: "candlestick", origin: "bottom-right" }, 0));
+    expect(bl).toBeGreaterThanOrEqual(0); // cells-ok — a column index
+    expect(br).toBeGreaterThan(bl); // cells-ok — a column index
+  });
+
+  it("OR12 (§3ac B4): the caller's x captions reverse, and a refused form keeps its own", () => {
+    // A caption names the samples it sits under. Leaving the three where they
+    // were under a reversed curve is the one furniture defect a reader cannot
+    // detect from the frame: both halves look right and only the pairing is
+    // wrong.
+    const labelled = {
+      ...data,
+      form: "line",
+      axes: true,
+      xLabels: ["alpha", "beta", "gamma"] as [string, string, string],
+    };
+    const rowWith = (rows: readonly string[]): string =>
+      rows.find((r) => r.includes("alpha")) ?? "";
+    const rightward = rowWith(bare({ ...labelled, origin: "bottom-left" }));
+    const leftward = rowWith(bare({ ...labelled, origin: "bottom-right" }));
+    expect(rightward.indexOf("alpha")).toBeLessThan(rightward.indexOf("gamma"));
+    expect(leftward.indexOf("gamma")).toBeLessThan(leftward.indexOf("alpha"));
+    // **A matrix with captions is the fixture nothing had.** A form that
+    // refuses `origin` keeps the facing its own renderer draws — which for the
+    // matrix family is downward — and the golden frames only caught the row
+    // order because no matrix fixture carries `xLabels`.
+    const matrix = { ...data, form: "heatmap", axes: true, xLabels: ["alpha", "beta", "gamma"] as [string, string, string] };
+    const wash = rowWith(bare(matrix));
+    expect(wash.indexOf("alpha")).toBeLessThan(wash.indexOf("gamma"));
+    const flipped = rowWith(bare({ ...matrix, origin: "top-right" }));
+    expect(flipped.indexOf("gamma")).toBeLessThan(flipped.indexOf("alpha"));
+    // And `contour` refuses the member, so its captions never move — the
+    // builder throws rather than accepting one, which OR7 covers by name.
+    const field = { ...data, form: "contour", axes: true, xLabels: ["alpha", "beta", "gamma"] as [string, string, string] };
+    const plain = rowWith(bare(field));
+    expect(plain.indexOf("alpha")).toBeLessThan(plain.indexOf("gamma"));
+  });
+
+  it("OR7 (§3ac): every form the record refuses is refused at both gates", () => {
+    const refused = (Object.keys(ORIGIN_DEFAULT) as PlotForm[]).filter(
+      (f) => ORIGIN_DEFAULT[f] === null,
+    );
+    expect(refused.length).toBe(29); // cells-ok — a form count
+    const bad = validateBlock({
+      kind: "plot", id: "p", form: "bar", height: 5,
+      series: [{ values: [1, 2] }], categories: ["x", "y"], origin: "top-left",
+    });
+    expect(bad.ok).toBe(false);
+    expect(bad.ok === false && bad.error.join(" ")).toContain("origin");
+    for (const form of refused) {
+      expect(() =>
+        b.plot({ series: [{ values: [1, 2] }], height: 4, form, origin: "top-left" }),
+      ).toThrow(/origin/);
+    }
+    // An unknown corner is refused by name, on a form that accepts the member.
+    expect(validateBlock({
+      kind: "plot", id: "p", form: "line", height: 5, series: [{ values: [1, 2] }], origin: "middle",
+    }).ok).toBe(false);
+  });
+
+  it("OR8 (§3ac A6): a single sample does not move sideways at an even width", () => {
+    // columnsOf centres a lone sample at floor((w − 1) / 2), which is one cell
+    // off its own mirror when the width is even — so the facing enters the
+    // *index* and never the answer.
+    const one = { series: [{ values: [5] }], form: "scatter", height: 4, axes: false };
+    for (const w of [40, 41, 12, 13]) { // cells-ok — a cell count
+      expect(bare({ ...one, origin: "bottom-right" }, w)).toEqual(
+        bare({ ...one, origin: "bottom-left" }, w),
+      );
+    }
+  });
+
+  it("OR9 (§3ac A7): a constant series draws the same rows under all four origins", () => {
+    // The flat-line branch returns before the facing, and it is right to: a
+    // series with no vertical extent has no direction to reverse.
+    const flat = { series: [{ values: [3, 3, 3, 3] }], form: "line", height: 6, axes: false };
+    const a = bare({ ...flat, origin: "bottom-left" });
+    expect(bare({ ...flat, origin: "top-left" })).toEqual(a);
+    expect(bare({ ...flat, origin: "bottom-right" })).toEqual(a);
+    expect(bare({ ...flat, origin: "top-right" })).toEqual(a);
+  });
+
+  it("OR10 (§3ac B5): a confidence band keeps its interior under a downward facing", () => {
+    // Under a downward facing `rowOf(max)` is the *larger* row index, so a fill
+    // looping a → b runs backwards and draws nothing. The band vanishes rather
+    // than inverting, which is the failure that looks like the member working.
+    const banded = {
+      series: [{ values: [4, 5, 6, 5, 4, 5, 6, 7] }],
+      form: "line",
+      height: 8,
+      annotations: [{
+        kind: "confidence",
+        upper: [5, 6, 7, 6, 5, 6, 7, 8],
+        lower: [3, 4, 5, 4, 3, 4, 5, 6],
+      }],
+    };
+    const shaded = (rows: readonly string[]): number =>
+      [...rows.join("")].filter((c) => c === "░").length; // cells-ok — a cell count
+    const up = shaded(bare({ ...banded, origin: "bottom-left" }));
+    const down = shaded(bare({ ...banded, origin: "top-left" }));
+    expect(up).toBeGreaterThan(0); // cells-ok — a cell count
+    expect(down).toBeGreaterThan(0); // cells-ok — a cell count
+    // **Not exactly equal, and the reason is arithmetic rather than a defect.**
+    // `Math.round` breaks ties upward, so `round(3.5)` is 4 and `round(-3.5)`
+    // is −3: a row lying exactly on a half boundary lands on one side going up
+    // and the other going down, and a band's two edges are two such boundaries
+    // per column. The measured gap is two cells in ninety-six. What would be a
+    // defect is the band **vanishing**, which is what an unordered fill loop
+    // does under a downward facing, and that is what the two bounds above catch.
+    expect(Math.abs(up - down)).toBeLessThanOrEqual(4); // cells-ok — a cell count
   });
 });
