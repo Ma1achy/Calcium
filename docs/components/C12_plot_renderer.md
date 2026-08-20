@@ -803,24 +803,38 @@ be told to want; matplotlib's `fill_between` is the one they arrive expecting.
 
 **And `fill: false` does *not* keep the old frame, because reading the frame found the old frame
 was wrong.** The draft claimed byte-identity and it was the safety argument for moving the default.
-Measured on a 50-column area with two edges — which should ink about 25 cells at `DASH_CELLS = 2` —
-the edges ink **seven**, and they ink seven at 8 samples, at 24, and at 100:
 
-| samples | inked cells |
-|---|---|
-| 8 | 7 |
-| 12 | 7 |
-| 24 | 7 |
-| 50 | 7 |
-| 100 | 7 |
+Measured as the annotation's own contribution — the same plot rendered with the band and without
+it, differenced — over a 50-column area at `DASH_CELLS = 2`, where two edges have about fifty
+dashed positions to ink:
 
-**The invariance is the finding, not the count.** A figure whose ink does not respond to the data
-is not drawing the data. The cause is one clause: a dot is set where a *sample's* dot column
-satisfies the dash test, `dotCol % (DASH_CELLS · BRAILLE_DOTS.x) === 0` — an intersection of *where
-a sample lands* with *where a dash is allowed*, which is nearly nowhere and gets rarer as the area
-widens. **The dash is a property of the drawn line and not a filter on the samples**, which is how
-`line` and `band` already draw theirs: `for (x = 0; x < dotWidth; x += DASH_CELLS · dots.x)`, every
-step inked, the row constant.
+| samples | edge ink, before | after |
+|---|---|---|
+| 8 | **2** | 27 |
+| 12 | 5 | 37 |
+| 24 | 8 | 40 |
+| 50 | 16 | 30 |
+| 100 | 24 | 24 |
+
+**The ink was proportional to the sample count and not to the area**, and at eight samples the two
+edges of a confidence band inked **two cells**. The cause is one clause: a dot is set where a
+*sample's* dot column satisfies the dash test, `dotCol % (DASH_CELLS · BRAILLE_DOTS.x) === 0` — an
+intersection of *where a sample lands* with *where a dash is allowed*. **The dash is a property of
+the drawn line and not a filter on the samples**, which is how `line` and `band` already draw
+theirs: `for (x = 0; x < dotWidth; x += DASH_CELLS · dots.x)`, every step inked, the row constant.
+
+**The last row is why it shipped.** At a hundred samples in fifty columns the two agree exactly,
+because every dashed column has a sample to land on. Any fixture with more readings than cells
+renders the defect invisible, and a catalogue fixture is exactly that — `a-defect-proportional-to-a-
+small-count`, arriving from the other end: correct for **large** *n*, and the fixtures are all large.
+
+**The first version of this table said seven, at every sample count, and the invariance was the
+argument.** It was measured against a block with `series: []`, so every frame in it was the empty
+message and `No data.` inks seven cells. The instrument answered a question about the fill by
+reporting the width of a string. *`test/support/README.md`'s rule — a fixture is shown to respond to
+the thing under test before it is asserted against — has a third instance, and this one is the
+dangerous shape: the conclusion drawn from the fabricated number was **right**, so nothing about
+the reasoning downstream of it looked wrong.*
 
 So a confidence edge walks that same loop with the row varying — the value at each dashed column
 interpolated between the samples that straddle it, which is the inverse mapping the interior needed
