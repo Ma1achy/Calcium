@@ -2683,6 +2683,69 @@ about colour meets a correct sentence about something else.
 
 ---
 
+## 3ab. `width`, `aspect` and `align` — one seam, and the deferral this does not pay
+
+C04 §3 rules the members; this is where they are drawn. **All three land in `render`, which is the
+only place a plot's width is decided:**
+
+```ts
+const render = (block, ctx) => {
+  const frame = max(1, floor(ctx.width));
+  const drawn = drawnWidth(block, frame);
+  const pad   = alignPad(block, frame, drawn);
+  return rows(FORM_ROWS[block.form](block, drawn, ctx).map(indent(pad)));
+};
+```
+
+**`FORM_ROWS` already takes a width and every form honours it**, because `facetWidths` renders
+each facet at an arbitrary one — so narrowing needs no renderer to change. And a row is a
+**string** at this seam, with its SGR already embedded, so `align` is a leading run of spaces:
+padding cannot disturb a colour because a blank carries none.
+
+**`measure` is untouched and I1 with it.** The height is declared and none of these three reads a
+series. `height: "fill"` does not interact either, and the reason is upstream: `fillHeight`
+resolves against the producer's region *before* the block is built, so `block.height` is a number
+by the time any of this runs. *That row of the walk's classification table — `aspect` × `height:
+"fill"`, each deriving the other — dissolves rather than resolving, which is the answer worth
+writing down because it is not the one the table predicted.*
+
+### `aspect` is `squareColumns`' direction, and that is why the deferral stays owed
+
+The plan for this work said `aspect` pays `squareRows`' deferral — *"an unused inverse … the day
+something needs it is the day to write it"* — and it does not. `aspect` is
+**width : height, visually**, so with a cell 1 × 2:
+
+    a = w / (h · CELL_ASPECT)   →   w = a · h · CELL_ASPECT
+
+At `a = 1` that is `squareColumns(h)` exactly. **The height is declared and the width is derived**,
+which is the direction that already exists and the only direction C12 I1 permits: `squareRows`
+derives a *height* from a width, and a plot deriving its height from anything is the invariant this
+component is built around.
+
+So writing `squareRows` here would re-create the second definition of the ratio that MG25 deleted,
+for a caller that wants the other one. **The deferral is not paid and the entry stands** — recorded
+because a plan claiming to close it is exactly how a deferral gets marked done and stays open.
+
+### What each refuses, and what the validator can see
+
+| | refused | where |
+|---|---|---|
+| `width` with `aspect` | two ways to say one number, and a plot that picked one would be reading the caller's other statement | both gates |
+| `align` with neither | aligning a figure that fills its frame is a member that does nothing (F207) | both gates |
+| `width` ≤ 0, non-integral, non-finite | a cell count that is not one | both gates |
+| `aspect` ≤ 0 or non-finite | a ratio that is not one | both gates |
+| `width` wider than the terminal | **not refused** — clamped at render | C04 has no terminal width |
+
+**The last row is the seam and not a weakness.** A validator refusing a width it cannot measure
+asserts a fact it does not hold; the frame's width arrives at `render` and nowhere earlier, so the
+clamp lives there and the gate checks what a document can be wrong about on its own.
+
+**A narrowed plot that no longer fits its furniture is already answered.** `layoutFor` returns
+`null` where the gutter and the area cannot both fit and the renderer draws *Too narrow.* — so
+`width: 4` on a plot with a five-cell gutter says so rather than drawing a frame with no scale.
+That is an existing rung, reached by a new road.
+
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The

@@ -949,9 +949,13 @@ picked one would be telling the caller its other statement had been read.
 `CELL_ASPECT`.** A caller deriving a width from a height has to know a cell is about 1 × 2, and
 `aspect.ts`'s whole argument is that exactly one file knows that: *"Same terminal geometry, two
 answers, one file aware of it. That is the shape of every defect this component has had twice."*
-Its deleted inverse `squareRows` is the deferral this pays — *"the day something needs it is the day
-to write it"* — which makes it the fourth instance of that pattern and **the first paid rather than
-found later**.
+**It does not pay `squareRows`' deferral, which this paragraph first said it did.** The inverse was
+deleted as unused — *"the day something needs it is the day to write it"* — and `aspect` wants the
+direction that already exists: with a cell 1 × 2, `a = w / (h · CELL_ASPECT)` gives
+`w = a · h · CELL_ASPECT`, which at `a = 1` is `squareColumns(h)` exactly. The height is declared and
+the width is derived, and **C12 I1 permits no other direction** — `squareRows` derives a height from
+a width, which is the thing a plot may never do. So the entry stands owed, recorded here because a
+plan claiming to close a deferral is how one gets marked done and stays open (C12 §3ab).
 
 **`align` is refused without one of them**, and the refusal is what gives the member its necessity:
 aligning a figure that already fills its frame is a member that does nothing, and a member that does
