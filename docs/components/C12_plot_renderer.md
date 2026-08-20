@@ -1123,6 +1123,59 @@ nullable ordinate (`Series.values`, `Cell.spark`, C04 I46a, I4's wording), and t
 ramp. **With the build**: the form member, the three refusals, the exhaustive switch, A7's
 recast limit, and the golden set above.
 
+## 6c. The right-hand gutter walk — the table and the trace, before any code
+
+A gutter has **structure** and a ladder has a **sequence**, so this takes both artefacts: a
+classification table for the interactions that hold at rest, and a trace for the ones a step
+mediates. Taking the table alone because a layout looks static is how the sequential half goes
+unexamined — and the ladder is sequential by construction, since rung *N* is reached only
+because rung *N* − 1 failed.
+
+Eight findings, all of them before any code. Six are cells where two correct statements overlap
+and two come from the trace.
+
+### 6c.1 The table — rules that both hold at rest
+
+| the cell | the two rules that meet | what it resolved to |
+|---|---|---|
+| `yAxis` × the tick rule | *a labelled row carries a tick* meets *the label is drawn on the other side* | **1** — `gutterSpans` tests `label !== ""`, and every caller blanks the label when `labelColumn` is 0, so the rule has never seen a label it does not itself draw. `yAxis: "right"` is the first case that separates them, and the left border draws `┤` pointing out at nothing. The test becomes *this side draws the label*. |
+| `yAxis` × `yLabels`' own guard | *no label column means no labels* meets *the labels are on the right* | **2** — three callers gate `yLabels` on `layout.labelColumn === 0`. A right axis computes nothing, and `"grid"` loses its horizontal rules with it (I26), because those are drawn on exactly the rows the gutter labels. One predicate, three consequences. |
+| `yAxis` × `plotFrame` | *the right gutter mirrors the left* meets *`"rule"` has no right edge* | **3** — the two `bare` predicates differ on purpose: `"corners"` on the left, `"corners"` and `"rule"` on the right. Mirroring the *glyph* draws the rule that style is defined by not having. Mirror the shape; take the edge from the right-hand predicate. |
+| `yCallout` × the column's width | *the column is sized before the layout* meets *a `+N` count needs the ink* | **4** — the callout's **text** is layout-independent and its **row** is not, so the count is circular where the text is not. Resolved to a one-cell mark (§3x). |
+| `yCallout` × the legend | *a callout names the series* meets *a legend names the series* | **5** — they name different things. The request's argument that a callout *says which line is which* holds only with the legend present, so there is no suppression and the auto-enabled legend stays. |
+| `yCallout` × `colourDepth: 1` | *the callout is highlighted* meets *`MONO.emphasised` is `{ bold: true }`* | **6** — the highlight channel is already spoken for at the one depth it was chosen for. The carrier is a mark (I25, §3b). |
+| `yAxis: false` × the matrix family | *`false` removes the y labels* meets *a matrix's row labels are its ordinate* | **7** — refused, which is C04 I50b's argument for refusing `axes: false` there, arriving on the second field able to express the same thing. |
+| `yCallout` × a trailing `null` | *the callout names the last value* meets *the line breaks at a gap* | no conflict: the last **finite** sample is both the value named and the last ink drawn, so the two halves agree without being reconciled (I4). |
+| `yCallout` × `plotStyle: "line"` | *the callout reads ink* meets *a different rasteriser drew it* | no conflict, and it is the reason the placement reads ink at all — §3x's measurement is what this cell produced. |
+| `yAxis` × legend placement | *both want the right edge* | no rule needed: `reservedFor` narrows the row before `layoutFor` runs, so the gutter is inside `layout.width` and `axed` appends the legend outside it. The legend sits outside the axis because it cannot do anything else. |
+
+### 6c.2 The trace — the ladder, width by width
+
+A four-cell label (`1284`), `MIN_AREA` 4, `AXIS_GUTTER` 2, `FRAME_RIGHT` 1. `L`/`R` are the two
+label columns, and a rung is reached only because the one above it did not fit.
+
+| width | `"left"` | `"right"` | `"both"` | `false` |
+|---|---|---|---|---|
+| 5–6 | rung 4 · no furniture | rung 4 | rung 4 | rung 4 |
+| 7–10 | rung 3 · no labels | rung 3 · no labels | rung 3 · no labels | rung 1 · area = *w* − 3 |
+| 11 | **rung 1 · L4** | rung 3 · no labels | rung 2 · L4 only | rung 1 |
+| 12–15 | rung 1 · L4 | **rung 1 · R4** | rung 2 · L4 only | rung 1 |
+| 16+ | rung 1 · L4 | rung 1 · R4 | **rung 1 · L4 R4** | rung 1 |
+
+Three readings, two of them findings:
+
+- **`"both"` is one axis between 11 and 15**, which is the rung doing its job rather than a gap:
+  the right column is a copy of the left, so it is the cheapest thing in the frame to lose.
+- **8 — `"right"` keeps its labels one cell later than `"left"`.** An unlabelled left gutter
+  still spends the cell that separates a label from its border, so the two sides do not cost the
+  same for the same label. Ruled in §3x and kept with both figures rather than equalised.
+- **Rung 2 is a no-op at `"right"`** — dropping the right column there produces exactly what
+  rung 3 produces, because there is no left column to fall back to. Recorded rather than
+  special-cased: the rung is named for what it does at `"both"`, and a second arm to make the
+  name true at `"right"` would change no cell of any frame.
+
+---
+
 ## 3f. Furniture — one compositor, and four gutters is the reason
 
 **The gutter is written four times.** `gutterSpans` (definition.ts), a near-identical copy
@@ -1749,6 +1802,144 @@ That is the same trade the pie makes in the other direction — a solid pie has 
 braille pie has no gaps — and it is why both are shipped rather than one being chosen. *Neither
 is better; they fail differently, and a reader who knows which failure they are looking at can
 pick.*
+
+---
+
+## 3x. The gutter on both sides, and the last value at its own row
+
+At eighty columns a reader cannot track a row back to a label seventy cells away, and every
+financial and monitoring TUI mirrors the axis for that reason. A **live** chart has a second
+problem the mirror does not solve: the number that matters most is the latest one, and it is the
+hardest thing to read off a line that is still moving.
+
+    yAxis?:    "left" | "right" | "both" | false     default "left"
+    yCallout?: "none" | "last"                       default "none"
+
+**Both cost width and neither costs a row**, so I1 is untouched. That is the vertical legend's
+class exactly — I27 lets a `"left"` or `"right"` legend size itself *because* width is already
+data-dependent through the gutter, where a horizontal one is a declared row and can never be.
+
+### One label, two consumers
+
+The right gutter writes what the left gutter was given, and which side draws it is a layout
+decision. `yAxis: "both"` therefore renders the same ticks on both sides **by construction**
+rather than by a second `yLabels` call — two calls could disagree, and a chart whose two axes
+disagree is worse than one with a single axis. A dual-**scale** right axis is a different
+feature and is refused: two ranges on one figure assert a correlation the data does not have.
+
+**The tick belongs to the side that draws the label, and the rule in the tree says something
+else.** `gutterSpans` draws `┤` where the label is non-empty and `│` where it is not — correct,
+and never tested, because every caller blanks the label when `labelColumn` is 0. *A label
+exists* and *this column draws it* have been one statement since the gutter was written.
+`yAxis: "right"` separates them, and the left border draws a stub pointing out at nothing.
+
+The same conflation is in the callers: three of them gate `yLabels` itself on
+`layout.labelColumn === 0`, so a right axis computes no labels at all — and takes the gridlines
+with it, because `"grid"` draws its horizontal rules on the rows the gutter labels (I26). One
+predicate, three consequences, and the frame would have looked deliberate.
+
+**The mirror is of the left gutter's shape and not of its glyphs.** `plotFrame: "rule"` has a
+left rule and a bottom rule and no right one — that is what the style *is* — so the two `bare`
+predicates in `furniture.ts` differ on purpose: `gutterSpans` blanks its edge for `"corners"`
+alone, `rightBorder` for `"corners"` and `"rule"` both. A right gutter mirroring the left one's
+glyph draws the rule that style exists not to have.
+
+### The callout is placed from ink, never from arithmetic
+
+`curveRows` rasterises at **dot** resolution and folds — `rowOf(v, range, rows × dotsY)` then
+`÷ dotsY` — while `lineDrawRows` and `candleRows` map at **cell** resolution. Recomputing a
+callout's row from its value picks one of those and is wrong wherever the other drew:
+
+    rows= 6  dotsY=4   157/1001 values disagree (15.7%)    rows=12  dotsY=4   170/1001 (17.0%)
+    rows= 8  dotsY=4   162/1001 values disagree (16.2%)    rows=20  dotsY=4   180/1001 (18.0%)
+    rows= 8  dotsY=8   192/1001 values disagree (19.2%)    rows=20  dotsY=8   210/1001 (21.0%)
+
+About one value in six at every ordinary height, and clustered at the **ends** of the range —
+which is where a live chart's newest value sits when something has just gone wrong. This is
+I37's class on the other axis: *the form owns which position lands where*, and a second mapping
+written beside the first agrees at the widths a fixture happens to use.
+
+So the callout reads the series' own rasterised rows: its row is the row of that series' ink in
+its last inked column. Exact for every rasteriser and every capability by construction, and it
+needs no table of sub-cell heights that a rasteriser added later could fail to join. **Where
+that column spans several rows the callout takes the span's midpoint** — the number is one
+sample's and the span is several, no row in it is wrong, and the midpoint is the only choice
+that does not imply a direction the data did not have.
+
+**The value is the last *finite* one, and the ink it made.** A series ending in `null` breaks
+its line there (I4), so the last inked column is the last finite sample's column and the two
+halves agree without being reconciled.
+
+### What a callout displaces, and what it does not
+
+**It replaces the right gutter's content on its row and leaves the left gutter alone.** A tick
+says *this row is 5200*; a callout says *your data is here*, which is more specific — but that
+argument reaches only the gutter the callout is written in. At `"both"` the reading survives on
+the left and dropping it there would break the axis for nothing; at `"right"` the tick genuinely
+goes, and that is the cost of asking for one axis and putting a callout on it.
+
+**Two callouts on one row: the later wins and the row says so** — a `+` after the value, one
+cell. Not stacked into two rows, which would change the row count and break I1; and not `+N`,
+which reads better and cannot be built. The count needs to know which rows collide, which needs
+the rasterised ink, which needs the area width, which needs the column this number is being
+sized for; *a one-cell mark is bounded before the layout exists.* The cell is reserved only
+where the block has more than one series. I8 is the rule it serves — a series dropped in
+silence is the failure — and the count is the nicety traded for not taking a second pass.
+
+**A callout does not replace the legend, and the argument that it did was the request's.** It
+names a *value*; a legend names an *identity*. Three numbers in three colours at the right edge
+say what each line reads and where each one ends, and say nothing about which is `alpha` — so
+the two are complementary and an auto-enabled legend stays. That is the rule `legendPlacement`
+already carries, read the right way round: *a form that names each row in its gutter already
+tells the reader what it needs* is about **names**, and a callout is not one.
+
+### The mark carries at one bit, and bold cannot
+
+`Style` has no `inverse` — the channels are `colour`, `background`, `bold`, `dim` and
+`underline`, and `background` is `resolveBackground`'s alone, from a `surface` ref (C10 I21). So
+the obvious highlight is `bold`; and at `colourDepth: 1` a series slot resolves through `MONO`,
+where `emphasised` **is** `{ bold: true }`. A bold callout in a slot whose mono class is already
+emphasised is typographically identical to the series it names — the channel chosen for the
+depth is spoken for at exactly that depth.
+
+**So the carrier is a mark**, which is I25's standing rule and what §3b binds: a callout's row
+takes a heavier edge than a tick's — `┣` against `├`, `#` against `+` — and bold and the
+series' colour ride above it where the terminal has them.
+
+### The ladder, and the one cell the two sides do not share
+
+The right label column is dropped **before** the left: at `"both"` it is a duplicate and costs
+least, and at `"right"` dropping it lands on the rung the left axis already has at that width.
+`bandLayout`'s `⌊width ÷ 3⌋` cap becomes a cap on the **pair** and not one per side, or two
+gutters at a third each leave a third for the data.
+
+**`"right"` reaches its degradation one cell before `"left"` does, and that is kept rather than
+fixed.** `AXIS_GUTTER` is a space and a `│`, and the space is there to separate a label from its
+border; with `labelColumn: 0` it separates nothing and is spent anyway. So a right axis pays
+`2 + 1 + 1 + n` where a left one pays `n + 2 + 1`. Measured at a four-cell label: the left axis
+keeps its labels from width 11 and the right from width 12. Equalising them means changing what
+an unlabelled gutter costs, which moves every narrow frame in the catalogue for one cell at one
+width — and those frames are this change's only check that the compositor was rewritten without
+moving anything.
+
+### Where each field applies, and what is refused
+
+Two total records, because they answer two questions and neither answers the other's:
+
+- **`HAS_Y_GUTTER`** — the forms that draw a left gutter at all. A non-`"left"` `yAxis` on a
+  form without one is refused rather than ignored; F207 is what ignoring costs.
+- **`HAS_CALLOUT`** — the forms that rasterise a per-series curve into the plot area. A callout
+  needs ink belonging to *one* series, which a band, a mosaic and a matrix do not have.
+
+`HAS_POSITION_AXIS` is neither of these and was the obvious reuse: it says whether the
+**abscissa** is a position, which is a question about the other axis. I43's whole finding is a
+total record over forms reading as a complete answer to a question it cannot ask.
+
+    yCallout: "last" with yAxis "left" or false      → refused; there is no gutter to write in
+    yCallout on a form outside HAS_CALLOUT           → refused
+    yAxis other than "left" with axes: false         → refused; there is no gutter at all
+    yAxis: false on the matrix family                → refused; a row label *is* the ordinate
+                                                       (I18), which is C04 I50b's own argument
 
 ---
 
@@ -2840,6 +3031,8 @@ orientation — and belongs in the classification table as its own rows.
 - **I44** — **A layer declares what it is, and where two peers contend the cell goes to one of them by turn.** I40's union was measured against a pie, whose wedges meet along a **boundary**, and generalised to every layer — but two curves run *alongside* one another, and the union then draws one series' ink in another's colour by the hundred *(`slope-default`: 25 foreign dots against 20 own; the braille radar, 70 of 279 frame cells wearing a series slot; the quadrant radar, 80 of 98)*. **The radar is worst for a structural reason — a value ring and a data polygon are the same shape at different radii, so there is no locus small enough for *a seam a cell wide* to describe.** **Occlusion is right across kinds and wrong within one**: `"context"` under `"curve"` is a gridline behind a line and nothing is lost, while a series under a series answers *where did this one go* with **nowhere**. **And a cell holding one colour never meant a region holding one colour** — occluding gave all eleven contested cells to one series, a neutral tone gave them to none, and turning the owner with the column gives each a third: *125 / 119 / 122 of 134 dots kept in their own slot, nothing mistinted, no line absent for more than three columns.* **A surface does not rotate**, because a wedge is a region rather than a line and turning its boundary stipples every seam — surfaces union and the boundary keeps the topmost tone. *The same ruling governs the quadrant figure at 2×2, where it matters more because a quadrant is a filled rectangle and a braille dot is not* (§3u, §3w).
 - **I45** — **A radar's grid is a polygon by default and a circle by option, and the two arms had silently chosen differently.** The braille arm drew its value rings with `arcDots` — circles — and the quadrant arm drew them as *n*-gons through the data's own vertices, so one form rendered two figures and neither the spec nor a test said which was meant. `plotGrid?: "polygon" | "circle"` makes it a decision. **Polygon is the default because the grid is a ruler for the shape measured against it**: at three categories a circular ring behind a triangular polygon is two figures in one frame, and a ring the data can touch at only three points answers *is this axis further out than that one* worse than one it meets along its whole length. At ten categories the two are within a dot, so the default costs nothing where its argument is weakest. **`"circle"` ships too** — it is matplotlib's default and what `make refdiff` compares against. *Neither is inferred from the category count: a figure that changes shape at a threshold is two figures with one name* (§3w).
 - **I46** — **A compact box's interquartile run is filled or heavier, and the caller says which.** With one row a box has no lid or floor, so a blank interior leaves `┤    │    ├` — two tees, a rule, and nothing saying those cells are the box; the interior has to carry the range. **That is an argument for a *run*, and it was read as an argument for a *fill*.** `━` is not the whisker either, and it leaves the summary a line drawing. `plotBox?: "solid" | "line"`, `"solid"` by default. *Which one reads depends on what is behind it: against a raincloud's filled ladder the solid box competes for the same weight, where a heavier line reads as the summary of the shape rather than a second shape.* Standing up it is `┃` against a leftward `█` run, by the same argument. **`heavyHorizontal` and `heavyVertical` are new named slots** rather than a reuse of `candleFilled`, which is already `┃` — a name that lied about its use would be the defect SS47 exists for (§3i).
+- **I47** — **The y gutter can be drawn on either side or both, and the right one writes what the left one was given.** At eighty columns a row cannot be tracked back to a label seventy cells away, which is why every financial and monitoring TUI mirrors its axis. `yAxis?: "left" | "right" | "both" | false`, `"left"` by default; it costs **width and never a row**, so I1 is untouched and the sizing is I27's data-dependent kind rather than its declared kind. **One label, two consumers** — `"both"` renders the same ticks on both sides by construction rather than by a second `yLabels` call, and a dual-*scale* right axis is refused because two ranges on one figure assert a correlation the data does not have. **The tick belongs to the side that draws the label**, which the tree spelled as *the label is non-empty*: every caller blanked the label when `labelColumn` was 0, so *a label exists* and *this column draws it* were one statement until a right axis separated them and the left border drew a stub pointing at nothing. Three callers gate `yLabels` on the same predicate, so a right axis computed no labels at all and `"grid"` lost its horizontal rules with them (I26). **The mirror is of the left gutter's shape and not of its glyphs** — `plotFrame: "rule"` has a left rule and no right one, which is what that style *is*, so the two `bare` predicates differ on purpose. **The right column is dropped before the left**, being a copy of it at `"both"` and landing on the existing unlabelled rung at `"right"`; `bandLayout`'s `⌊width ÷ 3⌋` cap becomes a cap on the pair. *A right axis reaches that degradation one cell before a left one, because `AXIS_GUTTER` spends the label-to-border space whether or not a label uses it — kept with both figures rather than equalised, since equalising moves every narrow frame for one cell at one width* (§3x, §6c).
+- **I48** — **A callout names a series' last finite value at that series' own row, and its row is read from ink rather than recomputed.** `yCallout?: "none" | "last"`, `"none"` by default and named for the case it serves: on a static chart the last value is at the end of the line, and on a live one it is the number that matters most and the hardest to read off a line still moving. **Recomputing the row from the value is wrong about one value in six** — `curveRows` rasterises at dot resolution and folds where `lineDrawRows` and `candleRows` map at cell resolution, and the two disagree for 15.7–21.0% of values at heights 6, 8, 12 and 20, clustered at the ends of the range where a live chart's newest value sits when something has gone wrong. *That is I37's class on the other axis.* Reading the series' own rasterised rows is exact for every rasteriser and capability by construction; where the last inked column spans several rows the callout takes the span's **midpoint**, since no row in it is wrong and the midpoint implies no direction the data did not have. **It displaces the right gutter's content on its row and never the left's** — the *your data is here* argument reaches only the gutter it is written in. **Two on one row: the later wins and a one-cell `+` says so** (I8), not `+N`, whose count needs the ink that needs the width that needs the column being sized, and not a second row, which would change the count and break I1. **The carrier at one bit is a mark and cannot be bold**, because a series slot resolves through `MONO` there and `emphasised` *is* `{ bold: true }` — so a heavier edge glyph carries it and colour and weight ride above (I25, §3b). **A callout does not replace the legend**: it names a value where a legend names an identity, and only together do they say which line is which and what each reads (§3x, §6c).
 
 ## 8. Commitments
 
@@ -2883,6 +3076,8 @@ orientation — and belongs in the classification table as its own rows.
 38. **A layer says what it is, and a contested cell turns between the peers that want it** — surfaces union and keep a wedge's tone because their partition is arbitrary; peers take one cell in *n* each, because giving the region to one says the rest are nowhere and giving it to none says nothing is there; context is occluded by whatever is in front (I44, §3u).
 39. **A radar's grid is a polygon or a circle, and it is declared** — the two arms had chosen differently and neither said so; polygon is the default because a ruler should share the shape it measures (I45, §3w).
 40. **A compact box's run is filled or heavier** — the one-row box has no edges so its interior carries the range, which argues for a run and not for a fill; `"line"` keeps the summary a line drawing where `"solid"` gives it mass (I46, §3i).
+41. **The y gutter is drawn on either side, or both** — a row cannot be tracked back to a label seventy cells away, and the mirror costs width rather than a row; the right gutter writes what the left was given, so two axes cannot disagree (I47, §3x).
+42. **A callout writes each series' last value at that series' own row**, in that series' colour and with its own mark, placed by reading the ink rather than by recomputing a row the rasteriser would have put elsewhere (I48, §3x).
 
 ---
 
@@ -2892,6 +3087,22 @@ Six tiers. No state machine — C12 is pure over the block.
 
 ### Tier 1 — unit
 
+- **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.
+- **YA2** (I47): `yAxis: "right"` draws no left label column and the plot area starts where the border does; the labels are the same strings `"left"` puts on the other side, at the same rows.
+- **YA3** (I47, I1): `plotHeight` is identical across all four `yAxis` values at every form that has a gutter. Width only, and the row that would fail if a mirrored gutter ever took a row.
+- **YA4** (I47, §3f): at `ambiguousWidth: "wide"` both axis columns stay straight, asserted on a label carrying an ambiguous-width character — the case §3f's four gutters got wrong on one side and would now get wrong on two.
+- **YA5** (I47, I27): `yAxis: "both"` with `legend: "right"` puts the legend **outside** the axis, and the frame's own rows line up with the area rows beside them.
+- **YA6** (I47): the ladder drops the right label column before the left, asserted at the width where only that rung binds — 11 cells at a four-cell label, where `"left"` keeps its labels and `"both"` has already lost its right column.
+- **YA7** (I47, I18, I26): a heatmap's row names mirror into the right gutter; `plotFrame: "rule"` draws the right label with **no** edge glyph beside it, which is the cell where mirroring the left gutter's glyph would have drawn the rule that style is defined by not having.
+- **YC1** (I48): one callout per series, at that series' final sample's row, in that series' colour — asserted over three series whose last values land on three different rows, so a rule keying every callout to one row passes nothing.
+- **YC2** (I48, I37): the callout's row is the row of that series' **ink**, asserted at a value inside the band where the cell-resolution mapping disagrees with the braille fold. The row that separates reading from recomputing; a fixture whose last value avoids that band agrees with both.
+- **YC3** (I48): a callout sharing a row with a tick takes the right gutter and **leaves the left tick standing**, asserted at `yAxis: "both"` where both are visible in one frame.
+- **YC4** (I48, I8): two series ending on one row — the later wins and a `+` marks the loss, and the frame carries exactly one number on that row rather than two rows or a silent drop.
+- **YC5** (I48, I1): `plotHeight` is identical with `yCallout` on and off.
+- **YC6** (I48): the value goes through `formatReadout` and honours `yFormat` — asserted on a percentage and a byte count, which a bare-number assertion agrees with.
+- **YC7** (I48): the refusals, at **both** gates and each with its converse — `yCallout` with `yAxis: "left"`, on a form outside `HAS_CALLOUT`, a non-`"left"` `yAxis` with `axes: false`, and `yAxis: false` on a matrix.
+- **YC8** (I48, I25): at `colourDepth: 1` a callout's row differs from a tick's by **mark**, asserted on the colour-stripped row and against a series whose mono class is `emphasised` — the case where bold says nothing because the series is already bold.
+- **YC9** (I48, I4): a series ending in `null` puts its callout on the last **finite** sample's ink, and names that sample's value.
 - **T1.1** (I1): height for each form and axes combination — sparkline 1, line 8, axed line 10 — independent of series length, including empty.
 - **T1.2**: braille encoding — each of the eight dot positions sets the documented bit; a full cell is `U+28FF`, an empty one `U+2800`.
 - **T1.3**: a horizontal run of points produces a continuous row of identical cells.
@@ -2999,6 +3210,13 @@ Six tiers. No state machine — C12 is pure over the block.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.32** (I48, I37): placing the callout with `rowOf(v, range, areaRows)` rather than from the series' ink → YC2 fails, and one value in six lands a row off the line it names, worst at the ends of the range. **Nothing else sees it**: every count, colour and width assertion passes, and the number is beside the right row at the widths a fixture happens to use.
+- **T6.33** (I48, I8): dropping the `+` where two callouts share a row → YC4 fails, and a series' reading disappears with the frame asserting nothing about it.
+- **T6.34** (I48): letting a callout take the **left** gutter's row as well → YC3 fails, and `yAxis: "both"` loses a reading on the one row where it has two chances to keep it.
+- **T6.35** (I47): sizing the right column from the tick labels alone → the callout truncates, and YC1's value assertion fails while every geometry row still passes.
+- **T6.36** (I47): mirroring the left gutter's `bare` predicate into the right gutter → YA7 fails, and `plotFrame: "rule"` grows the right rule that style exists not to have.
+- **T6.37** (I48, I25): carrying the callout at one bit with `bold` instead of a mark → YC8 fails, and a callout in an `emphasised` slot is typographically identical to the series it names.
+- **T6.38** (I47): keeping `gutterSpans`' tick rule as *the label is non-empty* → YA2 fails, and a right axis draws a left-hand stub pointing out at a column that is zero cells wide.
 - **T6.1** (I1): deriving height from series length → T1.1 fails and streaming plots start shifting the viewport.
 - **T6.2** (I3): dividing by the range without guarding a constant series → T1.5 fails with `NaN` output.
 - **T6.3** (I4): letting `NaN` reach the grid → T1.8 fails.
