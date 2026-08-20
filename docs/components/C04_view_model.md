@@ -734,7 +734,11 @@ styling. Applied to the config record's remaining candidates:
 | **explicit range** | already built — `yMin` and `yMax` (I29) | **nothing to do**, and stated so a second spelling is not added |
 
 **Every candidate passes, and a test that admits everything constrains nothing** — so the
-falsifier is stated rather than left implied. These fail it: a title's **alignment**, a series'
+falsifier is stated rather than left implied. **Both halves of this paragraph have since been
+measured and neither holds; the correction is below**, under *Six members for a plot's geometry* —
+two of the four falsifiers are `Plot` members today, one cites a roadmap number no document
+carries, and the rule the last thirty-seven members were actually decided by is a different one
+written in `plotFrame`'s comment. These fail it: a title's **alignment**, a series'
 **tone**, a bar's **glyph style** (roadmap 51), a heatmap's **colormap**. Each changes what the
 reader sees and no cell of the layout, and each already belongs to C10 or to the block that
 draws it. So the sibling category is real and, over this list, **empty** — the config record is
@@ -787,6 +791,182 @@ and `fill` is its encoding (C12 I20): a bar against a declared total, where an e
 reads as *zero*. A plot form is a **comparison** across positions or categories. The two share
 a word and no axis, and §3b's own test — *does it change the plot area* — is not the question
 that separates them; *what does the number mean* is.
+
+### Six members for a plot's geometry, and the test above admitted two of them for a reason it does not give
+
+**The widening test was re-run before it was used, and it does not hold as written.** Its rule —
+*does it change the plot area* — was stated over six candidates, all six passed, and the falsifier
+list was added because *a test that admits everything constrains nothing*. Measured at HEAD, the
+falsifiers do not hold either:
+
+| falsifier, as written | where it is today |
+|---|---|
+| a title's **alignment** | vacuous — `title` was never added, so nothing qualifies |
+| a series' **tone** | `Series.tone` — this type, one level down |
+| a bar's **glyph style** (*roadmap 51*) | `plotStyle` and `plotFill`, both on `Plot` — and **`docs/ROADMAP.md` carries no numbered entry**, so the citation resolves against nothing |
+| a heatmap's **colormap** | `colormap?: ColormapName`, on `Plot` |
+
+`Plot` carried **eleven** members the day that test was written and carries **forty-eight** today.
+**Thirty-seven landed after it and not one cites it** — so the rule was not falsified, it was never
+consulted. *Two of its four falsifiers are `Plot` members, a third is one level down, and the
+fourth is vacuous because the member it qualifies was never added.*
+
+**The test that actually decided those thirty-seven is written down, in `plotFrame`'s own comment**:
+*the references disagree with each other … so this is a style field rather than a choice the
+framework makes for the caller.* That is a **who-decides** test and not a geometry one, and
+`colormap`'s comment argues it from the other side — *a theme chooses which, never what it
+contains.* Two tests on one type, the second arriving later, neither citing the other, and the
+earlier one still reading as the rule.
+
+**Both survive and the correction is which is which.** Changing the plot area is **sufficient** and
+was never necessary: a member is `Plot`'s if it changes the area **or** if the decision is the
+caller's alone — no theme resolves it and no renderer constant settles it. Read that way the
+sibling category is real and non-empty, and `Series.tone` is its member rather than its
+counter-example: a theme resolves a tone, so it is decoration, and it sits on `Series` because a
+series is the thing that has one.
+
+**This is load-bearing here rather than tidying**, because two of the six below are admitted by the
+second arm and by nothing else:
+
+| member | admitted by |
+|---|---|
+| `width` | the area — it is the area |
+| `aspect` | the area — it derives one side from the other |
+| `axisCross` | the area — the axes move inside it and the gutter stops being spent beside it |
+| `calendarUnit` | the area — it decides the grid's row count |
+| `origin` | **the caller alone** — every cell count is unchanged and only which datum lands in which |
+| `align` | **the caller alone** — it moves a figure inside a frame and resizes nothing |
+
+The seventh member this pass adds, `Annotation.fill`, is ruled in I52 and needs nothing here.
+
+#### `calendarUnit` — the cell picks the grid, and the span was already sayable
+
+```typescript
+calendarUnit?: "hour" | "day" | "week" | "month";
+```
+
+**Rows are the sub-unit and columns the super-unit.** One statement and four layouts, rather than
+four layouts that happen to agree:
+
+| unit | rows | one column is | row labels |
+|---|---|---|---|
+| `hour` | 24 | a day | `00` … `23` |
+| `day` | 7 | a week | `Mon` … `Sun` |
+| `week` | 5 | a month | `W1` … `W5` |
+| `month` | 12 | a year | `Jan` … `Dec` |
+
+**The span needs no member, and that is what the unit buys.** `startDate` + `calendarUnit` +
+`series[0].values.length` states it exactly: `"2026-01-01"`, `day`, 365 values is a year of daily
+readings, and `"2026-03-04"`, `hour`, 24 values is one day of hourly ones. A `span` field beside
+those three would be a fourth statement of a fact the other three already fix, and the first
+disagreement between them would have no ruling.
+
+**`startDate` acquires its first reader, which is the whole of its exemption.**
+`tools/enforce/module-graph.mjs` carries `"plot.startDate": "step 0 scaffolding — builder shorthand
+lands in step 11"` — it is settable through `FigureBuilder`, written into the block, and read by
+nothing: four occurrences, all writes. MG24 exists to flag exactly that, and the exemption named
+the step that closes it.
+
+**One flat series, and the grid is derived from it.** More than one series with a unit is refused
+at both gates: a calendar's rows are a period, so a second series is a second period claiming the
+same rows.
+
+**The seam already exists and it is `quiver`'s.** `heatmapFormRows` substitutes a derived series
+list for a `quiver` before anything downstream sees it, and its comment says why — *"Substituted
+here rather than in `matrixRows`, so the range, the gutter labels, the legend and the overflow row
+all see one series list."* A calendar is that substitution one form along: one flat series in,
+twenty-four labelled rows out, every downstream mechanism unchanged, and the gutter labels included
+because a matrix's row label is `s.label ?? ""`.
+
+**So the height needs no refusal, and measuring is what says so.** The obvious ruling is that
+`calendarUnit: "hour"` needs twenty-four rows and a smaller `height` is a construction error. It is
+not: `matrixRows` already draws `areaRows − 1` rows and spends the last on `+18 more · 06 · 07 · …`,
+which is commitment 46 — *a bounded region says what it is hiding* — saying it in the calendar's own
+row labels. A refusal would replace a frame that tells the truth with an error telling the caller to
+pick a different number, and the mechanism that makes the frame truthful was already built.
+
+**No `Date`, and SS1 is the reason before the taste is.** `tools/enforce/source-scans.mjs` bans
+`new Date` across `src/` and allows `src/shell/session.ts` alone, so the arithmetic is
+days-from-civil by hand — pure, total, and better for C12 I11 than the constructor. **UTC only**, on
+`chrome.ts:formatClock`'s recorded reason: a local-time conversion is the part that needs the
+platform's zone database.
+
+**Refused off the `calendar` form**, on F207's terms — a field accepted where there is no arm for it
+tells the caller nothing and the reader nothing.
+
+#### `origin` and `axisCross` — two fields, because one enum makes a real pair inexpressible
+
+```typescript
+origin?:    "bottom-left" | "bottom-right" | "top-left" | "top-right";   // default "bottom-left"
+axisCross?: "edge" | "zero";                                            // default "edge"
+```
+
+`plotFrame` and `axes`' own test, one type along: a single enum spelling `"centre"` beside the four
+corners would make **`origin: "top-right"` with a crossing axis inexpressible**, and neither member
+makes the other meaningless. The two answer different questions — *which corner the data grows
+from*, and *where the axes are drawn*.
+
+**`axisCross: "zero"` is refused where the range excludes zero**, at both gates, on I29's argument
+read in the mirror. An annotation off the scale is dropped rather than clamped because a claim moved
+onto a range it is outside says the limit is somewhere it is not; an axis drawn at the nearest edge
+because zero is not in view says the same thing about the origin, and says it in furniture the
+reader takes for the frame. The validator sees `yMin`/`yMax` where they are declared and the series
+where they are not, so it is a question it can answer.
+
+**And refused where the form has no gutter to move** — `HAS_Y_GUTTER`'s existing set, becoming its
+third reader after the two gates that gate `yAxis` on it.
+
+**`origin`'s refusal set is owed with its measurement, and inventing it here is the error
+`HAS_Y_GUTTER` records.** That record is *measured, not reasoned* — every catalogue fixture
+rendered and asked whether any row carries an edge glyph past the first column — and the measurement
+corrected a guess in each direction. The matching question here is *does this form lay its data on a
+grid with two directions a caller could reverse*, and reasoning it produces answers wrong in both
+directions on sight: a `pie` has no corner, a `sparkline` is one row so half the member is inert,
+and **`flame` and `icicle` are one renderer whose whole difference is a vertical flip** — which is
+either this member's strongest argument or an argument for collapsing two forms, and the type cannot
+decide it. So the record lands with the render pass that can measure it (C12 §3z), and `origin`
+lands with the record.
+
+**Not `HAS_POSITION_AXIS`, which is the obvious reuse and is wrong for `HAS_CALLOUT`'s reason.** It
+reads `false` across the whole matrix family on the ground that a matrix labels its rows from
+`categories` rather than from a scale — and a matrix has an origin regardless: which corner row 0,
+column 0 sits in. That record answers a question about the **abscissa** and this one is about
+**direction**. *A total record read as a complete answer to a question it cannot ask is C12 I43's
+finding for the third time*, and the third instance is the one that says the shape is a class.
+
+#### `width`, `aspect` and `align` — and a validator that refuses what it can see
+
+```typescript
+width?:  number;                              // cells
+aspect?: number;                              // drawn width : height, visually
+align?:  "left" | "centre" | "right";         // default "left"
+```
+
+**`width` and `aspect` together are refused** — two ways to say one number, and a plot that quietly
+picked one would be telling the caller its other statement had been read.
+
+**`aspect` earns its place over arithmetic in the caller because it is the member that knows about
+`CELL_ASPECT`.** A caller deriving a width from a height has to know a cell is about 1 × 2, and
+`aspect.ts`'s whole argument is that exactly one file knows that: *"Same terminal geometry, two
+answers, one file aware of it. That is the shape of every defect this component has had twice."*
+Its deleted inverse `squareRows` is the deferral this pays — *"the day something needs it is the day
+to write it"* — which makes it the fourth instance of that pattern and **the first paid rather than
+found later**.
+
+**`align` is refused without one of them**, and the refusal is what gives the member its necessity:
+aligning a figure that already fills its frame is a member that does nothing, and a member that does
+nothing reads as one not yet implemented (F207).
+
+**The validator refuses what it can see and no more, and that is the seam rather than a weakness.**
+C04 has no terminal width, so a `width` wider than the frame cannot be refused at construction and
+is clamped at render; the boundary check is the one C04 can make — finite, positive and integral for
+`width`, finite and positive for `aspect`. *A validator refusing a width it cannot measure would be
+asserting a fact it does not hold*, which is the class §5's measurement contract exists to keep out.
+
+**`align` is not `matrixAnchor`, and a caller setting both should get both.** `matrixAnchor` places
+a **row shorter than the area** inside a fixed area; `align` places an **area narrower than the
+frame** inside the frame. Two containers, two contents, and they read as one question — which is why
+the distinction is written here rather than discovered by whoever sets both.
 
 ### Actions
 
@@ -1241,6 +1421,7 @@ persisted document rests on.
 - **I59** — **`plotStyle` is a union every form shares and a record says which arms each form has; `plotFill` is the fill beside it.** The style's refusal was a clause naming `candlestick` and the form it needs — correct, and a special case, because every style is one some forms draw and others do not and a second would want a second clause. C12's `STYLE_ARMS` is that shape as data, total over `PlotForm`, and this side's refusal is one rule over it: a style a form has no arm for is a construction error, which is this type's idiom (I50a, I56, I57) and the reason an ignored member is not the answer — it reads as one not yet implemented. **`plotFill?: "none" | "solid"` joins `plotFrame` / `plotCorners` / `plotDetail` / `plotMarks`** as a union in that family, and it is **refused where the vocabulary cannot fill**: a box-drawing outline has no interior alphabet, so `plotFill: "solid"` with `plotStyle: "line"` is refused rather than ignored. *A capability the renderer must degrade for is C12's — a solid pie at one bit degrades to braille — and a combination the caller could have avoided is this side's, which is the same split I56 draws between the row floor and the column floor.* C12 I43 is the arms this is the field for.
 - **I60** — **`yAxis` says which side the y labels sit on and `yCallout` puts a reading at the right edge, and both are refused where a form cannot honour them.** `yAxis?: "left" | "right" | "both" | false` and `yCallout?: "none" | "last"`, both costing **width and never a row** — the vertical legend's data-dependent kind (C12 I27), so C12 I1 is untouched. **Two total records answer *can this form take it*, and they live here rather than beside the renderer for `STYLE_ARMS`' reason**: the validator needs them and L0 cannot import L1 to ask (A02 §1). `HAS_Y_GUTTER` is **measured** — every catalogue fixture rendered at `axes: true` and asked whether any row carries an edge glyph past the first column, giving 32 of 42 — and the measurement corrected a guess in each direction: `smallmultiples` and `pairplot` *look* gutter-ed because a facet's own gutter shows in the frame, and a facet is a `Plot` that declares its own. `HAS_CALLOUT` is the seven forms that rasterise a per-series curve; **not `HAS_POSITION_AXIS`, which was the obvious reuse** and answers a question about the *abscissa* — it says `true` for `stackedarea` and `streamgraph`, whose rows are one figure cut into parts with no per-series ink to end. **Four refusals rather than four silences**: a non-`"left"` `yAxis` where there is no gutter, `yAxis: false` on a matrix (a row label *is* the ordinate — I50b's own argument, one field along), `yCallout` on a form with no curve, and `yCallout` with no right gutter to write in. *A field accepted where there is no arm reads as one not yet implemented, which is C12 I43's finding and F207's cost* (C12 §3x).
 - **I61** — **A field form declares what is drawn over it, and every member outside that family is refused rather than ignored.** `form: "contour"` reuses `series` — one `Series` per grid row, so the row labels *are* the ordinate (C12 I18) and a bare `number[][]` would be a second spelling with no y axis. `form: "quiver"` cannot reuse it, because nothing on `Plot` carries two numbers per cell: `VectorSeries` mirrors `Series` and its `values` are `readonly [u, v] | null`, with `null` for a gap on I46a's argument — `JSON.stringify` writes `NaN` as `null` regardless, so the declared form should be the persisted one. **`layers` is an ordered array in which one entry's position is inert**: `field` cannot occlude, so its membership decides whether the field paints and its index decides nothing. `fieldDim` and `glyphInk` are two members and not one union, on `plotFrame`'s test — a single enum would make `"floor"` with `"contrast"` inexpressible, and neither makes the other meaningless. **A new total record `IS_FIELD_FORM`, not a reuse of `MATRIX_LAYOUT`**, which answers whether a form's columns are a time window — a question about the abscissa, and C12 I43's finding is a total record read as a complete answer to a question it cannot ask. Six refusals: `vectors` off `quiver`, `quiver` with none, the three field members outside the family, a `layers` entry naming a layer with no data, and `levels` off `contour` (C12 §3y).
+- **I62** — **A plot's geometry is declared in six members, and each is refused where the form or the type cannot honour it.** `calendarUnit`, `origin`, `axisCross`, `width`, `aspect` and `align`. **The test that admits them is two-armed and only one arm was written down**: §3's *does it change the plot area* is **sufficient and never was necessary**, and `plotFrame`'s own comment holds the other — *a style field rather than a choice the framework makes for the caller.* `Plot` carried eleven members the day the first was written and carries forty-eight now; **thirty-seven landed after it, none cites it, and two of its four falsifiers are `Plot` members today**. `origin` and `align` are admitted by the second arm alone. **`calendarUnit` picks the cell and the grid falls out** — rows are the sub-unit, columns the super-unit, one statement over four layouts — and the span needs no member because `startDate` + unit + `values.length` fixes it, which is the reader `startDate` was published without. **No height refusal, because the matrix already says what it hides**: `matrixRows` draws `areaRows − 1` rows and spends the last on `+N more`, so a short calendar degrades into commitment 46 rather than into an error. **`origin` and `axisCross` are two fields on `plotFrame`'s test** — one enum would make `origin: "top-right"` with a crossing axis inexpressible — and `axisCross` is refused where the range excludes zero (I29 in the mirror: an axis at the nearest edge because zero is not in view says the origin is somewhere it is not) and where `HAS_Y_GUTTER` is false. **`origin`'s own refusal record is owed with its measurement and is not reasoned here**, on `HAS_Y_GUTTER`'s recorded precedent: `pie` has no corner, `sparkline` is one row so half the member is inert, and `flame` and `icicle` are one renderer differing by a vertical flip — and **not `HAS_POSITION_AXIS`**, which answers a question about the abscissa where this one is about direction (C12 I43's finding, third instance). **`width` and `aspect` are mutually exclusive**, `aspect` is the arm that knows `CELL_ASPECT` and pays `squareRows`' deferral, `align` is refused without one of them (F207), and **the validator refuses only what it can see** — finite, positive, integral — because C04 has no terminal width and a bound it cannot measure is a fact it does not hold (§3, C12 §3z).
 
 ## 7. Commitments
 
@@ -1310,6 +1491,7 @@ persisted document rests on.
 61. **`yAxis` and `yCallout` are refused where a form cannot honour them** — two total records, one of them measured rather than reasoned, and four refusals in place of four silences (I60, C12 §3x).
 62. **A field form's members are refused off the family, and the one that could not be reused says why** — `contour` takes the matrix family's `series` and gets its ordinate free; `quiver` takes a new `VectorSeries` because two numbers per cell had no spelling, and a total record answers *is this a field form* rather than a record that answers a different question about the same forms (I61, C12 §3y).
 57. **A distribution form's lowest rung is a floor, not a preference** — below it the figure states a property of the room and not of the data. The *row* floor is refused here because `height` is declared; the *column* floor is C12's, because a width is discovered rather than declared (I56).
+63. **A plot's geometry is six declared members and the test that admits them has two arms** — changing the area is sufficient and never was necessary, `origin` and `align` pass on the caller's-alone arm alone, and every one is refused where the form or the type cannot honour it (I62, C12 §3z).
 
 ---
 
