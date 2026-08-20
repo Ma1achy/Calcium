@@ -1,8 +1,13 @@
 /**
  * Render catalogue .txt files (ANSI) to PNGs via custom SVG + sharp.
  *
- * ansi-to-svg does not handle 24-bit colour. This writes the SVG directly,
- * parsing only the three SGR forms the framework emits:
+ * **`ansi-to-svg` was installed for this and could not do it** — it has no
+ * 24-bit arm — so the SVG is written here instead. The package then sat in
+ * `devDependencies`, imported by nothing, until SS31 counted it: a dependency
+ * kept for a job it was rejected from is the same defect as an export nothing
+ * consumes, and the comment naming it was the only trace. Removed.
+ *
+ * What is parsed is the three SGR forms the framework emits:
  *   38;2;R;G;Bm   24-bit foreground
  *   39m            default foreground
  *   0m             reset
