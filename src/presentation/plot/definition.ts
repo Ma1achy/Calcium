@@ -62,13 +62,13 @@ import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, f
 import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
 import { WAFFLE_ROWS, waffleCells } from "./waffle.js";
-import { heatmapFormRows } from "./heatmap.js";
+import { colormapFor, heatmapFormRows } from "./heatmap.js";
 import { glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
 import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
-import { horizonRows } from "./horizon.js";
+import { horizonGrid, horizonIsSigned, horizonLegendSpans, horizonSpans } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
@@ -2584,16 +2584,31 @@ const FORM_ROWS: Readonly<
     }
     return out;
   },
+  // **Two channels, and they are resolved in two places** (I52, §3z). The grid
+  // is pure geometry — band, sign and eighths per cell — and the spans are where
+  // capability decides which of them a terminal can carry. Computing both
+  // together is what let one alphabet carry both, which is the defect this form
+  // shipped with.
   horizon: (block, width, ctx) => {
     const s = block.series[0];
     const areaRows = plotAreaRows(block);
-    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
+    const layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+    if (!s) return emptyRows(block, layout, ctx);
     const data = seriesRange(block.series, block);
-    if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx);
+    if (data === null) return emptyRows(block, layout, ctx);
     const bands = block.bands ?? 3;
-    return horizonRows(s, data, bands, width, areaRows, ctx.capabilities).map((r) =>
-      line([{ text: r }], { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width }, ctx),
-    );
+    const map = colormapFor(block);
+    const area = horizonGrid(s, data, bands, width, areaRows).map((row) =>
+      line(horizonSpans(row, bands, map, ctx), layout, ctx));
+    // **The legend is the reading and not decoration** (§3z H7): a band is an
+    // ordinal index into a colour, so a horizon without the scale beside it is a
+    // picture of coloured noise. I19's argument for a matrix's scale, on the one
+    // other form whose channel a reader has to learn. `legend: false` is refused
+    // at both gates rather than dropped here.
+    const legend = line(
+      horizonLegendSpans(data, bands, horizonIsSigned(s, data), map, block.yFormat, ctx),
+      layout, ctx);
+    return composeRows(plotHeight(block), [], area, [legend]);
   },
 
   heatmap: (block, width, ctx) => heatmapFormRows(block, width, ctx),

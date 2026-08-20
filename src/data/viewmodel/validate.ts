@@ -34,6 +34,9 @@ import {
   type ViewDocument,
 } from "./types.js";
 import { isContainerKind } from "./tree.js";
+// **The entries, not the names.** `COLORMAP_SET` above answers *is this a map*;
+// H3 asks *does it have two halves*, which is `kind` and lives on the entry.
+import { COLORMAPS } from "../colormaps/index.js";
 
 export type Validity<T> = Result<T, readonly string[]>;
 
@@ -567,6 +570,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     }
     plotAxisErrors(b, e, at, form);
     plotFieldErrors(b, e, at, form);
+    plotHorizonErrors(b, e, at, form);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -752,6 +756,69 @@ function checkAlign(b: Record<string, unknown>, e: string[], at: string): void {
  * drops a field is one the caller believes is showing something else, and the
  * frame that results looks deliberate.
  */
+/**
+ * A horizon's two refusals (C12 I52, §3z H3 and H7).
+ *
+ * **Both are cells where two correct statements meet**, which is why neither is
+ * reachable from *depth is colour* on its own and why the classification table
+ * is what found them.
+ *
+ * **H3 — a sequential map has no second half.** The fold mirrors and the sign
+ * rides the two halves of a diverging map, so a signed series under a
+ * sequential one draws a trough in the same ramp as a peak: two opposite
+ * readings, one colour, and every count agreeing. Refused rather than
+ * substituted, because silently swapping a caller's named map is the thing
+ * `colormap`'s own ruling forbids.
+ *
+ * **H7 — the legend is the reading.** A band is an ordinal index into a colour,
+ * so a horizon with no scale beside it is a picture of coloured noise. I19's
+ * argument for a matrix's scale, arriving on the one other form whose channel
+ * has to be learnt.
+ */
+function plotHorizonErrors(
+  b: Readonly<Record<string, unknown>>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  if (form !== "horizon") return;
+
+  if (b["legend"] === false) {
+    e.push(
+      `${at}: "legend" cannot be false on a horizon (C12 I52) — band depth is a ` +
+        `colour, and the scale beside it is the reading rather than furniture`,
+    );
+  }
+
+  const name = b["colormap"];
+  if (typeof name !== "string") return;
+  const map = COLORMAPS[name];
+  if (map === undefined || map.kind === "diverging") return;
+
+  // Signed against the same baseline the renderer folds about: zero where the
+  // range spans it, the data's minimum otherwise — so a series that never
+  // crosses zero is unsigned and any map serves it.
+  const series = b["series"];
+  if (!isArray(series)) return;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const s of series) {
+    if (!isRecord(s) || !isArray(s["values"])) continue;
+    for (const v of s["values"]) {
+      if (!isFiniteNumber(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+  if (!Number.isFinite(min) || !(min < 0 && max >= 0)) return;
+
+  e.push(
+    `${at}: a horizon crossing its baseline needs a diverging "colormap" and ` +
+      `"${name}" is ${map.kind} (C12 I52) — the fold mirrors, so the sign rides ` +
+      `the map's two halves and a one-sided ramp draws a trough as a peak`,
+  );
+}
+
 function plotFieldErrors(
   b: Record<string, unknown>,
   e: string[],

@@ -1106,6 +1106,15 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     "bands-5": { form: "horizon", height: 5, series: [s(sin50)], bands: 5 },
     // height < bands — the default interaction nothing exercised.
     "folded-1x3": { form: "horizon", height: 1, series: [s(sin50)], bands: 3 },
+    // **A fixture that can respond to the mirror** (C12 I52, §3z). Every other
+    // horizon fixture is `sin50`, which never goes below its own baseline — and
+    // a series that never crosses zero renders *identically* whether the fold
+    // mirrors or folds about the minimum. So the catalogue could not have shown
+    // the defect and cannot show the fix; this one crosses.
+    signed: {
+      form: "horizon", height: 3, bands: 3,
+      series: [s(sin50.map((v) => v - 50))],
+    },
   },
 });
 

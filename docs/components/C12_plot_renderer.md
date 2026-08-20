@@ -2426,20 +2426,35 @@ never goes negative renders **identically** under both rules, so the defect is i
 exactly the fixtures a catalogue carries. That is why this needs a fixture that can respond to it
 before it needs an assertion.
 
-### Below the colour floor there is one channel for two data, and the frame decides
+### Below the colour floor there is one channel for two data — settled, arm A
 
 `continuousColour` returns `undefined` under `CONTINUOUS_FLOOR = 8`, so at 4-bit and at 1-bit
-there is no colour and the design is back where it started. Two candidates:
+there is no colour and the design is back where it started. Two candidates were written and the
+frames chose:
 
 | | keeps | loses |
 |---|---|---|
-| **A** — depth on the density ramp, height gone | the compression the form exists for | every inked column one row again, which is the defect above |
-| **B** — a plain eighths area over the whole range, `bands` inert | a figure that does not overstate what it resolves | the compression, which was always the colour's to sell |
+| **A** — depth on the density ramp, height in whole rows | the bands, which are the form's contract | sub-cell height; at `height: 1` height entirely |
+| **B** — a plain eighths area over the whole range, `bands` inert | more levels: 8 against 3 at one row, 40 against 25 at five | the bands, silently |
 
-**Provisional, and settled by reading the 4-bit and 1-bit frames rather than by argument written
-here.** §3y's ruling 10 was written this way, went the wrong direction — *the ramp yields* left
-both layers in one alphabet and the 1-bit frame was speckle — and the frame is what corrected it.
-Writing this one down as settled would repeat the error that correction was for.
+**B resolves strictly more and is refused anyway**, which is the part worth writing down —
+counting levels was the wrong measure. At `height: 1` and 1-bit, A gives three distinguishable
+values and B gives eight, and at `height: 5` A gives about twenty-five against B's forty, because
+the eighths ladder is a *unicode* vocabulary and 1-bit is a statement about *colour*: the glyphs
+are there either way. So the arm that keeps more information is the one that loses the bands.
+
+**A form that stops having bands below a colour depth is two forms with one name**, which is the
+fault `plotGrid` records in its own words — *a figure that changes shape at a threshold is two
+figures with one name*. Under B a caller declaring `bands: 5` gets a sparkline and nothing says
+so; under A they get a coarser horizon and the legend still names five. **A stated loss beats a
+silent change of meaning**, which is F34's rule about a carrier arriving on the question of
+whether a form still *is* itself.
+
+**Read rather than argued**: `horizon-bands-5-1bit` is a recognisable horizon — five rows, five
+densities, the staircase intact — because at `height > 1` arm A keeps *both* channels, the row
+count carrying height and the glyph carrying depth. Only at `height: 1` does height collapse, and
+that is where the loss is stated. `horizon-folded-1x3-1bit` is the frame that shows it: three
+shades across eighty columns where the 24-bit frame has twenty-four levels.
 
 ### A reading at the floor draws nothing, and three frames show it
 
@@ -2462,7 +2477,7 @@ familiar shape taken.
 
 | # | two rules meeting | ruling |
 |---|---|---|
-| H1 | *depth is colour* × `colourDepth < 8` | the frame decides between A and B; **not settled here** |
+| H1 | *depth is colour* × `colourDepth < 8` | **arm A** — depth returns to the density ramp and height keeps the rows. Settled by the frames, above, against the arm that resolves more |
 | H2 | *the baseline is 0* × a range not spanning 0 | fall back to `range.min`, and the fold is one-directional — which is today's behaviour and now says so |
 | H3 | *the sign rides the map's two halves* × a **sequential** `colormap` | refused at construction. A sequential map has no second half, and drawing negative bands in the same ramp says a trough is a peak |
 | H4 | *a finite reading draws ink* × a value at the baseline exactly | ink, one eighth. The floor is a reading and blank is absence (I16) |
@@ -3674,9 +3689,10 @@ Six tiers. No state machine — C12 is pure over the block.
 - **HZ1** (I52, §3z): band depth reads from the colormap and not from `ladderFor("density")` — asserted as *the glyph alphabet is the eighths at every band* plus *two bands differ in colour*, because a run that changed only the ramp would pass an assertion about colour alone.
 - **HZ2** (I52, §3z): at `height: 1` a series sweeping one band renders **eight** distinct glyphs. The row the shipped form fails: it renders one, and no assertion about band count can see that.
 - **HZ3** (I52, §3z): a negative value mirrors upward and takes the other half of the diverging map, asserted against a fixture that crosses zero — and the paired row that a sequential `colormap` is **refused**, which is where the sign would otherwise be silently lost.
-- **HZ4** (I52, §3z): below `colourDepth: 8`, whichever of §3z's A and B the frame settles — written against both and one deleted when the frame is read, never both left standing.
+- **HZ4** (I52, §3z): below `colourDepth: 8` the glyphs come from the **density** ladder and `bands` still separates them — arm A, settled by the frames. **The paired row is the one that matters**: at `height > 1` the row count still carries height, so a mutation collapsing the grid to one row per column fails here and not in HZ2, which only looks at `height: 1`.
 - **HZ5** (I52, I16): a reading at the range minimum draws ink. **A fixture that can respond to it first**: `sin50` reaches its minimum at two adjacent columns in three shipped frames, which is where the two-cell break came from.
-- **HZ6** (I52, I19): `legend: false` on a horizon is refused at both gates. The colour axis is the reading, and the refusal is the one H7 found that the two-channel ruling does not imply.
+- **HZ6** (I52, I19): `legend: false` on a horizon is refused at both gates, **with both controls** — a diverging map is accepted and a sequential one is accepted on unsigned data, because a refusal that fires on everything refuses nothing.
+- **HZ7** (I52, §3z H7): the legend row is declared, spent and drawn — `plotHeight` accounts for it, the rendered frame is that many rows, and the last of them is the scale. **The row the mutation pass asked for**: setting `FURNITURE_ROWS.horizon` to 0 leaves the grid untouched, so every geometry row passes while `composeRows` cuts the scale off the bottom. A test that calls the mechanism misses the wiring.
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.
 - **YA2** (I47): `yAxis: "right"` draws no left label column and the plot area starts where the border does; the labels are the same strings `"left"` puts on the other side, at the same rows.
 - **YA2b** (I47): at `yAxis: "right"` the left border is `│` on every row and never `┤`, with the converse asserted on the same fixture with the axis left. **The row the mutation pass asked for**: YA2 compares the gutters' *contents*, which are empty on that side either way, so it passes against a border still drawing a stub that points out at a column zero cells wide.
@@ -3852,6 +3868,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.50** (I51): recolouring for contrast **inside** the contour and quiver rasterisers rather than after the merge → **LY7** fails on a cell where the arrow lost the merge, and passes everywhere else. §6d.2's pass 6, and the only pass that reads two and writes one.
 - **T6.51** (I52): returning band depth to the density ramp → HZ1 fails, and the eighths channel is overwritten by the thing it was freed from. **Paired with a control**: swapping the *legend's* ramp alone fails nothing and is meant to, because the legend names bands either way — which is what says the ruling is about the plot area and not about the key.
 - **T6.52** (I52): making the fold an offset — negative bands growing downward through `▀`/`▔` → HZ3 fails, and one direction resolves to an eighth while the other resolves to a half. The mutation that shows §3r's repertoire finding is load-bearing here and not decoration.
+- **T6.53** (I52, §3z H7): `FURNITURE_ROWS.horizon` back to 0 → HZ7 fails, and the scale is cut off the bottom by the compositor with no refusal anywhere. **It survived the first pass** — the grid is unaffected, so the six geometry rows all passed — and HZ7 exists because of that survivor rather than beside it.
+- **T6.54** (I52, §3z): arm B below the colour floor, the eighths kept and `bands` inert → HZ4 fails. **The mutation that resolves *more* than the shipped arm**, which is why the row is written about the density ladder rather than about a level count.
 - **T6.1** (I1): deriving height from series length → T1.1 fails and streaming plots start shifting the viewport.
 - **T6.2** (I3): dividing by the range without guarding a constant series → T1.5 fails with `NaN` output.
 - **T6.3** (I4): letting `NaN` reach the grid → T1.8 fails.

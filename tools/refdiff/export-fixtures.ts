@@ -79,6 +79,7 @@ const caps = (CAPS as readonly { name: string; caps: unknown }[])
   .find((c) => c.name === "24bit")!.caps;
 const frame = frameFor as (s: unknown, c: unknown, w: number) => readonly string[];
 const strip = stripSgr as (s: string) => string;
+import { plotAreaRows, plotHeight } from "../../src/presentation/plot/height.js";
 
 /** A rendered row as a coverage mask: which cells carry ink. */
 export function inkMask(row: string): string {
@@ -94,7 +95,19 @@ export function inkMask(row: string): string {
  * would not survive the rebuild it exists to check.
  */
 export function calciumMask(spec: PlotSpec): readonly string[] {
-  return frame({ ...spec, height: ROWS, axes: false }, caps, COLS).map((l) => inkMask(l));
+  const bare = { ...spec, height: ROWS, axes: false };
+  // **A declared height is not a rendered height where the furniture is
+  // unconditional**, and the paragraph above rests on the half that is:
+  // `axes: false` zeroes `axedFurniture`, which is *cartesian* furniture. A
+  // matrix's scale legend and a horizon's band scale are not cartesian and do
+  // not answer to it, so those forms rendered `ROWS + furniture` rows and RD1
+  // caught the horizon at 17 against a grid of 16.
+  //
+  // Subtracting what the form declares — `facetAt`'s rule, one tool along —
+  // makes the mask exactly `ROWS` for every form rather than for the ones whose
+  // furniture happens to be optional.
+  const furniture = plotHeight(bare as never) - plotAreaRows(bare as never);
+  return frame({ ...bare, height: Math.max(1, ROWS - furniture) }, caps, COLS).map((l) => inkMask(l));
 }
 
 // The exclusion map and the mask helpers are imported by `pair.mjs`, so the

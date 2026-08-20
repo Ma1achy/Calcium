@@ -25,7 +25,9 @@ import { formatReadout, readoutSet } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
-import { horizonRows } from "../../src/presentation/plot/horizon.js";
+import { horizonBandT, horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
+import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
+import { validateBlock } from "../../src/data/viewmodel/index.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
 import { bandRows, stackBands } from "../../src/presentation/plot/stack.js";
@@ -986,62 +988,185 @@ describe("GROUP 6d: one fold, two origins", () => {
   });
 });
 
-describe("GROUP 6e: the horizon folds", () => {
+describe("GROUP 6e: the horizon folds — colour by depth, eighths by height", () => {
   const wave = { values: Array.from({ length: 50 }, (_, i) => 50 + Math.sin(i * 0.25) * 50) };
   const R = { min: 0, max: 100 };
+  // A grid rendered to plain glyph rows, for the geometry rows that are about
+  // shape rather than about which channel carries what.
+  const glyphRows = (
+    s: { values: readonly (number | null)[] },
+    range: { min: number; max: number },
+    bands: number, w: number, h: number, caps = FULL_CAPS,
+  ): readonly string[] =>
+    horizonGrid(s, range, bands, w, h).map((row) =>
+      row.map((c) => horizonGlyph(c, caps)).join(""));
 
   it("T1.49: the row count is the height, whatever the band count", () => {
-    // **The whole claim of the form**, and the old version broke it: one row per
-    // band, clipped at `min(areaRows, bands)`. This file's own header says *a
-    // series that would need twelve rows fits in two*.
+    // **The whole claim of the form**, and an earlier version broke it: one row
+    // per band, clipped at `min(areaRows, bands)`. This file's own header says
+    // *a series that would need twelve rows fits in two*.
     for (const bands of [1, 2, 5, 12]) {
       for (const h of [1, 2, 5]) {
-        expect(horizonRows(wave, R, bands, 40, h, FULL_CAPS).length, `${String(bands)} bands in ${String(h)} rows`).toBe(h); // cells-ok — a row count
+        expect(glyphRows(wave, R, bands, 40, h).length, `${String(bands)} bands in ${String(h)} rows`).toBe(h); // cells-ok — a row count
       }
     }
   });
 
-  it("T1.50: height 1 with 3 bands reads three depths, where it used to saturate", () => {
-    // The measured defect: the defaults interacted, `bands` defaulting to 3 and
-    // `height` to 1, so band 0 was drawn alone and everything above a normalised
-    // third saturated at maximum ink. No fixture pinned the two apart.
-    const row = horizonRows(wave, R, 3, 60, 1, FULL_CAPS)[0] ?? "";
+  it("HZ1 (C12 I52, §3z): band depth is the colour and the glyph is the height", () => {
+    // **Two assertions because either alone passes against the defect.** The
+    // shipped form carried depth on `ladderFor("density")`, so a row asserting
+    // only *the glyphs vary* passes against it, and one asserting only *the
+    // colours vary* passes against a build that painted a density ramp. The
+    // claim is that the glyphs come from the **height** ladder and the colours
+    // come from the map.
+    const grid = horizonGrid(wave, R, 3, 60, 1);
+    const eighths = new Set([...ladderFor("height", FULL_CAPS).steps]);
+    const density = new Set([...ladderFor("density", FULL_CAPS).steps]);
+    const drawn = new Set(grid[0]!.map((c) => horizonGlyph(c, FULL_CAPS)).filter((g) => g !== " "));
+    for (const g of drawn) {
+      expect(eighths.has(g), `${g} is on the height ladder`).toBe(true);
+      expect(density.has(g), `${g} is not on the density ladder`).toBe(false);
+    }
+    const spans = horizonSpans(grid[0]!, 3, COLORMAPS["coolwarm"], { capabilities: FULL_CAPS } as never);
+    const colours = new Set(spans.map((s) => JSON.stringify(s.style?.colour ?? null)));
+    expect(colours.size, "the bands are told apart by colour").toBeGreaterThanOrEqual(3); // cells-ok — a colour count
+  });
+
+  it("HZ2 (C12 I52, §3z): at height 1 a band resolves eight positions", () => {
+    // **The row the shipped form fails and no band-count assertion can see.**
+    // Within-band height was a whole number of rows, so at `height: 1` — the
+    // canonical horizon — every inked column was exactly one row and the
+    // position inside the band was gone. A series sweeping one band cleanly is
+    // what constructs the state: over the whole range the bands change too, and
+    // then eight glyphs prove nothing about eight *positions*.
+    const sweep = { values: Array.from({ length: 64 }, (_, i) => (i / 63) * 33) };
+    const row = glyphRows(sweep, R, 3, 64, 1)[0] ?? "";
     const inks = new Set([...row].filter((c) => c !== " "));
-    expect(inks.size, "three bands, three densities").toBeGreaterThanOrEqual(3); // cells-ok — a density count
+    expect(inks.size, "eight sub-cell positions in one row").toBe(8); // cells-ok — a glyph count
+  });
+
+  it("HZ3 (C12 I52, §3z): a negative reading mirrors upward and takes the other half", () => {
+    // The fold is a **mirror** because §3r measured that there is no downward
+    // eighths ladder — `▀` and `▔` are the whole upper repertoire — so an offset
+    // arm would resolve one direction to an eighth and the other to a half.
+    const signed = { values: [-40, -20, 20, 40] };
+    const range = { min: -40, max: 40 };
+    const grid = horizonGrid(signed, range, 2, 4, 1);
+    const cells = grid[0]!;
+    expect(cells.map((c) => c?.sign), "sign follows the baseline").toEqual([-1, -1, 1, 1]);
+    // Mirrored: both directions draw upward, so every cell has ink.
+    expect(cells.every((c) => c !== null && c.eighths > 0), "both directions draw").toBe(true);
+    // And the two halves of a diverging map are the two directions.
+    const below = horizonBandT(cells[0]!, 2, true);
+    const above = horizonBandT(cells[3]!, 2, true);
+    expect(below, "deepest below is the map's low end").toBeLessThan(0.5);
+    expect(above, "deepest above is the map's high end").toBeGreaterThan(0.5);
+  });
+
+  it("HZ5 (C12 I52, I16): a reading at the baseline draws ink", () => {
+    // **A floor that renders blank gives blank two meanings** — absence and the
+    // minimum — in the form whose whole subject is *how deep*. Three shipped
+    // frames carried a two-cell break where `sin50` touched its minimum at two
+    // adjacent columns, which is the fixture that can respond to this.
+    const floored = { values: [0, 0, 50, 100] };
+    const grid = horizonGrid(floored, R, 3, 4, 1);
+    expect(grid[0]![0], "the floor is a reading").not.toBeNull();
+    expect(grid[0]![0]!.eighths, "one eighth, not none").toBeGreaterThanOrEqual(1); // cells-ok — an eighth count
+    expect(horizonGlyph(grid[0]![0] ?? null, FULL_CAPS), "and it is drawn").not.toBe(" ");
+  });
+
+  it("HZ4 (C12 I52, §3z): below the colour floor, depth returns to the density ramp", () => {
+    // **Arm A, settled by the frames** — and against the arm that resolves more.
+    // B gives eight levels at one row where A gives three, because the eighths
+    // are a *unicode* vocabulary and 1-bit is a statement about colour; the
+    // glyphs are there either way. It loses anyway, because a form that stops
+    // having bands below a colour depth is two forms with one name.
+    const mono = { capabilities: MONO_UNICODE_CAPS } as never;
+    const grid = horizonGrid(wave, R, 3, 60, 1);
+    const spans = horizonSpans(grid[0]!, 3, COLORMAPS["coolwarm"], mono);
+    const drawn = new Set([...spans.map((x) => x.text).join("")].filter((g) => g !== " "));
+    const density = new Set([...ladderFor("density", MONO_UNICODE_CAPS).steps]);
+    for (const g of drawn) expect(density.has(g), `${g} is on the density ladder`).toBe(true);
+    expect(drawn.size, "the bands are still told apart").toBeGreaterThanOrEqual(3); // cells-ok — a glyph count
+    expect(spans.every((x) => x.style?.colour === undefined), "and no colour is claimed").toBe(true);
+
+    // **The paired half, and it is the one that matters.** At `height > 1` arm A
+    // keeps both channels — the row count carries height and the glyph carries
+    // depth — so a mutation collapsing the grid to one inked row per column
+    // fails here and not in HZ2, which only looks at `height: 1`.
+    const tall = horizonGrid(wave, R, 3, 60, 5);
+    const inked = tall[0]!.map((_c, i) => tall.filter((r) => r[i] !== null).length); // cells-ok — a row count
+    expect(new Set(inked).size, "the row count still varies with the value").toBeGreaterThan(1); // cells-ok — a count
+  });
+
+  it("HZ7 (C12 I52, §3z H7): the legend row is declared, spent and drawn", () => {
+    // **The row the mutation pass asked for.** Setting `FURNITURE_ROWS.horizon`
+    // to 0 survived every other row here: the grid is unaffected, so the geometry
+    // assertions pass, and `composeRows` quietly cuts the scale off the bottom —
+    // the exact frame H7 refuses, reached without a refusal. A test that calls
+    // the mechanism misses the wiring, and this asserts the wiring: the declared
+    // height accounts for the legend, the rendered frame is that many rows, and
+    // the last of them is the scale.
+    const b = block({
+      kind: "plot", id: "hz", form: "horizon", height: 3, bands: 3,
+      series: [{ label: "a", values: [1, 5, 10, 15] }],
+    } as Plot);
+    expect(plotHeight(b), "three area rows and the legend").toBe(4); // cells-ok — a row count
+    const rows = kit().renderToLines(b, 40);
+    expect(rows.length, "rendered is declared").toBe(4); // cells-ok — a row count
+    expect(rows[3], "and the last row is the scale").toContain("bands");
+  });
+
+  it("HZ6 (C12 I52, §3z H3, H7): the two refusals the table found", () => {
+    const horizon = (over: Record<string, unknown>): unknown => ({
+      kind: "plot", id: "h", form: "horizon", height: 2,
+      series: [{ label: "a", values: [-5, 0, 5] }], ...over,
+    });
+    const errs = (b: unknown): readonly string[] => {
+      const r = validateBlock(b);
+      return r.ok ? [] : (r as { error: readonly string[] }).error;
+    };
+    // H7 — the legend is the reading, not furniture.
+    expect(errs(horizon({ legend: false })).some((x) => x.includes("legend")),
+      "legend: false is refused").toBe(true);
+    // H3 — a sequential map has no second half for the sign to ride.
+    expect(errs(horizon({ colormap: "viridis" })).some((x) => x.includes("diverging")),
+      "sequential on signed data is refused").toBe(true);
+    // **The controls, because a refusal that fires on everything refuses
+    // nothing**: a diverging map is fine, and a sequential one is fine where
+    // nothing crosses the baseline.
+    expect(errs(horizon({ colormap: "coolwarm" })), "diverging is accepted").toEqual([]);
+    expect(errs({ ...horizon({ colormap: "viridis" }) as object,
+      series: [{ label: "a", values: [1, 2, 3] }] }), "unsigned takes any map").toEqual([]);
   });
 
   it("T1.51: a series shorter than its area is stretched, never left to run out", () => {
     // The heatmap's right-anchoring defect in a second form: `values[col]` found
     // nothing past column 49 of an 80-cell area and left thirty columns blank.
-    const rows = horizonRows(wave, R, 3, 80, 2, FULL_CAPS);
+    const rows = glyphRows(wave, R, 3, 80, 2);
     for (const r of rows) expect(r.length).toBe(80); // cells-ok — a cell count
-    // The last column carries the last sample rather than nothing.
     expect(rows.some((r) => r[79] !== " "), "the right edge is drawn").toBe(true); // cells-ok — a column index
   });
 
-  it("T1.52: a column carries at most two depths — its band, and the one it cleared", () => {
-    // The fold's shape. Three or more in a column means the bands are not
-    // overdrawing, which is a stack of separate charts wearing one frame.
-    const rows = horizonRows(wave, R, 5, 40, 6, FULL_CAPS);
+  it("T1.52: a column's ink is one band, and the rows below the top one are full", () => {
+    // **The fold's shape, restated for the channel that now carries it.** Under
+    // the density model a column carried its band and the one it had cleared,
+    // because depth was overdrawn in the glyph. With depth in the colour there
+    // is nothing to overdraw: one band per column, and the height channel is
+    // spent on `within` — full rows below, the remainder in the top one (§3z H5).
+    const grid = horizonGrid(wave, R, 5, 40, 6);
     for (let c = 0; c < 40; c += 1) { // cells-ok — a column count
-      const depths = new Set(rows.map((r) => r[c]).filter((g) => g !== undefined && g !== " "));
-      expect(depths.size, `column ${String(c)}`).toBeLessThanOrEqual(2); // cells-ok — a density count
+      const col = grid.map((r) => r[c]).filter((x) => x !== null && x !== undefined);
+      if (col.length === 0) continue; // cells-ok — a cell count
+      expect(new Set(col.map((x) => x!.band)).size, `column ${String(c)} is one band`).toBe(1); // cells-ok — a band count
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      // Every row but the topmost inked one is full.
+      const partial = col.filter((x) => x!.eighths !== 8); // cells-ok — an eighth count
+      expect(partial.length, `column ${String(c)} has at most one partial row`).toBeLessThanOrEqual(1); // cells-ok — a row count
     }
-
-    // **And at least two somewhere, which is the half `≤ 2` cannot see.**
-    // Removing the overdraw entirely leaves one depth per column and satisfies
-    // the bound above perfectly — a mutation that survived until this row. A
-    // value in the top band has cleared four below it, so the column above its
-    // own fill must carry the fourth band's ink rather than nothing.
-    // Mid-band, not at the ceiling: a value at exactly the top fills the whole
-    // height with its own band and leaves nothing above it to be the second
-    // depth — the state has to be constructed rather than assumed.
-    const deep = { values: [90, 90, 90, 90] };
-    const top = horizonRows(deep, R, 5, 8, 6, FULL_CAPS);
-    const col0 = new Set(top.map((r) => r[0]).filter((g) => g !== undefined && g !== " "));
-    expect(col0.size, "a cleared band shows above the one being filled").toBe(2); // cells-ok — a density count
   });
 });
+
 
 describe("GROUP 6f: the forest draws its interval", () => {
   const Q = { min: 0, q1: 0, median: 0, q3: 0, max: 0, centre: 0, lower: -1, upper: 1 } as const;
@@ -1757,7 +1882,8 @@ describe("GROUP 8: horizon bands fold", () => {
   it("a series spanning 3 bands uses 3 rows", () => {
     const series = { values: [1, 5, 10, 15, 20] as (number | null)[] };
     const range = { min: 1, max: 20 };
-    const rows = horizonRows(series, range, 3, 20, 3, FULL_CAPS);
+    const rows = horizonGrid(series, range, 3, 20, 3)
+      .map((r) => r.map((c) => horizonGlyph(c, FULL_CAPS)).join(""));
     const nonEmpty = rows.filter((r) => r.trim() !== "");
     expect(nonEmpty.length).toBeGreaterThan(1); // cells-ok — a row count
   });

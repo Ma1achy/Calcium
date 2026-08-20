@@ -151,7 +151,18 @@ const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>>
   // furniture belongs to its facets, so the declaration was the wrong half.
   smallmultiples: () => 0, pairplot: () => 0,
   pie: () => 0, radar: () => 0,
-  horizon: () => 0,
+  // **The one row a horizon spends, and it buys the thing the form is for**
+  // (I52, §3z H7). Band depth is an ordinal index into a colour, so the scale
+  // beside it is the reading rather than furniture — the matrix's argument
+  // (I19) on the only other form whose channel has to be learnt. It was `0`
+  // for as long as the colour axis was missing, which is consistent and was
+  // consistent about the wrong thing.
+  // **One row, and `AXIS_ROWS` was the wrong constant.** A matrix spends two —
+  // an x-label row *and* the scale legend — and a horizon has no x labels, so
+  // reaching for the same name padded a blank row and `refdiff`'s RD1 is what
+  // caught it: 18 rows against a declared grid of 16. The number a form spends
+  // is the rows it emits, not the rows the form beside it emits.
+  horizon: () => 1,
 };
 
 /** The block's measured height (I1). A function of the block alone. */

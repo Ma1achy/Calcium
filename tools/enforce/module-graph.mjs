@@ -1311,6 +1311,25 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // instance that found the trap. Each is observable state a test asserts and
   // no component reads — the same category as the two above, and each is used
   // only inside its own declaring file.
+  // **A fifth of that category, and the seam it crosses is inside one file.**
+  // MG24 asks whether a component is complete on its own side of a seam with
+  // nothing on the other; `HorizonCell` is the output of `horizonGrid` and the
+  // input of `horizonGlyph`/`horizonSpans`, which are the two halves of
+  // `horizon.ts` — deliberately split so the band and the glyph are resolved by
+  // different things, because computing them together is what let one alphabet
+  // carry both (C12 I52, §3z). `band` and `sign` are named across the file's own
+  // seam by `horizonBandT`; `eighths` is read only by the glyph half, so it is
+  // the one member the rule can see.
+  //
+  // **The bidirectional arm makes this self-expiring**: the day anything outside
+  // `horizon.ts` names `eighths`, this entry becomes a violation of its own.
+  "HorizonCell.eighths":
+    "C12 I52, §3z — sub-cell height, written by `horizonGrid` and read by " +
+    "`horizonGlyph` in the same file, which is the internal seam the two-channel " +
+    "split creates rather than a component boundary. `test/unit/plot-mutations.test.ts` " +
+    "asserts it in HZ5 and T1.52, which is where the claim *a finite reading always " +
+    "draws ink* is actually checkable",
+
   "FrameScheduler.contaminated":
     "C03 diagnostics — whether a frame was composed against a stale width. " +
     "`frame-scheduler.ts` sets and reads it; `test/revert/frame-scheduler.test.ts` " +

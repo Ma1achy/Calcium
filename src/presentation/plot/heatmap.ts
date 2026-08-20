@@ -124,13 +124,22 @@ const DEFAULT_COLORMAP: Readonly<Record<PlotForm, ColormapName | null>> = Object
   // warm ramp rather than a perceptual one — `viridis` says *more* where a
   // reader of a utilisation strip wants *hotter*.
   utilisation: "inferno",
+  // **Not a matrix, and the only non-matrix form with an entry** (I52, §3z).
+  // A horizon's band depth *is* a colour axis — its own header called the
+  // compression *paid for in a colour axis the reader has to learn* while this
+  // row was `null`, so the price was charged and the goods never arrived.
+  // Diverging rather than sequential because the fold has two directions and a
+  // diverging map's two halves are where the sign rides; a sequential map is
+  // refused on signed data rather than drawing a trough in the same ramp as a
+  // peak (§3z H3).
+  horizon: "coolwarm",
   // Not matrix forms.
   line: null, sparkline: null, scatter: null, step: null, ecdf: null, density: null,
   bar: null, histogram: null, boxplot: null, violin: null, ridgeline: null,
   forest: null, dumbbell: null, lollipop: null, dotplot: null, waffle: null,
   flame: null, icicle: null, treemap: null, funnel: null, gantt: null,
   waterfall: null, streamgraph: null, stackedarea: null,
-  smallmultiples: null, pairplot: null, pie: null, radar: null, horizon: null,
+  smallmultiples: null, pairplot: null, pie: null, radar: null,
   slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,
 });
 
@@ -320,7 +329,7 @@ function heatSpans(
   return out;
 }
 
-function colormapFor(block: Plot): Colormap | undefined {
+export function colormapFor(block: Plot): Colormap | undefined {
   const named = block.colormap ?? DEFAULT_COLORMAP[block.form];
   return named === null || named === undefined ? undefined : COLORMAPS[named];
 }
