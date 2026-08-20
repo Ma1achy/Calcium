@@ -137,66 +137,26 @@ function escapeXml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Braille U+2800–U+28FF: each codepoint encodes 8 dots as a bitmask.
-// Dot positions in the 2×4 cell (col, row):
-//   bit 0 → (0,0)  bit 3 → (1,0)
-//   bit 1 → (0,1)  bit 4 → (1,1)
-//   bit 2 → (0,2)  bit 5 → (1,2)
-//   bit 6 → (0,3)  bit 7 → (1,3)
-const BRAILLE_DOT_MAP = [
-  [0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [0, 3], [1, 3],
-];
-
-export function isBraille(ch) {
-  const cp = ch.codePointAt(0);
-  return cp !== undefined && cp >= 0x2800 && cp <= 0x28ff;
-}
-
-export function brailleDots(ch) {
-  const bits = ch.codePointAt(0) - 0x2800;
-  const dots = [];
-  for (let i = 0; i < 8; i++) {
-    if (bits & (1 << i)) {
-      dots.push(BRAILLE_DOT_MAP[i]);
-    }
-  }
-  return dots;
-}
-
 /**
- * **The dot radius is a fraction of the dot *pitch*, not of the cell.**
+ * **Braille goes through the font, like every other glyph.**
  *
- * It was `min(cellW, cellH) * 0.1` — 1.7px across, against a pitch of 4.5
- * vertically and 5.9 horizontally, so under a third of the space between two
- * dots was inked. A terminal font draws them nearly touching: `⣿` is a solid
- * cell and it previewed as eight specks.
+ * It used to be drawn by hand as circles, from a dot map and a radius — and the
+ * radius was `min(cellW, cellH) * 0.1`, 1.7px against a pitch of 4.5, with the
+ * two dot columns pushed to the cell's *edges*, 5.9px apart in an 8.4px cell
+ * where the true pitch is 4.2. So `⣿`, a **solid** cell, previewed as scattered
+ * specks with stripes through it, and correcting the radius by eye overshot the
+ * other way — 3.2px against the font's 2.04. *Measured off DejaVu Sans Mono at
+ * this size: pitch 4.11 × 3.88, dot 2.04 across, glyph spanning 2.56 to 14.19
+ * of the 16px cell.*
  *
- * The cost was not cosmetic. **Every braille figure in the catalogue read as
- * far sparser than it renders**, and a reader judging a filled pie, or whether
- * a line survives a crossing, was judging the previewer. 0.36 of the pitch puts
- * the dot at about 70% duty, which is where DejaVu Sans Mono's are.
+ * **Nothing hand-drawn can be checked without measuring the font, so the font
+ * draws it.** The argument for the circles was independence from the rendering
+ * machine's fonts — and the rest of the frame never had it: every box-drawing
+ * glyph, block glyph and letter already comes from the same stack, so a machine
+ * without it renders tofu with or without this path. Braille was the one glyph
+ * class modelled rather than rendered, and that inconsistency is where the
+ * error hid (F204).
  */
-const DOT_DUTY = 0.40;
-
-function renderBrailleCell(x, y, ch, colour, cellW, cellH) {
-  const dots = brailleDots(ch);
-  if (dots.length === 0) return "";
-  // **A braille cell is 2 sub-cells across and 4 down, and each dot is centred
-  // in its own.** The pitch was `cellW - 2 · 0.15 · cellW` — the two columns
-  // pushed to the cell's edges, 5.9px apart in an 8.4px cell against a true
-  // pitch of 4.2 — so the disc came out with vertical stripes through it.
-  const stepX = cellW / 2;
-  const stepY = cellH / 4;
-  const padX = stepX / 2;
-  const padY = stepY / 2;
-  const dotR = Math.min(stepX, stepY) * DOT_DUTY;
-  return dots.map(([dc, dr]) => {
-    const cx = x + padX + dc * stepX;
-    const cy = y + padY + dr * stepY;
-    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${dotR.toFixed(1)}" fill="${colour}"/>`;
-  }).join("\n");
-}
-
 export function ansiToSvg(ansi) {
   const lines = ansi.replace(/\n$/, "").split("\n");
   const maxCols = lines.reduce((mx, line) => {
@@ -298,12 +258,7 @@ export function ansiToSvg(ansi) {
         textRun = "";
       };
       for (const ch of span.text) {
-        if (isBraille(ch)) {
-          flush();
-          const cx = PAD + col * CELL_W;
-          const cy = PAD + row * CELL_H;
-          parts.push(renderBrailleCell(cx, cy, ch, span.colour, CELL_W, CELL_H));
-        } else if (ch === " ") {
+        if (ch === " ") {
           flush();
         } else {
           if (!textRun) textStart = col;

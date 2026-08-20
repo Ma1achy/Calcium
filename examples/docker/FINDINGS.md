@@ -10072,16 +10072,28 @@ as sparse, whether a line survives a crossing — all of it was read off frames 
 braille by a factor of three in area. *An instrument that renders the artefact is part of the
 artefact.*
 
-**And it had a fixture.** `tools/` has one for `ansiToSvg` and it passed throughout, because it
-asserts the SVG's *structure* — that a braille cell becomes circles, that the colours parse —
-and no assertion in it is about how big a circle is relative to the next one. **A fixture over
-shape cannot see a scale**, which is the same class as F190's assertion-by-proxy one directory
-along.
+**And it had a fixture.** `PC5` asserted the dot map — *braille dots land where the codepoint
+says* — and passed throughout, because it checks the **model** and never the rendering. A
+fixture over a model cannot see the model being wrong; it is the same class as F190's
+assertion-by-proxy, one directory along. It now asserts that no such model exists: no `<circle`
+in the output, and a braille glyph emitted as `<text>` at its own column like any other.
 
-Fixed: the pitch is `cellW / 2` by `cellH / 4` with each dot centred in its sub-cell, and the
-radius is `0.40` of the pitch — about 80% duty, where DejaVu Sans Mono's sit. **The number is
-evidence and not a threshold** (F179's rule): it was chosen by rendering the solid disc and
-looking, and the reason to keep it is that `⣿` must read as solid.
+**The first fix overshot, and the reader caught that too** — *still think the older version of
+the pie looked better.* Correct. Measured against the font instead of against my eye: rendering
+`⣿` in DejaVu Sans Mono at this size gives **20.2% ink**; the old circles gave 13.2% and the new
+ones **47.8%**. The font's geometry is pitch **4.11 × 3.88** with a dot **2.04px** across — my
+corrected radius was 3.2px, **57% too wide and 2.4× the area**, where the original was 18% too
+narrow. *I was wrong about the direction of the error and then wrong about its size.*
+
+**So the font draws it, and the model is deleted.** `BRAILLE_DOT_MAP`, `brailleDots`,
+`renderBrailleCell` and the duty constant are gone; a braille cell emits a `<text>` at its own
+column exactly as a box-drawing glyph does. Nothing hand-drawn here could be checked without
+measuring the font, and once you are measuring the font you may as well use it.
+
+**The argument for the circles was independence from the rendering machine's fonts, and the
+frame never had it**: every box-drawing glyph, block glyph and letter already comes from the same
+stack, so a machine without it renders tofu either way. **Braille was the one glyph class
+modelled rather than rendered, and that inconsistency is where the error hid.**
 
 **The third shape of *an instrument can manufacture evidence*, and the one that was missing**:
 not truncated, not fabricated from nothing, but **real bytes reassembled by a wrong model**. The

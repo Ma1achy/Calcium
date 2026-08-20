@@ -19,7 +19,7 @@ import { cells as width } from "../../src/presentation/text.js";
 import { CAPS, FORMS, clearGenerated, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { ansiToSvg, brailleDots, colour256, isBraille, parseLine, sheetBg } from "../../tools/catalogue-png.mjs";
+import { ansiToSvg, colour256, parseLine, sheetBg } from "../../tools/catalogue-png.mjs";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { ALL_FORMS } from "../support/plot-forms.js";
 
@@ -28,7 +28,6 @@ const caps = CAPS as readonly { name: string; caps: Record<string, unknown> }[];
 const frame = frameFor as (s: unknown, c: unknown, w: number) => readonly string[];
 const strip = stripSgr as (s: string) => string;
 const spans = parseLine as (s: string) => readonly { text: string; colour: string }[];
-const dots = brailleDots as (ch: string) => readonly (readonly [number, number])[];
 const pageBg = sheetBg as () => { r: number; g: number; b: number; alpha: number };
 
 describe("plot-catalogue — the corpus renders", () => {
@@ -394,13 +393,19 @@ describe("catalogue-png — the parser that failed silently", () => {
     expect(ys[1]! - ys[0]!).toBeLessThanOrEqual(1.143 * size);
   });
 
-  it("PC5: braille dots land where the codepoint says", () => {
-    // U+2801 is dot 1 alone — top-left. U+28FF is all eight. A dot map that is
-    // merely plausible draws a recognisable curve in the wrong places.
-    expect(isBraille("⠁")).toBe(true);
-    expect(isBraille("A")).toBe(false);
-    expect(dots("⠁")).toEqual([[0, 0]]);
-    expect(dots("⣿").length).toBe(8); // cells-ok — a dot count
-    expect(dots("⠀").length).toBe(0); // cells-ok — a dot count
+  it("PC5: a braille glyph goes through the font, on the same path as any other", () => {
+    // **This row asserted a dot map, and the dot map is gone** (F204). Braille
+    // was the one glyph class this file *modelled* rather than rendered — eight
+    // circles from a bitmask, at a radius nothing could check without measuring
+    // the font, and it was out by 2.4× in area for the tool's whole life. The
+    // claim now is that no such model exists: a braille cell emits a `<text>`
+    // at its own column, exactly as a box-drawing glyph does.
+    const svg = (ansiToSvg as (l: string) => string)("\u001b[38;2;255;0;0m⣿⠁\u001b[0m");
+    expect(svg).not.toContain("<circle");
+    for (const ch of ["⣿", "⠁"]) expect(svg).toContain(`>${ch}</text>`);
+    // At its own column, which is the property the per-glyph path exists for.
+    const xs = [...svg.matchAll(/<text x="([\d.]+)"[^>]*>[⣿⠁]<\/text>/gu)].map((m) => Number(m[1]));
+    expect(xs.length).toBe(2); // cells-ok — a glyph count
+    expect(xs[1]! - xs[0]!).toBeCloseTo(8.41, 1);
   });
 });
