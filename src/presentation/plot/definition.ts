@@ -2597,6 +2597,12 @@ const FORM_ROWS: Readonly<
   },
 
   heatmap: (block, width, ctx) => heatmapFormRows(block, width, ctx),
+  // **The field family's second reading, on the family's own path** (I49, §3y).
+  // A contour is the matrix renderer plus a glyph layer, which is why it is here
+  // and not a renderer of its own: the layout, the anchor, the gutter and the
+  // legend are all the matrix's, and the only new thing is what goes over the
+  // cells.
+  contour: (block, width, ctx) => heatmapFormRows(block, width, ctx),
 };
 
 const render = (block: Plot, ctx: RenderContext): ReactElement => {

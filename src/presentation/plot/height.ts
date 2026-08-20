@@ -86,6 +86,7 @@ const heightOrOne = (plot: PlotGeometry): number => Math.max(1, Math.floor(plot.
 const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 1,
   waffle: () => 10,
+  contour: heightOrOne,
   line: heightOrOne,
   heatmap: heightOrOne,
   scatter: heightOrOne, step: heightOrOne, ecdf: heightOrOne,
@@ -137,6 +138,9 @@ const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>>
   slope: axedFurniture, bubble: axedFurniture, autocorrelation: axedFurniture,
   timeline: axedFurniture, bullet: axedFurniture, utilisation: () => AXIS_ROWS,
   calendar: () => AXIS_ROWS, correlation: () => AXIS_ROWS, confusion: () => AXIS_ROWS,
+  // No lid, and the row pays for the legend — which here names the levels as
+  // well as the range, because a level cannot be written on its own line (I49).
+  contour: () => AXIS_ROWS,
   spectrogram: () => AXIS_ROWS, latency: () => AXIS_ROWS, density2d: () => AXIS_ROWS,
   density: axedFurniture, violin: axedFurniture, ridgeline: axedFurniture,
   // **These five compose their own rows and draw no cartesian furniture** (§2's

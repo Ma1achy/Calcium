@@ -25,6 +25,14 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
       { values: [2, 2, 3, 3], label: "c" },
     ],
   }),
+  contour: block({
+    kind: "plot", id: "form-contour", form: "contour", height: 3, axes: true,
+    series: [
+      { values: [1, 2, 3, 4], label: "a" },
+      { values: [4, 3, 2, 1], label: "b" },
+      { values: [2, 2, 3, 3], label: "c" },
+    ],
+  }),
   scatter: block({
     kind: "plot", id: "form-scatter", form: "scatter", height: 5, axes: true,
     series: [s([1, 3, 2, 5, 4])],

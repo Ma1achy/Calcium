@@ -535,6 +535,7 @@ export type PlotForm =
   | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
   | "slope" | "bubble" | "autocorrelation" | "timeline" | "bullet" | "utilisation"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
+  | "contour"
   | "density" | "violin" | "ridgeline"
   | "smallmultiples" | "pairplot"
   | "pie" | "radar"
@@ -703,6 +704,71 @@ export type Plot = Readonly<{
    * — and only the column's mark differs. So `form` stays `line` or `step`,
    * and the data it draws is `ohlc` rather than `series`.
    */
+  /**
+   * The iso-lines a `contour` draws, or derived when absent (C04 I61, C12 I49).
+   *
+   * Derived through `niceAxis` — the y gutter's own function — so a contour's
+   * levels and the axis ticks are the same numbers rather than two nice-number
+   * runs that agree at most ranges and not all. The interior ticks only: a level
+   * at the field's minimum crosses nothing, so drawing it says *no contour*
+   * where the caller asked for one.
+   *
+   * A declared level outside the field's range is kept in the legend and drawn
+   * nowhere. Dropping it makes an empty plot area indistinguishable from a
+   * constant field, which is the one thing a contour has to be able to say.
+   */
+  levels?: readonly number[];
+  /**
+   * What is drawn over a field, in **draw order — last on top** (C04 I61, C12 I51).
+   *
+   * The painter's reading, which is what a caller expects; `mergedRow` resolves
+   * a contested cell **first-wins**, so the array is reversed at that seam and
+   * nowhere else. The two answer different questions: this says *what is drawn*,
+   * `Layer.kind` says *how two inked cells resolve*.
+   *
+   * **`field`'s membership is load-bearing and its position is not.** A
+   * background has no glyph and cannot occlude one, so `["field", "contour"]`
+   * and `["contour", "field"]` render byte-identical — membership says whether
+   * the field paints at all, which is how `["contour"]` asks for lines on an
+   * unpainted area. Stated because a reader given an ordered array will assume
+   * every position in it means something.
+   */
+  layers?: readonly ("field" | "contour" | "quiver")[];
+  /**
+   * Whether the field dims to make room for a glyph over it (C12 I51, §3y).
+   *
+   * **A glyph over a colormap competes on legibility, not on cells**, which is
+   * the thing *the background has no competition* gets backwards. Measured
+   * against the 4.5 : 1 floor, a white glyph clears it on 45% of viridis and 16%
+   * of coolwarm; every theme slot clears viridis on 3–19%.
+   *
+   * `"floor"` dims until every sample clears, **computed per map rather than
+   * tabulated** — the shipped factors come out at 50% for viridis and coolwarm
+   * and 40% for inferno, and a constant that clears three maps fails the fourth.
+   * Its price is stated because it is real: viridis keeps 0.165 of its 0.742
+   * luminance spread, 22%, and luminance is the ordering channel a perceptual
+   * map exists for. So the remedy costs the thing the map was chosen for, which
+   * is why it is not the default.
+   *
+   * Inert below `colourDepth: 8`, where there is no background to dim.
+   */
+  fieldDim?: "none" | "floor";
+  /**
+   * Where a glyph over a field takes its colour from (C12 I51, §3y).
+   *
+   * **Two fields rather than one union**, on `plotFrame`'s test above: a single
+   * enum would make `fieldDim: "floor"` with `glyphInk: "contrast"`
+   * inexpressible, and neither makes the other meaningless — one changes the
+   * background, the other the foreground.
+   *
+   * `"contrast"` picks black or white per cell from that cell's own background,
+   * which is seaborn's annotated heatmap. It does not break *a block names a
+   * palette slot*: the block still names a `colormap`, and `continuousColour`
+   * already resolves data-dependent colour inside the renderer. Its price is
+   * that the glyph's colour stops meaning magnitude — so on a `quiver` it spends
+   * the second channel to save the first.
+   */
+  glyphInk?: "own" | "contrast";
   plotStyle?: "auto" | "braille" | "line" | "candlestick" | "solid";
   /**
    * Whether a shape's interior is drawn (C04 I59, C12 I43, §3w).
@@ -893,6 +959,9 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // `yAxis: false` is refused here and only here.
   heatmap: true, calendar: true, correlation: true, confusion: true,
   spectrogram: true, latency: true, density2d: true, utilisation: true,
+  // **A contour is a matrix by the same argument** (I49): its rows are the
+  // field's rows, and a field with no names beside it is a picture of numbers.
+  contour: true,
   // One row, or a figure that bounds itself: no gutter to put a label beside.
   sparkline: false, horizon: false, waffle: false,
   pie: false, radar: false, flame: false, icicle: false, treemap: false,
@@ -930,10 +999,71 @@ export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // A matrix has no per-series row, and no scale in its gutter to write beside.
   heatmap: false, calendar: false, correlation: false, confusion: false,
   spectrogram: false, latency: false, density2d: false, utilisation: false,
+  contour: false,
   // No cartesian area, or one row, or a composition.
   sparkline: false, horizon: false, waffle: false,
   pie: false, radar: false, flame: false, icicle: false, treemap: false,
   smallmultiples: false, pairplot: false,
+});
+
+
+/**
+ * The forms that draw a field — a grid where a cell is a position rather than a
+ * category (C04 I61, C12 §3y).
+ *
+ * **A new record and not a reuse of `MATRIX_LAYOUT`**, which answers whether a
+ * form's columns are a time window or a fixed category set. That is a question
+ * about the abscissa, and every matrix form has an answer to it while only two
+ * of them can take a glyph layer. C12 I43's finding is a total record over forms
+ * read as a complete answer to a question it cannot ask, and reusing that one
+ * here would be the same mistake with the same shape.
+ *
+ * Here rather than in `presentation/plot/`, for `HAS_Y_GUTTER`'s reason: the
+ * validator needs it and L0 cannot import L1 to ask (A02 §1).
+ */
+/**
+ * The matrix family (C04 I50b), **here rather than in `construct.ts`** because
+ * the validator needs it and had been asking a narrower question instead.
+ *
+ * `checkHeatmap` was widened to this record when `utilisation` fell through
+ * `form === "heatmap"`; `plotAxisErrors` was written afterwards and asked
+ * `form === "heatmap"` again, so `yAxis: false` was refused on one form of eight.
+ * `contour` is the ninth and it fell through in the same way — **the same narrow
+ * check, found by the same kind of member, two files apart.** A record both
+ * gates read is what closes the class rather than the instance.
+ */
+export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  heatmap: true, calendar: true, correlation: true, confusion: true,
+  spectrogram: true, latency: true, density2d: true, utilisation: true,
+  // **A contour is a matrix and I50b binds**: its rows are the field's rows, so
+  // `axes: false` would take the row labels *and* the level legend, and the
+  // legend is the only thing that says which line is which level (C12 I49).
+  contour: true,
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  density: false, bar: false, histogram: false, boxplot: false, violin: false,
+  ridgeline: false, forest: false, dumbbell: false, lollipop: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false,
+  funnel: false, gantt: false, waterfall: false, streamgraph: false,
+  stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
+  radar: false, horizon: false, slope: false, bubble: false,
+  autocorrelation: false, timeline: false, bullet: false,
+});
+
+export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  contour: true,
+  // Every other matrix form paints its cells and draws nothing over them. They
+  // are *fields* in the survey's sense and not in this one: `layers` on a
+  // `spectrogram` has no second thing to order.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  density: false, bar: false, histogram: false, boxplot: false, violin: false,
+  ridgeline: false, forest: false, dumbbell: false, lollipop: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false,
+  funnel: false, gantt: false, waterfall: false, streamgraph: false,
+  stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
+  radar: false, horizon: false, slope: false, bubble: false,
+  autocorrelation: false, timeline: false, bullet: false,
 });
 
 export type PlotStyleArm = NonNullable<Plot["plotStyle"]>;
@@ -963,6 +1093,12 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   bullet: [], autocorrelation: [], waffle: [], utilisation: [],
   heatmap: [], calendar: [], correlation: [], confusion: [],
   spectrogram: [], latency: [], density2d: [],
+  // **The one matrix form with a style fork, and the saddle is why** (I49,
+  // §3y). Both saddle resolutions give mask 15, so `"line"` renders `┼` either
+  // way and the centre-value ruling has nothing to be wrong about there. At 2×4
+  // the two segments part, so `"auto"` picks braille — the arm on which the
+  // ruling has a subject.
+  contour: ["braille", "line"],
   flame: [], icicle: [], treemap: [],
   sparkline: [], horizon: [],
   smallmultiples: [], pairplot: [],

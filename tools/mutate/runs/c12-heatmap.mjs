@@ -82,8 +82,11 @@ const results = runPass({
       // taking a glyph string and started reading one column map for both
       // channels. The subject has never moved — the range handed to a row is
       // the matrix's, or it is the row's own and the comparison is gone.
-      from: "        heatSpans(s, range, layout, map, style, ctx, matrixLayout),",
-      to: "        heatSpans(s, rowRange(s), layout, map, style, ctx, matrixLayout),",
+      // Re-anchored a third time, onto the `const field =` binding that C12
+      // §3y's pass 5/6 split introduced. The subject is still the range: the
+      // matrix's, or the row's own with the comparison gone.
+      from: "    const field = heatSpans(s, range, layout, map, style, ctx, matrixLayout, dim, painted);",
+      to: "    const field = heatSpans(s, rowRange(s), layout, map, style, ctx, matrixLayout, dim, painted);",
       expect: "T1.18",
       also: [
         {

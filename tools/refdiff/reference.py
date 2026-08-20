@@ -417,6 +417,12 @@ SKIPPED = {
     "treemap": "no matplotlib primitive; the reference is the squarify algorithm "
                "and T1.66 asserts it directly",
     "flame": "no matplotlib primitive; containment is asserted structurally in T1.64",
+    # matplotlib's `contour` exists, and it is not the comparison this instrument
+    # makes: ours is `axes: false`-isolated ink and a contour refuses that arm
+    # (C04 I50b), so the form is in UNISOLABLE and never reaches a reference.
+    # Recorded here as well, because a form absent from both halves is the gap
+    # RD5 exists for.
+    "contour": "unisolable — C04 I50b refuses the `axes: false` arm the mask needs",
     "icicle": "same as flame, inverted",
 }
 

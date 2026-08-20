@@ -105,6 +105,34 @@ const matrix = (rows: number, cols: number, step = 0.3): Series[] =>
     s(Array.from({ length: cols }, (_, c) => Math.sin((rr + c) * step) * 50 + 50), `row${String(rr)}`),
   );
 
+/**
+ * A field with **local extrema**, which `matrix` above does not have.
+ *
+ * `matrix` is `sin((r + c) · step)` — a function of `r + c` alone, so it is a
+ * ridge field: every iso-line is a straight diagonal and no cell can ever have
+ * two opposite corners above the level with the other two below. Measured
+ * against the shipped `marchingMask`, the catalogue's own fixture produces
+ * **zero saddles at every level**, so the ruling C12 I49 makes about them had
+ * no fixture that could respond to it.
+ *
+ * A separable product can, **and the level set decides whether it does.** A
+ * saddle needs both factors to change sign inside the visible span *and* a level
+ * at the value the surface takes there — which for `sin·sin` is exactly the mid.
+ * Derived ticks over 0–100 are 20/40/60/80 and hit none of them: measured, the
+ * separable field at `freq 1.0` gives **0 saddles at the derived levels and 18
+ * of 185 crossings at `levels: [50]`**. So the fixture that responds declares
+ * its level, and saying *use a product instead of a ridge* would have been half
+ * the answer. `test/support/README.md`'s rule — a fixture is shown to respond to
+ * the thing under test before it is asserted against.
+ */
+const field = (rows: number, cols: number, freq = 0.6): Series[] =>
+  Array.from({ length: rows }, (_, r) =>
+    s(
+      Array.from({ length: cols }, (_, c) => Math.sin(r * freq) * Math.sin(c * freq) * 50 + 50),
+      `row${String(r)}`,
+    ),
+  );
+
 const PIE_SEGMENTS = [
   { label: "Chrome", value: 65 },
   { label: "Firefox", value: 15 },
@@ -257,6 +285,31 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     sparse: { form: "heatmap", height: 5, axes: true, series: matrix(5, 20) },
     palette: { form: "heatmap", height: 5, axes: true, colormap: "viridis", series: matrix(5, 90) },
     empty: { form: "heatmap", height: 3, axes: true, series: [s([], "empty")] },
+  },
+  contour: {
+    // **The braille arm, which is the default and the one the saddle is visible
+    // on** (C12 I49). A 6x24 field of sin(r+c) gives crossings in every column.
+    default: { form: "contour", height: 6, axes: true, series: field(6, 24) },
+    // **The saddle, and it takes both halves** (C12 I49): a separable field so
+    // the surface has one, and `levels: [50]` because that is the value it takes
+    // there. 18 saddle cells of 185 crossings; the derived levels give zero.
+    saddle: {
+      form: "contour", height: 8, axes: true, levels: [50], series: field(8, 32, 1.0),
+    },
+    // The ridge field kept as its own variant: every iso-line straight, which is
+    // what a contour of a monotone surface looks like and is worth showing.
+    ridge: { form: "contour", height: 6, axes: true, series: matrix(6, 24) },
+    // The box-drawing fork: real joins, and both saddle resolutions collapse.
+    "style-line": { form: "contour", height: 6, axes: true, plotStyle: "line", series: field(6, 24) },
+    // Lines on an unpainted area — `field` dropped from `layers` (C12 I51).
+    "lines-only": { form: "contour", height: 6, axes: true, layers: ["contour"], series: field(6, 24) },
+    // The two contrast remedies, each with its own price (C12 I51).
+    "dim-floor": { form: "contour", height: 6, axes: true, fieldDim: "floor", series: field(6, 24) },
+    "ink-contrast": { form: "contour", height: 6, axes: true, glyphInk: "contrast", series: field(6, 24) },
+    // Declared levels, including one outside the range — named, drawn nowhere.
+    levels: { form: "contour", height: 6, axes: true, levels: [25, 50, 75, 500], series: field(6, 24) },
+    // A constant field crosses nothing: no contour, and not a full grid.
+    flat: { form: "contour", height: 4, axes: true, series: matrix(4, 16, 0) },
   },
   bar: {
     // **C12 §3j's case for the field**: ordered categories along the bottom.

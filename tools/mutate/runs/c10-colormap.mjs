@@ -80,7 +80,11 @@ const results = runPass({
       // nothing below 8-bit (C10 I31) and the ramp takes back over. Blanking the
       // cell unconditionally removes that fallback — beautiful at 24-bit, empty
       // at one bit, exactly the frame this row has always described.
-      from: "    run += colour === undefined ? glyphAt(x) : \" \";",
+      // Re-anchored when `layers` gave a field the option of not painting at
+      // all (C12 I51): the ramp fallback is now inside a `painted` arm, and the
+      // subject is unchanged — blanking the cell unconditionally still removes
+      // the one carrier that survives below 8-bit.
+      from: "    run += colour === undefined ? (painted ? glyphAt(x) : \" \") : \" \";",
       to: "    run += \" \";",
       expect: "T2.31",
     },

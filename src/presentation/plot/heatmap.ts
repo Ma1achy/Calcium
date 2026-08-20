@@ -23,6 +23,14 @@ import { tone } from "../blocks/paint.js";
 import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
 import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Layout } from "./furniture.js";
+import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
+import { slot } from "../blocks/paint.js";
+import { refOf } from "./marks.js";
+import {
+  contourCellRows, contourDotRows, contourLevels, dimColour, dimFactorFor, fieldSampler,
+  glyphLayerOrder, mergeFieldLayers, overlayGlyphs, paintsField,
+  type FieldLayer,
+} from "./field.js";
 
 const HEATMAP_ABSENT = " ";
 const MIN_AREA = 4;
@@ -54,6 +62,9 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
   // anchor now says so, which also means the caller who needs it is the one who
   // knows they do.
   heatmap: "stretch",
+  // A contour interpolates across whatever the map leaves visible, so a window
+  // would contour part of the field and say nothing about it (§6d.1 row 8).
+  contour: "stretch",
   spectrogram: "stretch",
   latency: "stretch",
   confusion: "stretch",
@@ -96,6 +107,7 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
  */
 const DEFAULT_COLORMAP: Readonly<Record<PlotForm, ColormapName | null>> = Object.freeze({
   heatmap: "viridis",
+  contour: "viridis",
   spectrogram: "viridis",
   latency: "viridis",
   confusion: "viridis",
@@ -219,6 +231,8 @@ function heatSpans(
   style: Readonly<{ ramp: string; absent: string }>,
   ctx: RenderContext,
   matrixLayout: MatrixLayout,
+  dim: number,
+  painted: boolean,
 ): readonly Span[] {
   const w = Math.max(0, Math.floor(layout.areaWidth));
   const columns = columnMap(series.values.length, w, matrixLayout); // cells-ok — a position count
@@ -242,10 +256,14 @@ function heatSpans(
   };
 
   const colourAt = (x: number): ColourValue | undefined => {
-    if (map === undefined) return undefined;
+    if (map === undefined || !painted) return undefined;
     const v = readingAt(x);
     if (v === null) return undefined;
-    return continuousColour(map, span <= 0 ? 0.5 : (v - range.min) / span, ctx.capabilities);
+    const c = continuousColour(map, span <= 0 ? 0.5 : (v - range.min) / span, ctx.capabilities);
+    // **`fieldDim` is applied here and only here** (I51). A dimmed colour is
+    // still the reading, so it belongs where the reading becomes a colour rather
+    // than in a pass that would have to know which cells were painted.
+    return c === undefined ? undefined : dimColour(c, dim);
   };
 
   const out: Span[] = [];
@@ -286,7 +304,10 @@ function heatSpans(
       flush();
       runColour = colour;
     }
-    run += colour === undefined ? glyphAt(x) : " ";
+    // **A field the caller did not ask to paint draws nothing**, not a ramp:
+    // `layers: ["contour"]` means lines on an unpainted area, and a density ramp
+    // there is the field drawn in the one vocabulary that was declined (I51).
+    run += colour === undefined ? (painted ? glyphAt(x) : " ") : " ";
     runCells += 1;
   }
   flush();
@@ -303,6 +324,7 @@ function matrixRows(
   range: Range,
   layout: Layout,
   ctx: RenderContext,
+  overlay: readonly FieldLayer[],
 ): readonly string[] {
   const style = { ramp: ladderFor("density", ctx.capabilities).steps, absent: HEATMAP_ABSENT };
   const map = colormapFor(block);
@@ -310,6 +332,9 @@ function matrixRows(
   // safe fallback rather than `window`: a form with no entry is one nobody
   // decided about, and blanking most of the width is not a neutral answer.
   const matrixLayout = block.matrixAnchor ?? MATRIX_LAYOUT[block.form] ?? "stretch";
+  const painted = paintsField(block);
+  const dim = block.fieldDim === "floor" && map !== undefined ? dimFactorFor(map) : 1;
+  const glyphInk = block.glyphInk ?? "own";
   const out: string[] = [];
 
   const overflow = block.series.length > layout.areaRows; // cells-ok — a row count
@@ -318,11 +343,24 @@ function matrixRows(
   for (let i = 0; i < visible; i += 1) {
     const s = block.series[i];
     if (s === undefined) continue;
+    const field = heatSpans(s, range, layout, map, style, ctx, matrixLayout, dim, painted);
+    // **Pass 5 then pass 6** (§6d.2). The merge cannot see the background and
+    // the ink pass needs both, which is why the second one runs here rather than
+    // inside either rasteriser.
+    const merged = overlay.length === 0 // cells-ok — a layer count
+      ? null
+      : mergeFieldLayers(overlay, i, layout.areaWidth);
     out.push(
       plotRow(
         i,
         s.label ?? "",
-        heatSpans(s, range, layout, map, style, ctx, matrixLayout),
+        merged === null
+          ? field
+          : overlayGlyphs(
+              field, merged.glyphs, merged.owners,
+              (owner) => slot(overlay[owner]!.ref, ctx.theme, ctx.capabilities),
+              glyphInk,
+            ),
         layout,
         ctx,
       ),
@@ -412,8 +450,18 @@ function matrixFurniture(
   // the trailing clause goes first, then the upper bound, then everything but
   // the bar. The *range* is what the legend is for, so it outlives the swatch.
   const muteds = (t: string): Span => ({ text: t, style: muted });
+  // **A level is named here and never on the line** (I49, §3y). A contour label
+  // sits *in* the stroke it names, in a gap cut for it, and there is no
+  // gap-cutting vocabulary — a label over a contour is the contour with a hole
+  // in it, and at one cell per crossing the hole *is* the crossing. A level
+  // outside the range is still named: dropping it makes an empty area
+  // indistinguishable from a constant field.
+  const levelText = block.form === "contour"
+    ? ` · ${contourLevels(block, range).map((v) => formatValue(v, block.yFormat)).join(" ")}`
+    : "";
   const rungs: readonly (readonly Span[])[] = [
-    [muteds(`${lo} `), ...bar(), muteds(` ${hi}${clause}`)],
+    [muteds(`${lo} `), ...bar(), muteds(` ${hi}${levelText}${clause}`)],
+    [muteds(`${lo} `), ...bar(), muteds(` ${hi}${levelText}`)],
     [muteds(`${lo} `), ...bar(), muteds(` ${hi}`)],
     [muteds(`${lo} - ${hi}`)],
   ];
@@ -434,6 +482,46 @@ function emptyRows(block: Plot, layout: Layout, ctx: RenderContext): readonly st
     ctx,
   );
   return Array.from({ length: total }, (_, i) => (i === middle ? styled : ""));
+}
+
+/**
+ * The glyph layers a field form draws, in **priority** order (I51, §6d.2).
+ *
+ * `glyphLayerOrder` has already reversed the caller's draw order and dropped
+ * `field`, which has no glyph to occlude with. The arm is `STYLE_ARMS`' — braille
+ * by default, because that is the one where the saddle's centre-value resolution
+ * is visible at all (I49).
+ */
+function fieldLayers(
+  block: Plot,
+  range: Range,
+  layout: Layout,
+  ctx: RenderContext,
+): readonly FieldLayer[] {
+  if (!IS_FIELD_FORM[block.form]) return [];
+  const order = glyphLayerOrder(block);
+  if (order.length === 0) return []; // cells-ok — a layer count
+
+  const sample = fieldSampler(block.series);
+  const columns = block.series[0]?.values.length ?? 0; // cells-ok — a column count
+  const span = { from: 0, to: Math.max(0, columns - 1), rows: block.series.length }; // cells-ok — a row count
+  const levels = contourLevels(block, range);
+  const braille = (block.plotStyle ?? "auto") !== "line";
+
+  const out: FieldLayer[] = [];
+  for (const kind of order) {
+    if (kind !== "contour") continue;
+    out.push({
+      glyphRows: braille
+        ? contourDotRows(sample, span, layout.areaWidth, layout.areaRows, levels)
+        : contourCellRows(
+            sample, span, layout.areaWidth, layout.areaRows, levels,
+            block.plotCorners ?? "rounded", ctx.capabilities,
+          ),
+      ref: refOf(0),
+    });
+  }
+  return out;
 }
 
 /**
@@ -460,5 +548,8 @@ export function heatmapFormRows(
   }
 
   if (range === null) return emptyRows(block, layout, ctx);
-  return [...matrixRows(block, range, layout, ctx), ...matrixFurniture(block, range, layout, ctx)];
+  return [
+    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx)),
+    ...matrixFurniture(block, range, layout, ctx),
+  ];
 }

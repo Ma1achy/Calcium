@@ -31,6 +31,7 @@ import {
   type PlotForm,
   type Tone,
   type ViewDocument,
+  IS_MATRIX,
 } from "./types.js";
 import { childBlocks } from "./tree.js";
 
@@ -93,6 +94,8 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
 const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
   sparkline: false,
   waffle: false,
+  // A field declares its rows like every other matrix form (C12 I49).
+  contour: true,
   line: true,
   heatmap: true,
   scatter: true, step: true, ecdf: true,
@@ -150,25 +153,13 @@ function checkPlotHeight(plot: Plot): void {
  * grew after the check was written. Found by `utilisation` accepting
  * `axes: false` and rendering eighteen rows into a sixteen-row grid.
  */
-const IS_MATRIX: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
-  heatmap: true, calendar: true, correlation: true, confusion: true,
-  spectrogram: true, latency: true, density2d: true, utilisation: true,
-  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
-  density: false, bar: false, histogram: false, boxplot: false, violin: false,
-  ridgeline: false, forest: false, dumbbell: false, lollipop: false,
-  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false,
-  funnel: false, gantt: false, waterfall: false, streamgraph: false,
-  stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
-  radar: false, horizon: false, slope: false, bubble: false,
-  autocorrelation: false, timeline: false, bullet: false,
-});
 
 function checkHeatmap(plot: Plot): void {
   if (!IS_MATRIX[plot.form]) return;
 
   if (plot.axes === false) {
     throw new BlockShapeError(
-      `plot "${plot.id}": a heatmap cannot set "axes: false" (C04 I50b) — ` +
+      `plot "${plot.id}": form "${plot.form}" cannot set "axes: false" (C04 I50b) — ` +
         `the scale legend is the only thing that says what a cell means, so a ` +
         `heatmap without one is unreadable rather than plain`,
     );
@@ -250,6 +241,8 @@ function checkPlotFormat(plot: Plot): void {
  */
 const ORIENTABLE: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
   bar: true, histogram: true, boxplot: true, violin: true,
+  // The matrix family's reason: two real axes already, and neither is a choice.
+  contour: false,
   // Not built: each needs its own column renderer and none was asked for.
   lollipop: false, dotplot: false, funnel: false, dumbbell: false, forest: false,
   ridgeline: false,

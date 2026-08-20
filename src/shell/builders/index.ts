@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_Y_GUTTER, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_Y_GUTTER, IS_FIELD_FORM, IS_MATRIX, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -404,6 +404,10 @@ function plot(
     plotGrid?: Plot["plotGrid"];
     yAxis?: Plot["yAxis"];
     yCallout?: Plot["yCallout"];
+    levels?: Plot["levels"];
+    layers?: Plot["layers"];
+    fieldDim?: Plot["fieldDim"];
+    glyphInk?: Plot["glyphInk"];
     /** A compact box plot's interquartile run (C12 I46, §3i). */
     plotBox?: Plot["plotBox"];
     /**
@@ -424,7 +428,7 @@ function plot(
     plotFrame?: Plot["plotFrame"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -506,9 +510,11 @@ function plot(
           `its own`,
       );
     }
-    if (yAxis === false && drawn === "heatmap") {
+    // The family, not the one form — see `plotAxisErrors`' own note: this is the
+    // third writing of a check that had already been widened once.
+    if (yAxis === false && IS_MATRIX[drawn]) {
       throw new TypeError(
-        `b.plot: "yAxis" is false on a heatmap (C04 I60) — a row label is the ordinate here, ` +
+        `b.plot: "yAxis" is false on form "${drawn}" (C04 I60) — a row label is the ordinate here, ` +
           `so a matrix without them is a picture of numbers with no way to tell which row ` +
           `is which`,
       );
@@ -524,6 +530,29 @@ function plot(
         `b.plot: "yCallout" is "last" with "yAxis" of ` +
           `"${yAxis === undefined ? "left" : String(yAxis)}" (C04 I60) — a callout is written ` +
           `in the right gutter and there is none; widen "yAxis" to "right" or "both"`,
+      );
+    }
+    // **The field family's four, refused off the family** (C04 I61, C12 §3y).
+    for (const [name, value] of [
+      ["layers", layers], ["fieldDim", fieldDim], ["glyphInk", glyphInk],
+    ] as const) {
+      if (value !== undefined && !IS_FIELD_FORM[drawn]) {
+        throw new TypeError(
+          `b.plot: "${name}" on form "${drawn}" (C04 I61) — that form paints its cells and ` +
+            `draws nothing over them, so there is no second thing to order`,
+        );
+      }
+    }
+    if (levels !== undefined && drawn !== "contour") {
+      throw new TypeError(
+        `b.plot: "levels" on form "${drawn}" (C04 I61) — only a contour draws iso-lines, ` +
+          `and a level on anything else names nothing`,
+      );
+    }
+    if (layers !== undefined && new Set(layers).size !== layers.length) { // cells-ok — a layer count
+      throw new TypeError(
+        `b.plot: "layers" names a layer twice (C04 I61) — a layer is drawn once, and the ` +
+          `order of an entry that cannot occlude means nothing`,
       );
     }
   }
@@ -547,6 +576,10 @@ function plot(
       ...(plotBox === undefined ? {} : { plotBox }),
       ...(yAxis === undefined ? {} : { yAxis }),
       ...(yCallout === undefined ? {} : { yCallout }),
+      ...(levels === undefined ? {} : { levels }),
+      ...(layers === undefined ? {} : { layers }),
+      ...(fieldDim === undefined ? {} : { fieldDim }),
+      ...(glyphInk === undefined ? {} : { glyphInk }),
       ...(xMin === undefined ? {} : { xMin }),
       ...(xMax === undefined ? {} : { xMax }),
       ...(xFormat === undefined ? {} : { xFormat }),

@@ -134,6 +134,8 @@ describe("refdiff — the grid is the model, not the answer", () => {
     // Kept in step with `reference.py`'s own list — the two halves of one
     // record, and a form in neither is the gap this row exists for.
     const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle"]);
+    // `contour` is not here: it is *unisolable* rather than unreferenced, so it
+    // leaves through `excluded` above. Both halves of the record still name it.
     expect(new Set(missing), "forms with neither a reference nor a recorded reason").toEqual(recorded);
     for (const form of excluded) expect(all.has(form), `${form} is excluded and is not a form`).toBe(true);
     console.log(`refdiff-coverage — ${String(all.size - excluded.size - missing.length)}/${String(all.size)} rows`);

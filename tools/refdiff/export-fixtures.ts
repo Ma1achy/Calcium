@@ -31,6 +31,7 @@ export const UNISOLABLE: ReadonlyMap<string, string> = new Map([
   ["latency", "C04 I50b — as heatmap"],
   ["density2d", "C04 I50b — as heatmap"],
   ["utilisation", "C04 I50b — as heatmap; the refusal reaches it now"],
+  ["contour", "C04 I50b — as heatmap; its rows are the field's rows and the legend names the levels"],
 ]);
 
 export const COLS = 64;

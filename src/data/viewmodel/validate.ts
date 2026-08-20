@@ -24,6 +24,8 @@ import {
   COLORMAP_NAMES,
   HAS_CALLOUT,
   HAS_Y_GUTTER,
+  IS_FIELD_FORM,
+  IS_MATRIX,
   STYLE_ARMS,
   type OHLC,
   type Plot,
@@ -564,6 +566,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "plotBox" must be "solid" or "line"`);
     }
     plotAxisErrors(b, e, at, form);
+    plotFieldErrors(b, e, at, form);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -742,6 +745,69 @@ function checkAlign(b: Record<string, unknown>, e: string[], at: string): void {
  * did nothing. That is F207 and C12 I43's finding: an arm accepted where there
  * is none tells the caller nothing and the reader nothing.
  */
+/**
+ * The field family's members, refused off the family (C04 I61, C12 §3y).
+ *
+ * **Refused rather than ignored**, on F207's measurement: a plot that quietly
+ * drops a field is one the caller believes is showing something else, and the
+ * frame that results looks deliberate.
+ */
+function plotFieldErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const isField = IS_FIELD_FORM[form as PlotForm] === true;
+  const dim = b["fieldDim"];
+  const ink = b["glyphInk"];
+  const layers = b["layers"];
+  const levels = b["levels"];
+
+  if (dim !== undefined && dim !== "none" && dim !== "floor") {
+    e.push(`${at}: "fieldDim" must be "none" or "floor"`);
+  }
+  if (ink !== undefined && ink !== "own" && ink !== "contrast") {
+    e.push(`${at}: "glyphInk" must be "own" or "contrast"`);
+  }
+  if (levels !== undefined && (!Array.isArray(levels) || levels.some((v) => typeof v !== "number"))) {
+    e.push(`${at}: "levels" must be an array of numbers`);
+  }
+  const KNOWN_LAYERS = ["field", "contour", "quiver"];
+  if (layers !== undefined) {
+    if (!Array.isArray(layers) || layers.some((l) => !KNOWN_LAYERS.includes(l as string))) {
+      e.push(`${at}: "layers" must be an array of "field", "contour" or "quiver"`);
+    } else if (new Set(layers as string[]).size !== layers.length) { // cells-ok — a layer count
+      // A layer named twice is a caller who believes the order means something
+      // it does not — I51's inert-position ruling arriving at the gate.
+      e.push(`${at}: "layers" names a layer twice (C04 I61) — a layer is drawn once`);
+    }
+  }
+
+  for (const [name, value] of [["layers", layers], ["fieldDim", dim], ["glyphInk", ink]] as const) {
+    if (value !== undefined && !isField) {
+      e.push(
+        `${at}: "${name}" on form "${String(form)}" (C04 I61) — that form paints its ` +
+          `cells and draws nothing over them, so there is no second thing to order`,
+      );
+    }
+  }
+  if (levels !== undefined && form !== "contour") {
+    e.push(
+      `${at}: "levels" on form "${String(form)}" (C04 I61) — only a contour draws ` +
+        `iso-lines, and a level on anything else names nothing`,
+    );
+  }
+  // **A layer with no data is refused at the gate**, because the alternative is
+  // an empty plot area that reads as a field with nothing in it.
+  if (Array.isArray(layers) && layers.includes("quiver") && b["vectors"] === undefined) {
+    e.push(
+      `${at}: "layers" names "quiver" and there are no "vectors" (C04 I61) — a layer ` +
+        `with no data draws an empty area that reads as a field with nothing in it`,
+    );
+  }
+}
+
 function plotAxisErrors(
   b: Record<string, unknown>,
   e: string[],
@@ -766,11 +832,15 @@ function plotAxisErrors(
   }
   // **A matrix's row labels *are* its ordinate** (C12 I18), which is the same
   // argument I50b makes for refusing `axes: false` one field along.
-  if (ya === false && form === "heatmap") {
+  // **The family, not the one form** (C04 I50b). This read `form === "heatmap"`,
+  // which is the narrow check `checkHeatmap` had already been widened out of —
+  // written again in a second file, and `contour` fell through it exactly as
+  // `utilisation` fell through the first.
+  if (ya === false && IS_MATRIX[form as PlotForm]) {
     e.push(
-      `${at}: "yAxis" is false on a heatmap (C04 I60) — a row label is the ordinate ` +
-        `here, so a matrix without them is a picture of numbers with no way to tell ` +
-        `which row is which`,
+      `${at}: "yAxis" is false on form "${String(form)}" (C04 I60) — a row label is the ` +
+        `ordinate here, so a matrix without them is a picture of numbers with no way to ` +
+        `tell which row is which`,
     );
   }
   if (yc !== "last") return;
@@ -837,6 +907,7 @@ const PLOT_FORM_MEMBERS = {
   smallmultiples: true, pairplot: true,
   pie: true, radar: true,
   horizon: true,
+  contour: true,
 } satisfies Record<PlotForm, true>;
 const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 
