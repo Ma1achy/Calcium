@@ -1438,6 +1438,53 @@ the boundary's exactness. A reader sees a seam a cell wide where the colour chan
 early or late; they no longer see a hole. Stated here because *the gaps are fixed* would imply
 the stronger thing, and the stronger thing needs a per-dot colour the span model does not have.
 
+### Where that paragraph was generalised past its case
+
+Every sentence above is true **about a pie**, and the paragraph was written as though it were
+about layers. It is not: it is about layers that meet along a **boundary**. Two wedges share a
+one-dimensional locus, so "a seam a cell wide" is the whole of the cost and the union is free.
+
+**Two curves do not meet along a boundary — they can run alongside each other for their whole
+length**, and there the same union draws one series' ink in another series' colour by the
+hundred. Measured, and each figure is the catalogue's own:
+
+| figure | what the union does |
+|---|---|
+| `slope-default` | 11 cells carry two series; **25 of the dots drawn in them belong to a series other than the one whose colour they wear** |
+| `radar-default` (braille) | **70 of the 279 frame cells wear a series slot** — the grey rings, drawn in orange and blue |
+| `radar-line` (quadrants) | 80 of 98 cells wearing a series colour are frame; 53 of them thicker than the frame's own glyph |
+
+The radar is the worst of the three and the reason is structural: **a value ring and a data
+polygon are the same shape at different radii**, so they do not cross at points, they run
+parallel. There is no locus small enough for "a seam a cell wide" to describe.
+
+So the report *the grey radar lines are getting coloured blue and orange* and the report *the
+orange bleeds onto the blue and green lines* are one mechanism, and it is this paragraph
+believed one form too far. **The observation was right and the scope was inferred** — the pie
+was the only figure it had been measured against.
+
+### The partition is what the layer is, not which form drew it
+
+A `Layer` declares a `kind`, required rather than defaulted so a ninth layer has to say:
+
+| kind | what it is | what happens where two meet |
+|---|---|---|
+| `"surface"` | part of one filled figure — a pie's wedges, a stack's bands | **union.** The partition is arbitrary and the ink is not; the boundary cell takes the topmost tone |
+| `"curve"` | an object with its own identity — a series, a radar polygon, the frame beneath them | **occlusion.** The topmost owns the cell outright and the rest draw nothing in it |
+
+**A gap and a lie are not the same cost, which is what settles it.** Occluding a curve costs it
+a cell at the crossing, and a one-cell break where another line passes over reads as depth —
+every plotting library draws it that way. Unioning it puts the curve's ink on screen wearing
+another curve's colour, which is not a seam a reader cannot see but *a statement about which
+series this is*, and a false one. A reader can recover from the first and cannot detect the
+second.
+
+**The frame no longer survives a polygon crossing it, and that is the ruling and not a
+regression.** `LM3`'s dot-containment row asserted the opposite and was right about the union it
+was written against; what replaces it is the property occlusion actually has — every cell the
+frame inks is still inked, by whatever is in front of it, and **no cell anywhere draws a dot
+belonging to a layer other than the one whose colour it wears**.
+
 **The priority order is what the ref still expresses**, which is why it is worth keeping rather
 than replacing with *the layer owning the most dots*: the radar's order is a ruling — labels over
 polygons over frame, because a word a polygon runs through is unreadable — and reading it off dot
@@ -1540,10 +1587,10 @@ nothing wrong.
 
 ### What the line-drawn radar costs, stated where a reader meets it
 
-I40 unions the dots where two layers ink one cell, **and the union is braille's alone** — a
-`glyphForMask` corner and a braille polygon cannot be OR-ed, so the first-wins rule stands there.
-The braille radar therefore draws both polygons where they cross and **the line-drawn one does
-not**: the nearer layer keeps the cell and the further loses it.
+I40 unions the dots where two layers ink one cell, **and the union is a surface's alone** (§3u) —
+so neither arm draws both polygons where they cross. The nearer layer keeps the cell and the
+further loses it, at 2×4 in the braille arm and 2×2 in this one. The line arm's cost is the
+coarser of the two, which is the trade the alphabet already made.
 
 #### The radar's line arm took four alphabets, and the fourth is the one that connects
 
@@ -1569,11 +1616,21 @@ upstream does. The quadrant blocks are **filled sub-cells**: consecutive cells t
 is a solid rectangle. Half braille's vertical resolution and the same horizontal, traded for
 coverage — which is the right trade for a **shape**, where braille's is right for a *curve*.
 
-The composition stays the third attempt's: one grid, an owner per sub-cell, no merge. **A cell can
-carry two shapes in different quadrants while its tone is one layer's** — I40's limit again, and it
-bites less at 2×2 than at 1×1, because the glyph keeps both and only the tone is chosen. *Data
-takes the tone over furniture, and `Math.max` gave it the frame:* `furniture` is `series.length`,
-greater than every series index, so a polygon crossing a ring lost its colour cell by cell.
+The composition stays the third attempt's: one grid, an owner per sub-cell, no merge. *Data takes
+the tone over furniture, and `Math.max` gave it the frame:* `furniture` is `series.length`, greater
+than every series index, so a polygon crossing a ring lost its colour cell by cell.
+
+**"A cell can carry two shapes in different quadrants while its tone is one layer's — and it bites
+less at 2×2 than at 1×1, because the glyph keeps both and only the tone is chosen" is what this
+paragraph used to say, and the measurement is the other way round.** Of the 98 cells wearing a
+series colour, **80 are frame** and 53 carry a fuller glyph than the frame's own. Keeping both
+shapes is what makes it worse, not better: the quadrant is a *filled rectangle*, so a frame
+sub-cell drawn in a series colour is four times the ink of a braille dot doing the same thing.
+The reader sees the pentagon go orange.
+
+A cell is one layer's, and draws only that layer's sub-cells — labels, then later series over
+earlier, then the furniture (I44). It is §3u's occlusion rule at 2×2 instead of 2×4, and the two
+arms did not agree on it until they were measured side by side.
 
 #### The frame is continuous, and the stipple was answering the wrong question
 
@@ -1582,6 +1639,11 @@ scale drawn as heavily as the data competes with it*. That is an argument about 
 was answered by leaving **holes** — and a stippled ring does not read as a lighter ring, it reads
 as a broken one. The frame is `tone.muted` and the polygons carry their series' slots, so the
 separation is already there and the scale can be a scale.
+
+`arcDots` took a `spacing` in dots and every call site passed the same constant once the stipple
+went, so the parameter is gone with it. **A knob nothing turns is a knob the next reader has to
+check** — and its comment still described the four-dot step and the ninety-cell disc it was read
+off, which is a justification for a mechanism that no longer exists.
 
 That is the same trade the pie makes in the other direction — a solid pie has no seams and a
 braille pie has no gaps — and it is why both are shipped rather than one being chosen. *Neither
@@ -2634,6 +2696,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I41** — **The positional family's x axis is nice numbers over a declared domain, and the sample index is what it falls back to.** `Plot` gains `xMin` / `xMax` / `xFormat` mirroring the y axis — the same `axisFor`, the same precision, the same formatter — and absent them the domain is `[0, n − 1]`, which is what the data has when nothing else was said. *Measured: `ax.plot(y)` over 24 samples ticks 0 5 10 15 20.* **The row it draws in was already reserved**: `axes: true` adds `AXIS_ROWS + FRAME_ROWS` to the declared height rather than taking it, and with no `xLabels` the third of those rows rendered as `""` — so every axed positional plot had been spending a row on an x-label row it never filled, and filling it costs nothing against I1. **`xLabels` wins where both are present**, because a caption is the caller's words and a scale is inferred, and overriding the first with the second is the wrong direction. A label that cannot keep its one-cell gap is dropped **with its tick**, `plotFrame: "corners"` draws the labels and no ticks — a tick is a mark on an edge and there is no edge, where a label is still a reading — and a log or time scale is labelled through `axisFor` or the two halves of one axis disagree. **The form owns the index-to-column mapping** (I37): a candlestick's ticks come from its own pitch, and the curve's rule would place them between candles at every width where the two separate (§3d.1).
 - **I42** — **A histogram bins every series on one shared edge set, and `layout: "overlap"` cannot mean *draw the first one*.** Binned on its own extent each series fills the width, so two distributions of different spreads draw the same picture and the comparison is gone — I35's argument one form along, and the reference's answer: `ax.hist([a, b], bins=8)` returns one edge array over the union and a count array per dataset. **The strategy's inputs are the union's too**, because the edges are: a bin *count* chosen from one series' `n` and spread belongs to edges that are not that series'. *The default layout dropped every series after the first and the legend named them all, so the picture asserted a series it did not draw — I8's rule, in the arm beside the one whose comment records being fixed for it.* **There is no overlapping picture a bar can draw** — two runs superimposed in one row of cells is one run — so `overlap` with more than one series means **grouped**, for the bar and the histogram alike, which is also what `ax.hist([a, b])` draws. Binned, a histogram *is* a bar chart of counts, so all four layouts arrive from the bar rather than being invented. **The vertical arm needed the `refFor` its transpose already had**, or N×S column bands draw in one colour under a legend naming S; and a series with no finite values keeps its bands, because dropping it renumbers the groups and the bin a reader is looking at holds different series in different bins (§3v).
 - **I43** — **Which styles a form has an arm for is a total record, and a fill is the braille arm's.** `plotStyle` was a shared union with `candlestick` refused on the wrong form by a clause naming that style — right, and a special case: every style is one some forms draw and others do not, and a second would want a second clause. `STYLE_ARMS` is `Record<PlotForm, readonly PlotStyle[]>`, total, and the refusal is one rule over it. **A braille violin changes the vocabulary and not the geometry** — the outline strokes the dot grid at 2×4 a cell, which is where the smoothness comes from, while I39's odd extent and §3i's rungs stay the figure's; the box and the summary marks remain cell-resolution and composite over the fill. **`plotFill` is refused on the line arm** rather than ignored, because a box-drawing outline has no interior vocabulary and putting `█` inside `╭──╮` is a third figure rather than the same one filled. **A solid pie degrades to braille at one bit and does not refuse** — the hatch ladder is that depth's identity channel and a block glyph has no hatch, so I18's precedent applies: where the capability cannot spare what a figure needs the honest answer is the thing that fits, not an error the caller could not have avoided. **And a radar's line arm took four alphabets**, which is §3c proving itself: `plotStyle` names *draw this as a connected line* and the glyphs are the renderer's. `strokePolyline` steps orthogonally and a pentagon's every edge is oblique; `╱`/`╲` draw a clean pentagon *in isolation* and compose to rubble, because I40's union is braille's alone and the labels, polygons and frame each take cells from the others; one grid with an owner per cell fixes that and **still renders as dashes**, because those two glyphs are strokes inside a box and do not reach their corners. **Quadrant blocks are filled sub-cells and connect.** Half braille's vertical resolution and the same horizontal, traded for coverage — the right trade for a *shape* where braille's is right for a *curve*. **And the frame is continuous**: stippling answered a question about weight by leaving holes, and a stippled ring reads as a broken one rather than a light one, where `tone.muted` against the series' slots already separates them. *The pie keeps both its arms for the complementary reason — a solid pie has no seams and a braille pie has no gaps, and neither loses the shape* (§3w).
+- **I44** — **A layer declares whether it is a surface or a curve, and that decides what happens where two of them ink one cell.** I40's union was measured against a pie, whose wedges meet along a **boundary**, and generalised to every layer — but two curves can run *alongside* one another for their whole length, and there the union draws one series' ink in another's colour by the hundred. *Measured: `slope-default` draws 25 foreign dots against 20 own in the cells two series share; the braille radar gives 70 of its 279 frame cells a series slot; the quadrant radar, 80 of the 98 cells wearing a series colour are frame.* **The radar is the worst and the reason is structural — a value ring and a data polygon are the same shape at different radii, so there is no locus small enough for *a seam a cell wide* to describe.** So `kind` is required on a `Layer`: a `"surface"` is part of one filled figure, its partition arbitrary and its ink not, and it **unions**; a `"curve"` has its own identity and it **occludes**, the topmost owning the cell outright. **A gap and a lie are not the same cost** — a one-cell break where another line passes over reads as depth and a reader recovers from it, while ink wearing the wrong colour is a false statement about which series it is and a reader cannot detect it. *The same ruling governs the quadrant figure at 2×2, where the tone is chosen per cell and the sub-cells of every other layer are dropped, and it matters more there because a quadrant is a filled rectangle and a braille dot is not* (§3u, §3w).
 
 ## 8. Commitments
 
@@ -2670,10 +2733,11 @@ orientation — and belongs in the classification table as its own rows.
 28. **`plotDetail` is a ladder of four rungs, every rung adding information rather than resolution**, with the jitter a pure function of the sample's identity — and the floor below the lowest rung is C04's refusal rather than this component's degradation (I34).
 32. **Colour indexes an identity** — a row cut from a continuous axis has none and takes one colour, a named row keeps its slot, a row's interior identities are coloured by their owner, and a form whose rows *are* series declares it (I38, §3t).
 33. **A mirrored figure draws on an odd extent** — a reflection needs a centre, the spare cell precedes the figure so the band's own label and tick still land on the spine, and the one-sided rungs are outside it (I39, §3i).
-34. **A cell two layers ink carries both layers' dots** — unioned where the vocabulary allows it, first-wins where it does not, and coloured by the priority order either way (I40, §3u).
+34. **A cell two surfaces ink carries both surfaces' dots** — unioned where the vocabulary allows it, first-wins where it does not, and coloured by the priority order either way (I40, §3u). *Curves do not union — see I44.*
 35. **The positional family has an x axis** — nice numbers over a declared domain, the sample index where none is declared, in the row `axes: true` was already reserving; the caller's captions win it where they exist, and the form owns which column a tick lands on (I41, §3d.1).
 36. **A histogram is every series binned on one edge set** — the union's, with the strategy's inputs taken from the union too, drawn through the bar's four layouts, and `overlap` meaning grouped because there is no overlapping picture and I8 forbids the alternative (I42, §3v).
 37. **A form declares which styles it has an arm for** — a total record, one refusal over it, a braille violin that changes vocabulary and not geometry, a fill the line arm refuses, and a solid pie that degrades at one bit rather than refusing (I43, §3w).
+38. **A layer says whether it is a surface or a curve** — surfaces union their dots where they meet because the partition is arbitrary and the ink is not; curves occlude, because a cell drawn in another series' colour is a false statement rather than an invisible seam, and a gap is the cheaper error (I44, §3u).
 
 ---
 
