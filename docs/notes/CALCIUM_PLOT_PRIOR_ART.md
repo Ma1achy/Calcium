@@ -248,12 +248,57 @@ the fold is different. Worth knowing before either is designed.
 ### Refused, with reasons
 
 ```
-contour          edge routing over a scalar field, and the labels are worse than the lines
 3D               a novelty, not a tool — already refused
 sankey           edge routing — the Mermaid problem, and it wants a real layout engine
 ```
 
+**`contour` was on this list and is not any more — see the correction below.**
+
 **`pie` is NOT refused** — see below. `radar` follows it: same circle problem, same answer.
+
+### The correction — `contour` was misclassified, and the grouping is what carried it
+
+**Marching squares is local. Mermaid's layout is global.** For each 2×2 group of grid points the
+four corners are each above or below the threshold — sixteen cases — and each maps to a segment
+through that one cell. No routing, no layout engine, nothing that has to see the whole figure.
+The two problems are not the same problem at two sizes; they are different problems, and contour
+was grouped with `sankey`, `arc` and `chord`, all three of which genuinely *are* edge routing.
+**It inherited their disposition on the strength of the grouping.**
+
+**The claim appeared four times in this document and was measured none of them** — the block
+just above, the order table below it, *What this does to the order*'s `still refused` row, and
+*Where the list actually ends* — each restating the last. That is the compression class CLAUDE.md names:
+*repetition across documents is not corroboration*, and four restatements of an unmeasured claim
+are one unmeasured claim. Here they were not even four documents.
+
+**Measured instead**, against `linedraw.ts` at HEAD: all sixteen cases were enumerated and every
+one lands on an entry the shipped `glyphForMask` table already has — **zero new glyphs**, eight
+distinct masks, and the derivation from corners to edges is four lines:
+
+```
+mask = (top ? UP : 0) | (right ? RIGHT : 0) | (bottom ? DOWN : 0) | (left ? LEFT : 0)
+       …where an edge is crossed exactly when its two corners disagree
+```
+
+Adjacent cells therefore agree **by construction** — a shared edge has the same two grid corners
+on both sides — so the strokes join with nothing joining them. The `rounded`/`sharp` fork and the
+ASCII arm come along unchanged, because they are properties of the table rather than of a curve.
+
+**The half of the refusal that survives is the half nobody repeated**: *the labels are worse than
+the lines.* A contour label sits **in** the line it names, in a gap cut for it, and there is no
+gap-cutting vocabulary here — a label written over a contour is the contour with a hole in it,
+which is `behind()`'s argument for gridlines one layer up. So **a level is named in the legend
+and never on the line**, and that is a ruling rather than an omission.
+
+**And one thing the refusal never reached.** Both saddle cases cross all four edges, so both
+resolutions produce mask 15 → `┼`: at cell resolution the choice matplotlib makes by the cell's
+centre value **has no observable consequence**. It separates only at braille, where the two
+segments genuinely part — which is why the contour's default arm is braille and not the box
+drawing that made the reversal possible. *A ruling that cannot be violated on the arm it ships
+on reads exactly like one that is obeyed.*
+
+`quiver` was never on the list, and it is the same field with a vector at each point: direction
+picks the glyph, magnitude picks the colour. Both are specified in C12 §3y.
 
 ---
 
@@ -269,7 +314,8 @@ sankey           edge routing — the Mermaid problem, and it wants a real layou
 7  parallel coords  ML-specific, no prior art, and Prism is the consumer
 —  violin · ridgeline · dendrogram · candlestick    later, each with a real consumer first
 7  pie · radar        circle approximation — rough and wanted anyway
-—  contour · sankey · 3D                             refused
+—  sankey · 3D                                       refused
+—  contour                                          REVERSED — see the correction
 ```
 
 **`scatter` moves to first because it is free**, and **the box plot moves ahead of the histogram
@@ -633,7 +679,7 @@ a shared scale       small multiples · pair plot
 a real estimator     violin · ridgeline — both want the KDE density already needs
 designed for this    HORIZON — and sys-tui is its consumer
 circle work          PIE · radar — rough, and built anyway
-still refused        contour · sankey · 3D
+still refused        sankey · 3D          (contour was here — reversed)
 ```
 
 **`horizon` is the one to notice.** It is the only chart type on any of these lists that was
@@ -818,8 +864,9 @@ folds        OHLC (candlestick's glyph) · depth chart (mirrored cumulative step
              latency heatmap (a heatmap, and worth NAMING because it is the standard
              way to show a distribution over time) · pair plot (small multiples of scatter)
 
-refused      contour · sankey · arc · chord · 3D — all edge routing or circles-with-edges,
+refused      sankey · arc · chord · 3D — all edge routing or circles-with-edges,
              and the roadmap's Mermaid ruling covers the reason: layout is the expense
+             (contour was in this group and did not belong to it — see the correction)
 ```
 
 **`latency heatmap` is the one worth naming despite being a heatmap** — time on x, latency
