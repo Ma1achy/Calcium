@@ -10368,3 +10368,51 @@ absent from all three.
 
 Not fixed here — it is a defect in `styleRasteriser`'s condition and unrelated to the change that
 found it, and folding it into a large diff is how a repair stops being readable.
+
+## F213 — five unions named as protected, and not one of them is checked ★★★★☆
+
+C04's `colormap` clause states the rule and names its siblings:
+
+> **A name that resolves to nothing renders uncoloured**, which is F172's shape and the one this
+> type will not reproduce twice. `plotFrame`, `legend`, `plotDetail`, `orientation` and
+> `matrixAnchor` are unions for the same reason.
+
+`colormap` **is** checked at the document gate — four occurrences in `validate.ts`. Of the five
+named beside it, **none is**. `plotFrame`, `plotDetail` and `matrixAnchor` appear in that file zero
+times; `legend` and `orientation` appear twice and once, and both hits are unrelated rules — a form
+that requires `vertical`, and a horizon refusing `legend: false`.
+
+**Being a union is a compile-time fact and the gate's subject is a document**, which is the whole of
+the confusion: a `Plot` built in TypeScript cannot hold a bad value, and a `Plot` arriving as JSON
+from the far side is exactly what `validateBlock` exists for. The sentence is true about the type
+and was read as true about the check.
+
+**What each unchecked value actually does**, measured from the consumer rather than reasoned:
+
+| member | a value outside the union | what the reader gets |
+|---|---|---|
+| `matrixAnchor` | `columnMap`'s final arm is a fall-through | silently **`window`** — right-anchored with a blank fringe |
+| `legend` | `legendPlacement` returns it; `legendRows` reserves 0 | silently **no legend**, on a plot that asked for one |
+| `plotFrame` | `{ ...layout, style: block.plotFrame }` | silently the frame renderer's default arm |
+| `plotDetail` | `block.plotDetail ?? "auto"`, then compared | silently `auto`'s arm |
+| `orientation` | `checkOrientation` returns early only for `undefined` and `"horizontal"` | **refused on a non-orientable form** with a message about a *vertical arm* the caller never asked for, and silently horizontal everywhere else |
+
+`orientation` is the one to read twice: it is the only member of the five that produces an error,
+and the error names a value the document does not contain. A caller who typed `"vertial"` on a
+`pie` is told the form has no vertical arm.
+
+**Found by the calendar's walk** (C12 §3ae A1, A12), which had to establish what a `matrixAnchor`
+does before it could rule on the calendar's columns — and establishing it meant reading `columnMap`
+to the bottom, where the fall-through is.
+
+**Partly fixed here.** `matrixAnchor` gains its check with the calendar, because the same commit
+widens that member's domain and shipping a new value into an unchecked member widens the hole. The
+other four are one commit of about twenty lines and they are **open**: folding them in would put
+five unrelated refusals in a diff about dates, and F212's own note is the reason not to.
+
+**The class, rather than the five instances**: a public union whose values are checked nowhere. The
+mechanism that closes it is a rule rather than five clauses — every union-typed optional member of
+`Plot` has a value check — and it is worth noting that the argument against automating it is the
+same one `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass makes: a citation resolving against the
+wrong subject cannot be caught by matching names.
+

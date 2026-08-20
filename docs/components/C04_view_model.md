@@ -894,6 +894,33 @@ platform's zone database.
 **Refused off the `calendar` form**, on F207's terms — a field accepted where there is no arm for it
 tells the caller nothing and the reader nothing.
 
+**`startDate` is required with a unit, and the shapes it takes are the ones nothing is dropped
+from.** `YYYY-MM-DD`, optionally `THH`, `:MM` and `:SS` and a trailing `Z` — everything below the
+hour is *inside* the cell rather than discarded, which is what makes ignoring it honest. An offset
+like `+05:00` does not match and is refused, because honouring it needs arithmetic across a zone
+database and ignoring it puts the reading in the wrong cell. A date that does not exist —
+`2026-02-30` — is refused on the leap rule, not on the string. **A unit without a `startDate` is
+refused**: index 0 → row 0 is an assumption the caller never stated, and the refusal costs one
+string to satisfy.
+
+**Zero series is not more than one, and that is two tests rather than one** (C12 §3ae A8). The gate
+refuses `> 1` and the renderer derives at `=== 1`; a gate written `!== 1` would make an empty
+calendar a construction error and contradict commitment 3, which says an empty series occupies its
+declared height rather than collapsing.
+
+**The caller's series label is dropped and this is written down rather than discovered.** A matrix's
+row label *is* its ordinate (I18), the calendar's ordinate is the sub-unit, and a matrix legend is a
+colour bar with no identity slot — so `s(values, "commits")` keeps its values and loses its name.
+Giving the legend a name slot would change every matrix frame for this one form.
+
+**The walk found the anchor, and `matrixAnchor` gains a fourth arm because of it** (C12 §3ae.5). The
+plan's own classification row read *the grid is derived, so an anchor has nothing to anchor*, and
+the anchor turns out to decide everything: a calendar is the first matrix whose columns have an
+**intrinsic width**, so `stretch`'s one-cell variation is a doubling at a pitch of one and two
+adjacent weeks read as one two-week reading. `uniform` is `left` with the cells widened to fill —
+identical wherever the pitch is one — and the fringe it leaves is removed with `width` rather than
+by stretching a period.
+
 #### `origin` and `axisCross` — two fields, because one enum makes a real pair inexpressible
 
 ```typescript

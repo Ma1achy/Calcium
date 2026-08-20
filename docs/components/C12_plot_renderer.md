@@ -3148,6 +3148,145 @@ draws no cross has nothing at runtime to ask. Stated here because nothing else w
     AC11 every form outside the seven refuses at both gates (A14)
     AC12 at one bit with two series nothing is drawn, and the frame is unchanged (A13)
 
+## 3ae. `calendarUnit` — the cell picks the grid, and the anchor that was said to have nothing to anchor
+
+`calendar` has been a `heatmap` alias with no date logic in it at all: `MATRIX_LAYOUT: "stretch"`,
+`DEFAULT_COLORMAP: "viridis"`, and that is the whole of it. The catalogue's frame is a 7-row grid
+whose `Mon … Sun` labels **the fixture wrote**, and `startDate` has been on `Plot` since step 0 with
+four occurrences, all writes. C04 §3 rules the member; this section is the walk.
+
+### 3ae.1 — The seam is `quiver`'s, one form along
+
+`heatmapFormRows` already substitutes a derived series list for a raw block before anything
+downstream sees it, and its comment says why: *"Substituted here rather than in `matrixRows`, so the
+range, the gutter labels, the legend and the overflow row all see one series list."* A calendar is
+that substitution with a different derivation — one flat series in, `N` labelled rows out — and the
+whole of §3ae.4 is the check that *"all see one series list"* is still true when the list is a grid.
+
+### 3ae.2 — Days from civil, and the reason three units are arithmetic and the fourth is a calendar
+
+`daysFromCivil` and its inverse, Howard Hinnant's, UTC, and no `Date` — SS1 bans the constructor
+outside `src/shell/session.ts`, and `chrome.ts:formatClock` carries the reason that outlives the
+scan: *a local-time conversion is the part that needs the platform's zone database.* A weekday is
+`((z + 3) mod 7 + 7) mod 7`, Monday zero, because 1970-01-01 was a Thursday.
+
+**Three of the four units are `(offset + i) mod cycle` and this is not tidiness.**
+
+| unit | rows | the map from value `i` | one column |
+|---|---|---|---|
+| `hour` | 24 | `row = (h₀ + i) mod 24` · `col = ⌊(h₀ + i) ÷ 24⌋` | a day |
+| `day` | 7 | `row = (w₀ + i) mod 7` · `col = ⌊(w₀ + i) ÷ 7⌋` | a week |
+| `month` | 12 | `row = (m₀ + i) mod 12` · `col = ⌊(m₀ + i) ÷ 12⌋` | a year |
+| `week` | 5 | `z = z₀ + 7i` → civil `(y, m, d)` · `row = ⌊(d − 1) ÷ 7⌋` · `col = 12(y − y₀) + (m − m₀)` | a month |
+
+**A month is not a whole number of weeks, so `week` is the one unit whose grid has interior
+holes.** Under the other three a blank cell can only be a ragged end — days before the start, hours
+after the last reading — and under `week` a 28-day February simply has no W5, and a start on the
+12th leaves W1 empty in its own first column. That is not a defect to fix: those cells are periods
+that do not exist. It is a distinction the frame cannot make, and §3ae.3 A15 is where it lands.
+
+### 3ae.3 — The classification table: structural interactions, before any code
+
+Two rules that both hold at rest. Indexed by rule interaction, never by input (A03 §2, CLAUDE.md).
+
+| | two rules that meet | ruling |
+|---|---|---|
+| A1 | *the grid is derived from the data* × *`matrixAnchor` decides which columns are shown* | **The plan's row said an anchor has nothing to anchor and that is false** — see §3ae.5. A calendar is the first matrix whose columns have an **intrinsic width**, and none of the three arms honours it. Fourth arm: `uniform`. |
+| A2 | *rows carry the unit's labels* × *the caller's one series carries a label* | The caller's label has **no home and is dropped**: a matrix's row label *is* its ordinate (I18) and the calendar's ordinate is the sub-unit, so `"commits"` cannot be a row name. A matrix legend is a colour bar with no identity slot, and giving it one would change every matrix frame for this. **Recorded rather than discovered** — the block's surrounding text names the calendar. |
+| A3 | *the columns are dates* × *`xLabelRow` places three captions across the **area*** | **No derived captions, and the reason is that the operation does not exist.** Under `uniform` the grid need not reach the area's right edge, so a derived end-date caption would sit up to `n − 1` cells past the column it names. Placing it against the grid needs an **offset**, and `xLabelRow(labels, width, caps, facing)` takes a width. A ruling that named the placement would have named an operation the layer below does not have — C23 §8a A4's class, caught before it was written down. §3ae.7 carries the deferral. |
+| A4 | *rows are derived in unit order* × *`origin` reverses the drawn order* | **Composes, and the reason is that a label rides its own row.** Each derived row is a `Series` carrying its label, so `facing.y === "up"` reverses rows and captions together. `hour` with `origin: "bottom-left"` is `23` at the lid and `00` at the floor, which is an ordinate growing upward and a thing a reader may want. |
+| A5 | *`height` is declared* × *the derived row count is fixed by the unit* | **No refusal, and C04 §3 measured why**: `matrixRows` draws `areaRows − 1` rows and spends the last on `+17 more · 07 · 08 · …`, which is commitment 46 speaking in the calendar's own labels. **The edge the ruling owns is `height: 1`**: `visible = 0`, so the frame is one notice naming all twenty-four rows and no cells at all. That is still true, and it is better than an error telling the caller to pick a different number. |
+| A6 | *`calendarUnit` is a `Plot` member* × *only `calendar` has an arm* | Refused by form at both gates (F207). |
+| A7 | *the grid is derived from one flat series* × *`series` is a list* | More than one series is refused at both gates: a calendar's rows **are** a period, so a second series is a second period claiming the same rows. |
+| A8 | *more than one series is refused* × *an empty block renders its message* | **Two tests, not one** — §3ad A15's shape, one component along. The gate refuses `> 1` and the renderer substitutes at `=== 1`; a gate written `!== 1` would make an empty calendar a construction error and contradict commitment 3. Zero is not more than one. |
+| A9 | *the row is a claim about when* × *`startDate` is optional on `Plot`* | `calendarUnit` **without** `startDate` is refused at both gates. Index 0 → row 0 is an assumption the caller never stated, and the refusal costs one string to satisfy. |
+| A10 | *a malformed `startDate` is refused* × *I11 says the renderer never throws* | The parse returns `null`, the substitution does not happen, and the frame is **today's raw matrix**. Nobody sees a refusal on that path, which is I11's price and the reason the gates carry the whole of it. |
+| A11 | *`uniform` widens the cell to fill* × *a short series has one column* | `day` with three values is one week, `⌊w ÷ 1⌋ = 74` cells wide. **No cap**, and the alternative is named with its cost: capping at `CELL_ASPECT`'s two columns would give a year of months twenty-four cells and a fifty-cell fringe, which is §3o's reported defect restored. A caller who wants square cells says `width` — the member landed in §3ab and this is its second reader. |
+| A12 | *the form's default anchor* × *the caller's declared one* | `block.matrixAnchor ?? MATRIX_LAYOUT[form]` is unchanged, so `stretch` remains sayable and fills the area with uneven columns. The default is a default. |
+| A13 | *`uniform` leaves a fringe* × *a caller's declared `xLabels`* | The same misalignment as A3, now reachable on **any** matrix that opts into `uniform`. One deferral covers both (§3ae.7). |
+| A14 | *the substitution is upstream* × *`colormap` · `glyphInk` · `fieldDim` · `yAxis`* | All four read the substituted block and none of them can see the difference. No rule. |
+| A15 | *an absent cell is blank* × *the fringe is blank* × *a `week` grid's interior hole is blank* | **Three meanings, one glyph, ruled harmless twice and named once.** *No reading here* is true of a ragged end and true of the fringe. It is also true of February's W5, where the honest statement is *no such week* — and the frame cannot say it. Recorded as a limit of the form rather than fixed: the alternative is a second absent glyph, which spends I16's argument on a distinction a calendar reader does not need. |
+| A16 | *`axes: false` hides the gutter* × *the row labels are the calendar* | **Already refused, on every matrix** — `checkHeatmap` throws for the whole family (C04 I50b). The walk's row was written before that was checked, and checking is what removed it. |
+
+### 3ae.4 — The trace over the passes, because the seam is an ordering
+
+`heatmapFormRows` is six passes and the substitution is the first. The interactions here are
+event-mediated in the only sense this function has events: **which pass sees which series list.**
+
+| | the sequence | what it settles |
+|---|---|---|
+| B1 | substitute → `fieldAxes` | `IS_FIELD_FORM.calendar` is false, so the pass is a no-op. Were it not, it would overwrite the derived row labels with `formatValue(i)` — the labels are the calendar. |
+| B2 | substitute → `seriesRange` | The grid holds exactly the caller's finite values plus `null`s, and `seriesRange` skips `null`. **The range is invariant under the substitution**, and asserting that is what says the derivation added no data. |
+| B3 | substitute → `layoutFor` | The gutter is `labelColumnWidth` over the **derived** labels: 3 for `Mon … Sun` and `Jan … Dec`, 2 for `00 … 23` and `W1 … W5`. Fixed per unit, and independent of what the caller called their series. |
+| B4 | substitute → `matrixRows`' overflow | `omitted.map(s => s.label ?? "row N")` finds every derived label non-empty, so the notice reads `+17 more · 07 · 08 · …` rather than `row 8 · row 9`. A5's frame depends on this pass seeing the substituted list, which is the seam's whole claim. |
+| B5 | substitute → `matrixFurniture`'s `dropped` | `dropped = max(0, longest − areaWidth)` is **correct under `uniform` without change**, and this was checked rather than assumed: at `count > w` the pitch is 1 and `shown` is `w`, so the columns dropped are exactly `count − w`; at `count ≤ w` the pitch is `⌊w ÷ n⌋` and `⌊w ÷ pitch⌋ ≥ n`, so nothing is dropped. |
+| B6 | the calendar substitution → the quiver substitution | Mutually exclusive by form, both at the top. No ordering to get wrong, and saying so is what stops a third one being appended somewhere else. |
+
+### 3ae.5 — `uniform`, and what the plan's row got wrong
+
+The plan's classification row read *`calendarUnit` × `matrixAnchor` — the grid is derived, so an
+anchor has nothing to anchor.* **The anchor does everything**, and the row was wrong in the useful
+direction: it named the interaction and mis-ruled it.
+
+A heatmap's columns are readings with no intrinsic duration, so stretching them to fill the area is
+free. **A calendar's column is a fixed period** — a week is a week — and `stretch` maps column `x`
+to reading `⌊x·n ÷ w⌋`, which gives widths differing by one cell. At a pitch of six that is
+imperceptible; **at a pitch of one it is a doubling**, and a two-cell week beside a one-cell week
+reads as two weeks holding the same value. That is a datum the data does not have, which is §6b
+B15's rule (*a candle wider than its neighbours reads as a datum*) arriving on its third consumer.
+
+So the fourth arm, and it is a **refinement of `left` rather than a new idea**:
+
+    pitch = max(1, ⌊w ÷ n⌋)          every column the same width
+    shown = min(n, ⌊w ÷ pitch⌋)      = n whenever n ≤ w
+    from  = n − shown                the oldest drop first, which is `left`'s rule
+
+`uniform` and `left` are **identical wherever the pitch is one**, and differ exactly when the
+columns could be widened: a year of twelve months is twelve cells under `left` and seventy-two
+under `uniform`. That is the mutation that catches it, and it is silent at fifty-three weeks.
+
+**The fringe is the price and it is the caller's to remove.** Fifty-three weeks at pitch one leave
+twenty-one blank cells of seventy-four; `width: 56` removes them, using §3ab's member for its
+second reader. §3o called a fringe *the defect that got reported* about a matrix that could have
+stretched — this one cannot, and the two rulings do not conflict once the distinction is columns
+that have a duration.
+
+**This is provisional in exactly one respect, and it is marked.** The choice between twenty-one
+blank cells and weeks of unequal width is a frame-read question, and §3z's ruling 4 was written the
+same way and corrected by the 1-bit frame. Both frames are rendered before this is called settled.
+
+### 3ae.6 — What a refusal leaves behind, and who sees it
+
+C13 `settle`'s question, and the calendar has two rejection paths.
+
+**The gates leave nothing behind.** `validateBlock` pushes a string and mutates no state;
+`plot()`'s `TypeError` abandons a builder mid-chain, which is what every member added since §3ab
+does. **`checkHeatmap` is on the same path, not a third gate** — `finish` → `rebuild` → `checkShape`
+→ `checkHeatmap` — so the builder's throw and the matrix-shape throw are two implementations
+serving one caller. `rebuild` is not exported from `src/index.ts`; the two caller-facing gates are
+the builder and the document validator, and that was checked rather than assumed.
+
+**The renderer has no rejection path at all, by construction.** The grid is sized from the last
+index's column *before* any cell is written, so there is no half-built grid to abandon and no throw
+to leave one behind. Stated here because the code has to keep it true, and because the shape that
+makes it true — size, then fill — is the one an optimisation would remove.
+
+**Who does not see a refusal is the answer worth writing down**: a block that reached the renderer
+without passing either gate renders as the pre-calendar matrix, silently. That frame is not wrong —
+it is what `calendar` has always drawn — and it is not a calendar.
+
+### 3ae.7 — The deferral, with its blocker named as a symbol
+
+**A calendar derives no x captions**, and the condition that would change it is
+**`xLabelRow` taking an offset as well as a width**. Grep that symbol; the day it has one, three
+derived captions — the first column's date, the middle column's, the last column's, formatted at
+the super-unit's granularity — cost about fifteen lines and `civilFromDays`, which is already here
+for `week`'s row.
+
+CLAUDE.md's table of three deferrals says the condition is written where the deferral is and the
+thing that meets it is written somewhere else. This one names the symbol, so grepping is the whole
+of the check.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -4285,6 +4424,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I50** — **A quiver's direction is its glyph and its magnitude is its colour, and a cell with no flow draws nothing.** Eight directions, with the ASCII arm required at `unicode: "ascii"` **and** at `ambiguousWidth: "wide"` — every arrow in U+2190–21FF is `East_Asian_Width=Ambiguous`, so a wide terminal draws the field at double width, and this is that switch's third consumer after `art.ts` and `mermaid.ts`. **One datum, one channel.** Magnitude is the arrow's colour where the field carries something else, and the *field's* colour where the caller named no scalar — colouring the arrow by magnitude over a magnitude field paints it in its own background, measured at `38;2;33;145;141` on `48;2;33;145;141` and invisible at full colour depth while every assertion passed. **Magnitude dies below `colourDepth: 8`**, not below one bit: `continuousColour` returns `undefined` under `CONTINUOUS_FLOOR`, and I25's mark ladder cannot carry it because the mark is already spent on direction. A zero-magnitude cell is blank rather than an arrow of arbitrary direction, and the field beneath it still reads (§3y).
 - **I51** — **`layers` is a draw order the caller reads and a priority order the merge takes, reversed at one documented seam.** `layers` says what is drawn; `Layer.kind` (I44) says how two inked cells resolve, and both a contour and a quiver are `"curve"`. **`field`'s membership is load-bearing and its position is inert** — a background cannot occlude, so the two orderings render byte-identical. `fieldDim` and `glyphInk` are two fields because they answer two questions: `"floor"` dims per colormap by measurement rather than by a constant (viridis and coolwarm at 50%, inferno at 40%) and costs viridis 78% of its luminance spread; `"contrast"` picks black or white per cell and costs a quiver its magnitude channel. Below `colourDepth: 8` the field is a ramp **glyph** rather than a wash, so two glyph layers meet — and **the field yields where the layer over it is drawn in the ramp's own alphabet**, which a contour is at every capability and an arrow is at none. Ruling the other way settles the cell contention and leaves both layers in one vocabulary, which no assertion can see and the frame shows at once. `fieldDim` is inert below the floor regardless (§3y).
 - **I52** — **A horizon carries band depth in colour and within-band height in the vertical eighths, and it folds by mirroring.** The form had no section and no invariant: it was built from the survey's entry, which says *colour = which band*, and shipped carrying depth on the density **glyph** ramp with `DEFAULT_COLORMAP.horizon` set to `null` — so the compression its own header calls *paid for in a colour axis* was charged and never delivered, and depth was occupying the alphabet height needs. At `height: 1`, the canonical horizon, every inked column was therefore exactly one row. **The mirror is forced rather than chosen**: §3r measured that Unicode's eighths are a complete ladder upward and `▀`/`▔` are the whole of the downward repertoire, so an offset fold would resolve one direction to an eighth and the other to a half — precision at one end reading as precision at both. The sign rides a diverging map's two halves, so a **sequential** `colormap` is refused rather than drawing a trough as a peak, and `legend: false` is refused because the colour axis *is* the reading (I19's argument for a matrix's scale). **The baseline is 0 where the range spans it and `range.min` otherwise** — folding about the minimum unconditionally is why it only ever folded one way, and it is invisible on any fixture that never goes negative. **A finite reading always draws ink** (I16 one form along): a floor rendering blank gives blank two meanings in the form whose subject is *how deep*. *Below `CONTINUOUS_FLOOR` there is one channel for two data and the frame decides, not this invariant (§3z).*
+- **I53** — **A calendar's rows are the sub-unit, its columns the super-unit, and its cells are the one thing in the matrix family that have a duration.** `calendarUnit` picks the cell and the grid falls out: 24 rows for `hour`, 7 for `day`, 5 for `week`, 12 for `month`, one flat series in and `N` labelled rows out, substituted at `heatmapFormRows` where a `quiver`'s magnitude field already is so that the range, the gutter, the legend and the overflow row all see one series list. **Three units are `(offset + i) mod cycle` and `week` is a calendar**, because a month is not a whole number of weeks — so `week` is the only unit whose grid has interior holes, and they are periods that do not exist rather than readings that are missing. **The span needs no member**: `startDate` + unit + `values.length` fixes it, which is the reader `startDate` was published without. **The columns are `uniform`** — every cell the same width, the oldest dropped first, the remainder a fringe — because `stretch` differs by one cell and one cell at a pitch of one is a doubling, and a two-cell week beside a one-cell week reads as two weeks holding one value (§6b B15's rule on its third consumer). `uniform` is `left` with the cells widened to fill, identical wherever the pitch is one, and the fringe is removed with `width` rather than by stretching. **No height refusal** — `matrixRows` spends its last row on `+17 more · 07 · 08 · …`, which is commitment 46 speaking in the calendar's own labels, and at `height: 1` the frame is that notice and no cells. **No `Date`** (SS1), UTC only, days-from-civil by hand. **No derived x captions**, because placing one against a grid that need not reach the area's right edge needs an offset and `xLabelRow` takes a width — a ruling that named the placement would have named an operation the layer below does not have (§3ae).
 
 ## 8. Commitments
 
@@ -4334,6 +4474,7 @@ orientation — and belongs in the classification table as its own rows.
 44. **A vector field is drawn as arrows, with direction in the glyph and magnitude in the colour** — the ASCII arm required at wide ambiguous width as well as at ASCII, and magnitude stated as lost below 8-bit rather than degraded into a mark already spent (I50, §3y).
 45. **The layers a field is drawn in are declared, and the two contrast remedies ship as options rather than as a refusal** — a glyph over a colormap competes on legibility and 45% of viridis clears the floor against white; `fieldDim` and `glyphInk` each name their own price, and both default off (I51, §3y).
 46. **A horizon's two channels stop sharing one alphabet** — depth is colour and height is the vertical eighths, the fold mirrors because the downward repertoire is two glyphs deep, and a form that had no section in this document gets one (I52, §3z).
+47. **A calendar learns what a date is** — the cell picks the grid and the span falls out of `startDate` + unit + length, so no span member is added and a member published in step 0 with four occurrences and no reader acquires one; the columns are uniform because they are the only cells in the family that have a duration (I53, §3ae).
 
 ---
 
