@@ -3,7 +3,13 @@
  * Tests A1–A12 from the plan, plus S1–S8 for scale types.
  */
 import { describe, expect, it } from "vitest";
-import { niceAxis, axisFor, niceLogAxis, niceTimeAxis, niceSymlogAxis, yLabels } from "../../src/presentation/plot/axes.js";
+import { niceAxis, axisFor, niceLogAxis, niceTimeAxis, niceSymlogAxis, ticksFor } from "../../src/presentation/plot/axes.js";
+import { block, type Plot } from "../../src/data/viewmodel/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { plotAreaRows } from "../../src/presentation/plot/height.js";
+import { seriesRange } from "../../src/presentation/plot/scale.js";
+import { FULL_CAPS, measurable } from "../support/render.js";
+import { gutter } from "../support/plot-forms.js";
 
 const pin = {};
 
@@ -166,7 +172,7 @@ describe("S9: the labels follow the scale, not just the range (C12 I15, C12 I22)
   const range = { min: 1, max: 1000 };
 
   it("a log axis is labelled at powers of the base", () => {
-    const text = yLabels(range, 9, undefined, pin, "log").map((l) => l.text);
+    const text = gutter(range, 9, undefined, pin, "log").map((l) => l.text);
     // 200 is `2 × 10²` — a log subdivision. 750 is what dividing the *span* gives.
     expect(text).toContain("200");
     expect(text).not.toContain("750");
@@ -175,7 +181,7 @@ describe("S9: the labels follow the scale, not just the range (C12 I15, C12 I22)
   it("and the same range without a scale is still divided linearly", () => {
     // The control, and it is the row that makes the one above about the scale
     // travelling rather than about `200` being reachable at all.
-    const text = yLabels(range, 9, undefined, pin).map((l) => l.text);
+    const text = gutter(range, 9, undefined, pin).map((l) => l.text);
     expect(text).toContain("750");
     expect(text).not.toContain("200");
   });
@@ -184,14 +190,82 @@ describe("S9: the labels follow the scale, not just the range (C12 I15, C12 I22)
     // `niceAxis` snaps a derived bound to a multiple of the step, which on this
     // range is 0 — and 0 is not on a log scale at all. The log arm leaves the
     // range where the data put it, and the label follows.
-    expect(yLabels(range, 9, undefined, pin, "log").map((l) => l.text)).toContain("1");
-    expect(yLabels(range, 9, undefined, pin).map((l) => l.text)).toContain("0");
+    expect(gutter(range, 9, undefined, pin, "log").map((l) => l.text)).toContain("1");
+    expect(gutter(range, 9, undefined, pin).map((l) => l.text)).toContain("0");
   });
 
   it("log2 subdivides in twos and time in round intervals", () => {
-    expect(yLabels({ min: 1, max: 64 }, 9, undefined, pin, "log2").map((l) => l.text))
+    expect(gutter({ min: 1, max: 64 }, 9, undefined, pin, "log2").map((l) => l.text))
       .toContain("32");
-    expect(yLabels({ min: 0, max: 3600 }, 9, undefined, pin, "time").map((l) => l.text))
+    expect(gutter({ min: 0, max: 3600 }, 9, undefined, pin, "time").map((l) => l.text))
       .toContain("1800");
+  });
+});
+
+/**
+ * YA1–YA3: the gutter is labelled from the axis the curve was drawn against
+ * (C12 I15, §3d, F210).
+ *
+ * **A wiring claim, so it is asserted against a rendered frame.** `gutter()`
+ * above composes `axisFor` with `yLabels` and cannot see whether the renderer
+ * hands the gutter *its own* axis — which is exactly what it did not: it niced
+ * once for the curve and `yLabels` niced again for the labels, and `niceAxis` is
+ * not idempotent.
+ *
+ * **The heights matter and are not a round set.** Both heights the golden corpus
+ * and the catalogue happen to render are in the agreeing set, which is why 312
+ * committed frames and 2313 unit rows all passed over it.
+ */
+describe("YA1 (C12 I15, §3d): the gutter's scale is the curve's scale", () => {
+  const kit = () => measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
+  const plain = (l: string): string => l.replace(/\x1b\[[0-9;]*m/gu, "");
+  const SPAN = [-3.7, 0, 5, 12.4, 8, -1, 12.4, -3.7];
+
+  /** Every non-blank gutter label of a rendered plot, top row first. */
+  function labels(height: number, values: readonly number[] = SPAN): readonly string[] {
+    return kit()
+      .renderToLines(block({
+        kind: "plot", id: "ya", form: "line", height, axes: true, series: [{ values }],
+      }), 50)
+      .map(plain)
+      .filter((r) => /┤/u.test(r))
+      .map((r) => (r.split("┤")[0] ?? "").trim());
+  }
+
+  it("the top label is the axis maximum, at a height where a second nicing widens it", () => {
+    // `axisFor({-3.7, 12.4}, ticksFor(16))` is `{-5, 12.5}` at step 2.5. A second
+    // pass over that span reaches for step 5 and returns `{-5, 15}` — so the row
+    // holding 12.4 was labelled `15`, an error five times the label's precision.
+    expect(labels(16)[0]).toBe("12.5");
+  });
+
+  it("and the bottom label is the axis minimum on the same frame", () => {
+    const rows = labels(16);
+    expect(rows[rows.length - 1]).toBe("-5.0");
+  });
+
+  it("the largest mark sits on the row that names its value", () => {
+    // **The case with no quantisation in it.** A series whose maximum *is* the
+    // axis maximum draws on the top area row, so the top label is a statement
+    // about that mark and nothing else. The form corpus' `bubble` is this shape
+    // — largest value 30, axis `{0, 30}` — and the gutter called that row `40`.
+    expect(labels(6, [1, 8, 30, 3])[0]).toBe("30");
+  });
+
+  it("no height labels the gutter from a range the curve was not drawn on", () => {
+    // The class rather than the instance: 12 of 23 heights diverged for this
+    // series, and the two the corpus renders are both in the agreeing set.
+    for (let height = 4; height <= 24; height += 1) { // cells-ok — a row count
+      const b: Plot = block({
+        kind: "plot", id: "ya", form: "line", height, axes: true, series: [{ values: SPAN }],
+      }) as Plot;
+      const range = axisFor(
+        seriesRange(b.series, b) ?? { min: 0, max: 1 },
+        ticksFor(plotAreaRows(b)), b, b.yScale,
+      ).range;
+      const seen = labels(height);
+      expect(Number(seen[0]), `height ${height} — top label`).toBeCloseTo(range.max, 6);
+      expect(Number(seen[seen.length - 1]), `height ${height} — bottom label`).toBeCloseTo(range.min, 6);
+    }
   });
 });

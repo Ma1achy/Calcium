@@ -99,8 +99,8 @@ const results = runPass({
       // asks about `series`, and a plain-candles block has none.
       name: "emptiness asks about `series` alone again",
       file: DEFN,
-      from: "  if (range === null || !(hasSamples(block.series) || hasBars(bars))) {",
-      to: "  if (range === null || !hasSamples(block.series)) {",
+      from: "  if (axis === null || !(hasSamples(block.series) || hasBars(bars))) {",
+      to: "  if (axis === null || !hasSamples(block.series)) {",
       expect: "CS1",
     },
     {

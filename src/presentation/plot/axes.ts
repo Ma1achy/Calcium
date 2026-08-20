@@ -401,22 +401,28 @@ export function niceAxis(
  * frame, which is what D39's goldens are for.
  */
 export function yLabels(
-  range: Range,
+  axis: Axis,
   rows: number,
   format: Plot["yFormat"],
-  pin: Pick<Plot, "yMin" | "yMax"> = {},
-  scale?: ScaleType,
   facing: Facing = FACING_DEFAULT,
 ): readonly YLabel[] {
   const h = Math.max(1, Math.floor(rows));
-  // **Through the dispatcher, not straight to the linear arm.** `axisFor` has
-  // existed for every scale since the scales landed and this function called
-  // `niceAxis` regardless, so a `yScale: "log"` plot picked log ticks in
-  // `positionalForm` — where only `.range` was read — and was then *labelled*
-  // linearly. The two halves of one axis disagreed and neither was wrong on its
-  // own, which is why nothing failed: the ticks were computed twice and the set
-  // nobody drew was the correct one.
-  const axis = axisFor(range, ticksFor(h), pin, scale);
+  // **The axis is handed in, and that is the whole of the fix.** This function
+  // used to take a `Range` and nice it itself, which made two nicings of one
+  // axis: `positionalForm` niced the data to get the range the curve is
+  // rasterised against, and this niced *that* to get the range the gutter is
+  // labelled against. `niceAxis` is not idempotent — a second pass sees the
+  // widened span, picks a coarser step and widens again — so at 12 of 23 heights
+  // for one ordinary series the two disagreed, and the frame read `15` on the
+  // row holding `12.4`.
+  //
+  // **The previous remedy is what built it.** The comment that stood here
+  // recorded the same class found once before — *a log axis picked log ticks in
+  // `positionalForm` and was labelled linearly* — and fixed it by threading the
+  // scale in so both nicings would agree. Two computations that agree about
+  // scale are still two computations, and they were left free to disagree about
+  // range. One axis, computed where the data is measured and passed down, is
+  // the answer that has no second half to keep in step (F210).
   // **Precision from the step, which is the smallest gap** (§3d). It was taken
   // from the *span* before, which is the same number divided by the tick count —
   // right when there were three labels and wrong the moment there are five, and

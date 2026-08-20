@@ -14,7 +14,7 @@ import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { stripHeights } from "../../src/presentation/plot/strips.js";
 import { lossCurve, plotOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
-import { yLabels } from "../../src/presentation/plot/axes.js";
+import { gutter } from "../support/plot-forms.js";
 import { cells, displayCells } from "../../src/presentation/text.js";
 import { smallMultiplesRows } from "../../src/presentation/plot/facet.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
@@ -235,16 +235,32 @@ describe("C12 tier 6 — fail-on-revert", () => {
     expect(new Set(columns).size, `edge columns: ${columns.join(",")}`).toBe(1);
   });
 
-  it("T6.18 (I15, I22): y-labels reaching past `axisFor` → S9 fails, and a log plot is labelled linearly", () => {
-    // The revert: `yLabels` calling `niceAxis` directly, which is what it did.
-    // It is invisible from the block: `positionalForm` picks the *right* ticks
-    // through `axisFor` and reads only `.range` off them, so the correct set is
-    // computed and discarded while the labels are derived a second time from the
-    // linear arm. Two computations of one axis, and the one nobody drew was the
-    // one that was right.
+  it("T6.18 (I15, I22): labelling the gutter from a second nicing → YA1 fails, and the mark's own row names another value", () => {
+    // **The revert this names has moved once already, which is the finding.**
+    // It used to be *`yLabels` calling `niceAxis` directly*, so a log plot was
+    // labelled linearly; that was fixed by threading the scale into the second
+    // nicing, and the second nicing stayed. `niceAxis` is not idempotent, so the
+    // two then disagreed about *range* instead — and the revert available today
+    // is `positionalForm` handing the gutter `axisFor(axis.range, …)` rather
+    // than the axis its own curve was rasterised against (F210).
+    //
+    // **Asserted on a frame, because both halves are correct in isolation.**
+    // Neither `axisFor` nor `yLabels` can be wrong about this on its own: the
+    // claim is that two call sites name one object, and `gutter()` below cannot
+    // see it — it composes the two the way the renderer is supposed to.
+    const b = block({
+      kind: "plot", id: "t618", form: "line", height: 6, axes: true,
+      series: [{ values: [1, 8, 30, 3] }],
+    });
+    const kit = measurable({ definitions: [plotDefinition] as never, capabilities: FULL_CAPS });
+    const top = (kit.renderToLines(b, 50).map((r) => visible(r)).find((r) => /┤/u.test(r)) ?? "");
+    // 30 is the axis maximum, so the largest mark draws on this row. A second
+    // nicing takes `{0, 30}` to `{0, 40}` and writes `40` beside it.
+    expect(top.split("┤")[0]?.trim()).toBe("30");
+    // And the scale still travels, which is what the earlier revert was about.
     const range = { min: 1, max: 1000 };
-    expect(yLabels(range, 9, undefined, {}, "log").map((l) => l.text)).toContain("200");
-    expect(yLabels(range, 9, undefined, {}).map((l) => l.text)).toContain("750");
+    expect(gutter(range, 9, undefined, {}, "log").map((l) => l.text)).toContain("200");
+    expect(gutter(range, 9, undefined, {}).map((l) => l.text)).toContain("750");
   });
 
   it("T6.19 (C12 I10): measuring a facet column in code units → T1.31 fails, and later facets vanish", () => {

@@ -29,6 +29,7 @@ import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js"
 import { columnsForAspect } from "./aspect.js";
 import { curveRows, isBlank } from "./curve.js";
 import { gridRow } from "./furniture.js";
+import type { Axis } from "./axes.js";
 import { formatReadout, labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
 import {
   areaText,
@@ -1038,22 +1039,22 @@ function styleRasteriser(
 
 function overlaidRows(
   block: Plot,
-  range: Range,
+  axis: Axis,
   layout: Layout,
   ctx: RenderContext,
   rasterise: Rasteriser = curveRows,
   under: readonly Layer[] = [],
   cursorAt: number | null = null,
 ): readonly string[] {
-  // **The scale, and the capability.** Both were dropped here and nowhere else:
-  // `yLabels` was called without `yScale`, so a log axis was labelled linearly,
-  // and the labels were measured against a default `ambiguousWidth` by
-  // `labelWidth` while `gutterSpans` padded against another — the two defects
-  // §3f names, in one call.
+  // **One axis, and it arrives measured.** The scale and the capability were
+  // both dropped here once — `yLabels` called without `yScale` labelled a log
+  // axis linearly, and `labelWidth` measured against a default `ambiguousWidth`
+  // while `gutterSpans` padded against another (§3f). Neither can recur: there
+  // is nothing left here to drop, because the axis the curve is drawn against
+  // is the object the gutter is labelled from (F210).
+  const range = axis.range;
   const facing = facingOf(block, FACING_DEFAULT);
-  const labels = hasYLabels(layout)
-    ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale, facing)
-    : [];
+  const labels = hasYLabels(layout) ? yLabels(axis, layout.areaRows, block.yFormat, facing) : [];
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
   // `"grid"` draws its lines where there is a value written — the rows the
   // gutter labels and the columns the bottom rule ticks (C12 I26).
@@ -1190,7 +1191,7 @@ function reserving(layout: Layout, block: Plot, width: number, ctx: RenderContex
  */
 function layoutFor(
   block: Plot,
-  range: Range,
+  axis: Axis,
   width: number,
   stacked: boolean,
   caps: Pick<TerminalCapabilities, "ambiguousWidth">,
@@ -1214,10 +1215,7 @@ function layoutFor(
     ? 0 // cells-ok — a cell width
     : stacked || block.form === "heatmap"
       ? seriesLabelWidth(block.series, caps.ambiguousWidth)
-      : labelWidth(
-          yLabels(range, areaRows, block.yFormat, block, block.yScale),
-          caps.ambiguousWidth,
-        );
+      : labelWidth(yLabels(axis, areaRows, block.yFormat), caps.ambiguousWidth);
   // **One set of labels, sized once and drawn on whichever sides asked** (I47).
   // Measuring the right column separately would let `"both"` render two axes
   // that disagree about their own width.
@@ -1419,8 +1417,9 @@ function categoricalColumnForm(
   // A bar's baseline is zero unless the data goes below it — the same rule
   // `barRow` takes, and the reason `[10, 25, 15]` used to draw nothing at 10.
   const zeroed = { min: baselineFor(data.min), max: data.max };
-  const range = axisFor(zeroed, ticksFor(areaRows), block, block.yScale).range;
-  const layout = reserving(layoutFor(block, range, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
+  const axis = axisFor(zeroed, ticksFor(areaRows), block, block.yScale);
+  const range = axis.range;
+  const layout = reserving(layoutFor(block, axis, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
 
   // Columns divide the area, remainder distributed left to right — the same
   // arithmetic `facetWidths` uses, and for the same reason: `floor(w / n)` times
@@ -1436,7 +1435,7 @@ function categoricalColumnForm(
   // capability both passed, which is the pair §3f names.
   const byRow = new Map(
     (hasYLabels(layout)
-      ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
+      ? yLabels(axis, layout.areaRows, block.yFormat)
       : []
     ).map((l) => [l.row, l.text]),
   );
@@ -1538,8 +1537,9 @@ function stackedForm(
   // area width the gutter leaves. Two passes because the range decides the
   // label column and the label column decides the width the bands are cut to.
   const rough = stackRange(stackBands(block.series, Math.max(1, width), centred));
-  const range = axisFor(rough, ticksFor(areaRows), block, block.yScale).range;
-  const layout = reserving(layoutFor(block, range, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
+  const axis = axisFor(rough, ticksFor(areaRows), block, block.yScale);
+  const range = axis.range;
+  const layout = reserving(layoutFor(block, axis, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
 
   const bands = stackBands(block.series, layout.areaWidth, centred);
   const layers: readonly Layer[] = bands.map((band, i) => ({
@@ -1553,9 +1553,7 @@ function stackedForm(
     kind: "surface" as const,
   }));
 
-  const labels = hasYLabels(layout)
-    ? yLabels(range, layout.areaRows, block.yFormat, block, block.yScale)
-    : [];
+  const labels = hasYLabels(layout) ? yLabels(axis, layout.areaRows, block.yFormat) : [];
   const byRow = new Map(labels.map((l) => [l.row, l.text]));
 
   const ticks = xAxis(block.xLabels, layout.areaWidth, ctx.capabilities).tickColumns;
@@ -1715,13 +1713,34 @@ function positionalForm(
   const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
   const bars = candlesOf(block);
   const data = seriesRange(block.series, block, bars);
-  const range =
-    data === null || stacked
-      ? data
-      : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale).range;
+  // **One nicing, taken where the data is measured** (F210). The axis the gutter
+  // is labelled from must be the axis the curve is rasterised against, and the
+  // only arrangement in which two of them cannot drift apart is one of them.
+  // `niceAxis` is not idempotent — a second pass sees the widened span, reaches
+  // for a coarser step and widens again — so the previous shape, which niced
+  // here and niced again inside `yLabels`, put `15` in the gutter beside a row
+  // holding `12.4`.
+  //
+  // **A stacked plot carries its raw bounds, and that is not an exception.** Its
+  // gutter holds series names rather than a scale (§5), so nothing is ever
+  // labelled against this axis; there is no scale here, only the bounds the
+  // bands are cut to, and that is what the object says.
+  const axis: Axis | null = data === null
+    ? null
+    : stacked
+      ? { range: data, ticks: [data.min, data.max], step: 0 }
+      : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale);
   const usable = usableWidth(block, width, ctx);
+  // **With no data the axis cannot reach the frame, and that was worth checking
+  // rather than asserting.** The comment here first said a bare unit axis would
+  // size the gutter from `0` and `1` and move every *No data.* frame; the
+  // mutation for it survived, because this layout's only consumer is
+  // `emptyRows`, which reads `layout.width` and nothing the axis influences.
+  // The dependency is two functions away and the type cannot state it, so it is
+  // stated here: a gutter drawn on an empty plot would make this line matter.
+  const sizing = axis ?? { range: { min: 0, max: 1 }, ticks: [0, 1], step: 1 };
   const layout = reserving(
-    layoutFor(block, range ?? { min: 0, max: 1 }, usable, stacked, ctx.capabilities)
+    layoutFor(block, sizing, usable, stacked, ctx.capabilities)
       ?? { areaRows: plotAreaRows(block), width: usable, gutter: 0, labelColumn: 0, areaWidth: usable },
     block, width, ctx,
   );
@@ -1735,16 +1754,17 @@ function positionalForm(
   // this component asks about `series`, and plain candles are `series: []` with
   // a full `ohlc`: a correct block rendering *"No data."*, internally consistent
   // and about nothing. `series: []` being legal is exactly what hides it.
-  if (range === null || !(hasSamples(block.series) || hasBars(bars))) {
+  if (axis === null || !(hasSamples(block.series) || hasBars(bars))) {
     return emptyRows(block, layout, ctx);
   }
+  const range = axis.range;
 
   const cursorIdx = ctx.cursorPositions?.[block.id];
   const marked = block.axes === true && cursorIdx !== undefined && Number.isFinite(cursorIdx);
   const at = marked ? cursorColumn(block, cursorIdx, layout.areaWidth) : null;
   const area = stacked
     ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, range, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx, facingOf(block, FACING_DEFAULT)), at);
+    : overlaidRows(block, axis, layout, ctx, rasterise, candleLayers(bars, range, layout, ctx, facingOf(block, FACING_DEFAULT)), at);
   if (marked) {
     return axedWithCursor(block, cursorIdx, at, area, layout, ctx);
   }

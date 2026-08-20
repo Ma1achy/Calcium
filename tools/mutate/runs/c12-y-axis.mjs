@@ -1,26 +1,37 @@
-// C12 I47 and I48 — the gutter on both sides, and the callout.
+// C12 I15, §3d — one axis per plot, and the second nicing that used to sit
+// inside `yLabels`.
 //
-// **The row this run exists for is T6.32.** The walk's own ruling for a
-// spanning last column — *take the midpoint* — lands on the row the
-// cell-resolution shortcut gives, so a mutation restoring the shortcut would
-// have survived against the spec as written. The ruling was corrected by
-// running the code; this is the run that keeps the correction honest.
+// **One mutation is missing from this list and the gap is the point.** *The
+// empty layout is sized from a bare unit range* was written here, survived, and
+// turned out to be a distinction that cannot be violated: with no data the only
+// consumer of that layout is `emptyRows`, which reads `layout.width` alone. The
+// survivor indicted the **comment** beside the code rather than any row in the
+// suite — A03 §2's vacuity class, arriving in a justification.
+//
+// **Two of these are the defect being reverted rather than an invented flaw**
+// (F210): the call-site mutation reintroduces the exact shipped code, and the
+// stacked one reintroduces the arm that would have been swept up with it. A
+// mutation whose `from` is what the tree held last week is the strongest kind,
+// because nothing about it had to be imagined.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const DEFN = "src/presentation/plot/definition.ts";
-const FURN = "src/presentation/plot/furniture.ts";
+const AXES = "src/presentation/plot/axes.ts";
+const DEF = "src/presentation/plot/definition.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
 const run = () => {
   try {
-    return execSync('npx vitest run test/unit/plot-y-axis.test.ts 2>&1',
-      { cwd: ROOT, encoding: "utf8" });
+    return execSync(
+      "npx vitest run test/unit/plot-axes.test.ts test/unit/plot.test.ts test/unit/plot-mutations.test.ts test/revert/plot.test.ts test/golden/plot-forms.test.ts test/golden/plot.test.ts 2>&1",
+      { cwd: ROOT, encoding: "utf8", timeout: 300_000 },
+    );
   } catch (e) {
-    return `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    const out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    return e.code === "ETIMEDOUT" ? `${out}\nTIMED OUT` : out;
   }
 };
 
@@ -29,117 +40,66 @@ const results = runPass({
   write,
   run,
   control: {
-    file: FURN,
-    from: "  const callout = layout.callouts?.get(row);",
-    to: "  const callout = undefined;",
-    why: "with no callout ever resolved the right gutter is a plain mirror, so every YC row is about nothing — a run where this survives cannot see a kill on any callout row below",
+    file: AXES,
+    from: "  const h = Math.max(1, Math.floor(rows));",
+    to: "  const h = 1;",
+    why: "every gutter collapses to one label on row 0, so every row about which value sits at which row goes; a run that cannot see that cannot see any row below",
   },
   mutations: [
     {
-      // **The defect the request would have shipped**, and the one no arithmetic
-      // assertion catches: 16-21% of values land a row off the line they name.
-      name: "the callout's row is recomputed from its value",
-      file: DEFN,
-      from: "  const row = lastInkRow(glyphRows, layout.areaWidth);",
-      to: "  const row = rowOf(v, seriesRange(block.series, block) ?? { min: 0, max: 1 }, layout.areaRows);",
-      expect: "YC2",
+      // **The shipped defect, restored verbatim.** This is what `overlaidRows`
+      // held: the axis niced once more on its way to the gutter.
+      name: "the gutter is labelled from a second nicing of the curve's range",
+      file: DEF,
+      from: "  const labels = hasYLabels(layout) ? yLabels(axis, layout.areaRows, block.yFormat, facing) : [];",
+      to: "  const labels = hasYLabels(layout) ? yLabels(axisFor(axis.range, ticksFor(layout.areaRows), block, block.yScale), layout.areaRows, block.yFormat, facing) : [];",
+      expect: "YA1",
     },
     {
-      // The walk's own ruling, which the implementation disproved. It answers
-      // *6* where the sample is in 7 — the shortcut's row exactly.
-      name: "a spanning last column takes its midpoint",
-      file: DEFN,
-      from: "    return Math.abs(here.top - from) >= Math.abs(here.bottom - from) ? here.top : here.bottom; // cells-ok — a row index",
-      to: "    return Math.floor((here.top + here.bottom) / 2); // cells-ok — a row index",
-      expect: "YC2",
+      // The same, from the other end: the *curve* drawn against the second
+      // nicing while the gutter keeps the first. Symmetric, and it fails the
+      // frame rows rather than the label rows.
+      name: "the curve is rasterised against a range the gutter does not describe",
+      file: DEF,
+      from: "      : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      to: "      : axisFor(axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale).range, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      expect: "YA1",
     },
     {
-      name: "two callouts on a row drop the mark",
-      file: DEFN,
-      from: "    shared: into.has(at),",
-      to: "    shared: false,",
-      expect: "YC4",
+      // §3d's ruling that the ends are the area's ends **by definition** — asking
+      // `rowOf` for them collapses a constant range onto one row, which is T1.5.
+      name: "the gutter's ends are placed by `rowOf` rather than reserved",
+      file: AXES,
+      from: "  const taken: number[] = [0, h - 1];",
+      to: "  const taken: number[] = [rowOf(axis.range.max, axis.range, h, facing), rowOf(axis.range.min, axis.range, h, facing)];",
+      expect: "T1.5",
     },
     {
-      // The other half of C12 I8's rule: the *earlier* series keeps the row and
-      // the later one is the silent loss instead.
-      name: "the earlier series keeps a contested row",
-      file: DEFN,
-      from: "  into.set(at, {",
-      to: "  if (into.has(at)) return;\n  into.set(at, {",
-      expect: "YC4",
+      // The facing swaps which value each end carries, and nothing else about
+      // the gutter moves (§3ac A1).
+      name: "the gutter's ends ignore the facing",
+      file: AXES,
+      from: '    [0, at(facing.y === "down" ? axis.range.min : axis.range.max)],',
+      to: "    [0, at(axis.range.max)],",
+      expect: "OR",
     },
     {
-      // *Your data is here* is more specific than *this row is 5200* — and the
-      // argument reaches only the gutter the callout is written in.
-      name: "a callout takes the left gutter's row too",
-      file: FURN,
-      from: "  const drawsLabel = label !== \"\" && layout.labelColumn > 0;",
-      to: "  const drawsLabel = label !== \"\" && layout.labelColumn > 0 && layout.callouts?.get(row) === undefined;",
-      expect: "YC3",
+      // **A stacked plot carries bounds, not an axis** — nicing them moves the
+      // ink for a scale no reader is given, because the gutter holds names.
+      name: "a stacked plot nices the bounds its bands are cut to",
+      file: DEF,
+      from: "      ? { range: data, ticks: [data.min, data.max], step: 0 }",
+      to: "      ? axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale)",
+      expect: "golden",
     },
     {
-      // A column sized from the ticks alone truncates every callout wider than
-      // its axis, which is most of them: a tick is a nice number and a last
-      // value is not.
-      name: "the right column is sized from the tick labels alone",
-      file: DEFN,
-      from: "    ? Math.max(wanted, calloutWidth(block, caps.ambiguousWidth))",
-      to: "    ? wanted",
-      expect: "YC1",
-    },
-    {
-      // **The carrier at one bit.** Bold is what a series slot already resolves
-      // to through `MONO.emphasised`, so this is invisible in colour and
-      // invisible without it.
-      name: "the callout is carried by weight rather than by a mark",
-      file: FURN,
-      from: "      { text: `${bare ? \" \" : g.calloutTee} `, style: muted },",
-      to: "      { text: `${bare ? \" \" : g.teeLeft} `, style: muted },",
-      expect: "YC8",
-    },
-    {
-      // Finding 1: the tick rule tested *a label exists* where it meant *this
-      // side draws it*, and a right axis is the first layout to separate them.
-      name: "the left tick asks whether a label exists rather than whether it is drawn",
-      file: FURN,
-      from: "  const drawsLabel = label !== \"\" && layout.labelColumn > 0;",
-      to: "  const drawsLabel = label !== \"\";",
-      expect: "YA2b",
-    },
-    {
-      // Finding 3: `"rule"` is a left rule and a bottom rule and no right one.
-      name: "the right gutter mirrors the left gutter's bare predicate",
-      file: FURN,
-      from: 'const BARE_RIGHT_EDGE: ReadonlySet<FrameStyle> = new Set<FrameStyle>(["corners", "rule"]);',
-      to: 'const BARE_RIGHT_EDGE: ReadonlySet<FrameStyle> = new Set<FrameStyle>(["corners"]);',
-      expect: "YA7",
-    },
-    {
-      // Finding 2: three callers gated `yLabels` on the *left* column, so a
-      // right axis computed no labels at all.
-      name: "the labels are gated on the left column again",
-      file: FURN,
-      from: "  return layout.labelColumn > 0 || (layout.rightColumn ?? 0) > 0;",
-      to: "  return layout.labelColumn > 0;",
-      expect: "YA2",
-    },
-    {
-      // The ladder's order: the right column is the copy and goes first.
-      name: "the left column is dropped before the right",
-      file: DEFN,
-      from: "  if (right > 0 && width - left - AXIS_GUTTER - FRAME_RIGHT >= MIN_AREA) {",
-      to: "  if (left > 0 && width - right - AXIS_GUTTER - FRAME_RIGHT >= MIN_AREA) {",
-      expect: "YA6",
-    },
-    {
-      // The 1-bit stacked arm, which is the capability `yCallout` would
-      // otherwise be accepted at and ignored at.
-      name: "the stacked arm resolves no callouts",
-      file: DEFN,
-      from: "    calloutInto(callouts, block, strip.layer.glyphRows, index, layout, base);",
-      to: "    void strip; void index;",
-      expect: "YC8b",
+      // §3d's precision rule: one per axis, from the step. Taken from the second
+      // nicing's coarser step it wrote `13` on the row holding `12.5`.
+      name: "the labels take the magnitude's decimals rather than the step's",
+      file: AXES,
+      from: "  const places = axis.step > 0 ? stepDecimals(axis.step) : undefined;",
+      to: "  const places = undefined;",
+      expect: "YA1",
     },
   ],
 });

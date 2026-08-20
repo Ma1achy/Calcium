@@ -1730,7 +1730,13 @@ describe("GROUP 6m: four frame shapes over one geometry", () => {
     // a hole in it, and at one cell per sample the hole is the sample.
     const g = glyphs(FULL_CAPS);
     const rows = plain(mk("grid"));
-    const labelled = rows.find((r) => /^\s*\d+\s*┤/u.test(r)) ?? "";
+    // **Any numeric label, not `\d+`.** The selector was written when this
+    // fixture's gutter read `10 · 5 · 0`, and it read that because the axis was
+    // niced twice: one pass over `1 … 6` gives `0 … 7.5` at step 2.5, and the
+    // second coarsened the step to 5 and wrote integers over a scale that was
+    // not one (F210). A row finder that can only see integers is a fixture
+    // answering for the code.
+    const labelled = rows.find((r) => /^\s*-?[\d.]+\s*┤/u.test(r)) ?? "";
     expect(labelled, "a labelled row carries a horizontal rule").toContain(g.dashedHorizontal);
     expect(rows.join(""), "and the tick columns a vertical one").toContain(g.dashedVertical);
     const unlabelled = rows.find((r) => /^\s+│/u.test(r)) ?? "";

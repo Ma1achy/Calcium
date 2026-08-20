@@ -6,7 +6,8 @@
 // and says very little to an assertion; the grid says exactly which columns carry
 // ink.
 import { describe, expect, it } from "vitest";
-import { formatValue, labelWidth, niceAxis, xLabelRow, yLabels } from "../../src/presentation/plot/axes.js";
+import { formatValue, labelWidth, niceAxis, xLabelRow } from "../../src/presentation/plot/axes.js";
+import { gutter } from "../support/plot-forms.js";
 import { curveRows } from "../../src/presentation/plot/curve.js";
 import { plotAreaWidth, plotHeight } from "../../src/presentation/plot/height.js";
 import { composeRows } from "../../src/presentation/plot/furniture.js";
@@ -216,7 +217,7 @@ describe("C12 tier 1 — degenerate series", () => {
   });
 
   it("T1.5 (I3): all three y-labels show the constant value", () => {
-    const labels = yLabels({ min: 3, max: 3 }, 5, "number");
+    const labels = gutter({ min: 3, max: 3 }, 5, "number");
     expect(labels.map((l) => l.text)).toEqual(["3", "3", "3"]);
   });
 
@@ -336,11 +337,11 @@ describe("C12 tier 1 — labels", () => {
     // rendered labels, so an arm that changes a label's width changes the plot
     // area — which is why this is an invariant about geometry and not a note
     // about formatting.
-    const asFraction = yLabels({ min: 0, max: 1 }, 5, "fraction");
-    const asPercent = yLabels({ min: 0, max: 100 }, 5, "percent");
+    const asFraction = gutter({ min: 0, max: 1 }, 5, "fraction");
+    const asPercent = gutter({ min: 0, max: 100 }, 5, "percent");
 
     expect(labelWidth(asFraction), "`100%` is four cells").toBe(4);
-    expect(labelWidth(yLabels({ min: 0, max: 0.5 }, 5, "fraction")), "`50%` is three").toBe(3);
+    expect(labelWidth(gutter({ min: 0, max: 0.5 }, 5, "fraction")), "`50%` is three").toBe(3);
     expect(labelWidth(asPercent)).toBe(4);
   });
 
@@ -354,7 +355,7 @@ describe("C12 tier 1 — labels", () => {
     // stripped the trailing zero, so one precision came out as three — `0.2`
     // beside `0.15` beside `0.1`, which is the exact thing sharing prevents
     // (F177).
-    const labels = yLabels({ min: 0.0874, max: 0.86 }, 8, "number");
+    const labels = gutter({ min: 0.0874, max: 0.86 }, 8, "number");
     const texts = labels.map((l) => l.text);
     expect(texts).toEqual(["1.0", "0.5", "0.0"]);
     expect(new Set(texts.map((t) => t.split(".")[1]?.length)).size, "one precision").toBe(1);
@@ -366,7 +367,7 @@ describe("C12 tier 1 — labels", () => {
     // right for a lone value and over-answers about a step: a step of 5 came back
     // as one place, so an integer ladder drew `40.0 · 35.0 · 30.0`. Read from a
     // frame at height 20 — the common height of 8 has too few rungs to show it.
-    const integers = yLabels({ min: 0, max: 40 }, 20, "number");
+    const integers = gutter({ min: 0, max: 40 }, 20, "number");
     expect(integers.map((l) => l.text)).toContain("35");
     expect(integers.map((l) => l.text).some((t) => t.includes(".")), "no spurious decimal").toBe(
       false,
@@ -377,7 +378,7 @@ describe("C12 tier 1 — labels", () => {
     // mutation swapping them survived sixteen assertions. Here the step is 2.5
     // over a span of 10 — one place against the span's zero — and reading the
     // span rounds every quarter-tick to an integer it is not.
-    const quarters = yLabels({ min: 0, max: 10 }, 12, "number").map((l) => l.text);
+    const quarters = gutter({ min: 0, max: 10 }, 12, "number").map((l) => l.text);
     expect(quarters, "a 2.5 step needs the place the span says it does not").toContain("7.5");
     expect(quarters).toContain("2.5");
   });
@@ -387,13 +388,13 @@ describe("C12 tier 1 — labels", () => {
     // range so the ends are round; a pinned axis exists so two plots can be
     // compared, and one that silently grew would defeat exactly that. So the
     // snap is per end.
-    const derived = yLabels({ min: 3, max: 87 }, 8, "number");
+    const derived = gutter({ min: 3, max: 87 }, 8, "number");
     expect(derived[0]?.text, "a derived top snaps up to a nice number").toBe("100");
 
-    const pinnedTop = yLabels({ min: 3, max: 87 }, 8, "number", { yMax: 87 });
+    const pinnedTop = gutter({ min: 3, max: 87 }, 8, "number", { yMax: 87 });
     expect(pinnedTop[0]?.text, "a declared top is the top").toBe("87");
 
-    const pinnedBoth = yLabels({ min: 3, max: 87 }, 8, "number", { yMin: 3, yMax: 87 });
+    const pinnedBoth = gutter({ min: 3, max: 87 }, 8, "number", { yMin: 3, yMax: 87 });
     expect(pinnedBoth[0]?.text).toBe("87");
     expect(pinnedBoth[pinnedBoth.length - 1]?.text).toBe("3");
   });
@@ -409,7 +410,7 @@ describe("C12 tier 1 — labels", () => {
     // agreeing about a clause none of them reached. At height 3 a range of
     // `5 … 63` snaps to `0 … 100` with a step of 50, and the three ticks land on
     // rows 0, 1 and 2: the midpoint touches both ends.
-    const tight = yLabels({ min: 5, max: 63 }, 3, "number");
+    const tight = gutter({ min: 5, max: 63 }, 3, "number");
     expect(tight.map((l) => l.row), "the abutting midpoint is dropped").toEqual([0, 2]);
     expect(tight.map((l) => l.text)).toEqual(["100", "0"]);
 
@@ -417,7 +418,7 @@ describe("C12 tier 1 — labels", () => {
       [0, 100, 3], [0, 100, 5], [0, 100, 8], [0, 100, 12], [0, 100, 20],
       [5, 63, 3], [5, 63, 4], [392, 960, 4], [0, 7, 3], [2, 29, 4], [0.087, 0.86, 9],
     ] as const) {
-      const rows = yLabels({ min: lo, max: hi }, h, "number").map((l) => l.row);
+      const rows = gutter({ min: lo, max: hi }, h, "number").map((l) => l.row);
       const gaps = rows.slice(1).map((r, i) => r - (rows[i] ?? 0));
       expect(
         gaps.every((g) => g >= 2),
@@ -446,20 +447,20 @@ describe("C12 tier 1 — labels", () => {
     // rather than by the grid. A value that rounds to zero and is not zero goes to
     // exponential, because a floor reading `0` when it is not is wrong in the one
     // direction a reader cannot detect.
-    expect(() => yLabels({ min: 5e-324, max: 1e-323 }, 5, "number")).not.toThrow();
+    expect(() => gutter({ min: 5e-324, max: 1e-323 }, 5, "number")).not.toThrow();
     expect(formatValue(5e-324, "number")).toBe("4.9e-324");
     expect(formatValue(1e300, "number")).toBe("1.0e+300");
   });
 
   it("T1.12 (I15): labels collapse from the middle outward", () => {
     const range = { min: 0, max: 10 };
-    expect(yLabels(range, 5, "number").map((l) => l.text)).toEqual(["10", "5", "0"]);
-    expect(yLabels(range, 2, "number").map((l) => l.text)).toEqual(["10", "0"]);
-    expect(yLabels(range, 1, "number").map((l) => l.text)).toEqual(["10"]);
+    expect(gutter(range, 5, "number").map((l) => l.text)).toEqual(["10", "5", "0"]);
+    expect(gutter(range, 2, "number").map((l) => l.text)).toEqual(["10", "0"]);
+    expect(gutter(range, 1, "number").map((l) => l.text)).toEqual(["10"]);
   });
 
   it("T1.12 (I15): and they sit at the max, mid and min rows", () => {
-    expect(yLabels({ min: 0, max: 10 }, 7, "number").map((l) => l.row)).toEqual([0, 3, 6]);
+    expect(gutter({ min: 0, max: 10 }, 7, "number").map((l) => l.row)).toEqual([0, 3, 6]);
   });
 
   it("T3.8: x-labels keep a cell between them or are dropped", () => {

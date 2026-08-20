@@ -4,7 +4,9 @@
  * A `Record<PlotForm, Plot>`, so adding a member to the union forces an entry
  * here or the file does not compile. The same pattern as ONE_PER_KIND.
  */
-import { block, type Plot, type PlotForm } from "../../src/data/viewmodel/index.js";
+import { block, type Plot, type PlotForm, type ScaleType } from "../../src/data/viewmodel/index.js";
+import { axisFor, ticksFor, yLabels, type YLabel } from "../../src/presentation/plot/axes.js";
+import type { Range } from "../../src/presentation/plot/scale.js";
 
 const s = (vs: number[]): { values: readonly (number | null)[] } => ({ values: vs });
 
@@ -309,3 +311,28 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
 });
 
 export const ALL_FORMS = Object.keys(ONE_PER_FORM) as readonly PlotForm[];
+
+/**
+ * The gutter's labels for a raw range — the composition `positionalForm`
+ * performs, in one call (F210).
+ *
+ * **`yLabels` takes an `Axis` and no longer nices anything**, because two
+ * nicings of one axis is what put `15` in the gutter beside a row holding
+ * `12.4`. These rows are about *which row carries which label*, so they still
+ * want a range as their input; the nicing that used to happen inside the
+ * function happens here instead, with the same arguments the renderer uses.
+ *
+ * **This helper cannot prove the wiring** — that `positionalForm` hands the
+ * gutter the axis its own curve was rasterised against — and it is not supposed
+ * to. That is a claim about two call sites agreeing, so it is asserted against a
+ * rendered frame (T1.63).
+ */
+export function gutter(
+  range: Range,
+  rows: number,
+  format: Plot["yFormat"],
+  pin: Pick<Plot, "yMin" | "yMax"> = {},
+  scale?: ScaleType,
+): readonly YLabel[] {
+  return yLabels(axisFor(range, ticksFor(rows), pin, scale), rows, format);
+}
