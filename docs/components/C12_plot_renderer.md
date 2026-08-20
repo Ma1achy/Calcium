@@ -2990,6 +2990,141 @@ produced this record, run as an assertion, so a form added to the accepted set w
 flip fails rather than shipping a member that silently does nothing.
 
 
+## 3ad. `axisCross: "zero"` — the axes moved inside, and the two tests that are not one test
+
+`origin` says which corner the data grows from. This says **where the axes are drawn**, and the
+two are separate fields because one enum spelling `"centre"` beside the four corners would make
+`origin: "top-right"` with a crossing axis inexpressible (C04 I62).
+
+### 3ad.1 — It is `set zeroaxis`, not `spines.set_position("zero")`
+
+Two references draw this and they draw different pictures. matplotlib **moves the spine**, and the
+tick labels go with it. gnuplot draws a rule at zero **inside** the plot and leaves the border and
+the labels where they are.
+
+**This is gnuplot's, and naming that is the whole of the ruling** — because the difference is
+exactly what a reader will otherwise expect and not get. The gutter keeps the scale; the x
+captions keep the row below the rule; the crossing axes are two rules in the plot area, resolved
+behind the data the way a gridline is (I23, I26).
+
+**The reason is not economy, and it is worth separating from the reason it is also cheap.** Moving
+the labels means the gutter is no longer a left column, and every rule in §3f about `gutter`,
+`labelColumn` and `rightColumn` is written in that shape. That is a second layout beside the
+first. But the argument for *not* doing it is that a plot's numbers belong in one place: a reader
+comparing two facets reads down one column, and a scale that migrates to wherever zero happens to
+be is a scale that moves between two plots of the same data at different ranges.
+
+**The matplotlib picture is still reachable and composes**: `plotFrame: "corners"` removes the
+border and leaves the cross. Nothing is coupled — the frame member and this one are orthogonal,
+which A3 below is the check on.
+
+### 3ad.2 — Seven of forty-four, and it is a strict subset of `origin`'s fifteen
+
+Measured the way §3ac's was, by instrumenting the composer and rendering the whole corpus rather
+than by reading a record:
+
+| machinery | forms | honours `axisCross` |
+|---|---|---|
+| `overlaidRows` — the positional family | `line scatter step ecdf slope bubble density` | **yes, 7** |
+| its 1-bit multi-series arm — `stackedRows` | the same seven | no — A13 |
+| `matrixRows` | 10 | no |
+| `categoricalForm` | 11 | no |
+| own renderer | 14 | no |
+| facet containers | 2 | no |
+
+**`origin` is honoured wherever this is, and on eight more.** A matrix has a corner and no zero,
+which is the whole of the difference: `origin` asks which way the axes run and `axisCross` asks
+where they meet, and only a form with a numeric ordinate *and* a numeric abscissa has an answer.
+
+**Not `HAS_POSITION_AXIS`, for the third time** (I43's finding; §3ac records the second). That
+record holds eleven forms — `stackedarea` and `streamgraph`, which have their own composers, and
+`contour` and `quiver`, which are drawn by the matrix renderer. It answers *does the abscissa
+carry positions*, which is a question about the axis and not about who draws the area.
+
+**And C04 I62's `HAS_Y_GUTTER` clause does no work.** All seven have a gutter, so every refusal it
+could make is already a refusal by form. It reads as a second constraint and is not one — A03 §2's
+vacuity class, in an invariant.
+
+### 3ad.3 — The classification table: rules that both hold at rest
+
+`axisCross` has structure and it has passes, so it gets both artefacts (A03 §2). This is the
+structural half.
+
+| | the two rules | ruling |
+|---|---|---|
+| **A1** | the frame draws a border on four sides · the cross draws two rules inside | both draw. The cross is a mark in the plot area and not a relocation of the frame |
+| **A2** | `"grid"` draws `┊` at tick columns and `┄` at labelled rows · the cross draws a rule at the zero column and row | one cell, two claims. **The cross wins and it is solid where the grid is dashed** — see 3ad.4 |
+| **A3** | `"corners"` draws no left rule and no bottom rule · the cross is interior | unchanged. **Its value is that it forbids an argument**: A4 must not rest on *the frame already draws that edge*, because here it does not |
+| **A4** | zero is in range · its row is the area's first or last | **not drawn**. At the boundary `"zero"` and `"edge"` name the same place, so `"zero"` has nothing to add — and a rule at area column 0 abuts the gutter's border and reads as a doubled frame |
+| **A5** | zero is outside the range · an axis has to go somewhere | **not drawn, never clamped to the nearest edge.** This is **C04 I52's** disposition — *an annotation moved onto a scale it is outside says the limit is somewhere it is not* — and **not C04 I29's**, which clamps *data* because pressing a reading against a ceiling is honest. C04 I62 cites C04 I29 *in the mirror*; the mirror is right about the error and C04 I52 is the invariant that already rules the case |
+| **A6** | `origin` flips which end of the area is which · the cross's position is a function of the range | falls out **if** the cross goes through `rowOf` and the same column expression the ticks use. The mutation is the cross ignoring the facing |
+| **A7** | `xLabels` replaces the numeric axis with three captions · the vertical half needs a column for the value 0 | three words have no domain, so **the vertical half is not drawn and the horizontal half is unaffected**. The halves are independent, which is why this is a row and not a refusal |
+| **A8** | a candlestick places its bars by `candleColumn` · the curve's rule places by `columnsOf` | the zero column goes through the same `columnAt` the ticks do, or the rule and the `0` caption sit in different columns. §3d.1's last row, arriving on a new consumer |
+| **A9** | `yAxis: "right"` and a callout spend a right column · the cross is drawn into an area row | no interaction on placement — both gutters are outside the area. **The cross must be built against the same layout the grid is**, or its row is the wrong width by the right column |
+| **A10** | an undeclared domain is the index `[0, n − 1]` · an index's zero is sample 0 | **subsumed by the range test**, because `0 < 0` is false. No declared-versus-inferred distinction is needed, and that is why the test is stated as strict inequalities rather than as *zero is in range* |
+| **A11** | a log domain excludes zero · `symlog` is linear about zero by construction | subsumed by the same test. `symlog` is the one scale where a crossing axis is the point |
+| **A12** | the area is two rows or two columns | subsumed: there is no interior |
+| **A13** | at one bit with more than one series the form draws one strip per series · a crossing axis is one rule across the ordinate | **not drawn, and the reason is that there is no single ordinate.** Each strip has its own row mapping, so one rule would sit at a different value in each, and one per strip is a grid |
+| **A14** | the member is on `Plot` for every form · six machineries compose an area | refused at both gates by a record, `ORIGIN_DEFAULT`'s sibling and shaped like it |
+| **A15** | a constant series · `rowOf` centres a degenerate range **by construction** | **the two tests are not one test.** A series of 5s has `min === max`, `rowOf` returns the centre row for every value including 0, and the interior test alone would draw a zero axis through a plot that never approaches zero. The range test — `min < 0 && max > 0`, strictly — is what excludes it, and the interior test is what excludes A4 and A12 |
+
+**A15 is the row that pays for the table.** Every other row narrows a condition that was going to
+be checked anyway; this one says a single check is two checks, and it is invisible from either
+rule alone — `rowOf`'s centring is correct (T1.5 depends on it) and *draw where zero is* is
+correct, and the defect lives only where they meet.
+
+### 3ad.4 — Solid, and §3k's own sentence is the objection
+
+`dashedVertical` exists because *a solid rule through a figure reads as part of it: a forest
+plot's null line crossing five intervals looks like a sixth interval unless it is visibly not
+one*. That sentence is about this exactly, and it rules the other way.
+
+**It does not apply, and the distinction is annotation against furniture.** A null line is a claim
+laid **over** a figure and must be visibly not part of it. An axis is the coordinate system the
+figure is drawn **in**, and the frame's own left border is a solid `│` that no reader has ever
+taken for a series. A crossing axis is that border, moved inside — so it takes the border's
+alphabet, and A2 resolves itself: solid against the grid's dashed, with the difference carrying
+the meaning rather than needing a rule about which wins.
+
+The cell where the two halves meet needs a glyph the set does not have. `crossing` — `┼`, and `+`
+at ASCII — beside `candleCross`, which is a different mark for a different job (I36).
+
+### 3ad.5 — The sequence trace: what happens between the passes
+
+| | the sequence | what could go wrong between |
+|---|---|---|
+| **B1** | data measured → axis niced → area composed → furniture composed | the cross's row and the gutter's `0` come from different objects. **This is F210, and it is why that had to land first**: the cross is the first consumer that makes the divergence a misplaced *line* rather than a misread number |
+| **B2** | domain → nice → tick columns → the zero column | computed separately, the rule and the `0` caption disagree. **One computation, returned together** — `XAxis` carries the zero column beside its ticks, so a plot's two axes are now both measured once and handed down |
+| **B3** | area rows → grid row → cursor rule → merged behind the data | three reference rows where there were two. The cursor's cell was already the grid's; the cross takes it from both, and the grid-over-cursor order is left where it is |
+| **B4** | `ecdf` and `density` rewrite the block, then call the same composer | the derived block must carry `axisCross` through the spread, or the member is silently dropped on two of its seven forms |
+| **B5** | a cursor is set → the readout replaces the label row | the cross is in the area and the readout is furniture. Nothing to do — stated so it is not re-derived |
+
+### 3ad.6 — What the refusal leaves behind, and who sees it
+
+Two gates refuse by **form**, and both throw or return before anything is assembled — `origin`'s
+shape exactly (§3ac.6).
+
+**The suppression is the one nobody sees.** A caller who sets `axisCross: "zero"` on a series that
+never crosses zero gets no cross, no error and no notice, because A5's disposition is a drop. That
+is I52's rule and it is right — a mark on a place the plot does not show is worse than no mark —
+but it means **the only record of the two conditions is this section**, and a reader whose plot
+draws no cross has nothing at runtime to ask. Stated here because nothing else will state it.
+
+### 3ad.7 — Tests
+
+    AC1  a series spanning zero draws a horizontal rule at the zero row and nowhere else
+    AC2  a declared x domain spanning zero draws the vertical rule, and the two meet in one cell
+    AC3  a range that excludes zero draws neither half — no clamp to the nearest edge (A5)
+    AC4  zero at the range's end draws nothing: `"zero"` and `"edge"` agree there (A4)
+    AC5  a constant series draws nothing, though `rowOf` centres it (A15)
+    AC6  an undeclared index domain draws no vertical half, and the horizontal one is unaffected (A10, A7)
+    AC7  `xLabels` given: no vertical half, horizontal unchanged (A7)
+    AC8  under `grid`, the cross is solid where the gridline is dashed, and wins the shared cell (A2)
+    AC9  a candlestick's zero column is the candle's column, not the curve's rule (A8)
+    AC10 the cross follows `origin` at all four corners (A6)
+    AC11 every form outside the seven refuses at both gates (A14)
+    AC12 at one bit with two series nothing is drawn, and the frame is unchanged (A13)
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
