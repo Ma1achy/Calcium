@@ -17,6 +17,7 @@
 // The rule from `test/support/README.md` applies to everything here: a default
 // differs from the value a test asks for, and a parameter with no observable
 // effect is a finding.
+import { livePids, psGroupArgv } from "./live-pids.mjs";
 import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -61,26 +62,15 @@ export class HarnessError extends Error {
  * runs. `waitForGroupEmpty` then polls to its bound and reports *the leader was
  * signalled and the group was not*, which is the opposite of what happened.
  *
- * **It does not weaken the assertion.** A group signal that genuinely failed
- * leaves its children `S`, not `Z`, and they are still counted — so the row can
- * still only pass by the signal arriving. What changes is that the harness stops
- * conflating *in the process table* with *alive*, which is a distinction macOS
- * never forced it to make.
+ * **The parse lives in `live-pids.mjs`**, because `fixture.mjs` asks the same
+ * question from inside the PTY and cannot import TypeScript. Two copies of it
+ * existed and both carried the same premise, so fixing this one left tier 5
+ * failing on the other.
  */
 export async function groupMembers(pgid: number): Promise<readonly number[]> {
-  const ran = await run(["ps", "-o", "pid=,stat=", "-g", String(pgid)]);
+  const ran = await run([...psGroupArgv(pgid)]);
 
-  if (ran.code === 0) {
-    return ran.stdout
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "")
-      .map((line) => line.split(/\s+/u))
-      // `Z` is zombie on both BSD and procps, and it is the first character of
-      // the state field on both.
-      .filter((parts) => !(parts[1] ?? "").startsWith("Z"))
-      .map((parts) => Number(parts[0]));
-  }
+  if (ran.code === 0) return livePids(ran.stdout);
 
   // The one non-zero status that means what it appears to: nothing matched.
   if (ran.code === 1 && ran.stdout.trim() === "" && ran.stderr.trim() === "") return [];
