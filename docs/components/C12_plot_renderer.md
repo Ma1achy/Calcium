@@ -2370,6 +2370,112 @@ have been recoloured for a background that a different glyph now sits on.
 
 ---
 
+## 3z. The horizon's two channels, and the alphabet they were sharing
+
+**This section is written because the form had none**, which is §3q's shape one form along.
+`horizon` appears twice in this document: in §2's height table, and in I24's list of four forms
+that composed their own rows and were therefore outside the one check written to catch their
+defect. Nothing here ever ruled on what it draws — so a collision between its two channels could
+ship, be rendered into four catalogue frames, and stay.
+
+### The entry it was built from names two channels and the build has one
+
+`CALCIUM_PLOT_PRIOR_ART.md` says *split the range into N bands, stack them, and colour by depth*
+and sketches `▁▂▃▅▇█` against `colour = which band`. What shipped carries depth on
+`ladderFor("density")` — a **glyph** ramp — and `DEFAULT_COLORMAP.horizon` is `null`.
+`horizon.ts`'s own header states the price in the same breath as the benefit: *that is what buys
+the compression … paid for in a colour axis the reader has to learn.* **The price is charged and
+the goods never arrive.**
+
+**And the second channel is spent paying for the first.** Within-band height is
+`max(1, round(within × h))` — a whole number of rows — so at `height: 1`, which is the canonical
+horizon and the compression the form exists for, every inked column is exactly one row.
+`horizon-folded-1x3-24bit.plain` is that frame: one row, and the only variation in it is the
+glyph. Depth is occupying the alphabet height needs.
+
+| channel | wants | had |
+|---|---|---|
+| band depth | a **colour** ramp — it is an ordinal index into a legend, not a quantity in the cell | the density glyph ramp |
+| within-band height | **`▁▂▃▄▅▆▇█`** — eight positions inside one row | one row of ink, or none |
+
+**Ruling: depth is colour and height is eighths.** Two data, two channels, and neither borrows the
+other's. That is also what the entry said before anything was built.
+
+### The mirror, and §3r is what forces it
+
+A horizon folds about a **baseline**, and a value below it is as real as one above. There are two
+ways to draw that and this vocabulary has one:
+
+- **offset** — negative bands grow *downwards* from the row's top.
+- **mirror** — negative bands reflect upwards and colour says which side. d3-horizon's.
+
+**§3r already measured why offset cannot work here**: *"Unicode's vertical eighths are a complete
+ladder upward — `▁▂▃▄▅▆▇█` — and there is no matching ladder downward: `▀` and `▔` are the whole
+of the upper repertoire, a half and an eighth."* An offset arm would resolve a positive band to
+an eighth and a negative one to a half — **precision at one end reading as precision at both**,
+which is the exact fault §3r rejected a sub-cell candle body for.
+
+So the mirror is **forced by the repertoire rather than chosen**, and the sign rides the channel
+that has room: a diverging colormap's two halves. `DEFAULT_COLORMAP.horizon` is `coolwarm` for
+that reason and not for taste — a sequential map has no second half, so under one the sign has
+nowhere to go and is refused rather than dropped.
+
+**The baseline is 0 where the range spans it and `range.min` otherwise.** What ships folds about
+the data's minimum unconditionally, which is why it only ever folds one way — and a series that
+never goes negative renders **identically** under both rules, so the defect is invisible on
+exactly the fixtures a catalogue carries. That is why this needs a fixture that can respond to it
+before it needs an assertion.
+
+### Below the colour floor there is one channel for two data, and the frame decides
+
+`continuousColour` returns `undefined` under `CONTINUOUS_FLOOR = 8`, so at 4-bit and at 1-bit
+there is no colour and the design is back where it started. Two candidates:
+
+| | keeps | loses |
+|---|---|---|
+| **A** — depth on the density ramp, height gone | the compression the form exists for | every inked column one row again, which is the defect above |
+| **B** — a plain eighths area over the whole range, `bands` inert | a figure that does not overstate what it resolves | the compression, which was always the colour's to sell |
+
+**Provisional, and settled by reading the 4-bit and 1-bit frames rather than by argument written
+here.** §3y's ruling 10 was written this way, went the wrong direction — *the ramp yields* left
+both layers in one alphabet and the 1-bit frame was speckle — and the frame is what corrected it.
+Writing this one down as settled would repeat the error that correction was for.
+
+### A reading at the floor draws nothing, and three frames show it
+
+`clamped <= 0 ? 0` with `band === 0` leaves the cell blank, so a value at the range's minimum is
+indistinguishable from a gap. Visible as a two-cell break near the right edge of
+`horizon-bands-3`, `horizon-bands-5` and `horizon-folded-1x3` — `⠖⠖⠖  ⠖⠖⠖`. **Observed in the
+frame; the mechanism above is the candidate and the walk is what confirms it**, because a
+mechanism inferred from a symptom is a belief until it has been run.
+
+Ruled: **a finite reading always draws ink.** That is I16's argument one form along — a ramp whose
+lowest step is its padding character gives one glyph two meanings, and a floor that draws blank
+gives blank two meanings, in the form whose whole subject is *how deep*.
+
+### The walk this needs is a table, and the reason is worth stating
+
+A horizon has no events: it is a fold over a series and the passes do not interact in sequence.
+Its interactions are structural — two rules that hold at rest — so the artefact is a
+classification table and a trace would find nothing here. §6d's rule applied rather than the
+familiar shape taken.
+
+| # | two rules meeting | ruling |
+|---|---|---|
+| H1 | *depth is colour* × `colourDepth < 8` | the frame decides between A and B; **not settled here** |
+| H2 | *the baseline is 0* × a range not spanning 0 | fall back to `range.min`, and the fold is one-directional — which is today's behaviour and now says so |
+| H3 | *the sign rides the map's two halves* × a **sequential** `colormap` | refused at construction. A sequential map has no second half, and drawing negative bands in the same ramp says a trough is a peak |
+| H4 | *a finite reading draws ink* × a value at the baseline exactly | ink, one eighth. The floor is a reading and blank is absence (I16) |
+| H5 | *height is eighths* × `height > 1` | eighths within the **top** inked row and full rows below it, so the two agree at `h = 1` rather than being two rules that meet there |
+| H6 | `bands: 1` | the fold is the identity and the figure is an area chart. Legal, and the legend says one band rather than the form pretending to compress |
+| H7 | *depth is colour* × `legend: false` | refused for this form. The colour axis **is** the reading, and a horizon with no legend is a picture of coloured noise — the argument I19 makes for a matrix's scale |
+
+**H3 and H7 are refusals and both are new**, which is the table earning its place: neither is
+reachable from the two-channel ruling on its own, and both are cells where a correct sentence
+about colour meets a correct sentence about something else.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -3506,6 +3612,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I49** — **A contour's glyph is derived from its cell's four corners, and the derivation is the curve renderer's own table.** An edge is crossed exactly when its two corners disagree; the mask is `(top?UP)|(right?RIGHT)|(bottom?DOWN)|(left?LEFT)` and the glyph is `glyphForMask`'s. All sixteen marching-squares cases land on entries that already exist — zero new glyphs, eight distinct masks — so adjacent cells agree **by construction**: a shared edge has the same two grid corners on both sides and the strokes join with nothing joining them. Levels union their masks in one cell, which is the only way `┤ ├ ┴ ┬` can be emitted. **Both saddle cases give mask 15**, so the centre-value resolution is observable on the braille arm and collapses to `┼` on `"line"` — the default is braille so that the ruling has a subject (§3y). Levels are named in the legend and never on the line: there is no gap-cutting vocabulary, and a label over a contour is the contour with a hole in it. **A field's own axes are positions**: the row index down the gutter and three captions over the column domain, derived where the caller named none, because a field is sampled over a domain where a matrix is a set of named rows — `ROW_IS_AN_IDENTITY` and `HAS_POSITION_AXIS` are both the opposite of the matrix family's answer.
 - **I50** — **A quiver's direction is its glyph and its magnitude is its colour, and a cell with no flow draws nothing.** Eight directions, with the ASCII arm required at `unicode: "ascii"` **and** at `ambiguousWidth: "wide"` — every arrow in U+2190–21FF is `East_Asian_Width=Ambiguous`, so a wide terminal draws the field at double width, and this is that switch's third consumer after `art.ts` and `mermaid.ts`. **One datum, one channel.** Magnitude is the arrow's colour where the field carries something else, and the *field's* colour where the caller named no scalar — colouring the arrow by magnitude over a magnitude field paints it in its own background, measured at `38;2;33;145;141` on `48;2;33;145;141` and invisible at full colour depth while every assertion passed. **Magnitude dies below `colourDepth: 8`**, not below one bit: `continuousColour` returns `undefined` under `CONTINUOUS_FLOOR`, and I25's mark ladder cannot carry it because the mark is already spent on direction. A zero-magnitude cell is blank rather than an arrow of arbitrary direction, and the field beneath it still reads (§3y).
 - **I51** — **`layers` is a draw order the caller reads and a priority order the merge takes, reversed at one documented seam.** `layers` says what is drawn; `Layer.kind` (I44) says how two inked cells resolve, and both a contour and a quiver are `"curve"`. **`field`'s membership is load-bearing and its position is inert** — a background cannot occlude, so the two orderings render byte-identical. `fieldDim` and `glyphInk` are two fields because they answer two questions: `"floor"` dims per colormap by measurement rather than by a constant (viridis and coolwarm at 50%, inferno at 40%) and costs viridis 78% of its luminance spread; `"contrast"` picks black or white per cell and costs a quiver its magnitude channel. Below `colourDepth: 8` the field is a ramp **glyph** rather than a wash, so two glyph layers meet — and **the field yields where the layer over it is drawn in the ramp's own alphabet**, which a contour is at every capability and an arrow is at none. Ruling the other way settles the cell contention and leaves both layers in one vocabulary, which no assertion can see and the frame shows at once. `fieldDim` is inert below the floor regardless (§3y).
+- **I52** — **A horizon carries band depth in colour and within-band height in the vertical eighths, and it folds by mirroring.** The form had no section and no invariant: it was built from the survey's entry, which says *colour = which band*, and shipped carrying depth on the density **glyph** ramp with `DEFAULT_COLORMAP.horizon` set to `null` — so the compression its own header calls *paid for in a colour axis* was charged and never delivered, and depth was occupying the alphabet height needs. At `height: 1`, the canonical horizon, every inked column was therefore exactly one row. **The mirror is forced rather than chosen**: §3r measured that Unicode's eighths are a complete ladder upward and `▀`/`▔` are the whole of the downward repertoire, so an offset fold would resolve one direction to an eighth and the other to a half — precision at one end reading as precision at both. The sign rides a diverging map's two halves, so a **sequential** `colormap` is refused rather than drawing a trough as a peak, and `legend: false` is refused because the colour axis *is* the reading (I19's argument for a matrix's scale). **The baseline is 0 where the range spans it and `range.min` otherwise** — folding about the minimum unconditionally is why it only ever folded one way, and it is invisible on any fixture that never goes negative. **A finite reading always draws ink** (I16 one form along): a floor rendering blank gives blank two meanings in the form whose subject is *how deep*. *Below `CONTINUOUS_FLOOR` there is one channel for two data and the frame decides, not this invariant (§3z).*
 
 ## 8. Commitments
 
@@ -3554,6 +3661,7 @@ orientation — and belongs in the classification table as its own rows.
 43. **A field is drawn as iso-lines, and the sixteen cases were already a table here** — the refusal grouped contour with sankey and chord and it inherited their disposition; marching squares is local, the derivation from corners to edges is four lines, and adjacent cells join by construction (I49, §3y).
 44. **A vector field is drawn as arrows, with direction in the glyph and magnitude in the colour** — the ASCII arm required at wide ambiguous width as well as at ASCII, and magnitude stated as lost below 8-bit rather than degraded into a mark already spent (I50, §3y).
 45. **The layers a field is drawn in are declared, and the two contrast remedies ship as options rather than as a refusal** — a glyph over a colormap competes on legibility and 45% of viridis clears the floor against white; `fieldDim` and `glyphInk` each name their own price, and both default off (I51, §3y).
+46. **A horizon's two channels stop sharing one alphabet** — depth is colour and height is the vertical eighths, the fold mirrors because the downward repertoire is two glyphs deep, and a form that had no section in this document gets one (I52, §3z).
 
 ---
 
@@ -3563,6 +3671,12 @@ Six tiers. No state machine — C12 is pure over the block.
 
 ### Tier 1 — unit
 
+- **HZ1** (I52, §3z): band depth reads from the colormap and not from `ladderFor("density")` — asserted as *the glyph alphabet is the eighths at every band* plus *two bands differ in colour*, because a run that changed only the ramp would pass an assertion about colour alone.
+- **HZ2** (I52, §3z): at `height: 1` a series sweeping one band renders **eight** distinct glyphs. The row the shipped form fails: it renders one, and no assertion about band count can see that.
+- **HZ3** (I52, §3z): a negative value mirrors upward and takes the other half of the diverging map, asserted against a fixture that crosses zero — and the paired row that a sequential `colormap` is **refused**, which is where the sign would otherwise be silently lost.
+- **HZ4** (I52, §3z): below `colourDepth: 8`, whichever of §3z's A and B the frame settles — written against both and one deleted when the frame is read, never both left standing.
+- **HZ5** (I52, I16): a reading at the range minimum draws ink. **A fixture that can respond to it first**: `sin50` reaches its minimum at two adjacent columns in three shipped frames, which is where the two-cell break came from.
+- **HZ6** (I52, I19): `legend: false` on a horizon is refused at both gates. The colour axis is the reading, and the refusal is the one H7 found that the two-channel ruling does not imply.
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.
 - **YA2** (I47): `yAxis: "right"` draws no left label column and the plot area starts where the border does; the labels are the same strings `"left"` puts on the other side, at the same rows.
 - **YA2b** (I47): at `yAxis: "right"` the left border is `│` on every row and never `┤`, with the converse asserted on the same fixture with the axis left. **The row the mutation pass asked for**: YA2 compares the gutters' *contents*, which are empty on that side either way, so it passes against a border still drawing a stub that points out at a column zero cells wide.
@@ -3731,6 +3845,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.48** (I51): letting the ramp win the cell below `colourDepth: 8` → **LY5** fails and nothing above the floor moves. The wiring mutation for the one interaction no frame above 8-bit can show.
 - **T6.49** (I51): dimming by a constant 50% rather than per colormap → **LY6** fails on inferno alone, which is the map the constant does not clear. A mutation that fails on one of three inputs is the argument for the row enumerating the maps.
 - **T6.50** (I51): recolouring for contrast **inside** the contour and quiver rasterisers rather than after the merge → **LY7** fails on a cell where the arrow lost the merge, and passes everywhere else. §6d.2's pass 6, and the only pass that reads two and writes one.
+- **T6.51** (I52): returning band depth to the density ramp → HZ1 fails, and the eighths channel is overwritten by the thing it was freed from. **Paired with a control**: swapping the *legend's* ramp alone fails nothing and is meant to, because the legend names bands either way — which is what says the ruling is about the plot area and not about the key.
+- **T6.52** (I52): making the fold an offset — negative bands growing downward through `▀`/`▔` → HZ3 fails, and one direction resolves to an eighth while the other resolves to a half. The mutation that shows §3r's repertoire finding is load-bearing here and not decoration.
 - **T6.1** (I1): deriving height from series length → T1.1 fails and streaming plots start shifting the viewport.
 - **T6.2** (I3): dividing by the range without guarding a constant series → T1.5 fails with `NaN` output.
 - **T6.3** (I4): letting `NaN` reach the grid → T1.8 fails.
