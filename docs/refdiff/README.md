@@ -23,7 +23,7 @@ change is the signal.
 what both halves independently took before F183 and is why a *style* was
 uncomparable: a candlestick is `form: "line"`. The extras are `EXTRA_VARIANTS`
 in `export-fixtures.ts`. So this table ranks
-**43 of 120 catalogue variants**, and the rest are unread rather than passing —
+**43 of 122 catalogue variants**, and the rest are unread rather than passing —
 adding one means adding a reference renderer beside it.
 
 | form | grid | ink | extent |
