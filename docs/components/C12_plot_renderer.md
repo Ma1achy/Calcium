@@ -2136,6 +2136,71 @@ total record over forms reading as a complete answer to a question it cannot ask
 
 ---
 
+### The smart ink does not port to the rest of the family, and measuring is what settled it
+
+A request asked for `glyphInk` and `fieldDim` — the contrast machinery `contour` and `quiver` use
+— to be extended to every other plot, optionally, so a figure could be made readable against a
+white terminal or a black one. **The plan agreed and the measurement disagreed**, so the gate stays
+`IS_FIELD_FORM` and the reason is now a table rather than an argument.
+
+Each of the eight non-field matrix forms was rendered twice at three colour depths — `glyphInk:
+"own"` against `"contrast"`, and `fieldDim: "none"` against `"floor"` — and the frames compared
+both stripped of SGR and with it:
+
+| | `glyphInk` | `fieldDim` |
+|---|---|---|
+| `heatmap` · `calendar` · `correlation` · `confusion` | **identical**, 24-bit / 8-bit / 1-bit | differs at 24-bit only |
+| `spectrogram` · `latency` · `density2d` · `utilisation` | **identical**, 24-bit / 8-bit / 1-bit | differs at 24-bit only |
+| `contour` | differs at every depth | differs at 24-bit only |
+
+**`glyphInk` changes nothing on any of the eight, at any depth, and the renderer says why in one
+line**: `run += colour === undefined ? (painted ? glyphAt(x) : " ") : " "`. A painted matrix cell is
+a **blank** — §3o's own ruling, *the colour leads and the glyph is the fallback* — so above the
+colour floor there is no glyph for `contrastInk` to ink, and below it there is no background for
+`contrastInk` to read. The member is inert in both directions and for opposite reasons. *Widening
+its gate is the F207 shape exactly: a field accepted where there is no arm for it.*
+
+**`fieldDim` is the harder half, because it is not inert — it is purposeless.** It dims the wash at
+24-bit on all eight, and `fieldDim`'s own doc says what dimming is for: *whether the field dims to
+make room for a glyph over it*. Nothing is over it. So the member has a visible effect and no
+subject, and its price is the one the doc already records — viridis keeps 0.165 of its 0.742
+luminance spread, 22%, and luminance is the ordering channel a perceptual map exists for. **A member
+that spends the map's ordering to make room for nothing is worse than one that does nothing**, which
+is the distinction F207 does not draw and this row adds to it.
+
+**So the request's real half is one layer down and this section is not it.** *Readable against a
+white terminal or a black one* is C10's guarantee — `validateTokens` clears every palette slot at
+4.5 : 1 against `surfaces.bg` — and the defect is that `tokens-dark.ts` declares
+`background: "terminal"` and never paints it, so the guarantee is measured against `#1a1a1a` and
+painted against nothing. Giving a plot its own contrast field would hand the plot a guarantee the
+prose beside it does not have.
+
+### And the probe found `fieldDim` inert at 8-bit, where the spec says it works
+
+`fieldDim`'s doc reads *inert below `colourDepth: 8`*, which says it works **at** 8. It does not,
+on `contour` either:
+
+| colourDepth | `contour`, none vs floor | `heatmap`, none vs floor |
+|---|---|---|
+| 24 | differs | differs |
+| **8** | **identical** | identical |
+| 4 | identical | identical |
+| 1 | identical | identical |
+
+`continuousColour` returns `{ kind: "rgb" }` at 24-bit and `{ kind: "ansi256", index }` at 8, and
+`dimColour` opens with `if (colour.kind !== "rgb" || factor >= 1) return colour`. **So the dim is
+applied, returns its argument, and nothing says so** — a member accepted, wired, invoked, and doing
+nothing on the one arm below the top.
+
+**It is fixable rather than a property of 8-bit**, which is the tempting reading: the 256-palette's
+cube is 6 × 6 × 6 over levels `0 · 95 · 135 · 175 · 215 · 255`, so an index converts to a colour,
+dims, and requantises. The conversion is **already written twice** — `resolve.ts` builds the cube
+for the theme's constraint solver and `colormap.ts` inlines the quantisation in
+`continuousColour`'s fallback — so the remedy is one definition and three callers rather than a
+fourth copy. *The cost is stated because it is real and it is not the 24-bit cost: the cube's levels
+are unevenly spaced, so halving 215 lands on 175 and halving 95 lands on 0. Dimming at 8-bit
+compresses the dark end harder than the light, and a map's lowest band goes to black.*
+
 ## 3y. Two more readings of a field — iso-lines and arrows
 
 A field is a grid of numbers and C12 draws exactly one thing with it: a heatmap, where the
