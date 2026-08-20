@@ -15,9 +15,9 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const DEFN = "src/presentation/plot/definition.ts";
 /** The guard the whole partition hangs on — spelled once (C12 I44). */
-const GUARD = '      if (dots === null || cellKind !== layer.kind) continue;';
-/** The tone half of the same rule — two peers name neither of themselves. */
-const NEUTRAL = '      if (layer.kind === "curve") cellRef = "tone.muted";';
+const GUARD = '        if (dots === null || cellKind !== layer.kind) continue;';
+/** The turn: which contending peer this cell goes to (C12 I44). */
+const PICK = '      const pick = peers[x % peers.length]!; // cells-ok — a cell column';
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -36,8 +36,8 @@ const results = runPass({
   run,
   control: {
     file: DEFN,
-    from: `${GUARD}\n      bits |= dots;`,
-    to: `${GUARD}\n      bits = 0;`,
+    from: `${GUARD}\n        bits |= dots;`,
+    to: `${GUARD}\n        bits = 0;`,
     why: "a cell whose unioned bits are always zero draws U+2800 — blank — wherever two layers meet, so the disc is holes and the frame is gone; a run that cannot see that cannot see any row below",
   },
   mutations: [
@@ -45,7 +45,7 @@ const results = runPass({
       // **The shipped defect, exactly.** The whole cell to the first layer.
       name: "the first layer to ink a cell keeps the whole cell",
       file: DEFN,
-      from: `${GUARD}\n      bits |= dots;\n      cell = String.fromCodePoint(BRAILLE_BASE + bits);`,
+      from: `${GUARD}\n        bits |= dots;\n        cell = String.fromCodePoint(BRAILLE_BASE + bits);`,
       to: "      break;",
       expect: "LM1",
     },
@@ -54,8 +54,8 @@ const results = runPass({
       // than join. The radar's frame would then erase the polygons under it.
       name: "a later layer's dots replace an earlier layer's",
       file: DEFN,
-      from: "      bits |= dots;",
-      to: "      bits = dots;",
+      from: "        bits |= dots;",
+      to: "        bits = dots;",
       expect: "LM1",
     },
     // **The non-braille `break` survived being removed, and the reason is a
@@ -86,8 +86,8 @@ const results = runPass({
       // first two drops it wherever two polygons already met.
       name: "the merge stops after two layers",
       file: DEFN,
-      from: `${GUARD}\n      bits |= dots;`,
-      to: `${GUARD.replace("if (dots === null", "if (bits !== 0 || dots === null")}\n      bits |= dots;`,
+      from: `${GUARD}\n        bits |= dots;`,
+      to: `${GUARD.replace("if (dots === null", "if (bits !== 0 || dots === null")}\n        bits |= dots;`,
       expect: "LM3",
     },
     {
@@ -97,7 +97,7 @@ const results = runPass({
       name: "every layer unions, context included",
       file: DEFN,
       from: GUARD,
-      to: "      if (dots === null) continue;",
+      to: "        if (dots === null) continue;",
       expect: "LM3",
     },
     {
@@ -107,27 +107,36 @@ const results = runPass({
       name: "two peers occlude instead of unioning",
       file: DEFN,
       from: GUARD,
-      to: '      if (dots === null || cellKind !== layer.kind || layer.kind === "curve") continue;',
+      to: '        if (dots === null || cellKind !== layer.kind || layer.kind === "curve") continue;',
       expect: "LM6",
     },
     {
-      // **The tone.** Peers union and the first one names the cell — which is
-      // the report the amendment came from, *the orange bleeds onto the blue
-      // and green lines*.
-      name: "the first peer names a cell two of them share",
+      // **The turn stops turning**, so the first contender keeps the whole
+      // contested run and the rest are absent from it — the deletion the
+      // reader caught, and the failure the suite had no row for.
+      name: "the first peer keeps every cell it contends",
       file: DEFN,
-      from: NEUTRAL,
-      to: "",
+      from: PICK,
+      to: "      const pick = peers[0]!;",
       expect: "LM6",
     },
     {
-      // And the converse: a wedge boundary greying. At ten segments the small
-      // wedges contest cells with both neighbours and a whole sector goes grey.
-      name: "a surface boundary names neither wedge",
+      // The other direction: the picked peer draws every peer's ink, in its own
+      // colour. *The orange bleeds onto the blue and green lines*, verbatim.
+      name: "the peer that takes a cell keeps every peer's ink in it",
       file: DEFN,
-      from: NEUTRAL,
-      to: '      cellRef = "tone.muted";',
-      expect: "LM5",
+      from: "      cell = String.fromCodePoint(BRAILLE_BASE + pick.ink);",
+      to: "      cell = String.fromCodePoint(BRAILLE_BASE + bits);",
+      expect: "LM6",
+    },
+    {
+      // A surface that rotates stipples every seam it has — the pie's wedges
+      // are regions and their continuity is not a reading (C12 I44).
+      name: "a wedge boundary turns between the two wedges",
+      file: DEFN,
+      from: '      if (layer.kind === "curve") peers.push({ ref: layer.ref, ink: dots });',
+      to: '      peers.push({ ref: layer.ref, ink: dots });',
+      expect: "LM1",
     },
     // **Renaming every wedge to one other kind is an identity, and measuring is
     // what says so.** The merge asks whether two layers share a kind, and a

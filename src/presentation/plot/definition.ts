@@ -506,6 +506,15 @@ function mergedRow(
     let cellRef: ColourRef | null = null;
     let cellKind: Layer["kind"] | null = null;
     let bits = 0;
+    /**
+     * The `"curve"` layers contending for this cell, in layer order (I44).
+     *
+     * `ink` rather than `dots`, because MG24 matches members **by name** (F160)
+     * and a local field called `dots` silently satisfies `UNCONSUMED_MEMBERS`'
+     * entry for `Grid.dots` — an exemption cleared by a homonym is an exemption
+     * nobody reads again.
+     */
+    const peers: { ref: ColourRef; ink: number }[] = [];
     for (const layer of layers) {
       const candidate = [...(layer.glyphRows[rowIndex] ?? "")][x] ?? " ";
       if (isBlank(candidate)) continue;
@@ -517,17 +526,27 @@ function mergedRow(
         // A non-braille winner ends the cell: nothing may be OR-ed into a letter.
         if (dots === null) break;
         bits = dots;
-        continue;
+      } else {
+        // Past the first inking layer, only braille contributes, only to a cell
+        // that is itself braille, and **only between two layers of one kind**
+        // (I44). Across kinds the topmost owns the cell outright.
+        if (dots === null || cellKind !== layer.kind) continue;
+        bits |= dots;
+        cell = String.fromCodePoint(BRAILLE_BASE + bits);
       }
-      // Past the first inking layer, only braille contributes, only to a cell
-      // that is itself braille, and **only between two layers of one kind**
-      // (I44). Across kinds the topmost owns the cell outright.
-      if (dots === null || cellKind !== layer.kind) continue;
-      bits |= dots;
-      cell = String.fromCodePoint(BRAILLE_BASE + bits);
-      // Two peers in one cell: both sets of dots, and a tone that names
-      // neither. A surface's boundary keeps its tone — see `Layer.kind`.
-      if (layer.kind === "curve") cellRef = "tone.muted";
+      // **One site, so which layers contend is stated once.** It was said in
+      // both branches, and a rule written twice is a rule half of which can be
+      // changed.
+      if (layer.kind === "curve") peers.push({ ref: layer.ref, ink: dots });
+    }
+    // **Where peers contend, the cell goes to one of them and which one turns
+    // with the column** (I44). Every cell then holds one series' dots in that
+    // series' colour, and each line runs through the overlap as a dash rather
+    // than one line taking the region and the rest vanishing.
+    if (peers.length > 1) { // cells-ok — a layer count
+      const pick = peers[x % peers.length]!; // cells-ok — a cell column
+      cellRef = pick.ref;
+      cell = String.fromCodePoint(BRAILLE_BASE + pick.ink);
     }
     if (cellRef !== runRef) {
       flush();

@@ -163,14 +163,33 @@ export function brailleDots(ch) {
   return dots;
 }
 
+/**
+ * **The dot radius is a fraction of the dot *pitch*, not of the cell.**
+ *
+ * It was `min(cellW, cellH) * 0.1` — 1.7px across, against a pitch of 4.5
+ * vertically and 5.9 horizontally, so under a third of the space between two
+ * dots was inked. A terminal font draws them nearly touching: `⣿` is a solid
+ * cell and it previewed as eight specks.
+ *
+ * The cost was not cosmetic. **Every braille figure in the catalogue read as
+ * far sparser than it renders**, and a reader judging a filled pie, or whether
+ * a line survives a crossing, was judging the previewer. 0.36 of the pitch puts
+ * the dot at about 70% duty, which is where DejaVu Sans Mono's are.
+ */
+const DOT_DUTY = 0.40;
+
 function renderBrailleCell(x, y, ch, colour, cellW, cellH) {
   const dots = brailleDots(ch);
   if (dots.length === 0) return "";
-  const dotR = Math.min(cellW, cellH) * 0.1;
-  const padX = cellW * 0.15;
-  const padY = cellH * 0.08;
-  const stepX = cellW - 2 * padX;
-  const stepY = (cellH - 2 * padY) / 3;
+  // **A braille cell is 2 sub-cells across and 4 down, and each dot is centred
+  // in its own.** The pitch was `cellW - 2 · 0.15 · cellW` — the two columns
+  // pushed to the cell's edges, 5.9px apart in an 8.4px cell against a true
+  // pitch of 4.2 — so the disc came out with vertical stripes through it.
+  const stepX = cellW / 2;
+  const stepY = cellH / 4;
+  const padX = stepX / 2;
+  const padY = stepY / 2;
+  const dotR = Math.min(stepX, stepY) * DOT_DUTY;
   return dots.map(([dc, dr]) => {
     const cx = x + padX + dc * stepX;
     const cy = y + padY + dr * stepY;

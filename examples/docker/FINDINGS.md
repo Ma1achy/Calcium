@@ -10019,13 +10019,23 @@ presence-of-ink with presence-of-this-series cannot measure either failure.*
 | occlude | **deleted** | correct | blue and green vanish through the crossing |
 | **union, neutral tone** | complete | **neither** | three lines converge into a grey braid and separate |
 
-**There was a third answer to *which series is this?* and it is *several*.** A `Span` carries one
-`ColourRef` and that was read as *it must name a series*. `tone.muted` names none, and the
-precedent was one section away the whole time: §3r's doji is muted rather than green **because
-the categories do not apply**. A cell holding two series is that same fact one form along.
+**And the neutral tone was a third compromise, not the answer** — *why are you using neutral,
+can't you just fix it properly.* Right again. **A cell holds one colour, and that never meant a
+*region* holds one colour**: the constraint was being read at the wrong scale three times
+running. Occlusion gave all eleven contested cells to one series; the neutral gave them to none;
+**turning the owner with the column gives each a share**, so every cell holds one series' dots
+in that series' own slot and each line runs the overlap as a dash.
 
-Measured on `slope-default`: **0 dots deleted, 0 dots drawn in another series' colour, 11 cells
-naming neither.**
+| rule | ink | tone | `slope-default` |
+|---|---|---|---|
+| union, first wins | complete | series 0 | 25 dots wearing another series' colour |
+| occlude by layer order | **deleted** | true | south and east absent through the crossing |
+| union, neutral tone | complete | **names neither** | 11 grey cells; no line identifiable |
+| **rotate by column** | a dash each | **true** | **125 / 119 / 122 of 134 dots in their own colour · 0 mistinted · longest absence 3 columns** |
+
+*Three lines genuinely occupy those cells — at 10 rows over a range of 26 they sit inside two
+dot rows of each other — so something has to give, and what gives is a third of the cells each
+rather than a line.*
 
 **And the neutral is wrong for a surface, which only the picture said.** Applied to a pie it does
 not draw a border — at ten segments the small wedges contest cells with *both* neighbours and a
@@ -10043,4 +10053,37 @@ is mistinted**, and a fabrication of each of the three wrong rules fails a diffe
 union of **any** layers waves through the frame joining a polygon, which is F199 again. Scoped to
 the peers, and shown to fail by fabricating it — with every layer unioning, all fifteen rows had
 been green.
+
+## F204 — the previewer drew every braille dot at a third of its pitch ★★★★★
+
+*This looks like ass, why is the pie all messed up* — and the pie's glyphs were `⣿`, a **fully
+solid cell**, all the way across the disc. Nothing was wrong with the plot.
+
+`catalogue-png.mjs` renders a braille cell as circles, and it sized them
+`min(cellW, cellH) * 0.1` — **1.7px across against a dot pitch of 4.5** — so under a third of
+the space between two dots was inked. It also spread the two dot columns to the cell's edges,
+`cellW - 2 · 0.15 · cellW = 5.9px` apart in an 8.4px cell, against a true pitch of `cellW / 2 =
+4.2`. So a solid disc previewed as scattered specks with vertical stripes through it, and a
+terminal draws it as a disc.
+
+**Every judgement made through this previewer in this arc was made through a distortion**, and
+they were the judgements that drove three rulings. The pie reading as broken, the radar reading
+as sparse, whether a line survives a crossing — all of it was read off frames that under-drew
+braille by a factor of three in area. *An instrument that renders the artefact is part of the
+artefact.*
+
+**And it had a fixture.** `tools/` has one for `ansiToSvg` and it passed throughout, because it
+asserts the SVG's *structure* — that a braille cell becomes circles, that the colours parse —
+and no assertion in it is about how big a circle is relative to the next one. **A fixture over
+shape cannot see a scale**, which is the same class as F190's assertion-by-proxy one directory
+along.
+
+Fixed: the pitch is `cellW / 2` by `cellH / 4` with each dot centred in its sub-cell, and the
+radius is `0.40` of the pitch — about 80% duty, where DejaVu Sans Mono's sit. **The number is
+evidence and not a threshold** (F179's rule): it was chosen by rendering the solid disc and
+looking, and the reason to keep it is that `⣿` must read as solid.
+
+**The third shape of *an instrument can manufacture evidence*, and the one that was missing**:
+not truncated, not fabricated from nothing, but **real bytes reassembled by a wrong model**. The
+glyphs were right, the colours were right, the geometry was a guess nobody had measured.
 

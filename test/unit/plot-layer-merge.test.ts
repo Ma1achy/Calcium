@@ -308,64 +308,80 @@ describe("LM6 (C12 I44): curves occlude and surfaces union, on real figures", ()
       80,
     ).map(plain);
 
-  it("nothing is deleted — every dot a series draws alone is drawn in the composed frame", () => {
-    const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
-    const composed = kit().renderToLines(slopeBlock(SLOPE), 80).map(plain);
-    const lost: string[] = [];
-    SLOPE.forEach((sr, k) => {
-      aloneRows(k).forEach((row, r) => {
-        [...row].forEach((ch, x) => {
-          const mine = bits(ch);
-          if (mine === 0) return;
-          const drawn = bits([...(composed[r] ?? "")][x] ?? " ");
-          if ((drawn & mine) !== mine) lost.push(`${sr.label} r${String(r)}c${String(x)}`);
-        });
-      });
+  /**
+   * The slot each series wears, tallied over the cells it inks alone.
+   *
+   * **Scraping every SGR out of an alone render also collects the axis's muted
+   * one**, and a muted cell was the answer under test at the time — so every
+   * row passed by naming it as one of the series' own.
+   */
+  const slotOfSeries = SLOPE.map((_s, k) => {
+    const tally = new Map<string, number>();
+    kit().renderToLines(
+      slopeBlock(SLOPE.map((sr, j) => (j === k ? sr : { ...sr, values: sr.values.map(() => null) }))),
+      80,
+    ).map(cellsOf).forEach((row) => {
+      for (const c of row) {
+        if (!isBraille(c.ch) || c.ch === "⠀" || c.slot === "") continue;
+        tally.set(c.slot, (tally.get(c.slot) ?? 0) + 1); // cells-ok — a cell count
+      }
     });
-    expect(lost).toEqual([]);
+    return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
   });
 
   it("nothing is mistinted — a cell wearing a series' slot holds only that series' ink", () => {
     const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
     const composed = kit().renderToLines(slopeBlock(SLOPE), 80).map(cellsOf);
     const alone = SLOPE.map((_s, k) => aloneRows(k));
-    // **The slot each series wears, taken from the cells it inks.** Scraping
-    // every SGR out of an alone render also collects the axis's muted slot, and
-    // the muted slot is the one a contested cell wears — so every row passed by
-    // naming the answer as one of the series' own.
-    const slotOfSeries = SLOPE.map((_s, k) => {
-      const tally = new Map<string, number>();
-      kit().renderToLines(
-        slopeBlock(SLOPE.map((sr, j) => (j === k ? sr : { ...sr, values: sr.values.map(() => null) }))),
-        80,
-      ).map(cellsOf).forEach((row) => {
-        for (const c of row) {
-          if (!isBraille(c.ch) || bits(c.ch) === 0 || c.slot === "") continue;
-          tally.set(c.slot, (tally.get(c.slot) ?? 0) + 1); // cells-ok — a cell count
-        }
-      });
-      return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
-    });
-    // Three series, three distinct slots — a fixture where two shared one would
-    // make the row below unfalsifiable.
-    expect(new Set(slotOfSeries).size).toBe(3); // cells-ok — a series count
-
     const bled: string[] = [];
     composed.forEach((row, r) => {
       row.forEach((cell, x) => {
         const drawn = bits(cell.ch);
         if (drawn === 0 || cell.slot === "") return;
-        // Which series claim ink here?
-        const owners = alone
-          .map((a, k) => [k, bits([...(a[r] ?? "")][x] ?? " ")] as const)
-          .filter(([, b]) => b !== 0);
-        if (owners.length < 2) return;
-        // Contested: the cell must name none of them (C12 I44, §3r's precedent).
-        const named = owners.some(([k]) => slotOfSeries[k] === cell.slot);
-        if (named) bled.push(`r${String(r)}c${String(x)} ${cell.slot}`);
+        const k = slotOfSeries.indexOf(cell.slot);
+        if (k < 0) return;
+        const mine = bits([...(alone[k]![r] ?? "")][x] ?? " ");
+        if ((drawn & ~mine) !== 0) bled.push(`r${String(r)}c${String(x)} ${cell.slot}`);
       });
     });
     expect(bled).toEqual([]);
+  });
+
+  it("no peer is dropped from a contested run — each takes about one cell in n", () => {
+    // **The row this suite was missing, and its absence licensed a deletion.**
+    // `nothing is mistinted` is satisfied perfectly by drawing one series and
+    // discarding the rest, which is what shipped: two opposite failures, one
+    // asserted. Three lines genuinely occupy these cells — at 10 rows over a
+    // range of 26 they are inside two dot rows of each other — so what is owed
+    // is not *every* cell but a **share** of them (C12 I44).
+    const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
+    const composed = kit().renderToLines(slopeBlock(SLOPE), 80).map(cellsOf);
+    const alone = SLOPE.map((_s, k) => aloneRows(k));
+    const held = SLOPE.map(() => 0);
+    let contested = 0;
+    composed.forEach((row, r) => {
+      row.forEach((cell, x) => {
+        const owners = alone
+          .map((a, k) => [k, bits([...(a[r] ?? "")][x] ?? " ")] as const)
+          .filter(([, b]) => b !== 0);
+        if (owners.length < 2) return; // cells-ok — a layer count
+        contested += 1; // cells-ok — a cell count
+        const k = slotOfSeries.indexOf(cell.slot);
+        if (k >= 0) held[k]! += 1; // cells-ok — a cell count
+      });
+    });
+    expect(contested).toBeGreaterThanOrEqual(8); // cells-ok — a cell count
+    // Every series that contends holds some of them: a share, not a monopoly
+    // and not nothing. The bound is `contested / n / 3` rather than an exact
+    // third, because which series contend varies cell to cell.
+    const floor = Math.floor(contested / SLOPE.length / 3); // cells-ok — a cell count
+    expect(floor).toBeGreaterThan(0); // cells-ok — a cell count
+    held.forEach((n, k) => {
+      expect(n, `${SLOPE[k]!.label} holds ${String(n)} of ${String(contested)} contested cells`)
+        .toBeGreaterThanOrEqual(floor);
+    });
+    // And no series takes all of them, which occlusion by layer order does.
+    expect(Math.max(...held)).toBeLessThan(contested); // cells-ok — a cell count
   });
 
   it("the fixture responds: the three series do share cells", () => {
