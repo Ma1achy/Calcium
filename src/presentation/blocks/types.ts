@@ -24,6 +24,19 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
  */
 export type BlockFault = Readonly<{
   kind: string;
+  /**
+   * **Which block, and it was missing** (C22 I69).
+   *
+   * A fault carrying only the kind is enough to write a diagnostic and not
+   * enough to *act* — the shell that wants to reserve rows for a block whose
+   * renderer gave way has to address it, and `ViewPatch` addresses by id. The
+   * kind cannot stand in: a document can hold three `plot`s.
+   *
+   * Ids are unique within a document (C04 I14) and **not across entries**, so
+   * this half of the address is the caller's: whoever is rendering an entry
+   * knows which one, and the fault does not.
+   */
+  id: string;
   /** Which half gave way. Three, and the fourth was folded into `elements` (I30). */
   member: "measure" | "render" | "elements";
   error: unknown;

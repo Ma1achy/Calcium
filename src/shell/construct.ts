@@ -40,6 +40,7 @@ import {
 } from "../data/transport/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
+import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
 import { plotDefinition } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
@@ -262,6 +263,13 @@ export type Graph = Readonly<{
    */
   diagnostics: () => readonly string[];
   blocks: ReturnType<typeof createBlockRegistry>;
+  /**
+   * What C09's containments swallowed, and what the frame owes for it (I69,
+   * I70). On the graph rather than private to construction, because the render
+   * loop both writes it — `visibleRows` scopes faults to an entry — and reads
+   * it, after the frame, where the reserve is issued.
+   */
+  blockFaults: BlockFaultLog;
   adapters: ReturnType<typeof createAdapterRegistry>;
   manifest: ReturnType<typeof createManifestStore>;
   completion: ReturnType<typeof createEngine>;
@@ -440,14 +448,12 @@ export async function constructGraph(
     // C20's — the component decides what is wrong, C22 §8 step 3 decides when
     // the reader is told, and a diagnostic painted onto the alternate screen is
     // discarded with it.
-    const blockFaults: string[] = [];
-    const blocks = createBlockRegistry({
-      defaults: true,
-      onError: (fault) => {
-        const text = `block ${fault.kind}.${fault.member}: ${String(fault.error)}`;
-        if (!blockFaults.includes(text)) blockFaults.push(text);
-      },
-    });
+    // **Still a pull, and now also a record of what is owed** (C22 I69, I70).
+    // The messages half is unchanged; the second half exists because a fault is
+    // the only thing that knows which block gave way, and the shell has to
+    // address one to reserve rows for it.
+    const blockFaults = new BlockFaultLog();
+    const blocks = createBlockRegistry({ defaults: true, onError: blockFaults.report });
     // **The three the framework itself produces** (C09 §1, I13). `defaults`
     // ships C09's fourteen; `table`, `plot` and `patch` register through the
     // public mechanism, and until this line nobody called it — so a stock
@@ -1574,10 +1580,11 @@ export async function constructGraph(
       Object.freeze([
         ...detection.warnings,
         ...stores.history.warnings,
-        ...built.blockFaults,
+        ...built.blockFaults.messages,
         ...pipeline.faults,
       ]),
     blocks: built.blocks,
+    blockFaults: built.blockFaults,
     adapters: built.adapters,
     manifest: built.manifest,
     completion: built.completion,

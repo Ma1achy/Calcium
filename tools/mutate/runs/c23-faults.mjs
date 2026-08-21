@@ -90,7 +90,7 @@ const results = runPass({
       from:
         "        ...detection.warnings,\n" +
         "        ...stores.history.warnings,\n" +
-        "        ...built.blockFaults,\n" +
+        "        ...built.blockFaults.messages,\n" +
         "        ...pipeline.faults,",
       to: "        ...detection.warnings,",
       expect: "T4.20",
@@ -98,8 +98,8 @@ const results = runPass({
     {
       name: "step 3 forgets C23's faults",
       file: "src/shell/construct.ts",
-      from: "        ...built.blockFaults,\n        ...pipeline.faults,",
-      to: "        ...built.blockFaults,",
+      from: "        ...built.blockFaults.messages,\n        ...pipeline.faults,",
+      to: "        ...built.blockFaults.messages,",
       expect: "T4.27",
     },
     {
@@ -108,7 +108,7 @@ const results = runPass({
       // reported nowhere for the life of the registry (F223).
       name: "step 3 forgets what C09's containments swallowed",
       file: "src/shell/construct.ts",
-      from: "        ...stores.history.warnings,\n        ...built.blockFaults,",
+      from: "        ...stores.history.warnings,\n        ...built.blockFaults.messages,",
       to: "        ...stores.history.warnings,",
       expect: "T4.28",
     },

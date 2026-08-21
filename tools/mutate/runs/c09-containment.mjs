@@ -89,14 +89,14 @@ const results = runPass({
       // C09 I29 — the state both catches shipped in.
       name: "the render catch swallows without reporting",
       file: REG,
-      from: '      this.#report(block.kind, "render", error);',
+      from: '      this.#report(block, "render", error);',
       to: "",
       expect: "T3.35",
     },
     {
       name: "the measure catch swallows without reporting",
       file: REG,
-      from: '      this.#report(block.kind, "measure", error);',
+      from: '      this.#report(block, "measure", error);',
       to: "",
       expect: "T3.14",
     },
@@ -106,9 +106,9 @@ const results = runPass({
       // the shipped disagreement: *no elements* and *do not descend* at once.
       name: "a throwing `elements` still owns its children",
       file: REG,
-      from: '      this.#report(block.kind, "elements", error);\n      return NO_ELEMENTS;',
+      from: '      this.#report(block, "elements", error);\n      return NO_ELEMENTS;',
       to:
-        '      this.#report(block.kind, "elements", error);\n' +
+        '      this.#report(block, "elements", error);\n' +
         "      return { elements: EMPTY_ELEMENTS, owned: true };",
       expect: "T3.37",
     },

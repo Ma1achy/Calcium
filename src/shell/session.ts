@@ -30,6 +30,9 @@ import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
 import { composeFrame } from "./render-frame.js";
 import { focusKey } from "./render-cache.js";
+import { reserveNeeded } from "./block-faults.js";
+import { descendants } from "../data/viewmodel/index.js";
+import type { Block } from "../data/viewmodel/index.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
@@ -551,6 +554,12 @@ class Session implements TuiInstance {
     graph.lifecycle.writer.write(result.write);
     this.#lastFrame = result.lines;
 
+    // **After the write, and that is the whole of why the frame stays one pass**
+    // (I69). The fault is discovered inside `visibleRows`, which is a read of the
+    // transcript; patching it there would be a write inside the frame it would
+    // change. Here the frame is on the terminal and the next one honours it.
+    this.#raiseReserves(graph);
+
     // **Armed from what this frame drew, not from what the document holds.**
     // `visibleRows` reported the cadence after windowing, so a spinner scrolled
     // off the screen stops the timer and one scrolled back on starts it — which
@@ -572,6 +581,46 @@ class Session implements TuiInstance {
    * Disposed and re-armed every frame: the interval belongs to the fastest set
    * on screen, and both the set and the screen can change between frames.
    */
+  /**
+   * What the frame owed, issued (C22 I69, C04 I67).
+   *
+   * The three guards are `reserveNeeded`'s and are written down there, with the
+   * reason one of them lives in a function rather than in this loop: the drain
+   * is in the same synchronous block as the frame that filled it, so the arm
+   * about a moved `rev` is reachable only through a frame that returned early —
+   * a real path and a narrow one, and not one a session row would enter.
+   */
+  #raiseReserves(graph: Graph): void {
+    let raised = false;
+    for (const req of graph.blockFaults.drain()) {
+      const entry = graph.transcript.entries.find((e) => e.id === req.entryId);
+      const held = entry === undefined ? undefined : blockById(entry.doc.blocks, req.blockId);
+      if (!reserveNeeded(entry, held, req)) continue;
+
+      graph.transcript.patch(
+        req.entryId,
+        { op: "reserve", blockId: req.blockId, rows: req.rows },
+        // **The gate reads who is writing** (C13 §6). The entries whose
+        // renderers gave way are settled ones by construction — a result settles
+        // the moment it lands — so the far side's arm would refuse every case
+        // this exists for.
+        "shell",
+      );
+      raised = true;
+    }
+    // **Guarded, and it is the second half of termination.** An unconditional
+    // commit ends every frame by scheduling another, and the patch guard above
+    // does nothing about it: the session never goes quiet, draws the correct
+    // picture for ever, and looks exactly like one that is idle. Measured — a
+    // fixture with nothing animating in it wrote thirty more frames while the
+    // screen did not change.
+    //
+    // C03's window, so a reserve coalesces with whatever else moved the
+    // document. `stream` rather than `input`: this is content changing, not a
+    // key, and 33 ms is one frame at a rate a reader cannot see.
+    if (raised) graph.scheduler.commit("stream");
+  }
+
   #armSpinner(): void {
     this.#spinner?.[Symbol.dispose]();
     this.#spinner = null;
@@ -863,9 +912,15 @@ function visibleRows(
     const animated = cadence === null ? "" : `\u0000${String(tick)}`;
     const slot = `${key}\u0000${range}\u0000${offsets}${animated}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
+    // **Faults from here are this entry's** (I69). A `BlockFault` names a block
+    // and ids are unique within a document and not across entries (C04 I14), so
+    // neither half addresses anything on its own. A scope rather than a field,
+    // because the render that produces the fault is one call and the caller is
+    // what knows which entry it is drawing.
     const lines =
       held ??
-      renderSequenceToLines(graph.blocks, windowed.blocks, width, {
+      graph.blockFaults.within(entry.id, entry.rev, () =>
+        renderSequenceToLines(graph.blocks, windowed.blocks, width, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
         // **The third field, and the context was shipped with two** (C16 §3).
@@ -881,10 +936,26 @@ function visibleRows(
         // two are a pair — supplying it here while the commit is missing leaves
         // the frame exactly as frozen, which is what made the obvious repair
         // indistinguishable from doing nothing.
-        tick,
-        scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
-      });
+          tick,
+          scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
+        }),
+      );
     if (held === undefined) {
+      // **C09's rows against C09's own number, on the frame that produced them**
+      // (I70, F230). The trim below reconciles this entry's rows against C14's
+      // slot and cannot say whether it is cutting a screen that ran out or a
+      // block that over-drew — the two are the same `slice` and one of them
+      // deletes the block underneath. This is where the difference is knowable,
+      // and it is asked only on a cache miss: a hit's lines came from a miss
+      // that was already asked.
+      const expected = graph.blocks.measureSequence(windowed.blocks, width);
+      if (lines.length !== expected) {
+        graph.blockFaults.note(
+          `entry ${entry.id}: C09 drew ${String(lines.length)} rows where measure ` +
+            `committed ${String(expected)} (C09 I1) — the frame keeps ${String(expected)}, ` +
+            `and anything below the overflow in this entry is dropped`,
+        );
+      }
       graph.rendered.set(entry.id, entry.rev, width, slot, theme, lines);
     }
 
@@ -945,6 +1016,22 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   const found = i === null ? undefined : elements[i];
   if (found === undefined) return null;
   return Object.freeze({ blockId: found.blockId, rowId: found.element.id });
+}
+
+/**
+ * One block by id, children included (C04 I14).
+ *
+ * **The subtree, because a containment descends.** A `steps` inside a `panel` is
+ * exactly what `b.live` builds, so the block that gave way is as likely to be a
+ * child as a top-level entry — and a top-level scan would silently reserve
+ * nothing for the arrangement the framework itself produces.
+ */
+function blockById(blocks: readonly Block[], id: string): Block | undefined {
+  for (const block of blocks) {
+    if (block.id === id) return block;
+    for (const child of descendants(block)) if (child.id === id) return child;
+  }
+  return undefined;
 }
 
 /** What `session` reads before the graph exists — §9's `created` state. */

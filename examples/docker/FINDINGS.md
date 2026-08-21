@@ -11353,3 +11353,44 @@ may set is a small, enumerable set, and the validator can be made to refuse all 
 
 **Filed rather than fixed**, because the deferred height change adds the second member of that
 set and the two should be closed together.
+
+---
+
+## F232 — the anchor checker read a concatenated anchor as its first fragment ★★★☆☆
+
+F173 widened `anchorsOf`'s pattern from one quote style to two and turned *108 of 465 anchors
+invisible* into a gate that could see its subject. **It stopped at the form in front of it.** A
+`from:` whose value is written as a `+`-joined run of literals on its own lines —
+
+```js
+      from:
+        "        ...detection.warnings,\n" +
+        "        ...stores.history.warnings,\n" +
+        "        ...built.blockFaults,\n" +
+        "        ...pipeline.faults,",
+```
+
+— was matched by `from:\s*("…")` with `\s*` crossing the newline, so **the anchor the checker
+held was the first fragment alone**. Six of 838 across five runs: `c02-polarity`,
+`c12-absence`, `c23-faults`, `enforce-public-surface`, `states-axis`.
+
+**And a fragment resolves where the whole does not, which is the direction that matters.**
+`...detection.warnings,` is in `construct.ts` and always will be; the four lines together stopped
+matching the moment `built.blockFaults` became `built.blockFaults.messages`. The gate said *no
+run drifted* about an anchor that had moved — measured on the commit that moved it.
+
+**This is not F173's class arriving again. It is one shape worse.** F173's anchors were
+*unread*: 465 counted, 108 unseen, and the summary said so by omission. These were **read
+wrongly** — counted, resolved, and reported clean — which is the truncated form of *an
+instrument can manufacture evidence*, the shape whose whole hazard is that the count looks
+right. Before and after the fix the total is **801 either way**; only which string was checked
+changed.
+
+**Fixed** — the pattern matches a sequence of literals and joins them, so the anchor the checker
+holds is the anchor the harness will apply. The one stale anchor was repaired and
+`c23-faults.mjs` re-run whole, twelve mutations, all caught.
+
+**The reusable part is where to point a widening.** F173's remedy was correct and its scope was
+the case in hand; nothing asked *what else does this pattern not read*, and the answer was one
+grep — `from:\s*\n` — against the same directory. A widening that fixes an instrument should
+count what it still cannot reach, and the figure belongs beside the fix.

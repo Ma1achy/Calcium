@@ -106,8 +106,8 @@ class Registry implements BlockRegistry {
    * cadence, so a flood is the default shape and L4's recorder already collapses
    * one by message.
    */
-  #report(kind: string, member: BlockFault["member"], error: unknown): void {
-    this.#onError(Object.freeze({ kind, member, error }));
+  #report(block: Block, member: BlockFault["member"], error: unknown): void {
+    this.#onError(Object.freeze({ kind: block.kind, id: block.id, member, error }));
   }
 
   /**
@@ -129,7 +129,7 @@ class Registry implements BlockRegistry {
       // row. This protects virtualisation: C14 sums measured heights without
       // rendering, so a measurer that throws would take the viewport with it
       // (T3.14). Compute, so no retry (A02 §7 rule 2).
-      this.#report(block.kind, "measure", error);
+      this.#report(block, "measure", error);
       return { ok: false, rows: Math.max(1, floor) };
     }
   }
@@ -178,7 +178,7 @@ class Registry implements BlockRegistry {
       if (declared === undefined) return NO_ELEMENTS;
       return { elements: declared(resolved.block, width, this.measure), owned: true };
     } catch (error) {
-      this.#report(block.kind, "elements", error);
+      this.#report(block, "elements", error);
       return NO_ELEMENTS;
     }
   }
@@ -498,7 +498,7 @@ class Registry implements BlockRegistry {
       // containment includes the row count**. The rest of the frame is
       // unaffected in position as well as in content, and the block says what
       // happened rather than vanishing.
-      this.#report(block.kind, "render", error);
+      this.#report(block, "render", error);
       const message = error instanceof Error ? error.message : String(error);
       return this.#floored(
         block,

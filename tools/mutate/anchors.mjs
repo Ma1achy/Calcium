@@ -122,20 +122,28 @@ function anchorsOf(src) {
   // inside the body and stop at the first one followed by a comma, which a value
   // containing `",` ends early and silently. Comment lines between `file:` and
   // `from:` are skipped — a re-anchoring usually arrives with its reason.
+  // **And the value may be a concatenation, on its own lines** — the second form
+  // this instrument could not see (F232). Widening for both quote styles left
+  // `from:` followed by a newline and a `+`-joined run of literals outside the
+  // pattern: **6 of 838 anchors across 5 runs**, and one of them was stale on the
+  // day it was measured. The same shape as F173 one turn later — a widening that
+  // fixed the form in front of it and stopped there — which is why this matches a
+  // *sequence* of literals rather than a third alternative.
+  const LITERAL = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`;
   const re = new RegExp(
     String.raw`file:\s*([A-Z_][A-Z_0-9]*|"[^"]*"|'[^']*')\s*,\s*\n\s*(?:\/\/[^\n]*\n\s*)*from:\s*` +
-      String.raw`(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')`,
+      String.raw`((?:(?:${LITERAL})\s*\+?\s*)+)`,
     "g",
   );
+  const pieces = new RegExp(LITERAL, "g");
   for (const m of src.matchAll(re)) {
     const raw = m[1];
     const file = raw.startsWith('"') || raw.startsWith("'") ? raw.slice(1, -1) : consts[raw];
     if (file === undefined) continue;
-    out.push(
-      m[2] !== undefined
-        ? { file, from: unquote(m[2], '"') }
-        : { file, from: unquote(m[3], "'") },
-    );
+    const from = (m[2].match(pieces) ?? [])
+      .map((lit) => unquote(lit.slice(1, -1), lit[0]))
+      .join("");
+    out.push({ file, from });
   }
   return out;
 }

@@ -48,6 +48,22 @@ const PAD = 1;
 const SECOND = 1000;
 
 /**
+ * The fewest rows a failure can be *stated* in (C22 I69, C04 I67).
+ *
+ * **Three, because three is where the ladder first draws a border** — below it
+ * the box is a bare message line and a reader cannot tell a contained failure
+ * from a block that happens to say something red. It is exported because the
+ * shell reserves it: a `rule` measures one row, so a `rule` whose renderer gave
+ * way has one row until something asks for more, and this is the number it asks
+ * for.
+ *
+ * **Not four.** The tag row costs the fourth and the ladder already gives it up
+ * at three deliberately — a floor is the least that says *something failed
+ * here*, not the height the figure would prefer.
+ */
+export const ERROR_MIN_ROWS = 3;
+
+/**
  * The height rungs (C09 I31).
  *
  * The full figure is two borders, two blanks and the tag row, so it needs
