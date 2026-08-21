@@ -314,7 +314,7 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
 
       // Parity of *height* is what the suite above checks. This is the other
       // half and the one a consumer trips: a fallback that is not 1:1 by column
-      // count widens a row without changing its height (C09 commitment 14).
+      // count widens a row without changing its height (C09 commitment 5).
       for (const width of DEFAULT_WIDTHS) {
         const ascii = rows(ASCII, width);
         const over = ascii.findIndex((line) => displayCells(plain(line)) > width);

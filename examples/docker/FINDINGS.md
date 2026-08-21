@@ -10851,3 +10851,160 @@ reads as strength**. C12 I27 carries the ruling and the residue together.
 written down and finding `legendRows`' comment says the opposite. Its running total is now four
 claims disproved and four produced, and this is the first of the four that was **mine**, filed one
 commit earlier in this same arc.
+
+---
+
+## F223 — a containment that restored the content and not the contract ★★★★☆
+
+**The boundary exists and predates the question.** `registry.ts` wraps four things — `measure`,
+`render`, `elements`, and the resolution behind the ownership question — and C09 I11, T3.13,
+T3.14, T6.7 and T6.8 were all written for it. Three of the four properties a per-block boundary
+needs hold: it is **per block** and genuinely so, because `renderChild` recurses through the same
+`render` and a throwing child inside a `panel` is contained at the child; the failure is
+**visible** — `[<kind> failed to render: <message>]`, carrying the thrown text; and the tone is
+`error`.
+
+**The fourth does not hold. Measured:**
+
+```
+measure=1   -> measure() says  1, render drew 1
+measure=2   -> measure() says  2, render drew 1
+measure=5   -> measure() says  5, render drew 1
+measure=20  -> measure() says 20, render drew 1
+
+a real plot, height: 20                     measure() = 20,  error block = 1
+measureSequence      [raw, throws(20), raw]           = 22
+renderSequenceToLines, the same sequence              =  3
+```
+
+The error path is `rows([paint([…])])` — one string, floored at one by `rows()` — and it never
+consults `measure`.
+
+**C09 I1 and C09 I11 sit adjacent in one list and neither mentions the other.** I1 is *"for every
+registered kind, `measure(b, w)` equals the row count of `render(b, ctx)`"*, and calls itself the
+system's most load-bearing invariant. I11 is *"a renderer throwing is contained: that block renders
+as an error block, **the rest of the frame is unaffected**."* That sentence is true about content
+and false about geometry — **MG24's shape**, a correct justification that does not constrain the
+decision attached to it. The cell where both invariants apply is a registered kind whose renderer
+throws, and it satisfies one of them.
+
+**The other direction was measured too and fails differently.** A throwing *measurer* is contained
+to 1 — ruled, in T3.14 — and nothing binds `render` to that number: the definition draws 5 rows and
+`visibleRows` clamps the entry with `rows.slice(0, ve.takeRows)`, so **four rows are dropped in
+silence**. A block showing a fifth of its drawing with nothing saying so.
+
+**What it does *not* do, which is where the obvious diagnosis is wrong.** `shell/paint.ts`'s
+`transcript()` throws `FrameError` when the viewport hands it more rows than the region has, and
+the first reading of this was that one broken plot takes the whole frame to the fallback — *"one
+row too few leaves the previous frame showing through while one too many scrolls the alternate
+screen"*, in that file's own words. **It does not.** The entry-level slice in `visibleRows` catches
+both directions before the frame check sees them. What actually happens is quieter and harder to
+attribute: the under-draw leaves the transcript short, `transcript()` pads it bottom-aligned, and
+C14 goes on scrolling the block as twenty rows — so a reader holding `↓` moves through nineteen
+rows of nothing and blank rows appear at the top of a viewport that is not short. **A frame
+arithmetically consistent and describing a different document than it holds**, which is the failure
+C09 I1 exists to prevent, arriving through the path that exists to survive failures.
+
+**The test that covers it asserts the defect.** T3.13's fixture is `broken("render")` with
+`measure: () => 2`, and its assertion is `lines[2]` contains `"after"` — the position the sibling
+takes *because* the error block is one row instead of two. The row is not weak; it is precise about
+the wrong frame. **The fixture constructs the divergent state and the expectation was written from
+the output**, which is the one direction a green run cannot distinguish.
+
+**And `logged` has never had a mechanism.** T3.14 reads *"contained, block treated as height 1,
+logged"*. Both catches are bare: `measure`'s discards the error entirely, `render`'s discards it
+the moment it has read the message off it, `RenderContext` carries no diagnostic seam, and L1
+cannot reach L4's. A step naming an effect with no mechanism, in a **test row** rather than a plan
+— satisfied by the half of the sentence that was true, which is why nothing ever went red.
+
+**Fixed in spec** — C09 I11 gains the geometry half rather than acquiring a sibling invariant, on
+the ground that a gap between two adjacent sentences is exactly what produced this one: the error
+block is `measure(b, w)` rows, the message is fitted to the committed height and never the height
+to the message, and a definition throwing in *either* half renders it. C09 I29 gives the four
+catches a sink — `createBlockRegistry({ onError })`, wired at L4 to C23's existing record of what
+the pipeline's bare catches swallowed (C23 I48), and supplied in the harness by one that fails the
+run. T3.13 is corrected to `lines[3]` **with the reason in the row**, because an expected value
+that changes without one reads as a test bent to fit the code. T6.21 restores the shipped
+behaviour — one row regardless of measure — and both new rows must die on it.
+
+**Found by measuring a boundary rather than by anything failing.** Nothing was red, no golden held
+a caught error, and the component had gone from 4 plot forms to 34 in one session — which is the
+argument for asking: bad *data* is handled by C12 I2 and a bad *shape* by both gates, and neither
+of those catches a bug.
+
+---
+
+## F224 — two catches, one block, two answers — and the container takes its subtree ★★★☆☆
+
+F223's class in a different member, found by checking the other two catches while in the file.
+
+`elementsOf` contains a throwing `elements` and answers `EMPTY_ELEMENTS`. The ownership question —
+*does this definition answer `elements` itself?* — is a **separate call** that asks whether
+`definition.elements !== undefined`, and its own catch covers only resolution. So for one block the
+two answer differently: *no elements*, and *it owns them, do not descend*.
+
+**Measured, and the control is the finding:**
+
+```
+E1  a leaf whose `elements` throws        elementsOf = [],  elementsIn found 4 from ["g","g2"]
+E2  a container declaring `elements`
+    that throws, two focusable children   elementsIn found 0
+E3  the same container, no `elements`     elementsIn found 4 from ["kid-1","kid-2"]
+```
+
+**0 against 4.** A container whose `elements` throws does not become atomic — it takes its whole
+subtree out of the focus walk, silently, and `↓` skips the lot. `scroll` is a shipped kind that
+declares `elements`, so a bug in it costs everything inside it. E1 is the contained case working:
+the block loses its own elements and its siblings keep theirs.
+
+**And the ruling it was supposed to satisfy names an outcome that does not exist.** C26 I12 read *"a
+refused or throwing `elements` makes the block atomic for that dispatch **and focus falls to the
+block level**."* `FocusState.rowId` is `string | null` and the type's own comment says `null` means
+the block itself is focused — and **`null` is constructed nowhere in `src/`**. `focusFor` returns
+`rowId: found.element.id` or no focus at all, so an atomic block is skipped rather than focused.
+Block-level focus is unbuilt.
+
+**That is C12 §3ah's class arriving in another spec**: a walk correct about the interaction it
+found and wrong about a mechanism it assumed existed. The finding survives and only the remedy
+changes — what a refusal must not leave behind is an unreachable **subtree**, which is what it was
+leaving, and that is expressible today.
+
+**Fixed in spec** — C09 I30 rules the mechanism (ownership is read from what resolution *returned*,
+never from whether the member is declared) and C26 I12 gains the reachability clause and loses the
+one with no mechanism. T3.37 asserts both arms, because a row that only exercises the throwing
+container passes at 0 and 4 alike; the control **is** the test.
+
+---
+
+## F225 — four commitments numbered twice, and the one citation into the collision resolves against neither ★★☆☆☆
+
+Found while appending to C09's commitment list, which could not be done cleanly without resolving
+it.
+
+**C09's `## 8. Commitments` is two lists.** The first runs 1–21; the second restarts at **11** and
+runs to 14 — so `C09 commitment 11`, `12`, `13` and `14` each name two different commitments.
+Measured across the tree: **C09 is the only spec with duplicate commitment numbers** — 25
+commitments, 4 collisions, against 0 in every other spec that has a numbered list.
+
+**Three citations exist and one of them is wrong in a way the collision hides.**
+`src/testing/expect-document.ts` cites `C09 commitment 14` for *"a fallback that is not 1:1 by
+column count widens a row without changing its height"* — which is **commitment 5**, *every
+capability substitution is 1:1 by cell count*. Neither candidate in the collided range is about
+substitution at all. The other two, in `C25` and `collapse.ts`, cite `commitment 11` and mean the
+first list's, and are correct by intent rather than by the number resolving.
+
+**Nothing checks it, and the rule that would is already argued for.** SP1 checks that a commitment
+cites an invariant; SP2 checks invariant numbering; **SP7 checks that a test row's number is unique
+within its spec**, on the reasoning that *"C13 I17 is the cap"* locates something only if the
+numbers do. A commitment is cited by fewer readers than a test row and by more than none, and
+`commitmentsOf` already parses `{n, text}` per row — the uniqueness check is a comparison it does
+not make.
+
+**Fixed** — the second list renumbered to 22–25 and the new commitments appended at 26–28;
+`expect-document.ts` re-pointed at commitment 5. **The enforcement row is not here**: A03
+commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, so the
+row lands with its implementation and this entry is the prose that goes ahead of it.
+
+**Worth its own number rather than a line in F223** because the test is *would landing this close
+it* — F223's fix touches none of this, and a renumber folded into another finding is a change
+nobody can find later.
