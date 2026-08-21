@@ -17,9 +17,10 @@ import {
 } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
-import { paint, rows, tone } from "./paint.js";
+import { fit, paint, rows, tone } from "./paint.js";
 import type {
   BlockDefinition,
+  BlockFault,
   BlockRegistry,
   NavElement,
   RenderContext,
@@ -34,6 +35,24 @@ import type {
  * every keystroke for a value that is always the same nothing.
  */
 const EMPTY_ELEMENTS: readonly NavElement[] = Object.freeze([]);
+
+/**
+ * *No elements, and this definition does not own them* — the one answer both
+ * halves of I30 are read from.
+ *
+ * **`owned: false` on the throwing path is the fix.** The two questions used to
+ * be two calls, and the ownership one asked whether `elements` was *declared*
+ * rather than what resolving it returned — so a container whose `elements` threw
+ * answered *no elements* and *do not descend* at once, and took its whole subtree
+ * out of the walk. Measured at 0 elements against a control's 4 (F224).
+ */
+const NO_ELEMENTS: Resolved = Object.freeze({ elements: EMPTY_ELEMENTS, owned: false });
+
+/** A block's elements and whether its definition answered them. */
+type Resolved = Readonly<{ elements: readonly NavElement[]; owned: boolean }>;
+
+/** The contained height, and whether the measurer gave way producing it (I11). */
+type Measured = Readonly<{ ok: boolean; rows: number }>;
 
 /**
  * The definition of last resort: a registry with no `raw` at all, which is
@@ -63,10 +82,83 @@ const MISSING: BlockDefinition = {
  */
 class Registry implements BlockRegistry {
   readonly #definitions = new Map<string, BlockDefinition>();
+  readonly #onError: (fault: BlockFault) => void;
   #sealed = false;
 
-  constructor(definitions: readonly BlockDefinition[]) {
+  constructor(definitions: readonly BlockDefinition[], onError: (fault: BlockFault) => void) {
     for (const definition of definitions) this.#definitions.set(definition.kind, definition);
+    this.#onError = onError;
+  }
+
+  /**
+   * What a containment swallowed, handed to whoever asked for it (I29).
+   *
+   * **Three call sites, not four**, and the fourth is gone rather than missing:
+   * the ownership question used to carry a catch of its own and now reads the
+   * one `#elements` already took (I30). The invariant was written expecting four
+   * and the implementation is what disproved it.
+   *
+   * **A throwing sink is not caught.** That is what makes a caught error a red
+   * suite rather than a quiet frame — the harness supplies one that throws, and
+   * containment that survives its own alarm would be the defect this exists to
+   * end. Deduplication is the sink's business: `measure` is called at frame
+   * cadence, so a flood is the default shape and L4's recorder already collapses
+   * one by message.
+   */
+  #report(kind: string, member: BlockFault["member"], error: unknown): void {
+    this.#onError(Object.freeze({ kind, member, error }));
+  }
+
+  /**
+   * `measure`, contained — and whether it gave way, which the error path needs
+   * and the public member throws away.
+   */
+  #measured(block: Block, width: number): Measured {
+    try {
+      const resolved = this.#resolve(block);
+      return { ok: true, rows: resolved.definition.measure(resolved.block, width, this.measure) };
+    } catch (error) {
+      // I11 — a throwing measurer is contained and the block treated as one
+      // row. This protects virtualisation: C14 sums measured heights without
+      // rendering, so a measurer that throws would take the viewport with it
+      // (T3.14). Compute, so no retry (A02 §7 rule 2).
+      this.#report(block.kind, "measure", error);
+      return { ok: false, rows: 1 };
+    }
+  }
+
+  /**
+   * The error block, at **exactly** the height already committed (I11).
+   *
+   * The message is fitted to the width and the remaining rows are blank; the
+   * height is never fitted to the message. A committed height of zero — an empty
+   * `group`, the one legitimate zero (`rows`' own comment) — draws **nothing**,
+   * and the fault still reaches the sink: the visible channel is bounded by the
+   * contract and the reporting channel is not.
+   */
+  #errorBlock(text: string, height: number, ctx: RenderContext): ReactElement {
+    if (height <= 0) return createElement(Box, { flexDirection: "column" });
+    const line = fit(text, ctx.width, ctx.capabilities);
+    const style = tone("error", ctx.theme, ctx.capabilities);
+    const filled = [paint([{ text: line, style }])];
+    while (filled.length < height) filled.push(""); // cells-ok — a row count
+    return rows(filled);
+  }
+
+  /**
+   * A block's elements **and** whether its definition owns them — one call,
+   * because they are one answer (I30, C26 I12).
+   */
+  #elements(block: Block, width: number): Resolved {
+    try {
+      const resolved = this.#resolve(block);
+      const declared = resolved.definition.elements;
+      if (declared === undefined) return NO_ELEMENTS;
+      return { elements: declared(resolved.block, width, this.measure), owned: true };
+    } catch (error) {
+      this.#report(block.kind, "elements", error);
+      return NO_ELEMENTS;
+    }
   }
 
   get sealed(): boolean {
@@ -127,19 +219,7 @@ class Registry implements BlockRegistry {
     };
   }
 
-  measure = (block: Block, width: number): number => {
-    const w = normaliseWidth(width);
-    try {
-      const resolved = this.#resolve(block);
-      return resolved.definition.measure(resolved.block, w, this.measure);
-    } catch {
-      // I11 — a throwing measurer is contained and the block treated as one
-      // row. This protects virtualisation: C14 sums measured heights without
-      // rendering, so a measurer that throws would take the viewport with it
-      // (T3.14). Compute, so no retry (A02 §7 rule 2).
-      return 1;
-    }
-  };
+  measure = (block: Block, width: number): number => this.#measured(block, normaliseWidth(width)).rows;
 
   /**
    * A sequence's rows: the blocks' heights plus one per `gapBefore` (C04 §3a).
@@ -164,27 +244,16 @@ class Registry implements BlockRegistry {
    * its block atomic for this call rather than taking the caller with it. C26
    * I12 rules that explicitly — the alternative leaves focus pointing at
    * something unresolvable two components from the throw.
+   *
+   * **And atomic means the block, never the subtree** (I30). The ownership
+   * question used to be a second call that read whether `elements` was
+   * *declared*, so a container whose `elements` threw answered *no elements* and
+   * *do not descend* at once — 0 elements against a control's 4, with `↓`
+   * skipping the lot (F224). Both answers come out of `#elements` now, which is
+   * why they cannot disagree rather than why they happen not to.
    */
-  elementsOf = (block: Block, width: number): readonly NavElement[] => {
-    const w = normaliseWidth(width);
-    try {
-      const resolved = this.#resolve(block);
-      const declared = resolved.definition.elements;
-      if (declared === undefined) return EMPTY_ELEMENTS;
-      return declared(resolved.block, w, this.measure);
-    } catch {
-      return EMPTY_ELEMENTS;
-    }
-  };
-
-  /** Does this block's definition answer `elements` itself? (C26 §4b cell 3.) */
-  #ownsElements(block: Block): boolean {
-    try {
-      return this.#resolve(block).definition.elements !== undefined;
-    } catch {
-      return false;
-    }
-  }
+  elementsOf = (block: Block, width: number): readonly NavElement[] =>
+    this.#elements(block, normaliseWidth(width)).elements;
 
   /**
    * Every element in a **sequence**, block-local rows lifted into
@@ -213,7 +282,10 @@ class Registry implements BlockRegistry {
       for (const block of seq) {
         if (block.gapBefore === true) row += 1;
         const top = row;
-        for (const element of this.elementsOf(block, atWidth)) {
+        // **One call for both questions** (I30). Asking twice is what let the
+        // two answers disagree.
+        const own = this.#elements(block, atWidth);
+        for (const element of own.elements) {
           out.push({
             blockId: block.id,
             element: Object.freeze({
@@ -231,7 +303,7 @@ class Registry implements BlockRegistry {
         // So the question is asked of the **definition** rather than of a list
         // of kinds, which is the one form that stays right when a fourth
         // container arrives: whichever answer it gives, this walk follows it.
-        if (hasChildren(block) && !this.#ownsElements(block)) {
+        if (hasChildren(block) && !own.owned) {
           const widths = childWidths(block, atWidth);
           const before = row;
           block.children.forEach((child, i) => {
@@ -343,23 +415,37 @@ class Registry implements BlockRegistry {
         this.render(child, { ...ctx, width: childWidth }),
     };
 
+    // **The height is committed before anything is drawn** (I11). One extra
+    // `measure` per render, and the two reasons it is affordable are that L4
+    // caches rendered lines per entry (C22 I58) so this is not a per-frame cost,
+    // and that `windowSequence` has already measured the same blocks on the way
+    // here. The alternative — measuring only inside the catch — cannot see a
+    // *measurer* that gave way while the renderer succeeded, which is the case
+    // that drew a fifth of a figure and said nothing.
+    const committed = this.#measured(block, width);
+
+    if (!committed.ok) {
+      // A definition that threw in either half renders the error block (I11).
+      // Truncating a good render to the fallback height is the same failure one
+      // level down: 4 of 5 rows dropped, in silence (F223).
+      return this.#errorBlock(`[${block.kind} failed to measure]`, committed.rows, childContext);
+    }
+
     try {
       const resolved = this.#resolve(block);
       return resolved.definition.render(resolved.block, childContext);
     } catch (error) {
-      // I11 — a throwing renderer is contained to its block. The rest of the
-      // frame is unaffected, and the block says what happened rather than
-      // vanishing, which is the difference between a visible fault and a
-      // document that quietly renders short.
+      // I11 — a throwing renderer is contained to its block, **and the
+      // containment includes the row count**. The rest of the frame is
+      // unaffected in position as well as in content, and the block says what
+      // happened rather than vanishing.
+      this.#report(block.kind, "render", error);
       const message = error instanceof Error ? error.message : String(error);
-      return rows([
-        paint([
-          {
-            text: `[${block.kind} failed to render: ${message}]`.slice(0, width), // cells-ok
-            style: tone("error", childContext.theme, childContext.capabilities),
-          },
-        ]),
-      ]);
+      return this.#errorBlock(
+        `[${block.kind} failed to render: ${message}]`,
+        committed.rows,
+        childContext,
+      );
     }
   };
 }
@@ -373,8 +459,17 @@ class Registry implements BlockRegistry {
  * it (§3). Three components rather than one matters: a single privileged
  * exception is indistinguishable from a special case.
  */
-export function createBlockRegistry(opts: { defaults?: boolean } = {}): BlockRegistry {
-  return new Registry(opts.defaults === false ? [] : DEFAULT_DEFINITIONS);
+export function createBlockRegistry(
+  opts: Readonly<{ defaults?: boolean; onError?: (fault: BlockFault) => void }> = {},
+): BlockRegistry {
+  return new Registry(
+    opts.defaults === false ? [] : DEFAULT_DEFINITIONS,
+    // **Silence is the default and the harness opts in** (I29). Loud by default
+    // would make every existing containment test a failure, which is a fact
+    // about those tests and not about a consumer's registry; the shell passes
+    // one, and `test/support/render.ts` passes one that throws.
+    opts.onError ?? ((): void => undefined),
+  );
 }
 
 /** A block without its `gapBefore`, so a dropped gap row is genuinely dropped. */

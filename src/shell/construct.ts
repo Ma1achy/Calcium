@@ -431,7 +431,23 @@ export async function constructGraph(
   };
 
   const built = await (async () => {
-    const blocks = createBlockRegistry({ defaults: true });
+    // **What C09's containments swallowed** (C09 I29, C22 I6a). The registry
+    // reports every occurrence and the deduplication is here, beside C23's own
+    // `recordFault` and for its reason: a measurer that gives way is called at
+    // frame cadence, so a flood is the default shape and one line is the intent.
+    //
+    // A pull rather than an emit, so this joins `diagnostics()` with C02's and
+    // C20's — the component decides what is wrong, C22 §8 step 3 decides when
+    // the reader is told, and a diagnostic painted onto the alternate screen is
+    // discarded with it.
+    const blockFaults: string[] = [];
+    const blocks = createBlockRegistry({
+      defaults: true,
+      onError: (fault) => {
+        const text = `block ${fault.kind}.${fault.member}: ${String(fault.error)}`;
+        if (!blockFaults.includes(text)) blockFaults.push(text);
+      },
+    });
     // **The three the framework itself produces** (C09 §1, I13). `defaults`
     // ships C09's fourteen; `table`, `plot` and `patch` register through the
     // public mechanism, and until this line nobody called it — so a stock
@@ -493,7 +509,7 @@ export async function constructGraph(
     }
     for (const source of config.completionSources) completion.register(source);
 
-    return { blocks, adapters, manifest, completion };
+    return { blocks, adapters, manifest, completion, blockFaults };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("registries", cause);
   });
@@ -1543,11 +1559,22 @@ export async function constructGraph(
      * session, and C23 collected nothing at all (F15). C02's ruling —
      * *the component decides what is wrong, never when the user is told* — is
      * only half a ruling until something drains them.
+     *
+     * **Four sources now, and the fourth's absence was structural rather than an
+     * omission** (C09 I29, F223): L1 cannot reach this list, so a contained
+     * renderer had nowhere to report and reported nowhere — for the life of the
+     * registry, and with T3.14's own row saying `logged` the whole time.
+     *
+     * The four are kept contiguous deliberately. `c23-faults` mutates this list
+     * by removing members, and a comment between two of them makes an anchor
+     * that spans the list unmatchable — which is how a mutation quietly becomes
+     * a different mutation (F219).
      */
     diagnostics: () =>
       Object.freeze([
         ...detection.warnings,
         ...stores.history.warnings,
+        ...built.blockFaults,
         ...pipeline.faults,
       ]),
     blocks: built.blocks,

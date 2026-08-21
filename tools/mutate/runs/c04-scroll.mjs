@@ -108,7 +108,10 @@ const MUTATIONS = [
     // coordinates the sequence never had. The condition is the definition's.
     name: "elementsIn walks into every container, answered or not",
     file: "src/presentation/blocks/registry.ts",
-    from: "        if (hasChildren(block) && !this.#ownsElements(block)) {",
+    // Re-anchored when the two element questions became one call (C09 I30,
+    // F224). The subject is unchanged — the condition is still the definition's
+    // — and this pass was re-run rather than re-anchored blind.
+    from: "        if (hasChildren(block) && !own.owned) {",
     to: "        if (hasChildren(block)) {",
     expect: "T2.34",
   },

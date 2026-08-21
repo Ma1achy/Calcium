@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import type { BlockFault, BlockRegistry } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
-import { renderToLines } from "../../src/presentation/render-lines.js";
+import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LOUD, measurable, visible } from "../support/render.js";
 
 describe("C09 §6 — the transition table's remaining cells", () => {
   it("T3.1: measure before seal works", () => {
@@ -191,19 +192,40 @@ describe("C09 tier 3 — widths", () => {
 });
 
 describe("C09 tier 3 — containment", () => {
-  /** A definition that fails in one half only, so the other's containment is visible. */
-  function broken(part: "measure" | "render") {
+  /**
+   * A definition that fails in one half only, so the other's containment is
+   * visible.
+   *
+   * **The height is a parameter and it did not used to be.** Fixed at 2, every
+   * assertion below could be satisfied by a boundary that answers a constant —
+   * which is what shipped, and what T3.13 read as correct (F223).
+   */
+  function broken(part: "measure" | "render", height = 2) {
     return {
       kind: "broken",
       measure: (): number => {
         if (part === "measure") throw new Error("measurer exploded");
-        return 2;
+        return height;
       },
       render: (): never => {
         throw new Error("renderer exploded");
       },
     };
   }
+
+  /** A registry that records what its containments swallowed (I29). */
+  function recording(definition: unknown, defaults = false) {
+    const faults: BlockFault[] = [];
+    const registry = createBlockRegistry({
+      defaults,
+      onError: (fault) => faults.push(fault),
+    });
+    if (definition !== null) registry.register(definition as never);
+    return { registry, faults };
+  }
+
+  const paint = (registry: BlockRegistry, b: Block, width = 60): readonly string[] =>
+    renderToLines(registry, b, width, { theme: DARK_THEME, capabilities: FULL_CAPS }).map(visible);
 
   it("T3.20 (I21): a rule with no label draws an unbroken line", () => {
     // **Found by reading a frame, and reachable by nothing else here.** The
@@ -223,9 +245,8 @@ describe("C09 tier 3 — containment", () => {
     expect(render("hunk"), "and a labelled rule is unchanged").toMatch(/^── hunk ─+$/u);
   });
 
-  it("T3.13 (I11): a throwing renderer is contained to its block", () => {
-    const registry = createBlockRegistry({});
-    registry.register(broken("render") as never);
+  it("T3.13 (I11): a throwing renderer is contained to its block, at the height it measured", () => {
+    const { registry, faults } = recording(broken("render"), true);
 
     const document = block({
       kind: "group",
@@ -238,24 +259,172 @@ describe("C09 tier 3 — containment", () => {
       ],
     });
 
-    const lines = renderToLines(registry, document, 60, {
+    const lines = paint(registry, document);
+
+    expect(lines[0]).toContain("before");
+    expect(lines[1], "the failure is stated, not hidden").toContain("failed to render");
+    expect(lines[1], "and it carries what was thrown").toContain("renderer exploded");
+    // **`lines[3]`, and the reason is the fixture rather than the code.**
+    // `broken("render")` measures 2, so the sibling sits at 3 the moment the
+    // error block is the height it was measured at. `lines[2]` was the position
+    // the frame took *because* the error block was one row — a number that read
+    // as an assertion about containment and was an assertion about the defect.
+    expect(lines[2]?.trim(), "the second committed row is blank, not borrowed").toBe("");
+    expect(lines[3], "siblings are unaffected in position as well as content").toContain("after");
+
+    expect(faults.map((f) => `${f.kind}.${f.member}`), "the swallow is reported").toEqual([
+      "broken.render",
+    ]);
+  });
+
+  it("T3.14 (I11, I29): a throwing measurer is contained at one row, and the render is replaced", () => {
+    // This one protects virtualisation rather than the frame: C14 sums measured
+    // heights without rendering, so a measurer that throws takes the viewport
+    // with it.
+    const { registry, faults } = recording(broken("measure"), true);
+    const bad = { kind: "broken", id: "bad" } as unknown as Block;
+
+    expect(() => registry.measure(bad, 80)).not.toThrow();
+    expect(registry.measure(bad, 80)).toBe(1);
+
+    // **The render is replaced rather than truncated to the fallback.** The
+    // definition's own renderer throws here too, but the point is which message
+    // arrives: a measurer that gave way is named as one, so a block showing a
+    // fifth of a drawing with nothing saying so is not a state this can reach.
+    const lines = paint(registry, bad);
+    expect(lines, "exactly the contained height").toHaveLength(1);
+    expect(lines[0]).toContain("failed to measure");
+
+    expect(faults.map((f) => f.member), "reported, not merely survived").toContain("measure");
+  });
+
+  it("T3.33 (I11): the error block is exactly the height that was measured, at four of them", () => {
+    // All four, because the defect answered 1 to all four: one height cannot
+    // tell a bound from a constant.
+    for (const height of [1, 2, 5, 20]) {
+      const { registry } = recording(broken("render", height), true);
+      const bad = { kind: "broken", id: "bad" } as unknown as Block;
+
+      expect(registry.measure(bad, 60), `measure at ${String(height)}`).toBe(height);
+      expect(paint(registry, bad), `render at ${String(height)}`).toHaveLength(height);
+    }
+  });
+
+  it("T3.34 (I11): a sequence measures what it renders, and the frame is where it is read", () => {
+    const { registry } = recording(broken("render", 20), true);
+    const sequence: readonly Block[] = [
+      block({ kind: "raw", id: "before", text: "BEFORE" }),
+      { kind: "broken", id: "bad" } as unknown as Block,
+      block({ kind: "raw", id: "after", text: "AFTER" }),
+    ];
+
+    const measured = registry.measureSequence(sequence, 60);
+    const drawn = renderSequenceToLines(registry, sequence, 60, {
       theme: DARK_THEME,
       capabilities: FULL_CAPS,
     }).map(visible);
 
-    expect(lines[0]).toContain("before");
-    expect(lines[1], "the failure is stated, not hidden").toContain("failed to render");
-    expect(lines[2], "siblings are unaffected").toContain("after");
+    // Measured at 22 against 3 before the fix (F223).
+    expect(measured, "the sequence's own arithmetic").toBe(22);
+    expect(drawn, "and what it actually draws").toHaveLength(measured);
+    // **The frame, not the count.** Every count agreed the whole time this was
+    // wrong; only the row the trailing block lands on could disagree.
+    expect(drawn[21], "the last block sits where the measurement put it").toContain("AFTER");
   });
 
-  it("T3.14 (I11): a throwing measurer is contained and the block treated as one row", () => {
-    // This one protects virtualisation rather than the frame: C14 sums measured
-    // heights without rendering, so a measurer that throws takes the viewport
-    // with it.
-    const registry = createBlockRegistry({});
-    registry.register(broken("measure") as never);
+  it("T3.35 (I29): a sink that throws makes a caught error fail the run", () => {
+    const registry = createBlockRegistry({ defaults: true, onError: LOUD });
+    registry.register(broken("render") as never);
 
-    expect(() => registry.measure({ kind: "broken", id: "bad" } as unknown as Block, 80)).not.toThrow();
-    expect(registry.measure({ kind: "broken", id: "bad" } as unknown as Block, 80)).toBe(1);
+    expect(() => paint(registry, { kind: "broken", id: "bad" } as unknown as Block)).toThrow(
+      /containment swallowed/u,
+    );
+
+    // The control: the same registry, the same sink, a block that does not
+    // throw. Without it this row asserts the harness rather than the boundary.
+    expect(() => paint(registry, block({ kind: "raw", id: "ok", text: "fine" }))).not.toThrow();
+  });
+
+  it("T3.36 (I30, C26 I12): a leaf whose `elements` throws loses its own and no other", () => {
+    const { registry, faults } = recording(null);
+    for (const kind of ["good", "bad"]) {
+      registry.register({
+        kind,
+        measure: (): number => 3,
+        render: (): never => ONE_PER_KIND.rule as never,
+        elements: (): unknown => {
+          if (kind === "bad") throw new TypeError("elements exploded");
+          return [{ id: `${kind}-e0`, rows: { from: 0, to: 1 }, kind: "row" }];
+        },
+      } as never);
+    }
+
+    const found = registry.elementsIn(
+      [
+        { kind: "good", id: "g1" },
+        { kind: "bad", id: "b" },
+        { kind: "good", id: "g2" },
+      ] as unknown as Block[],
+      60,
+    );
+
+    expect(found.map((f) => f.blockId), "two of three answer").toEqual(["g1", "g2"]);
+    expect(faults.map((f) => f.member)).toEqual(["elements"]);
+  });
+
+  it("T3.37 (I30): a container whose `elements` throws keeps its children reachable", () => {
+    // **The control is the row.** Both arms must find the children: the defect
+    // answered 0 against the control's 4, and an assertion on the throwing arm
+    // alone passes at either number.
+    const build = (throws: boolean) => {
+      const { registry } = recording(null);
+      registry.register({
+        kind: "kv",
+        measure: (): number => 2,
+        render: (): never => ONE_PER_KIND.rule as never,
+        elements: (): unknown => [
+          { id: "e0", rows: { from: 0, to: 1 }, kind: "row" },
+          { id: "e1", rows: { from: 1, to: 2 }, kind: "row" },
+        ],
+      } as never);
+      registry.register({
+        kind: "scroll",
+        measure: (): number => 6,
+        render: (): never => ONE_PER_KIND.rule as never,
+        ...(throws
+          ? {
+              elements: (): unknown => {
+                throw new TypeError("elements exploded");
+              },
+            }
+          : {}),
+      } as never);
+
+      return registry.elementsIn(
+        [
+          {
+            kind: "scroll",
+            id: "s",
+            children: [
+              { kind: "kv", id: "kid-1" },
+              { kind: "kv", id: "kid-2" },
+            ],
+          },
+        ] as unknown as Block[],
+        60,
+      );
+    };
+
+    const control = build(false).map((f) => f.blockId);
+    expect(control, "the control: a container declaring nothing is descended into").toEqual([
+      "kid-1",
+      "kid-1",
+      "kid-2",
+      "kid-2",
+    ]);
+    expect(
+      build(true).map((f) => f.blockId),
+      "and a container whose `elements` threw is not owned by a member that did not answer",
+    ).toEqual(control);
   });
 });

@@ -795,6 +795,73 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
       "the write failure is reported, and after the release",
     ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
   });
+
+  it("T4.28 (I6a, C09 I29): a swallowed render reaches the same drain", async () => {
+    // **The fourth source, and its absence was structural rather than an
+    // omission** (F223). L1 cannot reach this list, so C09's containments had
+    // nowhere to report and reported nowhere — while C09's own T3.14 said
+    // `logged` for as long as the row had existed. A boundary that hides the
+    // bugs it catches is worse than no boundary, because it looks like one.
+    //
+    // Fabricated at the definition, which is where a renderer's bug lives.
+    const manifest: NonNullable<TuiConfig["manifest"]> = {
+      schema: "tui.manifest/1",
+      binary: "prism",
+      version: "1.0.0",
+      tools: [{ name: "boom", local: true, summary: "a block that cannot draw", args: [], flags: [] }],
+    };
+    const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
+      boom: () => ({
+        schema: "tui.view/1",
+        command: "boom",
+        status: "ok",
+        blocks: [{ kind: "detonate", id: "d" } as never],
+      }),
+    };
+    const blocks: NonNullable<TuiConfig["blocks"]> = [
+      {
+        kind: "detonate",
+        measure: (): number => 3,
+        render: (): never => {
+          throw new Error("renderer exploded");
+        },
+      } as never,
+    ];
+
+    const stdin = fakeStdin();
+    const { stdout, tui, screen } = await buildSession({
+      manifest,
+      localHandlers,
+      blocks,
+      stdin: stdin as never,
+    });
+    await settle();
+
+    stdin.emit("/boom\r");
+    await settle();
+
+    // **The height, read from a real frame rather than from a registry.** The
+    // definition measures 3; the error block that replaces it occupies 3, so the
+    // rows below sit where the measurement put them. This is C09 I11 through the
+    // whole stack, and it is the assertion the unit rows cannot make — every
+    // count agreed while the frame was one row tall.
+    const rows = screen().rows;
+    const at = rows.findIndex((r) => r.includes("failed to render"));
+    expect(at, "the containment is on the screen").toBeGreaterThan(0);
+    expect(rows[at + 1]?.trim(), "and the second committed row is blank").toBe("");
+    expect(rows[at + 2]?.trim(), "and the third").toBe("");
+
+    const before = stdout.chunks.length;
+    await tui.stop("exit");
+    const after = stdout.chunks.slice(before).join("");
+
+    const LEAVE_ALT = "\u001b[?1049l";
+    expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
+    expect(
+      after.indexOf("renderer exploded"),
+      "what the containment swallowed is reported, and after the release",
+    ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+  });
 });
 
 describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {

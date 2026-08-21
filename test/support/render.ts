@@ -7,6 +7,7 @@
 import {
   createBlockRegistry,
   type BlockDefinition,
+  type BlockFault,
   type BlockRegistry,
 } from "../../src/presentation/blocks/index.js";
 import { defaultTheme, loadTheme, type ResolvedTheme } from "../../src/presentation/theme/index.js";
@@ -74,8 +75,36 @@ export const MONO_UNICODE_CAPS: TerminalCapabilities = Object.freeze({
  * registry stores `<Block>` and `defaults.ts` casts at its own collection point
  * for the same reason; this is that cast, once, here.
  */
-export function registry(definitions: readonly BlockDefinition<never>[] = []): BlockRegistry {
-  const r = createBlockRegistry({});
+/**
+ * The sink every harness registry gets unless the test asks for silence
+ * (C09 I29, T3.35).
+ *
+ * **A containment that reports nothing hides the bugs it exists to survive.**
+ * Two of C09's catches shipped reporting nothing at all, and a suite could go
+ * green with a caught throw in it — which is what this makes impossible for
+ * every test that does not opt out.
+ */
+export const LOUD = (fault: BlockFault): void => {
+  throw new Error(
+    `a C09 containment swallowed a ${fault.member} fault in \`${fault.kind}\`: ` +
+      `${String(fault.error)}. A boundary that hides what it catches is worse than none — ` +
+      "pass `onError: QUIET` where the containment is the subject.",
+  );
+};
+
+/**
+ * For the rows whose subject **is** the containment.
+ *
+ * Named and counted rather than defaulted to: an exemption a reader can grep is
+ * an exemption; a silent default is the state this replaced.
+ */
+export const QUIET = (): void => undefined;
+
+export function registry(
+  definitions: readonly BlockDefinition<never>[] = [],
+  onError: (fault: BlockFault) => void = LOUD,
+): BlockRegistry {
+  const r = createBlockRegistry({ onError });
   for (const definition of definitions) r.register(definition as unknown as BlockDefinition);
   return r;
 }
@@ -108,6 +137,11 @@ export function measurable(
     definitions?: readonly BlockDefinition<never>[];
     focus?: RenderOptions["focus"];
     cursorPositions?: RenderOptions["cursorPositions"];
+    /**
+     * What a swallowed containment does here (C09 I29). `LOUD` by default —
+     * pass `QUIET` where the throw is the subject rather than a surprise.
+     */
+    onError?: (fault: BlockFault) => void;
   }> = {},
 ): Readonly<{
   measure: (block: Block, width: number) => number;
@@ -129,7 +163,7 @@ export function measurable(
     to: number,
   ) => Readonly<{ block: Block; skipRows: number }> | undefined;
 }> {
-  const r = registry(options.definitions ?? []);
+  const r = registry(options.definitions ?? [], options.onError ?? LOUD);
   const render: RenderOptions = {
     theme: options.theme ?? DARK_THEME,
     capabilities: options.capabilities ?? FULL_CAPS,

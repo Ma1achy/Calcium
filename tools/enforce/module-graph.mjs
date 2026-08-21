@@ -1259,6 +1259,26 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "whose whole purpose is to be called from outside it cannot satisfy that scope " +
     "however many consumers it has",
 
+  // **The second entry of that category, and it arrived by a satisfier going
+  // away rather than by anything new being published** — which is the shape
+  // worth reading twice.
+  "NavigableRegistry.elementsOf":
+    "C26 §5 — **an inverted seam**: `NavigableRegistry` is the structural shape " +
+    "the conformance suite *takes*, so its implementers are a consumer's own " +
+    "registries and are out of tree by construction. The suite calls the member " +
+    "twice, at lines 116 and 168 of the file that declares it, and MG24 counts " +
+    "names elsewhere in `src/` — the right direction for a published member and " +
+    "the wrong one for a shape somebody else fills in. " +
+    "**It was satisfied until F223 by a name collision.** C09's `BlockRegistry` " +
+    "has an `elementsOf` too, and `registry.ts` called its own — " +
+    "`this.elementsOf(block, atWidth)` inside `elementsIn` — so the walk counted " +
+    "a mention of a different owner's member as a consumer of this one. Folding " +
+    "the two element questions into a single resolution (C09 I30) removed that " +
+    "call, and the exemption that had always been owed became visible in the same " +
+    "commit. **This is F105/F160's recorded blind spot arriving as an instance**: " +
+    "MG24 is exact for 490 of 1418 members and this member is one of the rest, so " +
+    "the rule was reporting *consumed* about a name rather than about a member",
+
   // --- a field whose consumer is one commit away ----------------------------
   //
   // **The blocker is stated as a symbol, so picking this up begins by grepping

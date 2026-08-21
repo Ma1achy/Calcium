@@ -35,6 +35,7 @@ export {
 } from "./kinds/code.js";
 export type {
   BlockDefinition,
+  BlockFault,
   BlockRegistry,
   FocusState,
   NavElement,

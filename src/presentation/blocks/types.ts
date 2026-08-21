@@ -11,6 +11,24 @@ import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /** Which block, and which row within it, currently holds focus. */
+/**
+ * What one of the registry's containments swallowed (I29).
+ *
+ * **The kind is the document's, not the fallback's.** An unregistered kind
+ * resolves through `raw` (I10), so reporting the resolved kind would name `raw`
+ * for a fault in someone else's block and send the reader to the wrong file.
+ *
+ * `error` is `unknown` rather than `Error` because `throw` takes anything, and a
+ * sink that assumed otherwise would itself throw on the one input it exists to
+ * describe.
+ */
+export type BlockFault = Readonly<{
+  kind: string;
+  /** Which half gave way. Three, and the fourth was folded into `elements` (I30). */
+  member: "measure" | "render" | "elements";
+  error: unknown;
+}>;
+
 export type FocusState = Readonly<{
   blockId: string;
   /** null — the block itself is focused, rather than a row inside it. */
