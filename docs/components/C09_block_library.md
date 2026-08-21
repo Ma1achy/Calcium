@@ -226,7 +226,7 @@ loading     no data yet, first fetch in flight. Not a failure at all
 ```
 ┌─────────────────────────────────────────┐
 │                                         │
-│  ─────────────[ERROR]─────────────      │
+│  ───────────── ERROR ─────────────      │
 │  ▲ plot failed to render:               │
 │    Cannot read properties of undefined  │
 │                                         │
@@ -234,7 +234,7 @@ loading     no data yet, first fetch in flight. Not a failure at all
 
 ┌─────────────────────────────────────────┐          retrying is the error box
 │                                         │          plus one line — compositional,
-│  ─────────────[ERROR]─────────────      │          not a third rendering
+│  ───────────── ERROR ─────────────      │          not a third rendering
 │  ▲ connection refused                   │
 │  ⠋ retrying in 8s (attempt 2)           │
 │                                         │
@@ -295,15 +295,15 @@ number nobody can act on; the cause without the countdown is still the fact. It 
 and `retrying` degrade to the same figure at one row, which is honest — at one row they are the
 same fact.
 
-**Width, and this ladder was missing.** `[ERROR]` is **7 cells**; a rule needs at least one dash
+**Width, and this ladder was missing.** ` ERROR ` is **7 cells**; a rule needs at least one dash
 each side, so it needs **9**. Padding is one cell inside each border. The content width is `W − 4`
 padded, `W − 2` bordered bare, `W` unbordered — and **padding is dropped before the border, the
 border before content.**
 
 ```
-W ≥ 13   bordered, padded     content ≥ 9    ─── [ERROR] ───
-W 11–12  bordered, padded     content 7–8    [ERROR], no rule
-W 9–10   bordered, bare       content 7–8    [ERROR], no rule
+W ≥ 13   bordered, padded     content ≥ 9    ───  ERROR  ───
+W 11–12  bordered, padded     content 7–8     ERROR , no rule
+W 9–10   bordered, bare       content 7–8     ERROR , no rule
 W 3–8    bordered, bare       content 1–6    no tag row — ▲ carries it
 W ≤ 2    unbordered           content W      the message, truncated
 ```
@@ -386,7 +386,7 @@ Structural rather than event-mediated, because the box has structure and no even
 | 6 | `colourDepth: 1` × *only the tag is painted* | tag and message both resolve to `{ bold: true }`, so the **brackets** are what distinguish them. The paint carries no information at one bit and the glyphs do |
 | 7 | a narrow-only set × `ambiguousWidth: "wide"` × `unicode: "ascii"` | one answer — the set's own ASCII pair — reached by two routes, and `spinnerFrames` already resolves both |
 | 8 | a `spinner` naming a set that does not exist | the default, never a throw. A spinner is decoration and a session that will not start because a set was misspelled is worse than one that spins the wrong way |
-| 9 | `measure` threw × the message is empty | the box draws, the tag says `[ERROR]`, the content row is blank. A box about nothing is still the honest report that something failed |
+| 9 | `measure` threw × the message is empty | the box draws, the tag says ` ERROR `, the content row is blank. A box about nothing is still the honest report that something failed |
 | 10 | `status` × `window` | omitted (I27). A bounded box has its border at both ends and cannot measure less without becoming a different box — `scroll`'s argument, and the same one |
 
 ### What a renderer emits, and what Ink is for
@@ -827,7 +827,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I28** — **A progress bar clamps its fill and never its number.** The bar has no cells past its last one; the percentage is the true fraction, so `150` of `100` draws a full bar and reads `150%`. Clamping both makes `100/100` and `150/100` one picture, which is the same objection `examples/docker`'s CPU bar was built around and the reason the two now agree rather than each being defensible about its own quantity. A `total` of zero has no proportion: an empty bar and `0%`, which is a floor and not a measurement. **A negative `current` is floored for the same reason** — `repeat()` with a negative count throws, so the block would not render at all (I2). Found by the mutation pass, which is where a guard with no fixture behind it shows up.
 - **I29** — **Every containment reports what it swallowed, through a sink supplied at construction.** `createBlockRegistry({ onError })`, called by all **three** catches — `measure`, `render` and `elements` — with the block, the member and the error. **Four, when this was written**: the ownership question carried a catch of its own, and I30 folded it into `elements` because the two are one answer, so the fourth is gone rather than unreported. The implementation is the first thing that could disprove the count, and it did. A containment that reports nothing hides the bugs it exists to survive, and both of the two that shipped reported nothing at all: `measure`'s catch is bare, and `render`'s discards the error the moment it has read the message off it. **T3.14 has said `logged` for as long as the row has existed and nothing anywhere logged** — an effect named in a test row with no mechanism, satisfied by the half of the sentence that was true (F223). L4 wires the sink to C23's record of what the pipeline's bare catches swallowed (C23 I48), which exists and is already drained; the test harness supplies one that fails the run, and that is what makes a caught throw a red suite rather than a quiet frame.
 - **I30** — **`elementsOf` and the ownership question are one answer about one block.** A throwing `elements` makes *that* block atomic for the dispatch (C26 I12) and leaves its children reachable: ownership is decided by what resolution **returned**, never by whether the member is declared. The two catches disagreed — `elementsOf` caught the throw and answered *no elements*, while the ownership question answered *it owns them, do not descend* — and the pair costs a whole subtree rather than a block: measured, a container whose `elements` threw yielded **0 elements against a control's 4**, with nothing said and `↓` skipping the lot (F224). I11's class in a different member, and it is stated here rather than left to C26 because the invariant is C26's and the mechanism is this file's.
-- **I31** — **The `status` box occupies exactly `measure(b, w)` rows, and its two ladders live on different axes: height allocates rows, width decides what fills them.** The row count is never a width decision, because `measure` has already answered and I1 is what the whole error path exists to preserve — so where the width ladder drops the tag row, the row goes to the message rather than going blank. **The height ladder needs six rows for the full figure** — two borders, two blanks and the tag row — and the padding is dropped as a pair, the tag row next, the border after that; at one row the message wins and the retry line is dropped, because a countdown without its cause is a number nobody can act on. **The width ladder was missing and would have shipped broken**: `[ERROR]` is 7 cells and a rule needs 9, against a `group: row` that can hand a block five columns. It is a *structural* interaction — two rules both holding at rest, no event between them — and a figure indexed on height cannot reach one however many rungs it has (C19 §8a's lesson in the other axis). **`H ≤ 2` has no border and therefore no evidence the height was honoured**; that is stated rather than left to be noticed, because it is the one place the argument for the border does not hold.
+- **I31** — **The `status` box occupies exactly `measure(b, w)` rows, and its two ladders live on different axes: height allocates rows, width decides what fills them.** The row count is never a width decision, because `measure` has already answered and I1 is what the whole error path exists to preserve — so where the width ladder drops the tag row, the row goes to the message rather than going blank. **The height ladder needs six rows for the full figure** — two borders, two blanks and the tag row — and the padding is dropped as a pair, the tag row next, the border after that; at one row the message wins and the retry line is dropped, because a countdown without its cause is a number nobody can act on. **The width ladder was missing and would have shipped broken**: ` ERROR ` is 7 cells and a rule needs 9, against a `group: row` that can hand a block five columns. It is a *structural* interaction — two rules both holding at rest, no event between them — and a figure indexed on height cannot reach one however many rungs it has (C19 §8a's lesson in the other axis). **`H ≤ 2` has no border and therefore no evidence the height was honoured**; that is stated rather than left to be noticed, because it is the one place the argument for the border does not hold.
 - **I32** — **`status` animates unconditionally, its interval belongs to its set, and its numbers are fields rather than either.** No state-dependent branch: `retrying` is the error box plus a spinner line, so excluding `error` from animating breaks the state composed out of it and needs a per-state exception where a simple rule would do — and `error` drawing the same bytes every tick makes its stickiness free rather than a mechanism. The set is named by the block and defaults to what `steps` resolves to, so one glyph means *waiting* in three places; `spinnerIntervalMs` is the same lookup as `spinnerFrames`, so a caller cannot hold one set's frames against another's tick. **`retryInMs`, `attempt` and `elapsedMs` are supplied, never derived** — `tick` cannot carry a duration because C03 coalesces and drops commits under load, and this layer may not read a clock, so the only honest source is whoever holds one. **The counter does not currently advance at all** (F227), and the kind is written against one that does.
 
 ---
@@ -862,7 +862,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 26. **A containment restores the contract it broke** (I11). The error path is bound by the number `measure` has already committed, because a per-block boundary that changes the block's height turns a contained renderer into a frame describing a document nobody holds — which is the failure I1 is the most load-bearing invariant against. It shipped as one row against a measured twenty, and the test that covered it asserted the shifted position as the expectation (F223).
 27. **A containment reports what it swallowed** (I29). Both catches that shipped reported nothing, and the test row covering one of them had said `logged` from the beginning — so the boundary hid the bugs it exists to survive, and a suite could go green with a caught throw in it (F223).
 28. **The two element answers are one answer** (I30). Ownership is read from what resolution returned rather than from whether the member is declared, so a throwing `elements` costs its own block and never its children — 0 against a control's 4 (F224).
-29. **A degradation ladder is owed on every axis the figure varies along, not on the one it was drawn against** (I31, §3a). The `status` box was specified with a height ladder and no width ladder, and the missing one is the axis that wraps: `[ERROR]` is 7 cells, a rule needs 9, and a `row` group hands out `floor((w − gaps) / n)`. Both ladders are rulings taken before the code, and the second exists because a classification table was run beside the height trace rather than instead of it.
+29. **A degradation ladder is owed on every axis the figure varies along, not on the one it was drawn against** (I31, §3a). The `status` box was specified with a height ladder and no width ladder, and the missing one is the axis that wraps: ` ERROR ` is 7 cells, a rule needs 9, and a `row` group hands out `floor((w − gaps) / n)`. Both ladders are rulings taken before the code, and the second exists because a classification table was run beside the height trace rather than instead of it.
 30. **A kind that composes one state out of another animates unconditionally** (I32). `retrying` is `error` plus a line, so any rule that excludes `error` needs an exception the moment the composition is drawn — and the still frame it was meant to buy is already free, because identical bytes write no diff.
 
 ---

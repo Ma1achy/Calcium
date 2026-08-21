@@ -137,6 +137,12 @@ class Registry implements BlockRegistry {
    * and the fault still reaches the sink: the visible channel is bounded by the
    * contract and the reporting channel is not.
    */
+  /**
+   * **No brackets around the message.** They shipped because the design figure
+   * drew `[⚠ plot failed to render: …]` as *annotation* — square brackets marking
+   * which cells the figure intended to paint — and the implementation read them
+   * as characters. The tag ` ERROR ` keeps its own, because those are real.
+   */
   #errorBlock(text: string, height: number, ctx: RenderContext): ReactElement {
     if (height <= 0) return createElement(Box, { flexDirection: "column" });
     // **Through the `status` definition, not a private figure** (C09 I31). The
@@ -438,7 +444,7 @@ class Registry implements BlockRegistry {
       // A definition that threw in either half renders the error block (I11).
       // Truncating a good render to the fallback height is the same failure one
       // level down: 4 of 5 rows dropped, in silence (F223).
-      return this.#errorBlock(`[${block.kind} failed to measure]`, committed.rows, childContext);
+      return this.#errorBlock(`${block.kind} failed to measure`, committed.rows, childContext);
     }
 
     try {
@@ -452,7 +458,7 @@ class Registry implements BlockRegistry {
       this.#report(block.kind, "render", error);
       const message = error instanceof Error ? error.message : String(error);
       return this.#errorBlock(
-        `[${block.kind} failed to render: ${message}]`,
+        `${block.kind} failed to render: ${message}`,
         committed.rows,
         childContext,
       );

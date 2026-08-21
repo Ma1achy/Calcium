@@ -49,6 +49,12 @@ const COVERED = [
   // out: `scan-cost.mjs` was added, `make instruments` went from 16/16 to
   // 17 found, 16 with a fixture, and named the file.
   ["tools/scan-cost.mjs", ["npx", "vitest", "run", "test/unit/scan-cost.test.ts"]],
+  // **Its subject is images, so its fixture asserts they respond.** A generator
+  // emitting the same frame every tick writes a GIF that looks like a GIF and
+  // does not move — which happened, when `pageHeight` went to `.gif()` where it
+  // belongs in the raw input options. The rows assert the frames rather than the
+  // encoded file, because that is the property an encoder cannot repair.
+  ["tools/status-proof.mjs", ["npx", "vitest", "run", "test/unit/status-proof.test.ts"]],
   // The Order column's verifier. **It caught this target's own claim a second
   // time**: `make instruments` went 19 found / 18 with a fixture and named the
   // file, which is the equality comparison paying out on the day the instrument

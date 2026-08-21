@@ -51,8 +51,8 @@ const results = runPass({
       // drawing it is the only thing that said otherwise.
       name: "the height ladder's top rung is labelled five",
       file: SRC,
-      from: "  if (height >= 6) return { border: true, pad: true, tag: tagged, content: height - 5 + tag(1) };",
-      to: "  if (height >= 5) return { border: true, pad: true, tag: tagged, content: height - 5 + tag(1) };",
+      from: "  if (height >= 6) return { border: true, pad: true, tag: tagged };",
+      to: "  if (height >= 4) return { border: true, pad: true, tag: tagged };",
       expect: "T3.39",
     },
     {
@@ -69,28 +69,31 @@ const results = runPass({
     {
       // **The second, and it only became reachable once the first was fixed**: furniture the width ladder took away has to give its
       // rows back, or `render` draws fewer than `measure` committed.
-      name: "the content count is a rung rather than the remainder",
+      name: "the group is not centred and the slack all falls below it",
       file: SRC,
-      from: "    const available = Math.max(1, height - furniture); // cells-ok — a row count",
-      to: "    const available = Math.max(1, frame.content); // cells-ok — a row count",
-      expect: "T3.40",
+      from: "    const slack = Math.max(0, interior - group); // cells-ok — a row count",
+      to: "    const slack = 0; // cells-ok — a row count",
+      expect: "T3.39",
     },
     {
       // C09 I31 — the tag row's reassignment. Without it a narrow box spends a
       // row on nothing while its message is truncated.
       name: "a dropped tag row is left blank rather than given to the message",
       file: SRC,
-      from: '      (frame.border ? 2 : 0) + (frame.pad ? 2 : 0) + (frame.tag && tagFit !== "none" ? 1 : 0); // cells-ok — a row count',
-      to: "      (frame.border ? 2 : 0) + (frame.pad ? 2 : 0) + (frame.tag ? 1 : 0); // cells-ok — a row count",
+      from: '    const tagRows = frame.tag && tagFit !== "none" ? 1 : 0;',
+      to: "    const tagRows = frame.tag ? 1 : 0;",
       expect: "T3.41",
     },
     {
       // C09 I31 — at one row the message wins. The countdown is the actionable
       // number and it is still worth less than the cause.
-      name: "the retry line wins the last row instead of the message",
+      name: "the activity line is admitted with no room for it",
       file: SRC,
-      from: "    const forMessage = Math.max(1, available - (line === \"\" ? 0 : 1)); // cells-ok — a row count",
-      to: "    const forMessage = Math.max(0, available - (line === \"\" ? 0 : 1)); // cells-ok — a row count",
+      // **Reachable only once the clamp went.** With `out.slice(0, height)` in
+      // place this was masked: the assembly made one row too many and the slice
+      // cut the line, so the rule and its absence produced the same frame.
+      from: '    const lineRows = line !== "" && interior - tagRows >= 2 ? 1 : 0;',
+      to: '    const lineRows = line !== "" ? 1 : 0;',
       expect: "T3.42",
     },
     {

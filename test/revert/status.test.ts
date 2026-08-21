@@ -52,7 +52,7 @@ describe("C09 tier 6 — the status box", () => {
     // border. A rung that still believed it could afford the padding would draw
     // a blank here.
     const second = rows[1] ?? "";
-    expect(second.includes("[ERROR]"), "the tag is on the second row").toBe(true);
+    expect(second.includes(" ERROR "), "the tag is on the second row").toBe(true);
   });
 
   it("T6.26 (C09 I32): `error` animates when it has something to animate", () => {

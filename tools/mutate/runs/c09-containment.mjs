@@ -65,8 +65,10 @@ const results = runPass({
       // rather than a block: 19 rows of pad and C14 still scrolling twenty.
       name: "the render catch uses the fallback height rather than the committed one",
       file: REG,
-      from: "        `[${block.kind} failed to render: ${message}]`,\n        committed.rows,",
-      to: "        `[${block.kind} failed to render: ${message}]`,\n        1,",
+      // Re-pointed when the message lost its brackets — they were annotation in
+      // a design figure marking which cells carry paint, read as characters.
+      from: "        `${block.kind} failed to render: ${message}`,\n        committed.rows,",
+      to: "        `${block.kind} failed to render: ${message}`,\n        1,",
       expect: "T3.34",
     },
     {

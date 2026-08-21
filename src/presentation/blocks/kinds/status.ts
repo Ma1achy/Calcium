@@ -21,11 +21,23 @@ import { glyphs, spinnerFrames } from "../glyphs.js";
 import { fit, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
-/** `[ERROR]`. The number both width rungs are measured against. */
-const TAG = "[ERROR]";
+/**
+ * The word, in a gap in the rule — `─── ERROR ───`.
+ *
+ * **No square brackets, and they shipped because a figure was read literally.**
+ * The design drew ` ERROR ` and `[▲ plot failed to render: …]`, and in both the
+ * brackets were *annotation*: they marked which cells carry a painted
+ * background. They were never characters. **When the paint slot exists, the word
+ * and its two spaces are what gets painted — white on red — and the paint is
+ * what the brackets were drawing.** Until then it is the error tone in a gap and
+ * nothing else.
+ *
+ * Seven cells either way, so the width ladder's arithmetic is unchanged.
+ */
+const TAG = " ERROR ";
 
 /** Through `cells()` and never `.length`, because the measurer uses `cells()` (SS23). */
-const TAG_CELLS = cells(TAG); // narrow-ok — `[ERROR]` is ASCII, so the two conventions agree
+const TAG_CELLS = cells(TAG); // narrow-ok — ` ERROR ` is ASCII, so the two conventions agree
 
 /** A rule needs at least one dash each side of the tag to read as one. */
 const TAG_WITH_RULE = TAG_CELLS + 2;
@@ -48,16 +60,13 @@ const SECOND = 1000;
  * rule the width ladder uses: a blank third of a box is worse than a longer
  * message.
  */
-type Frame = Readonly<{ border: boolean; pad: boolean; tag: boolean; content: number }>;
+type Frame = Readonly<{ border: boolean; pad: boolean; tag: boolean }>;
 
 export function heightRung(height: number, tagged: boolean): Frame {
-  const tag = (n: number): number => (tagged ? 0 : n);
-  if (height >= 6) return { border: true, pad: true, tag: tagged, content: height - 5 + tag(1) };
-  if (height === 5) return { border: true, pad: false, tag: tagged, content: 2 + tag(1) };
-  if (height === 4) return { border: true, pad: false, tag: tagged, content: 1 + tag(1) };
-  if (height === 3) return { border: true, pad: false, tag: false, content: 1 };
-  if (height === 2) return { border: false, pad: false, tag: false, content: 2 };
-  return { border: false, pad: false, tag: false, content: 1 };
+  if (height >= 6) return { border: true, pad: true, tag: tagged };
+  if (height >= 4) return { border: true, pad: false, tag: tagged };
+  if (height === 3) return { border: true, pad: false, tag: false };
+  return { border: false, pad: false, tag: false };
 }
 
 /**
@@ -95,7 +104,7 @@ function fitFor(content: number, tagged: boolean): TagFit {
  * alone decided the border, and the width ladder only ever spoke about the tag.
  *
  * **Then padding may be dropped to save the tag**, which buys two cells: at
- * width 11 a padded box holds `[ERROR]` exactly, and at 9 it does not while a
+ * width 11 a padded box holds ` ERROR ` exactly, and at 9 it does not while a
  * bare one does. Dropping it is worth more than the breathing room, because the
  * tag is the only thing on the row that says what kind of box this is.
  */
@@ -178,7 +187,13 @@ export const statusDefinition: BlockDefinition<Status> = {
     const rung = widthRung(width, heightRung(height, block.state !== "loading"));
     const frame = rung.frame;
     const tagFit = rung.tag;
-    const ink = tone("error", ctx.theme, ctx.capabilities);
+    // **The error tone belongs to the states that failed, and `loading` did
+    // not.** Painting the message red in all three drew *loading* as a failure —
+    // caught by looking at the image, because nothing asserts a tone per state
+    // and the arithmetic is identical either way. §3a already says loading has
+    // no error and therefore no rule and no tag; the tone follows the same fact.
+    const failed = block.state !== "loading";
+    const ink = failed ? tone("error", ctx.theme, ctx.capabilities) : undefined;
 
     const rowWidth = frame.border ? Math.max(1, width - 2) : width; // cells-ok — a cell count
     const gutter = frame.pad ? PAD : 0;
@@ -194,26 +209,44 @@ export const statusDefinition: BlockDefinition<Status> = {
     // and belongs to whoever schedules the tick, which is not this layer.
     const line = activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), ctx.tick);
 
-    // **The content count is the remainder, not a rung.** The height ladder says
-    // which furniture it can afford and the width ladder takes some of that back
-    // — a box too narrow for a border loses two rows of it — and every row the
-    // furniture gives up belongs to the content, or `render` draws fewer rows
-    // than `measure` committed. Reading a frame is what found this: at width 9
-    // the box drew four rows against a measured six, and every count in this
-    // file agreed with every other the whole time.
-    const furniture =
-      (frame.border ? 2 : 0) + (frame.pad ? 2 : 0) + (frame.tag && tagFit !== "none" ? 1 : 0); // cells-ok — a row count
-    const available = Math.max(1, height - furniture); // cells-ok — a row count
+    // **The interior is the remainder and the group is centred inside it.** The
+    // height ladder says which furniture it can afford and the width ladder
+    // takes some of that back — a box too narrow for a border loses two rows —
+    // and every row the furniture gives up belongs to the content, or `render`
+    // draws fewer rows than `measure` committed. Reading a frame found that at
+    // width 9 the box drew four against a measured six, with every count in this
+    // file agreeing the whole time.
+    const interior = Math.max(1, height - (frame.border ? 2 : 0)); // cells-ok — a row count
+    const tagRows = frame.tag && tagFit !== "none" ? 1 : 0;
     // At one row the message wins: a countdown without its cause is a number
     // nobody can act on, and the cause without the countdown is still the fact.
-    const forMessage = Math.max(1, available - (line === "" ? 0 : 1)); // cells-ok — a row count
+    //
+    // **The precedence is stated, not left to the clamp.** With the activity
+    // line unconditional the row count still came out right — the final
+    // `slice(0, height)` cut it — so the message won by truncation rather than
+    // by rule, and a mutation removing the condition changed nothing. A guard
+    // that is also the mechanism is a guard nothing can be wrong about.
+    const lineRows = line !== "" && interior - tagRows >= 2 ? 1 : 0;
+    const forMessage = Math.max(1, interior - tagRows - lineRows); // cells-ok — a row count
     const body = wrapCells(`${mark}${stripControl(block.message)}`, textWidth).slice(0, forMessage);
-    const content = [...body];
-    while (content.length < forMessage) content.push(""); // cells-ok — a row count
+
+    // **The whole group is centred, not the message inside the leftover.** The
+    // two are the same picture at the full figure's six rows, which is why this
+    // was invisible until a twenty-row box was drawn: the tag pinned under the
+    // top border, the message floating in the middle, and a gap between them
+    // that reads as two figures rather than one. An odd row goes below — text a
+    // little high reads as deliberate and a little low reads as dropped.
+    //
+    // The ladder's `pad` still decides the **horizontal** gutter; the vertical
+    // padding it used to name is this slack, and computing it removes the case
+    // where the two disagreed.
+    const group = tagRows + body.length + lineRows; // cells-ok — a row count
+    const slack = Math.max(0, interior - group); // cells-ok — a row count
+    const above = Math.floor(slack / 2);
 
     /** Content rows are the error tone; the border and the blanks are not. */
     const span = (text: string, painted: boolean): readonly Span[] =>
-      painted ? [{ text, style: ink }] : [{ text }];
+      painted && ink !== undefined ? [{ text, style: ink }] : [{ text }];
 
     const boxed = (text: string, painted: boolean): readonly Span[] =>
       frame.border
@@ -230,18 +263,26 @@ export const statusDefinition: BlockDefinition<Status> = {
 
     const out: (readonly Span[])[] = [];
     if (frame.border) out.push(edge(g.topLeft, g.topRight));
-    if (frame.pad) out.push(boxed("", false));
-    if (frame.tag && tagFit !== "none") out.push(boxed(tagRow(tagFit, textWidth, g.horizontal), true));
-    for (const row of content) out.push(boxed(row, true));
+    for (let i = 0; i < above; i += 1) out.push(boxed("", false));
+    if (tagRows === 1) out.push(boxed(tagRow(tagFit, textWidth, g.horizontal), true));
+    for (const row of body) out.push(boxed(row, true));
     // **The activity line takes the default tone, not the error tone** — the
     // error already said what went wrong, and this says what is happening now.
-    if (line !== "" && available > forMessage) out.push(boxed(line, false));
-    if (frame.pad) out.push(boxed("", false));
+    if (lineRows === 1) out.push(boxed(line, false));
+    for (let i = 0; i < slack - above; i += 1) out.push(boxed("", false));
     if (frame.border) out.push(edge(g.bottomLeft, g.bottomRight));
 
-    // The remainder above makes this exact; the clamp is the guard, not the
-    // mechanism, and a block that needed it would be a defect this kind exists
-    // to make impossible (C09 I1, I31).
-    return rows(out.slice(0, height).map((spans) => paint(spans)));
+    // **No clamp, and removing it is what made two mutations mean something.**
+    // `out.slice(0, height)` was here as a guard and was doing the work: with
+    // the activity line admitted unconditionally the assembly produced one row
+    // too many and the slice cut it, so the message won by truncation rather
+    // than by rule and the mutation that removed the rule changed nothing. A
+    // guard that is also the mechanism is a guard nothing can be wrong about
+    // (A03 §2).
+    //
+    // The count is exact by construction — `slack` is the remainder and the
+    // group is bounded by `forMessage` — and T3.38 is what asserts it, over
+    // seven heights and three states.
+    return rows(out.map((spans) => paint(spans)));
   },
 };

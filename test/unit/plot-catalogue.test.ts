@@ -6,7 +6,7 @@
 // asking whether the colour was there. So the rows below are mostly about the
 // two things that fail quietly: a corpus that renders nothing, and a parser
 // that returns a plausible answer for an input it does not handle.
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,8 +19,11 @@ import { cells as width } from "../../src/presentation/text.js";
 import { CAPS, FORMS, clearGenerated, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { ansiToSvg, colour256, parseLine, sheetBg } from "../../tools/catalogue-png.mjs";
+import { ansiToSvg, colour256, parseLine, sheetBg, unparsedSgr } from "../../tools/catalogue-png.mjs";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
+
+/** The rendered catalogue, which is what PC11 sweeps. */
+const CATALOGUE = join(import.meta.dirname, "..", "..", "docs", "catalogue");
 import { ALL_FORMS } from "../support/plot-forms.js";
 
 const forms = FORMS as Record<string, Record<string, Record<string, unknown>>>;
@@ -527,5 +530,54 @@ describe("catalogue-png — the parser that failed silently", () => {
     const xs = [...svg.matchAll(/<text x="([\d.]+)"[^>]*>[⣿⠁]<\/text>/gu)].map((m) => Number(m[1]));
     expect(xs.length).toBe(2); // cells-ok — a glyph count
     expect(xs[1]! - xs[0]!).toBeCloseTo(8.41, 1);
+  });
+
+  it("PC10 (F227): bold survives to the SVG, and it is all a one-bit frame has", () => {
+    // **The load-bearing arm.** `tone("error")` resolves to `{ bold: true }`
+    // below `colourDepth: 4` — no colour at all — so a renderer dropping `1m`
+    // draws a 1-bit error frame identically to plain text. The image would show
+    // the failure the design exists to prevent while looking correct, which is
+    // an instrument reassembling real bytes with a wrong model. This file has
+    // shipped that once: every catalogue frame in the default foreground,
+    // because `38;2;R;G;B` fell through and nothing asked.
+    const svg = (ansiToSvg as (l: string) => string)("\u001b[1mERR\u001b[22m ok");
+    const bolded = [...svg.matchAll(/<text[^>]*font-weight="bold"[^>]*>(.)<\/text>/gu)].map(
+      (m) => m[1],
+    );
+    expect(bolded.join(""), "the bold run and only the bold run").toBe("ERR");
+
+    // **And the assertion that says the arm is doing work**: a one-bit frame and
+    // a plain one must not produce the same image. Without it the row above
+    // could pass on a tool that emitted `font-weight` for everything.
+    const plain = (ansiToSvg as (l: string) => string)("ERR ok");
+    expect(svg, "one bit and no styling are different images").not.toBe(plain);
+  });
+
+  it("PC11 (F227): nothing in the catalogue emits an SGR code the parser drops", () => {
+    // **The watcher on the one arm deliberately not built.** `7m` has no
+    // producer — `Style.inverse` is written nowhere in `src/` — so an arm for it
+    // would be a mechanism with nothing to exercise it. A deferral naming a
+    // condition with nothing watching it is how a simplification outlives its
+    // excuse, so the condition is asserted here rather than described in a
+    // comment: the day a renderer emits inverse, this names the number.
+    const unknown = new Set<number>();
+    let swept = 0;
+    let withSgr = 0;
+    for (const file of readdirSync(CATALOGUE)) {
+      if (!file.endsWith(".txt")) continue;
+      const raw = readFileSync(join(CATALOGUE, file), "utf8");
+      swept += 1;
+      if (raw.includes(String.fromCharCode(27))) withSgr += 1;
+      for (const n of (unparsedSgr as (s: string) => readonly number[])(raw)) unknown.add(n);
+    }
+
+    // **The counters, because an exit status is one bit and it is the same bit
+    // for *clean* and for *did not run*.** A sweep over no files, or over files
+    // carrying no escapes at all, reports exactly this green — and three
+    // instruments in this repository have reported a completion they never
+    // observed.
+    expect(swept, "the sweep found catalogue frames").toBeGreaterThan(0);
+    expect(withSgr, "and they carry SGR, so there was something to parse").toBeGreaterThan(0);
+    expect([...unknown], "every SGR code in the catalogue has an arm").toEqual([]);
   });
 });

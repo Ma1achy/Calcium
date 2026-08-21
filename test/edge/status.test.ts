@@ -56,7 +56,7 @@ describe("C09 §3a — the box occupies what measure committed", () => {
   it("T3.39 (C09 I31): the height ladder's six rungs draw what §3a says", () => {
     const bordered = (rows: readonly string[]): boolean =>
       rows[0]?.startsWith("┌") === true && rows[rows.length - 1]?.startsWith("└") === true;
-    const tagged = (rows: readonly string[]): boolean => rows.some((r) => r.includes("[ERROR]"));
+    const tagged = (rows: readonly string[]): boolean => rows.some((r) => r.includes(" ERROR "));
     const padded = (rows: readonly string[]): boolean => rows[1]?.trim() === "││".slice(0, 0);
 
     const at = (h: number): readonly string[] => draw({ height: h }, 50);
@@ -69,11 +69,16 @@ describe("C09 §3a — the box occupies what measure committed", () => {
     // Five: the blanks go, together — one and not the other reads as an
     // off-by-one rather than as a decision.
     expect(tagged(at(5)), "5 keeps the tag").toBe(true);
-    expect(at(5)[1]?.includes("[ERROR]"), "5 puts the tag directly under the border").toBe(true);
+    expect(at(5)[1]?.includes(" ERROR "), "5 puts the tag directly under the border").toBe(true);
 
-    // Four: one content row.
+    // Four: one content row, and **no gutter** — the horizontal padding is the
+    // only thing the six-row rung still decides once the group is centred, so it
+    // is what this rung has to be asserted on. Without it the boundary between
+    // 6 and 5 constrains nothing.
     expect(tagged(at(4)), "4 keeps the tag").toBe(true);
     expect(at(4)).toHaveLength(4);
+    expect(at(4)[1]?.startsWith("│─"), "4 has no gutter").toBe(true);
+    expect(at(6)[2]?.startsWith("│ ─"), "6 has one").toBe(true);
 
     // Three: the tag row goes, and with it the only thing naming the box.
     expect(tagged(at(3)), "3 drops the tag").toBe(false);
@@ -101,7 +106,7 @@ describe("C09 §3a — the box occupies what measure committed", () => {
 
     const tagOf = (w: number): string => {
       const rows = draw({ height: 6 }, w);
-      const row = rows.find((r) => r.includes("[ERROR]"));
+      const row = rows.find((r) => r.includes(" ERROR "));
       if (row === undefined) return "none";
       return row.includes("─") ? "rule" : "bare";
     };
@@ -128,7 +133,7 @@ describe("C09 §3a — the box occupies what measure committed", () => {
     const messageRows = (w: number): number =>
       draw({ height: 6, message }, w)
         .map((r) => r.replace(/[│┌┐└┘─]/gu, "").trim())
-        .filter((r) => r !== "" && !r.includes("[ERROR]")).length;
+        .filter((r) => r !== "" && !r.includes(" ERROR ")).length;
 
     // **The comparison is the assertion, not the count.** At width 30 the tag
     // row is drawn and at 8 it is not, so the narrow box must carry exactly one
@@ -234,7 +239,30 @@ describe("C09 §3a — paint and degradation", () => {
       .renderToLines(status({ height: 6 }), 46)
       .map(plain);
     expect(mono.some((r) => r.includes("▲")), "the mark survives one bit").toBe(true);
-    expect(mono.some((r) => r.includes("[ERROR]")), "and so do the brackets").toBe(true);
+    expect(mono.some((r) => r.includes(" ERROR ")), "and the word in its gap").toBe(true);
+  });
+
+  it("T3.48b (C09 I31, C09 §3a): `loading` is not painted as a failure", () => {
+    // **Found by looking at the image.** The message row took the error tone in
+    // all three states, so a first fetch in flight drew red — and nothing here
+    // asserted a tone per state, because the arithmetic is identical either way
+    // and every row about the box was about its geometry. §3a already rules that
+    // loading has no error and therefore no rule and no tag; the tone is the
+    // same fact and was the half that had no mechanism.
+    const raw = (state: string): string =>
+      measurable({ capabilities: FULL_CAPS })
+        .renderToLines(
+          status({ height: 7, state, retryInMs: 8000, elapsedMs: 4000 }),
+          46,
+        )
+        .join("\n");
+
+    // The error tone at 24-bit is a `38;2` foreground. Its presence is the
+    // claim, and both directions are asserted so this cannot pass by drawing
+    // nothing at all.
+    expect(raw("error").includes("38;2"), "error is painted").toBe(true);
+    expect(raw("retrying").includes("38;2"), "retrying is painted").toBe(true);
+    expect(raw("loading").includes("38;2"), "loading is not").toBe(false);
   });
 
   it("T3.47 (C09 I31, C09 §3a): the ascii arm draws + - | and !, and no box drawing anywhere", () => {
