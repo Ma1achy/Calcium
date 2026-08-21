@@ -1108,16 +1108,24 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // a `Hunk` whose line `kind` is `"add"` — which the first version read as a
     // block kind that does not exist — and a single-line `Readonly<{…}> & Gap`
     // declaration, which a multi-line body regex read straight past.
+    // **The bases are declared, and that is a control this fixture did not have.**
+    // The rule used to carry the literal string `"gapBefore"` in its loop, so a
+    // fixture with no `Gap` declaration still checked the field; the fields are
+    // derived from the intersection now, and a fixture that omits the base
+    // would silently stop exercising the shared half. `Floor` is here for the
+    // same reason and carries the second kind of exemption.
     const types = [
       'export type Hunk = Readonly<{ lines: readonly Readonly<{ kind: "add"; text: string }>[] }>;',
-      'export type Rule = Readonly<{ kind: "rule"; id: string; label: string }> & Gap;',
+      "export type Gap = Readonly<{ gapBefore?: boolean }>;",
+      "export type Floor = Readonly<{ shellOnly?: number }>;",
+      'export type Rule = Readonly<{ kind: "rule"; id: string; label: string }> & Gap & Floor;',
       "export type Widget = Readonly<{",
       '  kind: "widget";',
       "  id: string;",
       "  shown: string;",
       "  hidden: number;",
       "  excused: boolean;",
-      "}> & Gap;",
+      "}> & Gap & Floor;",
       "",
       "export type Block =",
       "  | Rule",
@@ -1142,7 +1150,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // With `excused` accounted for and `hidden` not, exactly one field is a
     // violation — which is the discriminator: a rule reporting both would be
     // ignoring the reason list, and one reporting neither would be vacuous.
-    const violations = checkBuilderCoverage(files, read, { "widget.excused": "no surface has one" });
+    const NEVER = { shellOnly: "only a named op writes it" };
+    const violations = checkBuilderCoverage(
+      files,
+      read,
+      { "widget.excused": "no surface has one" },
+      NEVER,
+    );
     expect(
       violations.map((v) => v.message.match(/`(\w+)` and no builder/u)?.[1]),
       "`hidden` alone — `shown` is set, `excused` has a reason, `rule` is intact",
@@ -1167,10 +1181,42 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry naming a
     // field the builder now sets is itself a violation, or the list stops being
     // read the first time someone closes a gap without tidying up.
+    // **The derived base half.** Without `shellOnly` excused it is a violation on
+    // both kinds — which is what says the intersection is being read at all. The
+    // literal-string version of this rule would report nothing here, and it is
+    // the state MG27 shipped in: exhaustive over a block's own braces, and aware
+    // of exactly one shared field because someone typed its name.
+    const bare = checkBuilderCoverage(files, read, { "widget.excused": "x" }, {});
+    expect(
+      bare.filter((v) => v.message.includes("`shellOnly`")).length,
+      "a field on an intersected base is checked on every kind carrying it",
+    ).toBe(2);
+    expect(
+      bare.some((v) => v.message.includes("`gapBefore`")),
+      "and `gapBefore` is still covered, now because the builder mentions it",
+    ).toBe(false);
+
+    // The field-level list's own two arms. It claims no builder *can* set the
+    // field, so a builder that does makes the reason false rather than stale —
+    // and an entry naming a field no kind carries is vacuous.
+    const setAnyway = checkBuilderCoverage(
+      files,
+      read,
+      { "widget.excused": "x" },
+      { shown: "claimed unbuildable, and the builder sets it" },
+    );
+    expect(setAnyway.some((v) => v.message.includes("and the builder mentions it"))).toBe(true);
+
+    const vacuous = checkBuilderCoverage(files, read, { "widget.excused": "x" }, {
+      ...NEVER,
+      nosuchfield: "names nothing",
+    });
+    expect(vacuous.some((v) => v.message.includes("which no block kind carries"))).toBe(true);
+
     const stale = checkBuilderCoverage(files, read, {
       "widget.excused": "no surface has one",
       "widget.shown": "this one is set, so the entry has outlived its reason",
-    });
+    }, NEVER);
     expect(
       stale.some((v) => v.message.includes("which the builder now sets")),
       "an exemption that outlives its reason is a violation of its own",

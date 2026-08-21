@@ -65,10 +65,14 @@ const results = runPass({
       // rather than a block: 19 rows of pad and C14 still scrolling twenty.
       name: "the render catch uses the fallback height rather than the committed one",
       file: REG,
-      // Re-pointed when the message lost its brackets — they were annotation in
-      // a design figure marking which cells carry paint, read as characters.
-      from: "        `${block.kind} failed to render: ${message}`,\n        committed.rows,",
-      to: "        `${block.kind} failed to render: ${message}`,\n        1,",
+      // Re-pointed twice: when the message lost its brackets — they were
+      // annotation in a design figure marking which cells carry paint, read as
+      // characters — and again when the call moved inside `#floored` and the
+      // three arguments came onto one line. **Re-run on each re-anchor**, which
+      // is the standing rule: an anchor moved without the pass being run is a
+      // row nothing has watched since the day it was written.
+      from: "this.#errorBlock(`${block.kind} failed to render: ${message}`, committed.rows, childContext)",
+      to: "this.#errorBlock(`${block.kind} failed to render: ${message}`, 1, childContext)",
       expect: "T3.34",
     },
     {

@@ -5,6 +5,7 @@ import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import type { BlockFault, BlockRegistry } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
+import { scrollDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LOUD, measurable, visible } from "../support/render.js";
@@ -426,5 +427,89 @@ describe("C09 tier 3 — containment", () => {
       build(true).map((f) => f.blockId),
       "and a container whose `elements` threw is not owned by a member that did not answer",
     ).toEqual(control);
+  });
+});
+
+describe("C09 §3, I33 — C04's floor, applied by the registry", () => {
+  const kit = measurable();
+  const short = { kind: "notice", id: "n", tone: "info", text: "one" } as unknown as Block;
+  const floored = (rows: number, over: Record<string, unknown> = {}): Block =>
+    ({ ...short, ...over, minHeight: rows }) as unknown as Block;
+
+  it("T3.53 (I33, C04 I67): `measure` is the maximum, and a taller block keeps its own", () => {
+    expect(kit.measure(short, 40)).toBe(1);
+    expect(kit.measure(floored(3), 40)).toBe(3);
+
+    // **The arm a floor-always-wins implementation passes the other rows with.**
+    // A `logs` of four lines measures four; a floor of two must not lower it.
+    const logs = {
+      kind: "logs",
+      id: "l",
+      lines: ["a", "b", "c", "d"].map((m) => ({ ts: "12:00", level: "info", message: m })),
+    } as unknown as Block;
+    const own = kit.measure(logs, 40);
+    expect(own).toBeGreaterThan(2);
+    expect(kit.measure({ ...logs, minHeight: 2 } as unknown as Block, 40)).toBe(own);
+  });
+
+  it("T3.54 (I33, I1): the render pads to the floor and never bounds it", () => {
+    // The pair I1 is about: one number from one field, taken by both sides.
+    expect(kit.renderToLines(floored(3), 40)).toHaveLength(3);
+    expect(kit.measure(floored(3), 40)).toBe(3);
+
+    // **The half that matters, and it is a measurement about Ink rather than
+    // about us.** A box with a fixed `height` holding more rows than it declares
+    // drops its **first** row — `1 2 3 4` in a `height: 3` box renders `2 3 4` —
+    // and `overflowY: "hidden"` does not change it. So a bound here would
+    // silently behead a block that grew, which is the truncation this mechanism
+    // exists to stop, arriving through the mechanism.
+    const logs = {
+      kind: "logs",
+      id: "l",
+      lines: ["FIRST", "b", "c", "d"].map((m) => ({ ts: "12:00", level: "info", message: m })),
+    } as unknown as Block;
+    const drawn = kit.renderToLines({ ...logs, minHeight: 2 } as unknown as Block, 40);
+    expect(drawn).toHaveLength(kit.measure(logs, 40));
+    expect(drawn.join("\n"), "the first row is still there").toContain("FIRST");
+  });
+
+  it("T3.55 (I33, I2): no definition sees the floor", () => {
+    // **`scroll` is the one to ask.** C04 §3c rules its residue row a function of
+    // `(block, width)` and deliberately not of view state, because a box that
+    // shrank as a reader scrolled would jitter — so a floor reaching the
+    // definition would reopen an argument settled two components away.
+    const scroll = {
+      kind: "scroll",
+      id: "s",
+      height: 2,
+      children: [short, { ...short, id: "n2" }, { ...short, id: "n3" }],
+    } as unknown as Block;
+    expect(scrollDefinition.measure(scroll as never, 40, kit.measure)).toBe(
+      scrollDefinition.measure({ ...scroll, minHeight: 9 } as never, 40, kit.measure),
+    );
+  });
+
+  it("T3.52 (C04 I68, I26): a block carrying a floor is not windowed", () => {
+    // **The build sharpened the walk here.** The ruling was *a slice carries no
+    // floor*, which is true and insufficient: `windowSequence` derives its `to`
+    // from the **floored** height, so a `window` reaching only the definition's
+    // own rows breaks I26's identity from outside the definition, where nothing
+    // would look. Kept whole and paid out of `skipRows`, as a kind declaring no
+    // `window` already is.
+    const lines = Array.from({ length: 20 }, (_, i) => ({
+      ts: "12:00",
+      level: "info" as const,
+      message: `line ${String(i)}`,
+    }));
+    const logs = { kind: "logs", id: "l", lines } as unknown as Block;
+    const tall = { ...logs, minHeight: 30 } as unknown as Block;
+
+    const plain = kit.registry.windowSequence([logs], 40, 5, 10);
+    expect(plain.skipRows, "an unfloored block is windowed").toBe(0);
+    expect(kit.measure(plain.blocks[0] as Block, 40)).toBeLessThan(kit.measure(logs, 40));
+
+    const kept = kit.registry.windowSequence([tall], 40, 5, 10);
+    expect(kept.blocks[0], "the floored block is the block").toBe(tall);
+    expect(kept.skipRows, "and its rows are paid out of slack").toBe(5);
   });
 });

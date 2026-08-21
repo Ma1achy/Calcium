@@ -115,16 +115,22 @@ class Registry implements BlockRegistry {
    * and the public member throws away.
    */
   #measured(block: Block, width: number): Measured {
+    // **The floor is C04's and applying it is this function's** (I33, C04 I67).
+    // In both arms rather than only the successful one: a floor is about the
+    // block, not about which half of its definition gave way, and a measurer
+    // that threw is exactly the case where the rows are most needed.
+    const floor = floorOf(block);
     try {
       const resolved = this.#resolve(block);
-      return { ok: true, rows: resolved.definition.measure(resolved.block, width, this.measure) };
+      const rows = resolved.definition.measure(resolved.block, width, this.measure);
+      return { ok: true, rows: Math.max(rows, floor) };
     } catch (error) {
       // I11 — a throwing measurer is contained and the block treated as one
       // row. This protects virtualisation: C14 sums measured heights without
       // rendering, so a measurer that throws would take the viewport with it
       // (T3.14). Compute, so no retry (A02 §7 rule 2).
       this.#report(block.kind, "measure", error);
-      return { ok: false, rows: 1 };
+      return { ok: false, rows: Math.max(1, floor) };
     }
   }
 
@@ -374,7 +380,20 @@ class Registry implements BlockRegistry {
       if (bottom <= lo || top - gap >= hi) continue;
 
       const resolved = this.#resolve(block);
-      const windowable = resolved.definition.window;
+      // **A block carrying a floor is kept whole** (C09 I33, C04 I68).
+      //
+      // The window's contract is an identity about rows the *definition* can
+      // produce — `measure(w.block, w) − skipRows === to − from` (I26) — and a
+      // floor's rows are the registry's padding, which no definition knows
+      // about. Handing a `to` derived from the floored height to a `window` that
+      // can only reach the definition's own rows breaks that identity from
+      // outside the definition, where nothing would find it.
+      //
+      // Keeping it whole costs slack, which this function already pays for
+      // every kind declaring no `window` at all — and a floored block is small
+      // by construction, because the reason it has a floor is that it failed to
+      // draw.
+      const windowable = floorOf(block) > 0 ? undefined : resolved.definition.window;
 
       // The gap row, when the window opens on or above it, is kept by keeping
       // the block's own `gapBefore`; when the window opens *below* it the gap is
@@ -421,6 +440,27 @@ class Registry implements BlockRegistry {
     return createElement(Box, { flexDirection: "column", width }, children);
   };
 
+  /**
+   * The other half of C04's floor: the element, padded to it (I33).
+   *
+   * **`minHeight` and never `height`, and the difference was measured.** A box
+   * with a fixed height holding more rows than it declares drops its **first**
+   * row rather than its last — `["1","2","3","4"]` in a `height: 3` box renders
+   * `["2","3","4"]` — and `overflowY: "hidden"` does not change it. So a bound
+   * would silently behead a block that grew, which is F223's defect wearing the
+   * mechanism built to prevent it. `minHeight` pads a short child and leaves a
+   * tall one exactly as it was.
+   *
+   * With this and the `max` in `#measured`, I1 holds by construction: both
+   * sides take the same number from the same field, so neither is trusted to
+   * agree with the other.
+   */
+  #floored(block: Block, element: ReactElement): ReactElement {
+    const floor = floorOf(block);
+    if (floor === 0) return element;
+    return createElement(Box, { flexDirection: "column", minHeight: floor }, element);
+  }
+
   render = (block: Block, ctx: RenderContextInput): ReactElement => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
@@ -444,12 +484,15 @@ class Registry implements BlockRegistry {
       // A definition that threw in either half renders the error block (I11).
       // Truncating a good render to the fallback height is the same failure one
       // level down: 4 of 5 rows dropped, in silence (F223).
-      return this.#errorBlock(`${block.kind} failed to measure`, committed.rows, childContext);
+      return this.#floored(
+        block,
+        this.#errorBlock(`${block.kind} failed to measure`, committed.rows, childContext),
+      );
     }
 
     try {
       const resolved = this.#resolve(block);
-      return resolved.definition.render(resolved.block, childContext);
+      return this.#floored(block, resolved.definition.render(resolved.block, childContext));
     } catch (error) {
       // I11 — a throwing renderer is contained to its block, **and the
       // containment includes the row count**. The rest of the frame is
@@ -457,10 +500,9 @@ class Registry implements BlockRegistry {
       // happened rather than vanishing.
       this.#report(block.kind, "render", error);
       const message = error instanceof Error ? error.message : String(error);
-      return this.#errorBlock(
-        `${block.kind} failed to render: ${message}`,
-        committed.rows,
-        childContext,
+      return this.#floored(
+        block,
+        this.#errorBlock(`${block.kind} failed to render: ${message}`, committed.rows, childContext),
       );
     }
   };
@@ -486,6 +528,23 @@ export function createBlockRegistry(
     // one, and `test/support/render.ts` passes one that throws.
     opts.onError ?? ((): void => undefined),
   );
+}
+
+/**
+ * C04's floor, as a non-negative integer (C04 I67, C09 I33).
+ *
+ * **Read here and by no definition**, which is the whole of why the field is
+ * safe: `definition.measure` stays a function of `(block, width)` so I2 holds,
+ * and `scrollDefinition.measure` cannot consult it even by accident, so C04
+ * §3c's argument that a bounded box never depends on view state is not
+ * reopened by the mechanism added two components away.
+ *
+ * Total, because `measure` is: a malformed floor on a document that reached
+ * here anyway is treated as none rather than throwing at frame cadence.
+ */
+function floorOf(block: Block): number {
+  const held = (block as { minHeight?: unknown }).minHeight;
+  return typeof held === "number" && Number.isInteger(held) && held > 0 ? held : 0;
 }
 
 /** A block without its `gapBefore`, so a dropped gap row is genuinely dropped. */

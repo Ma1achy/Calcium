@@ -375,7 +375,33 @@ export type MergeRow = Omit<TableRow, "expanded">;
  */
 export type Gap = Readonly<{ gapBefore?: boolean }>;
 
-export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap;
+/**
+ * A floor on the rows a block occupies, set by a layer above and read by none
+ * (§3d, I67).
+ *
+ * **It exists because `measure` commits before anything is drawn.** A renderer
+ * that gives way is discovered after the number is fixed — C14 has indexed it
+ * and the viewport has chosen its slice — so the frame that finds the problem
+ * cannot fix it, and a block drawing taller is cut with whatever followed it
+ * (F230). The change is deferred instead: the frame completes, `op: "reserve"`
+ * sets this, and the next frame honours it.
+ *
+ * **Applied by C09's registry, outside every definition**, which is the whole of
+ * why it is safe: `definition.measure` stays a function of `(block, width)` so
+ * C09 I2 holds, `scrollDefinition.measure` cannot consult it even by accident so
+ * §3c's argument about view state is not reopened, and a container counts a
+ * floored child for nothing because `measureChild` **is** the registry's
+ * measurer.
+ *
+ * **View state, and not `gapBefore`'s kind of field.** A gap is content — a
+ * `merge` carries it. A floor is something the shell did, so `merge`, `expand`,
+ * `replace` and `window` all drop it (I68) and the far side may not set it at
+ * all: `validateDocument` refuses it at the adapter boundary, which is the half
+ * F231 found missing from `expanded`.
+ */
+export type Floor = Readonly<{ minHeight?: number }>;
+
+export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap & Floor;
 
 export type Notice = Readonly<{
   kind: "notice";
@@ -383,7 +409,7 @@ export type Notice = Readonly<{
   tone: Tone;
   glyph?: Glyph;
   text: string;
-}> & Gap;
+}> & Gap & Floor;
 
 export type KeyValue = Readonly<{
   kind: "keyValue";
@@ -424,7 +450,7 @@ export type KeyValue = Readonly<{
     /** The cells the bar occupies. Required when `bar` is present (I51). */
     barWidth?: number;
   }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Table = Readonly<{
   kind: "table";
@@ -434,7 +460,7 @@ export type Table = Readonly<{
   sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;
   showHeader?: boolean;
   emptyMessage?: string;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Steps = Readonly<{
   kind: "steps";
@@ -444,13 +470,13 @@ export type Steps = Readonly<{
     detail?: string;
     state: "pending" | "active" | "done" | "failed";
   }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Logs = Readonly<{
   kind: "logs";
   id: string;
   lines: readonly Readonly<{ ts: string; level: string; message: string }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Events = Readonly<{
   kind: "events";
@@ -470,7 +496,7 @@ export type Events = Readonly<{
    * never carries alone (D29).
    */
   events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 /**
  * A row of a **vector** field — `Series`' shape, with two numbers per position
@@ -1197,7 +1223,7 @@ export type Plot = Readonly<{
    * see a realised range from L0 (A02 §1).
    */
   axisCross?: AxisCross;
-}> & Gap;
+}> & Gap & Floor;
 
 /** Which corner of a plot area the data grows from (C04 I62, C12 §3ac). */
 export type Origin = "bottom-left" | "bottom-right" | "top-left" | "top-right";
@@ -1773,7 +1799,7 @@ export type Progress = Readonly<{
    * because a bar is decoration over a number that is already correct.
    */
   style?: string;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Code = Readonly<{
   kind: "code";
@@ -1781,7 +1807,7 @@ export type Code = Readonly<{
   language: string;
   text: string;
   wrap?: boolean;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Comparison = Readonly<{
   kind: "comparison";
@@ -1818,7 +1844,7 @@ export type Comparison = Readonly<{
     /** The judgement axis, and the only half that takes a colour. */
     verdict?: "better" | "worse";
   }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Hunk = Readonly<{
   header: string;
@@ -1876,7 +1902,7 @@ export type Patch = Readonly<{
    * it exists so a *window* can say what its parent measured.
    */
   numberWidth?: number;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Pills = Readonly<{
   kind: "pills";
@@ -1887,14 +1913,14 @@ export type Pills = Readonly<{
     action?: Action;
     active?: boolean;
   }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
   text: string;
   actions?: readonly Action[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Panel = Readonly<{
   kind: "panel";
@@ -1928,7 +1954,7 @@ export type Panel = Readonly<{
    */
   live?: boolean;
   children: readonly Block[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Group = Readonly<{
   kind: "group";
@@ -1966,7 +1992,7 @@ export type Group = Readonly<{
    * Ignored on a `column` group, on `flex`'s precedent and for its reason.
    */
   align?: readonly Valign[];
-}> & Gap;
+}> & Gap & Floor;
 
 /**
  * One child's share of a `row` group's width (I44).
@@ -2019,7 +2045,7 @@ export type Share = number | Readonly<{ cells: number }>;
 export type Valign = "top" | "middle" | "bottom";
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
-export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
+export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap & Floor;
 
 /**
  * A bounded region: a box of declared height holding children (C04 §3c, I47).
@@ -2053,7 +2079,7 @@ export type Scroll = Readonly<{
    * live here rather than in the renderer (§3c cell 5).
    */
   children: readonly Block[];
-}> & Gap;
+}> & Gap & Floor;
 
 /**
  * The block a layer above knows about and the definition does not (C04 I66, C09 I31).
@@ -2091,7 +2117,7 @@ export type Status = Readonly<{
   elapsedMs?: number;
   /** A `SPINNER_SETS` name. Unknown resolves to the default rather than throwing. */
   spinner?: string;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Block =
   | Rule
@@ -2140,7 +2166,24 @@ export type ViewPatch =
    * — "trust me" in two components, with the far side's adapter on one boundary.
    * A named op cannot be forged. The same argument as glyphs becoming tokens.
    */
-  | Readonly<{ op: "expand"; blockId: string; rowId: string; expanded: boolean }>;
+  | Readonly<{ op: "expand"; blockId: string; rowId: string; expanded: boolean }>
+  /**
+   * The second view-state arm, and the reason it is an op (§3d, §4, I67).
+   *
+   * **A floor on the block's rows, because a height can be discovered too late
+   * to use.** `measure` commits before anything is drawn; a renderer that gives
+   * way is found after the number is fixed. This is how the layer that found out
+   * says so, and the *next* frame is where it lands — nothing re-enters the
+   * layout, so every frame stays one pass.
+   *
+   * On `expand`'s side of C13's gate for `expand`'s reason: the entries worth
+   * reserving on are the settled ones. And a named op rather than a field the far
+   * side could set, because nothing out there knows a renderer threw.
+   *
+   * `rows` is a floor and never a height — a block already taller keeps its own
+   * measurement.
+   */
+  | Readonly<{ op: "reserve"; blockId: string; rows: number }>;
 
 /**
  * Fallible in the type (I15). `applyPatch` runs on every stream tick in the

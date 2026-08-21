@@ -575,6 +575,29 @@ function checkForbiddenEdges(files, readFile) {
  * exemption whose reason has expired is indistinguishable from a live one to a
  * reader, and equality comparison is what makes the difference mechanical.
  */
+/**
+ * Fields no builder sets for a reason about the **field**, not about a kind.
+ *
+ * **One entry rather than nineteen.** `BUILDER_OMISSIONS` is keyed `Kind.field`
+ * because its reasons are per kind — *`percent` multiplies by 100 and a CLI's
+ * numbers already are* is a sentence about `plot`. A field carried by an
+ * intersected base type is on every kind at once, so the same reason would be
+ * copied nineteen times, and nobody re-reads nineteen copies of one sentence.
+ * That is the failure mode `UNCONSUMED_MEMBERS` and this list's own
+ * bidirectional arm exist to prevent, arriving through the shape of the key.
+ *
+ * The bidirectional arm applies here too, and harder: if any builder starts
+ * setting one of these, the entry is a violation, because the whole claim is
+ * that no builder *can*.
+ */
+export const BUILDER_NEVER = Object.freeze({
+  minHeight:
+    "written only by `op: \"reserve\"` (C04 I67, §3d) — it is view state the shell sets " +
+    "after a renderer gave way, and nothing on the far side or in an author's hands knows " +
+    "that happened. A builder for it would be a second writer for a field whose whole " +
+    "argument is that it has one",
+});
+
 export const BUILDER_OMISSIONS = Object.freeze({
   // **`plot.xLabels` is gone from this list, and a surface is what removed it.**
   // Its reason had two clauses — *no surface has wanted one* and *a caption
@@ -752,6 +775,7 @@ export function checkBuilderCoverage(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
   omissions = BUILDER_OMISSIONS,
+  never = BUILDER_NEVER,
 ) {
   const typesFile = files.find((f) => f.endsWith("src/data/viewmodel/types.ts"));
   const buildersFile = files.find((f) => f.endsWith("src/shell/builders/index.ts"));
@@ -821,7 +845,27 @@ export function checkBuilderCoverage(
   }
 
   const violations = [];
+  /**
+   * The fields a block gets from its intersected bases — `}> & Gap & Floor;`.
+   *
+   * **This was the literal string `"gapBefore"` spelled into the loop below**,
+   * so the rule was exhaustive over the fields declared in a block's own braces
+   * and knew about exactly one of the shared ones by name. `minHeight` arrived
+   * on `Floor` and MG27 had no opinion about nineteen kinds carrying a field no
+   * builder sets — the rule passing for the reason it exists to catch.
+   *
+   * F228's class in an enforcement rule: a hand-maintained list beside a
+   * generated one, where the hand-maintained one reads as authoritative. Derived
+   * now, so a third base type is covered on the day it is written.
+   */
+  const baseFieldsOf = (typeName) => {
+    const m = new RegExp(`export type ${typeName} = Readonly<\\{[\\s\\S]*?\\n?\\}>([^;]*);`, "u").exec(types);
+    if (m === null) return [];
+    return [...m[1].matchAll(/&\s*(\w+)/gu)].flatMap((x) => fieldsOf(x[1]));
+  };
+
   const unreached = new Set();
+  const neverSeen = new Set();
   for (const typeName of typeNames) {
     const kindMatch = new RegExp(
       `export type ${typeName} = Readonly<\\{[\\s\\S]*?kind: "(\\w+)"`, "u",
@@ -829,7 +873,23 @@ export function checkBuilderCoverage(
     if (kindMatch === null) continue;
     const kind = kindMatch[1];
     const body = shared + (byKind.get(kind) ?? "");
-    for (const field of [...fieldsOf(typeName), "gapBefore"]) {
+    for (const field of [...fieldsOf(typeName), ...baseFieldsOf(typeName)]) {
+      // A field the *field* exempts, rather than a kind. Checked before the
+      // per-kind list so one reason covers every kind carrying it.
+      if (never[field] !== undefined) {
+        neverSeen.add(field);
+        if (new RegExp(`\\b${field}\\b`, "u").test(body)) {
+          violations.push({
+            rule: "MG27",
+            file: "tools/enforce/module-graph.mjs",
+            message:
+              `BUILDER_NEVER names \`${field}\`, and the builder mentions it. The entry claims no ` +
+              `builder *can* set it, so a builder that does makes the reason false rather than stale`,
+            spec: "A03 §3, MG27",
+          });
+        }
+        continue;
+      }
       if (new RegExp(`\\b${field}\\b`, "u").test(body)) continue;
       const key = `${kind}.${field}`;
       unreached.add(key);
@@ -844,6 +904,20 @@ export function checkBuilderCoverage(
         spec: "A03 §3, MG27",
       });
     }
+  }
+
+  // The same arm for the field-level list: an entry naming a field no block
+  // carries is a reason with nothing to be about.
+  for (const field of Object.keys(never)) {
+    if (neverSeen.has(field)) continue;
+    violations.push({
+      rule: "MG27",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `BUILDER_NEVER names \`${field}\`, which no block kind carries. An exemption for a ` +
+        `field that does not exist is vacuous, and reads as coverage`,
+      spec: "A03 §3, MG27",
+    });
   }
 
   // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry that is no

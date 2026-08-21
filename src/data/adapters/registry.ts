@@ -166,7 +166,16 @@ export function createAdapterRegistry(
     // through, so once C22 I33 drew it the transcript showed `ps --json`, the
     // spawned form with a flag the user never wrote, in place of the line they
     // submitted. Invisible until something displayed it.
-    const validity = validateDocument({ ...candidate, command: ctx.command });
+    // **`from: "farSide"` is asked for here and nowhere else** (C04 I67, F231).
+    // This is the funnel, so it is the one place the question *did this come
+    // from out there* has an answer — the store, the persist reload and every
+    // consumer of the public validator are all handling documents already
+    // inside the system, and a blanket refusal there would drop a restored
+    // entry a reader had expanded.
+    const validity = validateDocument(
+      { ...candidate, command: ctx.command },
+      { from: "farSide" },
+    );
     if (validity.ok) return validity.value;
     return lastResortDocument(raw, ctx, validity.error.join("; "));
   }

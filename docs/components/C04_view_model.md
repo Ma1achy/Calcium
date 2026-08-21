@@ -1291,7 +1291,7 @@ Four operations produce a new block from an old one, and **none of them carries 
 | `replace` | already covered — *replace is wholesale*, §4, no new sentence needed |
 | `merge` | the table has new content, and a floor raised for content that has gone is a block padded for nothing |
 | `expand` | the same argument: the rows changed, so the height that failed is not the height now |
-| `window` | a slice is not the block. C09 I26 is an identity about the slice — `measure(w.block, w) − skipRows === to − from` — and a floored slice fails it |
+| `window` | **the build sharpened this one: a floored block is not windowed at all.** The walk ruled *a slice carries no floor*, which is true and insufficient — `windowSequence` derives its `to` from the **floored** height, so a `window` reaching only the definition's own rows breaks C09 I26's identity from outside the definition, where nothing would look. Kept whole and paid for out of `skipRows`, exactly as a kind declaring no `window` already is, and affordable because a block with a floor is small by construction: the reason it has one is that it failed to draw |
 
 That is the whole of the clearing rule, and it is why nothing needs to watch a condition: a floor cannot outlive a change to the thing it was about.
 
@@ -1306,7 +1306,7 @@ That is the whole of the clearing rule, and it is why nothing needs to watch a c
 | 1 | the floor × I1 | the registry pads the element to the floor; measure returns the same number. Neither side is trusted to agree with the other |
 | 2 | the floor × a kind's own `measure` | applied outside the definition, so C09 I2 is untouched and no kind can consult it even by accident |
 | 3 | the floor × the empty `group`'s legitimate zero | **the floor wins and the group becomes visible.** A block that failed and shows nothing is *absence indistinguishable from failure*; making it visible is the mechanism working. Stated because §3 documents that zero as legitimate |
-| 4 | the floor × `window` (C09 I26) | dropped — see the table above |
+| 4 | the floor × `window` (C09 I26) | **not windowed** — see the table above. The row is kept here because the cell was right about the interaction and wrong about the remedy, which is the shape §3c's own trace names |
 | 5 | the floor × `merge` / `expand` / `replace` | dropped |
 | 6 | the floor × `gapBefore` | the gap is the sequence's (§3a) and is added by `sequenceHeight` **after** the block's rows, so `max` applies to the block alone. A floor applied to `block + gap` would be one row short at every gap |
 | 7 | the floor × a container's child | nothing propagates and nothing needs to: `measureChild` is the registry's own measurer, so the parent already counts the floored child, and the parent's own padding covers its frame |
@@ -1630,7 +1630,7 @@ persisted document rests on.
 
 - **I67** — **`minHeight` is a floor a layer above sets, written only by `op: "reserve"`, and refused on an inbound document.** It is applied by the registry outside every definition — `max(definition.measure(b, w), b.minHeight ?? 0)` — so no kind reads it, C09 I2's purity is untouched, and `scroll`'s argument that its residue is a function of `(block, width)` and never of view state is not reopened (§3c, §3d). The render pads to the floor and never bounds it, so C09 I1 holds by construction rather than by the two sides agreeing. **An empty `group`'s legitimate zero gives way to a floor**, deliberately: a block that failed and shows nothing is absence indistinguishable from failure.
 
-- **I68** — **A floor survives only while the block is untouched.** `replace`, `merge`, `expand` and `window` each produce a new block from an old one and none carries `minHeight` — `replace` because it is wholesale, `merge` and `expand` because the content the floor was raised for has changed, and `window` because C09 I26 is an identity about a slice and a slice is not the block. Nothing watches a condition and nothing needs to. **The floor can outlive a change to something else** — a renderer that threw at one width may not throw at another — and that is a stated limit rather than a defect: the cost is blank rows under a block that already failed once.
+- **I68** — **A floor survives only while the block is untouched.** `replace`, `merge`, `expand` and `window` each produce a new block from an old one and none carries `minHeight` — `replace` because it is wholesale, `merge` and `expand` because the content the floor was raised for has changed, and `window` by not windowing a floored block at all — the identity C09 I26 states is about rows a definition can produce, and a floor's rows are the registry's. Nothing watches a condition and nothing needs to. **The floor can outlive a change to something else** — a renderer that threw at one width may not throw at another — and that is a stated limit rather than a defect: the cost is blank rows under a block that already failed once.
 
 
 ## 7. Commitments

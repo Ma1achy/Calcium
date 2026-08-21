@@ -653,3 +653,103 @@ describe("C04 measurement edges", () => {
     }
   });
 });
+
+describe("C04 §3d, §4 — the floor a layer above sets", () => {
+  const floored = (over: Partial<Block> = {}): Block =>
+    ({ kind: "notice", id: "n", tone: "info", text: "one", ...over }) as Block;
+
+  it("T3.49 (I67, F231): the far side may not set view state, and it is one check over a set", () => {
+    // **The gate is asked for, not assumed** — `from: "farSide"`. A blanket
+    // refusal would be wrong in a way nothing here would show: `loadTranscript`
+    // puts every persisted line back through this function and *drops* what
+    // fails, so a reader who had expanded a row would lose the entry on the
+    // next start. So both arms are asserted, and the unasked one is the row
+    // that stops the rule being tightened later by someone reading only the
+    // first half.
+    const withFloor = doc({ blocks: [floored({ minHeight: 3 } as Partial<Block>)] });
+    const withExpanded = doc({
+      blocks: [
+        {
+          kind: "table",
+          id: "t",
+          columns: [{ key: "a", label: "A" }],
+          rows: [{ id: "r1", cells: { a: { text: "one" } }, expanded: true }],
+        } as unknown as Block,
+      ],
+    });
+
+    for (const [what, d] of [
+      ["minHeight", withFloor],
+      ["expanded", withExpanded],
+    ] as const) {
+      const far = validateDocument(d, { from: "farSide" });
+      expect(far.ok, `${what} is refused from the far side`).toBe(false);
+      if (!far.ok) expect(far.error.join(" ")).toContain(what);
+      expect(validateDocument(d).ok, `${what} is accepted without the flag`).toBe(true);
+    }
+  });
+
+  it("T3.50 (I67): `reserve` floors, takes the maximum, and refuses what it cannot honour", () => {
+    const base = doc({ blocks: [floored()] });
+
+    const set = applyPatch(base, { op: "reserve", blockId: "n", rows: 3 });
+    expect(set.ok).toBe(true);
+    if (!set.ok) return;
+    expect((set.doc.blocks[0] as { minHeight?: number }).minHeight).toBe(3);
+
+    // **The maximum, never the assignment.** Two blocks can be floored on one
+    // frame and a second request must not lower the first — and a caller
+    // re-stating a floor it holds must produce the same document, which is what
+    // makes the shell's guard a guard rather than a race.
+    const lower = applyPatch(set.doc, { op: "reserve", blockId: "n", rows: 1 });
+    expect(lower.ok).toBe(true);
+    if (lower.ok) {
+      expect((lower.doc.blocks[0] as { minHeight?: number }).minHeight).toBe(3);
+      expect(lower.doc.blocks[0], "an unchanged floor keeps the block").toBe(set.doc.blocks[0]);
+    }
+
+    // Addressing something that is not there is a caller bug, exactly as it is
+    // for `replace` and `merge`.
+    expect(applyPatch(base, { op: "reserve", blockId: "gone", rows: 3 }).ok).toBe(false);
+    // Rows, so a non-negative integer. Refused rather than clamped: clamping
+    // makes a caller's mistake indistinguishable from a caller's intent.
+    for (const rows of [-1, 2.5, Number.NaN]) {
+      expect(applyPatch(base, { op: "reserve", blockId: "n", rows }).ok, `rows ${String(rows)}`).toBe(
+        false,
+      );
+    }
+  });
+
+  it("T3.51 (I68): `merge`, `expand` and `replace` each produce a block with no floor", () => {
+    // **All three, because the reason differs per op.** A single case passes on
+    // whichever one happens to rebuild the block wholesale, and `replace`
+    // already did before this rule existed — so a test written on `replace`
+    // alone would have agreed with `merge` carrying the floor through.
+    const table = {
+      kind: "table",
+      id: "t",
+      columns: [{ key: "a", label: "A" }],
+      rows: [{ id: "r1", cells: { a: { text: "one" } } }],
+    } as unknown as Block;
+
+    const start = applyPatch(doc({ blocks: [table] }), { op: "reserve", blockId: "t", rows: 4 });
+    expect(start.ok).toBe(true);
+    if (!start.ok) return;
+    expect((start.doc.blocks[0] as { minHeight?: number }).minHeight).toBe(4);
+
+    const after = [
+      applyPatch(start.doc, { op: "merge", blockId: "t", rows: [{ id: "r2", cells: { a: { text: "two" } } }] }),
+      applyPatch(start.doc, { op: "expand", blockId: "t", rowId: "r1", expanded: true }),
+      applyPatch(start.doc, { op: "replace", blockId: "t", block: table }),
+    ];
+    const names = ["merge", "expand", "replace"];
+    for (const [i, r] of after.entries()) {
+      expect(r.ok, names[i]).toBe(true);
+      if (!r.ok) continue;
+      expect(
+        (r.doc.blocks[0] as { minHeight?: number }).minHeight,
+        `${String(names[i])} drops the floor`,
+      ).toBeUndefined();
+    }
+  });
+});

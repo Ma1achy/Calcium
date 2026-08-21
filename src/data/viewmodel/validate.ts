@@ -1586,12 +1586,23 @@ function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
  * `ids` accumulates across the whole document, because I14's uniqueness is a
  * document-wide property, not a per-branch one.
  */
+/**
+ * The fields only a named op may write (C04 I67, I68 · F231).
+ *
+ * `expanded` sits on a table *row* rather than on the block, so the row walk
+ * below carries the same check — one set, asked in two places, because the two
+ * places are where the two fields live.
+ */
+const FAR_SIDE_REFUSES_ON_BLOCK: readonly string[] = Object.freeze(["minHeight"]);
+const FAR_SIDE_REFUSES_ON_ROW: readonly string[] = Object.freeze(["expanded"]);
+
 function walkBlock(
   value: unknown,
   errors: string[],
   ids: Map<string, number>,
   path: Set<unknown>,
   at: string,
+  opts: ValidateOptions,
 ): void {
   if (!isRecord(value)) {
     errors.push(`${at}: not an object`);
@@ -1609,6 +1620,51 @@ function walkBlock(
   }
   const where = `${at} (${kind})`;
 
+  // **View state the far side may not set** (I67, F231). Only a named op writes
+  // these, and until this ran the guarantee held at the op and leaked at the
+  // field: measured, an inbound document carrying `expanded: true` validated and
+  // its table measured **3 against 2** — the far side set view state and was
+  // charged a real row for it.
+  //
+  // **A set rather than a check per field**, because the set grows whenever an
+  // op is added and a line per field is how the second one goes missing. Three
+  // instances of a validator blind to a member argued for closing the kind
+  // (F220, F221, F231).
+  //
+  // **Gated, because this is not a property of a document.** A restored
+  // transcript legitimately holds both — `loadTranscript` puts every persisted
+  // line back through this function and *drops* what fails — so a blanket
+  // refusal would silently lose every entry a reader had expanded. The rule is
+  // about a boundary, so it is asked for at one.
+  if (opts.from === "farSide") {
+    for (const field of FAR_SIDE_REFUSES_ON_BLOCK) {
+      if (value[field] !== undefined) {
+        errors.push(
+          `${where}: "${field}" is view state and cannot arrive from the far side ` +
+            `(C04 I67) — only its named op may set it`,
+        );
+      }
+    }
+    // The row half, and it is the instance F231 measured. Here rather than in
+    // `KIND_CHECKS.table` because those take a fixed signature and threading an
+    // option through nineteen of them to reach one is how the next field lands
+    // in only one of the two places.
+    const rows = value["rows"];
+    if (isArray(rows)) {
+      for (const [i, row] of rows.entries()) {
+        if (!isRecord(row)) continue;
+        for (const field of FAR_SIDE_REFUSES_ON_ROW) {
+          if (row[field] !== undefined) {
+            errors.push(
+              `${where} row ${String(i)}: "${field}" is view state and cannot arrive ` +
+                `from the far side (C04 I67) — only its named op may set it`,
+            );
+          }
+        }
+      }
+    }
+  }
+
   if (!isString(value["id"]) || value["id"].length === 0) {
     errors.push(`${where}: "id" must be a non-empty string — ViewPatch addresses blocks by it`);
   } else {
@@ -1625,7 +1681,7 @@ function walkBlock(
   path.add(value);
   const children = childBlocksOf(value);
   for (const [i, child] of children.entries()) {
-    walkBlock(child, errors, ids, path, `${where} child ${i}`);
+    walkBlock(child, errors, ids, path, `${where} child ${i}`, opts);
   }
   path.delete(value);
 }
@@ -1633,9 +1689,9 @@ function walkBlock(
 // --- public ---------------------------------------------------------------
 
 /** I4 — total. Any input yields a result, never a throw. */
-export function validateBlock(block: unknown): Validity<Block> {
+export function validateBlock(block: unknown, opts: ValidateOptions = {}): Validity<Block> {
   const errors: string[] = [];
-  walkBlock(block, errors, new Map(), new Set(), "block");
+  walkBlock(block, errors, new Map(), new Set(), "block", opts);
   return errors.length === 0
     ? { ok: true, value: block as Block }
     : { ok: false, error: Object.freeze(errors) };
@@ -1672,8 +1728,20 @@ function validateMeta(meta: unknown, errors: string[]): void {
   }
 }
 
+/**
+ * Where a document came from, for the one rule that depends on it (I67).
+ *
+ * Absent means *do not ask* — a document already inside the system, which is the
+ * store, the persist reload and every consumer of the public API. `"farSide"` is
+ * an adapter's output, and it is the only place a view-state field is a lie.
+ */
+export type ValidateOptions = Readonly<{ from?: "farSide" }>;
+
 /** I4 — total. I2, I3, I14 and I27 are established here and nowhere else. */
-export function validateDocument(doc: unknown): Validity<ViewDocument> {
+export function validateDocument(
+  doc: unknown,
+  opts: ValidateOptions = {},
+): Validity<ViewDocument> {
   const errors: string[] = [];
 
   if (!isRecord(doc)) {
@@ -1716,7 +1784,7 @@ export function validateDocument(doc: unknown): Validity<ViewDocument> {
     errors.push(`blocks: must be an array`);
   } else {
     for (const [i, b] of doc["blocks"].entries()) {
-      walkBlock(b, errors, ids, new Set(), `blocks[${i}]`);
+      walkBlock(b, errors, ids, new Set(), `blocks[${i}]`, opts);
     }
   }
 
