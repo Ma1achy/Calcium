@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_Y_GUTTER, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
   Action,
@@ -505,6 +505,20 @@ function plot(
         `b.plot: "plotStyle" is "${plotStyle}" on form "${drawn}" (C04 I59) — that form has ` +
           `${arms.length === 0 ? "no style arms" : `arms for ${arms.join(", ")}`}, and an ` +
           `ignored member reads as one not yet implemented`,
+      );
+    }
+  }
+  // **The member had no scope on either gate until now** (F220). `plotDetail`
+  // has one reader in `src/` and reached two forms of forty-four; on the other
+  // forty-two it was accepted here, carried through the document, and ignored —
+  // which is the sentence `plotStyle`'s refusal just above already spells out:
+  // *an ignored member reads as one not yet implemented*.
+  if (plotDetail !== undefined) {
+    const drawn = form ?? "line";
+    if (!HAS_DETAIL_RUNGS[drawn]) {
+      throw new TypeError(
+        `b.plot: "plotDetail" is "${plotDetail}" on form "${drawn}" (C12 I34) — that form ` +
+          `has one figure and no ladder of rungs to pick from`,
       );
     }
   }

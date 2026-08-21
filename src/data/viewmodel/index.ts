@@ -68,7 +68,7 @@ export type {
   ViewPatch,
 } from "./types.js";
 
-export { ACTION_KINDS, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, HAS_CALLOUT, HAS_X_TITLE, HAS_Y_GUTTER, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, SCHEMA, STYLE_ARMS, TONES } from "./types.js";
+export { ACTION_KINDS, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_X_TITLE, HAS_Y_GUTTER, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, SCHEMA, STYLE_ARMS, TONES } from "./types.js";
 
 export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild } from "./construct.js";
 

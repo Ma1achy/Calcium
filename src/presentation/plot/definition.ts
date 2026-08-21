@@ -264,6 +264,20 @@ const RUNGS: Readonly<Record<"boxplot" | "violin", readonly RungSpec[]>> = Objec
 });
 
 /**
+ * The forms that have a ladder, published for C12 T2.10 (F220).
+ *
+ * **`HAS_DETAIL_RUNGS` cannot be derived from this and this cannot be derived
+ * from it** — the record is in `types.ts` (L0) and validation reads it there,
+ * while `RUNGS` is here (L1) and L0 does not import upward. So the two are
+ * written separately and a row asserts they agree: a `true` with no ladder is a
+ * refusal that never fires, and a `false` with one is a ladder no caller reaches.
+ *
+ * Derived from `RUNGS`' own keys rather than restated, so the two halves of that
+ * row cannot both be a copy of the same mistake.
+ */
+export const RUNG_FORMS: readonly string[] = Object.freeze(Object.keys(RUNGS));
+
+/**
  * The samples a density rung needs before it is drawing an estimate rather than
  * an artefact.
  *

@@ -24,6 +24,7 @@ import {
   type Glyph,
   COLORMAP_NAMES,
   HAS_CALLOUT,
+  HAS_DETAIL_RUNGS,
   HAS_X_TITLE,
   HAS_Y_GUTTER,
   HONOURS_AXIS_CROSS,
@@ -1278,6 +1279,22 @@ function plotAxisErrors(
     e.push(`${at}: "yAxis" must be "left", "right", "both" or false`);
   }
   const DRAWS = new Set(["last", "name", "both"]);
+  // **The member had no scope until `HAS_DETAIL_RUNGS`** (F220). One reader in
+  // `src/`, three call sites, and nothing refused it anywhere — so it was
+  // accepted on 42 of 44 forms that do nothing with it, which is F207's
+  // *accepted at construction and ignored at render* in a member rather than a
+  // record.
+  const pd = b["plotDetail"];
+  if (pd !== undefined) {
+    if (pd !== "auto" && pd !== "compact" && pd !== "full") {
+      e.push(`${at}: "plotDetail" must be "auto", "compact" or "full" (C12 I34)`);
+    } else if (HAS_DETAIL_RUNGS[form as PlotForm] === false) {
+      e.push(
+        `${at}: "plotDetail" is ${JSON.stringify(pd)} on form ${JSON.stringify(form)} ` +
+          `(C12 I34) — that form has one figure and no ladder of rungs to pick from`,
+      );
+    }
+  }
   const xt = b["xTitle"];
   if (xt !== undefined) {
     if (!isString(xt)) {

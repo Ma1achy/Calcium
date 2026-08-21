@@ -10699,3 +10699,49 @@ ago and for the same reason.
 *name*; this one is an instrument answering a question about a *string*. Both are exact enough
 to be trusted and neither says how exact it is at the point of use — F218 prints its precision
 on every run and this one prints nothing at all.
+
+
+## F220 — `plotDetail` is accepted on forty-four forms and read by two ★★★★☆
+
+**Found by checking a premise before building on it.** Phase B's `tree` puts its three rungs on
+`plotDetail`, so the first question was what that member does today. `grep` over `src/` answers
+structurally rather than by sampling:
+
+```
+definition.ts:302   const mode = block.plotDetail ?? "auto";        <- the only read
+definition.ts:2297  rungFor(block, "boxplot", ...)                  <- call site 1
+definition.ts:2636  rungFor(block, "violin",  ...)                  <- call site 2
+definition.ts:2660  rungFor(block, "violin",  ...)                  <- call site 3
+validate.ts         nothing
+```
+
+**One reader. Three call sites, all inside the `boxplot` and `violin` renderers. No validator
+anywhere.** So `plotDetail: "compact"` on a `line`, a `bar`, a `heatmap` or a `pie` is accepted at
+construction, carried through the document, and does nothing — on **42 of 44 forms**.
+
+**This is F207's class in a member rather than in a record.** That finding's own words: *accepted
+at construction and ignored at render is the worst of the three answers — worse than refusing,
+which tells the caller, and worse than degrading, which tells the reader.* F207 was about
+`STYLE_ARMS` claiming a braille arm that four of a violin's five routines did not have; there the
+record was total and compiler-checked and **still** answered a question it could not ask. Here
+there is no record at all.
+
+**The difference from F207 is which way the silence runs.** `STYLE_ARMS` said *yes* where the
+renderer said nothing; `plotDetail` says nothing anywhere — the type permits it on every form and
+no artefact in the tree states which forms have a ladder. §3i describes the boxplot's and the
+violin's rungs and never says the scope is those two, so a reader takes the member as general
+because nothing narrows it.
+
+**Why it survived**: the member is *optional* and its default is `"auto"`, so every form renders
+correctly whether or not it is set. There is no wrong frame to find. The only observable is the
+absence of an error, and an absence is what no frame-read, golden or mutation reaches — the
+suite's own blind spot rather than a gap in it.
+
+**And it was about to get worse.** `tree` joining the ladder takes the ratio from 2/44 to 3/44 and
+leaves 41 forms accepting a member that governs three. A member's scope narrowing as the component
+grows is the direction that reads as *more implemented* and is less.
+
+**Fixed** — `HAS_DETAIL_RUNGS`, total over `PlotForm`, on `HAS_CALLOUT`'s and `HAS_X_TITLE`'s shape
+in the same file; refused at both gates where it is `false`, with the message naming the form. The
+record and `RUNGS` must agree, and PD3 asserts that rather than trusting it: a record in `types.ts`
+and a ladder in `definition.ts` cannot be derived from one another, because L0 does not import L1.

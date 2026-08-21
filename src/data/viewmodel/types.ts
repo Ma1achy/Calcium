@@ -1393,6 +1393,49 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
  * Total over `PlotForm`, so the thirty-fifth form declares which it is — and the
  * sweep in C12 T2.9 re-measures it rather than trusting these values.
  */
+/**
+ * Whether this form has a `plotDetail` rung ladder to select from (C12 I28, I34,
+ * §3i · F220).
+ *
+ * **The member had no scope at all until this record.** `plotDetail` has one
+ * reader in `src/` — `rungFor` — reached only from the `boxplot` and `violin`
+ * renderers, and nothing refused it anywhere: it was accepted on **42 of 44
+ * forms** that do nothing with it. That is F207's class arriving in a member
+ * rather than in a record, and the silence runs the other way — `STYLE_ARMS`
+ * said *yes* where the renderer said nothing, and here nothing said anything, so
+ * §3i's description of two ladders read as general because no artefact narrowed
+ * it.
+ *
+ * **It survived because the member is optional and defaults to `"auto"`**, so
+ * every form renders correctly whether or not it is set. There is no wrong frame
+ * to find; the only observable is the absence of an error, which is what no
+ * frame-read, golden or mutation reaches.
+ *
+ * **This record and `RUNGS` cannot be derived from one another** — `RUNGS` is in
+ * `definition.ts` (L1) and validation is here (L0), and L0 does not import
+ * upward. So they must agree, and C12 T2.10 asserts it rather than trusting it:
+ * a `true` with no ladder is a refusal that never fires, and a `false` with one
+ * is a ladder no caller can reach.
+ *
+ * Total over `PlotForm`, so the thirty-fifth form declares which it is.
+ */
+export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // The two distribution ladders §3i is written about.
+  boxplot: true, violin: true,
+  // Everything else. A form joining this list needs a `RUNGS` entry with it, or
+  // the refusal stops firing and nothing starts drawing.
+  line: false, sparkline: false, heatmap: false, scatter: false, step: false,
+  ecdf: false, bar: false, histogram: false, forest: false, dumbbell: false,
+  lollipop: false, dotplot: false, waffle: false, flame: false, icicle: false,
+  funnel: false, gantt: false, waterfall: false, streamgraph: false,
+  stackedarea: false, treemap: false, slope: false, bubble: false,
+  autocorrelation: false, timeline: false, bullet: false, utilisation: false,
+  calendar: false, correlation: false, confusion: false, spectrogram: false,
+  latency: false, density2d: false, contour: false, quiver: false,
+  density: false, ridgeline: false, smallmultiples: false, pairplot: false,
+  pie: false, radar: false, horizon: false,
+});
+
 export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // Composed by `axed`, `axedWithCursor` or `categoricalColumnForm` — the
   // positional family and the categorical one.

@@ -4233,6 +4233,29 @@ A boxplot at one row per category cannot show a mean; at three it is the referen
 violin needs five before an outline and its box overlay are both legible. Both wants are real
 and neither should cost the caller arithmetic.
 
+### The member's scope, which it did not have
+
+**`plotDetail` governs the forms with a ladder and nothing else — and until `HAS_DETAIL_RUNGS`
+nothing said so** (F220). It has **one reader** in `src/`, `rungFor`, reached from three call
+sites all inside the `boxplot` and `violin` renderers; `validate.ts` never mentioned it. So it was
+accepted on **42 of 44 forms** and did nothing on them.
+
+**This section is where that came from.** Everything below describes two ladders and none of it
+says the member is theirs, so a reader takes it as general because no artefact narrows it — which
+is F207's *accepted at construction and ignored at render* arriving in a member rather than in a
+record, with the silence running the other way: `STYLE_ARMS` said *yes* where the renderer said
+nothing, and here nothing said anything at all.
+
+**It survived because the member is optional and defaults to `"auto"`.** Every form renders
+correctly whether or not it is set, so there is no wrong frame to find — the only observable is
+the absence of an error, which is what no frame-read, golden or mutation reaches.
+
+**`HAS_DETAIL_RUNGS` and `RUNGS` are two artefacts that must agree and cannot be derived from one
+another**: the record is in `types.ts` so `validateBlock` can read it, `RUNGS` is in
+`definition.ts`, and L0 does not import L1. T2.10 asserts the agreement against `RUNG_FORMS`, which
+is `RUNGS`' own keys rather than a restatement — a `true` with no ladder is a refusal that never
+fires, and a `false` with one is a ladder no caller can reach.
+
 **Four rungs, and every one adds information rather than resolution.** That is the test a
 rung has to pass: a figure that says the same thing larger is not a rung, it is a bigger
 drawing.
@@ -4950,6 +4973,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.112** (I55): **there is no mark prefix at any capability**, asserted as an absence at both `FULL_CAPS` and `MONO_CAPS` with a positive control in the same frame. The row exists because I55 named a remedy before it was reachable, and an arm that cannot fire reads exactly like one that is satisfied — A03 §2's vacuity class in a member rather than a rule.
 - **T1.113** (I56) — `TL16`–`TL18`: the title costs exactly one row and it is the **last**, with the row above it asserted *not* to carry it; `measure` equals the rendered count; it is centred on the plot **area**, asserted with a title two cells narrower than the area against the frame's own border columns, because area-centred and row-centred differ by the gutter and no short title separates them at any tolerance that is not itself a guess; a long title's **last inked column** stops at the area's right edge, asserted as a position rather than as a remaining width; it survives ascii; and it stacks with `legend: "below"`.
 - **T2.9** (I56): **`HAS_X_TITLE` is re-measured rather than trusted** — every `true` renders its title and keeps `measure === rendered`, every `false` is refused at the gate, and the count of drawing forms is asserted at 26 so the sweep cannot pass against an all-`false` record. This is the row that makes the record safe to edit.
+- **T2.10** (I34) — `PD1`–`PD3`: every form with no ladder refuses `plotDetail` at **both** gates, for all three values, with the count asserted at **42** so the row cannot pass against an all-`true` record; `boxplot` and `violin` still accept all three; **absent is accepted everywhere**, which is the row that says why the defect was invisible; and `HAS_DETAIL_RUNGS` agrees with `RUNG_FORMS` form for form, read from `definition.ts` rather than restated, so the two halves cannot both be a copy of one mistake.
 - **T1.98** (I35): three distributions of very different spread in one block draw three different widths, and the same three scaled to their own extents draw the same shape. **The fixture responds first**: the spreads differ by a factor that a shared axis must show and an unshared one cannot.
 - **T1.97** (I34): eighteen bands in a vertical violin at a width their count does not divide — every band draws the same rung, and the three bands a cell wider draw that rung wider rather than a different one. Asserted over the *set* of figures in the frame rather than on any band, because the defect is that the set has two members.
 - **T1.95** (I11, I34): the jitter is decorrelated from the index it is drawn from — every position is reached, fewer than half the indices agree with `index % positions`, and a second band is a different speckle. **The sawtooth is the row's subject**: it is deterministic, satisfies I11, and draws diagonal stripes through sorted data.
