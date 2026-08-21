@@ -224,6 +224,50 @@ const ANNOTATION_CHECKS: Readonly<Record<Annotation["kind"], AnnotationCheck>> =
   },
 });
 
+/**
+ * A series' per-sample names (C04 I63, C12 I55, §3ag).
+ *
+ * **Three refusals, and the form one is the reason the record is `HAS_CALLOUT`
+ * rather than a new one.** That table partitions the forms whose sample is drawn
+ * at its own value; a band form draws sample *j* at a cumulative height, so a
+ * label placed from `rowOf(value)` would name a row the sample is not on. Same
+ * fact, second consumer — not a record borrowed for a different question.
+ */
+function checkPointLabels(
+  s: Record<string, unknown>,
+  e: string[],
+  at: string,
+  index: number,
+  form: unknown,
+): void {
+  const labels = s["pointLabels"];
+  if (labels === undefined) return;
+  const where = `${at}: series[${String(index)}].pointLabels`;
+  if (!isArray(labels)) {
+    e.push(`${where} must be an array (C04 I63)`);
+    return;
+  }
+  for (const l of labels) {
+    if (l !== null && !isString(l)) {
+      e.push(`${where} entries must be a string or null (C04 I63)`);
+      break;
+    }
+  }
+  const values = s["values"];
+  if (isArray(values) && labels.length > values.length) {
+    e.push(
+      `${where} has ${String(labels.length)} entries against ${String(values.length)} ` +
+        `values (C04 I63) — an entry past the last reading names a sample that does not exist`,
+    );
+  }
+  if (HAS_CALLOUT[form as PlotForm] === false) {
+    e.push(
+      `${where} on form ${JSON.stringify(form)} (C04 I63) — a point label sits beside the ` +
+        `sample it names, and that form does not draw a sample at its own value`,
+    );
+  }
+}
+
 function checkAnnotations(
   annotations: unknown,
   e: string[],
@@ -493,6 +537,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (isArray(b["series"])) {
       for (const [i, s] of b["series"].entries()) {
         if (isRecord(s)) requireFiniteNumbers(s["values"], e, at, `series[${String(i)}].values`);
+        if (isRecord(s)) checkPointLabels(s, e, at, i, b["form"]);
       }
       // **I50a — refused, not cycled** (roadmap 51). The categorical palette
       // distinguishes eight, and a ninth series used to reuse the first's

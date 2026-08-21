@@ -64,6 +64,7 @@ import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, f
 import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
 import { WAFFLE_ROWS, waffleCells } from "./waffle.js";
+import { pointLabelRows } from "./pointlabels.js";
 import { colormapFor, heatmapFormRows } from "./heatmap.js";
 import { glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
@@ -1031,6 +1032,22 @@ function stackedRows(
       ref: refOf(s, index),
       kind: "curve" as const,
     },
+    // **The names reach this arm too, and the callout's own comment is why**
+    // (C12 I55): *a map built only in the overlaid arm would accept the field
+    // and draw nothing at one bit, on the exact terminals where a reader most
+    // needs it spelled out.* A strip is one series in its own band, so it gets
+    // its own collision grid — strips share no rows — and no mark prefix, since
+    // the gutter beside it already names the series.
+    names: s.pointLabels === undefined
+      ? null
+      : {
+          glyphRows: pointLabelRows(
+            [s], range, layout.areaWidth, heights[index] ?? 0, ctx.capabilities,
+            facingOf(block, FACING_DEFAULT),
+          )[0] ?? [],
+          ref: refOf(s, index),
+          kind: "label" as const,
+        },
     rows: heights[index] ?? 0,
   }));
   const callouts = new Map<number, Callout>();
@@ -1047,7 +1064,7 @@ function stackedRows(
         plotRow(
           out.length, // cells-ok — a row index
           i === 0 ? (series[index]?.label ?? "") : "",
-          mergedRow([strip.layer], i, withRight, ctx),
+          mergedRow(strip.names === null ? [strip.layer] : [strip.names, strip.layer], i, withRight, ctx),
           withRight,
           ctx,
         ),
@@ -1145,7 +1162,21 @@ function overlaidRows(
   const zeroRow = zeroAt !== null && zeroAt > 0 && zeroAt < layout.areaRows - 1 ? zeroAt : null; // cells-ok — a row index
   const zeroColumn = crossing ? xaxis.zeroColumn : null;
 
+  // **The names, first, because a label draws over the data** (C12 I55, §3ag
+  // A11). That is the opposite of an annotation's reference line, and
+  // deliberately: a line is a claim the curve is *compared against*, so hiding a
+  // sample under it loses the comparison — while a name hidden by the thing it
+  // names says nothing at all. `kind: "label"` already existed for the radar's
+  // spoke names and shares with nothing in either direction, which is exactly
+  // what text wants.
+  const names = pointLabelRows(
+    block.series, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing,
+  );
   const layers: readonly Layer[] = [
+    ...block.series.flatMap((s, index) =>
+      s.pointLabels === undefined
+        ? []
+        : [{ glyphRows: names[index] ?? [], ref: refOf(s, index), kind: "label" as const }]),
     ...block.series.map((s, index) => ({
       glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing),
       ref: refOf(s, index),

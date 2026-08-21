@@ -516,6 +516,25 @@ export type Series = Readonly<{
    * as they treated a `NaN`.
    */
   values: readonly (number | null)[];
+  /**
+   * A name beside one sample, parallel to `values` (C12 I55, §3ag).
+   *
+   * **Parallel and not a record**, because `values` is a bare array and the
+   * abscissa a sample has *is* its index — a keyed record would be a second way
+   * to say which sample, and the two could disagree. `null` is *no label here*,
+   * so a sparse set needs no length and no sentinel index.
+   *
+   * **Longer than `values` is refused**: an entry past the last reading names a
+   * sample that does not exist, which is a document saying something about
+   * nothing rather than a harmless extra.
+   *
+   * **Refused where `HAS_CALLOUT` is false**, and that record is the right one
+   * rather than a convenient one: it partitions the forms whose sample is drawn
+   * at *its own value*. A `stackedarea` or a `streamgraph` draws sample *j* at a
+   * cumulative height, so `rowOf(value)` names a row the sample is not on — the
+   * same fact the callout was excluded from those forms for.
+   */
+  pointLabels?: readonly (string | null)[];
   label?: string;
   tone?: Tone;
   marker?: string;

@@ -10614,3 +10614,46 @@ at all. Recorded as a candidate rather than built, on `docs/COMMITMENT_INVARIANT
 padding ring, which is the only part of it a child does not paint over), §3g carries both
 corrections with the direction each moved, and `types.ts` records that the condition is met and
 the arm is not.
+
+
+## F218 — a local variable cleared a published member's exemption, and MG24 is gated ★★★☆☆
+
+**Adding a file with `let blocker: Owner | null` — first written `blocked` — failed `make
+enforce`**, on a rule about a glyph:
+
+```
+MG24  UNCONSUMED_MEMBERS names GlyphSet.blocked, which is no longer an unconsumed
+      published member — it is either wired now or gone. Remove the entry.
+```
+
+`GlyphSet.blocked` is `⊘`, declared in `glyphs.ts`, drawn by nothing. It is still drawn by
+nothing. What changed is that an unrelated file in a different directory declared a **local
+variable** of the same name, and MG24 resolves consumption by name.
+
+**The instrument reports this limitation itself, on every run**: *name exactness · MG24 is exact
+for 488/1416 members; the rest share a name with another owner — id (32), kind (25), text (20),
+label (16), width (13)*. That line has been read as a precision figure about a **reported** number.
+It is not only that: `UNCONSUMED_MEMBERS` is a **gated** exemption list, and a name collision
+anywhere in `src/` clears an entry and fails the build.
+
+**Both directions are wrong and only one of them fails loudly.**
+
+| | what happens |
+|---|---|
+| a local variable takes an exempt member's name | the exemption reads as stale, `make enforce` fails, and the fix is to rename something unrelated |
+| a local variable takes an **unexempt** member's name | the member reads as consumed, and MG24 stops asking about it — **silently** |
+
+The second is the one to worry about: MG24's whole subject is *a published member nothing
+consumes*, and any of the 928 inexact members can be answered by a `let` in a test helper.
+`id`, `kind`, `text`, `label` and `width` are the top five collisions and all five are ordinary
+local-variable names.
+
+**Not fixed here.** The rename to `blocker` is an improvement on its own terms — the variable
+holds the *blocker*, not a boolean — so the immediate failure is gone without contorting the
+source. Resolving MG24 by symbol rather than by name is a change to the instrument and wants its
+own commit, with F105/F160 in front of it: **this is the first instance where the imprecision has
+teeth rather than only noise.**
+
+**And it belongs to the group about instruments** rather than to the group about unconsumed
+members, which is the distinction the ranking rests on: the finding is not that `⊘` is undrawn —
+it is that the thing asking has an answer that depends on a variable in another file.

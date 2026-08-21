@@ -87,8 +87,11 @@ const results = runPass({
       // cross — including the one a reader is comparing against the line.
       name: "annotations are layered in front, hiding the samples they cross",
       file: DEF,
-      from: "  const layers: readonly Layer[] = [\n    ...block.series.map((s, index) => ({",
-      to: "  const layers: readonly Layer[] = [\n    ...(block.annotations ?? []).map((a) => ({\n      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),\n      ref: `tone.${a.tone ?? \"muted\"}`,\n    })),\n    ...block.series.map((s, index) => ({",
+      // Re-anchored when the point-label layers landed ahead of the curves
+      // (C12 I55 §3ag A11). The mutation is unchanged: the annotations go to
+      // the front of the list, which is what "layered in front" means.
+      from: "  const layers: readonly Layer[] = [\n    ...block.series.flatMap((s, index) =>",
+      to: "  const layers: readonly Layer[] = [\n    ...(block.annotations ?? []).map((a) => ({\n      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),\n      ref: `tone.${a.tone ?? \"muted\"}`,\n      kind: \"context\" as const,\n    })),\n    ...block.series.flatMap((s, index) =>",
       expect: "T1.30",
     },
     {

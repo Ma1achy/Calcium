@@ -399,6 +399,18 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
   },
   scatter: {
     default: { form: "scatter", height: 8, axes: true, series: [s(sin50)] },
+    // C04 I63 §3ag — a name beside a sample, and the last one is at the right
+    // edge, so it has to flip to the other side of its own dot rather than
+    // slide over it.
+    "point-labels": {
+      form: "scatter", height: 9, axes: true, legend: false,
+      series: [{
+        values: sin50,
+        label: "alpha",
+        pointLabels: sin50.map((_v, i) =>
+          i === 6 ? "rise" : i === 24 ? "crest" : i === 49 ? "last" : null),
+      }],
+    },
     minimal: { form: "scatter", height: 3, axes: false, series: [s([1, 5, 2])] },
     dense: { form: "scatter", height: 8, axes: true, series: [s(sin500)] },
     "multi-series": {
