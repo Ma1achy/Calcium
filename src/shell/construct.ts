@@ -645,32 +645,75 @@ export async function constructGraph(
     // start because a preference file has a stray byte in it has made a
     // preference into a dependency.
     //
-    // Anything that is not one of the two variants is treated as absent, and
+    // Anything the set does not hold as a name is treated as absent, and
     // `themeWarning` is what stops "absent" and "corrupt" looking the same to
     // a user who chose light and got dark. The notice is committed at step 8,
     // once there is a transcript to put it in.
+    //
+    // **Absent, empty and unusable are one arm here** (I68, §6h.2 rows 6 and 7).
+    // They were already the same for this rule's purposes — an unreadable file
+    // leaves the base theme standing — and the polarity below is what makes the
+    // collapse load-bearing rather than tidy: *a preference that cannot be
+    // honoured is not a preference*, so all three fall through to the terminal.
     const persisted = await readOrAbsent(config.fs, themePath(config.stateDir));
-    if (persisted !== null) {
-      const trimmed = persisted.trim();
-      // **A membership test against the set, not a comparison to two literals**
-      // (C10 I27). The migration is nothing — `dark` and `light` are names in
-      // the shipped set — and a literal pair here would refuse a legitimate
-      // name the moment a third theme existed.
-      if (themed.value.names.includes(trimmed)) themed.value.setTheme(trimmed);
-      else if (trimmed !== "") {
-        // Appended here rather than carried out to `start()`: the transcript
-        // exists at this point and a warning threaded through the graph is a
-        // second record of the same fact. `origin: "refresh"` because no user
-        // command produced it.
-        transcript.append(
-          noticeDoc(
-            "",
-            `theme preference ignored: \`${trimmed.slice(0, 40)}\` is not dark or light`,
-            "warn",
-            { origin: "refresh" },
-          ),
-        );
-      }
+    const trimmed = persisted?.trim() ?? "";
+    // **A membership test against the set, not a comparison to two literals**
+    // (C10 I27). The migration is nothing — `dark` and `light` are names in
+    // the shipped set — and a literal pair here would refuse a legitimate
+    // name the moment a third theme existed.
+    const stated = themed.value.names.includes(trimmed);
+    if (stated) themed.value.setTheme(trimmed);
+    else if (trimmed !== "") {
+      // Appended here rather than carried out to `start()`: the transcript
+      // exists at this point and a warning threaded through the graph is a
+      // second record of the same fact. `origin: "refresh"` because no user
+      // command produced it.
+      //
+      // **The set's own names, not `dark or light`** (F215). The literal pair
+      // survived C10 I27's fork in this string and in three documents, and on a
+      // set holding `high-contrast` it names two of the three themes available
+      // and calls the third a mistake. Nothing asserted the sentence, which is
+      // why it was free to be wrong.
+      transcript.append(
+        noticeDoc(
+          "",
+          `theme preference ignored: \`${trimmed.slice(0, 40)}\` is not ` +
+            `${themed.value.names.join(", ")}`,
+          "warn",
+          { origin: "refresh" },
+        ),
+      );
+    }
+
+    // **The terminal's own polarity, where the reader has not usably stated a
+    // preference** (I68, §6h). C02 reads `COLORFGBG` and answers `dark`, `light`
+    // or `unknown`; the third value is what makes this branch expressible, since
+    // *nothing stated* and *stated light* would otherwise be one fact.
+    //
+    // **A search of the set by `variant`, and not a switch to a name.** C10 I27
+    // keyed the set by name and made polarity a property a theme declares, so
+    // there is no `setTheme(polarity)` to call — and the search is the first
+    // reader of `variant` outside `store.ts`, which is the use I27 published it
+    // for. The variants come from `config.theme` rather than through a new C10
+    // accessor: the set is the argument `loadTheme` was given, already in hand.
+    //
+    // **Declaration order, on `loadTheme`'s own precedent** — `opening` defaults
+    // to the set's first key rather than to a literal — and **silent when it
+    // matches nothing**: the set is the app author's, and a notice would be the
+    // framework reporting on their choice to their user (§6h.2 rows 4 and 5).
+    //
+    // **Never persisted.** `${stateDir}/theme` has one writer and it is
+    // `/theme`'s handler (I40). A written inference is indistinguishable from a
+    // statement on the next read, and that distinction is what the `stated`
+    // branch above runs on (§6h.3 row 1).
+    if (!stated) {
+      const polarity = detection.capabilities.backgroundPolarity;
+      const match =
+        polarity === "unknown"
+          ? undefined
+          : themed.value.names.find((n) => config.theme[n]?.variant === polarity);
+      // Cannot throw: every name here came from the store's own list (§6h.5).
+      if (match !== undefined) themed.value.setTheme(match);
     }
 
     // **§8's seventh severity, and the only one that had no home.** Six of the

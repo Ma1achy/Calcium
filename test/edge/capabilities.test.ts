@@ -17,6 +17,7 @@ describe("C02 edge cases", () => {
       colourDepth: 1,
       unicode: "ascii",
       ambiguousWidth: "narrow",
+      backgroundPolarity: "unknown",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -46,7 +47,7 @@ describe("C02 edge cases", () => {
     } as unknown as Partial<TerminalCapabilities>);
 
     expect(capabilities.colourDepth).toBe(24);
-    expect(Object.keys(capabilities)).toHaveLength(8);
+    expect(Object.keys(capabilities)).toHaveLength(9);
     expect(warnings).toEqual([]);
   });
 
@@ -105,6 +106,46 @@ describe("C02 edge cases", () => {
 
     // Nothing leaked onto Object.prototype along the way.
     expect(({} as Record<string, unknown>)["TERM"]).toBeUndefined();
+  });
+
+  it("T3.11 (C02 I10): the whole domain — {0-6, 8} dark, {7, 9-15} light", () => {
+    // **All sixteen, because the split has two discontinuities.** A sampled pair
+    // cannot tell a wrong boundary from a right one: `index < 7` passes on 0 and
+    // 15, and so does `index !== 7 && index !== 8`.
+    const dark = [0, 1, 2, 3, 4, 5, 6, 8];
+    const light = [7, 9, 10, 11, 12, 13, 14, 15];
+
+    for (const bg of dark) {
+      expect(caps({ TERM: "xterm", COLORFGBG: `15;${String(bg)}` }).backgroundPolarity, `bg ${String(bg)}`)
+        .toBe("dark");
+    }
+    for (const bg of light) {
+      expect(caps({ TERM: "xterm", COLORFGBG: `0;${String(bg)}` }).backgroundPolarity, `bg ${String(bg)}`)
+        .toBe("light");
+    }
+    // The two lists are the domain, with nothing counted twice.
+    expect(new Set([...dark, ...light]).size).toBe(16);
+  });
+
+  it("T3.12 (C02 I10): the dumb gate does not reach COLORFGBG either", () => {
+    // T3.10's assertion for the other ungated rule, and the same argument: the
+    // gate is about terminfo and this variable is not derived from it.
+    const c = caps({ TERM: "dumb", COLORFGBG: "0;15" });
+
+    expect(c.backgroundPolarity).toBe("light");
+    expect(c.altScreen).toBe(false);
+    // Inert rather than wrong: at one bit nothing is coloured, so the polarity
+    // reaches C22 and chooses between themes that resolve alike (C10 I26).
+    expect(c.colourDepth).toBe(1);
+  });
+
+  it("T3.13 (C02 I10): COLORFGBG empty is unset, through `read` and not a second check", () => {
+    // The same path T3.6 asserts for TMUX. Worth its own row because a rule that
+    // re-checked for "" here would pass while the shared one rotted.
+    expect(caps({ TERM: "xterm", COLORFGBG: "" }).backgroundPolarity).toBe("unknown");
+    // The control: the same env with a value answers, so the row is about the
+    // empty string and not about the fixture.
+    expect(caps({ TERM: "xterm", COLORFGBG: "0;15" }).backgroundPolarity).toBe("light");
   });
 
   it("T3.10: the dumb gate applies to TERM's rules, not TERM_PROGRAM's", () => {

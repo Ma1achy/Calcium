@@ -1,5 +1,6 @@
 // C02 tier 6 — fail-on-revert. Each test names the *change* that makes it fail,
 // not merely the assertion it makes.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SCANS } from "../../tools/enforce/source-scans.mjs";
 import { GLYPH_REQUIRED_TONES } from "../../src/data/viewmodel/index.js";
@@ -61,10 +62,10 @@ describe("C02 fail-on-revert", () => {
     const { capabilities } = detectCapabilities({ TERM: "xterm" });
     expect(Object.keys(DEGRADATION).sort()).toEqual(Object.keys(capabilities).sort());
 
-    // The check has to be a bijection, or an eighth field slips through: this is
+    // The check has to be a bijection, or a further field slips through: this is
     // the shape T2.6 asserts, exercised here against a record that has one.
-    const withEighth = { ...capabilities, kittyKeyboard: true };
-    expect(Object.keys(DEGRADATION).sort()).not.toEqual(Object.keys(withEighth).sort());
+    const withExtra = { ...capabilities, kittyKeyboard: true };
+    expect(Object.keys(DEGRADATION).sort()).not.toEqual(Object.keys(withExtra).sort());
   });
 
   it("T6.5 (I1): making any field optional → T2.1 fails", () => {
@@ -110,5 +111,58 @@ describe("C02 fail-on-revert", () => {
     const second = detectCapabilities(env);
     expect(first.capabilities).toEqual(second.capabilities);
     expect(first.capabilities).not.toBe(second.capabilities);
+  });
+
+  it("T6.8 (C02 I10): taking COLORFGBG's second field instead of its last → T1.11 fails", () => {
+    // **One fixture disagrees with the second-field rule and every other one
+    // agrees with it.** rxvt writes `fg;default;bg`, so the second field is the
+    // word `default` and the answer would be `unknown` on a terminal that
+    // stated a background plainly.
+    const rxvt = detectCapabilities({ TERM: "xterm", COLORFGBG: "0;default;15" }).capabilities;
+    expect(rxvt.backgroundPolarity).toBe("light");
+
+    // The control, and it is the reason this row exists separately: the ordinary
+    // two-field form answers the same under both rules, so a suite without the
+    // line above tests the last-field rule against itself.
+    const plain = detectCapabilities({ TERM: "xterm", COLORFGBG: "0;15" }).capabilities;
+    expect(plain.backgroundPolarity).toBe("light");
+  });
+
+  it("T6.9 (C02 I10): collapsing `unknown` into `dark` → T1.11 fails and C22's T1.20c does not", () => {
+    // **The asymmetry is the row's content.** A two-valued field is wrong only
+    // where nothing is stated, and there the wrong answer happens to be the one
+    // the reader would have got anyway — so every frame agrees and only the
+    // *reason* is gone. It is C22 that pays: C22 I68 branches on this value, and a
+    // field that never says `unknown` makes it choose from a guess.
+    expect(detectCapabilities({ TERM: "xterm" }).capabilities.backgroundPolarity).toBe("unknown");
+    expect(detectCapabilities({ TERM: "xterm", COLORFGBG: "15;default" }).capabilities.backgroundPolarity)
+      .toBe("unknown");
+    // And the value is reachable at all, which a collapsed field would fail.
+    const all = new Set(
+      ["15;0", "0;15", "15;default", "15;235"].map(
+        (v) => detectCapabilities({ TERM: "xterm", COLORFGBG: v }).capabilities.backgroundPolarity,
+      ),
+    );
+    expect([...all].sort()).toEqual(["dark", "light", "unknown"]);
+  });
+
+  it("T6.10 (I1): a field declared in §4 and not in §2 → T2.8 fails and T2.6 does not", () => {
+    // **F214, as a row.** This is the state `ambiguousWidth` shipped in: §3, §4,
+    // an invariant, a commitment, ten test rows, and §2 declaring seven fields.
+    // Asserted by asking both sections about a field neither has, so the row
+    // fails the day one of the two parses stops locating its table.
+    const spec = readFileSync("docs/components/C02_capability_detection.md", "utf8");
+    const iface = spec.split("## 2. Public interface")[1]?.split("\n## ")[0] ?? "";
+    const degrade = spec.split("## 4. Degradation")[1]?.split("\n## ")[0] ?? "";
+
+    // Both sections were found, and each names every field the record has.
+    const { capabilities } = detectCapabilities({ TERM: "xterm" });
+    for (const field of Object.keys(capabilities)) {
+      expect(iface, `§2 declares ${field}`).toContain(`${field}:`);
+      expect(degrade, `§4 has a row for ${field}`).toContain(`\`${field}\``);
+    }
+    // And neither names one it does not — the direction a stale row survives in.
+    expect(iface).not.toContain("kittyKeyboard");
+    expect(degrade).not.toContain("kittyKeyboard");
   });
 });

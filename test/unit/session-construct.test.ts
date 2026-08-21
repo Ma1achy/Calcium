@@ -804,4 +804,133 @@ describe("C22 §2b — the completion sources", () => {
       "and the injected readDir, through the path source",
     ).toContain("notes.md");
   });
+  // --- I68 · the terminal's polarity chooses the opening theme ---------------
+  //
+  // **Asserted on `graph.theme.current`, not on a frame.** T4.5's precedent
+  // compares two sessions' bytes, which answers *did something change* and not
+  // *which theme opened* — and the second question is this invariant's whole
+  // content.
+  //
+  // **By reference to the tokens, and not by `current.name`.** That field is the
+  // store's identity string and it is built from `tokens.name`, which is the
+  // *app's* name — both shipped themes call themselves `prism`, so `prism/light`
+  // says the polarity but not the key, and T1.20g's whole point is a set whose
+  // key and variant disagree. The tokens object is the one thing that names
+  // exactly which entry of the set opened.
+
+  /**
+   * A `fakeFs` with `${stateDir}/theme` already written, or with none — and a
+   * record of every path written **after** the seeding.
+   *
+   * The written list rather than a read-back, because this file's `fakeFs`
+   * answers `""` for a missing file: *absent* and *written empty* are the same
+   * string there, and *absent* is exactly what T1.20b claims.
+   */
+  function seeded(preference?: string) {
+    const fs = fakeFs();
+    if (preference !== undefined) void fs.writeFile("/state/theme", `${preference}\n`);
+    const written: string[] = [];
+    const inner = fs.writeFile.bind(fs);
+    return {
+      fs: {
+        ...fs,
+        writeFile: (p: string, d: string) => {
+          written.push(p);
+          return inner(p, d);
+        },
+      } as FileSystem,
+      written,
+    };
+  }
+
+  const opened = async (over: Partial<TuiConfig>) => (await build(over)).graph.theme.current.tokens;
+
+  it("T1.20b (I68): no preference and a light terminal → the light theme, and nothing is written", async () => {
+    const { fs, written } = seeded();
+    const { graph } = await build({ fs, env: { TERM: "xterm", COLORFGBG: "0;15" } });
+
+    expect(graph.theme.current.tokens).toBe(defaultTheme["light"]);
+    // **The second half, and it fails on nothing else** (§6h.3 row 1). A session
+    // that opens light and persists `light` draws every frame correctly and has
+    // written an inference into the file that holds statements — after which
+    // nothing can tell the two apart.
+    expect(written, "the choice stayed unwritten").not.toContain("/state/theme");
+    // The control: construction does write to the state directory, so the
+    // assertion above is about this file and not about a session that wrote
+    // nothing at all.
+    expect(written, "and the fixture can see a write").toContain("/state/.gitignore");
+  });
+
+  it("T1.20c (I68): a terminal that says nothing keeps the set's first key", async () => {
+    // C02 T6.9's other half. A two-valued polarity would answer `dark` here and
+    // give the same theme for a different reason — so this row passes under the
+    // defect, and C02's T1.11 is where the collapse is caught.
+    expect(await opened({ fs: seeded().fs, env: { TERM: "xterm" } })).toBe(defaultTheme["dark"]);
+  });
+
+  it("T1.20d (I68): a stated preference outranks the terminal", async () => {
+    // §6h.2 row 1, the only cell where both rules could honour their own subject.
+    expect(await opened({ fs: seeded("light").fs, env: { TERM: "xterm", COLORFGBG: "15;0" } }))
+      .toBe(defaultTheme["light"]);
+
+    // **The control is the same dark terminal with no file**, not the same file
+    // with no terminal: it shows the polarity was live and lost, where the other
+    // control would pass on a session that never read `COLORFGBG` at all.
+    expect(await opened({ fs: seeded().fs, env: { TERM: "xterm", COLORFGBG: "15;0" } }))
+      .toBe(defaultTheme["dark"]);
+  });
+
+  it("T1.20e (I68): a preference the set cannot honour is not a preference", async () => {
+    // §6h.2 row 6 — the row the classification table was for. *A file exists, so
+    // a preference exists* leaves the reader holding a notice saying their choice
+    // was ignored beside a theme neither they nor their terminal picked.
+    const { graph } = await build({
+      fs: seeded("mauve").fs,
+      env: { TERM: "xterm", COLORFGBG: "0;15" },
+    });
+
+    expect(graph.theme.current.tokens).toBe(defaultTheme["light"]);
+    const notices = JSON.stringify(graph.transcript.entries);
+    expect(notices, "and the repair still says so").toContain("theme preference ignored");
+    // **F215** — the set's own names, not the two literals that outlived C10 I27.
+    expect(notices).toContain("high-contrast");
+  });
+
+  it("T1.20f (I68): a polarity no theme in the set declares keeps the default, silently", async () => {
+    // §6h.2 row 4. The set is the app author's, so a notice would be the
+    // framework reporting on their choice to their user.
+    const noLight = { dark: defaultTheme["dark"]!, "high-contrast": defaultTheme["high-contrast"]! };
+    const { graph } = await build({
+      fs: seeded().fs,
+      theme: noLight,
+      env: { TERM: "xterm", COLORFGBG: "0;15" },
+    });
+
+    expect(graph.theme.current.tokens).toBe(defaultTheme["dark"]);
+    expect(
+      JSON.stringify(graph.transcript.entries),
+      "nothing was said about it",
+    ).not.toContain("theme");
+
+    // **The fixture responds** (`test/support/README.md`). The same set with a
+    // preference it cannot honour does put a notice in the transcript, so the
+    // silence above is this rule's and not the harness's.
+    const noisy = await build({
+      fs: seeded("mauve").fs,
+      theme: noLight,
+      env: { TERM: "xterm", COLORFGBG: "0;15" },
+    });
+    expect(JSON.stringify(noisy.graph.transcript.entries)).toContain("theme preference ignored");
+  });
+
+  it("T1.20g (I68): the search is by `variant` and not by the name `light`", async () => {
+    // **The shipped set is exactly the fixture where the two rules agree** — its
+    // light theme is called `light` — so every row above passes under a search
+    // by name. This is the set where they disagree, and it is the only place the
+    // mistake is visible (C10 I27: a theme declares its polarity; the key is a
+    // name).
+    const renamed = { dark: defaultTheme["dark"]!, paper: defaultTheme["light"]! };
+    expect(await opened({ fs: seeded().fs, theme: renamed, env: { TERM: "xterm", COLORFGBG: "0;15" } }))
+      .toBe(defaultTheme["light"]);
+  });
 });

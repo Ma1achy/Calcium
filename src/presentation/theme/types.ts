@@ -84,7 +84,9 @@ export type ThemeTokens = Readonly<{
    * Kept rather than derived because a token cannot express **intent** for a
    * mid-luminance theme, and a user asking for the dark one is asking about
    * intent. Published through `ResolvedTheme` so an app can choose an asset by
-   * it — *no reader here* is not *no reader*.
+   * it — *no reader here* is not *no reader*, and C22 I68 is the reader that
+   * arrived: the opening theme is chosen by matching this field against the
+   * terminal's own background.
    */
   variant: "dark" | "light";
   /**
@@ -115,9 +117,13 @@ export type ThemeTokens = Readonly<{
  * put it — and I25 took that job when a theme began declaring the background it
  * assumes.
  *
- * **Nothing reads `variant` as polarity**: its readers are all in `store.ts`,
- * each a key into this record or part of the memo identity. That measurement is
- * what the name-keying rests on, rather than the argument for it (§5a.1).
+ * **`variant` was read only inside `store.ts`** when the keys were freed —
+ * each read a key into this record or part of the memo identity — and that
+ * measurement is what the name-keying rests on rather than the argument for it
+ * (§5a.1). **It has since expired as the doc comment below predicted it would**:
+ * `shell/construct.ts` searches this record by `variant` to open the theme that
+ * matches the terminal's detected polarity (C22 I68), which is one consumer and
+ * is the use the field is published for.
  *
  * A `{ dark, light }` literal still satisfies this, which is what makes the
  * widening free for every app that already supplies one.

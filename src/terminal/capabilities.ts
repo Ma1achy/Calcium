@@ -6,8 +6,10 @@
  * numbers in tests. If the spec is wrong, change the spec first.
  *
  * This is the only module in `src/` permitted to read TERM, COLORTERM,
- * TERM_PROGRAM, LANG, LC_ALL, LC_CTYPE or TMUX (I5, A03 SS10) — and it reads
- * them from the injected record, never from `process`.
+ * TERM_PROGRAM, LANG, LC_ALL, LC_CTYPE, TMUX or COLORFGBG (I5, A03 SS10) — and
+ * it reads them from the injected record, never from `process`. SS10's subject
+ * is `process.env` rather than a name list, so this comment is what a reader
+ * checks against and not what the scan matches.
  */
 
 export type TerminalCapabilities = Readonly<{
@@ -26,6 +28,28 @@ export type TerminalCapabilities = Readonly<{
    * I2's I/O and there is no escape sequence for it anyway.
    */
   ambiguousWidth: "narrow" | "wide";
+  /**
+   * Whether the reader is looking at a dark background or a light one (I10).
+   *
+   * **From `COLORFGBG` alone, and the background is the field after the *last*
+   * `;`.** The variable is `fg;bg` — rxvt, urxvt, Konsole, mintty — except that
+   * rxvt writes three fields, `fg;default;bg`, when one colour is left at the
+   * terminal's own. Taking the last field is right for both shapes; taking the
+   * second is right for one of them.
+   *
+   * **`unknown` is a third value and not a default.** *Nothing stated* and
+   * *stated light* are different facts, and a two-valued field has to pick one
+   * of them to mean both — which is precisely what its only consumer branches
+   * on: C22 chooses a theme from a detected polarity and must not choose from an
+   * absent one (→ C22 I68).
+   *
+   * **The certain range stops at 15, on a layer rule.** A terminal may write a
+   * 256-colour index and 16–255 *is* knowable — C10 holds the cube and validates
+   * its floors against it — but C10 is L1 and this is L0-terminal, so reaching
+   * for it is an import upward and a second cube here is a second source of
+   * truth for that table.
+   */
+  backgroundPolarity: "dark" | "light" | "unknown";
   synchronisedUpdate: boolean;
   bracketedPaste: boolean;
   mouse: boolean;
@@ -70,6 +94,11 @@ export const DEGRADATION: Readonly<
     behaviour:
       "Every East_Asian_Width=Ambiguous glyph is measured and drawn as narrow, which is the Western convention and today's behaviour; where the locale says otherwise the wide arm is used and the ramps that would double in width are replaced by narrow ones",
     owner: "C09 C12",
+  }),
+  backgroundPolarity: Object.freeze({
+    behaviour:
+      "`unknown` keeps the app's own opening theme — the set's first key, or whatever the reader persisted. Nothing is painted differently and no notice is drawn: a terminal that does not say is a terminal the framework does not guess about",
+    owner: "C22",
   }),
   synchronisedUpdate: Object.freeze({
     behaviour: "Frames written unwrapped; tearing possible under heavy repaint, accepted",
@@ -171,6 +200,38 @@ function detectAmbiguousWidth(
   return WIDE_AMBIGUOUS_LANGUAGES.includes(subtag) ? "wide" : "narrow";
 }
 
+/**
+ * §3, I10. `COLORFGBG` is `fg;bg`, and rxvt's three-field `fg;default;bg` is why
+ * the background is taken **after the last `;`** rather than as the second
+ * field: the last-field rule is right for both shapes and the second-field rule
+ * is right for one.
+ *
+ * **Three-valued, and `unknown` carries the weight.** Absent, empty, no
+ * separator, a non-numeric background (`15;default` is a real value) and an
+ * index above 15 all answer `unknown` — because the consumer acts on `dark` and
+ * `light` and must not act on a guess (→ C22 I68).
+ *
+ * **No warning when it says nothing.** C02 warns about rejected overrides (I8)
+ * and about nothing else; an absent `TERM_PROGRAM` does not warn either.
+ */
+function detectBackgroundPolarity(
+  colorfgbg: string | undefined,
+): TerminalCapabilities["backgroundPolarity"] {
+  if (colorfgbg === undefined) return "unknown";
+  const cut = colorfgbg.lastIndexOf(";");
+  if (cut === -1) return "unknown";
+  const background = colorfgbg.slice(cut + 1).trim();
+  // A digit test before the parse: `parseInt` reads `15abc` as 15 and `""` as
+  // NaN, and only one of those two is a value this rule should decline.
+  if (!/^\d+$/u.test(background)) return "unknown";
+  const index = Number(background);
+  // 0–6 are the dark half of the base eight, 7 is light grey, 8 is bright black
+  // and 9–15 are the bright half. Above 15 the answer is C10's table and C10 is
+  // a layer up, so it is declined rather than guessed at.
+  if (index > 15) return "unknown";
+  return index === 7 || index > 8 ? "light" : "dark";
+}
+
 const SYNCHRONISED_UPDATE_PROGRAMS: readonly string[] = [
   "iterm.app",
   "wezterm",
@@ -212,6 +273,11 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
       read(env, "LC_CTYPE"),
       read(env, "LANG"),
     ),
+    // Not gated by `usable`, on §3's boundary: the gate applies to rules derived
+    // from `TERM`, and this one is derived from `COLORFGBG`. It is also inert at
+    // `TERM=dumb` — depth 1 colours nothing — which is a separate fact and the
+    // reason the combination is asserted rather than assumed (T3.12).
+    backgroundPolarity: detectBackgroundPolarity(read(env, "COLORFGBG")),
     synchronisedUpdate: detectSynchronisedUpdate(term, termProgram),
     bracketedPaste: usable,
     mouse: usable && read(env, "TMUX") === undefined,
@@ -239,6 +305,7 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
     colourDepth: oneOf(1, 4, 8, 24),
     unicode: oneOf("full", "bmp", "ascii"),
     ambiguousWidth: oneOf("narrow", "wide"),
+    backgroundPolarity: oneOf("dark", "light", "unknown"),
     synchronisedUpdate: isBoolean,
     bracketedPaste: isBoolean,
     mouse: isBoolean,

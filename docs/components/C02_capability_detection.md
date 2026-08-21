@@ -223,7 +223,7 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.
-- **T1.11** (I10): background polarity — `COLORFGBG=15;0` → `dark`; `0;15` → `light`; `0;default;15` → `light`, which is rxvt's three-field form and the row that decides *last field* against *second field*; `15;default` → `unknown`, because the background is the thing that is not a number; `COLORFGBG` absent → `unknown`; `15;235` → `unknown`, the 256-index case the rule declines rather than guesses at.
+- **T1.11** (I10): background polarity — `COLORFGBG=15;0` → `dark`; `0;15` → `light`; `0;default;15` → `light`, which is rxvt's three-field form and the row that decides *last field* against *second field*; `15;default` → `unknown`, because the background is the thing that is not a number; **`0;15x` and `0;15.5` → `unknown`**, which is the digit test rather than a parse and was **added by the mutation pass** — `parseInt` declines `default` and answers `15` for `15x`, so the two rules agree on every value a fixture happened to hold and the sentence naming the difference was in a comment with nothing asserting it; `COLORFGBG` absent → `unknown`; `15;235` → `unknown`, the 256-index case the rule declines rather than guesses at.
 
 ### Tier 2 — contract / interface
 
