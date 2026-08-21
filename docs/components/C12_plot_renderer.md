@@ -1466,9 +1466,19 @@ omission — the tick row is suppressed there rather than drawn against nothing.
 ## 3g. The legend — and the two axes are not symmetric
 
 C04 §3b already ruled that legend position belongs on `Plot`, and deferred it: *the members
-arrive with their first surface.* This is that surface. C04 I52 defers `Annotation.label` to
-the same place — *it arrives with the legend row that can hold it* — so one row closes two
-conditions that were written down and then watched by nothing.
+arrive with their first surface.* This is that surface.
+
+**It was written that one row closes two conditions, and it closed one** (F217). C04 I52 defers
+`Annotation.label` here — *it arrives with the legend row that can hold it* — and the row
+arrived without the field: `Annotation` has three arms and none carries a label, at HEAD, some
+commits after this sentence was written. **A sentence that says a condition is closed is not a
+mechanism that closes it**, and it reads exactly like one — which is the whole reason the
+paragraph beside it says such conditions are *watched by nothing*.
+
+**And the arm that would offer the row still counts the wrong thing.** `legendPlacement`'s auto
+branch keys off `SHARES_CELLS[form] && count > 1` over **series**, so the case C04 I52 was
+written about — one line, one reference line — resolves to no legend. The field and the count land
+together or the field lands unreadable.
 
 | value | shape | costs |
 |---|---|---|
@@ -1494,9 +1504,26 @@ the gutter, so they never need a legend* reads as correct, is correct for eleven
 members, and `stackedBarRow` composites series into one row with no per-series label anywhere.
 **A row governed by one rule restates that rule and finds nothing.**
 
-**Skipped entirely at `colourDepth: 1`**, where the positional family already falls back to
-`stackedRows` and its per-series row labels. A swatch with no colour in it is worse than no
-swatch — it is a legend that has stopped being one and still occupies the row.
+**Skipped where the form has already labelled its own rows**, which at `colourDepth: 1` is the
+positional family falling back to `stackedRows`. There the swatch names a mark that appears
+nowhere, because the strips are not drawn with `markOf` — so it is a legend that has stopped
+being one and still occupies the width.
+
+**This paragraph read *skipped entirely at `colourDepth: 1`* and the code has said otherwise for
+some time** (F217). `legendEntries` carries the correction in its own comment — *skipping the
+legend at one bit is the same error one layer up: it means little where colour leads and it is
+the **only** thing that means anything where colour does not* — and `markOf` descends the same
+ladder as the figure, so a 1-bit legend shows the marks the plot is actually drawn with. **The
+implementation was fixed and the spec was not**, and a reader taking the spec as the contract
+would have re-broken it. Recorded rather than silently narrowed, because which way the sentence
+moved is the part worth keeping.
+
+**What one bit takes from a label is its identity, never its leader.** A leader line is `─ │ ╰`
+and degrades to `- | +` through `linedraw.ts`'s `ASCII` table, so it survives every alphabet the
+framework has — the arm to worry about is `unicode`, not `colourDepth`, and it is already built.
+What one bit removes is *which series a label belongs to*, because colour is the carrier. So a
+label takes its series' `markOf` glyph as a prefix exactly where colour has stopped separating
+the categories, which is the same predicate the swatch already uses (I25, I29).
 
 **Horizontal placements truncate with a count**, reusing I8's existing wording: the entries
 that fit, plus how many did not. **Vertical placements cap at a third of the width**, matching
@@ -3874,9 +3901,48 @@ survives a two-cell tile; there is no border vocabulary that does. Skipped where
 the rectangle cannot afford it, because a tile shrunk to nothing reports an area
 of zero.
 
-A frame's label is written inside it where it fits and dropped where it does not.
-Three characters of a symbol name is not a shorter name; it is a different one,
-and the strip's extent is the datum either way.
+### The label is written inside where it fits — and for eight months only one layout did it
+
+**The rule below is this section's, it is filed under the treemap, and the treemap is the one
+form that ignores it** (F217).
+
+A node's label is written inside its own figure where it fits and dropped where it does not.
+Three characters of a symbol name is not a shorter name; it is a different one, and the extent
+is the datum either way.
+
+`hierarchyStripRows` implements it — `st.label.length + 2 <= cells`, the name laid into the
+strip and the mark filling the rest. `treemapRows` computes the same layout, receives `label` on
+every `Tile`, and fills the rectangle with `markOf(idx)`. **The same fixture through the two
+renderers:**
+
+```
+flame · tree · 24bit          treemap · default · 24bit
+ raster ████████████          ████████████████████████████████
+ curve ██████ paint █████     ████████████████████████████████
+ render ████ layout ████      ████████████████████████████████
+ root ███████████████████     ████████████████████████████████   ← twelve rows, no word
+```
+
+**At ASCII and at one bit there is not even colour left**, so the figure is `#/\\/xxxx%%%%` and
+`█▚▞▙▖` — a form whose declared subject is *containment*, saying nothing about what is contained.
+
+**Why it survived being read**: the sentence says *a frame's* label, which is flame vocabulary,
+so a reader checking the family finds it satisfied in the renderer that uses that word and stops.
+**A correct ruling filed under the form that breaks it** is the MG24 class one step along —
+there a true sentence justified the wrong scope; here a true sentence sits in the wrong section.
+
+**The ruling: a tile's label goes in its top padding row, and a leaf's inside its rectangle.**
+This is forced rather than chosen. Nesting is drawn by depth ordering — a parent is painted, then
+its children over it — so **every interior cell of a parent belongs to a child by the time the
+grid is done**, and a label written into the parent's middle is overpainted by the thing it was
+naming. The one part a parent keeps is the inset ring the padding already gives it, and the top
+row of that ring is one row tall and the tile's full width, which is exactly a label's shape.
+So the mechanism that makes nesting visible is the mechanism that makes labelling possible, and
+neither was built for the other.
+
+**Where `inset` declines to pad — `w > by * 3`, a rectangle too small to spare the ring — a
+parent has no cells of its own and its label is dropped and counted.** That is the same
+condition, read for a second purpose.
 
 ---
 

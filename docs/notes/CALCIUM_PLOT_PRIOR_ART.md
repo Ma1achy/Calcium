@@ -254,6 +254,10 @@ sankey           edge routing — the Mermaid problem, and it wants a real layou
 
 **`contour` was on this list and is not any more — see the correction below.**
 
+**And *the Mermaid problem* has stopped being one — see the second correction.** The line above
+is kept as written because what it says about `sankey` may still hold; what it cites no longer
+does.
+
 **`pie` is NOT refused** — see below. `radar` follows it: same circle problem, same answer.
 
 ### The correction — `contour` was misclassified, and the grouping is what carried it
@@ -299,6 +303,58 @@ on reads exactly like one that is obeyed.*
 
 `quiver` was never on the list, and it is the same field with a vector at each point: direction
 picks the glyph, magnitude picks the colour. Both are specified in C12 §3y.
+
+### The second correction — every reason given for refusing a graph has been a cost argument
+
+**The recorded reason is build cost.** `DEPENDENCIES.md` states it plainly: *layout is the whole
+problem… the alternative to a dependency here is not 150 lines but a layout engine.* **The
+framework bought the engine.** `beautiful-mermaid` 1.1.3 ships at one call site and brings
+`elkjs` 0.11 with it — `layered`, `stress`, `mrtree`, `radial`, `force`, `disco`. Node-and-edge
+data already renders in this tree, through `mermaidCode`, into a `code` block.
+
+So the reason is spent, and each replacement reached for turned out to be the same argument in
+different clothes:
+
+| reason | status | measured |
+|---|---|---|
+| layout is expensive to build | **expired** | the dependency ships; `elkjs` is transitive |
+| it is expensive to run | **dead** | Fruchterman–Reingold, 300 iterations: **24.2 ms at n=20, 10.4 at n=50, 36.1 at n=100** |
+| it is non-deterministic | **dead** | a circular initial placement needs no draw at all — SS2 untouched, no `createRng` |
+| the edges cannot be drawn | **expired, and it was never a fit argument** | *`strokePolyline` steps orthogonally* is a fact about **the tool**. `drawLine` in `raster.ts` strokes arbitrary angles at 2 × 4 and is on every line plot's default path |
+| **the labels collide** | **stands** | below |
+
+**The fourth row is the one worth reading twice**, because it reads as a property of the figure
+and is a property of the toolbox — the diagonal renderer is not hypothetical, it is what
+`curve.ts` calls. A refusal accumulates reasons faster than it loses them: each new one is
+written by somebody who found the last one thin, and nobody re-reads the stack.
+
+**What stands is the labels, and the first probe measured it at both extremes.** Node centres
+snapped to 74 × 20, 8-cell labels, overlapping label pairs:
+
+```
+                   n=12                n=20                n=50
+near-path       0 pairs   0.0%      0 pairs   0.0%      48 pairs   3.9%
+dense ~1/3      6 pairs   9.1%     33 pairs  17.4%     199 pairs  16.2%
+complete        0 pairs   0.0%      0 pairs   0.0%       0 pairs   0.0%
+```
+
+**Both ends read clean and the middle fails.** A near-path graph is nearly a layered graph; a
+complete graph's force layout is a ring with every node equidistant. Real graphs are neither, and
+at a third of the edges present **one label pair in six overlaps at n = 20**. The near-path probe
+was run first, returned zero, and the refusal was moved off the labels on the strength of it —
+which is this document's own `contour` lesson turned on the instrument instead of the claim.
+
+**This is the second refusal here to survive on its labelling rather than its drawing.** The
+`contour` correction above ends the same way: *a level is named in the legend and never on the
+line.* Two instances is the minimum for noticing a shape and not evidence for one, so it is
+recorded and not promoted — but the answer it suggests for a graph is the same answer: **mark
+the nodes in the figure and name them in the legend**, which costs no placement pass at all.
+
+**So `force` is refused on the labels alone, and the refusal carries its expiry.** When a label
+pass can shift, drop and count — C12's label taxonomy, `shiftInward` — a force graph draws the
+nodes it can label and counts the rest, on I8's mechanism. Written as a symbol because **a
+deferral names a condition and nothing watches it**, and three of the five rows above expired
+without anyone noticing.
 
 ---
 

@@ -10538,3 +10538,79 @@ of `plotStyle: "line"`. The corpus stops varying `unicode` and `ambiguousWidth` 
 also gives `full · wide` its first frame — the combination F171's braille ramp lives in. AA1
 asserts the whole corpus in one row, because the four sites were four mechanisms and what they
 share is the output.
+
+
+## F217 — three sentences a component's spec asserts about itself, and the code disagrees in both directions ★★★★☆
+
+**Found by reading C12's spec against the tree while writing a plan that cited it**, which is the
+only reason all three came out together: each is invisible from the side that holds it.
+
+### 1 · A correct ruling, filed under the form that breaks it
+
+C12 §3n's containment section ended: *A frame's label is written inside it where it fits and
+dropped where it does not.* The sentence sat inside the **treemap** subsection.
+
+`hierarchyStripRows` implements it — `st.label.length + 2 <= cells`, the name laid into the strip.
+`treemapRows` receives `label` on every `Tile` from the same layout module and fills the rectangle
+with `markOf(idx)`. **The same fixture, the same file, the same paragraph:**
+
+```
+flame · tree · 24bit          treemap · default · 24bit
+ raster ████████████          ████████████████████████████████
+ curve ██████ paint █████     ████████████████████████████████
+ render ████ layout ████      ████████████████████████████████
+ root ███████████████████     ████████████████████████████████   <- twelve rows, no word
+```
+
+At `ascii` the figure is a fill pattern and at one bit another one. **A form whose declared subject
+is containment, saying nothing about what is contained, at every capability.**
+
+**Why it survived**: the sentence says *a frame's* label — flame vocabulary — so a reader checking
+the family finds it satisfied in the renderer that uses that word and stops. **A correct ruling
+filed under the form that breaks it.** MG24's class one step along: there a true sentence justified
+the wrong scope, here a true sentence sits in the wrong section, and review checks whether a
+sentence is true.
+
+### 2 · A sentence saying a condition is closed, which closed one of two
+
+§3g opened: *C04 I52 defers `Annotation.label` to the same place — it arrives with the legend row
+that can hold it — **so one row closes two conditions that were written down and then watched by
+nothing.*** The legend landed. `Annotation` has three arms at HEAD and **none carries a label.**
+
+The sentence is in the paragraph complaining that such conditions are watched by nothing, and it
+is itself the thing not watched. **A claim that a deferral is paid reads exactly like the payment.**
+
+And the residue is worse than the missing field: `legendPlacement`'s auto arm keys off
+`SHARES_CELLS[form] && count > 1` over **series**, so the case I52 was written about — one line,
+one reference line — resolves to no legend. Adding the field alone would have landed it in the
+state the deferral refused.
+
+### 3 · The same section, behind the code instead of ahead of it
+
+§3g also said *__Skipped entirely at `colourDepth: 1`__*. `legendPlacement` skips only where
+`POSITIONAL_STACKS[form]`, and `legendEntries` carries the correction in its own comment:
+*skipping the legend at one bit is the same error one layer up — it means little where colour
+leads and it is the **only** thing that means anything where colour does not.*
+
+**The code was fixed and the spec was not**, and CLAUDE.md's contract makes the spec
+authoritative — so a reader implementing to it would have re-broken the thing the comment records
+fixing.
+
+### What is new against F128
+
+F128 keyed *three specs disagreed with the code they specify, **all in one direction***. These
+three are **two directions in one section**: 1 and 2 are the spec ahead of the code, 3 is the spec
+behind it. **A rule assuming spec divergence is aspirational would pass 3, and one assuming it is
+stale would pass 1 and 2.** That is the increment, and it is the reason not to build the obvious
+gate.
+
+**One narrow mechanical check would have caught 2**: a spec sentence naming a `Type.member` that
+the type does not declare. Its blind spot is large and worth stating — it cannot reach 1, where
+every symbol named exists and only the *section* is wrong, nor 3, where the prose names no symbol
+at all. Recorded as a candidate rather than built, on `docs/COMMITMENT_INVARIANT_AUDIT.md`
+§Fourth pass's argument.
+
+**Fixed** — §3n carries the ruling with the tile's own answer (a parent's label goes in the
+padding ring, which is the only part of it a child does not paint over), §3g carries both
+corrections with the direction each moved, and `types.ts` records that the condition is met and
+the arm is not.

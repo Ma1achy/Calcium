@@ -600,6 +600,23 @@ export type PlotForm =
  * It wants a legend row, which the overlaid form does not have. A member nothing
  * draws is indistinguishable from one not yet implemented, so the field arrives
  * with the row that can hold it.
+ *
+ * **The condition is met and the field is one commit behind it** (C12 §3g).
+ * `legendPlacement` honours an explicit `legend:` on every form, so the row the
+ * paragraph above is waiting for exists and can be asked for.
+ *
+ * **What is not met is the arm that would offer it.** The *auto* branch keys off
+ * `SHARES_CELLS[form] && count > 1` and counts **series**, so the case the
+ * deferral was written about — one line, one reference line — still resolves to
+ * no legend, and the field would land in exactly the state it refused. So the
+ * two go together: the arm counts labelled annotations, or the member is drawn
+ * nowhere again.
+ *
+ * **Recorded here because the condition was met somewhere else.** The legend
+ * landed for series identity and knew nothing about this sentence; this sentence
+ * names its blocker and watches nothing. That is the deferral pattern's third
+ * shape and its standing remedy — *grep from the satisfier, not from the
+ * deferral* — which is how it was found.
  */
 export type Annotation =
   | Readonly<{ kind: "line"; value: number; tone?: Tone }>
