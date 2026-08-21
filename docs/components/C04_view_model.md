@@ -1297,6 +1297,37 @@ That is the whole of the clearing rule, and it is why nothing needs to watch a c
 
 **And it can outlive a change to something else, which is a limit rather than a bug.** A renderer that threw at one width may not throw at another; the floor is set from the frame that observed it and stays until the block is touched, so the block can be padded for a failure that would no longer happen. The cost is blank rows under a block that already failed once. Stated here rather than left implicit, because a condition nobody watches is how a deferral becomes permanent.
 
+### One consumer, and the other three shapes were measured rather than assumed
+
+**A mechanism with one consumer is a shape worth naming out loud**, so the candidates were
+checked against the tree instead of being reasoned about. Four things look like *a block that
+needs more room than it has*, and three of them are a **document change** with a path already:
+
+| the shape | at HEAD | |
+|---|---|---|
+| a pending block replaced by its result | `refresh.ts` issues `op: "replace"` with `origin: "shell"`. **Measured** through the real driver: `rev` 0 → 1, the panel 3 rows → 10, `minHeight` `undefined` | works today |
+| the same block gaining rows as output streams | `execution.ts` calls `transcript.patch(id, view)` per chunk, coalesced at C03's `"stream"` | works today |
+| a bounded result the reader opens | `op: "expand"`, issued from `actions.ts` and nowhere else | exists |
+| **the document did not change and the height must** | nothing. A renderer gave way after `measure` committed | **this** |
+
+**That is the distinction, and it is the whole test for a second consumer.** Anything driven by
+arriving data is a document change: new content, new `rev`, both caches invalidated, and the
+block measures whatever it now holds. `minHeight` is for the case where the document is the
+same document and the number was wrong about it.
+
+**And the three that were ruled against rather than merely absent.** C11's cells truncate and
+never wrap, so a table row is one row by construction. C12 I1 makes the series unreachable from
+`plotHeight` **by type** — *a legend that grew a second row for a ninth series would make
+`plotHeight` a function of the series, which is the one thing C12 I1 forbids*. And §3c's residue
+row is a function of `(block, width)` and deliberately not of the offset, because a box that
+shrank as a reader scrolled would jitter. All three forbid a height that follows view state,
+for the same stated reason; this is the exception they leave room for, because the height
+changes **once** and then never again.
+
+**`meta.origin`'s `agent` arm is declared in three type positions and used nowhere in `src/`** —
+reserved, as §2 says. So there is no agent harness to widen this on, and a future one that
+replaces a pending block with a result is the first row of the table rather than a fifth shape.
+
 ### The walk — both artefacts, because a floor is structure and its arrival is an event
 
 **The classification table**, indexed by the cells where two rules both hold at rest:
