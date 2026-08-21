@@ -107,21 +107,47 @@ side, so a gap before one of them is ignored rather than being an error.
 
 **Animation state arrives through `ctx.tick`.** `steps` shows a spinner, and a renderer must stay pure, so the frame index cannot come from a clock inside the block. `tick` is a monotonic counter incremented by C03's `spinner` commit; a renderer computes `frames[tick % frames.length]`. Nothing else in C09 reads it, and `measure` never does — animation must never change height.
 
-**And nothing increments it, which this section asserted for as long as it has existed.** *A
-monotonic counter incremented by C03's `spinner` commit* describes a chain with three links and
-none of them is joined: `commit("spinner")` is called from six test files and nowhere in `src/`;
-C22's `visibleRows` omits `tick` from the render options, so every block in the transcript
-renders at `?? 0`; and the line cache has no tick axis, so a supplied one is served the held
-lines. Measured over ten real frames of a real session, `steps` drew **one distinct spinner
-glyph** where the same block through the test harness drew **ten** (F227).
+**And for the life of the project nothing incremented it, which this section asserted the whole
+time.** *A monotonic counter incremented by C03's `spinner` commit* described a chain with three
+links and none of them was joined: `commit("spinner")` was called from six test files and nowhere
+in `src/`; C22's `visibleRows` omitted `tick` from the render options, so every block in the
+transcript rendered at `?? 0`; and the line cache had no tick axis, so a supplied one was served
+the held lines. Measured over ten real frames of a real session, `steps` drew **one distinct
+spinner glyph** where the same block through the test harness drew **ten** (F227).
 
-**Patching the omission alone moves nothing** — two of the three are each sufficient, so the
-obvious repair is indistinguishable from doing nothing until the cache admits the axis too.
+**Patching the omission alone moved nothing** — two of the three were each sufficient, so the
+obvious repair was indistinguishable from doing nothing until the cache admitted the axis too.
 
 **Two of the three were already recorded** — C22 I60 and its §6c trace row 10, correctly and as
 a coupled pair, and filed as a hypothetical because from inside a cache they are one. The link
-recorded nowhere is C03's, and it is the one that made the other two look dormant. **The sentence
+recorded nowhere was C03's, and it is the one that made the other two look dormant. **The sentence
 above is C09's own**, and it asserted a chain this component cannot see the far end of.
+
+**Fixed in C22, and this paragraph was left in the present tense for one commit** — along with
+§3a's and I32's, and C03 §3's. The repair belonged to the component that held the wiring, so
+C22's four statements of the defect were rewritten and the two components that hold the *subject*
+— C03 declares the counter, C09 consumes it — went on describing it as current. **Which is the
+half a reader meets**: nobody looking up how `status` animates opens C22. F233.
+
+**Which kinds animate is C09's fact, and `blocks/animation.ts` is where it is stated.** `ANIMATES`
+is a `Readonly<Record<BlockKind, boolean>>` and never a `Set` — a record is checked for
+exhaustiveness in **both** directions, so a kind added to the union without an entry is a type
+error and an entry naming a kind that no longer exists is one too. A `Set` of two strings compiles
+with either missing, which is F228's class: a hand-maintained list beside a generated one, where
+the hand-maintained list is the one that reads as authoritative. Two entries today — `status` and
+`steps` — and nothing else in C09 reads `ctx.tick`.
+
+**`animationIntervalOf` descends into containers, and the mutation pass is the only thing that
+said so.** Removing the descent survived every row until the fixture put the spinner inside a
+`panel` — which is not a contrived arrangement but exactly what `b.live` builds, because `Panel`
+is the only kind with a title and the title is where a live part says what state it is in. **The
+fixture was testing a shape the framework does not produce.** The interval comes from the block's
+own set through the same lookup as its frames, so a caller cannot hold one set's frames against
+another's tick.
+
+**This module shipped with no text in this spec at all** — 78 lines and three exports in C09's own
+directory, documented only by a test row in C22's list, because the commit that added it was a C22
+repair (F233).
 
 ### 2a. `window` — a block reduced to a valid smaller block
 
@@ -336,9 +362,16 @@ fixed ratio — and it cannot come from a clock, which this layer may not read. 
 `attempt` and `elapsedMs` are written by whoever holds the clock, exactly as `retryInMs` already
 is. Two sources for two things, because one is appearance and the other is a measurement.
 
-**`RenderContext.tick` does not currently advance** (F227), so every `status` block renders at
-frame 0 until C03 raises the commit, C22 supplies the counter and the line cache admits the axis.
-The kind is written against a working counter and degrades to a still frame without one.
+**`RenderContext.tick` advances, and for the life of the project it did not** (F227). All three
+links are joined: C03's commit is raised from C22's ticker, `visibleRows` supplies the counter,
+and the line cache carries a `tick` axis **per kind**, so an entry holding nothing animated keys
+exactly as it did (C22 I60) (C22 I60a). The kind is written against a working counter and degrades to
+a still frame without one — which is what it did, and the degradation is the reason a suite of
+sixteen spinner sets stayed green over it.
+
+**The observable cadence is `max(set, window)`.** The braille default declares 80 ms and C03's
+`spinner` window is 100, so the default runs at 10 fps rather than 12.5 — C03 §3's trade, applied
+unconditionally, and written down in C22 I60a because neither half mentioned the other.
 
 #### Degradation
 
@@ -835,7 +868,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I29** — **Every containment reports what it swallowed, through a sink supplied at construction.** `createBlockRegistry({ onError })`, called by all **three** catches — `measure`, `render` and `elements` — with the block, the member and the error. **Four, when this was written**: the ownership question carried a catch of its own, and I30 folded it into `elements` because the two are one answer, so the fourth is gone rather than unreported. The implementation is the first thing that could disprove the count, and it did. A containment that reports nothing hides the bugs it exists to survive, and both of the two that shipped reported nothing at all: `measure`'s catch is bare, and `render`'s discards the error the moment it has read the message off it. **T3.14 has said `logged` for as long as the row has existed and nothing anywhere logged** — an effect named in a test row with no mechanism, satisfied by the half of the sentence that was true (F223). L4 wires the sink to C23's record of what the pipeline's bare catches swallowed (C23 I48), which exists and is already drained; the test harness supplies one that fails the run, and that is what makes a caught throw a red suite rather than a quiet frame.
 - **I30** — **`elementsOf` and the ownership question are one answer about one block.** A throwing `elements` makes *that* block atomic for the dispatch (C26 I12) and leaves its children reachable: ownership is decided by what resolution **returned**, never by whether the member is declared. The two catches disagreed — `elementsOf` caught the throw and answered *no elements*, while the ownership question answered *it owns them, do not descend* — and the pair costs a whole subtree rather than a block: measured, a container whose `elements` threw yielded **0 elements against a control's 4**, with nothing said and `↓` skipping the lot (F224). I11's class in a different member, and it is stated here rather than left to C26 because the invariant is C26's and the mechanism is this file's.
 - **I31** — **The `status` box occupies exactly `measure(b, w)` rows, and its two ladders live on different axes: height allocates rows, width decides what fills them.** The row count is never a width decision, because `measure` has already answered and I1 is what the whole error path exists to preserve — so where the width ladder drops the tag row, the row goes to the message rather than going blank. **The height ladder needs six rows for the full figure** — two borders, two blanks and the tag row — and the padding is dropped as a pair, the tag row next, the border after that; at one row the message wins and the retry line is dropped, because a countdown without its cause is a number nobody can act on. **The width ladder was missing and would have shipped broken**: ` ERROR ` is 7 cells and a rule needs 9, against a `group: row` that can hand a block five columns. It is a *structural* interaction — two rules both holding at rest, no event between them — and a figure indexed on height cannot reach one however many rungs it has (C19 §8a's lesson in the other axis). **`H ≤ 2` has no border and therefore no evidence the height was honoured**; that is stated rather than left to be noticed, because it is the one place the argument for the border does not hold.
-- **I32** — **`status` animates unconditionally, its interval belongs to its set, and its numbers are fields rather than either.** No state-dependent branch: `retrying` is the error box plus a spinner line, so excluding `error` from animating breaks the state composed out of it and needs a per-state exception where a simple rule would do — and `error` drawing the same bytes every tick makes its stickiness free rather than a mechanism. The set is named by the block and defaults to what `steps` resolves to, so one glyph means *waiting* in three places; `spinnerIntervalMs` is the same lookup as `spinnerFrames`, so a caller cannot hold one set's frames against another's tick. **`retryInMs`, `attempt` and `elapsedMs` are supplied, never derived** — `tick` cannot carry a duration because C03 coalesces and drops commits under load, and this layer may not read a clock, so the only honest source is whoever holds one. **The counter does not currently advance at all** (F227), and the kind is written against one that does.
+- **I32** — **`status` animates unconditionally, its interval belongs to its set, and its numbers are fields rather than either.** No state-dependent branch: `retrying` is the error box plus a spinner line, so excluding `error` from animating breaks the state composed out of it and needs a per-state exception where a simple rule would do — and `error` drawing the same bytes every tick makes its stickiness free rather than a mechanism. The set is named by the block and defaults to what `steps` resolves to, so one glyph means *waiting* in three places; `spinnerIntervalMs` is the same lookup as `spinnerFrames`, so a caller cannot hold one set's frames against another's tick. **`retryInMs`, `attempt` and `elapsedMs` are supplied, never derived** — `tick` cannot carry a duration because C03 coalesces and drops commits under load, and this layer may not read a clock, so the only honest source is whoever holds one. **The counter advances, and for the life of the project it did not** (F227) — C03's commit is raised from C22's ticker, `visibleRows` supplies it, and the line cache carries the axis per kind. The kind was written against a working counter and drew a still frame instead, which is why sixteen tested spinner sets and a green suite said nothing: **`error` drawing the same bytes every tick is indistinguishable from `error` drawing them because nothing moved.** The property that makes stickiness free is the one that hid the break.
 
 - **I33** — **The registry applies C04's `minHeight` floor on both sides, so I1 holds by construction.** `measure` returns `max(definition.measure(…), block.minHeight ?? 0)` and `render` wraps a floored element in a box with the same minimum, which pads a short child and leaves a tall one alone. **Padding and never bounding is the whole of it**, and the alternative was measured: a fixed height drops an over-full box's **first** row rather than its last, and `overflowY: "hidden"` does not change that — so a bound would silently behead a block that grew. **A block carrying a floor is not windowed** (C04 I68). I26's identity is about rows the *definition* can produce, and `windowSequence` derives its `to` from the floored height — so a `window` that can only reach the definition's own rows breaks the identity from outside the definition. Kept whole and paid out of `skipRows`, as a kind declaring no `window` already is. **The floor is applied outside the definition** so that I2 survives it and `scroll`'s §3c purity argument is not reopened.
 

@@ -11166,6 +11166,20 @@ The two repeats in the *after* row are the wrap, not a stall: ten samples at 250
 cadence near 100 ms traverses the set and starts again. **T4.35 asserts all ten** by sampling
 thirty times rather than by tuning the interval.
 
+**And as images**, because a spinner is the one subject a string of glyphs argues about badly —
+`tools/status-proof.mjs` writes both to `docs/catalogue/status/`:
+
+```
+steps-before.gif    every frame at tick 0 — what a session drew, measured
+steps-after.gif     the counter moving
+```
+
+**The *before* is not a reconstruction**, which is the trap this file has fallen into once
+already: it is the real renderer at the real value a real session supplied, so the honest image
+and the defect are the same render. That is the only reason a before-image was available at all
+— had the defect been in the renderer rather than in its input, there would be no way to draw
+one without a checkout, and no image is the honest answer then (F156's shape).
+
 **And a number that was not stated anywhere before this.** The braille set declares **80 ms** and
 C03's `spinner` window is **100 ms**, so the observable cadence is `max(set, window)` — the
 default runs at 10 fps rather than 12.5. C03 §3 makes that trade explicitly for a spinner
@@ -11394,3 +11408,92 @@ holds is the anchor the harness will apply. The one stale anchor was repaired an
 the case in hand; nothing asked *what else does this pattern not read*, and the answer was one
 grep — `from:\s*\n` — against the same directory. A widening that fixes an instrument should
 count what it still cannot reach, and the figure belongs beside the fix.
+
+---
+
+## F233 — the fix rewrote the spec of the component that held the repair, and not the two that held the subject ★★★★☆
+
+F227 named three links in three components. **Its fix touched one spec.**
+
+```
+cc84ca4  docs/components/C22_composition_root.md   +8
+         docs/components/C03_frame_scheduler.md     0
+         docs/components/C09_block_library.md       0
+```
+
+C22's four statements of the defect were rewritten at length — §6c row 10, I60, the new I60a,
+T4.35. C03 §3 and C09 §2, §3a and I32 went on saying it in the present tense:
+
+| where | what it still said |
+|---|---|
+| C03 §3 | *no producer raises it … `RenderContext.tick` is `0` for the life of a session and `steps` cannot animate* |
+| C09 §2 | *nothing increments it … a chain with three links and none of them is joined* |
+| C09 §3a | *`RenderContext.tick` does not currently advance … until C03 raises the commit, C22 supplies the counter and the line cache admits the axis* |
+| C09 I32 | *The counter does not currently advance at all* |
+
+**Four present-tense statements of a defect that had been repaired**, in the two components a
+reader actually opens for the subject. Nobody looking up how `status` animates opens C22 — the
+wiring is C22's, the *kind* is C09's, and the counter is declared in C03.
+
+**And then the sweep found two more, in C22 — the component that *was* rewritten.** This is the
+part that changes the finding, because the first version of it was *the untouched components are
+where the stale text is*, and that is not what the tree says:
+
+| where | its lead sentence | where the repair was written |
+|---|---|---|
+| C22 I60 | *`ctx.tick` is **not** in the key and no transcript render receives one* | eleven lines below, under *Resolved by the first arm of its own ruling* |
+| C22 §6c row 10 | *`visibleRows` passes no `tick`, so every transcript render is at 0* | the row's last clause — *it is now owed rather than anticipated* |
+
+**The correction was appended and the claim was left standing at the top.** An invariant is read
+by its lead sentence — the lead sentence *is* the invariant — so eleven lines of correct history
+underneath do not change what I60 says. And row 10's own resolution stops at **owed**, which was
+true when it was written and was already false in the same commit.
+
+**So the axis is finer than *which component*: it is *the headline versus the body*.** Appending
+is the natural motion when a finding is being closed — the history is what you have just learned
+and it feels like the valuable part — and it leaves the one sentence a reader will actually take
+away pointing the wrong way. Six statements, three components, and **the two worst are in the
+file the fix was careful about.**
+
+**Found because the four sentences sourced a false premise into a plan.** A step was scoped as
+*S4 · MAKE `tick` LIVE — sixteen spinner sets ship, fully tested, and nothing in a session can
+animate one*, with all three links listed as owed. Every clause of that is what C03 and C09 say
+today. Nothing was misread.
+
+**And a third thing, which is the same mechanism with the tense removed.** The fix added
+`src/presentation/blocks/animation.ts` — 78 lines, three exports, **C09's directory** — and:
+
+```
+ANIMATES · animationIntervalOf · tickIntervalOf   in docs/components/C09_*.md   0 hits
+                                                  in docs/components/C22_*.md   1 (a test row)
+```
+
+A new C09 module whose only documentation is an obligation in **C22's** test list. The rule the
+module implements — which kinds animate and how fast — is C09 I32's subject, and I32 does not
+know the module exists.
+
+**So the axis is not *summary versus body*. It is *where the repair landed versus where the
+subject lives*.** F86, F89 and F92 are a claim weakened by being summarised; this is a claim
+**corrected** in one place and left standing in three, and the direction is opposite. The common
+cause is that a commit's blast radius is measured in code — and the code was almost all C22's,
+which is exactly why C22's prose got the attention.
+
+**Second instance of the retraction direction** (F89 is the first: a retraction that never
+reached the Order list citing it). **Two instances is the minimum for noticing a rule, not
+evidence for one** — so this is a habit and not a gate: *when a finding names N components, ask
+which of the N the fix is about to leave untouched, and open those.*
+
+**The cheap mechanical half, named and not built.** *A spec cites F-N* ∧ *F-N is dispositioned
+`fixed` in TRIAGE* is a grep, and it yields a short review list. What it cannot do is read tense
+— that half is prose, and matching *does not currently advance* against *it advances* is the
+citation-resolves-against-the-wrong-thing class the audit argues against automating. The list
+would have been four lines long here and every one a true positive, which is the number that
+would make it worth building on a third instance.
+
+**Fixed** — the six statements rewritten against HEAD **lead sentence first**, `animation.ts`
+given its C09 text, and F227's two proof GIFs cited from the finding that measured them rather
+than sitting unreferenced in `docs/catalogue/status/`.
+
+**The habit this leaves is one line: when closing a finding, rewrite the claim, then append the
+history.** Doing it in the other order is what produced I60, and the other order is the one that
+comes naturally.

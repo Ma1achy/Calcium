@@ -68,18 +68,27 @@ function createFrameScheduler(opts: {
 | `stream` | 33 ms | ~30 frames/s ceiling, matching the A02 §7 budget. Configurable down to 16 ms, but terminals generally benefit from fewer, larger writes — the default is the conservative end deliberately |
 | `spinner` | 100 ms | Animation only; a faster tick conveys nothing |
 
-**And no producer raises it.** `commit("spinner")` appears in six of this component's own test
-files and nowhere in `src/` — the reason is declared, its window is tuned, its interaction with
-`stream` is specified in three paragraphs below, and nothing in the product ever supplies one.
-So `RenderContext.tick` is `0` for the life of a session and `steps` cannot animate: measured at
-**one distinct spinner glyph across ten real frames**, against ten through the test harness
-(F227). Two of the three links are elsewhere — C22 omits `tick` from the render options and its
-line cache has no tick axis — which is why patching either one alone leaves the frame unchanged.
+**And for the life of the project no producer raised it.** `commit("spinner")` appeared in six
+of this component's own test files and nowhere in `src/` — the reason declared, the window
+tuned, the interaction with `stream` specified in three paragraphs below, and nothing in the
+product ever supplying one. So `RenderContext.tick` was `0` for the life of a session and
+`steps` could not animate: measured at **one distinct spinner glyph across ten real frames**,
+against ten through the test harness (F227). Two of the three links were elsewhere — C22
+omitted `tick` from the render options and its line cache had no tick axis — which is why
+patching either one alone left the frame unchanged.
 
-**This is the link recorded nowhere, and that is why the other two read as dormant.** C22 I60 and
-its §6c row 10 both state their halves correctly and call them *not reachable*, which is true
-only while nothing here raises a commit. A missing producer makes every consumer downstream of it
-look like a decision deferred rather than a chain broken.
+**The producer is C22's spinner ticker** (C22 I60a), armed from what the frame drew and disposed
+when nothing on screen animates — so a `spinner` commit is raised only while something is
+waiting on one, and this component's window is a floor under the block's own interval rather
+than a heartbeat. **This paragraph described the break for one commit after it was repaired**,
+because the fix was C22's and so was the prose that got rewritten (F233).
+
+**This was the link recorded nowhere, and that is why the other two read as dormant.** C22 I60
+and its §6c row 10 both stated their halves correctly and called them *not reachable*, which was
+true only while nothing here raised a commit. **A missing producer makes every consumer
+downstream of it look like a decision deferred rather than a chain broken** — which is the part
+worth keeping now that the chain is joined, because it is a fact about reading a spec and not
+about this defect.
 
 **Immediate reasons cannot be made coalesced.** `windows` may tune `stream` and `spinner` only; supplying a window for `input`, `completion` or `resize` is rejected at construction. A config file must not be able to introduce input lag (I2).
 
