@@ -11268,3 +11268,88 @@ re-read when a ruling moves.
 **Fixed** — §3c states the falsification where the claim is, keeps cell 1's reasoning about the
 two windows composing, and gives up only the part the build disproved: that this kind is the one
 performing it.
+
+---
+
+## F230 — the entry trim reconciles a height disagreement by deleting blocks ★★★★☆
+
+C09 I1 is the contract that `measure(b, w)` equals the rows `render` draws, and **nothing
+enforces it.** A kind registered to measure 1 and render 3 returns three lines from
+`renderToLines` — no throw, no clamp, nothing to the sink.
+
+What binds is one line in the shell:
+
+```
+session.ts   out.push(...rows.slice(0, ve.takeRows));
+viewport.ts  const takeRows = Math.min(available, height - taken);   // height is the index's
+```
+
+`takeRows` can never exceed what C14 measured for the entry, so a block drawing taller is cut —
+**and the cut is taken out of whatever follows it.** Measured in a real session:
+
+| the entry | on screen |
+|---|---|
+| the over-drawing block alone | **1 row** — its first. Rows 2 and 3 gone |
+| the block, then a `notice` | **2 rows** of the block, and **the notice is not on the frame** |
+
+No fault, no diagnostic. `BlockFault` has three arms — `measure`, `render`, `elements` — and a
+frame-level disagreement is none of them, so the sink that exists for exactly this kind of
+silence is never called.
+
+**The repair already exists one level up and was not applied one level down.** `paint.ts`'s
+`transcript()` refuses a frame whose rows exceed the region, and its comment is about this
+exact shape: *"the trim was `rows[0 … height)` — the **top** of the selection — … `heightsSum`
+compares the frame with itself and C14 I10 compares the viewport with itself, so the only place
+the two quantities meet is here, where the trim was quietly reconciling them."* That trim became
+a `FrameError`. The per-entry trim, one loop inside the same function's caller, still reconciles
+quietly.
+
+**Second instance of F40's class.** There, `document-view.ts` packed nearly twice what the region
+holds and C15 cut the excess in silence; here C09 draws more than C14 indexed and C22 cuts it in
+silence. Both are a component below reconciling a disagreement it did not cause, and in both the
+component that chose the rows goes on believing it was obeyed.
+
+**Nothing in the tree triggers it**, which is why it has survived: every default kind plus
+`table`, `plot` and `patch` honours I1 across **15 kinds × 4 widths, zero divergences**. It is a
+contract holding on good behaviour with a frame-corrupting failure mode and no alarm — and the
+deferred height change is the first thing that will make a disagreement ordinary.
+
+**Not a throw.** A frame that dies because one block over-drew is worse than a frame that
+truncates and complains, and `paint.ts`'s refusal is affordable only because it is unreachable
+with I34 held. This one is reachable.
+
+---
+
+## F231 — the named op is unforgeable and the field it lands as is not ★★★☆☆
+
+C04 §4 rules `op: "expand"` a named op rather than a `viewState: true` flag on `replace`, and
+states the argument in full:
+
+> A named op rather than a `viewState: true` flag on `replace`, and the reason is unforgeability
+> rather than tidiness: `replace` is the arm C25's patch expansion uses, so the flag would be set
+> by C25's renderer **and** by adapters — "trust me" in two components, with the far side's
+> adapter on one boundary. A named op cannot be forged.
+
+The op cannot. **The field it writes can**, because `validate.ts` does not contain the word
+`expanded`. Measured — an inbound document carrying `expanded: true` on a table row:
+
+```
+validateDocument            ok: true
+measure, expanded: true     3
+measure, expanded: false    2
+```
+
+The far side set view state, the detail was drawn, and the row it cost was real. **The guarantee
+holds at the op and leaks at the field**, which is the precedent being half-true: everything the
+argument says about `replace` is correct, and the conclusion it licenses — *so this is
+unforgeable* — is about the op alone. Nobody copying it would notice, because the sentence they
+are copying is true.
+
+**Third instance of the `validateBlock` gap class**, after F220 (`plotDetail`, one reader,
+governing two forms of forty-four) and F221 (`hierarchy`, a whole typed field, the word absent
+from the file). Three of one kind argues for a check over the kind rather than a third line —
+*close the class, not the instance* — and the shape is available: a field that only a named op
+may set is a small, enumerable set, and the validator can be made to refuse all of them at once.
+
+**Filed rather than fixed**, because the deferred height change adds the second member of that
+set and the two should be closed together.
