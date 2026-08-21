@@ -3463,6 +3463,99 @@ resolution.
   gains an error and no document becomes invalid — which means the fix moves frames and moves no
   validation, and every gate that would have caught it is a frame read.
 
+## 3ag. Labels — six kinds, one pass, and the sizing cycle I48 had already ruled
+
+**Three of the six exist and are not named as one thing**, which is why the rules they share were
+about to be written a fourth time. `yCallout` places a value at a series' own row; `xAxis` places
+ticks and drops the ones that collide; `hierarchyStripRows` writes a node's name inside its strip
+and drops it where it does not fit. Each carries its own placement, its own collision rule and its
+own drop. **This section is the partition, and the walk is what it is for.**
+
+### 3ag.1 — the kinds, and what each anchors to
+
+| kind | anchors at | drawn in | today |
+|---|---|---|---|
+| **value** | the series' last inked row, read from ink (I48) | right gutter | `yCallout: "last"` |
+| **series name** | the same row, the same reading | right gutter | — |
+| **annotation** | the reference line's row | legend row | — (C04 I52) |
+| **node** | the node's own strip or tile | inside the area | strips only (§3n) |
+| **point** | one cell right of the sample, or one left | inside the area | — |
+| **axis title** | the row below the x-labels | outside the area | — |
+| **segment** | — | — | **refused — `segmentLegend` ships** |
+| **tick** | its own column or row | gutter, x-row | `niceAxis` (§3d) |
+
+**A tick is on this list to be excluded from the rest of it.** It is *at* a position and the others
+are *near* one, which is the whole difference between the two collision rules: a tick that moves is
+a lie about a coordinate, and a name that moves is still the same name.
+
+### 3ag.2 — the classification table: two rules that both hold at rest
+
+| | rule A | rule B | ruling |
+|---|---|---|---|
+| **A1** | I48 — a callout displaces the mirrored right label and never the left gutter's | `"both"` puts a name *and* a value on one row | **The pair is one string in one gutter and the value leads.** Two gutter writers on one row is the four-gutter defect I24 was written about. Where the pair does not fit, the **name** is cut: I48's own argument is that the value is the number a live chart is read for |
+| **A2** | a series name at the line's end suppresses the auto legend | I25 — two things a reader must tell apart differ by mark or by name | **Confirms, and it is why the suppression is safe.** A name at the line's end *is* the name, so I25 is satisfied by the thing that replaced the legend rather than in spite of it. `POSITIONAL_STACKS`' existing suppression rests on the same sentence |
+| **A3** | C04 I52 — an annotation's label needs a legend row | `legend: false` is the caller refusing that row | **Refused at both gates.** A label with `legend: false` asks for a string and forbids the only place it goes. C04 I57's three refusals are the idiom, and a construction throw leaves nothing behind because it fires before any render state exists |
+| **A4** | I8 — a series is never dropped silently | a dropped **label** is not a dropped series | **I8 does not reach it, and saying so is the ruling.** A tile whose name did not fit is still drawn and still carries its extent; nothing about the data is missing. I8 is about a series having *no row*, and a label has no row of its own to lose |
+| **A5** | §3n — a tile's label goes in its padding ring | `inset` pads only where `w > by * 3` | **No ring, no label, and no notice.** The same condition read for a second purpose, and A4 is why it can be silent |
+| **A6** | a point label sits one cell right of its sample | the area's right edge | **Two positions and never a slide.** Right of the point, or left of it, or dropped. A label slid inward from the right edge covers **the sample it names**, and an anchor hidden by its own label is worse than no label |
+| **A7** | `xTitle` costs the row below the x-labels | `legend: "below"` costs the same row | **Both, stacked, title nearest the axis.** Two declared rows, both counted by `plotHeight` before the data — I1 is untouched because neither is data-dependent |
+| **A8** | `xTitle` sits below the x-label row | `axes: false` removes that row | **Refused at both gates.** A title for an axis that is not drawn names nothing, and the alternative — floating it at the bottom — is a second placement rule for one member |
+| **A9** | a vertical legend sizes itself to its longest entry | a drop count would be an entry | **The cycle. See below** |
+| **A10** | the treemap paints children over parents | a parent's label lives in the ring the children do not cover | **The root is not an exception.** Its children are inset from the unit square, so its own top row is free by the same arithmetic. Depth 0 needs no special case, which is the check worth having rather than the rule |
+| **A11** | a point label is drawn inside the area | `mergedRow` takes the first layer that inked a cell | **A label is an annotation and draws last, over the data** — the opposite of C04 I23's reference line, and deliberately. A line is a *claim about the ordinate* the curve is compared against; a label is the curve's own name, and a name hidden by the thing it names says nothing |
+
+### 3ag.3 — the sequence trace: reserve, size, place, drop, mark
+
+| | the sequence | what it finds |
+|---|---|---|
+| **S1** | place A · place B · A would collide with B | **Placement is one pass in series order and a label never moves onto an occupied cell.** A shift that could displace an already-placed label makes the output depend on the order two independent labels were considered in |
+| **S2** | A at the right edge flips left · B is already there | Flip, then test, then drop — **the flip is a candidate and not a commitment**. A2's two positions are two candidates and the drop is the third rung |
+| **S3** | a label is dropped · the survivor is marked | **A one-cell `+` at the survivor**, never `+N` |
+| **S4** | the legend is sized · labels are placed · a drop wants a legend entry | **the cycle** |
+| **S5** | `"both"` · the pair does not fit · the name is cut · the value alone fits | A1's ruling reached from the other side; the `+` is not drawn, because nothing was *dropped* — one string was truncated |
+
+### 3ag.4 — the cycle, and it was ruled before this section existed
+
+**S4 and A9 are the same thing and it does not terminate.** A vertical legend's width is
+`longest entry + gaps`, capped at a third. The width decides `areaWidth`. `areaWidth` decides where
+every sample lands. Where samples land decides which labels collide. Which labels collide decides
+what is counted. What is counted is a legend entry, which decides the width.
+
+**I48 found this and ruled it, one label kind along, in one clause:**
+
+> Two on one row: the later wins and a one-cell `+` says so (I8), **not `+N`, whose count needs
+> the ink that needs the width that needs the column being sized.**
+
+So the ruling here is inherited rather than made: **a dropped label is marked at the survivor with a
+one-cell `+`, and no label outcome is ever a legend entry.** The legend is sized from series,
+segments and annotations — everything knowable before a single label is placed — and placement
+reads that width without writing to it.
+
+**This strikes the obvious answer, which is the one this section was planned with.** *A dropped
+label is counted in the legend, on I8's mechanism* is what the plan said, and it is the arm I48
+explicitly refused, for this reason, in this component. **The walk's job was to find that the plan
+had re-derived a ruling and got it backwards**, and the reason it could is that I48's clause is
+about a *callout* — so a reader indexing by label kind never reaches it.
+
+### 3ag.5 — residue
+
+- **`plotMarks: "always"` and a label's mark prefix are two answers to one question at 24-bit** and
+  the interaction is not walked here. Both are opt-in and neither is a default, so nothing is
+  silently doubled — but a caller setting both gets a mark on the swatch and a mark on the label,
+  and whether that is redundant or wanted has not been measured.
+- **A9's cycle is broken by fiat rather than by construction.** Nothing in the types stops a future
+  label rule from writing a legend entry; what stops it is this section. That is weaker than
+  `measure`'s purity, which cannot be broken without a signature change, and it is recorded as
+  weaker.
+- **The tick is excluded and its own drop rule is untouched** (§3d). Two collision rules now live in
+  this component and the partition between them is *at* versus *near*, which is a sentence and not a
+  predicate — no `TICKLIKE` record makes it total over the kinds.
+- **§3n said *dropped and counted* and A4 strikes the counting**, which is a correction inside the
+  arc that wrote it: the finding's own remedy, one commit old, over-applied I8 to a case I8 does not
+  reach.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -3941,8 +4034,15 @@ So the mechanism that makes nesting visible is the mechanism that makes labellin
 neither was built for the other.
 
 **Where `inset` declines to pad — `w > by * 3`, a rectangle too small to spare the ring — a
-parent has no cells of its own and its label is dropped and counted.** That is the same
-condition, read for a second purpose.
+parent has no cells of its own and its label is dropped, silently.** That is the same condition,
+read for a second purpose.
+
+**Silently, and §3ag A4 is why.** This paragraph first read *dropped and counted*, reaching for
+I8 — and I8 is about a series that gets **no row**, which is data going missing. A tile whose name
+did not fit is still drawn, still coloured and still carries its extent; nothing about the datum is
+absent. Counting it would also have fed the sizing cycle §3ag.4 records. **The correction is one
+commit old and inside the arc that wrote it**, which is the ordinary way an over-applied invariant
+gets caught: by walking the rule it was borrowed from.
 
 ---
 
@@ -4641,6 +4741,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I52** — **A horizon carries band depth in colour and within-band height in the vertical eighths, and it folds by mirroring.** The form had no section and no invariant: it was built from the survey's entry, which says *colour = which band*, and shipped carrying depth on the density **glyph** ramp with `DEFAULT_COLORMAP.horizon` set to `null` — so the compression its own header calls *paid for in a colour axis* was charged and never delivered, and depth was occupying the alphabet height needs. At `height: 1`, the canonical horizon, every inked column was therefore exactly one row. **The mirror is forced rather than chosen**: §3r measured that Unicode's eighths are a complete ladder upward and `▀`/`▔` are the whole of the downward repertoire, so an offset fold would resolve one direction to an eighth and the other to a half — precision at one end reading as precision at both. The sign rides a diverging map's two halves, so a **sequential** `colormap` is refused rather than drawing a trough as a peak, and `legend: false` is refused because the colour axis *is* the reading (I19's argument for a matrix's scale). **The baseline is 0 where the range spans it and `range.min` otherwise** — folding about the minimum unconditionally is why it only ever folded one way, and it is invisible on any fixture that never goes negative. **A finite reading always draws ink** (I16 one form along): a floor rendering blank gives blank two meanings in the form whose subject is *how deep*. *Below `CONTINUOUS_FLOOR` there is one channel for two data and the frame decides, not this invariant (§3z).*
 - **I53** — **A calendar's rows are the sub-unit, its columns the super-unit, and its cells are the one thing in the matrix family that have a duration.** `calendarUnit` picks the cell and the grid falls out: 24 rows for `hour`, 7 for `day`, 5 for `week`, 12 for `month`, one flat series in and `N` labelled rows out, substituted at `heatmapFormRows` where a `quiver`'s magnitude field already is so that the range, the gutter, the legend and the overflow row all see one series list. **Three units are `(offset + i) mod cycle` and `week` is a calendar**, because a month is not a whole number of weeks — so `week` is the only unit whose grid has interior holes, and they are periods that do not exist rather than readings that are missing. **The span needs no member**: `startDate` + unit + `values.length` fixes it, which is the reader `startDate` was published without. **The columns are `uniform`** — every cell the same width, the oldest dropped first, the remainder a fringe — because `stretch` differs by one cell and one cell at a pitch of one is a doubling, and a two-cell week beside a one-cell week reads as two weeks holding one value (§6b B15's rule on its third consumer). `uniform` is `left` with the cells widened to fill, identical wherever the pitch is one, and the fringe is removed with `width` rather than by stretching. **No height refusal** — `matrixRows` spends its last row on `+17 more · 07 · 08 · …`, which is commitment 46 speaking in the calendar's own labels, and at `height: 1` the frame is that notice and no cells. **No `Date`** (SS1), UTC only, days-from-civil by hand. **Three x captions, derived at the super-unit's granularity where the caller declared none, and read through `columnMap` so they name the columns that are shown rather than the columns that exist.** The walk ruled the other way and gave a reason — *placing one against a grid that need not reach the area's right edge needs an offset, and `xLabelRow` takes a width* — that is true of a right-anchored grid and false of the three arms whose grid starts at column 0. **A matrix's captions span its grid rather than its area** from here on, which was already wrong for `left` and was shipped; `window` keeps the area and §3ae.7 names why (§3ae.8).
 - **I54** — **An alphabet is chosen by capability and never by `plotStyle`, and at `unicode: "ascii"` every sub-cell repertoire has a stated substitute.** §3c's *`plotStyle` names what, never the alphabet* was the rule and four sites decided it from the style alone: `lineDrawRows` selected its glyph table with no capability in the signature, `styleRasteriser` branched on `ambiguousWidth` where the question is `unicode`, and the contour and violin arms read `plotStyle` while holding `ctx.capabilities`. **The substitutions are C02 §4's, not new ones** — box drawing becomes `+ - |` through the `ASCII` table `glyphForMask` has had all along, braille becomes the density ramp, and the legend separator becomes `-`. **A style is degraded and never refused**, on I18's precedent: a caller cannot avoid the terminal they are on. **`lineDrawRows` degrades in place rather than yielding to `curveRows`**, because the ramp is ASCII and loses the connectivity that is the whole content of `plotStyle: "line"`. Measured: 49 of 159 variants at `ascii · narrow` and 24 at `ascii · wide`, 32 files of the rendered corpus carrying braille in a frame labelled ascii, and `expectDocument(…).degradesToAscii()` — the assertion this framework publishes for a consumer's suite — failing on a `line` plot and on a `contour` (C12 §3af, F216, → C09 I22, C02 §4).
+- **I55** — **A label is placed once, marked where it displaces another, and never sized into the thing that sizes it.** Six kinds share one anchor vocabulary — a value and a series name at the series' own inked row, an annotation's in a legend row, a node's inside its own figure, a point's beside its sample, an axis title in a declared row — and a **tick is not one of them**, because a tick is *at* a coordinate and a label is *near* one, which is the whole difference between moving a tick (a lie) and moving a name (still the name). **A point label takes one of two positions and never slides**: right of its sample, else left of it, else dropped — a label slid inward from the right edge covers the sample it names, and an anchor hidden by its own label is worse than no label. **Placement is a single pass in series order onto free cells only**, so no label displaces one already placed and the output does not depend on which of two independent labels was considered first. **A displaced label is marked with a one-cell `+` at the survivor and is never a legend entry**, which is I48's clause inherited rather than re-derived: a vertical legend sizes itself to its longest entry, that width sets `areaWidth`, `areaWidth` sets where samples land, and what collides sets what would be counted — *`+N`'s count needs the ink that needs the width that needs the column being sized.* **The legend is sized from series, segments and annotations alone**, all knowable before a label is placed. **I8 does not reach a dropped label**: it governs a series given no row, and a tile whose name did not fit is still drawn and still carries its extent — so a treemap tile with no padding ring drops its name and says nothing, and §3n's first wording said *counted* by borrowing an invariant one case too far. **A label draws over the data and an annotation line draws behind it** (C04 I23), because a reference line is a claim the curve is compared against and a name is the curve's own. **At one bit the leader survives and the identity does not** — `─ │ ╰` degrade to `- | +` through `linedraw.ts`'s ASCII table, so the arm at risk is `unicode` and it is already built, while colour is what stops separating the categories, so a label takes its series' `markOf` glyph as a prefix on the same predicate the swatch uses (I25, I29). *The cycle is broken by this invariant and not by a signature, which is weaker than `measure`'s purity and is recorded as weaker* (§3ag).
 
 ## 8. Commitments
 
@@ -4692,6 +4793,7 @@ orientation — and belongs in the classification table as its own rows.
 46. **A horizon's two channels stop sharing one alphabet** — depth is colour and height is the vertical eighths, the fold mirrors because the downward repertoire is two glyphs deep, and a form that had no section in this document gets one (I52, §3z).
 47. **A calendar learns what a date is** — the cell picks the grid and the span falls out of `startDate` + unit + length, so no span member is added and a member published in step 0 with four occurrences and no reader acquires one; the columns are uniform because they are the only cells in the family that have a duration (I53, §3ae).
 48. **The alphabet is the terminal's and the style is the caller's** — one predicate at every decision, C02 §4's own substitutions, degraded and never refused; and the corpus stops varying `unicode` and `ambiguousWidth` together, which is what made a rule stated in three places contradicted at four sites for the life of the component (I54, C12 §3af).
+49. **Six kinds of label become one pass with one collision rule** — two positions and never a slide, a single pass onto free cells, a one-cell `+` where one displaces another, and no label outcome that can widen the legend that decides where labels go; and the tick stays outside it, because *at* a coordinate and *near* one are different rules (I55, §3ag).
 
 ---
 
@@ -4808,6 +4910,10 @@ Six tiers. No state machine — C12 is pure over the block.
 - **CS7b** (I36, FINDINGS F182): `formatReadout`'s numeric arm keeps the digit the producer sent — `45.2`, not `45` — and does not manufacture one: `1284` stays `1284`, and a computed value stops at **four significant figures** rather than at a decimal cap. A flat six places is right for `0.023` and prints a sine as `55.827460`, which a catalogue frame is what showed. The four values of one readout share **one** precision (F177), which is a claim only a caller can make and is why `readoutSet` takes a set rather than an argument.
 - **CS8** (I36): a wide terminal fits the **same** number of candles as a narrow one and draws them `= # |`, and the frame is exactly its declared width at both. **The row that would have asserted the conflation**: its first form said *half as many*, which is what the section said before `glyphs()` was measured — and the reason the golden frames carry both widths is now that the two agree.
 - **T1.100** (I33): a band whose `q3` equals its `max` draws no stub at the box's right edge, and one whose `q1` equals its `min` draws none at the left — `│` on the spine, `─` on the vertical arm's lid. **Asserted at the degenerate end and at the ordinary one in the same row**, because a fix that removed every stub would satisfy an assertion written only about the collapsed case. The ASCII arm cannot express the difference — every box-drawing glyph collapses to `+` — so the row states that rather than asserting a distinction the alphabet does not have.
+- **T1.101** (I55): a point label whose right position would leave the area is drawn **left** of its sample, and the sample's own cell still carries its mark. **Both halves in one row**, because a slide that stopped one cell short of the edge satisfies *inside the area* and covers the anchor — which is the reading the two-position rule exists to refuse. The fixture responds first: the same label one column further in draws to the right.
+- **T1.102** (I55): two labels whose spans overlap give the first placed, a one-cell `+` on it, and nothing of the second — and the same block with the series **reversed** gives the mirror answer. The second half is the row: a rule that let a later label displace an earlier one passes the first half and returns a different frame for the same data in the other order.
+- **T1.103** (I55): a block whose labels all fit and the same block with three of them dropped render legends of **identical width**, at four widths. The cycle §3ag.4 records is only observable as an equality, because a legend that grew by a count would still be a legend that renders.
+- **T1.104** (I55, §3n): a treemap tile below `inset`'s padding threshold draws no name and the frame carries **no notice, no `+` and no legend row** — asserted against the frame rather than against a return value, since a count reaching any of the three is the I8 over-application the walk struck.
 - **T1.98** (I35): three distributions of very different spread in one block draw three different widths, and the same three scaled to their own extents draw the same shape. **The fixture responds first**: the spreads differ by a factor that a shared axis must show and an unshared one cannot.
 - **T1.97** (I34): eighteen bands in a vertical violin at a width their count does not divide — every band draws the same rung, and the three bands a cell wider draw that rung wider rather than a different one. Asserted over the *set* of figures in the frame rather than on any band, because the defect is that the set has two members.
 - **T1.95** (I11, I34): the jitter is decorrelated from the index it is drawn from — every position is reached, fewer than half the indices agree with `index % positions`, and a second band is a different speckle. **The sawtooth is the row's subject**: it is deterministic, satisfies I11, and draws diagonal stripes through sorted data.
@@ -4828,6 +4934,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T2.5** (I11): a source scan finds no mutable module state in `plot/`.
 - **T2.6** (I12): `plot` is registered via `registry.register`; removing the call removes the kind.
 - **T2.7** (I2): rasterisation called a hundred times on the same input returns identical output.
+- **T2.8** (I55): every kind in §3ag.1's table either resolves to a placement or is refused at construction — a sweep over the table's own rows, with `segment` asserted **refused** rather than skipped. A kind added to the vocabulary and to no renderer fails this row, which is the member-nothing-draws class caught at the partition rather than per form.
 
 ### Tier 3 — edge cases
 
@@ -4847,6 +4954,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T3.12**: a `spark` on a table cell narrower than the series → windows to the last N points, matching the mockup's behaviour.
 - **T3.13**: a series of exactly `width × 2` points → one point per dot column, no downsampling, no interpolation.
 - **T3.17** (I24): on a terminal reporting `ambiguousWidth: "wide"`, a label carrying an ambiguous-width character leaves every row's border in the **same cell column**, across all four gutter paths — positional, categorical, banded, matrix. Asserted by *measuring the rows against each other* rather than by matching a border at a fixed offset, which would pass on a frame where every row is wrong by the same amount. The fixture is shown to respond first: `a→b` is 3 cells narrow and 4 wide, and a label with no ambiguous character passes against a renderer that ignores the capability entirely.
+- **T3.18** (I55): a label wider than the whole plot area is dropped at both candidate positions and marks nothing — there is no survivor to carry a `+`, and a rule that emitted one would be pointing at a label that does not exist.
 
 ### Tier 4 — integration
 
@@ -4870,6 +4978,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.56** (I54): `styleRasteriser` reading `ambiguousWidth` again instead of `unicode` → **AA1's narrow arm fails and its wide arm does not**, which is the whole of F212 as a single row: the two capabilities agreed in every fixture the corpus had.
 - **T6.57** (I54): the contour or the violin choosing braille from `plotStyle` alone → AA1 and AA3 fail. Two sites, one row, because the mutation is the same expression twice and a separate row would assert the same thing.
 - **T6.58** (I54): the catalogue's ASCII arm returned to `ambiguousWidth: "wide"` → **AA1 still passes**, and that is the row's content: the corpus is not the gate, and a fixture that varies two capabilities together cannot be made into one by adding frames.
+- **T6.59** (I55): the two-position rule replaced by a slide that clamps the label's span into the area → **T1.101 fails**. The frame still renders and still fits, which is why the row asserts the anchor's own cell.
+- **T6.60** (I55): a dropped label made a legend entry → **T1.103 fails**. Nothing else does, and that is the point: the cycle is a width equality and every assertion about correctness survives it.
+- **T6.61** (I55, §3n): a treemap's dropped tile name counted in a notice → **T1.104 fails**. The mutation restores exactly the wording §3n shipped with for one commit.
 - **T6.32** (I48, I37): placing the callout with `rowOf(v, range, areaRows)` rather than from the series' ink → YC2 fails, and one value in six lands a row off the line it names, worst at the ends of the range. **Nothing else sees it**: every count, colour and width assertion passes, and the number is beside the right row at the widths a fixture happens to use.
 - **T6.33** (I48, I8): dropping the `+` where two callouts share a row → YC4 fails, and a series' reading disappears with the frame asserting nothing about it.
 - **T6.34** (I48): letting a callout take the **left** gutter's row as well → YC3 fails, and `yAxis: "both"` loses a reading on the one row where it has two chances to keep it.
