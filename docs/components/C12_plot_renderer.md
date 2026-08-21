@@ -3562,6 +3562,213 @@ about a *callout* — so a reader indexing by label kind never reaches it.
 
 ---
 
+## 3ah. `tree` — three layouts of one drawing, and the ladder the plan brought is not one
+
+A `hierarchy` has four readings and three of them are about magnitude. `flame`, `icicle` and
+`treemap` divide space in proportion to `value` (§3n); **`tree` draws the structure and nothing
+else** — the node-link figure every reference means by *a tree diagram*, where a parent sits over
+its children and an edge says only *this is under that*.
+
+### 3ah.1 — the plan said `plotDetail`, and measuring the three layouts says it cannot
+
+Phase B was planned around a rung ladder: three layouts on `plotDetail`, `rungFor` widened to take
+a row budget and a column budget, `HAS_DETAIL_RUNGS.tree` set to `true`. The natural size of each
+layout, measured over four trees before any code:
+
+| the tree | top-down | left-to-right | outline |
+|---|---|---|---|
+| the catalogue's · 9 nodes, 5 leaves, depth 3 | 7 × 31 | 5 × 29 | 9 × 18 |
+| broad · 13 nodes, 12 leaves, depth 1 | **3** × 85 | 12 × 13 | 13 × **11** |
+| deep · 7 nodes, 1 leaf, depth 6 | **13** × 6 | **1** × 50 | 7 × 28 |
+| wide-parent · 5 nodes, 3 leaves, depth 2 | 5 × 20 | 3 × 27 | 5 × 22 |
+
+**No ordering survives the four rows.** On the catalogue's tree the rows run left-to-right (5) <
+top-down (7) < outline (9) and the columns run outline (18) < left-to-right (29) < top-down (31),
+which already disagree. The two extremes are what settle it: on the **broad** tree the top-down
+figure is the cheapest of the three in rows, at 3, and the dearest in columns, at 85; on the
+**deep** tree it is the dearest in rows, at 13, and the cheapest in columns, at 6. The same layout
+is a floor on an axis for one tree and a ceiling on that same axis for another, so there is no
+ordering by budget — **not even one that depends only on the budget**, because which layout is
+cheapest depends on the tree.
+
+**And they carry the same information.** All three draw the same nine names and the same eight
+edges, and none of them encodes `value`. I34's test for a rung is *every rung adds information
+rather than resolution — a figure that says the same thing larger is not a rung, it is a bigger
+drawing*, and these three fail it in the same way: they are one drawing at three aspect ratios.
+
+So **`HAS_DETAIL_RUNGS.tree` is `false`** and `plotDetail` is refused on the form. B1 wrote that
+record one commit ago to give the member a scope; the first new question put to it is answered in
+the negative, which is what a record is for. **`rungFor` does not change**, and the plan's own
+weak joint — *changing the call shape touches the two forms with the most intricate ladder in the
+component* — is not paid rather than being paid carefully.
+
+### 3ah.2 — the three layouts, and each formula is a measurement
+
+Rows and columns are the layout's **natural** size: what it needs to draw the whole tree.
+
+- **top-down** — Reingold–Tilford. `rows = 2·depth + 1`, a label row and a connector row per
+  level. `columns = W(root)`, where `W(leaf) = cells(label)` and
+  `W(node) = max(cells(label), Σ W(children) + (children − 1))`.
+- **left-to-right** — the same node-link figure turned ninety degrees. `rows = leaves`, each leaf
+  on its own row and each parent on the midpoint of its children's. `columns = Σ_d max cells(label
+  at depth d) + 2·depth` — one aligned column per depth so the depth is readable down the figure,
+  two cells of edge between them.
+- **outline** — `tree(1)`. `rows = nodes`, `columns = max over nodes of (4·depth + cells(label))`.
+
+**The `max` in the top-down width is the interaction, and the plan's formula did not have it.**
+That formula was `Σ leaf widths + gaps`, which gives **5** on the wide-parent tree and the
+measurement gives **20**: `initialiseRenderer` is eighteen cells over two children of one, so the
+parent's own name is what the subtree has to be wide enough for. Without the `max` the name is
+drawn over its siblings and **every count still agrees** — the leaf positions, the depth, the node
+total. It is the same shape as the defect the plan predicted for the contour shifting, one term
+earlier and reachable with the contour arithmetic entirely correct.
+
+**Four cells of indent is not a taste.** `├── ` and `|-- ` are both four cells, so the outline's
+indent is the one geometry in this section whose ASCII arm is free: I9's identical cell grid holds
+by construction rather than through a substitution table.
+
+**Two nodes at one depth never share a row in the left-to-right layout**, and it falls out of the
+in-order rule rather than needing a check: sibling subtrees occupy disjoint leaf ranges, a
+parent's row is the midpoint of its own range, and distinct non-empty ranges have distinct
+midpoints. Depth separates the columns, so nothing at two depths can collide either.
+
+### 3ah.3 — `treeLayout`, and `"auto"` is a fit rather than a rung
+
+    treeLayout?: "auto" | "topDown" | "leftRight" | "outline"
+
+Default `"auto"`. **A union-typed field rather than a question** is §3w's ruling — build the
+variants and let the caller name one — and it is what every reference does (`rankdir` in graphviz,
+`tree(1)` being its own program).
+
+**A second member rather than one shared with `graph`.** The value sets do not overlap: a tree has
+no `"force"` and a graph has no `"outline"`. Sharing would make a six-value union with two
+per-form refusal lists, which is a larger artefact and a worse message than two members each
+refused off everything but its own form. Recorded here so phase C does not re-open it.
+
+**`"auto"` takes the first layout that fits both axes, preferring top-down, then left-to-right,
+then the outline.** Top-down first because it is what *a tree diagram* means — the figure a reader
+recognises without reading it. Left-to-right second because a terminal is wide and short and a
+broad tree is what it survives: 12 × 13 against the top-down's 3 × 85 on the broad tree above. The
+outline last, not because it is worse but because it is the reading a `pre` block could already
+have given the caller; **where a drawing fits, a plot form should draw.**
+
+**Where none fits whole, `"auto"` takes the layout that keeps the most nodes at the budget**, ties
+broken by the same preference order. Not the smallest overflow: overflow is measured in rows and
+columns and the two are not comparable, while nodes kept is the thing the figure is about.
+
+### 3ah.4 — what does not fit is named in a row, and the row is spent before the choice
+
+I8's mechanism, which `stackedRows` already draws: the nodes that fit, then a `warn`-toned line
+inside the plot area — `+4 more · gc · io · …`. It costs no width, so it cannot feed §3ag.4's
+sizing cycle.
+
+**It costs a row, though, and that is the cycle in a second place.** The notice exists because
+something was dropped; what is dropped depends on how many rows the drawing has; how many rows it
+has depends on whether the notice took one. Ruled the way §3ag.4 ruled the legend: **the layout is
+chosen once, against the full row budget; if the chosen layout's natural rows exceed it, the last
+row becomes the notice and the drawing takes `rows − 1`; the choice is never revisited.** So the
+notice cannot remove itself by making the drawing fit, and nothing whose existence depends on a
+size sets that size.
+
+**Each layout drops in its own order, and the order is part of the layout**: the outline drops
+from the end of the pre-order walk, the top-down drops the deepest level and its connector row
+together, the left-to-right drops the last leaf and any ancestor it leaves childless. **So the
+count in the notice is a property of the layout and not of the tree** — the same tree in the same
+box reports a different `+N` under two layouts, and that is correct rather than an inconsistency.
+
+### 3ah.5 — the fan, and there is no new vocabulary
+
+A parent to *N* children is three orthogonal moves: a stub down from the parent, a bar across the
+children's columns, a stub down to each child. `strokePolyline` strokes them and `glyphForMask`
+resolves `┬ ┴ ├ ┤ ┼ ─ │`; the ASCII arm gives `+ - |`.
+
+**A fan of one is not a bar.** A bar of zero length drawn as `┬`…`┴` puts a branch glyph where
+nothing branches, so one child is `│` and the two cases differ in the frame.
+
+**Curved and diagonal are refused for the layout's reason and not the toolbox's.** `drawLine`
+would draw a diagonal at 2 × 4 today — the cost argument expired before it could be made — and the
+reason that stands is what a tidy tree's edge means: every run is down or across, and a braille
+diagonal would be a second alphabet in a figure whose joins are box-drawing.
+
+**No categorical palette.** Edges are `tone.muted` — they are structure, like a gridline — and
+names take the default text tone. A treemap needs `categoryRef` because adjacent tiles have
+nothing else to separate them; a tree's edges do that job, and `CATEGORY_LIMIT` is 8 against a tree
+of arbitrarily many nodes. **So I25 has nothing to carry here**, which is stated rather than left
+to be discovered: there is no identity in colour to lose, because the name is the identity at every
+depth and it is drawn at every capability.
+
+### 3ah.6 — `value` is ignored, and the answer sits beside the ruling
+
+`hierarchy` is one field for four forms and three of them are about magnitude (C04 I54).
+Reingold–Tilford places by structure alone, so **`tree` reads `label` and `children` and nothing
+else**.
+
+**The ruling alone would not be enough.** A caller who passes a weighted hierarchy and watches the
+weights vanish has a fair complaint, and *a field that does nothing reads as one not yet
+implemented* is exactly what a bare refusal leaves open. Two things close it, and the second is
+the one that matters: `value` becomes **optional** on `HierarchyNode` (C04 I64), so a tree's
+caller does not have to invent a number; and `HierarchyNode.value`'s own doc carries the answer —
+**put it in the name.** `label: "gc (2.1s)"` costs nothing, works today, and is what the caller
+wanted.
+
+### 3ah.7 — the classification table: rules that both hold at rest
+
+| the cell | the two rules that meet | what it resolved to |
+|---|---|---|
+| a named `treeLayout` × a budget it does not fit | *the caller's choice is honoured* meets *a figure never overflows its declared height* (I10) | **1** — the choice is honoured and the drawing is truncated, exactly as an explicit `"full"` degrades rather than overflowing (I28). `"auto"` is the only value that may change layout, which is what makes the other three mean anything |
+| a parent's own label × its children's span | *x is the in-order position of the leaves* meets *a node's label is written where it fits* (§3n) | **2** — the parent sets the width where its name is wider than everything beneath it. Measured at 20 columns against the plan's 5, and without it a name is drawn over its siblings with every count agreeing |
+| a dropped node × a dropped name | *a name that does not fit is dropped silently* (§3n) meets *data that goes missing is counted* (I8) | **3** — the same event here, and the ruling is the **opposite** of the neighbouring form's. A tile has an extent and keeps its datum when its name is dropped; a tree node **is** its name, so a name that does not fit is a node that is not drawn, and it is counted |
+| the notice's row × the layout's rows | *the notice costs a row* meets *the layout was chosen against the budget* | **4** — §3ag.4's cycle in a second place, ruled the same way: chosen once against the full budget, the last row spent if anything was dropped, never revisited |
+| a fan of one × the bar across the children | *a parent joins its children with a bar* meets *the bar spans the children's columns* | **5** — zero length drawn as `┬`…`┴` is a branch glyph where nothing branches. One child is `│`, and the two differ in the frame |
+| a single-node tree × all three layouts | *each layout has its own shape* meets *a root with no children has no shape to have* | **6** — one row, one name, no edge, no notice, and **the three layouts agree exactly**. Recorded because of what it does to a fixture: a single-node tree passes against any layout and discriminates nothing |
+| a wide codepoint × the column arithmetic | *`cells()` and never `.length`* meets *a two-cell character owns the cell behind it* | **7** — the treemap's names already answer it, continuation cell and all (§3n, T1.104) |
+| `unicode: "ascii"` × the outline's indent | *the ASCII grid is identical* (I9) meets *the indent is a run of glyphs* | **8** — `├── ` and `|-- ` are both four cells, so four is chosen **because both alphabets have a four-cell form** |
+| `colourDepth: 1` × I25 | *category identity survives colour loss* meets *edges are structure and names are text* | **9** — nothing to carry, and the row exists so the absence is stated rather than found later |
+| `legend` × a form with no series | *a legend names series, segments and annotations* (§3ag.4) meets *a tree has none of the three* | **10** — no entries, so `"right"` costs no width and `"below"` costs no row. The second half is F222's fix, which this form needs as a **precondition** rather than inheriting as a consequence |
+
+### 3ah.8 — the trace: the composition passes, and what each may touch
+
+§6d.2's shape rather than §6c's. There is no ladder to walk width by width, and the sequence that
+does exist is the order the passes run in.
+
+| pass | may read | may not |
+|---|---|---|
+| 1 · read | the tree | the budget — a count that changes with the width is a count of the drawing |
+| 2 · choose | the counts, both budgets, `treeLayout` | anything about what will be dropped |
+| 3 · truncate | the chosen layout's drop sequence, `rows − 1` where the first fit overflowed | the layout, which is already chosen |
+| 4 · place | the **kept** set | the dropped set |
+| 5 · route | the placed positions | `children` — an edge is derived from the kept set |
+| 6 · notice | the dropped count and their names | anything with a width |
+
+Three readings:
+
+- **A · truncate before placing, and it is an ordering rather than an optimisation.** Place first
+  and drop after, and every surviving parent is centred over a span that includes the subtree that
+  is gone: the parent sits over blank cells, every count agrees, and the figure says the tree has a
+  child it has not. **This is the defect the plan predicted for Reingold–Tilford's contour
+  shifting, reachable with the contour arithmetic entirely correct** — which is the argument for
+  the trace, since no row of the table above reaches an ordering.
+- **B · pass 5 reads positions and never `children`.** Deriving an edge from the tree draws a line
+  to a child pass 3 removed. It is one pass along from A and it is a separate ruling, because the
+  fix for A does not fix B: a correctly truncated placement still has a complete tree beside it.
+- **C · the notice is composed last and can afford to name things**, which is the loop closing.
+  Pass 2 has already spent the row, so pass 6 cannot widen anything, and the `+N` may carry names
+  without re-entering §3ag.4's cycle.
+
+### 3ah.9 — what the refusal leaves behind, and the third path is the one a walk forgets
+
+`form: "tree"` with no `hierarchy` is refused, on C04 I57's idiom — `plotStyle: "candlestick"`
+with no `ohlc` is the same sentence one field along. **Three paths and three answers:**
+
+- **construction** throws, and leaves nothing behind: it happens before any render state exists.
+- **a document** is refused by `validateBlock`, and never renders.
+- **a fixture reaches the renderer without passing either** — I2's own wording — so `treeRows` is
+  total and an absent hierarchy draws `emptyRows`, which is what `treemapRows` already does.
+
+The third is the one to state, because a refusal at two gates reads as a guarantee at three.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -4790,6 +4997,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I54** — **An alphabet is chosen by capability and never by `plotStyle`, and at `unicode: "ascii"` every sub-cell repertoire has a stated substitute.** §3c's *`plotStyle` names what, never the alphabet* was the rule and four sites decided it from the style alone: `lineDrawRows` selected its glyph table with no capability in the signature, `styleRasteriser` branched on `ambiguousWidth` where the question is `unicode`, and the contour and violin arms read `plotStyle` while holding `ctx.capabilities`. **The substitutions are C02 §4's, not new ones** — box drawing becomes `+ - |` through the `ASCII` table `glyphForMask` has had all along, braille becomes the density ramp, and the legend separator becomes `-`. **A style is degraded and never refused**, on I18's precedent: a caller cannot avoid the terminal they are on. **`lineDrawRows` degrades in place rather than yielding to `curveRows`**, because the ramp is ASCII and loses the connectivity that is the whole content of `plotStyle: "line"`. Measured: 49 of 159 variants at `ascii · narrow` and 24 at `ascii · wide`, 32 files of the rendered corpus carrying braille in a frame labelled ascii, and `expectDocument(…).degradesToAscii()` — the assertion this framework publishes for a consumer's suite — failing on a `line` plot and on a `contour` (C12 §3af, F216, → C09 I22, C02 §4).
 - **I55** — **A label is placed once, marked where it displaces another, and never sized into the thing that sizes it.** Six kinds share one anchor vocabulary — a value and a series name at the series' own inked row, an annotation's in a legend row, a node's inside its own figure, a point's beside its sample, an axis title in a declared row — and a **tick is not one of them**, because a tick is *at* a coordinate and a label is *near* one, which is the whole difference between moving a tick (a lie) and moving a name (still the name). **A point label takes one of two positions and never slides**: right of its sample, else left of it, else dropped — a label slid inward from the right edge covers the sample it names, and an anchor hidden by its own label is worse than no label. **Placement is a single pass in series order onto free cells only**, so no label displaces one already placed and the output does not depend on which of two independent labels was considered first. **A displaced label is marked with a one-cell `+` at the survivor and is never a legend entry**, which is I48's clause inherited rather than re-derived: a vertical legend sizes itself to its longest entry, that width sets `areaWidth`, `areaWidth` sets where samples land, and what collides sets what would be counted — *`+N`'s count needs the ink that needs the width that needs the column being sized.* **The legend is sized from series, segments and annotations alone**, all knowable before a label is placed. **I8 does not reach a dropped label**: it governs a series given no row, and a tile whose name did not fit is still drawn and still carries its extent — so a treemap tile with no padding ring drops its name and says nothing, and §3n's first wording said *counted* by borrowing an invariant one case too far. **A label draws over the data and an annotation line draws behind it** (C04 I23), because a reference line is a claim the curve is compared against and a name is the curve's own. **At one bit the leader survives and the identity does not** — `─ │ ╰` degrade to `- | +` through `linedraw.ts`'s ASCII table, so the arm at risk is `unicode` and it is already built. **The remedy this clause first named cannot fire and is struck**: it said a label takes its series' `markOf` glyph as a prefix *on the same predicate the swatch uses*, which is `colourDepth >= 4` — and above that floor colour separates the categories, while below it `positionalForm` stops overlaying and **stacks into strips the gutter already names**. Every form that accepts a point label is in `POSITIONAL_STACKS`, so the two arms meet with nothing between them. **The identity is carried at one bit, by the strip's own gutter label**, which is a mechanism that already shipped — and the prefix was a member that would have done nothing at any capability (§3ag). *The cycle is broken by this invariant and not by a signature, which is weaker than `measure`'s purity and is recorded as weaker* (§3ag).
 - **I56** — **The abscissa is named in one declared row beneath its labels, and the forms that can carry one were measured rather than reasoned about.** `xTitle?: string`, drawn centred over the **plot area** — `layout.gutter` is the whole left offset, which is what `xLabelRowFor` one row above uses — truncated and never wrapped, because a second row would change a declared height (I1). **Below the labels and never above them**: the labels are the scale, and a name between a scale and the thing it measures separates the two. **The row is added by `titleRows` centrally**, on `legendRows`' recorded reason — every form that draws one pays it the same way, and thirty-six entries each adding the same term is thirty-six chances to forget one. **`HAS_X_TITLE` is total over `PlotForm` and every value in it was measured**: each form was rendered with a title and the frame searched for it, giving **26 true and 18 false** — and **16 of those 18 also broke `measure === rendered`**, because the row was declared and nothing composed it. So the record is not a taste, it is what keeps I1, and the **refusal is the mechanism**: a `true` in the wrong place is a block whose declaration and drawing disagree. *The matrix family is a named gap and not an omission* — a heatmap draws a column-label row a title could sit under, and wiring it is a change to that family's compositor. **`axes: false` is refused**, because a title for an axis that is not drawn names nothing and the alternative is a second placement rule for one member. **There is no `yTitle`**: rotated it is a column of single letters no terminal reader parses, horizontal above the gutter it is `xLabels`' shape and a second title member — and **a y-axis title is a heading, which C09 already has**, costing the same row and reusable by every kind. *The first draft offset the row by `labelColumn + AXIS_GUTTER` on top of the gutter and pushed it four cells right, off the area's centre and past its right edge into `clampSpans`' ellipsis; a row-width assertion cannot see that, because the row is exactly `width` either way* (§3ag).
+- **I57** — **A tree is one drawing in three layouts, chosen to fit and never as a rung.** `tree` is the fourth reading of `hierarchy` and the first whose subject is structure rather than magnitude: it takes `label` and `children`, and **`value` is ignored** — optional on the node for it (C04 I64), with the answer beside the ruling in the member's own doc, because *put it in the name* costs nothing and a bare refusal leaves *a field that does nothing* reading as one not yet implemented. **Top-down Reingold–Tilford, left-to-right, and `tree(1)`'s indented outline**, with natural sizes `2·depth + 1` × `W(root)`, `leaves` × `Σ_d max label + 2·depth`, and `nodes` × `max(4·depth + label)` — where **`W(node) = max(cells(label), Σ W(children) + gaps)`**, because a parent's own name can be wider than everything beneath it and then the parent sets the width: measured at 20 columns against a plan formula's 5, with the leaf positions, the depth and the node total agreeing either way. **They are not a ladder, and `HAS_DETAIL_RUNGS.tree` is `false`.** Measured over four trees, the top-down figure is the cheapest of the three in rows on a broad tree (3) and the dearest on a deep one (13) while its columns invert with it, so no ordering by budget exists — **not even one that depends only on the budget**, since which layout is cheapest depends on the tree; and all three draw the same names and the same edges, which is I34's own test for a rung failed three times in the same way. **The choice is `treeLayout` and `"auto"` is a fit**: the first of top-down, left-to-right, outline whose natural size fits both axes, else the one that keeps the most nodes at the budget. **What does not fit is a `warn`-toned row inside the area** (I8), and **the row is spent before the choice rather than after it**, so the notice cannot remove itself by making the drawing fit — §3ag.4's cycle in a second place, ruled the same way. **Truncation runs before placement**, or a surviving parent is centred over a span that includes the subtree that is gone, with every count agreeing; and an edge is derived from the kept set rather than from `children`, which is that defect one pass along and a separate ruling because the first fix does not make the second. A fan is three orthogonal moves through `strokePolyline` and `glyphForMask`, **a fan of one is `│` and never a zero-length bar**, the outline's indent is four cells because `├── ` and `|-- ` both are, and edges are `tone.muted` with no categorical palette — **so I25 has nothing to carry here**, the name being the identity at every depth and drawn at every capability. `hierarchy` absent is refused at both gates and drawn as `emptyRows` on the third path, where a fixture reaches the renderer without passing either (I2).
 
 ## 8. Commitments
 
@@ -4843,6 +5051,7 @@ orientation — and belongs in the classification table as its own rows.
 48. **The alphabet is the terminal's and the style is the caller's** — one predicate at every decision, C02 §4's own substitutions, degraded and never refused; and the corpus stops varying `unicode` and `ambiguousWidth` together, which is what made a rule stated in three places contradicted at four sites for the life of the component (I54, C12 §3af).
 49. **Six kinds of label become one pass with one collision rule** — two positions and never a slide, a single pass onto free cells, a one-cell `+` where one displaces another, and no label outcome that can widen the legend that decides where labels go; and the tick stays outside it, because *at* a coordinate and *near* one are different rules (I55, §3ag).
 50. **The abscissa gets a name, in a row declared before the data and drawn only by the forms that were measured to draw it** — 26 of 44, with the other 18 refused because 16 of them would otherwise declare a row nothing composes; and there is no `yTitle`, because a y-axis title is a heading and C09 has one (I56, §3ag).
+51. **A tree is one drawing in three layouts, chosen to fit** — measured over four trees rather than ordered into a ladder, because the cheapest layout depends on the tree and not on the budget; the choice is a member, the overflow row is spent before the choice so it cannot remove itself, and truncation runs before placement so no parent is centred over a subtree that is gone (I57, §3ah).
 
 ---
 
@@ -4972,8 +5181,20 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.111** (I55, C04 I63) — `TL10`–`TL15`: a label with room draws one blank right of its sample; one at the right edge **flips left and the sample's own cell keeps its ink**, asserted together because a slide that stopped a cell short satisfies *inside the area* and covers the anchor; a second label takes the free side rather than dropping, and a third with both sides taken is dropped with a **one-cell `+`** on the survivor, asserted `not /\+\d/`; the frame differs when the series order is reversed, which is what *first placed wins* means; the names reach the 1-bit stacked arm per strip; a wide codepoint leaves every framed row exactly `width`; and three refusals — more labels than values, an entry that is neither string nor `null`, and a form whose sample is not drawn at its own value.
 - **T1.112** (I55): **there is no mark prefix at any capability**, asserted as an absence at both `FULL_CAPS` and `MONO_CAPS` with a positive control in the same frame. The row exists because I55 named a remedy before it was reachable, and an arm that cannot fire reads exactly like one that is satisfied — A03 §2's vacuity class in a member rather than a rule.
 - **T1.113** (I56) — `TL16`–`TL18`: the title costs exactly one row and it is the **last**, with the row above it asserted *not* to carry it; `measure` equals the rendered count; it is centred on the plot **area**, asserted with a title two cells narrower than the area against the frame's own border columns, because area-centred and row-centred differ by the gutter and no short title separates them at any tolerance that is not itself a guess; a long title's **last inked column** stops at the area's right edge, asserted as a position rather than as a remaining width; it survives ascii; and it stacks with `legend: "below"`.
+- **T1.114** (I57): the three natural sizes are the formulas, over the four trees §3ah.1 measures. **The wide-parent tree is the row that carries it**: `W(node)` without the `max` gives 5 columns where the measurement gives 20, and the leaf positions, the depth and the node total agree in both — so a row asserted on the catalogue's tree alone passes against the wrong formula.
+- **T1.115** (I57): `"auto"` takes the first layout that fits both axes — asserted at three budgets each chosen where **only one** layout fits, plus a fourth where none does and the winner is the one keeping the most nodes. The budgets come from §3ah.1's table rather than from the implementation.
+- **T1.116** (I57, I8): a tree larger than its budget draws what fits plus a `warn`-toned `+N` row, and **the count differs between two layouts of the same tree in the same box** — which is the assertion that the count is the layout's drop sequence and not a property of the tree.
+- **T1.117** (I57): the notice's row is spent before the choice. A budget where the drawing fits in `rows` and not in `rows − 1` draws the notice and does **not** re-choose, so the notice cannot remove itself.
+- **T1.118** (I57): truncation runs before placement — on an asymmetric tree whose last subtree is dropped, every surviving parent sits over the span of its **remaining** children. Asserted on the frame, because the node total, the depth and the leaf count agree under both orders.
+- **T1.119** (I57): a fan of *N* resolves `┬ ┴ ├ ┼` through `glyphForMask`, and **a fan of one is `│` with no bar** — the two cases differ in the frame rather than in a count.
+- **T1.120** (I57, I9): the ASCII arm draws `+ - |` and `|-- ` in the same cells as the Unicode arm, the outline's indent being four in both alphabets.
+- **T1.121** (I57): a single-node tree draws one name, no edge and no notice, **and the three layouts produce identical frames** — the row exists to keep a fixture honest, since a single node discriminates no layout at all.
+- **T1.122** (I57, C04 I64): `value` changes no frame — two trees differing only in it are byte-identical — **and `label: "gc (2.1s)"` does change it**, which asserts the workaround rather than describing it.
+- **T1.123** (I57): every node drawn is named once, no name twice, and every parent sits over the span of its own children — on an asymmetric tree where a midpoint and a first-child position differ, so the two placements are not satisfied by one assertion.
+- **T1.124** (I57): a wide codepoint in a label is measured with `cells()`, and the cell behind it is not written into (§3n, T1.104).
 - **T2.9** (I56): **`HAS_X_TITLE` is re-measured rather than trusted** — every `true` renders its title and keeps `measure === rendered`, every `false` is refused at the gate, and the count of drawing forms is asserted at 26 so the sweep cannot pass against an all-`false` record. This is the row that makes the record safe to edit.
 - **T2.10** (I34) — `PD1`–`PD3`: every form with no ladder refuses `plotDetail` at **both** gates, for all three values, with the count asserted at **42** so the row cannot pass against an all-`true` record; `boxplot` and `violin` still accept all three; **absent is accepted everywhere**, which is the row that says why the defect was invisible; and `HAS_DETAIL_RUNGS` agrees with `RUNG_FORMS` form for form, read from `definition.ts` rather than restated, so the two halves cannot both be a copy of one mistake.
+- **T2.11** (I57, I34): `plotDetail` is refused on `tree` at both gates and `HAS_DETAIL_RUNGS.tree` is `false` — B1's record answering its first new question, and answering it in the negative.
 - **T1.98** (I35): three distributions of very different spread in one block draw three different widths, and the same three scaled to their own extents draw the same shape. **The fixture responds first**: the spreads differ by a factor that a shared axis must show and an unshared one cannot.
 - **T1.97** (I34): eighteen bands in a vertical violin at a width their count does not divide — every band draws the same rung, and the three bands a cell wider draw that rung wider rather than a different one. Asserted over the *set* of figures in the frame rather than on any band, because the defect is that the set has two members.
 - **T1.95** (I11, I34): the jitter is decorrelated from the index it is drawn from — every position is reached, fewer than half the indices agree with `index % positions`, and a second band is a different speckle. **The sawtooth is the row's subject**: it is deterministic, satisfies I11, and draws diagonal stripes through sorted data.
@@ -5015,6 +5236,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T3.13**: a series of exactly `width × 2` points → one point per dot column, no downsampling, no interpolation.
 - **T3.17** (I24): on a terminal reporting `ambiguousWidth: "wide"`, a label carrying an ambiguous-width character leaves every row's border in the **same cell column**, across all four gutter paths — positional, categorical, banded, matrix. Asserted by *measuring the rows against each other* rather than by matching a border at a fixed offset, which would pass on a frame where every row is wrong by the same amount. The fixture is shown to respond first: `a→b` is 3 cells narrow and 4 wide, and a label with no ambiguous character passes against a renderer that ignores the capability entirely.
 - **T3.18** (I55): a label wider than the whole plot area is dropped at both candidate positions and marks nothing — there is no survivor to carry a `+`, and a rule that emitted one would be pointing at a label that does not exist.
+- **T3.19** (I57, I2): `form: "tree"` with no `hierarchy` — refused at both gates, and the renderer called directly draws `emptyRows` at the declared height rather than throwing. The third path is the row, because a refusal at two gates reads as a guarantee at three.
 
 ### Tier 4 — integration
 
@@ -5044,6 +5266,11 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.62** (I55): seven mutations in `c12-callout-name.mjs`, all caught — the suppression widened to `"last"` and removed entirely (→ `TL3`); the refusals returned to `yc !== "last"` (→ `TL4`, and it **survived** until the rows existed); the gutter measured from a second computation of its own string (→ `TL2`, `legendEntries`' recorded defect with cells instead of colour); an unlabelled series given a blank name (→ `TL5`, and it **survived** too); and both halves of the stacked degradation (→ `TL6`). **The control went stale inside the pass** when the degradation landed, and the harness reported `ANCHOR MISSED` rather than a survivor — which is the distinction that keeps a row from reading as verified when it ran nothing.
 - **T6.63** (C04 I52, I55): five mutations in `c12-annotation-label.mjs`, all caught — the auto arm counting series alone (→ `TL7`, the deferral's exact refused state, and the frame still renders); the label's clause gated on `SHARES_CELLS` (→ `TL7`); the swatch taken from the category ladder (→ `TL8`); and both refusals dropped (→ `TL9`). **Two of the five survived the first run and neither was a test gap**: the placement had *two* sufficient mechanisms and each hid the other. A survivor pair with one mutation each is what a redundant clause looks like from outside, and nothing else in the suite reports it.
 - **T6.64** (I56): seven mutations in `c12-x-title.mjs`, all caught — the row declared and never drawn (→ `TL16`, and `composeRows` pads it, so the height stays right and a blank line appears); the title above the labels; the offset the first draft shipped; a long title untruncated; a matrix flipped to `true` and the form refusal dropped (→ `T2.9`, both of which break I1 rather than the drawing). **Three survived the first run and one of the three was not a survivor at all**: its anchor matched four times in `types.ts` and mutated a different record — F219, and the reason a uniqueness check belongs beside the staleness one.
+- **T6.65** (I57, I34): the three layouts ordered into a ladder and hung off `plotDetail` — `"compact"`, `"auto"`, `"full"` mapped onto outline, left-to-right, top-down → **T1.115 fails on the broad tree and passes on the catalogue's**, which is the whole of §3ah.1: the ordering holds on the fixture that was measured first.
+- **T6.66** (I57): `W(node)` returning `Σ W(children) + gaps` without the `max` → **T1.114 fails on the wide-parent tree alone**, and the frame renders with a parent's name over its siblings.
+- **T6.67** (I57): placement before truncation → T1.118 fails, and every count in the frame still agrees.
+- **T6.68** (I57): the layout re-chosen after the notice takes its row → T1.117 fails, and the notice removes itself on exactly the budgets where it was needed.
+- **T6.69** (I57): a fan of one drawn as a zero-length bar → T1.119 fails, and a branch glyph appears where nothing branches.
 - **T6.32** (I48, I37): placing the callout with `rowOf(v, range, areaRows)` rather than from the series' ink → YC2 fails, and one value in six lands a row off the line it names, worst at the ends of the range. **Nothing else sees it**: every count, colour and width assertion passes, and the number is beside the right row at the widths a fixture happens to use.
 - **T6.33** (I48, I8): dropping the `+` where two callouts share a row → YC4 fails, and a series' reading disappears with the frame asserting nothing about it.
 - **T6.34** (I48): letting a callout take the **left** gutter's row as well → YC3 fails, and `yAxis: "both"` loses a reading on the one row where it has two chances to keep it.
