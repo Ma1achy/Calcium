@@ -229,6 +229,8 @@ type BarSpec = Readonly<{
 | `tip` | text with fill actions | `ceil(len / w)` |
 | `panel` | title, footer, children | children measured at `w - 2`, + 2 |
 | `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
+| `scroll` | declared `height`, children | `height`, plus one residue row where the content overflows (I47, I49). **Absent from this table until F228**, which found the same gap in C09's |
+| `status` | state, message, optional `retryInMs` / `attempt` / `elapsedMs` / `spinner` | `height` — the box is bound by what `measure` committed (C09 I31) |
 | `raw` | pre-formatted text | lines |
 
 A *sequence* of blocks — a document's top level, a `panel`'s children, a `column`
@@ -1077,11 +1079,57 @@ to decline, which is the shape C09 I1's neighbours keep rejecting.
 
 ---
 
+## 3b. `status` — the block a layer above knows about and the definition does not
+
+**Three states, one kind** (C09 §3a, C09 I31, C09 I32):
+
+```typescript
+export type Status = Readonly<{
+  kind: "status";
+  id: string;
+  state: "error" | "loading" | "retrying";
+  message: string;
+  /** The rows the box occupies. Bound by what `measure` committed (C09 I11). */
+  height: number;
+  /** Supplied by whoever holds the clock, never derived from `tick`. */
+  retryInMs?: number;
+  attempt?: number;
+  elapsedMs?: number;
+  spinner?: SpinnerName;
+}>;
+```
+
+**Why it is a block and not a rendering mode.** Only `error` is reachable from the registry — L1
+catches a throw and knows. It cannot know that a part has never fetched, or that a backoff is
+counting down: those are the builder's and the refresh driver's facts, both L4, and a registry
+that could see them would be reading upward. So the state is carried *in the block*, constructed
+by whoever holds the fact, and drawn by one definition. One implementation, three call sites.
+
+**The three optional numbers are supplied and never derived.** `tick` cannot carry a duration —
+C03 coalesces and drops commits under load, so it is not in a fixed ratio with wall-clock — and
+L1 may not read a clock. `retryInMs` already arrives this way through `LiveSpec.renderError`; the
+other two follow it rather than inventing a second route.
+
+**`height` is required and is not a default.** `plot`'s argument, for the same reason: a box whose
+height the framework guessed is silently wrong-sized and nobody notices it is wrong. The registry
+supplies the number it already committed; a consumer constructing one supplies its own.
+
+**Validation refuses an empty `message` and a non-positive `height`** — both at construction, both
+naming the field (I57). An empty message in an `error` box is a box that says something failed and
+not what, which is the same objection §3a's three-row rung makes about dropping the rule.
+
 ## 3c. The scroll container — a declared height, and an offset that is not the block's
 
-Roadmap 46's kind, and **C26 §4b's cell 3 gets its first inhabitant**: the one kind declaring
-both `elements` and `window`. That cell was ruled while empty, which is what made it cheap to
-get wrong, so this section is the ruling meeting a subject.
+Roadmap 46's kind, and **C26 §4b's cell 3 was expected to get its first inhabitant**: the one
+kind declaring both `elements` and `window`. That cell was ruled while empty, which is what made
+it cheap to get wrong, so this section is the ruling meeting a subject.
+
+**And the subject falsified it — `scroll` declares `elements` and no `window`.** A bounded region's
+height is declared, so it cannot measure less without becoming a different box, and the composition
+cell 1 describes is not this kind's to make. **The overturn was recorded in C26 §4b, which now reads
+*cell 3 is still empty*, and in `containers.ts`, which cites cell 1 while contradicting it — and not
+here, in the document that makes the claim first** (F229). Cell 1's reasoning about the two windows
+stands; what does not is this kind being the one that performs it.
 
 ```typescript
 export type Scroll = Readonly<{
@@ -1488,6 +1536,7 @@ persisted document rests on.
 - **I63** — **A series may name individual samples, in an array parallel to `values`, and the member is refused where a sample is not drawn at its own value.** `pointLabels?: readonly (string | null)[]` — parallel rather than keyed, because `Series.values` is a bare array and the abscissa a sample has *is* its index, so a record would be a second way to say *which sample* and the two could disagree; `null` is *no label here*, so a sparse set needs neither a length nor a sentinel. **Longer than `values` is refused**: an entry past the last reading names a sample that does not exist, which is a document asserting something about nothing rather than a harmless extra. **Refused where `HAS_CALLOUT` is false, and that record is the right one rather than a convenient one** — it partitions the forms whose sample is drawn at *its own value*, and a `stackedarea` or `streamgraph` draws sample *j* at a cumulative height, so a label placed from `rowOf(value)` would name a row the sample is not on. That is the same fact the callout was excluded from those forms for, so this is a second consumer of one partition and not a record borrowed for a different question (C12 I55, §3ag).
 - **I64** — **A field that carries a shape is checked like one, and `hierarchy` was checked like nothing.** `validate.ts` did not contain the word: a node that is the number `42`, a `children` that is the string `"nope"`, a node with no `label` writing those nine letters into a frame as a tile's name — all accepted at both gates, and two of the six shapes measured reached `[plot failed to render]`, which is C09 I11's containment rather than luck (F221). **It survived because `hierarchy` is a shape and not a member**, which is I54's own argument — *one field for three forms rather than three shapes* — and a gate written member by member has nothing to hang a clause on. Every other typed field on `Plot` is a flat list or a small record, so its clause is one line and got written; a recursive shape needs a walk, and the type carries the whole claim while a document does not typecheck. **Every node is an object with a string `label`, `children` is an array where present, and `value` is a finite non-negative number exactly where the form's subject is magnitude** — `flame`, `icicle`, `treemap` — **and optional where it is not**. `value` becomes optional on `HierarchyNode` for `tree`, whose figure is placed by structure alone: a required number every caller of that form must invent is worse than a member that does nothing, because a member that does nothing can at least be left out. **The depth is bounded and the bound is not what this is for** — a chain 3200 deep satisfies every rule the type states and is refused by the stack, the treemap failing between 1600 and 3200 and the flame between 3200 and 6400, which is the two walks' frame sizes rather than anything about the data. 256 is an eighth of the lower figure and deeper than any call stack a profile prints, and the bound exists because **a gate that walks a recursion must terminate it** rather than because anybody's data is deep. **Breadth is not bounded**, and the asymmetry is the reason: a node with ten thousand children degrades to ten thousand zero-width strips, which is a figure saying *too many to draw* and not a throw.
 - **I65** — **A tree's layout is a member, and it was measured rather than reasoned about.** `treeLayout?: "auto" | "topDown" | "leftRight" | "outline"`, refused on every other form. **The three are not a ladder**: over four trees the top-down figure is the cheapest of the three in rows on a broad tree (3) and the dearest on a deep one (13) while its columns invert with it, so no ordering by budget exists — not even one depending only on the budget, since which layout is cheapest depends on the tree — and all three draw the same names and the same edges, which is C12 I34's own test for a rung failed three times in the same way. So `plotDetail` is refused on the form and this member carries the choice, on C12 §3w's ruling that a styling fork ships every option rather than asking which one. **A second member rather than one shared with a future `graph`**, because the value sets do not overlap: sharing would make a six-value union with two per-form refusal lists, which is a larger artefact and a worse message than two members each refused off everything but its own form. **`"auto"` is a fit**, the first whose natural size fits both axes and otherwise the one that keeps the most nodes; a named layout is honoured whatever the budget and the drawing is truncated rather than overflowing, exactly as an explicit `plotDetail: "full"` degrades (C12 I28). **And `hierarchy` stops being optional on this one form**: the three magnitude forms have something to fall back to — two draw their series and the third its empty message — and a form whose whole subject is the shape has nothing, so its absence is refused at both gates rather than drawn as an empty message. **The values are restated in `validate.ts` and held in `tree.ts`**, which is L1 and cannot be imported from L0, so the two must agree and a row asserts it rather than deriving one from the other.
+- **I66** — **`status` carries the state and the three numbers that describe it, and every one of them is supplied rather than derived.** The kind exists because only one of its three states is knowable where the block is drawn: L1 catches a throw and knows `error`, and *never fetched* and *backing off* are facts held by the builder and the refresh driver two layers up (C09 §3a). So the state travels in the block. `retryInMs`, `attempt` and `elapsedMs` are optional and **never computed from `ctx.tick`** — C03 coalesces and drops commits under load, so tick is not in a fixed ratio with wall-clock, and the layer that draws may not read a clock; `retryInMs` already arrives this way and the other two follow it rather than opening a second route. **`height` is required**, on `plot`'s argument: a box the framework sized by guess is silently wrong and nobody notices it is wrong. **An empty `message` and a non-positive `height` are construction errors naming their field** (I57) — a box that says something failed and not what is the objection C09 §3a's three-row rung already makes about dropping the rule.
 
 ## 7. Commitments
 
@@ -1560,6 +1609,7 @@ persisted document rests on.
 63. **A plot's geometry is six declared members and the test that admits them has two arms** — changing the area is sufficient and never was necessary, `origin` and `align` pass on the caller's-alone arm alone, and every one is refused where the form or the type cannot honour it (I62, C12 §3ab, C12 §3ac).
 64. **A field that carries a shape is checked like one** — `hierarchy` is walked at both gates, `value` is required exactly where the form's subject is magnitude and optional where it is not, and the depth is bounded because the walk that draws it recurses (I64).
 65. **A tree's layout is a member and not a rung** — measured over four trees rather than ordered, because the cheapest layout depends on the tree and not on the budget; `"auto"` is a fit, a named layout is honoured and truncated, and `hierarchy` is required on the one form with nothing to fall back to (I65).
+66. **A state only a higher layer can know travels in the block, not in a rendering mode** (I66). `status` is one kind for three states because the alternative is a registry reading upward for two of them; the numbers that describe those states are supplied by whoever holds the clock, since the animation counter cannot carry a duration and the drawing layer cannot read a clock.
 
 ---
 
@@ -1590,6 +1640,8 @@ Six tiers. No state machine, so no transition table.
 - **T1.17** (I27): a document whose `panel` contains itself is refused by `validateDocument` with a named error, and the call returns. A shared-but-acyclic subtree appearing twice validates — the seen-set is path-scoped, and a global one would fail this.
 - **T1.18** (I1, §4b): C24's `b` produces blocks frozen exactly once — the constructor is the only freeze point, asserted by spying on it.
 - **T1.20** (I42): a weight of `0`, a negative, a non-finite, and a list whose length does not match the children — each refused at construction with a named error. **Four values in one row**, because the field's whole risk is a number that reads as meaningful and means two things.
+- **T1.21** (I66): `status` with an empty `message` and with `height: 0` are refused at construction, each naming its field; a valid one round-trips every optional member.
+- **T1.22** (I66): the three optional numbers survive a `ViewDocument` round-trip and **none of them is present on a block the registry built for a thrown renderer** — the error path knows the height and nothing else, so a defaulted `attempt` would be a number nobody measured.
 
 ### Tier 2 — contract / interface
 

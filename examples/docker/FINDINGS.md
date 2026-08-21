@@ -11198,3 +11198,42 @@ hand-maintained list is the one that reads as authoritative.
 
 **Fixed** — the counts corrected to fifteen and eighteen, `scroll` given its row, and T1.4's
 obligation rewritten from a number to a comparison. The comparison itself lands with the code.
+
+---
+
+## F229 — the overturn was recorded in two places and not in the one that made the claim ★★★☆☆
+
+C04 §3c opens: *C26 §4b's cell 3 gets its first inhabitant: **the one kind declaring both
+`elements` and `window`.*** `scroll` declares `elements` and **no `window`**.
+
+The build falsified the walk — a bounded region's height is declared, so it cannot measure less
+without becoming a different box — and that is recorded twice:
+
+```
+C26 §4b        "The kind that would have inhabited cell 3 declares only `elements`."
+               "So cell 3 is still empty, and the ruling that filled it is unaffected."
+containers.ts  "No `window`, and the sweep is what said so (C04 §3c cell 1)."
+C04 §3c        unchanged — still the first, most confident statement of the old ruling
+```
+
+**The code comment cites the cell it contradicts.** Whoever wrote it went to §3c, read cell 1,
+disagreed with it correctly, wrote down the disagreement where the code is, and did not carry it
+back. C26 was updated because the claim was *about* C26's table; C04 was not, because the claim
+was C04's own.
+
+**This is the sixth blind spot pointed at a stale copy rather than a missing one.** The usual
+shape is *a claim carried with no record anywhere*; here there are three records, two current and
+one not, and the stale one is the one a reader meets first — §3c is where the kind is specified,
+so a reader arrives there before either correction. Repetition across documents is not
+corroboration, and it is not currency either.
+
+**And §3c is the section that already does this well**, which is what makes the omission legible:
+cell 8 carries *"The walk missed this and `tsc` did not"* and its trace row 1 carries *"RULING
+NAMES AN OPERATION THAT DOES NOT EXIST"*, both added in place after the build overturned them.
+The habit exists in this exact section and was not applied to the sentence that opens it —
+an opening paragraph reads as framing rather than as a claim, and framing is not what gets
+re-read when a ruling moves.
+
+**Fixed** — §3c states the falsification where the claim is, keeps cell 1's reasoning about the
+two windows composing, and gives up only the part the build disproved: that this kind is the one
+performing it.
