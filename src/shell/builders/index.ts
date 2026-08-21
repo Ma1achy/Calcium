@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
   Action,
@@ -521,6 +521,22 @@ function plot(
           `has one figure and no ladder of rungs to pick from`,
       );
     }
+  }
+  // **The shape, through the validator's own walk** (C04 I64, F221). The
+  // `plotDetail` refusal above is a copy on purpose — a one-line predicate
+  // written twice can be compared by eye — and a recursive walk is not: two
+  // copies of it are two walks, and the second one drifts.
+  if (hierarchy !== undefined) {
+    const drawn = form ?? "line";
+    const role = HIERARCHY_ROLE[drawn];
+    if (role === null) {
+      throw new TypeError(
+        `b.plot: "hierarchy" on form "${drawn}" (C04 I64) — that form draws a series, a ` +
+          `matrix or a field, and an ignored member reads as one not yet implemented`,
+      );
+    }
+    const fault = hierarchyFault(hierarchy, role === "magnitude", "hierarchy");
+    if (fault !== null) throw new TypeError(`b.plot: ${fault} (C04 I64)`);
   }
   // **The same rule over the same two records the validator reads** (C04 I60,
   // C12 I47, C12 I48), on the **resolved** form for `plotStyle`'s reason: the

@@ -1436,6 +1436,55 @@ export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.free
   pie: false, radar: false, horizon: false,
 });
 
+/**
+ * The deepest a `hierarchy` may nest (I64, F221).
+ *
+ * **The bound is not what the check is for**, and the figures say why: a chain
+ * 3200 deep satisfies every rule the type states and is refused by the *stack*,
+ * the treemap failing between 1600 and 3200 and the flame between 3200 and 6400
+ * — which is the size of the two walks' frames rather than anything about the
+ * data. Nobody has a call stack that deep. 256 is an eighth of the lower figure
+ * and deeper than any profile prints, and it exists because **a gate that walks
+ * a recursion has to terminate it** — including on an object graph with a cycle,
+ * which a builder call can hand over and a document cannot.
+ *
+ * **Breadth is deliberately not bounded**, and the asymmetry is the reason: ten
+ * thousand children degrade to ten thousand zero-width strips, which is a figure
+ * saying *too many to draw*, where depth degrades to a throw.
+ */
+export const HIERARCHY_MAX_DEPTH = 256;
+
+/**
+ * What a form reads a `hierarchy` **for**, or `null` where it reads none (I64).
+ *
+ * Three forms divide space in proportion to `value` — `flame`, `icicle`,
+ * `treemap` — so on those a node without a finite non-negative magnitude is not
+ * a node drawn oddly, it is not a node. **The arm for a form whose subject is
+ * structure arrives with `tree`** (C12 §3ah, C12 I57), and it arrives as a third
+ * value of this union rather than as a second record: `value` becomes optional
+ * on the node exactly then, because until there is a form that ignores it, an
+ * optional `value` is a weaker type refused identically at both gates.
+ *
+ * Total over `PlotForm`, so the forty-fifth form declares which it is — and the
+ * `null` arm is a refusal rather than silence, because `hierarchy` on a form
+ * that draws a series is F220's class in a second member.
+ */
+export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | null>> = Object.freeze({
+  // The three forms whose subject is containment (I54, C12 §3n).
+  flame: "magnitude", icicle: "magnitude", treemap: "magnitude",
+  // Everything else draws a series, a matrix or a field.
+  line: null, sparkline: null, heatmap: null, scatter: null, step: null,
+  ecdf: null, bar: null, histogram: null, forest: null, dumbbell: null,
+  lollipop: null, dotplot: null, waffle: null, boxplot: null, violin: null,
+  funnel: null, gantt: null, waterfall: null, streamgraph: null,
+  stackedarea: null, slope: null, bubble: null,
+  autocorrelation: null, timeline: null, bullet: null, utilisation: null,
+  calendar: null, correlation: null, confusion: null, spectrogram: null,
+  latency: null, density2d: null, contour: null, quiver: null,
+  density: null, ridgeline: null, smallmultiples: null, pairplot: null,
+  pie: null, radar: null, horizon: null,
+});
+
 export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // Composed by `axed`, `axedWithCursor` or `categoricalColumnForm` — the
   // positional family and the categorical one.
@@ -1651,6 +1700,20 @@ export type Segment = Readonly<{ label: string; value: number }>;
  * subtree's where it does; a renderer takes the larger of the two, so a parent
  * whose stated value is less than its children's sum does not draw its children
  * outside itself.
+ *
+ * **A magnitude you want a *structural* reading to show goes in the name.**
+ * `HIERARCHY_ROLE` says which forms read `value` at all, and a form whose
+ * subject is structure rather than area places by shape alone — so
+ * `label: "gc (2.1s)"` is what to write, which costs nothing and works today.
+ * The ruling on its own would leave *a field that does nothing* reading as one
+ * not yet implemented (C12 §3ah).
+ *
+ * **The shape is checked at both gates rather than by the type** (I64, F221).
+ * `validate.ts` did not contain the word `hierarchy`: a node that was the number
+ * `42`, a `children` that was the string `"nope"`, a node with no `label`
+ * writing those nine letters into a frame as a tile's name — all accepted. A
+ * document does not typecheck, and a gate written member by member has nothing
+ * to hang a clause on when the field is a recursive shape.
  */
 export type HierarchyNode = Readonly<{
   label: string;

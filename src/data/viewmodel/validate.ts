@@ -25,6 +25,8 @@ import {
   COLORMAP_NAMES,
   HAS_CALLOUT,
   HAS_DETAIL_RUNGS,
+  HIERARCHY_MAX_DEPTH,
+  HIERARCHY_ROLE,
   HAS_X_TITLE,
   HAS_Y_GUTTER,
   HONOURS_AXIS_CROSS,
@@ -268,6 +270,78 @@ function checkPointLabels(
         `sample it names, and that form does not draw a sample at its own value`,
     );
   }
+}
+
+/**
+ * The first thing wrong with a `hierarchy`, named by its path — or `null`
+ * (C04 I64, F221).
+ *
+ * **One walk, read by both gates.** A one-line predicate written twice is a rule
+ * stated twice and the two can be compared by eye; a recursive walk written
+ * twice is two walks, and the second one drifts. So this is exported and the
+ * constructor imports it, where `plotDetail`'s refusal is a copy on purpose.
+ *
+ * **It stops at the first fault rather than collecting them.** A malformed tree
+ * is malformed in one way at one place, and ten thousand nodes are ten thousand
+ * messages about the same mistake — `checkPointLabels` breaks out of its loop
+ * for the same reason.
+ */
+export function hierarchyFault(
+  node: unknown,
+  needsValue: boolean,
+  path: string,
+  depth = 0, // cells-ok — a depth index
+): string | null {
+  if (depth > HIERARCHY_MAX_DEPTH) { // cells-ok — a depth index
+    return `${path} nests deeper than ${String(HIERARCHY_MAX_DEPTH)}, which is the bound the walk that draws it needs`;
+  }
+  if (!isRecord(node)) return `${path} must be an object with a "label"`;
+  if (!isString(node["label"])) return `${path}.label must be a string`;
+  if (needsValue) {
+    const v = node["value"];
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) {
+      return `${path}.value must be a number of at least zero — that form divides space in proportion to it`;
+    }
+  }
+  const kids = node["children"];
+  if (kids === undefined) return null;
+  if (!isArray(kids)) return `${path}.children must be an array`;
+  for (const [i, kid] of kids.entries()) { // cells-ok — a child index
+    const fault = hierarchyFault(kid, needsValue, `${path}.children[${String(i)}]`, depth + 1); // cells-ok — a depth index
+    if (fault !== null) return fault;
+  }
+  return null;
+}
+
+/**
+ * `hierarchy` — the shape, and the forms that read one (C04 I64).
+ *
+ * **The field reached the renderer with nothing asked of it** (F221), because
+ * C04's gate is written member by member and this is not a member — it is a
+ * shape, which is I54's own *one field for three forms rather than three
+ * shapes*. Every other typed field here is a flat list or a small record, so its
+ * clause is one line and got written.
+ */
+function plotHierarchyErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const h = b["hierarchy"];
+  if (h === undefined) return;
+  const role = HIERARCHY_ROLE[form as PlotForm];
+  // An unrecognised form is the form check's to report, not this one's.
+  if (role === undefined) return;
+  if (role === null) {
+    e.push(
+      `${at}: "hierarchy" on form ${JSON.stringify(form)} (C04 I64) — that form draws a ` +
+        `series, a matrix or a field, and an ignored member reads as one not yet implemented`,
+    );
+    return;
+  }
+  const fault = hierarchyFault(h, role === "magnitude", `${at}: hierarchy`);
+  if (fault !== null) e.push(`${fault} (C04 I64)`);
 }
 
 function checkAnnotations(
@@ -722,6 +796,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (pb !== undefined && pb !== "solid" && pb !== "line") {
       e.push(`${at}: "plotBox" must be "solid" or "line"`);
     }
+    plotHierarchyErrors(b, e, at, form);
     plotAxisErrors(b, e, at, form);
     plotFieldErrors(b, e, at, form);
     plotHorizonErrors(b, e, at, form);

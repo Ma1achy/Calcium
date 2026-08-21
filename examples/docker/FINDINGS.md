@@ -10793,10 +10793,19 @@ the validator is where an untrusted document does, and a document does not typec
 the shape — a treemap with a broken hierarchy still draws a rectangle, and a tree with one draws
 nothing at all.
 
-**Fix owed** — a `checkHierarchy` walk at both gates: every node an object with a string `label`,
-`children` an array where present, `value` finite and non-negative **where the form's subject is
-magnitude**, and a stated depth bound, because a gate that walks a recursion must terminate it.
-C04 I64.
+**Fixed** — `hierarchyFault`, one walk exported from `validate.ts` and called by both gates:
+every node an object with a string `label`, `children` an array where present, `value` finite and
+non-negative **where the form's subject is magnitude**, and a 256 bound because a gate that walks
+a recursion must terminate it — including on a cyclic object graph, which a builder call can hand
+over and a document cannot. **One walk rather than two**, where `plotDetail`'s refusal is
+deliberately a copy: a one-line predicate written twice can be compared by eye, and a recursive
+walk written twice is two walks.
+
+**And `HIERARCHY_ROLE` closes the other half**, which the probe found on the way past: `hierarchy`
+was accepted on all forty-four forms and read by three, which is F220's class in a second member.
+The record is total over `PlotForm` with a `null` arm that refuses, and **HG5 asserts it against
+the frames rather than against a restatement** — every form rendered twice, with and without a
+hierarchy, and the set that moves must be exactly the three. C04 I64, T2.29, T2.30.
 
 ---
 
