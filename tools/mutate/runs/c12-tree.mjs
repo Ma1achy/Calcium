@@ -137,6 +137,16 @@ const results = runPass({
       expect: "TR11",
     },
     {
+      // **The frame-read finding.** `╰──` is a claim — *this is the last child*
+      // — and computed over the kept set it contradicts the notice one row
+      // below. The other two layouts have no glyph that makes the claim.
+      name: "the outline's last-child glyph is read from what survived",
+      file: TREE,
+      from: "    const siblings = nodes[parent]!.kids;",
+      to: "    const siblings = keptKids(nodes, kept, parent);",
+      expect: "TR13",
+    },
+    {
       // The member's scope: accepted on the forty-four forms that have one
       // layout, which is F220's class in a third member.
       name: "`treeLayout` is accepted on every form",

@@ -2734,6 +2734,238 @@ exports[`golden frames — the mirrored rung, both parities > violin · 7 rows a
 "
 `;
 
+exports[`golden frames — the three tree layouts > tree · left-to-right · ascii-1bit-wide · 40 1`] = `
+"── tree · left-to-right · measured 5 · rendered 5
+    +-render+-curve----raster
+    |       +-paint
+root+-layout+-measure
+    |       +-wrap
+    +-parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · left-to-right · ascii-1bit-wide · 80 1`] = `
+"── tree · left-to-right · measured 5 · rendered 5
+    +-render+-curve----raster
+    |       +-paint
+root+-layout+-measure
+    |       +-wrap
+    +-parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · left-to-right · full · 40 1`] = `
+"── tree · left-to-right · measured 5 · rendered 5
+    ╭─render┬─curve────raster
+    │       ╰─paint
+root┼─layout┬─measure
+    │       ╰─wrap
+    ╰─parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · left-to-right · full · 80 1`] = `
+"── tree · left-to-right · measured 5 · rendered 5
+    ╭─render┬─curve────raster
+    │       ╰─paint
+root┼─layout┬─measure
+    │       ╰─wrap
+    ╰─parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · left-to-right-overflow · ascii-1bit-wide · 40 1`] = `
+"── tree · left-to-right-overflow · measured 3 · rendered 3
+root--render+-curve--raster
+            +-paint
+[1m+4 more - layout - measure - wrap - par~[22m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · left-to-right-overflow · ascii-1bit-wide · 80 1`] = `
+"── tree · left-to-right-overflow · measured 3 · rendered 3
+root--render+-curve--raster
+            +-paint
+[1m+4 more - layout - measure - wrap - parse[22m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · left-to-right-overflow · full · 40 1`] = `
+"── tree · left-to-right-overflow · measured 3 · rendered 3
+root──render┬─curve──raster
+            ╰─paint
+[38;2;212;179;90m+4 more · layout · measure · wrap · par…[39m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · left-to-right-overflow · full · 80 1`] = `
+"── tree · left-to-right-overflow · measured 3 · rendered 3
+root──render┬─curve──raster
+            ╰─paint
+[38;2;212;179;90m+4 more · layout · measure · wrap · parse[39m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline · ascii-1bit-wide · 40 1`] = `
+"── tree · outline · measured 9 · rendered 9
+root
++-- render
+|   +-- curve
+|   |   +-- raster
+|   +-- paint
++-- layout
+|   +-- measure
+|   +-- wrap
++-- parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline · ascii-1bit-wide · 80 1`] = `
+"── tree · outline · measured 9 · rendered 9
+root
++-- render
+|   +-- curve
+|   |   +-- raster
+|   +-- paint
++-- layout
+|   +-- measure
+|   +-- wrap
++-- parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline · full · 40 1`] = `
+"── tree · outline · measured 9 · rendered 9
+root
+├── render
+│   ├── curve
+│   │   ╰── raster
+│   ╰── paint
+├── layout
+│   ├── measure
+│   ╰── wrap
+╰── parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline · full · 80 1`] = `
+"── tree · outline · measured 9 · rendered 9
+root
+├── render
+│   ├── curve
+│   │   ╰── raster
+│   ╰── paint
+├── layout
+│   ├── measure
+│   ╰── wrap
+╰── parse"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline-overflow · ascii-1bit-wide · 40 1`] = `
+"── tree · outline-overflow · measured 6 · rendered 6
+root
++-- render
+|   +-- curve
+|   |   +-- raster
+|   +-- paint
+[1m+4 more - layout - measure - wrap - par~[22m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline-overflow · ascii-1bit-wide · 80 1`] = `
+"── tree · outline-overflow · measured 6 · rendered 6
+root
++-- render
+|   +-- curve
+|   |   +-- raster
+|   +-- paint
+[1m+4 more - layout - measure - wrap - parse[22m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline-overflow · full · 40 1`] = `
+"── tree · outline-overflow · measured 6 · rendered 6
+root
+├── render
+│   ├── curve
+│   │   ╰── raster
+│   ╰── paint
+[38;2;212;179;90m+4 more · layout · measure · wrap · par…[39m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · outline-overflow · full · 80 1`] = `
+"── tree · outline-overflow · measured 6 · rendered 6
+root
+├── render
+│   ├── curve
+│   │   ╰── raster
+│   ╰── paint
+[38;2;212;179;90m+4 more · layout · measure · wrap · parse[39m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down · ascii-1bit-wide · 40 1`] = `
+"── tree · top-down · measured 7 · rendered 7
+                   root
+         +----------+--+--------+
+       render        layout   parse
+      +--+---+      +--+--+
+    curve  paint measure wrap
+      |
+    raster"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down · ascii-1bit-wide · 80 1`] = `
+"── tree · top-down · measured 7 · rendered 7
+                                       root
+                             +----------+--+--------+
+                           render        layout   parse
+                          +--+---+      +--+--+
+                        curve  paint measure wrap
+                          |
+                        raster"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down · full · 40 1`] = `
+"── tree · top-down · measured 7 · rendered 7
+                   root
+         ╭──────────┴──┬────────╮
+       render        layout   parse
+      ╭──┴───╮      ╭──┴──╮
+    curve  paint measure wrap
+      │
+    raster"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down · full · 80 1`] = `
+"── tree · top-down · measured 7 · rendered 7
+                                       root
+                             ╭──────────┴──┬────────╮
+                           render        layout   parse
+                          ╭──┴───╮      ╭──┴──╮
+                        curve  paint measure wrap
+                          │
+                        raster"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down-overflow · ascii-1bit-wide · 40 1`] = `
+"── tree · top-down-overflow · measured 4 · rendered 4
+                  root
+            +------+------+
+          render layout parse
+[1m+5 more - curve - raster - paint - meas~[22m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down-overflow · ascii-1bit-wide · 80 1`] = `
+"── tree · top-down-overflow · measured 4 · rendered 4
+                                      root
+                                +------+------+
+                              render layout parse
+[1m+5 more - curve - raster - paint - measure - wrap[22m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down-overflow · full · 40 1`] = `
+"── tree · top-down-overflow · measured 4 · rendered 4
+                  root
+            ╭──────┼──────╮
+          render layout parse
+[38;2;212;179;90m+5 more · curve · raster · paint · meas…[39m"
+`;
+
+exports[`golden frames — the three tree layouts > tree · top-down-overflow · full · 80 1`] = `
+"── tree · top-down-overflow · measured 4 · rendered 4
+                                      root
+                                ╭──────┼──────╮
+                              render layout parse
+[38;2;212;179;90m+5 more · curve · raster · paint · measure · wrap[39m"
+`;
+
 exports[`golden frames — the vertical arm > bar · vertical · ascii-1bit-wide · 40 1`] = `
 "── bar · vertical · measured 12 · rendered 12
    [2m+-----------------------------------+[22m

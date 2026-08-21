@@ -309,6 +309,33 @@ describe("TR11 (C12 I57, §3n): a wide codepoint is measured with `cells()`", ()
   });
 });
 
+describe("TR13 (C12 I57): a glyph that claims *last* is read from the real tree", () => {
+  it("a node whose later siblings were dropped still draws a branch", () => {
+    // **Found by reading the overflow frame.** Computed over the kept set it
+    // drew `╰── render` on a root whose `layout` and `parse` were named in the
+    // notice one row below, so the glyph and the notice contradicted each other.
+    // The other two layouts have no such glyph — an absent fan claims nothing.
+    const f = frame(CATALOGUE, 6, 40, { treeLayout: "outline" });
+    expect(f[1]).toMatch(/^├── render/u);
+    expect(f[4]).toMatch(/^│   ╰── paint/u);
+    expect(notice(f)).toContain("layout");
+  });
+
+  it("and the claim is true where it is made — the last child keeps its elbow", () => {
+    const f = frame(CATALOGUE, 9, 40, { treeLayout: "outline" });
+    expect(f[8]).toMatch(/^╰── parse/u);
+    expect(f[1]).toMatch(/^├── render/u);
+  });
+
+  it("invisible at ascii, where both forms substitute to `+`", () => {
+    // The arm the defect could not be found on, stated so the row's reach is
+    // recorded rather than assumed: `glyphForMask`'s ASCII table maps `├` and
+    // `╰` to the same `+`, so no frame there could have shown it.
+    const f = frame(CATALOGUE, 6, 40, { treeLayout: "outline" }, { unicode: "ascii" });
+    expect(f[1]).toMatch(/^\+-- render/u);
+  });
+});
+
 describe("TR12 (C04 I65): the member's gates, and the values agree with the code", () => {
   const errs = (form: string, extra: object): readonly string[] => {
     const r = validateDocument({

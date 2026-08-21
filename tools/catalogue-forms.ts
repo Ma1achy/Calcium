@@ -825,10 +825,84 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   tree: {
-    // The catalogue's own tree, and §3ah.1's measurements are taken on it: 9
-    // nodes, 5 leaves, depth 3, leaf names totalling 27 cells.
+    // The catalogue's own tree, and C12 §3ah.1's measurements are taken on it:
+    // 9 nodes, 5 leaves, depth 3, leaf names totalling 27 cells. **Three
+    // layouts at their natural size and three overflowing**, because the
+    // overflow row competes with something different in each — one more line in
+    // a list, a row under a fan that could read as a child, or a row beside the
+    // deepest column — and one frame cannot answer for the other two.
     default: {
       form: "tree", height: 7, series: [],
+      hierarchy: {
+      label: "root",
+      children: [
+        { label: "render", children: [
+          { label: "curve", children: [{ label: "raster" }] },
+          { label: "paint" },
+        ] },
+        { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+        { label: "parse" },
+      ],
+    },
+    },
+    "left-right": {
+      form: "tree", height: 5, series: [], treeLayout: "leftRight",
+      hierarchy: {
+      label: "root",
+      children: [
+        { label: "render", children: [
+          { label: "curve", children: [{ label: "raster" }] },
+          { label: "paint" },
+        ] },
+        { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+        { label: "parse" },
+      ],
+    },
+    },
+    outline: {
+      form: "tree", height: 9, series: [], treeLayout: "outline",
+      hierarchy: {
+      label: "root",
+      children: [
+        { label: "render", children: [
+          { label: "curve", children: [{ label: "raster" }] },
+          { label: "paint" },
+        ] },
+        { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+        { label: "parse" },
+      ],
+    },
+    },
+    "overflow-top-down": {
+      form: "tree", height: 4, series: [], treeLayout: "topDown",
+      hierarchy: {
+      label: "root",
+      children: [
+        { label: "render", children: [
+          { label: "curve", children: [{ label: "raster" }] },
+          { label: "paint" },
+        ] },
+        { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+        { label: "parse" },
+      ],
+    },
+    },
+    "overflow-left-right": {
+      form: "tree", height: 3, series: [], treeLayout: "leftRight",
+      hierarchy: {
+      label: "root",
+      children: [
+        { label: "render", children: [
+          { label: "curve", children: [{ label: "raster" }] },
+          { label: "paint" },
+        ] },
+        { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+        { label: "parse" },
+      ],
+    },
+    },
+    "overflow-outline": {
+      form: "tree", height: 6, series: [], treeLayout: "outline",
       hierarchy: {
       label: "root",
       children: [

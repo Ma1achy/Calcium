@@ -392,10 +392,18 @@ function drawLeftRight(
 function drawOutline(
   nodes: readonly Flat[], kept: Kept, g: Grid, caps: Caps, corners: "rounded" | "sharp",
 ): void {
+  // **The real sibling list, not the kept one** — read off the overflow frame.
+  // `╰──` is a claim: *this is the last child*. Computed over what survived
+  // truncation it said `╰── render` on a root whose `layout` and `parse` were in
+  // the notice one row below, so the glyph and the notice contradicted each
+  // other. The other two layouts have no such glyph — an absent fan claims
+  // nothing — which is why this is the one layout the reading applies to, and
+  // why it is invisible at `unicode: "ascii"`, where both forms substitute to
+  // `+` and the distinction the claim is made in does not exist.
   const isLast = (i: number): boolean => {
     const parent = nodes[i]!.parent;
     if (parent < 0) return true; // cells-ok — a node index
-    const siblings = keptKids(nodes, kept, parent);
+    const siblings = nodes[parent]!.kids;
     return siblings[siblings.length - 1] === i; // cells-ok — a node index
   };
   // **Every one of these is `OUTLINE_INDENT` cells wide**, derived rather than

@@ -3779,10 +3779,44 @@ Three readings:
   Pass 2 has already spent the row, so pass 6 cannot widen anything, and the `+N` may carry names
   without re-entering §3ag.4's cycle.
 
-### 3ah.8a — what the mutation pass said, and one of the two indicted the source
+### 3ah.8a — what the instruments said, and each found something the other could not
 
-Eleven mutations, all caught — and **two were caught by a row other than the one that named them**,
-which is the pass's other job.
+**The frame read the overflow at all three layouts, because the notice competes with something
+different in each** — one more line in a list, a row under a fan that could read as a child of the
+node above it, or a row beside the deepest column. Six catalogue variants and twenty-four golden
+frames, and the finding is in the first of the three.
+
+**A glyph that claims *last* was computed over what survived.** The outline drew
+
+```
+root                          root
+╰── render                    ├── render
+    ├── curve         →       │   ├── curve
+    │   ╰── raster            │   │   ╰── raster
+    ╰── paint                 │   ╰── paint
++4 more · layout · …          +4 more · layout · …
+```
+
+and `╰──` **is a claim**: *this is the last child of root*. `layout` and `parse` are named in the
+notice one row below, so the glyph and the notice contradicted each other, and the glyph is the one
+a reader believes. Read from the real sibling list it says `├──`, which is true, and the notice
+completes it rather than arguing with it.
+
+**Only one layout could have the defect *fixed*, and that is the ruling rather than the repair.**
+The top-down figure draws no glyph about siblings at all — a truncated level leaves parents with no
+fan, and an absent fan claims nothing. The left-to-right figure **does** make a claim: `root──render`
+is a straight run where three children would give `┬ ├ ╰`, so it says *one child* about a root that
+has three. It is not fixed, and the reason is that its glyph is an **edge** where the outline's is a
+**list marker**: an edge needs a row at the other end, and the only way to say *more below* is to
+extend the vertical run past the last drawn row — into the notice, which would make the notice read
+as a child. That is the exact failure this read was looking for, arriving as the cost of the repair
+rather than as the defect. So: where the alphabet's distinction is about the sibling **list**, take
+it from the tree; where it is about an **edge**, the absent fan plus the notice is the answer. **And it is invisible at `unicode: "ascii"`**, where
+`glyphForMask` substitutes both forms to `+`: the arm that cannot show it is the one four of the
+twelve frames were drawn on.
+
+**Twelve mutations, all caught** — and two first landed on rows other than the ones that named
+them, which is the pass's other job.
 
 - **`OUTLINE_INDENT` governed the measurement and half the drawing.** The constant sized the
   layout and padded the blank continuation, while the bar and the branch were written out as
@@ -5240,6 +5274,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.121** (I57): `TR8` — a single-node tree draws one name, no edge and no notice, **and the three layouts produce identical frames** — the row exists to keep a fixture honest, since a single node discriminates no layout at all.
 - **T1.122** (I57, C04 I64): `TR9` — `value` changes no frame — two trees differing only in it are byte-identical — **and `label: "gc (2.1s)"` does change it**, which asserts the workaround rather than describing it.
 - **T1.123** (I57): `TR10` — every node drawn is named once, no name twice, and every parent sits over the span of its own children — on an asymmetric tree where a midpoint and a first-child position differ, so the two placements are not satisfied by one assertion.
+- **T1.125** (I57): `TR13` — the outline's *last child* glyph is read from the **real** sibling list: a node whose later siblings were truncated still draws `├──`, and the last one drawn keeps its `╰──` where the claim is true. **Found by reading the overflow frame** (§3ah.8a), and the row records the arm it could not have been found on — at `unicode: "ascii"` both forms substitute to `+`, so no frame there distinguishes them.
 - **T1.124** (I57): `TR11` — a wide codepoint in a label is measured with `cells()`, and the cell behind it is not written into (§3n, T1.104).
 - **T2.9** (I56): **`HAS_X_TITLE` is re-measured rather than trusted** — every `true` renders its title and keeps `measure === rendered`, every `false` is refused at the gate, and the count of drawing forms is asserted at 26 so the sweep cannot pass against an all-`false` record. This is the row that makes the record safe to edit.
 - **T2.10** (I34) — `PD1`–`PD3`: every form with no ladder refuses `plotDetail` at **both** gates, for all three values, with the count asserted at **42** so the row cannot pass against an all-`true` record; `boxplot` and `violin` still accept all three; **absent is accepted everywhere**, which is the row that says why the defect was invisible; and `HAS_DETAIL_RUNGS` agrees with `RUNG_FORMS` form for form, read from `definition.ts` rather than restated, so the two halves cannot both be a copy of one mistake.
@@ -5320,7 +5355,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.67** (I57): placement before truncation → T1.118 fails, and every count in the frame still agrees.
 - **T6.68** (I57): the layout re-chosen after the notice takes its row → T1.117 fails, and the notice removes itself on exactly the budgets where it was needed.
 - **T6.69** (I57): a fan of one drawn as a zero-length bar → T1.119 fails, and a branch glyph appears where nothing branches.
-- **T6.70** (I57): eleven mutations in `c12-tree.mjs`, all caught — and the two that first landed on rows other than the ones they named are §3ah.8a: `OUTLINE_INDENT` set to 2 was caught by a **natural-size** row because the constant governed the measurement and only half the drawing, and the shared drop tail removed was caught by a **preference** row because every row asserting *something was dropped* is satisfied by dropping everything. Both are fixed at the thing they indict rather than at the row.
+- **T6.70** (I57): twelve mutations in `c12-tree.mjs`, all caught — including the outline's last-child glyph computed over the kept set (→ `TR13`), the frame-read finding wired to a row — and the two that first landed on rows other than the ones they named are §3ah.8a: `OUTLINE_INDENT` set to 2 was caught by a **natural-size** row because the constant governed the measurement and only half the drawing, and the shared drop tail removed was caught by a **preference** row because every row asserting *something was dropped* is satisfied by dropping everything. Both are fixed at the thing they indict rather than at the row.
 - **T6.32** (I48, I37): placing the callout with `rowOf(v, range, areaRows)` rather than from the series' ink → YC2 fails, and one value in six lands a row off the line it names, worst at the ends of the range. **Nothing else sees it**: every count, colour and width assertion passes, and the number is beside the right row at the widths a fixture happens to use.
 - **T6.33** (I48, I8): dropping the `+` where two callouts share a row → YC4 fails, and a series' reading disappears with the frame asserting nothing about it.
 - **T6.34** (I48): letting a callout take the **left** gutter's row as well → YC3 fails, and `yAxis: "both"` loses a reading on the one row where it has two chances to keep it.

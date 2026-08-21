@@ -151,6 +151,61 @@ describe("golden frames — the candlestick style", () => {
   }
 });
 
+/**
+ * The three tree layouts, at their natural size and one row short of it
+ * (C12 I57, §3ah).
+ *
+ * **Its own corpus because `ONE_PER_FORM`'s tree is one block**, and the form's
+ * whole subject is that the same information has three drawings. The natural
+ * heights are §3ah.1's measured table — 7, 5 and 9 — and the overflow rows are
+ * one short of each, because **the notice competes with something different in
+ * every layout**: one more line in a list, a row under a fan that could read as
+ * a child of the node above it, or a row beside the deepest column. One frame
+ * cannot answer for the other two, which is why there are six here and not two.
+ */
+const TREE_FIXTURE = {
+  label: "root",
+  children: [
+    { label: "render", children: [{ label: "curve", children: [{ label: "raster" }] }, { label: "paint" }] },
+    { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+    { label: "parse" },
+  ],
+};
+
+const TREES = [
+  ["top-down", { height: 7, treeLayout: "topDown" }],
+  ["left-to-right", { height: 5, treeLayout: "leftRight" }],
+  ["outline", { height: 9, treeLayout: "outline" }],
+  ["top-down-overflow", { height: 4, treeLayout: "topDown" }],
+  ["left-to-right-overflow", { height: 3, treeLayout: "leftRight" }],
+  ["outline-overflow", { height: 6, treeLayout: "outline" }],
+] as const;
+
+describe("golden frames — the three tree layouts", () => {
+  for (const [name, spec] of TREES) {
+    for (const mode of MODES) {
+      for (const width of WIDTHS) {
+        it(`tree · ${name} · ${mode.name} · ${String(width)}`, () => {
+          const b = block({
+            kind: "plot", id: `t-${name}`, form: "tree", series: [], hierarchy: TREE_FIXTURE, ...spec,
+          } as never);
+          const kit = measurable({
+            definitions: [plotDefinition],
+            theme: DARK_THEME,
+            capabilities: mode.capabilities,
+          });
+          const lines = kit.renderToLines(b, width);
+          const frame = [
+            `── tree · ${name} · measured ${String(kit.measure(b, width))} · rendered ${String(lines.length)}`, // cells-ok
+            ...lines,
+          ].join("\n");
+          expect(frame).toMatchSnapshot();
+        });
+      }
+    }
+  }
+});
+
 describe("golden frames — the vertical arm", () => {
   for (const [form, spec] of VERTICAL) {
     for (const mode of MODES) {
