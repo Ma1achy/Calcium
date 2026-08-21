@@ -11497,3 +11497,84 @@ than sitting unreferenced in `docs/catalogue/status/`.
 **The habit this leaves is one line: when closing a finding, rewrite the claim, then append the
 history.** Doing it in the other order is what produced I60, and the other order is the one that
 comes naturally.
+
+---
+
+## F234 — the 1 Hz counter was the weak joint on paper, and it is 0.4 frames a second ★★★☆☆
+
+The elapsed counter S5 needs writes a document once a second, bumps `rev`, misses the cache and
+rewrites the block. **Named as the joint to watch, and measured before anything rested on it.**
+
+**Ten seconds of fake time, 90 × 24, frames counted as writes reaching the terminal:**
+
+```
+                       frames   polls
+still,    no patch        0       0     ← the instrument responds
+still,    1 Hz           10      10     ← a patch costs exactly one frame, alone
+spinner,  no patch       55       0
+spinner,  1 Hz           59      10     ← the 1 Hz write costs FOUR, not ten
+spinner,  10 Hz          99     100
+```
+
+**Six of the ten writes cost nothing**: C03 coalesces the `stream` commit into a spinner frame
+that was already going to happen. The marginal cost of the counter beside its own spinner is
+**0.4 frames a second against 5.5 — seven per cent.**
+
+**And the two control arms are why the number can be believed.** *Nothing animating, no patch* is
+**0 frames** — C22 I60a's claim measured end to end rather than reasoned from the arming code —
+and *patch alone* is exactly 10. A fixture that could not tell those apart could not tell the
+other three apart either.
+
+**The inversion is the point: the counter is cheapest exactly when it is visible.** A loading
+status animates, so the ticker is armed, so the write lands inside a frame that was already
+scheduled. There is no case where the counter is expensive and also on screen.
+
+**So coarsening is not a cost argument, and the guard survives on a different one.** `elapsed()`
+never gets coarser than the second — `99s`, then `1m 40s`, then `60m 0s` — so a 1 Hz write is
+needed for as long as the box is up, and a ladder would buy 0.3 frames a second. What the guard
+is for is that **a write which changes nothing observable is still a `rev` bump**: it invalidates
+C14's height cache and tells the transcript the document changed when it did not. A hygiene
+argument, not a throughput one, and it is the honest one to write down — *a justification the
+next person checks and cannot reproduce is a justification they delete.*
+
+**The frame read settled the height, and the arithmetic could not have.** Both defaults land
+inside `livePanel`, which already draws a border and a title:
+
+```
+H=1   │fetching containers                    │   message only — NO SPINNER
+H=2   │fetching containers                    │   ✓
+      │⠸ loading (4s)                         │
+H=3   │┌─────────────────────────────────────┐│   a second border inside the panel's,
+      ││fetching containers                  ││   one row spent, nothing gained
+H=4   ││─────────── ERROR ───────────────────││   the tag, at two nested borders
+```
+
+**H=2**, and at 1-bit it degrades to `!`, `/` and `+ - |` with the word carrying it.
+
+**The `error` arm is H=1, and that came out of the same read.** A state with no activity line
+draws a blank second row at H=2 — and **the first reading of that was wrong.** It looked like the
+ladder failing to fill a row it had allocated; measuring a long message showed it wraps into
+exactly that row, so the blank is a declared-height box with one row of content, which is I31
+working. **It is only a defect where L4 picks the height itself** — and `renderError` with
+`retryInMs === null` is precisely that case, so its arm is `error` at 1 rather than `retrying`
+at 2. Nothing about the ladder needs to change.
+
+**And I31's three-numbers rule turns out to be implemented rather than only ruled.** The
+classification table's watch row — *`retrying` with `elapsedMs` set* — was open on whether *ruled
+against* meant *unreachable*. It is neither: the block constructs fine and `activityLine` silently
+prefers the countdown.
+
+```
+retrying + elapsedMs  ->  |▲ msg|  |⠸ retrying in 8s (attempt 2)|   elapsed dropped
+loading  + retryInMs  ->  |msg|    |⠸ loading (4s)|                 countdown dropped
+```
+
+**The ladder has an answer and it is the right one**, which is what the table was for — *ruled
+against* and *unreachable* are different states, and only running it says which.
+
+**The last one is a defect S5 would have introduced.** `retrying` **without** `retryInMs` draws
+no activity line **and therefore no spinner** — `|▲ msg|  ||` — and `refresh.ts` passes
+`retryIn = null` for every one-shot (`intervalMs === 0`). Mapping `renderError`'s default to
+`retrying` unconditionally would have given a one-shot's failure a blank row where the spinner
+goes. The state union already carries the distinction; `retryInMs === null` **means** no retry is
+coming, and the arm is `error`.
