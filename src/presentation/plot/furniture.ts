@@ -696,6 +696,13 @@ export function legendPlacement(
 ): "above" | "below" | "left" | "right" | null {
   if (block.legend === false) return null;
   if (block.legend !== undefined) return block.legend;
+  // **A name at the line's end *is* the legend** (C12 I55, §3ag A2). C12 I48
+  // ruled that a callout does not replace one — *it names a value where a legend
+  // names an identity* — and that sentence selects rather than excludes: the
+  // arms that write the identity answer the question the legend answers, and
+  // `"last"` still does not. Same shape as the 1-bit strip suppression below,
+  // arriving for a second reason; an explicit `legend:` has already won above.
+  if (block.yCallout === "name" || block.yCallout === "both") return null;
   const count = (block.segments?.length ?? 0) || block.series.length; // cells-ok — a series count
   if (!SHARES_CELLS[block.form] || count <= 1) return null; // cells-ok — a series count
   // **Not where the form has already labelled its own rows.** Below the colour

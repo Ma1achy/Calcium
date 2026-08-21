@@ -1202,8 +1202,9 @@ function plotAxisErrors(
   if (ya !== undefined && !known) {
     e.push(`${at}: "yAxis" must be "left", "right", "both" or false`);
   }
-  if (yc !== undefined && yc !== "none" && yc !== "last") {
-    e.push(`${at}: "yCallout" must be "none" or "last"`);
+  const DRAWS = new Set(["last", "name", "both"]);
+  if (yc !== undefined && yc !== "none" && !DRAWS.has(yc as string)) {
+    e.push(`${at}: "yCallout" must be "none", "last", "name" or "both"`);
   }
   if (ya !== undefined && known && ya !== "left" && HAS_Y_GUTTER[form as PlotForm] === false) {
     e.push(
@@ -1225,16 +1226,21 @@ function plotAxisErrors(
         `tell which row is which`,
     );
   }
-  if (yc !== "last") return;
+  // **Every value that draws, not the one that used to be the only one.** This
+  // read `yc !== "last"`, which is the narrow check `checkHeatmap` was widened
+  // out of and `ya === false && IS_MATRIX` above records a second instance of:
+  // two new drawing arms would have walked past both refusals in silence, on
+  // exactly the forms and gutters they were written to refuse.
+  if (!DRAWS.has(yc as string)) return;
   if (HAS_CALLOUT[form as PlotForm] === false) {
     e.push(
-      `${at}: "yCallout" is "last" on form "${String(form)}" (C04 I60) — a callout names ` +
-        `where one series ends, and that form draws no per-series curve to end`,
+      `${at}: "yCallout" is "${String(yc)}" on form "${String(form)}" (C04 I60) — a callout ` +
+        `names where one series ends, and that form draws no per-series curve to end`,
     );
   }
   if (ya === undefined || ya === "left" || ya === false) {
     e.push(
-      `${at}: "yCallout" is "last" with "yAxis" of "${ya === undefined ? "left" : String(ya)}" ` +
+      `${at}: "yCallout" is "${String(yc)}" with "yAxis" of "${ya === undefined ? "left" : String(ya)}" ` +
         `(C04 I60) — a callout is written in the right gutter and there is none; widen ` +
         `"yAxis" to "right" or "both"`,
     );

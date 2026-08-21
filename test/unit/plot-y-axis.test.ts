@@ -12,6 +12,7 @@ import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
+import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
 const plain = (l: string): string => l.replace(/\x1b\[[0-9;]*m/gu, "");
@@ -397,5 +398,209 @@ describe("YC9 (C12 I48, I4): a trailing gap names the last finite sample", () =>
       .filter((r) => EDGE.test(r));
     expect(gutters(g[calloutRows(g)[0]!]!).right).toBe("22");
     expect(calloutRows(g)).toEqual(calloutRows(n));
+  });
+});
+
+/**
+ * TL1–TL3: the same anchor carrying a name (C12 I55, §3ag).
+ *
+ * **`"name"` and `"both"` are asserted against `"last"` rather than against a
+ * fixed row**, because the claim is that they are one mechanism: a row set that
+ * agreed with a hand-written expectation and disagreed with `"last"` would be
+ * two mechanisms that happen to land together on this fixture.
+ */
+describe("TL1 (C12 I55): a name takes the value's anchor, not its own", () => {
+  it("the callout rows are identical for `last`, `name` and `both`, at eight heights", () => {
+    for (const height of [4, 5, 6, 8, 10, 12, 16, 20]) {
+      const at = (yCallout: string): number[] =>
+        calloutRows(bare({ height, yAxis: "both", yCallout, series: [
+          { values: wave(40), label: "alpha" },
+        ] }).filter((r) => EDGE.test(r)));
+      const last = at("last");
+      // The fixture responds: there is something to compare at every height.
+      expect(last.length, `height ${String(height)}`).toBeGreaterThan(0);
+      expect(at("name"), `height ${String(height)}`).toEqual(last);
+      expect(at("both"), `height ${String(height)}`).toEqual(last);
+    }
+  });
+});
+
+describe("TL2 (C12 I55): `both` writes the pair, and a shared row still says so", () => {
+  it("the name leads and the number ends the string", () => {
+    const frame = bare({ yAxis: "both", yCallout: "both", series: [
+      { values: wave(40), label: "alpha" },
+    ] }).filter((r) => EDGE.test(r));
+    const text = gutters(frame[calloutRows(frame)[0]!]!).right;
+    expect(text).toMatch(/^alpha /u);
+    expect(text).toMatch(/[\d.]+$/u);
+  });
+
+  it("two series ending on one row give the later, plus a one-cell `+` (C12 I48)", () => {
+    // Two series with identical values end on the same row by construction, so
+    // the collision is the fixture rather than an accident of the sampling.
+    const same = wave(40);
+    const frame = bare({
+      height: 6, yAxis: "both", yCallout: "both", yMin: 0, yMax: 100,
+      series: [{ values: same, label: "alpha" }, { values: same, label: "beta" }],
+    }).filter((r) => EDGE.test(r));
+    const marks = calloutRows(frame);
+    expect(marks.length).toBe(1);
+    const text = gutters(frame[marks[0]!]!).right;
+    expect(text).toMatch(/^beta /u);
+    expect(text.endsWith("+")).toBe(true);
+    // **Not `+N`** — the count is what C12 I48 refused, because it cannot be
+    // sized before the column it is being sized for (§3ag.4).
+    expect(text).not.toMatch(/\+\d/u);
+  });
+});
+
+describe("TL3 (C12 I55): a name at the line's end is the legend, and `last` is not", () => {
+  const twoSeries = [
+    { values: wave(40), label: "alpha" },
+    { values: wave(40).map((v) => 100 - v), label: "beta" },
+  ];
+  const drawn = (extra: object): string[] =>
+    kit().renderToLines(block({
+      kind: "plot", id: "tl3", form: "line", height: 8, axes: true,
+      yAxis: "both", series: twoSeries, ...extra,
+    }), 60).map(plain);
+  const hasSwatchFor = (rowsIn: readonly string[]): boolean =>
+    rowsIn.some((r) => gutters(r).right.includes("alpha"));
+
+  it("`last` keeps the automatic legend — it names a value, not an identity", () => {
+    expect(hasSwatchFor(drawn({ yCallout: "last" }))).toBe(true);
+  });
+
+  it("`name` and `both` suppress it, because the identity is already on the line", () => {
+    for (const yCallout of ["name", "both"] as const) {
+      const b0 = block({
+        kind: "plot", id: "tl3", form: "line", height: 8, axes: true,
+        yAxis: "both", series: twoSeries, yCallout,
+      });
+      // **The rule and the frame, because neither alone is the claim.** The
+      // placement asserts what was decided; the frame asserts that the decision
+      // reached the render — a seam-level row passes on the day nothing calls it.
+      expect(legendPlacement(b0 as Parameters<typeof legendPlacement>[0], FULL_CAPS), yCallout)
+        .toBeNull();
+      const frame = drawn({ yCallout });
+      expect(frame.join("\n"), yCallout).toContain("alpha");
+      expect(calloutRows(frame.filter((r) => EDGE.test(r))).length, yCallout).toBeGreaterThan(0);
+    }
+  });
+
+  it("`last` is not suppressed at the rule, which is where the two arms part", () => {
+    const b0 = block({
+      kind: "plot", id: "tl3", form: "line", height: 8, axes: true,
+      yAxis: "both", series: twoSeries, yCallout: "last",
+    });
+    expect(legendPlacement(b0 as Parameters<typeof legendPlacement>[0], FULL_CAPS)).toBe("right");
+  });
+
+  it("an explicit `legend` still draws, exactly as it does for the 1-bit strips", () => {
+    const frame = drawn({ yCallout: "name", legend: "right" });
+    expect(frame.join("\n")).toContain("beta");
+    // **The width is the observable**: an explicit legend takes columns the
+    // suppressed one does not, so the two frames cannot be the same shape.
+    expect(frame.join("\n")).not.toBe(drawn({ yCallout: "name" }).join("\n"));
+  });
+});
+
+/**
+ * TL4–TL5: the two survivors, and both were findings about the tests.
+ *
+ * **C04 I60's `yCallout` refusals had no row at all.** Reverting `DRAWS` to
+ * `yc !== "last"` killed nothing, because nothing anywhere asserted that a
+ * callout is refused on a form with no curve to end or with no right gutter to
+ * write in — so the widening this commit made was untestable and the rule it
+ * widened was untested.
+ */
+describe("TL4 (C12 I55, C04 I60): every drawing arm reaches the refusals", () => {
+  const errs = (plot: object): readonly string[] => {
+    const r = validateDocument({
+      version: 1,
+      blocks: [{ kind: "plot", id: "p", form: "line", series: [{ values: [1, 2] }], height: 4, ...plot }],
+    });
+    return r.ok ? [] : r.error.filter((m) => /yCallout/u.test(m));
+  };
+
+  it("no right gutter refuses `last`, `name` and `both` alike", () => {
+    for (const yCallout of ["last", "name", "both"] as const) {
+      expect(errs({ yCallout }), yCallout).not.toEqual([]);
+      expect(errs({ yCallout }).join(" "), yCallout).toContain(yCallout);
+    }
+    // The fixture responds: the same block with a right gutter passes the rule.
+    for (const yCallout of ["last", "name", "both"] as const) {
+      expect(errs({ yCallout, yAxis: "both" }), yCallout).toEqual([]);
+    }
+  });
+
+  it("a form with no per-series curve refuses all three", () => {
+    for (const yCallout of ["last", "name", "both"] as const) {
+      const e = errs({ form: "treemap", yAxis: "both", yCallout });
+      expect(e.join(" "), yCallout).toMatch(/no per-series curve/u);
+    }
+  });
+
+  it("`none` and absent are refused by neither", () => {
+    expect(errs({ yCallout: "none" })).toEqual([]);
+    expect(errs({})).toEqual([]);
+  });
+
+  it("an unknown value is named with all four", () => {
+    expect(errs({ yCallout: "end" }).join(" ")).toContain('"none", "last", "name" or "both"');
+  });
+});
+
+describe("TL5 (C12 I55, C12 I25): an unlabelled series is named, never blank", () => {
+  it("two unlabelled series take the legend's own wording", () => {
+    // **C12 I25 in the gutter rather than in the swatch.** Two blank callouts
+    // are told apart by colour alone, which is the rule's whole subject — and
+    // the legend already answers it with `series N`, so a second answer here
+    // would be a second vocabulary for one fact.
+    const same = wave(40);
+    const frame = bare({
+      height: 6, yAxis: "both", yCallout: "name", yMin: 0, yMax: 100,
+      series: [{ values: same }, { values: same.map((v) => 100 - v) }],
+    }).filter((r) => EDGE.test(r));
+    const texts = calloutRows(frame).map((i) => gutters(frame[i]!).right);
+    expect(texts.length).toBe(2);
+    for (const t of texts) expect(t).not.toBe("");
+    expect(new Set(texts).size).toBe(2);
+  });
+});
+
+describe("TL6 (C12 I55, C12 I6): below the colour floor the strips already say the name", () => {
+  const two = [
+    { values: wave(40), label: "alpha" },
+    { values: wave(40).map((v) => 100 - v), label: "beta" },
+  ];
+  const at = (yCallout: string): string[] =>
+    bare({ height: 8, yAxis: "both", yCallout, series: two }, 60, MONO_CAPS)
+      .filter((r) => EDGE.test(r));
+
+  it("`name` writes no callout, because the gutter already holds it twice", () => {
+    // **Found by reading the frame and by nothing else.** The positional family
+    // stacks below the colour floor and `stackedRows` writes each name in the y
+    // gutter; C12 I47 then mirrors that name to the right. A name callout was
+    // the third copy on the same row.
+    const rowsIn = at("name");
+    expect(calloutRows(rowsIn)).toEqual([]);
+    // The fixture responds twice over: the names are present from the strips,
+    // and the same block above the colour floor does draw callouts.
+    expect(rowsIn.join("\n")).toContain("alpha");
+    expect(calloutRows(bare({ height: 8, yAxis: "both", yCallout: "name", series: two })
+      .filter((r) => EDGE.test(r))).length).toBeGreaterThan(0);
+  });
+
+  it("`both` degrades to the value, which is the one thing the strips do not say", () => {
+    const both = at("both");
+    const last = at("last");
+    expect(calloutRows(both)).toEqual(calloutRows(last));
+    for (const i of calloutRows(both)) {
+      expect(gutters(both[i]!).right).toBe(gutters(last[i]!).right);
+    }
+    // And it is a number, not a name — or the equality above would hold with
+    // both arms writing the same wrong thing.
+    expect(gutters(both[calloutRows(both)[0]!]!).right).toMatch(/^[\d.]+$/u);
   });
 });

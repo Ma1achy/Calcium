@@ -205,6 +205,21 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "line", height: 8, axes: true, plotFrame: "corners", legend: false,
       series: [s(sin50, "alpha")],
     },
+    // C12 I55 §3ag — the two arms that write an identity at the line's end and
+    // take the automatic legend with them. `callout-last` is the value arm for
+    // comparison, since the whole claim is that the three share one anchor.
+    "callout-last": {
+      form: "line", height: 8, axes: true, yAxis: "both", yCallout: "last",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],
+    },
+    "callout-name": {
+      form: "line", height: 8, axes: true, yAxis: "both", yCallout: "name",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],
+    },
+    "callout-both": {
+      form: "line", height: 8, axes: true, yAxis: "both", yCallout: "both",
+      series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],
+    },
     "frame-grid": {
       form: "line", height: 8, axes: true, plotFrame: "grid", legend: false,
       xLabels: ["epoch 0", "epoch 20", "now"],

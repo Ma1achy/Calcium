@@ -1020,7 +1020,24 @@ export type Plot = Readonly<{
    * opt-in, and it needs a right gutter to write in — `yCallout` with
    * `yAxis: "left"` is refused rather than quietly widening the axis.
    */
-  yCallout?: "none" | "last";
+  /**
+   * **`"name"` and `"both"` are the same mechanism, not a second one**
+   * (C12 I55, §3ag). A value at the line's end and a *name* at the line's end
+   * take the same anchor — the series' own last inked row, read from ink — the
+   * same collision rule, the same right gutter and the same 1-bit carrier, so a
+   * second field would be a second copy of C12 I48 to keep in step.
+   *
+   * **`"name"` and `"both"` suppress the automatic legend and `"last"` does
+   * not**, because only they answer the question a legend answers. C12 I48 ruled
+   * that a callout *does not* replace the legend — *it names a value where a
+   * legend names an identity* — and a name at the line's end names the identity,
+   * so the sentence selects rather than excludes. An explicit `legend:` still
+   * draws, exactly as it does for the positional family's 1-bit strips.
+   *
+   * **Where the pair does not fit, the number survives**: a live chart is read
+   * for the value, which is C12 I48's own argument for the field existing.
+   */
+  yCallout?: "none" | "last" | "name" | "both";
   /**
    * The cells the figure is drawn in, narrower than the frame it sits in
    * (C04 I62, C12 §3ab).

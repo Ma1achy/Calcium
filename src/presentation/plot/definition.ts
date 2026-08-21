@@ -864,15 +864,70 @@ function withCallouts(layout: Layout, callouts: ReadonlyMap<number, Callout>): L
  * from the ink afterwards, and there is no second pass. The shared mark is one
  * cell and only reachable with a second series to lose one.
  */
-function calloutWidth(block: Plot, ambiguous: AmbiguousWidth): number {
-  if (block.yCallout !== "last") return 0;
+function calloutWidth(block: Plot, ambiguous: AmbiguousWidth, stacked: boolean): number {
+  if (!calloutDraws(block)) return 0;
   let widest = 0; // cells-ok — a cell width
-  for (const s of block.series) {
-    const v = lastFinite(s.values);
-    if (v === null) continue;
-    widest = Math.max(widest, cells(formatReadout(v, block.yFormat), ambiguous)); // cells-ok — a cell width
+  for (const [i, s] of block.series.entries()) { // cells-ok — a series index
+    const text = calloutTextFor(block, s, i, stacked);
+    if (text === null) continue;
+    widest = Math.max(widest, cells(text, ambiguous)); // cells-ok — a cell width
   }
   return widest === 0 ? 0 : widest + (block.series.length > 1 ? 1 : 0); // cells-ok — a series count
+}
+
+/** Whether the field asks for anything to be written (C12 I55). */
+function calloutDraws(block: Plot): boolean {
+  return block.yCallout === "last" || block.yCallout === "name" || block.yCallout === "both";
+}
+
+/**
+ * Whether the positional family has stopped overlaying and stacked into
+ * labelled strips (I6, I7).
+ *
+ * **One definition, because two consumers now branch on it** — the renderer,
+ * which stacks, and the callout, which must not repeat the name the stacking
+ * already wrote. `legendPlacement` asks the same question of the same rung one
+ * file along and suppresses the legend for the same reason.
+ */
+function stacksAtOneBit(block: Plot, caps: Pick<TerminalCapabilities, "colourDepth">): boolean {
+  return caps.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
+}
+
+/**
+ * What one series' callout says, or nothing where it has nothing to say.
+ *
+ * **One function for the width and the placement**, because they are the same
+ * string measured and then written: `legendEntries`' own comment records what a
+ * second door to the same fact cost there — a swatch drawing a colour the
+ * legend did not name — and a gutter sized from one string and filled with
+ * another is that defect with the cells instead of the colour.
+ *
+ * **A series with no finite value has no *value* and still has a name**, so
+ * `"name"` answers where `"last"` does not: the row a name is written on is the
+ * row that series' ink ends on, and a series with no ink is dropped by
+ * `lastInkRow` rather than here.
+ */
+function calloutTextFor(block: Plot, s: Series, index: number, stacked: boolean): string | null {
+  const name = s.label ?? `series ${String(index + 1)}`;
+  // **Where the form has already labelled its own rows, an identity at the
+  // line's end is the third copy of it** — found by reading the frame, not by
+  // the walk. Below the colour floor the positional family stacks into strips
+  // and `stackedRows` writes each series' name in the y gutter; with
+  // `yAxis: "both"` I47 mirrors that name to the right as well. So `"name"`
+  // wrote `alpha` into a row already reading `alpha … alpha`.
+  //
+  // `"name"` therefore writes nothing there and `"both"` degrades to the value,
+  // which is still the one thing the strips do not say. This is exactly the
+  // rung `legendPlacement` already declines at, arriving for the same reason:
+  // *not where the form has already labelled its own rows*.
+  if (block.yCallout === "name") return stacked ? null : name;
+  const v = lastFinite(s.values);
+  if (v === null) return null;
+  const value = formatReadout(v, block.yFormat);
+  // **The name first and the number last, and the number is what survives a
+  // cut** (§3ag A1): a live chart is read for the value, which is C12 I48's own
+  // argument for the field existing at all.
+  return block.yCallout === "both" && !stacked ? `${name} ${value}` : value;
 }
 
 /**
@@ -891,24 +946,21 @@ function calloutInto(
   glyphRows: readonly string[],
   seriesIndex: number,
   layout: Layout,
+  stacked: boolean,
   offset = 0,
 ): void {
-  if (block.yCallout !== "last" || (layout.rightColumn ?? 0) === 0) return;
+  if (!calloutDraws(block) || (layout.rightColumn ?? 0) === 0) return;
   const s = block.series[seriesIndex];
   if (s === undefined) return;
-  const v = lastFinite(s.values);
-  if (v === null) return;
+  const text = calloutTextFor(block, s, seriesIndex, stacked);
+  if (text === null) return;
   const row = lastInkRow(glyphRows, layout.areaWidth);
   if (row === null) return;
   const at = row + offset; // cells-ok — a row index
   // **The later series wins and the row says so** (I8). Not two rows, which
   // would change the count and break I1, and not a count, which cannot be
   // sized before the layout it is being sized for (§3x).
-  into.set(at, {
-    text: formatReadout(v, block.yFormat),
-    ref: refOf(s, seriesIndex),
-    shared: into.has(at),
-  });
+  into.set(at, { text, ref: refOf(s, seriesIndex), shared: into.has(at) });
 }
 
 /**
@@ -984,7 +1036,7 @@ function stackedRows(
   const callouts = new Map<number, Callout>();
   let base = 0; // cells-ok — a row index
   strips.forEach((strip, index) => {
-    calloutInto(callouts, block, strip.layer.glyphRows, index, layout, base);
+    calloutInto(callouts, block, strip.layer.glyphRows, index, layout, true, base);
     base += strip.rows; // cells-ok — a row count
   });
   const withRight = withCallouts(layout, callouts);
@@ -1115,7 +1167,7 @@ function overlaidRows(
   const callouts = new Map<number, Callout>();
   block.series.forEach((_s, index) => {
     const rows = layers[index]?.glyphRows;
-    if (rows !== undefined) calloutInto(callouts, block, rows, index, layout);
+    if (rows !== undefined) calloutInto(callouts, block, rows, index, layout, false);
   });
   const withRight = withCallouts(layout, callouts);
 
@@ -1267,7 +1319,7 @@ function layoutFor(
   // on the right, so sizing the left column for it would waste the cells at
   // every width. Same content, two widths, one measurement each.
   const right = sides.right // cells-ok — a cell width
-    ? Math.max(wanted, calloutWidth(block, caps.ambiguousWidth))
+    ? Math.max(wanted, calloutWidth(block, caps.ambiguousWidth, stacked))
     : 0;
   // **The frame's right edge is furniture and pays before the curve**, which is
   // the same rung it has always been: labels, then furniture, then the plot
@@ -1834,7 +1886,7 @@ function positionalForm(
   ctx: RenderContext,
   rasterise: Rasteriser,
 ): readonly string[] {
-  const stacked = ctx.capabilities.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count
+  const stacked = stacksAtOneBit(block, ctx.capabilities); // cells-ok — a series count
   const bars = candlesOf(block);
   const data = seriesRange(block.series, block, bars);
   // **One nicing, taken where the data is measured** (F210). The axis the gutter
