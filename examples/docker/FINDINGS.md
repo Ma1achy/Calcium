@@ -10416,3 +10416,62 @@ mechanism that closes it is a rule rather than five clauses — every union-type
 same one `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass makes: a citation resolving against the
 wrong subject cannot be caught by matching names.
 
+
+---
+
+## F214 — the bijection guards §4 and §2 drifted behind it ★★★★☆
+
+C02 T2.6 parses the spec's §4 degradation table at test time and asserts a bijection with the
+record's own keys, in both directions, with the owners compared per field. It is a good gate and it
+has been green throughout.
+
+**§2 — the public interface block, which is the first thing anyone reads — declared seven fields
+while the record had eight.** `ambiguousWidth` shipped with a §3 subsection arguing for it, a §4
+row, invariant I9, commitment 12 and a full set of test rows, and was never added to the interface
+block. T2.1's prose still said *the seven documented keys* while T2.1's own `FIELDS` array listed
+eight and the assertion passed.
+
+**Nothing was wrong except the reach.** Every statement in that commit was true; the gate covered
+the table it was written for and the other table has no gate, so the drift is invisible from a
+green run and from a careful read of either document alone — §2 is internally consistent, and so
+is §4.
+
+**The class is the one this repository keeps finding**: a rule is exhaustive over the artefact it
+names, and reads as exhaustive over the subject. `docs/COMMITMENT_INVARIANT_AUDIT.md` makes the
+same point about citations, and F84's MG24 scope is the same shape one layer out — a correct
+sentence bounding a rule to a quarter of its subject.
+
+**Fixed** — §2 gains both `ambiguousWidth` and `backgroundPolarity`, and **T2.8 parses the fenced
+block** the way T2.6 parses the table. Kept as a separate row rather than folded into T2.6: the two
+tables fail separately, T6.4 already cites T2.6 for §4's half, and the failure message should name
+which document is behind.
+
+---
+
+## F215 — a name and a variant, conflated in four documents and one user-facing string ★★★☆☆
+
+C10 I27 keyed the theme set by **name** and made polarity a property a theme declares. The guard in
+`construct.ts` moved with it — `themed.value.names.includes(trimmed)` — and the word *variant*
+stayed where it was:
+
+| where | what it says |
+|---|---|
+| C22 I40 | *anything that is not one of the two variants is treated as absent* |
+| C22 commitment 17 | *a file that is not a known variant* |
+| C22 §12a | *one file, holding the variant* |
+| `construct.ts:668` | **`theme preference ignored: \`X\` is not dark or light`** |
+
+The last one is the one that matters, because it is text a reader sees. On a set holding
+`high-contrast` it names two of the three themes available and calls the third a mistake — and no
+test asserts that half of the string, so it was free to be wrong.
+
+**Found by needing the distinction rather than by reading for it.** C22 §6h had to rule on whether a
+detected polarity outranks a persisted preference, and the plan's own words were *pick the theme
+variant* — an operation that does not exist, since `setTheme` takes a name and the set has no map
+from a polarity to a theme. Establishing what the persisted file actually holds is what turned the
+other three up.
+
+**Repetition across four documents is not corroboration** — the same shape as F58, and the same
+count. Each restatement cites the situation rather than the guard.
+
+**Fixed**: the three prose sites and the message, which becomes `is not one of ${names}`.

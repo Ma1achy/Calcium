@@ -1375,6 +1375,113 @@ parsed **and enum-checked** it into `args.variant`.
 
 ---
 
+## 6h. Choosing a theme from the terminal, walked by hand
+
+### 6h.1 — the plan's vocabulary was one fork out of date
+
+The scope this arrived in says *C22 picks the theme **variant** from the detected polarity*, and
+there is no such operation. C10 I27 keyed the theme set by **name**: `ThemeSet` is
+`Readonly<Record<string, ThemeTokens>>`, `setTheme` takes a name and throws on one the set does not
+hold, and the persisted file holds a name — `names.includes(trimmed)` is the guard that reads it. A
+variant is a *property* of a theme, declared on its tokens and checked against its own background
+(C10 I28).
+
+So the choice is **a search of the set for a theme whose `variant` matches**, which differs in
+three ways that each produce a row below: it can find nothing, it can find several, and it reads a
+field C10 I27 measured as having no reader outside `store.ts`. I27 anticipated exactly this reader
+and said so — *`ResolvedTheme.variant` stays published, because no reader here is not no reader,
+and choosing an asset by polarity is what a published field is for.*
+
+**The variants are read from `config.theme`, not from the store.** `ThemeStore` publishes `names`
+and `current` and no map from a name to a variant; the set itself is the argument `loadTheme` was
+given three lines above the call site. Adding an accessor to C10 for one caller widens a public
+interface where a value already in hand answers — which is MG24's subject from the other end.
+
+### 6h.2 — the classification table: which rule chooses the opening theme
+
+Structural, and indexed by pairs of rules that could both claim the choice. Nothing happens between
+them: a persisted file and a detected polarity are two facts that hold at rest, which is why this
+half is a table and §6h.3 is where the sessions go.
+
+| # | at rest | which rules claim it | ruling |
+|---|---|---|---|
+| 1 | a persisted name the set holds · polarity `light` | the repair rule and the polarity rule | **the persisted name.** A statement outranks an inference, and this is the only row where both rules could honour their own subject |
+| 2 | no file · polarity `light` · a light theme in the set | polarity alone | **switch to it** |
+| 3 | no file · polarity `unknown` | neither | the set's first key — today's behaviour, unchanged, and the arm every existing test runs on |
+| 4 | no file · polarity `light` · **no light theme in the set** | polarity claims it and cannot be honoured | the set's first key, **silently** — 6h.5 |
+| 5 | no file · polarity `light` · **two light themes** | polarity claims it twice | the **first in declaration order**, on `loadTheme`'s own precedent: `opening` defaults to the set's first key rather than to a literal |
+| 6 | a persisted name the set does **not** hold · polarity `light` | the repair rule and the polarity rule | **both fire.** The notice is committed *and* polarity chooses. A preference that cannot be honoured is not a preference, and the alternative hands the reader a notice saying their choice was ignored beside a theme chosen by neither them nor their terminal |
+| 7 | a persisted **empty** file · polarity `light` | the empty-string arm and the polarity rule | polarity chooses, and no notice — I40 already treats empty as absent silently, and 6h.5 is why that arm is now load-bearing |
+| 8 | `[terminal] background_polarity` overridden · a different value detected | C02 I4 alone | the override, and C22 never sees the detected value: it is applied inside `detectCapabilities`, so this cell costs nothing here |
+| 9 | polarity `light` · `colourDepth: 1` | both hold | polarity chooses and **nothing on the screen differs** — at one bit both themes resolve to the same typographic styles (C10 I26). Named so the untested combination is not mistaken for an untaken one |
+| 10 | polarity `dark` · the set's first theme is light and **paints** | both hold | the switch **stops a paint**, and it is the only path in a session that removes a painted background without anyone typing anything (C10 I25, C22 §6g) |
+
+**Row 6 is the row the table was for.** The corrupt-file arm and the polarity arm both hold, and
+the reading that gives the repair rule the whole cell — *a file exists, so a preference exists* —
+is the one a reader writes without noticing, because the repair rule's prose is about a file and
+the polarity rule's is about a terminal.
+
+**Row 10 is the second.** Nothing else in the session takes a background away, and §6g's whole
+argument is about establishing one.
+
+### 6h.3 — the sequence trace: what the *second* session opens with
+
+The events are sessions rather than keystrokes, because nothing changes a polarity inside one: the
+record is built at step 2 and no verb writes a capability (C02 I1, I9's session-constant clause).
+
+| # | sequence | ruling |
+|---|---|---|
+| 1 | light terminal · session 1 opens light · nothing typed · exit · session 2 opens | light again, and **nothing was written**: the file has one writer and it is `/theme`'s handler (I40) |
+| 2 | as 1, then `/theme dark` · session 2 opens | dark. The write is on the change, and the persisted name wins next time — table row 1, arriving through time |
+| 3 | as 2, the reader makes the terminal dark, session 3 opens | dark. Unremarkable, and the case that makes rows 4 and 5 legible |
+| 4 | as 2, the reader makes the terminal **light**, session 3 opens | dark — **a stale preference, and no verb clears it.** 6h.5 |
+| 5 | light terminal · session opens light · `/theme light` | light, and now persisted. `setTheme` no-ops and `persistTheme` still runs, which is right: the reader has *stated* what was inferred |
+
+**Row 1 is the ruling that would have been easiest to take the other way.** Persisting a detected
+choice writes an inference into the file that holds statements, and from the next session nothing
+can tell them apart — which is the distinction table rows 1 and 6 are both built on. It would also
+make session 2 open on session 1's terminal rather than on its own.
+
+**Row 5 is the only affordance for *make this stick*,** and it is free: a reader who agrees with
+the detection nails it down by typing it.
+
+### 6h.4 — the rulings
+
+1. **A persisted name outranks a detected polarity; an unusable one does not.** Absent, empty and
+   not-in-the-set all reach the polarity rule, and the corrupt case keeps its notice.
+2. **The choice is the first theme in declaration order whose `variant` matches**, and no match
+   keeps the set's own opening theme.
+3. **A detected choice is never written to `${stateDir}/theme`.**
+4. **`unknown` chooses nothing**, and C02 I10's third value is what makes that expressible here.
+5. **No notice is committed for a detected choice** — it is what the reader's own terminal says,
+   and a session that announces its agreement with the environment is noise on every start.
+
+### 6h.5 — what the rulings leave behind
+
+- **A stale preference has no verb.** `/theme`'s `variant` is an `enum` whose values are the set's
+  names (C10 I27), so `/theme auto` is a validation error rather than a way back — and adding
+  `auto` to those values would put a name in the vocabulary that is not a theme. The way back does
+  exist and is undocumented: an empty file is treated as absent, so emptying `${stateDir}/theme`
+  restores detection. **Owed and named rather than built**, because the verb it wants is a
+  vocabulary change and this ruling is a choice at construction.
+- **Row 4's silence is a decision.** A polarity that matches no theme in the set keeps the default
+  and says nothing, because the set is the app author's and a notice would be the framework
+  reporting on their choice to their user.
+- **C10 I27's measurement is now stale in the way it predicted.** *Nothing reads `variant` as
+  polarity — its readers are all in `store.ts`* was the fork's evidence; there is now a reader in
+  `construct.ts`, and it is the use I27 published the field for. The sentence stays true about
+  `store.ts` and stops being true about the tree.
+- **The corrupt-file notice names a vocabulary that is one fork out of date**, and it is a
+  user-facing string: *is not dark or light*, on a set that may hold three (F215). Fixed here
+  because this ruling's whole content is that a name and a variant are different, and shipping the
+  ruling beside a message that conflates them is the state the ruling exists to leave.
+- **Nothing here can throw.** `setTheme` throws on a name the set does not hold, and every name
+  this rule can produce came from `Object.keys` of that set — so the rejection path C13 `settle`'s
+  precedent asks about is unreachable rather than handled, which is a fact about where the name
+  comes from and would stop being true if it ever came from anywhere else.
+
+---
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -1565,7 +1672,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I37** — The non-TTY help is **CLI usage and not `/help`**, and it is non-empty. `/help` renders keybindings from the keymap (C23 I26), which is the right answer at a prompt and the wrong register for a pipe, where there is neither. The non-empty half is the one a test forgets: exiting 0 having printed nothing is indistinguishable from a hang to the caller and from a working gate to an assertion about the exit code.
 - **I38** — **The completion spinner is read at paint time and armed at request time, and both halves are needed.** C19 answers `spinning` — the earliest source call still in flight is older than 500 ms — and until now no file under `src/shell` read it, so C19 §7's spinner had an implementation on one side of the seam and none on the other. Two separate mechanisms, because the wrong implementations fail differently and both look right: the frame composes the indicator from a **fresh read on every paint**, so a value cached at request time can never become true; and the request **arms a wake** at the threshold, so the frame that first shows it is one nothing else would have drawn. Without the wake the spinner appears only when the user next types — the *key that appears to do nothing until you press another one*, which is C22 I32's symptom arriving through a different timer. It is **appearance and never geometry**: the glyph is painted into the prompt's last row over padding it does not lengthen, so `measure` never sees it and the prompt's height is the same whether a request is in flight or not.
 - **I39** — **A keystroke cancels a pending completion**, and until now nothing did. C19 §7 commits that a keystroke during a pending request supersedes it — the old sequence abandoned, the spinner cleared, nothing arriving late to overwrite the buffer — and C19 holds the whole mechanism: `cancel()` invalidates the token, and a superseded request already resolves with no candidates (C19 I13). What was missing is the caller. No file under `src/shell` called `cancel()`, so typing after a `Tab` on a slow source left the request live, and a menu opened a second and a half later for a prefix the user had moved past. The same shape as I38 and found by the row I38 unblocked: a component complete on its own side of a seam, with nothing on the other. The printable and paste paths cancel; the guard in the effect table does not cover it, because that one compares the shell's own sequence and a printable keystroke does not advance it.
-- **I40** — **The theme variant is persisted by C22 and repaired on read.** `/theme <variant>` writes it to `${stateDir}/theme` at the moment of the change rather than at exit, because a session killed by `SIGKILL` runs no shutdown path and a preference that survives a clean exit and not a crash is one people stop trusting. On construction the file is read; anything that is not one of the two variants is treated as absent, the base theme is retained, and **a notice is committed** — C20's precedent, where history repairs a corrupt file at open rather than failing. The notice is the half that matters: without it "absent" and "corrupt" look identical to a user who chose light and got dark. It is C22's and not C10's because C10 is a pure function over tokens and this is session state with a filesystem behind it; a store reaching a disk from L1 is MG23's neighbourhood.
+- **I40** — **The theme variant is persisted by C22 and repaired on read.** `/theme <variant>` writes it to `${stateDir}/theme` at the moment of the change rather than at exit, because a session killed by `SIGKILL` runs no shutdown path and a preference that survives a clean exit and not a crash is one people stop trusting. On construction the file is read; anything **the set does not hold as a name** is treated as absent, the base theme is retained, and **a notice is committed** — C20's precedent, where history repairs a corrupt file at open rather than failing. The notice is the half that matters: without it "absent" and "corrupt" look identical to a user who chose light and got dark. It is C22's and not C10's because C10 is a pure function over tokens and this is session state with a filesystem behind it; a store reaching a disk from L1 is MG23's neighbourhood. **The file holds a name, not a variant**, and this invariant said *variant* until C22 §6h needed the two to be different things: C10 I27 keyed the set by name and the guard here has read `names.includes` ever since, so the word was one fork out of date in four places including the notice the reader sees (F215). *Absent* now reaches I68's polarity rule rather than only the base theme — the two arms are one sentence there and neither displaces this one.
 - **I41** — **A pushed view holds one piece of state: its row offset.** `n` and `p` compute a hunk's first row from the offset; `g` and `G` set it. A view holding an offset *and* a hunk index has two cursors for one position — `G` leaves the index pointing at the hunk the reader scrolled away from, so `p` jumps upward from a place nothing on screen explains — and no test that drives one motion at a time can see it (C25 §3c A4).
 - **I42** — **A pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes.** A snapshot taken at push time shows a diff the entry no longer holds, and `expand` produces exactly such a patch one keystroke earlier. C15 supplies the reason code and cannot detect the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so the owner watches the transcript, and `Esc` never meets a dangling view because the view is gone before it (C25 §3c A6).
 - **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
@@ -1598,6 +1705,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I65** — **A theme's background is a base style re-established after every reset, and never a span.** A sequence that returns a channel to the terminal's default is what a base has to survive, and that set is **`\x1b[0m` and `\x1b[49m`** — not `SGR_RESET` alone, which is what the walk counted. L1's rendered rows carry no full reset: Ink closes a foreground run with `39`, which a base survives untouched, and a background run with `49`, which returns the *background* to the terminal's own and is what a patch row ends with. Every such sequence inside a finished row is repaired in one pass by the painter, and `render-frame`'s per-row prefix is answered by the row's leading base (§6g.2). The blind spot is stated: a compound sequence carrying `0` or `49` among other parameters is not repaired, and nothing in the tree emits one — a measurement, not a guarantee. It is **not** merged into a span the way a diff row's background is, because a span is rendered inside a cached entry and a base is a fact about the screen: merging it would put a screen-level decision into C22 I58's cached bytes and oblige that key a new axis. The padding this was said to share with the selection wash is **already built and belongs to neither** — `exact()` squares every row and predates both, and `washed` consumes it (§6g.1). What the two share is the reset, one layer below where the note pointed. **Every painted row closes itself with a reset**, which makes the escaping attribute unreachable rather than repaired: no lifecycle path is touched, and a handoff, an exit, a fault and a signal are covered by one rule instead of four call sites. The cursor's shape needed C01's record because a shape *is* terminal state; a base is bytes inside a row, and that is where the two problems part (I63, C01 I20, §6g.3 rows 5 and 6).
 - **I66** — **A per-invocation presentation flag is read where the invocation is parsed and invalidates on its own account.** `--no-bg` is `shellOnly`, so `validation.transmitted` strips it and a local handler's positional argv stays correct — the safety belongs to the declaration and not to the handler, and declared otherwise a valid `/theme --no-bg light` answers with a usage error. Its reader is `LocalContext`'s validated `args`, because the only other surface a handler has is the line as typed and re-parsing that is the second parser `transmitted` exists to prevent; `--help`'s precedent does not extend, since `--help` *replaces* a result and this one modifies it. **Clearing the flag reaches a frame, and what discharges that is already built**: every `/theme` appends a notice through `appendAndCommit` and invalidates on the verb unconditionally, so the frame does not depend on `setVariant` — whose no-op guard is about the variant and is blind to the flag as a second axis on the same command. The obligation is stated here because it is the one a future refactor can silently drop: the day a `/theme` that changes nothing stops appending a document, the flag stops reaching the screen (§6g.3 row 2, §6g.5). The warning fires only where the flag suppresses an actual paint, names the consequence, and complies (→ C10 I25).
 - **I67** — **The state directory is created ignoring itself.** `stateDir` defaults to `.calcium` in the project directory, so anything written there — the theme preference, the history, and a persisted transcript once a verb declares one (C13 I20) — is a file that can be committed. The directory is created with a `.gitignore` containing `*`, which ignores the directory's contents **regardless of the project's own ignore rules** and does not depend on the app author having thought of it. It goes in beside the `mkdir` that already warns and continues, on the same ground: an unwritable state directory costs persistence and not the session, and an unwritten `.gitignore` costs the same.
+- **I68** — **A detected terminal polarity chooses the opening theme only where the reader has not usably stated one, and is never persisted.** The persisted name is read first and wins where the set holds it; absent, empty and not-in-the-set all fall through to the polarity, and the corrupt case keeps its notice — *a preference that cannot be honoured is not a preference*, and the alternative leaves a reader told their choice was ignored beside a theme neither they nor their terminal picked (§6h.2 row 6). The choice itself is **a search of the set for the first theme in declaration order whose `variant` matches**, read from `config.theme` rather than through a new C10 accessor, and a set with no such theme keeps its own opening key **silently**: the set is the app author's and the notice would be the framework reporting on it. `unknown` chooses nothing, which is the whole reason C02 I10 is three-valued rather than two. **Nothing writes the detected choice to `${stateDir}/theme`** — one writer, and it is `/theme`'s handler (I40) — because a written inference is indistinguishable from a statement on the next read, and that distinction is what the first clause runs on. This is the first reader of `variant` outside `store.ts`, which is the use C10 I27 published it for and the measurement it rests on going stale as predicted (→ C02 I10, C10 I25, I27).
 ---
 
 ## 11. Commitments
@@ -1634,7 +1742,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 14g. Anything that settles outside a decoded batch commits when it settles — the completion menu and the identity refresh are the two live producers, and I27's per-batch rule does not reach either (I31).
 14f. Layers composite onto the accumulated rows, bottom-first, each writing every cell of its box; a box escaping the region refuses the frame (I29, I30).
 15. `stopped` is terminal (I16).
-17. The theme variant persists through `${stateDir}/theme`, written on the change and repaired on read: a file that is not a known variant leaves the base theme standing and commits a notice (I40).
+17. The theme **name** persists through `${stateDir}/theme`, written on the change and repaired on read: a file holding a name the set does not have leaves the base theme standing and commits a notice — which is then the polarity rule's cell rather than the default's (I40, I68).
 18. C22 owns the pushed view: one piece of state, rewindowed from the live block, dismissed on eviction with the reason C15 declares and cannot detect (I41, I42).
 16a. A keystroke during a pending completion cancels it, so nothing arrives late to a prompt that has moved on. C19 holds the mechanism; L4 is the caller that was missing (I39).
 16. The completion spinner is composed from a fresh read of C19's `spinning` on every paint, and a request arms a wake at the threshold so a frame exists to show it. Appearance, never geometry (I38).
@@ -1662,6 +1770,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 36. **A painted background is a base re-established at every return to the terminal's default, not a span and not a padding change** — repaired in one pass over the finished row, over `0m` and `49m` rather than over a full reset alone, and the padding the entry called shared was already built and owed by neither entry (I65, §6g).
 37. **A per-invocation flag is `shellOnly`, read from the validated args, and reaches a frame when it is cleared** — which is what makes *per invocation, not sticky* observable rather than merely stated, and what discharges it is the document `/theme` already appends rather than anything this entry adds (I66, §6g, → C10 I25).
 38. **The state directory ignores itself**, written when it is created rather than left to the app's own ignore rules — because what lands there is a preference today and a transcript the moment a verb declares one (I67, → C13 I20).
+39. **The terminal's polarity chooses the opening theme where the reader has not usably stated one, and is never written down** — a search of the set by `variant`, silent when it matches nothing, and inert when the terminal says nothing (I68, §6h). The three-valued polarity it reads and the field it searches on are both elsewhere (→ C02 I10, C10 I27).
 
 ---
 
@@ -1694,6 +1803,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.21c** (I62, §6e.5): **a marker wherever rows are elided and nowhere else** — a mid-buffer cursor draws one above and one below with `cap − 2` content rows, and a cursor at the head draws one below only. Both cases, because the middle one alone does not carry the claim: the mutation that removes the head's bottom marker leaves it untouched (T6.50). The bottom marker is what makes the clipped wash honest (table row 4), so its absence is a defect and not a missing nicety. **A both-ends window needs `n > 2·cap − 2`** — below that the head and tail branches meet with no gap — which is arithmetic the ruling implies and did not state, found by the fixture coming back with one marker.
 - **T1.21e** (I62, §6e table row 5): the spinner goes on the **cursor's** painted row, and the bottom marker carries none. Fixtured mid-buffer, because that is the only arrangement where the cursor's row and the last painted row differ — which is why the old justification survived so long.
 - **T1.21d** (I62, §6e.5): the cursor in the last half-window → the window is **identical** to the tail-anchored one. The row that says the common frame did not change, and the argument for centring over `menuWindow`'s keep-it-last rule.
+- **T1.20b** (I68): no `theme` file · `COLORFGBG=0;15` · a set of `{dark, light}` → the session opens **light**, and `${stateDir}/theme` **does not exist afterwards**. Two assertions, because opening light while persisting it passes the first and is §6h.3 row 1's defect: an inference written into the file that holds statements.
+- **T1.20c** (I68): no `theme` file · `COLORFGBG` **absent** → the set's first key, unchanged. This is T6.9's subject from C02's side — the row a two-valued polarity would still pass by guessing right, which is why C02 T1.11 carries the other half.
+- **T1.20d** (I68): a `theme` file holding `light` · `COLORFGBG=15;0` (a dark terminal) → **light**. The statement outranks the inference (§6h.2 row 1), and the control is the same file with no `COLORFGBG`, which must give the same answer — otherwise the row passes on a session that ignored the file for a different reason.
+- **T1.20e** (I68): a `theme` file holding `mauve` · `COLORFGBG=0;15` → **light**, *and* the notice is in the transcript. §6h.2 row 6, and both halves are needed: choosing the default silently satisfies neither, choosing light without the notice loses I40, and keeping the notice while opening the default is the reading the walk rejected.
+- **T1.20f** (I68): a set of `{dark, high-contrast}` — both declaring `variant: "dark"` — with `COLORFGBG=0;15` → the set's first key, **no notice, no throw**. §6h.2 row 4, and it is also the row that would fail loudest if the search returned a name the set does not hold.
 - **T1.19b** (I40): a `theme` file holding something that is not a variant → the base theme is retained **and a notice is in the transcript**. Two assertions because either alone passes against the other's defect: retaining silently satisfies the first, and a notice beside a switched theme satisfies the second. The control is a valid file, which must produce no notice.
 - **T1.18** (I38): a request with a slow source shows no spinner before the threshold and one after it, on a fake clock, **read off the composed frame** rather than off the engine, and the frame carrying it arrives with **no further input** — and the prompt's height and the frame's widths are identical in both, which is the half that says it is appearance. The two mutations fail differently and both must: reading `spinning` once at request time and caching it → the spinner never appears; dropping the wake → it appears only on the frame the *next keystroke* draws, so the assertion that a frame arrives with no further input is what carries it.
 - **T1.4** (I3): all four seals are closed before the input router accepts anything — C05's, C07's and C09's, and C23's local registry, which is the one a test counting only the construction-time ones would miss. C19's engine has no `seal`, and the test asserts that too: a count is the wrong assertion when one member of the set does not belong to it.
@@ -1872,6 +1986,9 @@ PTY harness.
 - **T6.35** (I40): writing the variant at exit instead of on the change → T1.19 still passes on a clean stop and the preference is lost to every crash, so the row drives the write and then constructs a second session **without stopping the first**.
 - **T6.37** (I51): removing the forward → T4.7b fails, and typing stops the moment the menu appears — which the as-you-type menu makes unavoidable and `Tab` alone made survivable.
 - **T6.36** (I40): treating an unreadable `theme` file as fatal, or as silently absent → T1.19b fails on the notice or on the session opening at all. The two halves of C20's repair, arriving one component up.
+- **T6.68** (I68): persisting the detected choice — one `persistTheme` call on the polarity arm → T1.20b fails on the file's absence and **on nothing else**, because a session that opens light and writes `light` is correct in every frame it draws. §6h.3 row 1.
+- **T6.69** (I68): letting a detected polarity outrank a usable persisted name → T1.20d fails. The inverse — letting an *unusable* persisted name block the polarity — fails T1.20e, and the two rows are separate because a single rule change satisfies either one alone.
+- **T6.70** (I68): searching the set by name (`"light"`) instead of by `variant` → T1.20b still passes on the shipped set, where the light theme is called `light`, and **T1.20f fails**. That is the row's argument: the shipped set is exactly the fixture where the two rules agree, so a set whose names and variants differ is the only place the mistake is visible.
 - **T6.34** (I39): removing the `cancel()` from the printable path → C19 T5.2 fails on its last assertion, and a menu opens for a prefix the user has typed past. The effect table's own `mine !== seq` guard does not cover it: a printable keystroke does not advance that sequence, which is why the guard looked like the mechanism and was not.
 - **T6.47** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.
 - **T6.52** (I63): keying the style on the layer rather than on the target → T1.22 fails, and the prompt has no style at all while `overlay` and `pushedView` keep theirs. **Two of seven, passing every assertion the two layers can make.**
@@ -1916,9 +2033,11 @@ It was unowned for four components. C10 T4.5 and T4.6 asserted persistence and w
 
 **It is C22's rather than C10's, and that is the load-bearing half.** C10 resolves themes and is a pure function over tokens; persistence is session state with a filesystem behind it. A store reaching a disk from L1 is MG23's neighbourhood, and the shape already exists one layer up — C20's history is a store with a file behind it through the injected `fs` (I10), and `stateDir` is already injected for exactly this kind of thing.
 
-One value, one file: `${stateDir}/theme`, holding the variant.
+One value, one file: `${stateDir}/theme`, holding the **name** of the chosen theme. It held *the variant* when there were two themes and the set was keyed by polarity; C10 I27 changed the key and the guard, and the word survived here, in I40, in commitment 17 and in the notice the reader is shown (F215).
 
-**A corrupt file keeps the base theme and commits a notice** (I40). That is C20's precedent rather than a new decision — history repairs a corrupt file at open rather than failing — and the reasoning transfers whole: a session that refuses to start because a preference file has a stray byte in it has made a preference into a dependency. Anything that is not one of the two variants is treated as absent, and the notice is what stops "absent" and "corrupt" looking the same to a user who chose light and got dark.
+**A corrupt file keeps the base theme and commits a notice** (I40). That is C20's precedent rather than a new decision — history repairs a corrupt file at open rather than failing — and the reasoning transfers whole: a session that refuses to start because a preference file has a stray byte in it has made a preference into a dependency. Anything the set does not hold as a name is treated as absent, and the notice is what stops "absent" and "corrupt" looking the same to a user who chose light and got dark.
+
+**Absent is no longer the same as unchosen**, which is §6h's addition and the reason this section is worth re-reading beside it: a file that is missing, empty or unusable falls through to the terminal's own polarity (I68), so *keeps the base theme* is now the third arm of three rather than the answer.
 
 **The write is on the change, not on exit.** A session killed by `SIGKILL` runs no shutdown path (C01 §5's ninth row), and a preference that survives a clean exit and not a crash is one people stop trusting. `/theme` is rare enough that a write per invocation costs nothing worth measuring.
 
