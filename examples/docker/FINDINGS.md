@@ -10745,3 +10745,95 @@ grows is the direction that reads as *more implemented* and is less.
 in the same file; refused at both gates where it is `false`, with the message naming the form. The
 record and `RUNGS` must agree, and PD3 asserts that rather than trusting it: a record in `types.ts`
 and a ladder in `definition.ts` cannot be derived from one another, because L0 does not import L1.
+
+---
+
+## F221 — the `hierarchy` field reaches the renderer unopened by either gate ★★★☆☆
+
+**Found by asking the same question of the second field.** B1 asked what `plotDetail` is checked
+for and found one reader; the same question about `hierarchy` has a shorter answer — `validate.ts`
+does not contain the word.
+
+Measured, `form: "treemap"`, `height: 6`, 40 cells, through `validateBlock` and then through the
+renderer:
+
+```
+a node with no `value`        accepted    6 rows, blank
+`children: "nope"`            accepted    1 row   [plot failed to render: ...]
+a child that is the number 42 accepted    6 rows, blank
+a node with no `label`        accepted    6 rows, a tile named `undefined`
+`value: NaN`                  accepted    6 rows, blank
+a well-formed chain, 3200     accepted    1 row   [plot failed to render: ...]
+```
+
+**The frame is not corrupted, and that is C09 I11 rather than luck** — a throwing renderer is
+contained to its block and the block says what happened. So two of the six are *visible* faults,
+which is the containment doing its job.
+
+**The silent one is `undefined`.** A node with no `label` writes those nine letters into the frame
+as a tile's name, through the coercion every JavaScript program has. The type says `label: string`
+and nothing between a document and the grid asks whether it is one.
+
+**The last row is well-formed input**, which is the one worth keeping. A chain 3200 deep satisfies
+every rule `HierarchyNode` states and is refused by the **stack** rather than by a gate. The
+figures, so nobody re-derives them: the treemap fails between 1600 and 3200 and the flame between
+3200 and 6400, and the difference between the two is the size of the two walks' frames rather than
+anything about the data. **Nobody has a call stack 3200 deep** — the depth is not what this finding
+is about, and saying so is what stops the fix being a cap and nothing else.
+
+**Why it survived being read.** C04's gate is written member by member, and `hierarchy` is not a
+member — it is a **shape**, which is I54's own argument: *one field for three forms rather than
+three shapes*. Every other typed field on `Plot` is a flat list or a small record, so a clause
+against it is one line and gets written; a recursive shape needs a walk, and the walk is the thing
+that did not get written. **The type carries the whole claim, and the type is not a gate** — which
+is C04's own division of labour stated backwards: the constructor is where an author finds out and
+the validator is where an untrusted document does, and a document does not typecheck.
+
+**And it was about to acquire a fourth reader.** `tree` is the first form whose *whole* subject is
+the shape — a treemap with a broken hierarchy still draws a rectangle, and a tree with one draws
+nothing at all.
+
+**Fix owed** — a `checkHierarchy` walk at both gates: every node an object with a string `label`,
+`children` an array where present, `value` finite and non-negative **where the form's subject is
+magnitude**, and a stated depth bound, because a gate that walks a recursion must terminate it.
+C04 I64.
+
+---
+
+## F222 — the legend's row is declared by a type that cannot see whether there is anything to name ★★★☆☆
+
+`legendRows(plot)` returns 1 for `"above"` and `"below"` and 0 otherwise. Its parameter is
+
+```ts
+type PlotGeometry = Pick<Plot, "form" | "height" | "axes" | "legend" | "xTitle">;
+```
+
+which excludes `series`, `segments`, `ohlc` and `annotations` — **every source `legendEntries`
+reads**. So the row is declared from the member alone, and a plot with nothing to name declares it
+anyway.
+
+Measured: `form: "treemap"`, `height: 4`, `series: []`, a `hierarchy`, `legend: "below"` → **five
+rows, the fifth blank**. `legend: "right"` on the same block is correct at four, because a
+width-costing placement sizes itself from the entries and finds none.
+
+**The `Pick` is the mechanism and it is also why review passed it.** The reason `legendRows` takes
+a narrow parameter at all is I1 — measured height is a function of the block alone — so a `Pick`
+that excludes the data reads as *the discipline being kept*. It is the discipline kept about the
+wrong four members: an entry count is a count of **block members**, knowable before a single label
+is placed (C12 §3ag.4), and the four excluded are exactly those members. **A type that excludes
+the inputs its answer depends on is not a narrower contract, it is a wrong one.**
+
+**The near miss is in the same file's comment.** The `Pick` grew once already, for `xTitle`, with
+the sentence *it belongs in this Pick* — the new member was asked whether height depends on it and
+the member already there was not asked again.
+
+**Where it bites**: the forms whose legend sources can all be empty — `flame`, `icicle` and
+`treemap` driven from a `hierarchy`, and `tree` when it lands. One row of the caller's declared
+height, drawn blank. **Not in the corpus**, because no variant sets a horizontal legend on a
+hierarchy form, so no golden could have moved.
+
+**Fix owed** — the count moves into `height.ts` beside `legendRows` and `furniture.ts` reads it
+from there. That direction and not the other: `furniture.ts` already imports `height.ts`, so the
+predicate cannot live where it is used without a cycle. The `Pick` grows by those four members and
+`values` stays outside it — the Pick is a guard about *which* members height may read, not about
+how many. C12 I27.
