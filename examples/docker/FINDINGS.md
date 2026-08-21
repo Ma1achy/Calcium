@@ -11008,3 +11008,51 @@ row lands with its implementation and this entry is the prose that goes ahead of
 **Worth its own number rather than a line in F223** because the test is *would landing this close
 it* — F223's fix touches none of this, and a renumber folded into another finding is a change
 nobody can find later.
+
+---
+
+## F226 — two fail-on-revert rows about a containment, on a kind that never reached it ★★★★☆
+
+C09 T6.7 and T6.8 are the tier-6 rows for I11 — *letting a renderer's throw propagate → T3.13
+fails and the frame dies*, and the same for a measurer. Both build their document around a block of
+kind `explodes`.
+
+**Nothing registers `explodes`.** `test/revert/blocks.test.ts` never passes `definitions`, so the
+kind is unknown, and an unknown kind resolves through `raw` (C09 I10) and renders as its own JSON.
+Measured:
+
+```
+kinds registered: explodes is NOT registered
+measure(explodes) = 1
+frame:
+  [0] "first"
+  [1] "{\"kind\":\"explodes\",\"id\":\"bad\"}"
+  [2] "third"
+```
+
+**Both rows pass with the render catch deleted entirely**, because no throw ever happens: they
+exercise C09 I10's fallback and are named for C09 I11's containment. **A03 §2's vacuity class, in
+the tier that exists to prevent it** — a revert row about a catch has to reach the catch.
+
+**Two things made it invisible, and the second is the one to keep.** `not.toThrow()` is an
+assertion that cannot tell *contained* from *never thrown*; that much is ordinary. The other is
+arithmetic: `measure` answers **1** for the contained case *and* **1** for a 29-character JSON
+string at width 80 — the fallback height and the containment height are the same number, so
+T6.8's second assertion agrees with both readings. A fixture whose two candidate behaviours
+produce one observation.
+
+**Found by a new instrument on its first run, and it fired by staying silent.** C09 I29's sink is
+`LOUD` by default in the harness, so any test reaching a containment now throws. Turning it on
+turned exactly one row red — T3.13, whose subject it is. T6.7 and T6.8 stayed green, and *that*
+is the measurement: a row named for a catch, in a suite where reaching a catch is now fatal,
+which does not go red is a row that does not reach one. **A negative result from an instrument
+built for the positive one.**
+
+**Fixed** — both rows register a definition that genuinely throws, pass `QUIET` (the named
+exemption, because the containment is their subject), and assert the containment *fired*:
+`failed to render` in the frame, not merely the absence of a throw. C09's T6.7 and T6.8 carry the
+requirement in their text, since the rows were right and the fixtures were not.
+
+**And it generalises past these two.** `measurable()`'s `definitions` is opt-in, so any test
+naming a kind it did not register is testing `raw`. The loud sink is now the standing check for
+the containment half of that, which is the half nothing could see.
