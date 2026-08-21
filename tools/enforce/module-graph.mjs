@@ -592,19 +592,26 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "that set it would be asserting a gutter its own lines do not justify. `windowPatch` is " +
     "the one writer, and a builder exposing it would offer a consumer the drift (F134)",
 
-  // --- plot forms: fields whose builders are being built (step 11) ----------
-  "plot.categories": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.layout": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.binning": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.quartiles": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.offsets": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.totals": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.startDate": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.bands": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.facets": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.segments": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.xScale": "step 0 scaffolding — builder shorthand lands in step 11",
-  "plot.yScale": "step 0 scaffolding — builder shorthand lands in step 11",
+  // --- plot forms: fields with no plot-builder shorthand --------------------
+  //
+  // **The step these named has arrived and took exactly one of them.**
+  // `plot.startDate` said *builder shorthand lands in step 11* and its shorthand
+  // did, with `calendarUnit` beside it — the entry is gone rather than reworded.
+  // The eleven below were never that step's subject and their shared sentence
+  // now points at a step that has passed, which is a justification the next
+  // reader checks and cannot reproduce (CLAUDE.md). Kept, with the schedule
+  // struck: each is a builder that has not been written, and no plan owes it.
+  "plot.categories": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.layout": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.binning": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.quartiles": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.offsets": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.totals": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.bands": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.facets": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.segments": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.xScale": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  "plot.yScale": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
 });
 
 /** `Kind.field` for every block field, and whether a builder mentions it. */

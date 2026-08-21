@@ -36,6 +36,7 @@ import {
   type Result,
   type ViewDocument,
 } from "./types.js";
+import { parseStartDate } from "../dates.js";
 import { isContainerKind } from "./tree.js";
 // **The entries, not the names.** `COLORMAP_SET` above answers *is this a map*;
 // H3 asks *does it have two halves*, which is `kind` and lives on the entry.
@@ -649,8 +650,9 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     plotFieldErrors(b, e, at, form);
     plotHorizonErrors(b, e, at, form);
     plotSizeErrors(b, e, at);
-  plotOriginErrors(b, e, at, form);
+    plotOriginErrors(b, e, at, form);
     plotAxisCrossErrors(b, e, at, form);
+    plotCalendarErrors(b, e, at, form);
   },
   progress: (b, e, at) => {
     requireString(b, "label", e, at);
@@ -1109,6 +1111,81 @@ function plotAxisCrossErrors(
       `${at}: "axisCross": "zero" with a declared range of ${lo}..${hi} (C04 I62, C04 I29) — ` +
         `the range excludes zero, and an axis drawn at the nearest edge would say the origin is ` +
         `somewhere it is not`,
+    );
+  }
+}
+
+/**
+ * `matrixAnchor` and `calendarUnit` — the anchor's values, and the calendar's
+ * four refusals (C04 I62, C12 I53, §3ae).
+ *
+ * **`matrixAnchor` is checked here for the first time and F213 is why.** C04's
+ * `colormap` clause names it among five unions protected by F172's argument —
+ * *a name that resolves to nothing renders uncoloured* — and none of the five
+ * had a check: being a union is a compile-time fact, and this gate's subject is
+ * a document. `columnMap`'s final arm is a fall-through, so `"uniforn"` rendered
+ * right-anchored with a blank fringe and nothing said so. The other four are
+ * open, as one commit rather than five clauses folded into a diff about dates.
+ *
+ * **The calendar's refusals are all four member rules**, because the shape rule
+ * — more than one series — is a member rule here too: this layer can count a
+ * list. `> 1` and never `!== 1`, because zero is not more than one (§3ae A8) and
+ * an empty calendar is commitment 3's empty plot.
+ */
+function plotCalendarErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const anchor = b["matrixAnchor"];
+  if (
+    anchor !== undefined
+    && anchor !== "stretch" && anchor !== "window" && anchor !== "left" && anchor !== "uniform"
+  ) {
+    e.push(
+      `${at}: "matrixAnchor" must be "stretch", "window", "left" or "uniform" (C04 I50b, F213) — ` +
+        `an unknown anchor falls through to "window", so the matrix renders right-anchored with a ` +
+        `blank fringe and nothing says the value was not understood`,
+    );
+  }
+
+  const unit = b["calendarUnit"];
+  if (unit === undefined) return;
+  if (unit !== "hour" && unit !== "day" && unit !== "week" && unit !== "month") {
+    e.push(`${at}: "calendarUnit" must be "hour", "day", "week" or "month" (C04 I62)`);
+    return;
+  }
+  if (form !== "calendar") {
+    e.push(
+      `${at}: "calendarUnit" on form "${String(form)}" (C04 I62, C12 §3ae) — only a calendar has a ` +
+        `grid for a unit to pick, and a member accepted where nothing honours it reads as one not ` +
+        `yet implemented`,
+    );
+    return;
+  }
+  const series = b["series"];
+  if (Array.isArray(series) && series.length > 1) { // cells-ok — a series count
+    e.push(
+      `${at}: "calendarUnit" with ${String(series.length)} series (C04 I62, C12 I53) — a calendar's ` +
+        `rows are a period, so a second series is a second period claiming the same rows; the grid ` +
+        `is derived from one flat series in time order`,
+    );
+  }
+  const start = b["startDate"];
+  if (start === undefined) {
+    e.push(
+      `${at}: "calendarUnit" without "startDate" (C04 I62, C12 I53) — a calendar's row is a claim ` +
+        `about when, and placing the first reading in the first row is an assumption the caller ` +
+        `never stated`,
+    );
+    return;
+  }
+  if (typeof start !== "string" || parseStartDate(start) === null) {
+    e.push(
+      `${at}: "startDate" is not a date this can place (C04 I62, C12 I53) — "YYYY-MM-DD", ` +
+        `optionally "THH", ":MM", ":SS" and a trailing "Z"; a zone offset is refused rather than ` +
+        `ignored, and a day the month does not have is refused on the leap rule`,
     );
   }
 }

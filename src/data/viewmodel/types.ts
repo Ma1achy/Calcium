@@ -734,6 +734,35 @@ export type Plot = Readonly<{
   ohlc?: readonly OHLC[];
   offsets?: readonly number[];
   totals?: readonly boolean[];
+  /**
+   * The cell a `calendar` is built from, which picks the grid (C12 I53, §3ae).
+   *
+   * **Rows are the sub-unit and columns the super-unit** — one statement over
+   * four layouts rather than four layouts that happen to agree: `hour` is 24
+   * rows and a column is a day, `day` is 7 rows (`Mon … Sun`) and a column is a
+   * week, `week` is 5 rows and a column is a month, `month` is 12 rows and a
+   * column is a year.
+   *
+   * **The span needs no member, and that is what the unit buys.** `startDate` +
+   * this + `series[0].values.length` states it exactly, and a `span` field
+   * beside those three would be a fourth statement of a fact they already fix.
+   *
+   * One flat series in time order, and more than one is refused: a calendar's
+   * rows *are* a period, so a second series is a second period claiming the same
+   * rows. Without this member a `calendar` stays the raw matrix it has always
+   * been, so no shipped frame moves.
+   */
+  calendarUnit?: "hour" | "day" | "week" | "month";
+  /**
+   * When the first reading was taken, for a `calendar` (C12 I53, §3ae).
+   *
+   * `YYYY-MM-DD`, optionally `THH`, `:MM`, `:SS` and a trailing `Z` —
+   * everything below the hour is *inside* the cell rather than discarded, which
+   * is what makes ignoring it honest. A zone offset is refused rather than
+   * ignored, and a date that does not exist is refused on the leap rule.
+   * Required with `calendarUnit`: index 0 → row 0 is an assumption the caller
+   * never stated.
+   */
   startDate?: string;
   bands?: number;
   facets?: readonly Plot[];
@@ -910,8 +939,18 @@ export type Plot = Readonly<{
    * scrolls once full. The default is per form: a live feed anchors so a
    * column does not move every tick, and a grid of categories has no time axis
    * to anchor to.
+   *
+   * **`"uniform"` is `"left"` with the cells widened to fill** (C12 §3ae.5),
+   * added because a `calendar`'s columns are the family's first with an
+   * *intrinsic width* — a week is a week. `"stretch"` gives widths differing by
+   * one cell, which is imperceptible at a pitch of six and a **doubling** at a
+   * pitch of one, and a two-cell week beside a one-cell week reads as two weeks
+   * holding one value (C12 §6b B15). Every column takes `⌊w ÷ n⌋` cells, the oldest
+   * drop first as `"left"`'s do, and the remainder is a fringe the caller
+   * removes with `width` rather than by stretching a period. The two arms are
+   * identical wherever the pitch is one.
    */
-  matrixAnchor?: "stretch" | "window" | "left";
+  matrixAnchor?: "stretch" | "window" | "left" | "uniform";
   /**
    * Where the legend goes, or `false` for none (C12 §3g, C12 I27).
    *

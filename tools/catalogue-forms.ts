@@ -799,11 +799,46 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
   },
   calendar: {
+    // **The pre-unit calendar, and it is the frame that must not move** (C12
+    // §3ae, CL6): seven rows the *fixture* named, over a matrix that has never
+    // heard of a day.
     default: {
       form: "calendar", height: 7, axes: true,
       series: Array.from({ length: 7 }, (_, d) =>
         s(Array.from({ length: 53 }, (_, w) => Math.abs(Math.sin((d * 53 + w) * 0.7)) * 12), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d]),
       ),
+    },
+    // A year of daily readings from a Thursday — GitHub's contribution grid,
+    // and the ragged first column is the three days that precede the start.
+    day: {
+      form: "calendar", height: 7, axes: true, calendarUnit: "day", startDate: "2026-01-01",
+      series: [s(Array.from({ length: 365 }, (_, i) => Math.abs(Math.sin(i * 0.37)) * 12 + (i % 7 === 5 ? 6 : 0)), "commits")],
+    },
+    // **The same readings under the anchor the walk ruled against**, so the two
+    // frames can be read side by side (§3ae.5): fifty-three weeks over
+    // seventy-odd cells gives columns of one and two cells under `stretch`.
+    "day-stretch": {
+      form: "calendar", height: 7, axes: true, calendarUnit: "day", startDate: "2026-01-01",
+      matrixAnchor: "stretch",
+      series: [s(Array.from({ length: 365 }, (_, i) => Math.abs(Math.sin(i * 0.37)) * 12 + (i % 7 === 5 ? 6 : 0)), "commits")],
+    },
+    // A fortnight of hourly readings: twenty-four rows, a column a day, and a
+    // diurnal shape that makes a wrong row obvious.
+    hour: {
+      form: "calendar", height: 24, axes: true, calendarUnit: "hour", startDate: "2026-03-04T09",
+      series: [s(Array.from({ length: 336 }, (_, i) => 6 + 5 * Math.sin(((i + 9) % 24) * 0.26)), "load")],
+    },
+    // Twenty-four months of weekly readings — the unit whose grid has interior
+    // holes, because a month is not a whole number of weeks.
+    week: {
+      form: "calendar", height: 5, axes: true, calendarUnit: "week", startDate: "2026-01-05",
+      series: [s(Array.from({ length: 104 }, (_, i) => Math.abs(Math.cos(i * 0.41)) * 9), "deploys")],
+    },
+    // Twelve years of monthly readings, which is where `uniform` widens a column
+    // to six cells and `left` would leave twelve of seventy-odd.
+    month: {
+      form: "calendar", height: 12, axes: true, calendarUnit: "month", startDate: "2026-01-01",
+      series: [s(Array.from({ length: 144 }, (_, i) => 20 + 15 * Math.sin(i * 0.52) + (i % 12) * 0.8), "revenue")],
     },
   },
   correlation: {

@@ -24,6 +24,8 @@ import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
 import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Layout } from "./furniture.js";
 import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
+import { calendarGrid } from "./calendar.js";
+import { parseStartDate } from "../../data/dates.js";
 import { slot } from "../blocks/paint.js";
 import { refOf } from "./marks.js";
 import {
@@ -73,7 +75,9 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
   latency: "stretch",
   confusion: "stretch",
   correlation: "stretch",
-  calendar: "stretch",
+  // **The one form whose columns have a duration** (C12 I53, §3ae.5), so the
+  // one that cannot stretch: a week is a week.
+  calendar: "uniform",
   density2d: "stretch",
   utilisation: "stretch",
   // Not matrix forms.
@@ -244,6 +248,27 @@ function columnMap(
     // the *oldest* column is the fixed one.
     const from = Math.max(0, count - w);
     for (let x = 0; x < w; x += 1) out.push(x < count - from ? from + x : null); // cells-ok — a column index
+    return faced(out);
+  }
+
+  if (layout === "uniform") {
+    // **Every column the same width** (C12 §3ae.5, I53). `stretch` differs by one
+    // cell, which is nothing at a pitch of six and a doubling at a pitch of one
+    // — and a two-cell period beside a one-cell one reads as two periods holding
+    // the same reading, which is §6b B15's rule about a candle wider than its
+    // neighbours, on its third consumer.
+    //
+    // **`left`'s rule for what does not fit**: the oldest drop first. The two
+    // arms are identical wherever the pitch is one, which is exactly where a
+    // mutation swapping them survives — a year of twelve months is twelve cells
+    // under `left` and seventy-two here.
+    const pitch = Math.max(1, Math.floor(w / count)); // cells-ok — a cell width
+    const shown = Math.min(count, Math.floor(w / pitch)); // cells-ok — a column count
+    const from = count - shown; // cells-ok — a reading index
+    for (let x = 0; x < w; x += 1) {
+      const k = Math.floor(x / pitch); // cells-ok — a column index
+      out.push(k < shown ? from + k : null); // cells-ok — a column count
+    }
     return faced(out);
   }
 
@@ -680,6 +705,36 @@ function fieldAxes(block: Plot): Plot {
 }
 
 /**
+ * A calendar's derived grid, or the block unchanged (C12 I53, §3ae).
+ *
+ * **The seam is `quiver`'s, one form along**: substituted here rather than in
+ * `matrixRows`, so the range, the gutter labels, the legend and the overflow row
+ * all see one series list. §3ae.4 is the check that this stays true — B2 says
+ * the range is invariant under the substitution because the grid holds the same
+ * finite values, and B4 says the overflow notice reads `+17 more · 07 · 08 · …`
+ * because it sees the derived labels rather than the caller's one.
+ *
+ * **Every condition is a silent fall-through and that is I11's price** (§3ae.6
+ * A10). A block that reached the renderer without passing a gate renders as the
+ * pre-calendar matrix — a frame that is not wrong, because it is what `calendar`
+ * has always drawn, and is not a calendar. The refusals live at the gates
+ * because this is the layer that cannot have one.
+ *
+ * `series.length === 1` and not `!== 1`, because zero is not more than one
+ * (§3ae A8): an empty calendar is commitment 3's empty plot, not an error.
+ */
+function calendarRows(raw: Plot): Plot {
+  const unit = raw.calendarUnit;
+  if (raw.form !== "calendar" || unit === undefined) return raw;
+  const only = raw.series.length === 1 ? raw.series[0] : undefined; // cells-ok — a series count
+  if (only === undefined || only.values.length === 0) return raw; // cells-ok — a reading count
+  if (raw.startDate === undefined) return raw;
+  const start = parseStartDate(raw.startDate);
+  if (start === null) return raw;
+  return { ...raw, series: calendarGrid(unit, start, only.values) };
+}
+
+/**
  * Render a heatmap-family form. All seven forms share this path; the only
  * difference is axis semantics (handled by the caller's field choices).
  */
@@ -696,7 +751,7 @@ export function heatmapFormRows(
   // row all see one series list.
   const withField: Plot = raw.form === "quiver" && raw.series.length === 0 && raw.vectors !== undefined // cells-ok — a series count
     ? { ...raw, series: magnitudeSeries(raw.vectors) }
-    : raw;
+    : calendarRows(raw);
   const block = fieldAxes(withField);
   const range = seriesRange(block.series, block);
   const layout = layoutFor(block, width, ctx.capabilities);

@@ -38,6 +38,7 @@
  */
 
 import { HAS_CALLOUT, HAS_Y_GUTTER, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { parseStartDate } from "../../data/dates.js";
 import type {
   Action,
   Block,
@@ -432,9 +433,11 @@ function plot(
     align?: Plot["align"];
     origin?: Plot["origin"];
     axisCross?: Plot["axisCross"];
+    calendarUnit?: Plot["calendarUnit"];
+    startDate?: Plot["startDate"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -584,6 +587,37 @@ function plot(
           `a numeric ordinate and a numeric abscissa, and this form has no zero for them to meet at`,
       );
     }
+    // **The calendar's four refusals, in the order a caller trips them** (C04
+    // I62, C12 I53, §3ae). `> 1` and never `!== 1`: zero is not more than one,
+    // and an empty calendar is commitment 3's empty plot rather than an error.
+    if (calendarUnit !== undefined && drawn !== "calendar") {
+      throw new TypeError(
+        `b.plot: "calendarUnit" on form "${drawn}" (C04 I62, C12 §3ae) — only a calendar has a ` +
+          `grid for a unit to pick, and a member accepted where nothing honours it reads as one ` +
+          `not yet implemented`,
+      );
+    }
+    if (calendarUnit !== undefined && series.length > 1) { // cells-ok — a series count
+      throw new TypeError(
+        `b.plot: "calendarUnit" with ${String(series.length)} series (C04 I62, C12 I53) — a ` +
+          `calendar's rows are a period, so a second series is a second period claiming the same ` +
+          `rows; the grid is derived from one flat series in time order`,
+      );
+    }
+    if (calendarUnit !== undefined && startDate === undefined) {
+      throw new TypeError(
+        `b.plot: "calendarUnit" without "startDate" (C04 I62, C12 I53) — a calendar's row is a ` +
+          `claim about when, and placing the first reading in the first row is an assumption the ` +
+          `caller never stated`,
+      );
+    }
+    if (startDate !== undefined && parseStartDate(startDate) === null) {
+      throw new TypeError(
+        `b.plot: "startDate" of "${startDate}" is not a date this can place (C04 I62, C12 I53) — ` +
+          `"YYYY-MM-DD", optionally "THH", ":MM", ":SS" and a trailing "Z"; a zone offset is ` +
+          `refused rather than ignored, and a day the month does not have is refused on the leap rule`,
+      );
+    }
     if (axisCross === "zero" && yMin !== undefined && yMax !== undefined && (yMin > 0 || yMax < 0)) {
       throw new TypeError(
         `b.plot: "axisCross": "zero" with a declared range of ${yMin}..${yMax} (C04 I62, C04 I29) — ` +
@@ -665,6 +699,8 @@ function plot(
       ...(align === undefined ? {} : { align }),
       ...(origin === undefined ? {} : { origin }),
       ...(axisCross === undefined ? {} : { axisCross }),
+      ...(calendarUnit === undefined ? {} : { calendarUnit }),
+      ...(startDate === undefined ? {} : { startDate }),
     } as Plot,
     spec,
     true,
