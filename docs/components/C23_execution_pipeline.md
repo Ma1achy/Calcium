@@ -530,6 +530,80 @@ retries**, because silently re-attempting something the user asked for once is a
 surprise. Both distinctions live in the declaration rather than in the failure,
 which is what keeps them decidable at the moment the failure arrives.
 
+### 3d-bis. The two framework defaults, and the counter that ticks one of them
+
+**`b.live`'s loading placeholder and `renderError`'s fallback construct a `status`**, not a
+`notice`. The kind exists for exactly these three facts — a thrown renderer, a first fetch in
+flight, a backoff counting down — and C09 §3a's argument for it is that a consumer holds none of
+the three, so a box asserting one it has not observed is a lie the framework wrote the type for.
+Two of the three had no producer until now: `elapsedMs` and `attempt` were fields nothing in
+`src/` wrote, so two of `activityLine`'s three arms could not be reached from any session.
+
+**Three arms, and the height of each is a frame read** (F234). Both defaults land inside
+`livePanel`, which already draws a border and carries the title:
+
+| when | state | height | what it draws |
+|---|---|---|---|
+| the first fetch is in flight | `loading` | **2** | the message, then `⠸ loading (4s)` |
+| a fetch failed and a retry is coming | `retrying` | **2** | `▲ message`, then `⠸ retrying in 8s (attempt 2)` |
+| a fetch failed and **`retryInMs` is `null`** | `error` | **1** | `▲ message` alone |
+
+**H=2 and not 3, because the panel already has the border.** At 3 the box draws a second border
+inside the panel's and spends a row on it; at 4 it buys the ERROR tag at two nested borders. Only
+the figure says so — every rung is arithmetically self-consistent.
+
+**And the third arm is the one the classification table produced.** A `retrying` box **without**
+`retryInMs` draws no activity line and therefore **no spinner** — and §3d's rule 3 says a one-shot
+never retries, so `retryIn` is `null` for every one of them. Mapping the fallback to `retrying`
+unconditionally would give every one-shot failure a blank row where the spinner goes. The state
+union already carries the distinction: **`retryInMs === null` means no retry is coming**, and that
+is `error`.
+
+**`attempt` is `src.failures` and therefore consecutive**, reset to 0 by any success (§8d D6 — the
+backoff is the source's, so two parts behind one source show the same number, which is the same
+reason they back off together). Worth stating because *attempt 1* immediately after a long outage
+reads like a defect and is the count doing its job.
+
+#### The elapsed counter
+
+**Owned here, because this is where the clock is.** C04 I66 and C09 I32 rule that `retryInMs`,
+`attempt` and `elapsedMs` are supplied and never derived — `tick` cannot carry a duration, since
+C03 coalesces and drops commits under load, and L1 may not read a clock at all. `resolveStall`
+above is the precedent: a duration computed from `deps.clock()`, patched in at `origin: "shell"`.
+
+Four rules, and each one exists because the walk found something:
+
+- **It writes only when the figure changes.** `elapsed()` renders `4s`, `99s`, `1m 40s` — so the
+  guard asks whether the *rendered string* moved, not whether the clock did. **Not a throughput
+  argument**: measured, the counter beside its own spinner costs 0.4 frames a second, because
+  C03 coalesces six writes in ten into a frame already scheduled (F234). It is a hygiene one — a
+  write changing nothing observable is still a `rev` bump, and it invalidates C14's height cache
+  and tells the transcript a document changed when it did not.
+- **It is gated by `anyoneLooking`, the same gate the poller uses** (I46). The trace's sharpest
+  row: C22's spinner ticker disarms when nothing on screen animates, and this driver cannot see
+  the viewport — so off screen the spinner stops and the counter would keep writing, at **one
+  full frame each** rather than 0.4, which is exactly F234's *patch alone* arm. The gate already
+  exists for the poll and is heard through `visibilityChanged` rather than polled.
+- **It reads the block currently in place**, never one remembered at declaration — `put`'s own
+  rule, for `put`'s own reason. A fetch can fail between the arm and the fire, so the box the tick
+  was armed for may now be `retrying`; if what is there is not a `loading` status, nothing is
+  written.
+- **It never touches a consumer's block.** A part declaring `renderLoading` or `renderError` owns
+  its own rendering — C24 §5's *behaviour is fixed, rendering is overridable* — so the counter
+  fires only where the spec left the default in place.
+
+**A patch landing on a released host is tolerated silently**, as everywhere else here: `put`
+already returns `outcome.ok` and `unknown` is not a failure (I21, §5).
+
+#### The shape this was chosen over
+
+**Moving both defaults into this file**, so the framework's fallbacks live in one place rather
+than one in `builders/index.ts` and one in `execution.ts`, and `attempt` reaches the box without
+widening anything. It is tidier and it is **not** what was asked for, so it was not taken —
+recorded because the alternative is invisible from the result: a third parameter on
+`renderError` is a public widening (C24), and someone later collapsing it back has to be able to
+see what it was chosen over rather than reading it as incidental wiring.
+
 ### What stops a refresh
 
 Five triggers, all through `release(host)`, and one that is deliberately absent:
@@ -816,6 +890,8 @@ Per submission.
 
 
 - **I50** — **The `shell` route's failure is a document like any other: `error` filled, and the shell's own stderr in it.** A non-zero exit composed `status: "error"` with no `error` field, which C04 I3 forbids in both directions, so `transcript.append` refused every one of them (C13 I10) and the route produced **no entry at all** — the user seeing F15's fault notice cite two invariant numbers instead of the command they typed. This is the **third instance of the class `documents.ts` closed at `noticeDoc`**, and the argument recorded there — *filling the field here rather than at the two call sites is the class rather than the instances* — is why it recurred: the class was closed at one composer, and this route does not go through it. **Closing a class means checking the class has one member.** The second half is `stderr`: `ChildHandle` delivers it separately (C21 I3) and the route read only `stdout`, so a failing command's one explanatory sentence was produced, delivered and dropped — leaving a raw block that was empty as well as unappendable. §3's verb route already reads it, which is both the precedent and the proof it was reachable. **A bare word is the likeliest thing an unfamiliar reader types**, and it is the input this route exists for.
+- **I51** — **The two framework defaults construct a `status`, and its state is decided by whether a retry is coming.** `b.live`'s placeholder is `loading`; a failed fetch is `retrying` when the driver has a countdown to show and **`error` when it has not**, because §3d rule 3 makes `retryIn` `null` for every one-shot and a `retrying` box without `retryInMs` draws no activity line **and therefore no spinner** — a blank row where the one moving thing goes. The state union already carries the distinction, so the fallback reads it rather than asserting a state it has not observed (C09 §3a). **Their heights are 2, 2 and 1, and only a frame says so**: both land inside `livePanel`, which already draws a border and carries the title, so at 3 the box spends a row on a second border inside the first and at 4 it buys the ERROR tag at two nested borders (F234). `error` takes 1 because it has no activity line, and a declared height with nothing to put in it is a blank row — which is I31 working and is a defect only where this layer picks the number.
+- **I52** — **The elapsed counter is written here, only when the figure changes, only while someone is looking, and never into a block this layer did not put there.** The clock is C23's — C04 I66 and C09 I32 forbid deriving a duration from `tick`, which C03 coalesces and drops under load, and L1 may not read one — so `resolveStall`'s shape is the precedent. **The guard is on the rendered string and not on the clock**, and its argument is hygiene rather than throughput: measured, the counter beside its own spinner costs **0.4 frames a second**, because C03 folds six writes in ten into a frame already scheduled — but a write that changes nothing observable is still a `rev` bump, and it invalidates C14's height cache and says a document changed when it did not (F234). **`anyoneLooking` gates it, the same gate the poll uses** (I46): C22's ticker disarms when nothing on screen animates and this driver cannot see the viewport, so off screen the spinner stops while the counter would go on writing — at one whole frame each rather than 0.4, which is the condition the cost measurement was taken under and could not itself name. And the target is **the block currently in place**, never one remembered at declaration, because a fetch can fail between the arm and the fire; `attempt` is `src.failures` and therefore consecutive, reset by any success and shared by every part behind one source (§8d D6).
 ---
 
 ## 8. Commitments
@@ -864,6 +940,8 @@ Per submission.
 41. A source polls only while something is looking at it, and stops nothing when it is not — no teardown, no release, and due again the moment a referring host is visible (I46, I45, I9).
 42. A failure the pipeline swallows is said twice — once in the transcript at the time, once on the restored primary screen at exit — and C23 chooses only the first moment (I48).
 43. A stage failure after the append finishes the sequence rather than abandoning it, and the entry id is returned whenever the entry exists (I49).
+44. The framework's loading and failure boxes are `status` blocks whose state is read from whether a retry is coming, at the heights a frame chose rather than the ladder's preferred figure (I51).
+45. An elapsed counter advances in the transcript while a first fetch is in flight, and stops writing when the figure would not change, when nobody is looking, and when the block it was armed for is gone (I52).
 
 ---
 
@@ -883,6 +961,57 @@ statements overlap.
 | 5 | 120 s silent → stall patch → **settle** | I25 × §3b | **Defect A4.** A false notice, frozen in |
 | 6 | guard → **`append` throws** | I1 exception 2 × §6 | **Defect A5.** Guard stranded |
 | 7 | cancel → settle `partial` → **`end` arrives** | I10 × I8 | `settle` is a no-op on a settled id — correct |
+
+### 8a-bis. The elapsed counter — a trace and a table, because it has both kinds
+
+**Two artefacts, and taking only the trace would have missed half.** The tick is event-mediated
+and wants a sequence; which fields are legible in which state holds at rest with no event
+between, and wants a classification table. A component with state **and** structure needs both,
+and taking the trace alone because the timer is the obvious thing is how the structural half goes
+unexamined.
+
+#### The sequence trace
+
+| # | Sequence | Rules meeting | Outcome |
+|---|---|---|---|
+| B1 | tick fires → patch issued → **the first fetch resolves first** | the counter writes × `renderPart` replaces the panel | Both go through `put` on one entry and serialise. One stale frame, then the resolved content — **tolerated**, and the tick stops because B3's rule finds no `loading` block |
+| B2 | tick fires → **the host was released** between arm and fire | the counter patches × `patch` returns `{ok:false, reason:"unknown"}` | **Tolerated silently.** I21 and §5 — `unknown` is not a failure, and `put` already returns `outcome.ok` |
+| B3 | fetch **fails** → the box becomes `retrying` → the loading tick is still armed | the counter's target × the block currently in place | **Defect B3.** The tick would write `elapsedMs` into a `retrying` box. Fixed by reading the block in place, which is `put`'s own rule for `put`'s own reason |
+| B4 | fail → **succeed** → fail | `attempt` is `src.failures` × `failures = 0` on success | Attempt 1 after a recovery — correct, and it is why the field is named for the count rather than for a total |
+| B5 | two parts, one source, the source fails | `attempt` is the **source's** × each part draws its own arm | Same number in both boxes. §8d D6 already rules this and it is consistent — they back off together too |
+| B6 | `stop()` between arm and fire | the tick is armed × `stopped` | Must check `stopped`, as `armParts` does — otherwise it patches a torn-down transcript |
+| B7 | the entry **scrolls out of the window** | C22 I60a disarms the spinner × this driver cannot see the viewport | **Defect B7, and the sharpest.** Off screen the spinner stops and the counter keeps writing — **at one full frame each rather than 0.4**, because there is no longer a spinner frame to coalesce into. Fixed by `anyoneLooking` (I46), which already exists for the poll |
+
+**B7 is the row the whole trace was worth.** The cost measurement in F234 is conditional on
+something the measurement itself could not see: it was taken with the box on screen, which is
+where the counter is free, and the arm that says *patch alone is ten frames* is the same
+measurement describing the off-screen case without either of them being labelled that way.
+**A number is measured under a condition, and a trace is where the condition gets named.**
+
+#### The classification table
+
+Structural — two rules both holding at rest, no event between them. **Run against the shipped
+renderer rather than reasoned about**, which is what turned three of these from open questions
+into answers (F234).
+
+| state × fields | what the ladder does | ruling |
+|---|---|---|
+| `loading` + `elapsedMs` | `⠸ loading (4s)` | the arm |
+| `loading` + `retryInMs` or `attempt` | both ignored | correct — no second countdown |
+| `retrying` + `retryInMs` + `attempt` | `⠸ retrying in 8s (attempt 2)` | the arm |
+| **`retrying` + `elapsedMs`** | elapsed **dropped**, countdown wins | **C09 I31 is implemented, not merely ruled.** *Three numbers on one line is one too many* is a sentence about a preference; the question the table asks is whether a consumer can construct the state and what happens when they do. It constructs fine and the renderer already decides |
+| **`retrying` − `retryInMs`** | blank row, **and no spinner** | **Defect C1.** Every one-shot failure. The arm is `error` |
+| `error` + any of the three | no activity line at all | which is why `error`'s height is **1** |
+| `loading`, elapsed < 1s | no counter | a fast load must not flash one — already in `elapsed()` |
+| `loading`, elapsed past 99s | `1m 40s`, never coarser than the second | so the write rate never falls of its own accord; F234 measured that it does not need to |
+| a consumer's `renderLoading` returns a `status` | the counter must not overwrite it | C24 §5 — behaviour fixed, rendering overridable |
+| host is a **view**, not the transcript | `put` branches to `updateView` | free, provided the write goes through `put` rather than round `it` |
+| H = 2 inside `livePanel` | message + activity line | the arm |
+| H = 3 inside `livePanel` | a second border inside the panel's | one row spent, nothing gained |
+
+**C1 is a structural finding and no sequence could reach it** — nothing happens between *a
+one-shot declares no interval* and *the fallback picks a state*. It is two correct statements
+overlapping in a cell, which is the only place either artefact has ever found anything.
 
 ### A1 — the cancellation window, and the ladder that cannot see it
 

@@ -369,6 +369,15 @@ exactly as it did (C22 I60) (C22 I60a). The kind is written against a working co
 a still frame without one — which is what it did, and the degradation is the reason a suite of
 sixteen spinner sets stayed green over it.
 
+**Who constructs one, and at what height** — three producers, and two of them were absent for as
+long as the kind existed. The registry supplies the number `measure` already committed when a
+renderer gives way (I31); C23's two framework defaults **choose** theirs, at 2 for `loading` and
+`retrying` and 1 for `error`, because both land inside a `panel` that already draws a border and
+because `error` has no activity line to put in a second row (C23 I51, F234). **`elapsedMs` and
+`attempt` had no writer anywhere in `src/`** until C23 I52, so two of `activityLine`'s three arms
+were unreachable from any session while sixteen spinner sets shipped fully tested — the same
+shape as the counter above, one field down.
+
 **The observable cadence is `max(set, window)`.** The braille default declares 80 ms and C03's
 `spinner` window is 100, so the default runs at 10 fps rather than 12.5 — C03 §3's trade, applied
 unconditionally, and written down in C22 I60a because neither half mentioned the other.

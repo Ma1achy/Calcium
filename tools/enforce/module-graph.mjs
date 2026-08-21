@@ -624,10 +624,16 @@ export const BUILDER_OMISSIONS = Object.freeze({
   // today, so nothing here is owed a later step (C09 §3a, C04 I66).
   "status.state": "C09 §3a — the state is observed, never declared; a builder would let it be claimed",
   "status.message": "C09 §3a — as `state`: the message is what the boundary or the driver caught",
-  "status.height": "C09 I31 — the box is bound by what `measure` committed and cannot be given its own",
-  "status.retryInMs": "C09 I32 — the backoff is the source's, and only the driver can compute it",
-  "status.attempt": "C09 I32 — as `retryInMs`, and counted once per source rather than per part",
-  "status.elapsedMs": "C09 I32 — supplied by whoever holds the clock, which is never a builder",
+  // **This reason expired halfway and the half that survives is the one that matters.** It
+  // read *the box is bound by what `measure` committed and cannot be given its own*, which is
+  // true of the containment path and false since C23 I51: the two framework defaults pick 2
+  // and 1, chosen from a frame. What has not changed is that no **consumer** picks one — the
+  // pickers are the registry and the refresh driver, both inside the framework, and a builder
+  // would hand the number to someone with no way to know what will be drawn in it.
+  "status.height": "C09 I31, C23 I51 — the height is the framework's, from a committed measure or from a frame read; never a consumer's",
+  "status.retryInMs": "C09 I32, C23 I51 — the backoff is the source's, and only the driver can compute it",
+  "status.attempt": "C09 I32, C23 I52 — as `retryInMs`: `src.failures`, consecutive, and counted once per source rather than per part",
+  "status.elapsedMs": "C09 I32, C23 I52 — supplied by whoever holds the clock, which is the refresh driver and never a builder",
   "status.spinner": "C09 I32 — reachable when a consumer owns a `status` block, and none does",
 
   "plot.emptyMessage":
