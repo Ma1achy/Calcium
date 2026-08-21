@@ -10475,3 +10475,60 @@ other three up.
 count. Each restatement cites the situation rather than the guard.
 
 **Fixed**: the three prose sites and the message, which becomes `is not one of ${names}`.
+
+---
+
+## F216 — a rule stated three times, contradicted at four sites, and the corpus could not see it ★★★★★
+
+**The rule was never in doubt.** C12 §3c ends *`plotStyle` names __what__, never the alphabet*.
+I43 says *`plotStyle: "line"` says draw this as a connected line; which glyphs do it is the
+renderer's*. C02 §4 gives the substitution with a named owner — *box drawing → `+ - \|`; braille
+plots → coarse block plot, owner C09 C12*.
+
+**Four sites decide the alphabet from `plotStyle` or from the wrong capability:**
+
+| site | the decision |
+|---|---|
+| `linedraw.ts` `lineDrawRows` | `const table = corners === "sharp" ? SHARP : ROUNDED` — no capability in the signature |
+| `definition.ts` `styleRasteriser` | branches on `ambiguousWidth`, which answers *how wide is a glyph*, where *can this terminal draw one* is `unicode` — and discards `_caps` on the way to the site above |
+| `heatmap.ts`, the contour | `const braille = (block.plotStyle ?? "auto") !== "line"` |
+| `definition.ts`, the violin ×4 | `block.plotStyle === "braille"`, passed as a boolean to four routines that each hold `ctx.capabilities` |
+
+**The first is the one to read twice.** `glyphForMask` sits **twelve lines below** it in the same
+file, already takes `caps`, and already has an `ASCII` table whose doc comment reads: *every caller
+was emitting box-drawing regardless of capability … the violin's outline made it visible — an ASCII
+frame came back full of `╭─╯`.* The fix was made, for the exported helper, and never reached the
+function above it — where the frame full of `╭─╯` still comes back.
+
+**Measured across the corpus**, every form × variant at `unicode: "ascii"`:
+
+| | `ascii · narrow` | `ascii · wide` |
+|---|---|---|
+| variants carrying a non-ASCII codepoint | **49 of 159** | **24 of 159** |
+
+**And the framework fails its own published contract.** `expectDocument(doc).degradesToAscii()` —
+C24 §7, exported for a consumer's suite — refuses a document containing a `line` plot (`U+256D`)
+and one containing a `contour` (`U+28C0`). A consumer running the assertion the framework hands
+them is told their document is wrong.
+
+**F212 named half of it.** Its diagnosis was the missing arm — *the catalogue's ASCII arm is
+`ascii-wide`, so every ASCII frame is also a wide frame and the wide arm answers for the ASCII
+one* — and that is exactly right about sites 1 and 2. It could not reach sites 3 and 4, which are
+wrong in the arm that **is** rendered: **32 committed catalogue files carry braille inside a frame
+labelled `ascii`**, and nobody had read them. *A finding about a missing fixture is not a finding
+about the fixtures you have.*
+
+**The separator is the same class in prose.** `·` (U+00B7) is written into five plot strings and
+passes `checkMarks` correctly — `·` is in `PROSE_MARKS`, and that rule's comment records the blind
+spot with its number: *106 literals carry prose punctuation and this passes every one … a real and
+much larger question, and not this rule's.* It does **not** pass `degradesToAscii`, which is a
+contract on a rendered document and has no opinion about punctuation. Two instruments, two
+subjects, and the weaker one was the one being run.
+
+**Fixed** — C12 I54, §3af. One predicate at every decision, C02 §4's own substitutions, degraded
+and never refused. `lineDrawRows` degrades **in place** rather than yielding to `curveRows`:
+falling back to the ramp keeps the frame ASCII and loses the connectivity that is the whole content
+of `plotStyle: "line"`. The corpus stops varying `unicode` and `ambiguousWidth` together, which
+also gives `full · wide` its first frame — the combination F171's braille ramp lives in. AA1
+asserts the whole corpus in one row, because the four sites were four mechanisms and what they
+share is the output.

@@ -3345,6 +3345,79 @@ outnumber the cells the oldest are dropped, so the three positions are read *thr
 series' own indices instead would caption a five-year calendar with the first week of five years
 ago, which is not on the frame.
 
+## 3af. The alphabet is a capability, and four sites decided it from `plotStyle`
+
+**The ruling is not new here — it is stated three times and the code contradicts it at four
+sites.** §3c ends *`plotStyle` names __what__, never the alphabet*; I43 says *`plotStyle: "line"`
+says draw this as a connected line; which glyphs do it is the renderer's*; C02 §4 gives the
+substitution with a named owner — *box drawing → `+ - |`; braille plots → coarse block plot,
+owner C09 C12*. So this section records a defect against a rule the document already holds, and
+what it adds is the invariant tests can cite and the instrument that would have found it.
+
+### 3af.1 — measured, at the arm the corpus does not render
+
+A sweep of every catalogue form × variant at `unicode: "ascii"`, both widths:
+
+| | `ascii · narrow` | `ascii · wide` |
+|---|---|---|
+| variants carrying a non-ASCII codepoint | **49 of 159** | **24 of 159** |
+
+**And the framework's own published contract fails on the commonest form.** `expectDocument(doc)
+.degradesToAscii()` — C24 §7, exported for a consumer's suite — refuses a document containing a
+`line` plot (`U+256D ╭`) and one containing a `contour` (`U+28C0 ⣀`). A consumer calling the
+assertion the framework publishes is told their document is wrong, and it is the renderer's.
+
+### 3af.2 — the four sites, and why each was invisible
+
+| # | site | the decision | what hid it |
+|---|---|---|---|
+| 1 | `linedraw.ts` `lineDrawRows` | `const table = corners === "sharp" ? SHARP : ROUNDED` — **no capability at all** | `glyphForMask`, **twelve lines below in the same file**, already takes `caps` and already has an `ASCII` table whose comment reads *every caller was emitting box-drawing regardless of capability*. The fix was made, for the exported helper, and never reached the function above it |
+| 2 | `definition.ts` `styleRasteriser` | `useLineDraw = ps === "line" \|\| (auto && caps.ambiguousWidth !== "wide")` — it reads `ambiguousWidth`, which answers *how wide is a glyph*, where *can this terminal draw one* is `unicode`; and it discards `_caps` on the way to site 1 | the corpus's only ASCII arm is **wide**, where `useLineDraw` is false. The two capabilities vary together in every fixture, so the wide arm answers for the ASCII one (F212) |
+| 3 | `heatmap.ts`, the contour | `const braille = (block.plotStyle ?? "auto") !== "line"` — the alphabet from the style alone | `contourCellRows` **already takes `caps`** and degrades correctly; the chooser above it never asks. Visible in the rendered corpus and never read |
+| 4 | `definition.ts`, the violin ×4 | `block.plotStyle === "braille"` passed as a boolean to four routines that each hold `ctx.capabilities` | same — the capability is *in scope at the call site* and is not part of the decision |
+
+**Sites 3 and 4 are in the arm the catalogue does render**, so **32 committed catalogue files carry
+braille inside a frame labelled `ascii`**. Nothing read them. That is the half F212 did not reach:
+it diagnosed the missing arm, and the arm that exists was wrong too.
+
+### 3af.3 — the separator is the same class in prose
+
+`·` (U+00B7) is written into five plot strings — two legends, a grouped bar's category, a
+heatmap's overflow clause, a contour's level list. It passes `checkMarks`, correctly: `·` is in
+`PROSE_MARKS` and that rule's own comment records the blind spot with its figure — *106 literals
+carry prose punctuation and this passes every one … a real and much larger question, and not this
+rule's.*
+
+**It does not pass `degradesToAscii`,** which is a contract on a rendered document and does not
+care whether a codepoint is punctuation. The five are fixed here and the wider 106 are not: a plot
+frame is the place with the stronger contract, and answering the general question from inside one
+component is how a narrow scope comes to read as deliberate (F84).
+
+### 3af.4 — the ruling
+
+**One predicate, at every alphabet decision.** A declared `plotStyle` is a preference about *what*
+is drawn; whether the terminal has the repertoire is the renderer's, and at `unicode: "ascii"` the
+answer is the substitution C02 §4 already names — `+ - |` for box drawing, the density ramp for
+braille, `-` for the separator. **A style is never refused for it**, because a caller could not
+have avoided the terminal (I18's precedent, the solid pie at one bit).
+
+**`lineDrawRows` degrades rather than yielding to `curveRows`,** and that is the choice worth
+stating: falling back to the ramp would keep the frame ASCII and lose the *connectivity* that is
+the whole content of `plotStyle: "line"`. The ASCII table exists, C02 §4 promises exactly it, and
+a corner is `+` in all four directions — `/` and `\` read as a slope rather than a join at this
+resolution.
+
+### 3af.5 — what the ruling leaves behind
+
+- **The corpus's ASCII arm was also its wide arm and its one-bit arm.** Splitting it is what makes
+  any of this visible, and it is a **new** frame for `full · wide` — the combination F171's braille
+  ramp lives in and which no catalogue file has ever held.
+- **The `·` is fixed in five plot sites and stands in ~101 others.** Counted, not swept, and the
+  number is in `source-scans.mjs` where the blind spot is declared.
+- **Nothing here refuses.** A `plotStyle` a terminal cannot honour still renders, so no caller
+  gains an error and no document becomes invalid — which means the fix moves frames and moves no
+  validation, and every gate that would have caught it is a frame read.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -4483,6 +4556,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I51** — **`layers` is a draw order the caller reads and a priority order the merge takes, reversed at one documented seam.** `layers` says what is drawn; `Layer.kind` (I44) says how two inked cells resolve, and both a contour and a quiver are `"curve"`. **`field`'s membership is load-bearing and its position is inert** — a background cannot occlude, so the two orderings render byte-identical. `fieldDim` and `glyphInk` are two fields because they answer two questions: `"floor"` dims per colormap by measurement rather than by a constant (viridis and coolwarm at 50%, inferno at 40%) and costs viridis 78% of its luminance spread; `"contrast"` picks black or white per cell and costs a quiver its magnitude channel. Below `colourDepth: 8` the field is a ramp **glyph** rather than a wash, so two glyph layers meet — and **the field yields where the layer over it is drawn in the ramp's own alphabet**, which a contour is at every capability and an arrow is at none. Ruling the other way settles the cell contention and leaves both layers in one vocabulary, which no assertion can see and the frame shows at once. `fieldDim` is inert below the floor regardless (§3y).
 - **I52** — **A horizon carries band depth in colour and within-band height in the vertical eighths, and it folds by mirroring.** The form had no section and no invariant: it was built from the survey's entry, which says *colour = which band*, and shipped carrying depth on the density **glyph** ramp with `DEFAULT_COLORMAP.horizon` set to `null` — so the compression its own header calls *paid for in a colour axis* was charged and never delivered, and depth was occupying the alphabet height needs. At `height: 1`, the canonical horizon, every inked column was therefore exactly one row. **The mirror is forced rather than chosen**: §3r measured that Unicode's eighths are a complete ladder upward and `▀`/`▔` are the whole of the downward repertoire, so an offset fold would resolve one direction to an eighth and the other to a half — precision at one end reading as precision at both. The sign rides a diverging map's two halves, so a **sequential** `colormap` is refused rather than drawing a trough as a peak, and `legend: false` is refused because the colour axis *is* the reading (I19's argument for a matrix's scale). **The baseline is 0 where the range spans it and `range.min` otherwise** — folding about the minimum unconditionally is why it only ever folded one way, and it is invisible on any fixture that never goes negative. **A finite reading always draws ink** (I16 one form along): a floor rendering blank gives blank two meanings in the form whose subject is *how deep*. *Below `CONTINUOUS_FLOOR` there is one channel for two data and the frame decides, not this invariant (§3z).*
 - **I53** — **A calendar's rows are the sub-unit, its columns the super-unit, and its cells are the one thing in the matrix family that have a duration.** `calendarUnit` picks the cell and the grid falls out: 24 rows for `hour`, 7 for `day`, 5 for `week`, 12 for `month`, one flat series in and `N` labelled rows out, substituted at `heatmapFormRows` where a `quiver`'s magnitude field already is so that the range, the gutter, the legend and the overflow row all see one series list. **Three units are `(offset + i) mod cycle` and `week` is a calendar**, because a month is not a whole number of weeks — so `week` is the only unit whose grid has interior holes, and they are periods that do not exist rather than readings that are missing. **The span needs no member**: `startDate` + unit + `values.length` fixes it, which is the reader `startDate` was published without. **The columns are `uniform`** — every cell the same width, the oldest dropped first, the remainder a fringe — because `stretch` differs by one cell and one cell at a pitch of one is a doubling, and a two-cell week beside a one-cell week reads as two weeks holding one value (§6b B15's rule on its third consumer). `uniform` is `left` with the cells widened to fill, identical wherever the pitch is one, and the fringe is removed with `width` rather than by stretching. **No height refusal** — `matrixRows` spends its last row on `+17 more · 07 · 08 · …`, which is commitment 46 speaking in the calendar's own labels, and at `height: 1` the frame is that notice and no cells. **No `Date`** (SS1), UTC only, days-from-civil by hand. **Three x captions, derived at the super-unit's granularity where the caller declared none, and read through `columnMap` so they name the columns that are shown rather than the columns that exist.** The walk ruled the other way and gave a reason — *placing one against a grid that need not reach the area's right edge needs an offset, and `xLabelRow` takes a width* — that is true of a right-anchored grid and false of the three arms whose grid starts at column 0. **A matrix's captions span its grid rather than its area** from here on, which was already wrong for `left` and was shipped; `window` keeps the area and §3ae.7 names why (§3ae.8).
+- **I54** — **An alphabet is chosen by capability and never by `plotStyle`, and at `unicode: "ascii"` every sub-cell repertoire has a stated substitute.** §3c's *`plotStyle` names what, never the alphabet* was the rule and four sites decided it from the style alone: `lineDrawRows` selected its glyph table with no capability in the signature, `styleRasteriser` branched on `ambiguousWidth` where the question is `unicode`, and the contour and violin arms read `plotStyle` while holding `ctx.capabilities`. **The substitutions are C02 §4's, not new ones** — box drawing becomes `+ - |` through the `ASCII` table `glyphForMask` has had all along, braille becomes the density ramp, and the legend separator becomes `-`. **A style is degraded and never refused**, on I18's precedent: a caller cannot avoid the terminal they are on. **`lineDrawRows` degrades in place rather than yielding to `curveRows`**, because the ramp is ASCII and loses the connectivity that is the whole content of `plotStyle: "line"`. Measured: 49 of 159 variants at `ascii · narrow` and 24 at `ascii · wide`, 32 committed catalogue files carrying braille in a frame labelled ascii, and `expectDocument(…).degradesToAscii()` — the assertion this framework publishes for a consumer's suite — failing on a `line` plot and on a `contour` (C12 §3af, F216, → C09 I22, C02 §4).
 
 ## 8. Commitments
 
@@ -4533,6 +4607,7 @@ orientation — and belongs in the classification table as its own rows.
 45. **The layers a field is drawn in are declared, and the two contrast remedies ship as options rather than as a refusal** — a glyph over a colormap competes on legibility and 45% of viridis clears the floor against white; `fieldDim` and `glyphInk` each name their own price, and both default off (I51, §3y).
 46. **A horizon's two channels stop sharing one alphabet** — depth is colour and height is the vertical eighths, the fold mirrors because the downward repertoire is two glyphs deep, and a form that had no section in this document gets one (I52, §3z).
 47. **A calendar learns what a date is** — the cell picks the grid and the span falls out of `startDate` + unit + length, so no span member is added and a member published in step 0 with four occurrences and no reader acquires one; the columns are uniform because they are the only cells in the family that have a duration (I53, §3ae).
+48. **The alphabet is the terminal's and the style is the caller's** — one predicate at every decision, C02 §4's own substitutions, degraded and never refused; and the corpus stops varying `unicode` and `ambiguousWidth` together, which is what made a rule stated in three places contradicted at four sites for the life of the component (I54, C12 §3af).
 
 ---
 
@@ -4542,6 +4617,10 @@ Six tiers. No state machine — C12 is pure over the block.
 
 ### Tier 1 — unit
 
+- **AA1** (I54, §3af): **the whole corpus, at both ASCII arms** — every catalogue form × variant rendered at `unicode: "ascii"` with `ambiguousWidth` at each value, asserting every codepoint is under 128. One assertion rather than a row per form, because the four sites were four different mechanisms and what they share is the output. It is the row that would have caught all of them, and the measurement it replaces is 49 of 159 and 24 of 159.
+- **AA2** (I54, §3af): a `line` plot at `ascii · narrow` draws a **connected** figure in `+ - |` — asserted as *no codepoint above 127* **and** *a `+` appears where the curve turns*, because falling back to the density ramp satisfies the first and loses what `plotStyle: "line"` means. The paired row is the same fixture at `unicode: "full"`, which must still be `╭─╯`.
+- **AA3** (I54, §3af): `plotStyle: "braille"` on a violin and an unstyled `contour`, both at ASCII, render in the ramp and **do not refuse** — the block is valid, the document renders, and only the alphabet changed (I18's precedent).
+- **AA4** (I54, §3af): `expectDocument(doc).degradesToAscii()` **passes** for a document holding a line plot, a contour and a two-series bar with a legend. The framework's own published contract, exercised against the forms that broke it — and the *fixture responds* control is the same assertion at `unicode: "full"`, which must find the non-ASCII it is supposed to allow there.
 - **HZ1** (I52, §3z): band depth reads from the colormap and not from `ladderFor("density")` — asserted as *the glyph alphabet is the eighths at every band* plus *two bands differ in colour*, because a run that changed only the ramp would pass an assertion about colour alone.
 - **HZ2** (I52, §3z): at `height: 1` a series sweeping one band renders **eight** distinct glyphs. The row the shipped form fails: it renders one, and no assertion about band count can see that.
 - **HZ3** (I52, §3z): a negative value mirrors upward and takes the other half of the diverging map, asserted against a fixture that crosses zero — and the paired row that a sequential `colormap` is **refused**, which is where the sign would otherwise be silently lost.
@@ -4703,6 +4782,10 @@ Six tiers. No state machine — C12 is pure over the block.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.55** (I54): returning `lineDrawRows` to a table chosen from `corners` alone → AA1 and AA2 fail. **The state it shipped in**, twelve lines above an `ASCII` table whose comment says every caller was emitting box-drawing regardless of capability.
+- **T6.56** (I54): `styleRasteriser` reading `ambiguousWidth` again instead of `unicode` → **AA1's narrow arm fails and its wide arm does not**, which is the whole of F212 as a single row: the two capabilities agreed in every fixture the corpus had.
+- **T6.57** (I54): the contour or the violin choosing braille from `plotStyle` alone → AA1 and AA3 fail. Two sites, one row, because the mutation is the same expression twice and a separate row would assert the same thing.
+- **T6.58** (I54): the catalogue's ASCII arm returned to `ambiguousWidth: "wide"` → **AA1 still passes**, and that is the row's content: the corpus is not the gate, and a fixture that varies two capabilities together cannot be made into one by adding frames.
 - **T6.32** (I48, I37): placing the callout with `rowOf(v, range, areaRows)` rather than from the series' ink → YC2 fails, and one value in six lands a row off the line it names, worst at the ends of the range. **Nothing else sees it**: every count, colour and width assertion passes, and the number is beside the right row at the widths a fixture happens to use.
 - **T6.33** (I48, I8): dropping the `+` where two callouts share a row → YC4 fails, and a series' reading disappears with the frame asserting nothing about it.
 - **T6.34** (I48): letting a callout take the **left** gutter's row as well → YC3 fails, and `yAxis: "both"` loses a reading on the one row where it has two chances to keep it.
