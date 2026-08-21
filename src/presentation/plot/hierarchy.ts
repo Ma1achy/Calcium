@@ -37,7 +37,13 @@ export type Tile = Readonly<{
  * children outside the parent that contains them.
  */
 function extentOf(node: HierarchyNode): number {
-  const own = Number.isFinite(node.value) ? Math.max(0, node.value) : 0;
+  // **`value` is optional since `tree` joined the field** (C04 I64): absent is
+  // zero here, which is what the three magnitude forms already did with a
+  // non-finite one — and the gate refuses an absent value on all three, so a
+  // node reaching this without one came through a fixture (C12 I2).
+  const own = typeof node.value === "number" && Number.isFinite(node.value)
+    ? Math.max(0, node.value)
+    : 0;
   const kids = (node.children ?? []).reduce((sum: number, c: HierarchyNode) => sum + extentOf(c), 0);
   return Math.max(own, kids);
 }

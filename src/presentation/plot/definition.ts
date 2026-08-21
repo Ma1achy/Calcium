@@ -27,6 +27,7 @@ import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
+import { treeArea } from "./tree.js";
 import { curveRows, isBlank } from "./curve.js";
 import { crossRow, gridRow, xRowFor, xTitleRow } from "./furniture.js";
 import type { Axis, XAxis } from "./axes.js";
@@ -1840,6 +1841,39 @@ function hierarchyStripRows(
  * and is left to one (§3n). The alternative is a feature reaching back to widen
  * the geometry that serves it.
  */
+/**
+ * A tree — the node-link figure, in whichever of three layouts fits (C12 I57).
+ *
+ * **The area is geometry and the row beneath it is a claim about the data.**
+ * `tree.ts` returns plain rows and the names it had to drop; the notice is I8's
+ * mechanism and is toned here, because a node not drawn is data going missing —
+ * the opposite of the tile whose *name* did not fit, which is still drawn, still
+ * coloured and still carries its extent (§3n, §3ah.7).
+ */
+function treeRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
+  const root = block.hierarchy;
+  const areaRows = plotAreaRows(block);
+  const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (root === undefined) return emptyRows(block, layout, ctx);
+
+  const drawn = treeArea(
+    root, areaRows, width, block.treeLayout, ctx.capabilities, block.plotCorners ?? "rounded",
+  );
+  const out = drawn.rows.map((r) => line([{ text: r }], layout, ctx));
+  if (drawn.dropped.length > 0) { // cells-ok — a node count
+    const sep = partSeparator(ctx.capabilities);
+    const notice = `+${String(drawn.dropped.length)} more${sep}${drawn.dropped.join(sep)}`; // cells-ok — a node count
+    out.push(
+      line(
+        [{ text: areaText(notice, layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) }],
+        layout,
+        ctx,
+      ),
+    );
+  }
+  return composeRows(plotHeight(block), [], out, []);
+}
+
 function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
   const root = block.hierarchy;
   const areaRows = plotAreaRows(block);
@@ -2446,6 +2480,7 @@ const FORM_ROWS: Readonly<
       ? hierarchyStripRows(block, width, ctx, true)
       : legacyDepthBars(block, width, ctx, true),
   treemap: (block, width, ctx) => treemapRows(block, width, ctx),
+  tree: (block, width, ctx) => treeRows(block, width, ctx),
 
   // --- the six that had no renderer -------------------------------------
   //

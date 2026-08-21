@@ -417,6 +417,12 @@ SKIPPED = {
     "treemap": "no matplotlib primitive; the reference is the squarify algorithm "
                "and T1.66 asserts it directly",
     "flame": "no matplotlib primitive; containment is asserted structurally in T1.64",
+    # A tree is the fourth reading of the same field, and the reason is the
+    # family's: graphviz would be the reference and it is not a dependency this
+    # comparison should acquire. TR1 asserts the three layouts' natural sizes
+    # against four trees directly, which is the algorithm rather than a picture.
+    "tree": "no matplotlib primitive; the three layouts' sizes are asserted "
+            "directly in TR1",
     # matplotlib's `contour` exists, and it is not the comparison this instrument
     # makes: ours is `axes: false`-isolated ink and a contour refuses that arm
     # (C04 I50b), so the form is in UNISOLABLE and never reaches a reference.

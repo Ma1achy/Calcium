@@ -824,6 +824,24 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ],
     },
   },
+  tree: {
+    // The catalogue's own tree, and §3ah.1's measurements are taken on it: 9
+    // nodes, 5 leaves, depth 3, leaf names totalling 27 cells.
+    default: {
+      form: "tree", height: 7, series: [],
+      hierarchy: {
+      label: "root",
+      children: [
+        { label: "render", children: [
+          { label: "curve", children: [{ label: "raster" }] },
+          { label: "paint" },
+        ] },
+        { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+        { label: "parse" },
+      ],
+    },
+    },
+  },
   treemap: {
     // One tree, three forms — C04 I54. The same fixture below under `flame` and
     // `icicle`, because what they disagree about is layout.

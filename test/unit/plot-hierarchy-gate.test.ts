@@ -98,8 +98,18 @@ describe("HG2 (C04 I64): a hierarchy on a form that reads none is refused", () =
     }
   });
 
-  it("absent is accepted everywhere, which is why the field went unchecked", () => {
-    for (const form of ALL_FORMS) expect(errs(form, undefined), form).toEqual([]);
+  it("absent is accepted everywhere but the one form with nothing else", () => {
+    // **The row that records why the field went unchecked**, and the carve-out
+    // is deliberate: `tree` is the only form whose whole subject is the shape,
+    // so absence is refused there and ordinary on the other forty-four, two of
+    // which fall back to their series and one to its empty message (C04 I65).
+    for (const form of ALL_FORMS) {
+      if (HIERARCHY_ROLE[form] === "structure") {
+        expect(errs(form, undefined), form).toHaveLength(1);
+        continue;
+      }
+      expect(errs(form, undefined), form).toEqual([]);
+    }
   });
 });
 
@@ -153,6 +163,6 @@ describe("HG5 (C04 I64): the record agrees with the frames", () => {
       const after = rows({ ...base, hierarchy: good });
       if (before !== after) moved.push(form);
     }
-    expect(moved.sort()).toEqual(["flame", "icicle", "treemap"]);
+    expect(moved.sort()).toEqual(["flame", "icicle", "tree", "treemap"]);
   });
 });

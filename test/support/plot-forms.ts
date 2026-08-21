@@ -183,6 +183,23 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
     kind: "plot", id: "form-utilisation", form: "utilisation", height: 3,
     series: [s([10, 40, 90, 30]), s([70, 20, 50, 80]), s([5, 60, 35, 95])],
   }),
+  // **No `value` anywhere in it**, which is the fourth form's whole point: a
+   // tree is placed by shape alone, and the member is optional for it (C04 I64).
+  tree: block({
+    kind: "plot", id: "form-tree", form: "tree", height: 7,
+    series: [],
+    hierarchy: {
+      label: "root",
+      children: [
+        { label: "render", children: [
+          { label: "curve", children: [{ label: "raster" }] },
+          { label: "paint" },
+        ] },
+        { label: "layout", children: [{ label: "measure" }, { label: "wrap" }] },
+        { label: "parse" },
+      ],
+    },
+  }),
   treemap: block({
     kind: "plot", id: "form-treemap", form: "treemap", height: 8, series: [],
     hierarchy: {

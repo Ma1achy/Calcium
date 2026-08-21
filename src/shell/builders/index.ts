@@ -426,6 +426,7 @@ function plot(
     orientation?: Plot["orientation"];
     bandwidth?: Plot["bandwidth"];
     hierarchy?: Plot["hierarchy"];
+    treeLayout?: Plot["treeLayout"];
     matrixAnchor?: Plot["matrixAnchor"];
     legend?: Plot["legend"];
     plotFrame?: Plot["plotFrame"];
@@ -438,7 +439,7 @@ function plot(
     startDate?: Plot["startDate"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -526,6 +527,24 @@ function plot(
   // `plotDetail` refusal above is a copy on purpose — a one-line predicate
   // written twice can be compared by eye — and a recursive walk is not: two
   // copies of it are two walks, and the second one drifts.
+  {
+    const drawn = form ?? "line";
+    if (treeLayout !== undefined && drawn !== "tree") {
+      throw new TypeError(
+        `b.plot: "treeLayout" is "${treeLayout}" on form "${drawn}" (C04 I65) — only a tree ` +
+          `has more than one layout to choose between, and an ignored member reads as one ` +
+          `not yet implemented`,
+      );
+    }
+    // **A structure form has nothing else to draw** (C04 I65, C12 §3ah.9),
+    // where the three magnitude forms fall back to a series or an empty message.
+    if (hierarchy === undefined && HIERARCHY_ROLE[drawn] === "structure") {
+      throw new TypeError(
+        `b.plot: form "${drawn}" with no "hierarchy" (C04 I65) — that form draws a tree and ` +
+          `nothing else, so there is no figure to fall back to`,
+      );
+    }
+  }
   if (hierarchy !== undefined) {
     const drawn = form ?? "line";
     const role = HIERARCHY_ROLE[drawn];
@@ -723,6 +742,7 @@ function plot(
       ...(orientation === undefined ? {} : { orientation }),
       ...(bandwidth === undefined ? {} : { bandwidth }),
       ...(hierarchy === undefined ? {} : { hierarchy }),
+      ...(treeLayout === undefined ? {} : { treeLayout }),
       ...(matrixAnchor === undefined ? {} : { matrixAnchor }),
       ...(legend === undefined ? {} : { legend }),
       ...(plotFrame === undefined ? {} : { plotFrame }),

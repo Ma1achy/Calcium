@@ -133,7 +133,7 @@ describe("refdiff — the grid is the model, not the answer", () => {
     // neither place is an unrecorded gap.
     // Kept in step with `reference.py`'s own list — the two halves of one
     // record, and a form in neither is the gap this row exists for.
-    const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle"]);
+    const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle", "tree"]);
     // `contour` is not here: it is *unisolable* rather than unreferenced, so it
     // leaves through `excluded` above. Both halves of the record still name it.
     expect(new Set(missing), "forms with neither a reference nor a recorded reason").toEqual(recorded);

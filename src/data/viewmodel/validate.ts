@@ -322,6 +322,34 @@ export function hierarchyFault(
  * shapes*. Every other typed field here is a flat list or a small record, so its
  * clause is one line and got written.
  */
+/**
+ * `treeLayout` — the values, and the one form that has them (C04 I65).
+ *
+ * **The literals are restated here and `TREE_LAYOUTS` holds them in `tree.ts`**,
+ * which is L1; L0 does not import upward, so the two must agree and a row
+ * asserts it rather than deriving one from the other — `RUNG_FORMS`' argument,
+ * one member along.
+ */
+function checkTreeLayout(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const tl = b["treeLayout"];
+  if (tl === undefined) return;
+  if (tl !== "auto" && tl !== "topDown" && tl !== "leftRight" && tl !== "outline") {
+    e.push(`${at}: "treeLayout" must be "auto", "topDown", "leftRight" or "outline" (C04 I65)`);
+    return;
+  }
+  if (form !== "tree") {
+    e.push(
+      `${at}: "treeLayout" on form ${JSON.stringify(form)} (C04 I65) — only a tree has more ` +
+        `than one layout to choose between, and an ignored member reads as one not yet implemented`,
+    );
+  }
+}
+
 function plotHierarchyErrors(
   b: Record<string, unknown>,
   e: string[],
@@ -329,10 +357,22 @@ function plotHierarchyErrors(
   form: unknown,
 ): void {
   const h = b["hierarchy"];
-  if (h === undefined) return;
   const role = HIERARCHY_ROLE[form as PlotForm];
   // An unrecognised form is the form check's to report, not this one's.
   if (role === undefined) return;
+  checkTreeLayout(b, e, at, form);
+  if (h === undefined) {
+    // **A structure form has nothing else to draw** (C04 I65, C12 §3ah.9). The
+    // three magnitude forms do: two fall back to their series and the third
+    // draws its empty message, so absence is ordinary there and fatal here.
+    if (role === "structure") {
+      e.push(
+        `${at}: form ${JSON.stringify(form)} with no "hierarchy" (C04 I65) — that form draws ` +
+          `a tree and nothing else, so there is no figure to fall back to`,
+      );
+    }
+    return;
+  }
   if (role === null) {
     e.push(
       `${at}: "hierarchy" on form ${JSON.stringify(form)} (C04 I64) — that form draws a ` +
@@ -1475,7 +1515,7 @@ const PLOT_FORM_MEMBERS = {
   scatter: true, step: true, ecdf: true,
   bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
   lollipop: true, dotplot: true, waffle: true,
-  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true,
   slope: true, bubble: true, autocorrelation: true, timeline: true, bullet: true, utilisation: true,
   calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
   density: true, violin: true, ridgeline: true,

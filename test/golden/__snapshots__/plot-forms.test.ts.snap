@@ -1664,6 +1664,50 @@ exports[`golden frames — every form > timeline · full · 80 1`] = `
 "
 `;
 
+exports[`golden frames — every form > tree · ascii-1bit-wide · 40 1`] = `
+"── tree · measured 7 · rendered 7
+                   root
+         +----------+--+--------+
+       render        layout   parse
+      +--+---+      +--+--+
+    curve  paint measure wrap
+      |
+    raster"
+`;
+
+exports[`golden frames — every form > tree · ascii-1bit-wide · 80 1`] = `
+"── tree · measured 7 · rendered 7
+                                       root
+                             +----------+--+--------+
+                           render        layout   parse
+                          +--+---+      +--+--+
+                        curve  paint measure wrap
+                          |
+                        raster"
+`;
+
+exports[`golden frames — every form > tree · full · 40 1`] = `
+"── tree · measured 7 · rendered 7
+                   root
+         ╭──────────┴──┬────────╮
+       render        layout   parse
+      ╭──┴───╮      ╭──┴──╮
+    curve  paint measure wrap
+      │
+    raster"
+`;
+
+exports[`golden frames — every form > tree · full · 80 1`] = `
+"── tree · measured 7 · rendered 7
+                                       root
+                             ╭──────────┴──┬────────╮
+                           render        layout   parse
+                          ╭──┴───╮      ╭──┴──╮
+                        curve  paint measure wrap
+                          │
+                        raster"
+`;
+
 exports[`golden frames — every form > treemap · ascii-1bit-wide · 40 1`] = `
 "── treemap · measured 8 · rendered 8
 # plot //////////////# test xxxxxxxxxxxx

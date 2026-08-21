@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
-import { block, type Plot, type QuartileSummary } from "../../src/data/viewmodel/index.js";
+import { HIERARCHY_ROLE, block, type Plot, type QuartileSummary } from "../../src/data/viewmodel/index.js";
 import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
@@ -3058,7 +3058,14 @@ it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and ca
     const refused = (Object.keys(ORIGIN_DEFAULT) as PlotForm[]).filter(
       (f) => ORIGIN_DEFAULT[f] === null,
     );
-    expect(refused.length).toBe(29); // cells-ok — a form count
+    expect(refused.length).toBe(30); // cells-ok — a form count
+    // **A form with a required member needs it here, or this row asserts about
+    // a different refusal.** `tree` is the first: without a `hierarchy` the
+    // constructor complains about that instead, and the row would pass on a
+    // gate it never reached (C04 I65).
+    const valid = (form: PlotForm): object =>
+      HIERARCHY_ROLE[form] === "structure" ? { hierarchy: { label: "root" } } : {};
+
     const bad = validateBlock({
       kind: "plot", id: "p", form: "bar", height: 5,
       series: [{ values: [1, 2] }], categories: ["x", "y"], origin: "top-left",
@@ -3067,7 +3074,7 @@ it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and ca
     expect(bad.ok === false && bad.error.join(" ")).toContain("origin");
     for (const form of refused) {
       expect(() =>
-        b.plot({ series: [{ values: [1, 2] }], height: 4, form, origin: "top-left" }),
+        b.plot({ series: [{ values: [1, 2] }], height: 4, form, origin: "top-left", ...valid(form) }),
       ).toThrow(/origin/);
     }
     // An unknown corner is refused by name, on a form that accepts the member.
@@ -3300,14 +3307,21 @@ describe("C12 §3ad — axisCross, and the two conditions that are not one condi
   it("AC11 (§3ad A14): every form outside the seven refuses at both gates", () => {
     const forms = Object.keys(HONOURS_AXIS_CROSS) as PlotForm[];
     const refused = forms.filter((f) => !HONOURS_AXIS_CROSS[f]);
-    expect(refused.length, "37 of 44").toBe(37); // cells-ok — a form count
+    expect(refused.length, "38 of 45").toBe(38); // cells-ok — a form count
+    // **A form with a required member needs it here, or this row asserts about
+    // a different refusal.** `tree` is the first: without a `hierarchy` the
+    // constructor complains about that instead, and the row would pass on a
+    // gate it never reached (C04 I65).
+    const valid = (form: PlotForm): object =>
+      HIERARCHY_ROLE[form] === "structure" ? { hierarchy: { label: "root" } } : {};
+
     for (const form of refused) {
       const bad = validateBlock({
         kind: "plot", id: "r", form, height: 5,
-        series: [{ values: [1, 2] }], categories: ["x", "y"], axisCross: "zero",
+        series: [{ values: [1, 2] }], categories: ["x", "y"], axisCross: "zero", ...valid(form),
       });
       expect(bad.ok, `${form} refused by the validator`).toBe(false);
-      expect(() => b.plot({ series: [{ values: [1, 2] }], height: 4, form, axisCross: "zero" }),
+      expect(() => b.plot({ series: [{ values: [1, 2] }], height: 4, form, axisCross: "zero", ...valid(form) }),
         `${form} refused by the builder`).toThrow(/axisCross/u);
     }
     // And the seven are accepted, or the rows above pass against a gate that

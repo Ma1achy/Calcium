@@ -578,6 +578,7 @@ export type PlotForm =
   | "scatter" | "step" | "ecdf"
   | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
   | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
+  | "tree"
   | "slope" | "bubble" | "autocorrelation" | "timeline" | "bullet" | "utilisation"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
   | "contour" | "quiver"
@@ -994,8 +995,29 @@ export type Plot = Readonly<{
    * Below 1 sharpens, above 1 smooths.
    */
   bandwidth?: number;
-  /** The tree `flame`, `icicle` and `treemap` are drawn from (C04 I54, C12 §3n). */
+  /** The tree `flame`, `icicle`, `treemap` and `tree` are drawn from (C04 I54, C12 §3n, C12 §3ah). */
   hierarchy?: HierarchyNode;
+  /**
+   * Which of three layouts a `tree` is drawn in (C04 I65, C12 I57, C12 §3ah).
+   *
+   * **A member rather than a rung on `plotDetail`, and it was measured.** Over
+   * four trees the top-down figure is the cheapest of the three in rows on a
+   * broad tree and the dearest on a deep one, while its columns invert with it —
+   * so no ordering by budget exists, not even one depending only on the budget,
+   * because which layout is cheapest depends on the tree. All three draw the
+   * same names and the same edges, which is C12 I34's test for a rung failed
+   * three times in the same way.
+   *
+   * **`"auto"` is a fit**: the first of `topDown`, `leftRight`, `outline` whose
+   * natural size fits both axes, else the one that keeps the most nodes. Naming
+   * one is honoured whatever the budget, and the drawing is truncated with a
+   * `+N` row rather than overflowing — an explicit `plotDetail: "full"` degrades
+   * the same way (C12 I28).
+   *
+   * Refused on every other form: a member that does nothing reads as one not
+   * yet implemented.
+   */
+  treeLayout?: "auto" | "topDown" | "leftRight" | "outline";
   /**
    * The vector field a `quiver` draws (C04 I61, C12 I50).
    *
@@ -1239,7 +1261,7 @@ export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.
   // Their own renderer (14).
   boxplot: null, flame: null, histogram: null, horizon: null, icicle: null,
   pie: null, radar: null, ridgeline: null, sparkline: null, stackedarea: null,
-  streamgraph: null, treemap: null, violin: null, waffle: null,
+  streamgraph: null, treemap: null, tree: null, violin: null, waffle: null,
 
   // Facet containers — each facet is a `Plot` and declares its own.
   smallmultiples: null, pairplot: null,
@@ -1287,7 +1309,7 @@ export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.fr
   // Own renderer — a disc, a mosaic, a tree, a band, a single row.
   boxplot: false, flame: false, histogram: false, horizon: false, icicle: false,
   pie: false, radar: false, ridgeline: false, sparkline: false, stackedarea: false,
-  streamgraph: false, treemap: false, violin: false, waffle: false,
+  streamgraph: false, treemap: false, tree: false, violin: false, waffle: false,
 
   // Facet containers — each facet is a `Plot` and declares its own.
   smallmultiples: false, pairplot: false,
@@ -1351,7 +1373,7 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   contour: true, quiver: true,
   // One row, or a figure that bounds itself: no gutter to put a label beside.
   sparkline: false, horizon: false, waffle: false,
-  pie: false, radar: false, flame: false, icicle: false, treemap: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false,
   // Composition: the facets carry the gutters and each declares its own.
   smallmultiples: false, pairplot: false,
 });
@@ -1429,6 +1451,12 @@ export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.free
   lollipop: false, dotplot: false, waffle: false, flame: false, icicle: false,
   funnel: false, gantt: false, waterfall: false, streamgraph: false,
   stackedarea: false, treemap: false, slope: false, bubble: false,
+  // **Measured rather than reasoned** (C12 §3ah.1): the three tree layouts are
+  // one drawing at three aspect ratios, no ordering by budget exists over them,
+  // and I34's own test for a rung — every rung adds information rather than
+  // resolution — is failed by all three in the same way. The choice is
+  // `treeLayout`, and this record's first new question is answered `false`.
+  tree: false,
   autocorrelation: false, timeline: false, bullet: false, utilisation: false,
   calendar: false, correlation: false, confusion: false, spectrogram: false,
   latency: false, density2d: false, contour: false, quiver: false,
@@ -1469,9 +1497,14 @@ export const HIERARCHY_MAX_DEPTH = 256;
  * `null` arm is a refusal rather than silence, because `hierarchy` on a form
  * that draws a series is F220's class in a second member.
  */
-export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | null>> = Object.freeze({
+export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | "structure" | null>> = Object.freeze({
   // The three forms whose subject is containment (I54, C12 §3n).
   flame: "magnitude", icicle: "magnitude", treemap: "magnitude",
+  // **And the one whose subject is structure** (C12 §3ah, C12 I57) — which is why
+  // `value` is optional on the node: a tree is placed by shape alone, and a
+  // number every caller of that form has to invent is worse than a member that
+  // does nothing — a member that does nothing can at least be left out.
+  tree: "structure",
   // Everything else draws a series, a matrix or a field.
   line: null, sparkline: null, heatmap: null, scatter: null, step: null,
   ecdf: null, bar: null, histogram: null, forest: null, dumbbell: null,
@@ -1502,7 +1535,7 @@ export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   spectrogram: false, latency: false, density2d: false, utilisation: false,
   contour: false, quiver: false,
   // No abscissa to name: a disc, a polygon, a mosaic, one row, a composition.
-  pie: false, radar: false, waffle: false, treemap: false,
+  pie: false, radar: false, waffle: false, treemap: false, tree: false,
   horizon: false, sparkline: false, smallmultiples: false, pairplot: false,
 });
 
@@ -1524,7 +1557,7 @@ export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   contour: false, quiver: false,
   // No cartesian area, or one row, or a composition.
   sparkline: false, horizon: false, waffle: false,
-  pie: false, radar: false, flame: false, icicle: false, treemap: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false,
   smallmultiples: false, pairplot: false,
 });
 
@@ -1565,7 +1598,7 @@ export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   line: false, sparkline: false, scatter: false, step: false, ecdf: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
-  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false,
   funnel: false, gantt: false, waterfall: false, streamgraph: false,
   stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
   radar: false, horizon: false, slope: false, bubble: false,
@@ -1582,7 +1615,7 @@ export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze(
   line: false, sparkline: false, scatter: false, step: false, ecdf: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
-  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false,
   funnel: false, gantt: false, waterfall: false, streamgraph: false,
   stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
   radar: false, horizon: false, slope: false, bubble: false,
@@ -1626,7 +1659,7 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   // rather than omitted — an empty list is an answer, and the vocabulary here
   // is the form's own.
   quiver: [],
-  flame: [], icicle: [], treemap: [],
+  flame: [], icicle: [], treemap: [], tree: [],
   sparkline: [], horizon: [],
   smallmultiples: [], pairplot: [],
 });
@@ -1717,7 +1750,7 @@ export type Segment = Readonly<{ label: string; value: number }>;
  */
 export type HierarchyNode = Readonly<{
   label: string;
-  value: number;
+  value?: number;
   children?: readonly HierarchyNode[];
 }>;
 
