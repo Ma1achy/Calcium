@@ -224,7 +224,12 @@ const ANNOTATION_CHECKS: Readonly<Record<Annotation["kind"], AnnotationCheck>> =
   },
 });
 
-function checkAnnotations(annotations: unknown, e: string[], at: string): void {
+function checkAnnotations(
+  annotations: unknown,
+  e: string[],
+  at: string,
+  legend: unknown,
+): void {
   if (annotations === undefined) return;
   if (!isArray(annotations)) {
     e.push(`${at}: "annotations" must be an array (C04 I52)`);
@@ -232,6 +237,30 @@ function checkAnnotations(annotations: unknown, e: string[], at: string): void {
   }
   for (const a of annotations) {
     if (!isRecord(a)) continue;
+    const label = a["label"];
+    if (label !== undefined && !isString(label)) {
+      e.push(`${at}: annotation "label" must be a string (C04 I52)`);
+    }
+    // **`confidence` and `whiskers` carry no label**, because both are drawn
+    // across the whole abscissa: one string would name the band as a whole on
+    // one arm and a sample on the other, which is one member with two meanings.
+    if (label !== undefined && a["kind"] !== "line" && a["kind"] !== "band") {
+      e.push(
+        `${at}: annotation "label" on kind ${JSON.stringify(a["kind"])} (C04 I52) — a label ` +
+          `names one place on the ordinate, and that kind is drawn across every sample`,
+      );
+    }
+    // **The caller asked for a string and forbade the only place it goes**
+    // (C12 §3ag A3). A label has no home in the plot area — it would overwrite
+    // the curve it exists to be compared against — so the legend row is not one
+    // of two options.
+    if (isString(label) && legend === false) {
+      e.push(
+        `${at}: annotation "label" is ${JSON.stringify(label)} with "legend" false (C04 I52) — ` +
+          `an annotation's label is written in a legend row and there is none; drop the label ` +
+          `or allow the legend`,
+      );
+    }
     const check = ANNOTATION_CHECKS[a["kind"] as Annotation["kind"]] as AnnotationCheck | undefined;
     if (check === undefined) {
       e.push(
@@ -447,7 +476,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   logs: (b, e, at) => requireArray(b, "lines", e, at),
   events: (b, e, at) => requireArray(b, "events", e, at),
   plot: (b, e, at) => {
-    checkAnnotations(b["annotations"], e, at);
+    checkAnnotations(b["annotations"], e, at, b["legend"]);
     // **An unknown colormap is refused rather than ignored** (C10 I31). A name
     // that resolves to nothing renders uncoloured and green, which is F172's
     // shape exactly — and the reason a colormap is chosen by name at all is that

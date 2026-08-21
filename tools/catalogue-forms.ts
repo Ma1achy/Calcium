@@ -208,6 +208,16 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // C12 I55 §3ag — the two arms that write an identity at the line's end and
     // take the automatic legend with them. `callout-last` is the value arm for
     // comparison, since the whole claim is that the three share one anchor.
+    // C04 I52 §3ag — the label the deferral was waiting for a legend row to
+    // hold, on the one-series case it was written about.
+    "annotation-label": {
+      form: "line", height: 8, axes: true,
+      annotations: [
+        { kind: "line", value: 80, label: "budget" },
+        { kind: "band", from: 20, to: 40, label: "warm-up" },
+      ],
+      series: [s(sin50, "alpha")],
+    },
     "callout-last": {
       form: "line", height: 8, axes: true, yAxis: "both", yCallout: "last",
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],

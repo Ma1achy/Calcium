@@ -39,7 +39,7 @@ import { HAS_POSITION_AXIS } from "./marks.js";
 import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import { FACING_DEFAULT, facingOf } from "./scale.js";
-import type { Plot } from "../../data/viewmodel/index.js";
+import type { Annotation, Plot } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import { SHARES_CELLS, markOf, refOf } from "./marks.js";
 import type { RenderContext } from "../blocks/types.js";
@@ -703,7 +703,27 @@ export function legendPlacement(
   // `"last"` still does not. Same shape as the 1-bit strip suppression below,
   // arriving for a second reason; an explicit `legend:` has already won above.
   if (block.yCallout === "name" || block.yCallout === "both") return null;
+  // **Labelled annotations count, or the field lands in the state its deferral
+  // refused** (C04 I52, C12 §3g). The case I52 was written about is *one line,
+  // one reference line*: counting series alone answers `null` there, so the
+  // member would exist and draw nowhere — which is the member-nothing-draws
+  // class the deferral was avoiding, arriving by way of the arm rather than the
+  // field. **And it is why `count` is not `series.length`**: two annotations on
+  // a one-series plot need the row exactly as two series do.
+  const labelled = (block.annotations ?? [])
+    .filter((a) => (a as { label?: string }).label !== undefined).length; // cells-ok — an annotation count
   const count = (block.segments?.length ?? 0) || block.series.length; // cells-ok — a series count
+  // **A labelled annotation earns the row on any form that draws annotations**,
+  // and it does not join `count`. `SHARES_CELLS` partitions forms by whether
+  // *categories* share cells; an annotation's label is not a category, so
+  // folding it into the count would give it the row on a line plot and refuse it
+  // on a bar chart for a reason that is about neither.
+  //
+  // **This was both, and the mutation pass is what said so.** Two clauses each
+  // sufficient for the one-series case mask each other perfectly: removing
+  // either killed nothing, and the survivor pair was the only signal that a
+  // second mechanism existed at all.
+  if (labelled > 0) return "right";
   if (!SHARES_CELLS[block.form] || count <= 1) return null; // cells-ok — a series count
   // **Not where the form has already labelled its own rows.** Below the colour
   // floor `positionalForm` stops overlaying and stacks into labelled strips, so
@@ -761,6 +781,23 @@ export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendE
           { mark: g.candleFilled, label: "falling", ref: "tone.error" },
         ]
       : [];
+  // **The third source, and it comes last** (C04 I52, C12 §3ag). An annotation
+  // is a claim *about* the data, so it reads after the things it is a claim
+  // about — the same order `mergedRow` draws them in, one layer along.
+  //
+  // **The swatch is the dash the line is actually drawn with**, not `markOf`'s
+  // ladder: this function's own comment records what a swatch naming a glyph
+  // that appears nowhere cost, and an annotation is dashed at every depth
+  // (C04 I23), so the dash is available on every arm rather than only below the
+  // colour floor.
+  const annotations: readonly LegendEntry[] = (block.annotations ?? [])
+    .flatMap((a) => {
+      const label = (a as { label?: string }).label;
+      if (label === undefined) return [];
+      const t = (a as Annotation).tone;
+      const ref: ColourRef = t === undefined ? "tone.muted" : `tone.${t}`;
+      return [{ mark: g.dashedHorizontal, label, ref }];
+    });
   return [
     ...candles,
     ...source.map((label, i) => ({
@@ -768,6 +805,7 @@ export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendE
       label,
       ref: refOf(i),
     })),
+    ...annotations,
   ];
 }
 

@@ -617,10 +617,22 @@ export type PlotForm =
  * names its blocker and watches nothing. That is the deferral pattern's third
  * shape and its standing remedy — *grep from the satisfier, not from the
  * deferral* — which is how it was found.
+ *
+ * **Paid.** `label` is on the two arms that are a claim about *one* place on the
+ * ordinate. `confidence` and `whiskers` do not carry it: both are per-sample
+ * series drawn across the whole abscissa, so a single string names no particular
+ * reading, and a member that would have to mean *the band as a whole* on one arm
+ * and *this sample* on another is one member with two meanings — C04's own test
+ * for whether a field is one field.
+ *
+ * **A label with `legend: false` is refused at both gates** (C12 §3ag A3): the
+ * caller asks for a string and forbids the only place it goes. C04 I57's three
+ * refusals are the idiom, and a construction throw leaves nothing behind because
+ * it fires before any render state exists.
  */
 export type Annotation =
-  | Readonly<{ kind: "line"; value: number; tone?: Tone }>
-  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone }>
+  | Readonly<{ kind: "line"; value: number; tone?: Tone; label?: string }>
+  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone; label?: string }>
   | Readonly<{
       kind: "confidence";
       upper: readonly number[];

@@ -111,8 +111,11 @@ const results = runPass({
       // validation below it.
       name: "THE GUARD THAT DELETES: the annotation check returns early inside `plot`",
       file: VAL,
-      from: "  plot: (b, e, at) => {\n    checkAnnotations(b[\"annotations\"], e, at);",
-      to: "  plot: (b, e, at) => {\n    checkAnnotations(b[\"annotations\"], e, at);\n    if (b[\"annotations\"] === undefined) return;",
+      // Re-anchored when `checkAnnotations` gained `legend` — a label with the
+      // legend refused is a refusal the function could not previously see
+      // (C04 I52, C12 §3ag A3). The mutation is unchanged.
+      from: "  plot: (b, e, at) => {\n    checkAnnotations(b[\"annotations\"], e, at, b[\"legend\"]);",
+      to: "  plot: (b, e, at) => {\n    checkAnnotations(b[\"annotations\"], e, at, b[\"legend\"]);\n    if (b[\"annotations\"] === undefined) return;",
       expect: "T1.30",
     },
     {
