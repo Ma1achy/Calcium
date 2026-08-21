@@ -10809,7 +10809,7 @@ hierarchy, and the set that moves must be exactly the three. C04 I64, T2.29, T2.
 
 ---
 
-## F222 — the legend's row is declared by a type that cannot see whether there is anything to name ★★★☆☆
+## F222 — a blank legend row, and the diagnosis was wrong ★★☆☆☆ · **disproved**
 
 `legendRows(plot)` returns 1 for `"above"` and `"below"` and 0 otherwise. Its parameter is
 
@@ -10825,24 +10825,29 @@ Measured: `form: "treemap"`, `height: 4`, `series: []`, a `hierarchy`, `legend: 
 rows, the fifth blank**. `legend: "right"` on the same block is correct at four, because a
 width-costing placement sizes itself from the entries and finds none.
 
-**The `Pick` is the mechanism and it is also why review passed it.** The reason `legendRows` takes
-a narrow parameter at all is I1 — measured height is a function of the block alone — so a `Pick`
-that excludes the data reads as *the discipline being kept*. It is the discipline kept about the
-wrong four members: an entry count is a count of **block members**, knowable before a single label
-is placed (C12 §3ag.4), and the four excluded are exactly those members. **A type that excludes
-the inputs its answer depends on is not a narrower contract, it is a wrong one.**
+**The measurement stands and the diagnosis was wrong.** This finding first read the `Pick` as the
+MG24 class — *a correct sentence justifying the wrong scope* — on the grounds that an entry count
+is a count of block members, knowable before a label is placed. The fix it proposed was to widen
+the `Pick` by those four members and read them.
 
-**The near miss is in the same file's comment.** The `Pick` grew once already, for `xTitle`, with
-the sentence *it belongs in this Pick* — the new member was asked whether height depends on it and
-the member already there was not asked again.
+**Checked before building on it, and the check refuses it.** `ViewPatch` carries
+`op: "replace"`, so a streaming plot is a new block on every tick; `series: []` gaining its first
+entry is the ordinary way a plot starts. A legend row that appeared at that moment would change
+the block's height mid-stream and shift everything below it — **which is §2's empty-series rule,
+one row down**: *an empty series occupies its declared height rather than collapsing, because a
+plot that changes height when data arrives would shift everything below it*. The blank legend row
+is that rule applied to the legend, not an oversight. `legendRows`' own comment says so, and it is
+both true **and** the constraint on the decision it is attached to — which is exactly what
+distinguishes it from MG24's sentence, and is a distinction only running the case can make.
 
-**Where it bites**: the forms whose legend sources can all be empty — `flame`, `icicle` and
-`treemap` driven from a `hierarchy`, and `tree` when it lands. One row of the caller's declared
-height, drawn blank. **Not in the corpus**, because no variant sets a horizontal legend on a
-hierarchy form, so no golden could have moved.
+**What survives is the residue.** A form that can *never* gain a series keeps a blank row for a
+legend it can never fill — `treemap` today, whose renderer reads `hierarchy` and nothing else, and
+`tree` after it. `flame` and `icicle` are not in that set: absent a `hierarchy` they fall back to
+`barRow` and draw their series. So closing it means a total record over forty-four forms for two
+entries, and the residue is named here rather than built — **stated, because an unrecorded limit
+reads as strength**. C12 I27 carries the ruling and the residue together.
 
-**Fix owed** — the count moves into `height.ts` beside `legendRows` and `furniture.ts` reads it
-from there. That direction and not the other: `furniture.ts` already imports `height.ts`, so the
-predicate cannot live where it is used without a cycle. The `Pick` grows by those four members and
-`values` stays outside it — the Pick is a guard about *which* members height may read, not about
-how many. C12 I27.
+**The instrument that caught it is the one that checks the record**: asking where a claim is
+written down and finding `legendRows`' comment says the opposite. Its running total is now four
+claims disproved and four produced, and this is the first of the four that was **mine**, filed one
+commit earlier in this same arc.
