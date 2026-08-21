@@ -1708,6 +1708,33 @@ function hierarchyStripRows(
  * over it, so a child is visibly inside the rectangle that contains it. There is
  * no border vocabulary that survives a two-cell tile, and a mark that does not
  * fit the smallest tile is a mark that lies about the ones it does fit.
+ *
+ * **The names are read off the grid, not off the rectangle** (C12 I55, §3n,
+ * F217). §3n ruled that a tile's label goes in the padding ring, on the
+ * reasoning that the ring is the only part of a parent a child does not paint
+ * over — and the arithmetic disagrees. `pad` is **one scalar on the unit
+ * square** and the two axes have different cell counts: at 80 × 12 it is
+ * `1/80`, which is `1.000` cells across and **`0.150` rows down**. So the ring
+ * is one cell wide and zero rows tall, `render` and its child `curve` both
+ * start at row 0, and there is no top row to write in.
+ *
+ * Reading the placement from the filled grid is I48's principle one label kind
+ * along — *its row is read from ink rather than recomputed* — and it is total
+ * where the rectangle is not: it answers for a leaf, for a parent, for the root,
+ * and for either aspect, since which axis gets the ring flips when `areaRows`
+ * exceeds `width`.
+ *
+ * **Two tiles can never both own a cell**, because ownership was already
+ * resolved by the depth-ordered fill above. So the label pass cannot overwrite
+ * another tile's label however it is ordered, and I55's *one pass onto free
+ * cells* holds here by construction rather than by care.
+ *
+ * **On today's padding this names the leaves and no interior node**, measured:
+ * `render` and `layout` own one cell either side of their children and `curve`
+ * owns two, so none has a run wide enough. That is what the references draw —
+ * an interior name wants a header row, which is a question about the *layout*
+ * and is left to one (§3n). The alternative is a feature reaching back to widen
+ * the geometry that serves it.
  */
 function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
   const root = block.hierarchy;
@@ -1727,7 +1754,28 @@ function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly s
     }
   }
 
-  const out = grid.map((row) => {
+  // The names, written into cells their own tile still owns. `undefined` is
+  // *no label here*; `""` is the second cell of a wide codepoint and emits
+  // nothing, so a two-cell character cannot leave a hole the fill walks into.
+  const ambiguous = ctx.capabilities.ambiguousWidth;
+  const named: (string | undefined)[][] =
+    Array.from({ length: areaRows }, () => new Array<string | undefined>(width).fill(undefined));
+  for (const t of placed) {
+    // The blanks are `hierarchyStripRows`' convention, and they are what keeps
+    // a name off its neighbour's colour rather than decoration.
+    const text = ` ${t.label} `;
+    const at = ownRun(grid, t.index, cells(text, ambiguous), areaRows, width); // cells-ok — a tile index
+    if (at === null) continue;
+    let col = at.col; // cells-ok — a column position
+    for (const ch of text) {
+      named[at.row]![col] = ch;
+      const w = cells(ch, ambiguous);
+      for (let k = 1; k < w; k += 1) named[at.row]![col + k] = ""; // cells-ok — a cell count
+      col += w;
+    }
+  }
+
+  const out = grid.map((row, r) => {
     const spans: Span[] = [];
     let run = "", runIdx = -2; // cells-ok — a tile index
     const flush = (): void => {
@@ -1736,14 +1784,48 @@ function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly s
         : { text: run, style: slot(categoryRef(runIdx), ctx.theme, ctx.capabilities) });
       run = "";
     };
-    for (const idx of row) {
+    for (const [c, idx] of row.entries()) { // cells-ok — a column position
       if (idx !== runIdx) { flush(); runIdx = idx; }
-      run += idx < 0 ? " " : markOf(idx, ctx.capabilities); // cells-ok — a tile index
+      // A name shares its tile's slot, so the run is unbroken and the letters
+      // arrive in the colour the rectangle is already drawn in.
+      const glyph = named[r]![c];
+      run += glyph !== undefined ? glyph
+        : idx < 0 ? " " : markOf(idx, ctx.capabilities); // cells-ok — a tile index
     }
     flush();
     return line(spans, layout, ctx);
   });
   return composeRows(plotHeight(block), [], out, []);
+}
+
+/**
+ * The topmost run of `need` cells a tile still owns, or nothing (C12 I55).
+ *
+ * **Ownership comes from the painted grid**, so a parent covered by its children
+ * has only its padding ring left and answers `null` where the ring is narrower
+ * than the name — which is §3n's drop condition arriving from the ink rather
+ * than from `inset`'s threshold, and correct on both aspects rather than on the
+ * one the threshold was written for.
+ */
+function ownRun(
+  grid: readonly (readonly number[])[],
+  index: number,
+  need: number,
+  areaRows: number,
+  width: number,
+): { row: number; col: number } | null {
+  for (let r = 0; r < areaRows; r += 1) { // cells-ok — a row index
+    let start = -1; // cells-ok — a column position
+    for (let c = 0; c <= width; c += 1) { // cells-ok — a column position
+      const own = c < width && grid[r]![c] === index; // cells-ok — a tile index
+      if (own && start < 0) start = c; // cells-ok — a column position
+      if (!own && start >= 0) { // cells-ok — a column position
+        if (c - start >= need) return { row: r, col: start }; // cells-ok — a cell count
+        start = -1; // cells-ok — a column position
+      }
+    }
+  }
+  return null;
 }
 
 function positionalForm(

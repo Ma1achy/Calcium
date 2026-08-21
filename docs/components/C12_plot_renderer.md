@@ -4024,18 +4024,31 @@ so a reader checking the family finds it satisfied in the renderer that uses tha
 **A correct ruling filed under the form that breaks it** is the MG24 class one step along —
 there a true sentence justified the wrong scope; here a true sentence sits in the wrong section.
 
-**The ruling: a tile's label goes in its top padding row, and a leaf's inside its rectangle.**
-This is forced rather than chosen. Nesting is drawn by depth ordering — a parent is painted, then
-its children over it — so **every interior cell of a parent belongs to a child by the time the
-grid is done**, and a label written into the parent's middle is overpainted by the thing it was
-naming. The one part a parent keeps is the inset ring the padding already gives it, and the top
-row of that ring is one row tall and the tile's full width, which is exactly a label's shape.
-So the mechanism that makes nesting visible is the mechanism that makes labelling possible, and
-neither was built for the other.
+**The half of the ruling that holds: a name goes where its tile still owns cells, and the grid is
+what says so.** Nesting is drawn by depth ordering — a parent is painted, then its children over
+it — so a label written into a parent's middle is overpainted by the thing it was naming. Reading
+the placement off the **filled grid** is I48's principle one label kind along, *its row is read
+from ink rather than recomputed*, and it answers for a leaf, a parent, the root and either aspect
+with one expression.
 
-**Where `inset` declines to pad — `w > by * 3`, a rectangle too small to spare the ring — a
-parent has no cells of its own and its label is dropped, silently.** That is the same condition,
-read for a second purpose.
+**The half that did not survive the code: there is no top padding row.** This section first ruled
+that a parent's label goes in the ring the padding gives it, and called it forced. `pad` is **one
+scalar on the unit square** and the axes have different cell counts — at 80 × 12 it is `1/80`,
+which is `1.000` cells across and **`0.150` rows down**. Measured, `render` occupies rows 0–7 and
+its child `curve` occupies rows 0–7: the ring is one cell wide and zero rows tall, and the row the
+ruling reserved does not exist. **Which axis gets the ring flips when `areaRows` exceeds `width`**,
+so no fixed choice of row would have been right either.
+
+**So today's padding names the leaves and no interior node**, measured on the catalogue's own
+tree: `render` and `layout` own a single column either side of their children and `curve` owns
+two, and no run holds a name. That is what the references draw — an interior name wants a **header
+row**, which is a question about the layout and not about labels. It is named here and not
+answered, because a feature reaching back to widen the geometry that serves it is how a form
+acquires a shape nobody chose.
+
+**Where no run is wide enough the name is dropped, silently**, which replaces `inset`'s threshold
+as the condition: the threshold is about whether a ring exists and this is about whether a name
+fits in one, and only the second is the question.
 
 **Silently, and §3ag A4 is why.** This paragraph first read *dropped and counted*, reaching for
 I8 — and I8 is about a series that gets **no row**, which is data going missing. A tile whose name
@@ -4043,6 +4056,11 @@ did not fit is still drawn, still coloured and still carries its extent; nothing
 absent. Counting it would also have fed the sizing cycle §3ag.4 records. **The correction is one
 commit old and inside the arc that wrote it**, which is the ordinary way an over-applied invariant
 gets caught: by walking the rule it was borrowed from.
+
+**Two rulings from this arc have now been overturned by running the code**, and both were called
+forced when they were written — the padding ring here, and the shift-inward in §3ag that turned
+out to cover the sample it names. *The walk rules the shape and the code is the first thing that
+can disprove it*, which is an argument for building early rather than for walking less.
 
 ---
 
@@ -4913,7 +4931,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.101** (I55): a point label whose right position would leave the area is drawn **left** of its sample, and the sample's own cell still carries its mark. **Both halves in one row**, because a slide that stopped one cell short of the edge satisfies *inside the area* and covers the anchor — which is the reading the two-position rule exists to refuse. The fixture responds first: the same label one column further in draws to the right.
 - **T1.102** (I55): two labels whose spans overlap give the first placed, a one-cell `+` on it, and nothing of the second — and the same block with the series **reversed** gives the mirror answer. The second half is the row: a rule that let a later label displace an earlier one passes the first half and returns a different frame for the same data in the other order.
 - **T1.103** (I55): a block whose labels all fit and the same block with three of them dropped render legends of **identical width**, at four widths. The cycle §3ag.4 records is only observable as an equality, because a legend that grew by a count would still be a legend that renders.
-- **T1.104** (I55, §3n): a treemap tile below `inset`'s padding threshold draws no name and the frame carries **no notice, no `+` and no legend row** — asserted against the frame rather than against a return value, since a count reaching any of the three is the I8 over-application the walk struck.
+- **T1.104** (I55, §3n) — `TM1`–`TM5`: every leaf with a wide enough run is named at 80 columns and **at `ascii` and one bit**, which is where the form previously said nothing at all; an interior node covered by its children is not named and the frame carries **no notice, no `+` and no legend row**, since a count reaching any of the three is the I8 over-application §3ag A4 struck. **Each absence row carries a positive assertion in the same frame**, or all three pass on a renderer that names nothing. **`TM5` came from a survivor**: removing the wide-codepoint continuation cell killed nothing, because every label in every fixture was narrow — so the rule *a two-cell character consumes two cells* was true of nothing the suite drew, and the row asserts `cells(row) === width` rather than the name alone.
 - **T1.98** (I35): three distributions of very different spread in one block draw three different widths, and the same three scaled to their own extents draw the same shape. **The fixture responds first**: the spreads differ by a factor that a shared axis must show and an unshared one cannot.
 - **T1.97** (I34): eighteen bands in a vertical violin at a width their count does not divide — every band draws the same rung, and the three bands a cell wider draw that rung wider rather than a different one. Asserted over the *set* of figures in the frame rather than on any band, because the defect is that the set has two members.
 - **T1.95** (I11, I34): the jitter is decorrelated from the index it is drawn from — every position is reached, fewer than half the indices agree with `index % positions`, and a second band is a different speckle. **The sawtooth is the row's subject**: it is deterministic, satisfies I11, and draws diagonal stripes through sorted data.
@@ -4980,7 +4998,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.58** (I54): the catalogue's ASCII arm returned to `ambiguousWidth: "wide"` → **AA1 still passes**, and that is the row's content: the corpus is not the gate, and a fixture that varies two capabilities together cannot be made into one by adding frames.
 - **T6.59** (I55): the two-position rule replaced by a slide that clamps the label's span into the area → **T1.101 fails**. The frame still renders and still fits, which is why the row asserts the anchor's own cell.
 - **T6.60** (I55): a dropped label made a legend entry → **T1.103 fails**. Nothing else does, and that is the point: the cycle is a width equality and every assertion about correctness survives it.
-- **T6.61** (I55, §3n): a treemap's dropped tile name counted in a notice → **T1.104 fails**. The mutation restores exactly the wording §3n shipped with for one commit.
+- **T6.61** (I55, §3n): four mutations in `c12-tile-labels.mjs`, all caught — a tile named wherever it owns *any* cell (→ `TM3`, and the frame still renders and still fits, attributing eight cells to the wrong node); a name cut to fit rather than dropped (→ `TM4`, §3n's oldest sentence); the placement taken from the **rectangle** instead of the ink (→ `TM4`, the ruling the arithmetic disproved, kept falsifiable); and the wide-codepoint continuation removed (→ `TM5`). The control is `named` computed and not consulted, which is the state the form shipped in.
 - **T6.32** (I48, I37): placing the callout with `rowOf(v, range, areaRows)` rather than from the series' ink → YC2 fails, and one value in six lands a row off the line it names, worst at the ends of the range. **Nothing else sees it**: every count, colour and width assertion passes, and the number is beside the right row at the widths a fixture happens to use.
 - **T6.33** (I48, I8): dropping the `+` where two callouts share a row → YC4 fails, and a series' reading disappears with the frame asserting nothing about it.
 - **T6.34** (I48): letting a callout take the **left** gutter's row as well → YC3 fails, and `yAxis: "both"` loses a reading on the one row where it has two chances to keep it.
