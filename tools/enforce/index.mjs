@@ -12,7 +12,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import {
   checkCommitments,
@@ -72,6 +72,12 @@ const violations = [
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
   ...checkSourceScans(files),
+  // SS52 — the control-character class over the tree the *tools* read, which is
+  // wider than the one `SCANS` walks. `files` is `walk("src")`, so widening
+  // SS43's scope string alone would have changed nothing; and putting `test/`
+  // into `files` would place every other scan in scope of the tests, which is a
+  // different decision (F236).
+  ...checkControlBytes([...files, ...walk("test"), ...walk("tools")]),
   // SS47 — a mark the framework draws and cannot substitute. Its own function
   // rather than a row of `SCANS`, for MG27's reason: the subject is a string
   // literal's contents, its exemptions carry reasons, and it has the

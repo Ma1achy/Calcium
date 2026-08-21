@@ -87,7 +87,7 @@ export type ViewRefresh = Readonly<{
    * held from when the document was made is stale by the first resize.
    */
   render: (data: unknown, ctx: ProducerContext) => Block;
-  renderError: (err: ErrorLike, retryInMs: number | null) => Block;
+  renderError: (err: ErrorLike, retryInMs: number | null, attempt: number) => Block;
 }>;
 
 /**
@@ -498,7 +498,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       child = part.spec.render(input, deps.producerContext());
     } catch (err) {
       const shown = { message: err instanceof Error ? err.message : String(err) };
-      put(part.host, part, part.spec.renderError(shown, null));
+      // **`null` because a render throw is deterministic** (§3d, A03 §7 rule 2)
+      // — same data, same throw, so nothing is retrying and the box is `error`
+      // rather than a countdown to a retry that will not happen. The attempt
+      // count is still the source's: the fetch that produced this data may well
+      // have failed twice on the way.
+      put(part.host, part, part.spec.renderError(shown, null, src.failures));
       return true;
     }
     part.lastOk = deps.clock();
@@ -553,7 +558,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // once rather than once per referrer.
           let any = false;
           for (const part of [...src.parts]) {
-            if (put(part.host, part, part.spec.renderError(shown, retryIn))) any = true;
+            if (put(part.host, part, part.spec.renderError(shown, retryIn, src.failures))) any = true;
             else release(part.host);
           }
           if (any) deps.commit("stream");
@@ -951,7 +956,11 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       if (drawn.length > 0) {
         let any = false;
         for (const { part, message } of drawn) {
-          if (put(part.host, part, part.spec.renderError({ message }, null))) any = true;
+          // A refused declaration never had a source, so there is no attempt to
+          // count and `1` is the honest number: this is the first and only time
+          // it will be drawn (I43 — its source is `done` and referred to by
+          // nobody).
+          if (put(part.host, part, part.spec.renderError({ message }, null, 1))) any = true;
         }
         if (any) deps.commit("stream");
       }

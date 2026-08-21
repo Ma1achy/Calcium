@@ -185,7 +185,7 @@ describe("C09 §3a — the spinner", () => {
     // change to the default moves both consumers or fails here.
     const frames = spinnerFrames(FULL_CAPS);
     const first = draw({ height: 6, state: "loading", elapsedMs: 4000 }, 46, { tick: 0 });
-    expect(first.some((r) => r.includes(frames[0] ?? " ")), "frame 0 is the set's").toBe(true);
+    expect(first.some((r) => r.includes(frames[0] ?? "\u0000")), "frame 0 is the set's").toBe(true);
 
     // A named set uses its own frames.
     const named = draw(
@@ -194,7 +194,7 @@ describe("C09 §3a — the spinner", () => {
       { tick: 0 },
     );
     const box = spinnerFrames(FULL_CAPS, "boxBounce");
-    expect(named.some((r) => r.includes(box[0] ?? " ")), "a named set is honoured").toBe(true);
+    expect(named.some((r) => r.includes(box[0] ?? "\u0000")), "a named set is honoured").toBe(true);
 
     // An unknown name is the default rather than a throw: a spinner is
     // decoration, and a session that will not start because a set was misspelt
@@ -204,7 +204,7 @@ describe("C09 §3a — the spinner", () => {
       46,
       { tick: 0 },
     );
-    expect(unknown.some((r) => r.includes(frames[0] ?? " ")), "unknown falls back").toBe(true);
+    expect(unknown.some((r) => r.includes(frames[0] ?? "\u0000")), "unknown falls back").toBe(true);
   });
 
   it("T3.45 (C09 I32): the default is width-stable, and a narrow-only set takes its ASCII pair", () => {
@@ -284,5 +284,63 @@ describe("C09 §3a — the kind's shape", () => {
     const windowed = kit.registry.windowSequence([status({ height: 6 })], 46, 2, 5);
     expect(windowed.blocks, "one block, unchanged").toHaveLength(1);
     expect(windowed.skipRows, "and the slack is paid out of skipRows").toBe(2);
+  });
+});
+
+describe("C09 I31 — the one-row rung, and the state it was not reasoned about", () => {
+  // **The ladder's last rung reads *at one row the message wins*, and that
+  // sentence is about `error` and `retrying`** — the message is the failure and
+  // the countdown is secondary, so a number without its cause is unactionable.
+  // `loading` has no cause. Its message is a label the panel above already
+  // carries, and the whole of what a waiting box says is that it is still
+  // waiting (F235).
+  //
+  // **Wired up at two rows it drew `loading` over `⠋ loading`** — the word
+  // twice, `measure` saying 2 and `render` drawing 2, and no assertion about
+  // heights, wrapping or precedence able to fail. Only the frame showed it.
+  const at = (state: "loading" | "retrying", height: number, message: string): readonly string[] =>
+    draw(
+      { state, message, height, ...(state === "retrying" ? { retryInMs: 8000 } : { elapsedMs: 4000 }) },
+      30,
+      { tick: 3 },
+    );
+
+  it("T3.42a (C09 I31, F235): `loading` at one row is the activity line, not the message", () => {
+    const rows = at("loading", 1, "SENTINEL");
+    // **The count is asserted beside the contents, because the defect had the
+    // right count.** A row assertion alone passes on the frame this stands
+    // against, and a contents assertion alone would pass on a two-row box.
+    expect(rows).toHaveLength(1);
+    expect((rows[0] ?? ""), "the line that moves is what a waiting box says").toContain(
+      "loading (4s)",
+    );
+    expect(
+      (rows[0] ?? ""),
+      "and the message is dropped — asserted on a sentinel the row would show if it were kept",
+    ).not.toContain("SENTINEL");
+  });
+
+  it("T3.42b (C09 I31): `retrying` at one row keeps the message, which is the half that was right", () => {
+    const rows = at("retrying", 1, "connection refused");
+    expect(rows).toHaveLength(1);
+    expect((rows[0] ?? "")).toContain("connection refused");
+    // The dropped line is the assertion, not the kept one (T3.42's rule).
+    expect((rows[0] ?? "")).not.toContain("retrying in");
+  });
+
+  it("T3.42c (C09 I31, F235): the message loses by rule and not by truncation", () => {
+    // **The rung's own note records this defect being fixed once already**: with
+    // the activity line unconditional the row count still came out right,
+    // because the final `slice(0, height)` cut it — so the message won by
+    // truncation and a mutation removing the precedence changed nothing. The
+    // floor here is zero rather than one for the same reason, in the other
+    // direction: a floor of one puts the message back and lets the clamp decide.
+    //
+    // A message long enough to wrap several times, so a clamp and a rule give
+    // the same row count and only the contents part company.
+    const rows = at("loading", 1, "a message long enough to wrap over several rows at this width");
+    expect(rows).toHaveLength(1);
+    expect((rows[0] ?? "")).toContain("loading (4s)");
+    expect((rows[0] ?? ""), "no fragment of the message survives").not.toContain("a message");
   });
 });

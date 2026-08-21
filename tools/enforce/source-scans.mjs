@@ -1104,3 +1104,66 @@ export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8"
   }
   return violations;
 }
+
+/**
+ * SS52 — a literal NUL anywhere the repository's own tools have to read.
+ *
+ * **SS43 is the same class and its scope is `src/`, which is where the byte is
+ * least harmful.** In source a stray NUL is a wrong character inside a string.
+ * In a *test* file it is something else: `grep` classifies the file as binary
+ * and skips it **silently**, so every search for that file's subject returns
+ * nothing — and nothing reads exactly like *no coverage*.
+ *
+ * **Measured, and it produced a false conclusion during the work that found
+ * it.** `test/edge/status.test.ts` carried three literal NULs written as
+ * `?? " "` fallbacks — SS43's own stated failure mode, *a separator that reads
+ * as a space turns out to be a NUL* — in 14 KB of C09's status ladder rows.
+ * Searching for them returned nothing, and the conclusion drawn was *the eleven
+ * ledger rows T3.38-T3.48 have no tests*. They all do (F236).
+ *
+ * **Bytes rather than lines, and no comment exemption, which is where this
+ * differs from SS43 rather than merely extending it.** SS43 skips comment lines
+ * because a rule's own prose is not a violation of it — correct there and wrong
+ * here, since a NUL inside a comment makes the file just as invisible. The
+ * subject is not what the character means; it is that the file stops being
+ * readable by the tools everything else in this directory depends on.
+ *
+ * **NUL alone, and the narrowing is a measurement rather than caution.** The
+ * first draft took SS43's whole C0 class and reported **90** hits, every one a
+ * literal ESC in a test about escape sequences — and those files grep fine:
+ * `file` calls them *UTF-8 text, with escape sequences* and `grep -c` counts
+ * their rows. Only NUL flips a file to `data`. A rule whose subject is *the
+ * file became unreadable* and which fires on 90 readable files is a rule people
+ * turn off, and the ninety would have been silenced with an allow-list that
+ * hid the four real ones among them.
+ *
+ * **Its blind spot, stated because an unrecorded limit reads as strength**: a
+ * non-NUL control character in `test/` or `tools/` is invisible to a *reader*
+ * and is caught by nothing — SS43 has that class and stops at `src/`. It is
+ * left open deliberately, because the two rules answer different questions and
+ * merging them is what produced the ninety.
+ */
+const CONTROL_BYTES = /\u0000/u;
+
+export function checkControlBytes(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+  for (const file of files) {
+    const src = readFile(file);
+    const lines = src.split("\n");
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i] ?? "";
+      const at = CONTROL_BYTES.exec(line);
+      if (at === null) continue;
+      const code = (at[0].codePointAt(0) ?? 0).toString(16).padStart(4, "0").toUpperCase();
+      violations.push({
+        rule: "SS52",
+        file: `${file}:${i + 1}`,
+        message:
+          `a literal U+${code} makes this file binary to \`grep\`, which then skips it in ` +
+          `silence — write it as an escape. Column ${String(at.index + 1)}`,
+        spec: "C16 T2.10 · F236",
+      });
+    }
+  }
+  return violations;
+}

@@ -85,16 +85,44 @@ const results = runPass({
       expect: "T3.41",
     },
     {
-      // C09 I31 — at one row the message wins. The countdown is the actionable
-      // number and it is still worth less than the cause.
+      // C09 I31 — at one row the **failed** states keep the message. The
+      // countdown is the actionable number and it is still worth less than the
+      // cause.
       name: "the activity line is admitted with no room for it",
       file: SRC,
       // **Reachable only once the clamp went.** With `out.slice(0, height)` in
       // place this was masked: the assembly made one row too many and the slice
       // cut the line, so the rule and its absence produced the same frame.
-      from: '    const lineRows = line !== "" && interior - tagRows >= 2 ? 1 : 0;',
+      //
+      // **Re-anchored when `loading` was given the other half of the rung**
+      // (F235) — the guard gained a state term rather than moving, so what this
+      // restores is unchanged: a failed box admitting a line it has no room for.
+      from: '    const lineRows = line !== "" && (interior - tagRows >= 2 || lineWins) ? 1 : 0;',
       to: '    const lineRows = line !== "" ? 1 : 0;',
       expect: "T3.42",
+    },
+    {
+      // **F235's own half, and it is the one the frame found.** `loading` has no
+      // cause, so the sentence the rung above is built on says nothing about
+      // which of its two rows to keep — and applied unchanged it drew `loading`
+      // over `⠋ loading`, the word twice, with every count agreeing.
+      name: "`loading` is given the failed states' one-row rung",
+      file: SRC,
+      from: "    const lineWins = block.state === \"loading\";",
+      to: "    const lineWins = false;",
+      expect: "T3.42a",
+    },
+    {
+      // **The precedence returning to a truncation**, which is the defect the
+      // rung's own note records having been fixed once already — in the other
+      // direction. A floor of one puts the message back and lets the final clamp
+      // decide which row survives, so the rule and its absence agree on the row
+      // count and part company only in the contents.
+      name: "the message floor puts it back and lets the clamp choose",
+      file: SRC,
+      from: "    const forMessage = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count",
+      to: "    const forMessage = Math.max(1, interior - tagRows - lineRows); // cells-ok — a row count",
+      expect: "T3.42c",
     },
     {
       // **C09 I32, and the field was declared and unread when this was written.**

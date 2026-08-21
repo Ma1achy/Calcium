@@ -34,6 +34,7 @@ import {
   publicSurfaceUseSignal,
 } from "../../tools/enforce/module-graph.mjs";
 import {
+  checkControlBytes,
   checkMarks,
   checkSourceScans,
   RAMP_VOCABULARIES,
@@ -593,11 +594,14 @@ const scanIds = SCANS.map((s) => s.id);
  *
  * SS47's subject is a string literal's *contents* rather than a line, and its
  * exemptions carry reasons with a bidirectional arm — neither of which the shared
- * row shape can hold. Listed here for the same reason `MODULE_GRAPH_RULES` is a
+ * row shape can hold. SS52's reason is sharper: `FABRICATED` holds a `source`
+ * string in this file, and SS52's subject is the one byte that would make this
+ * file binary to `grep` if it were written literally — **the defect installing
+ * itself in the fixture that tests for it** (F236). Listed here for the same reason `MODULE_GRAPH_RULES` is a
  * list: a rule invisible to `implemented` is a rule the fabrication check does not
  * demand a violation for, which is A03 §2 arriving in the mechanism against it.
  */
-const STANDALONE_SCANS = ["SS47"];
+const STANDALONE_SCANS = ["SS47", "SS52"];
 
 const implemented = [
   ...scanIds,
@@ -639,6 +643,14 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // SS47 likewise: its subject is a string literal's contents rather than a
       // line, and its exemptions carry reasons the shared shape has nowhere to put.
       "SS47",
+      // SS52 likewise, and for a reason the shared table structurally cannot
+      // hold: `FABRICATED` is a `source` string in *this* file, and this rule's
+      // subject is a byte that would make this file binary to `grep` the moment
+      // it were written literally — the defect installing itself in the fixture
+      // that tests for it. Its own rows build the byte at runtime, and one of
+      // them is the negative arm, which the shared shape has no place for
+      // either (F236).
+      "SS52",
       // MG27 likewise: its subject is two whole files read together — a block
       // type and the builder that constructs it — so the shared `FABRICATED`
       // shape, which is one file's text, cannot express it.
@@ -2001,5 +2013,63 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     const unspecified = implemented.filter((id) => !inventoried.has(id));
 
     expect(unspecified, `${unspecified.join(", ")} is enforced but not inventoried`).toEqual([]);
+  });
+});
+
+/** The tool's own walk, so the row below reads the same tree `make enforce` does. */
+const walk = (dir: string, out: string[] = []): string[] => {
+  for (const name of readdirSync(dir)) {
+    const p = `${dir}/${name}`;
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (/\.(ts|tsx|mjs|js)$/u.test(name)) out.push(p);
+  }
+  return out;
+};
+
+describe("SS52 — a NUL makes a file invisible to every search", () => {
+  // **The rule exists because it produced a false conclusion, not because a byte
+  // is untidy** (F236). `test/edge/status.test.ts` carried three literal NULs;
+  // `file` calls such a file `data`, `grep` skips it in **silence**, and a
+  // search for C09's status ladder rows came back empty. The conclusion drawn
+  // was *the eleven ledger rows T3.38-T3.48 have no tests*. All eleven exist, in
+  // 14 KB, in the file the search could not read.
+  //
+  // **Nothing reads exactly like no coverage**, which is why this is a gate and
+  // not a habit: no amount of care at the keyboard makes an invisible file
+  // visible, and the reader has no signal that anything was skipped.
+
+  it("SS52 fires: a literal NUL in a test file", () => {
+    const source = ['expect(frames[0] ?? "', '").toBe(mark);'].join("\u0000");
+    const found = checkControlBytes(["test/edge/example.test.ts"], () => source);
+    expect(found.map((v: { rule: string }) => v.rule)).toEqual(["SS52"]);
+    // The column, because a NUL is invisible and "somewhere on line 1" is not
+    // actionable — finding it by eye is the exact thing that cannot be done.
+    expect(found[0]?.message).toContain("Column 22");
+    expect(found[0]?.file).toBe("test/edge/example.test.ts:1");
+  });
+
+  it("SS52 does not fire on an escape sequence test, which is the narrowing", () => {
+    // **The first draft took SS43's whole C0 class and reported 90 hits**, every
+    // one a literal ESC in a test about escape sequences — and those files grep
+    // perfectly well. A rule whose subject is *the file became unreadable*,
+    // firing on ninety readable files, is a rule someone turns off; the four
+    // real ones would then have been hidden inside the allow-list that silenced
+    // them.
+    const esc = String.fromCharCode(27);
+    const source = `const reset = "${esc}[0m";`;
+    expect(checkControlBytes(["test/contract/x.test.ts"], () => source)).toEqual([]);
+  });
+
+  it("SS52: the real tree is clean, and over a wider list than SCANS walks", () => {
+    // **`checkSourceScans` only ever receives `walk("src")`**, so widening
+    // SS43's scope string would have changed nothing at all — the rule would
+    // have read as tightened and been identical. This one takes its own list,
+    // and the assertion below is that the list actually reaches `test/`: a
+    // control-byte check that silently scanned `src/` alone would pass here
+    // exactly as it does now.
+    const tree = [...walk("src"), ...walk("test"), ...walk("tools")];
+    expect(tree.some((f) => f.startsWith("test/")), "the list reaches test/").toBe(true);
+    expect(tree.some((f) => f.startsWith("tools/")), "and tools/").toBe(true);
+    expect(checkControlBytes(tree)).toEqual([]);
   });
 });

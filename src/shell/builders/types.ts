@@ -236,7 +236,20 @@ export type LiveSpec = BlockOpts &
      * Additive — an implementation ignoring it is unchanged.
      */
     render: (data: unknown, ctx: ProducerContext) => Block;
-    renderError?: (err: ErrorLike, retryInMs: number | null) => Block;
+    /**
+     * **Three parameters, and the third is a deliberate widening** (C24 §5).
+     *
+     * `attempt` is the source's consecutive failure count, reset by any success
+     * and shared by every part behind one source. An override wanting it would
+     * otherwise keep its own count against a backoff it does not own. Additive,
+     * so an implementation taking two is unchanged.
+     *
+     * **Declaring this takes the part out of the framework's counter.** C23's
+     * elapsed tick fires only where the default is still in place — the block is
+     * yours, and a framework timer writing fields into it would be the guarantee
+     * reaching past its own boundary (C23 I52).
+     */
+    renderError?: (err: ErrorLike, retryInMs: number | null, attempt: number) => Block;
     renderLoading?: () => Block;
     /** Default: twice `every`. Below it, construction throws (C24 T3.6). */
     staleAfter?: number;

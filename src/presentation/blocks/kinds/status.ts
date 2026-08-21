@@ -268,9 +268,21 @@ export const statusDefinition: BlockDefinition<Status> = {
     // `slice(0, height)` cut it — so the message won by truncation rather than
     // by rule, and a mutation removing the condition changed nothing. A guard
     // that is also the mechanism is a guard nothing can be wrong about.
-    const lineRows = line !== "" && interior - tagRows >= 2 ? 1 : 0;
-    const forMessage = Math.max(1, interior - tagRows - lineRows); // cells-ok — a row count
-    const body = wrapCells(`${mark}${stripControl(block.message)}`, textWidth).slice(0, forMessage);
+    //
+    // **And at one row `loading` inverts it, because it has no cause.** The rung
+    // above is a correct sentence about the *failed* states — the message is the
+    // error and the countdown is secondary — and `loading`'s message is not an
+    // error, it is a label the panel title already carries. Reading the frame is
+    // what said so: `b.live` drew `loading` over `⠋ loading`, the word twice,
+    // with every count agreeing. All the information in a waiting box is that it
+    // is still waiting, and that lives entirely in the line that moves (F235).
+    const lineWins = block.state === "loading";
+    const lineRows = line !== "" && (interior - tagRows >= 2 || lineWins) ? 1 : 0;
+    const forMessage = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count
+    const body =
+      forMessage === 0
+        ? []
+        : wrapCells(`${mark}${stripControl(block.message)}`, textWidth).slice(0, forMessage);
 
     // **The whole group is centred, not the message inside the leftover.** The
     // two are the same picture at the full figure's six rows, which is why this

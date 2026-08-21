@@ -41,6 +41,18 @@ export declare function checkSourceScans(
  */
 export declare const MARK_EXEMPTIONS: Readonly<Record<string, string>>;
 
+/**
+ * SS52 — a literal NUL anywhere the repository's own tools read (F236).
+ *
+ * Its own function rather than a `SCANS` row, because `checkSourceScans` only
+ * ever receives `walk("src")`: widening SS43's scope string would have read as
+ * a tightening and changed nothing.
+ */
+export declare function checkControlBytes(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): Violation[];
+
 /** SS47 — a mark the framework draws and cannot substitute (C09 I22). */
 export declare function checkMarks(
   files: readonly string[],

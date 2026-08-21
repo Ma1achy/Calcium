@@ -421,7 +421,7 @@ export function checkTodoExpiry(
       }
 
       if (isImplemented(path)) {
-        const key = `${id} ${path}`;
+        const key = `${id}\u0000${path}`;
         if (!expired.has(key)) expired.set(key, { id, path, files: [] });
         expired.get(key).files.push(file);
       }

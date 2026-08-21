@@ -11578,3 +11578,145 @@ no activity line **and therefore no spinner** — `|▲ msg|  ||` — and `refre
 `retrying` unconditionally would have given a one-shot's failure a blank row where the spinner
 goes. The state union already carries the distinction; `retryInMs === null` **means** no retry is
 coming, and the arm is `error`.
+
+---
+
+## F235 — the one-row rung was a correct sentence about the two states it was reasoned from ★★★★☆
+
+C09 I31's height ladder ends: *at one row the message wins and the retry line is dropped, because
+a countdown without its cause is a number nobody can act on.*
+
+**True, well argued, and about `error` and `retrying`.** The rung applies to all three states, and
+`loading` has no cause — its message is a label, not an error. Wired up, `b.live` drew:
+
+```
+┌ containers ───────────────┐
+│loading                    │
+│⠋ loading                  │
+└───────────────────────────┘
+```
+
+**The word twice, with every count agreeing.** `measure` said 2 and `render` drew 2; the message
+row took one and the activity line took the other, exactly as the ladder specifies. No assertion
+about heights, rows, wrapping or precedence could have failed.
+
+**MG24's shape, and that is why it is worth filing rather than fixing quietly.** *A correct
+sentence justifying a decision whose scope is wider than the sentence's subject* — review checks
+whether a justification is true, and this one is. The question that reaches it is **does this
+sentence constrain the case it is being applied to**, and for `loading` it does not: there is no
+countdown and no cause, so the clause is silent about which of the two rows to keep and reads as
+though it has ruled.
+
+**All the information in a waiting box is that it is still waiting, and that lives entirely in
+the line that moves.** The panel above already carries the title. So at one row `loading` keeps
+the activity line and the other two keep the message, and the rung's argument is unchanged for
+the states it was written about.
+
+```
+┌ containers ───────────────┐     ┌ ▌ containers ─────────────┐
+│⠋ loading                  │     │▲ connection refused       │
+└───────────────────────────┘     │⠋ retrying in 2s (attempt 1)│
+                                  └───────────────────────────┘
+```
+
+**Found by reading a frame, and it is the fourth thing in this sequence that only a frame
+found** — after the width ladder that would have shipped broken, the box that drew four rows
+against a measured six, and F234's height choice. **The count is now the argument**: every one of
+the four is a cell where the arithmetic is self-consistent and the figure is wrong, and a suite
+indexed by row counts agrees with itself in all four.
+
+**And it changes a shipped rung rather than only the new caller**, which is the right blast
+radius: a `loading` status at one row is wrong for the registry and for a consumer too, and
+fixing it at `b.live` by picking height 2 would have left the rung wrong and hidden the evidence.
+
+**One thing the fix had to be careful about**, and the file's own comment is what flagged it: the
+message used to be floored at one row by `Math.max(1, …)`, and with the activity line taking the
+only row that floor would put the message back and let the final `slice(0, height)` cut it —
+**the message winning by truncation rather than by rule**, which is the exact defect the rung's
+comment records having been fixed once already. The floor is `Math.max(0, …)` and the body is
+empty when there is no room, so the precedence stays a statement rather than an accident.
+
+---
+
+## F236 — three NUL bytes made a 14 KB test file invisible, and the search that missed it read as coverage ★★★★★
+
+Looking for where C09's status ladder is tested:
+
+```
+grep -rn 'kind: "status"' test/            ->  3 files, none of them tier 3
+grep -n  'it("' test/edge/status.test.ts   ->  nothing
+```
+
+**The conclusion drawn was that C09's eleven ledger rows T3.38-T3.48 have no tests.** All eleven
+exist, in `test/edge/status.test.ts`, 14 KB of them — and the file was open in front of me, since
+`head -40` printed it perfectly.
+
+```
+file test/edge/status.test.ts   ->  data
+```
+
+**Three literal NUL bytes**, at offsets 9565, 9892 and 10339. `grep` classifies such a file as
+binary and skips it **in silence**: no warning, no count, no diagnostic. A search for its contents
+returns nothing, and **nothing reads exactly like no coverage.**
+
+**They were written as `?? " "` fallbacks** — `r.includes(frames[0] ?? " ")` where the string that
+looks like a space is a NUL. That is SS43's own stated failure mode, word for word: *a separator
+that reads as a space turns out to be a NUL*.
+
+**And SS43's scope is `src/`, which is where the byte does the least harm.** In source a stray NUL
+is a wrong character inside a string — bad, and visible to every other tool. In a *test* file it
+deletes the file from every search anyone will ever run. **The rule was scoped to the directory
+where its subject was first found rather than to the one where its consequence is worst.**
+
+**Five files, measured across the whole tree:**
+
+```
+test/contract/parser.test.ts    1     among a list of separator strings
+test/edge/history.test.ts       1     inside an appended command line
+test/edge/process.test.ts       1     inside an expected output
+test/edge/status.test.ts        3     the `?? " "` fallbacks above
+tools/enforce/todo-expiry.mjs   1     a Map key separator, `${id} ${path}`
+```
+
+The last is an **enforcement tool** that was itself invisible to `grep`.
+
+All five replaced by the escape "\u0000" — byte-identical behaviour, and the remedy SS43 already
+prescribes. 125 tests unchanged, `make enforce` unchanged.
+
+**SS52 is the rule, and three things about its shape were decided by measurement.**
+
+- **It is not SS43 widened.** `checkSourceScans` only ever receives `walk("src")`, so changing
+  SS43's scope *string* would have read as a tightening and done nothing at all. It needs its own
+  pass over its own list — and its row asserts the list actually reaches `test/`, because a
+  control-byte check that silently scanned `src/` alone would pass identically.
+- **NUL alone.** The first draft took SS43's whole C0 class and reported **90** violations, every
+  one a literal ESC in a test about escape sequences — and those files grep perfectly well; `file`
+  calls them *UTF-8 text, with escape sequences*. A rule whose subject is *the file became
+  unreadable*, firing on ninety readable files, is a rule someone turns off — and the four real
+  instances would then have been buried in the allow-list that silenced them.
+- **Bytes, and no comment exemption.** SS43 skips comment lines because a rule's own prose is not a
+  violation of it. Correct there and wrong here: a NUL inside a comment makes the file just as
+  invisible.
+
+**Its blind spot, stated**: a non-NUL control character in `test/` or `tools/` is invisible to a
+*reader* and is now caught by nothing. Left open deliberately — the two rules answer different
+questions, and merging them is what produced the ninety.
+
+**The fabricated violation could not go in the shared table, and the reason is the finding in
+miniature.** `FABRICATED` is a list of `source` strings inside `enforce-rules.test.ts`, and SS52's
+subject is the one byte that would make *that file* binary to `grep` if written literally — **the
+defect installing itself in the fixture that tests for it.** Its rows build the byte at runtime.
+
+**Two instruments caught this class while it was being fixed, and neither was the suite.** The
+first draft of the scan was written through a shell heredoc and **the tool refused the command**,
+because it contained control characters that would be hidden in an approval dialog — SS43's own
+argument, enforced by something with no knowledge of this repository. It then refused this finding
+for quoting them. The second was `file` reporting `data`, which is the whole diagnosis in one word
+and was one command away for however long those bytes had been there.
+
+**The reusable part is not the byte.** It is that **a search returning nothing is evidence only if
+the search could have returned something**, and an empty result carries no signal about whether the
+corpus was read. Every other instrument here checks a thing that exists — the frame-read checks
+output, the mutation pass checks tests, the audit checks code, *where is this written down* checks
+the record. **This is the first about whether the reading happened at all**, and the near-miss it
+produced was a finding about eleven missing tests that were never missing.

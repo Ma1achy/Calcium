@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
   Action,
@@ -1097,11 +1097,34 @@ function live(spec: LiveSpec): Panel {
   // around rather than a way past it.
   const loading =
     spec.renderLoading?.() ??
-    // **The `pending` glyph rather than an ellipsis in the text** (C09 I22,
-    // F122). A builder runs above the renderer, so a character written here
-    // cannot be substituted — and the mark this wanted is one C09 already
-    // carries, with `.` for a terminal that cannot draw `◌`.
-    noticeOf("muted", "loading", "pending", { id: `${spec.id}-loading` });
+    // **A `status` at `loading`, and the kind exists for this fact** (C23 I51,
+    // C09 §3a). A first fetch in flight is the builder's to know — the part is
+    // constructed before the driver has run — and it is one of the three states
+    // a consumer cannot observe, which is the whole argument for the kind.
+    //
+    // **This was a `notice` and drew no spinner.** The `pending` glyph was the
+    // right answer while the box was static: a builder runs above the renderer,
+    // so a character written here cannot be substituted, and `◌` is one C09
+    // already carries with `.` below unicode. A `status` carries its own mark
+    // the same way and animates as well, which the notice could not — and
+    // `elapsedMs` gives the box something to say while it waits (C23 I52).
+    //
+    // **Height 1, and it took two frame reads to get there** (F234, F235). The
+    // panel below already draws the border and holds the title, so 3 spends a
+    // row on a second border inside the first — and 2 drew `loading` over
+    // `⠋ loading`, the same word twice, because at two rows the message gets one
+    // and the activity line gets the other. A waiting box's whole content is the
+    // line that moves; C09 I31's one-row rung now gives `loading` that line.
+    //
+    // `message` is still what a taller one would say — the registry can size
+    // this box from a committed measure, and a consumer can read it.
+    block({
+      kind: "status",
+      id: `${spec.id}-loading`,
+      state: "loading",
+      message: "loading",
+      height: 1,
+    });
   const panel = finish<Panel>(
     { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
     spec,

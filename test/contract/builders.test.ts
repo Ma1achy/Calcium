@@ -541,9 +541,22 @@ describe("C24 §5 — b.live", () => {
     expect(part.kind).toBe("panel");
     expect(part.title).toBe("activity");
     expect(part.children).toHaveLength(1);
+    // **A `status` at `loading`, not a `notice`** (C23 I51). The notice was
+    // static and this animates — `elapsedMs` gives the box something to say
+    // while it waits, and the spinner says it is still trying.
+    //
+    // **Height 1, and it took two frame reads** (F234, F235). The panel above
+    // already draws the border and holds the title, so 3 spends a row on a
+    // second border; and 2 drew `loading` over `⠋ loading` — the same word
+    // twice, with every count agreeing. C09 I31's one-row rung gives `loading`
+    // the line that moves, because a waiting box has no cause to state.
     expect(part.children[0]?.kind, "the placeholder is there before anything fetches").toBe(
-      "notice",
+      "status",
     );
+    expect(part.children[0], "and it is the waiting state, sized for the panel").toMatchObject({
+      state: "loading",
+      height: 1,
+    });
     expect(validateBlock(part).ok, "and it is a valid block").toBe(true);
   });
 
