@@ -303,6 +303,96 @@ describe("C12 §3ae — the frame, and what does not move", () => {
   });
 });
 
+describe("C12 §3ae.8 — the captions, and the grid they span", () => {
+  /** The caption row: the last row before the legend that carries no `┤`. */
+  const captionOf = (rows: readonly string[]): string => {
+    const last = rows.map((r, i) => (r.includes("┤") ? i : -1)).filter((i) => i >= 0).pop() ?? -1; // cells-ok
+    return rows[last + 1] ?? "";
+  };
+  const flatFor = (n: number): readonly { label: string; values: readonly number[] }[] =>
+    [{ label: "x", values: Array.from({ length: n }, (_, i) => i % 11) }];
+  const mono = (o: Record<string, unknown>): readonly string[] =>
+    kit(MONO_UNICODE_CAPS)
+      .renderToLines(
+        block({ kind: "plot", id: "cal", form: "calendar", height: 7, axes: true, ...o } as unknown as Plot),
+        80,
+      )
+      .map((r) => r.replace(/\x1b\[[0-9;]*m/g, ""));
+
+  it("CP1 (§3ae.8): each unit is captioned at its super-unit's granularity", () => {
+    const cases = [
+      // 2026-01-01 is a Thursday, so the first column is the week starting Monday 2025-12-29.
+      ["day", 365, "2026-01-01", 7, ["2025-12-29", "2026-12-28"]],
+      ["hour", 336, "2026-03-04T09", 24, ["2026-03-04", "2026-03-18"]],
+      ["week", 104, "2026-01-05", 5, ["2026-01", "2027-12"]],
+      ["month", 144, "2026-01-01", 12, ["2026", "2037"]],
+    ] as const;
+    for (const [unit, n, startDate, height, [first, last]] of cases) {
+      const caption = captionOf(draw({ series: flatFor(n), calendarUnit: unit, startDate, height }));
+      expect(caption.trimStart().startsWith(first), `${unit} first: ${caption}`).toBe(true);
+      expect(caption.trimEnd().endsWith(last), `${unit} last: ${caption}`).toBe(true);
+    }
+  });
+
+  it("CP2 (§3ae.8): the caption row ends at the grid's edge and not the area's", () => {
+    // Fifty-three weeks at a pitch of one leave a twenty-two cell fringe, and a
+    // caption placed against the area's right edge names a column that is not
+    // there. The row's own length is what says which edge it took.
+    //
+    // **At one bit, for CL10's reason and the second time in this file**: a
+    // painted cell is a background, so a full-colour frame strips to blanks and
+    // an ink measurement over it answers zero for every arm. Twice is the number
+    // that makes it worth writing down rather than remembering.
+    const rows = mono({ series: flatFor(365), calendarUnit: "day", startDate: "2026-01-01" });
+    const gutter = (rows.find((r) => r.includes("┤")) ?? "").indexOf("┤") + 1; // cells-ok — a cell width
+    const inked = (rows.find((r) => r.includes("┤")) ?? "").slice(gutter).trimEnd().length; // cells-ok
+    expect(inked, "fifty-three weeks, one cell each").toBe(53); // cells-ok — a cell width
+    expect(captionOf(rows).trimEnd().length, "gutter plus grid, not gutter plus area").toBe(gutter + inked); // cells-ok
+  });
+
+  it("CP3 (§3ae.8): a declared xLabels still wins, on `fieldAxes`' precedent", () => {
+    const rows = draw({
+      series: flatFor(365), calendarUnit: "day", startDate: "2026-01-01",
+      xLabels: ["start", "middle", "end"],
+    });
+    const caption = captionOf(rows);
+    expect(caption).toContain("start");
+    expect(caption).toContain("end");
+    expect(caption).not.toContain("2026");
+  });
+
+  it("CP4 (§3ae.7): `window` keeps the area, which is the limit rather than the rule", () => {
+    // A right-anchored grid begins at `w − n`, so its captions need an offset
+    // `xLabelRow` does not take. Stated so the frame is not read as a defect:
+    // the caption row spans the area and the leftmost names a blank column.
+    const short = [{ label: "r", values: [1, 2, 3, 4, 5] }];
+    const spec = { series: short, xLabels: ["a", "b", "c"] as const, height: 1 };
+    const win = captionOf(draw({ ...spec, matrixAnchor: "window" }));
+    const lft = captionOf(draw({ ...spec, matrixAnchor: "left" }));
+    // `left` grows from column 0, so its captions stop at its five cells;
+    // `window` is anchored right and keeps the whole area.
+    expect(lft.trimEnd().length).toBeLessThan(win.trimEnd().length); // cells-ok — a cell width
+  });
+
+  it("CP5 (§3ae.8): the captions name the columns shown, not the columns that exist", () => {
+    // Five years of daily readings: 261 week-columns into seventy-odd cells, so
+    // the oldest are dropped. Captioning column 0 would name a week that is not
+    // on the frame — which is why the three positions are read through the map.
+    const caption = captionOf(draw({
+      series: flatFor(1826), calendarUnit: "day", startDate: "2026-01-01", height: 7,
+    }));
+    expect(caption, "the first week of 2026 is off the left").not.toContain("2025-12-29");
+    // **Derived, because guessing a date has been wrong twice in this file.**
+    // The last column is the week holding the last reading, and its Monday is
+    // what a `day` column is called — from primitives CL4 checks against an
+    // external oracle.
+    const lastDay = daysFromCivil(2026, 1, 1) + 1825;
+    const monday = civilFromDays(lastDay - weekdayFromDays(lastDay));
+    const expected = `${String(monday.year)}-${String(monday.month).padStart(2, "0")}-${String(monday.day).padStart(2, "0")}`;
+    expect(caption.trimEnd().endsWith(expected), `${caption} · expected ${expected}`).toBe(true);
+  });
+});
+
 describe("C04 I62 — the calendar's refusals, at both gates", () => {
   const flat = [{ label: "x", values: [1, 2, 3] }];
   const one = (errs: readonly string[], needle: string): void => {

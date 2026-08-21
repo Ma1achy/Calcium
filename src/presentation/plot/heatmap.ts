@@ -24,7 +24,7 @@ import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
 import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Layout } from "./furniture.js";
 import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
-import { calendarGrid } from "./calendar.js";
+import { calendarCaptions, calendarGrid } from "./calendar.js";
 import { parseStartDate } from "../../data/dates.js";
 import { slot } from "../blocks/paint.js";
 import { refOf } from "./marks.js";
@@ -385,13 +385,13 @@ function matrixRows(
   layout: Layout,
   ctx: RenderContext,
   overlay: readonly FieldLayer[],
+  matrixLayout: MatrixLayout,
 ): readonly string[] {
   const style = { ramp: ladderFor("density", ctx.capabilities).steps, absent: HEATMAP_ABSENT };
   const map = colormapFor(block);
   // The caller's choice wins, then the form's, then `stretch` — which is the
   // safe fallback rather than `window`: a form with no entry is one nobody
   // decided about, and blanking most of the width is not a neutral answer.
-  const matrixLayout = block.matrixAnchor ?? MATRIX_LAYOUT[block.form] ?? "stretch";
   const painted = fieldPaintsUnder(block, overlay, ctx.capabilities);
   // The second argument is *which colour the reader will see*: below 24-bit
   // `continuousColour` quantises to the 256-cube, and the factor has to clear
@@ -493,19 +493,42 @@ function matrixFurniture(
   range: Range,
   layout: Layout,
   ctx: RenderContext,
+  matrixLayout: MatrixLayout,
 ): readonly string[] {
   const muted = tone("muted", ctx.theme, ctx.capabilities);
   // **The matrix's captions come through here and not `xRowFor`**, which is a
   // third caption builder and the reason a surviving mutation was right about a
   // remedy in the wrong file: `furnitureFor` is reached from `axed`, and a
   // matrix composes its own furniture. OR12's heatmap arm is what said so.
-  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities, facingOf(block, FACING_MATRIX));
+  const facing = facingOf(block, FACING_MATRIX);
+  const longest = block.series.reduce((n, s) => Math.max(n, s.values.length), 0); // cells-ok — a position count
+
+  /**
+   * **The captions span the grid and not the area** (C12 §3ae.8).
+   *
+   * `left` has left a fringe since it was written and `uniform` leaves a larger
+   * one, so a caption placed against the area's right edge names a column that
+   * is not there. The extent is read off `columnMap`'s **own output** rather
+   * than recomputed — the map already says which column holds which reading, so
+   * the first and last non-null positions *are* the grid's edges, and a second
+   * derivation is the defect this function's own comment records.
+   *
+   * **`window` keeps the area**, and that is a stated limit rather than an
+   * oversight: its grid begins at `w − n`, so its captions need an offset
+   * `xLabelRow` does not take (§3ae.7).
+   */
+  const grid = columnMap(longest, layout.areaWidth, matrixLayout, facing);
+  const leading = grid.findIndex((c) => c !== null); // cells-ok — a column index
+  const occupied = grid.reduce<number>((n, c, x) => (c === null ? n : x + 1), 0); // cells-ok — a cell width
+  const captionWidth = leading === 0 ? occupied : layout.areaWidth; // cells-ok — a cell width
+
+  const captions = block.xLabels ?? calendarCaptions(block, grid);
+  const labels = xLabelRow(captions, captionWidth, ctx.capabilities, facing);
   const labelRow =
     labels === ""
       ? ""
       : line([{ text: " ".repeat(layout.gutter) }, { text: labels, style: muted }], layout, ctx);
 
-  const longest = block.series.reduce((n, s) => Math.max(n, s.values.length), 0); // cells-ok — a position count
   const dropped = Math.max(0, longest - layout.areaWidth);
 
   const lo = formatValue(range.min, block.yFormat);
@@ -768,8 +791,13 @@ export function heatmapFormRows(
   }
 
   if (range === null) return emptyRows(block, layout, ctx);
+  // **Resolved once and handed down**, because the furniture and the cells have
+  // to agree about which columns the grid occupies (§3ae.8). Two lookups of
+  // `matrixAnchor ?? MATRIX_LAYOUT[form]` would be two answers the day a third
+  // caller reads one of them.
+  const matrixLayout = block.matrixAnchor ?? MATRIX_LAYOUT[block.form] ?? "stretch";
   return [
-    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx, withField !== raw)),
-    ...matrixFurniture(block, range, layout, ctx),
+    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx, withField !== raw), matrixLayout),
+    ...matrixFurniture(block, range, layout, ctx, matrixLayout),
   ];
 }

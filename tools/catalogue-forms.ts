@@ -372,6 +372,16 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // (C12 §3ac): `series[0]`, `values[0]` is at the *top* left because a row
     // index grows downward. `bottom-right` is therefore both flips at once.
     origin: { form: "heatmap", height: 5, axes: true, colormap: "viridis", series: matrix(5, 20), origin: "bottom-right" },
+    // **A caption over a fringe names a column that is not there** (C12 §3ae.8,
+    // A13). `left` has left a fringe since it was written and no fixture ever
+    // paired it with captions, so the misalignment was shipped and invisible:
+    // twenty readings into an area three times as wide, with `now` against the
+    // area's right edge and the newest reading forty cells to its left.
+    "captions-left": {
+      form: "heatmap", height: 5, axes: true, colormap: "viridis",
+      matrixAnchor: "left", xLabels: ["epoch 0", "epoch 10", "now"],
+      series: matrix(5, 20),
+    },
   },
   contour: {
     // **The braille arm, which is the default and the one the saddle is visible

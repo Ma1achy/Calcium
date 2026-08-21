@@ -3329,6 +3329,16 @@ Two rulings, and the first is general:
    wins, which is `fieldAxes`' precedent — *a caller who names one is a caller saying their columns
    mean something the index does not.*
 
+**The cost is that a caption over a narrow grid truncates harder**, and it is the right trade
+rather than a regression. `xLabelRow` gives each caption a third of the width it is handed, so a
+twenty-cell grid in a seventy-four-cell area renders `epoch… epoch…    now` where it used to render
+all three in full — spread across an area whose right two-thirds hold no data. **A caption that
+names the right column tersely beats one that names the wrong column in full**, and the caller who
+wants both has `width` and shorter labels. `heatmap.captions-left` is the fixture, added because the
+shipped half of this had no frame in the corpus: no matrix fixture had ever paired a fringe-leaving
+anchor with captions, so 312 goldens and 1264 catalogue files all walked the arm where the two edges
+coincide.
+
 **The captions name the columns that are shown, not the columns that exist.** Where the readings
 outnumber the cells the oldest are dropped, so the three positions are read *through the map* —
 `map[0]`, the map at the middle, and the map at the last occupied cell. Deriving them from the

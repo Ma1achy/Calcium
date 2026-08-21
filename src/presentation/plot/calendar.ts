@@ -14,7 +14,7 @@
  */
 import type { Plot, Series } from "../../data/viewmodel/index.js";
 import type { CalendarStart } from "../../data/dates.js";
-import { civilFromDays, weekdayFromDays } from "../../data/dates.js";
+import { civilFromDays, parseStartDate, weekdayFromDays } from "../../data/dates.js";
 
 /** The cell a calendar's grid is built from. */
 export type CalendarUnit = NonNullable<Plot["calendarUnit"]>;
@@ -89,4 +89,65 @@ export function calendarGrid(
     if (cell !== undefined && row !== undefined) row[cell.column] = v;
   });
   return labels.map((label, r) => ({ label, values: grid[r] ?? [] }));
+}
+
+/** `2026-03-04`, with the parts padded so a column of them lines up. */
+function iso(days: number): string {
+  const c = civilFromDays(days);
+  return `${String(c.year).padStart(4, "0")}-${String(c.month).padStart(2, "0")}-${String(c.day).padStart(2, "0")}`;
+}
+
+/**
+ * What column `k` is called, at the **super-unit's** granularity (C12 §3ae.8).
+ *
+ * The rows say which month; the legend says how much; without this the super
+ * unit has no voice at all — twelve years of monthly readings at a pitch of six
+ * is seventy-two cells of wash with nothing saying which year a column is, and
+ * the frame is what showed it because every assertion was about the grid.
+ *
+ * **Not the index's own date.** A column is a period, so the caption is the
+ * period rather than the first reading in it: a column of days is the week its
+ * Monday starts, whichever day the series began on.
+ */
+export function calendarColumnLabel(unit: CalendarUnit, start: CalendarStart, column: number): string {
+  if (unit === "hour") return iso(start.z + column);
+  if (unit === "day") return iso(start.z - weekdayFromDays(start.z) + 7 * column);
+  if (unit === "week") {
+    const m = start.month - 1 + column;
+    return `${String(start.year + Math.floor(m / 12)).padStart(4, "0")}-${String((m % 12) + 1).padStart(2, "0")}`;
+  }
+  return String(start.year + column);
+}
+
+/**
+ * The three captions, or `undefined` where this block is not a dated calendar.
+ *
+ * **Read through the map rather than off the series' own indices**, which is the
+ * whole of §3ae.8's second half: where the readings outnumber the cells the
+ * oldest are dropped, and captioning column 0 would name a week that is not on
+ * the frame. `columns` is `columnMap`'s output — the one derivation — so the
+ * caption and the cell under it are answering from the same array.
+ */
+export function calendarCaptions(
+  block: Plot,
+  columns: readonly (number | null)[],
+): readonly [string, string, string] | undefined {
+  const unit = block.calendarUnit;
+  if (block.form !== "calendar" || unit === undefined) return undefined;
+  if (block.startDate === undefined) return undefined;
+
+  // **Precedence is the caller's business and it is expressed once.** This used
+  // to refuse where `block.xLabels` was set, which is the same rule the `??` at
+  // the call site states — and two guards for one rule make the call site's
+  // mutation a no-op. The pass is what said so: swapping the two operands
+  // failed nothing, because this function had already answered `undefined`.
+  const start = parseStartDate(block.startDate);
+  if (start === null) return undefined;
+  const shown = columns.filter((c): c is number => c !== null);
+  const last = shown[shown.length - 1]; // cells-ok — a column index
+  const first = shown[0];
+  const mid = shown[Math.floor((shown.length - 1) / 2)]; // cells-ok — a column index
+  if (first === undefined || mid === undefined || last === undefined) return undefined;
+  const at = (c: number): string => calendarColumnLabel(unit, start, c);
+  return [at(first), at(mid), at(last)];
 }

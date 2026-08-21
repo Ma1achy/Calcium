@@ -182,8 +182,12 @@ const results = runPass({
       // matrix ever calls — and this mutation surviving is what said so.
       name: "the matrix's x captions do not follow the facing",
       file: HEAT,
-      from: "  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities, facingOf(block, FACING_MATRIX));",
-      to: "  const labels = xLabelRow(block.xLabels, layout.areaWidth, ctx.capabilities);",
+      // **Re-anchored when the captions moved from the area to the grid** (C12
+      // §3ae.8): the facing is now resolved once at the top of the function and
+      // the width is the grid's extent, so the mutation drops the argument at
+      // the call rather than the whole expression.
+      from: "  const labels = xLabelRow(captions, captionWidth, ctx.capabilities, facing);",
+      to: "  const labels = xLabelRow(captions, captionWidth, ctx.capabilities);",
       expect: "OR12",
     },
   ],

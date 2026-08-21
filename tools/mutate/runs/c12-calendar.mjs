@@ -139,6 +139,46 @@ const results = runPass({
       to: "  if (day < 1 || day > 31) return null;",
       expect: "CL5",
     },
+    {
+      // **§3ae.8's first ruling, reverted.** The captions span the area again,
+      // so the last one sits up to `n − 1` cells past the column it names —
+      // shipped for `left` and invisible to 312 goldens, because no matrix
+      // fixture had ever paired a fringe-leaving anchor with captions.
+      name: "the captions span the area rather than the grid",
+      file: HEAT,
+      from: "  const captionWidth = leading === 0 ? occupied : layout.areaWidth; // cells-ok — a cell width",
+      to: "  const captionWidth = layout.areaWidth; // cells-ok — a cell width",
+      expect: "CP2",
+    },
+    {
+      // The captions taken off the series' own indices rather than through the
+      // map: correct until the columns outnumber the cells, and then it names
+      // a week that is not on the frame.
+      name: "the captions name the columns that exist rather than the ones shown",
+      file: CAL,
+      from: "  const shown = columns.filter((c): c is number => c !== null);",
+      to: "  const shown = columns.map((_, i) => i);",
+      expect: "CP5",
+    },
+    {
+      // `fieldAxes`' precedent inverted — a caller who names their columns is
+      // saying they mean something the index does not.
+      name: "a derived caption outranks the caller's own",
+      file: HEAT,
+      from: "  const captions = block.xLabels ?? calendarCaptions(block, grid);",
+      to: "  const captions = calendarCaptions(block, grid) ?? block.xLabels;",
+      expect: "CP3",
+    },
+    {
+      // **A column is a period, not the first reading in it.** Dropping the
+      // weekday term captions the first column with the start date itself, so
+      // a Thursday start says the week begins on a Thursday.
+      name: "a `day` column is captioned with the start date, not its week's Monday",
+      file: CAL,
+      from: '  if (unit === "day") return iso(start.z - weekdayFromDays(start.z) + 7 * column);',
+      to: '  if (unit === "day") return iso(start.z + 7 * column);',
+      expect: "CP1",
+    },
   ],
 });
 
