@@ -364,13 +364,20 @@ implementation was read against them, which is F161's class in a drawing rather 
 count. `glyphs().warning` is `▲` at unicode and `!` at ascii, both one cell, and a figure that
 names a mark the tree does not have is a figure nobody can build.
 
-**No background, and the measurement is why.** A painted tag wants a foreground and background
-*pair*, and `resolveBackground` admits a background only from a `surface.*` ref because §4's
-contrast floors are measured for surfaces and not for tones (C10 I21). `Surfaces` carries
-`bg · bgElev · bgDeep · border · borderStrong · diffAdd · diffRemove · selection` and **no error
-surface**, so the pair is not expressible today. Minting one is C10's, with its own floor. The
-unpainted figure works: the rule, the tag and the message in the error tone, and at one bit the
-mark plus bold.
+**The tag is painted and nothing else is.** `surfaces.errorGround` and `surfaces.errorInk` are
+**one pair, minted together and checked together** (C10 §4a): white on `#c62828` at **5.62 : 1**
+on dark and light, and inverted to black on `#ff0000` at **5.25 : 1** on high contrast, where
+white-on-red measures 4.00 and would fail. Both halves live in `surfaces` because the tag has no
+palette slot it could borrow — `tone.error` is authored as a foreground for a dark page and is
+the wrong brightness to sit behind text, which is C10 I21's rule from the other direction. **A
+ground with no ink of its own borrows a foreground nothing measured against it**, so neither
+arrives alone.
+
+**And the pair degrades together.** At 4-bit and 1-bit there is no ground *and no ink*: the tag
+carries no styling and is distinguishable by being the one run that does not — non-bold between
+two bold rules at one bit. An ink left behind on a ground that vanished would be the same missed
+floor in the other direction, which is why T3.46 asserts both halves' absence rather than the
+ground's alone.
 
 #### §3a classification table — the cells where two rules meet
 
@@ -797,7 +804,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 ## 7. Invariants
 
 - **I1** — For every registered kind, `measure(b, w)` equals the row count of `render(b, ctx)` at width `w`. The system's most load-bearing invariant.
-- **I2** — `measure` is pure and total (C04 §5). No I/O, no clock, no throw on any input.
+- **I2** — `measure` is pure and total (C04 §5). No I/O, no clock, no throw on any input. **A `minHeight` floor does not weaken this and cannot, because no definition sees it**: the registry applies it (I33), so `definition.measure` is a function of `(block, width)` exactly as before, and a kind cannot consult a floor even by accident.
 - **I3** — No renderer reads the environment. Capabilities and theme arrive through `ctx`.
 - **I4** — No renderer emits a colour directly; all styling comes from `resolve` against a declared palette slot.
 - **I5** — Every capability substitution is 1:1 by cell count.
@@ -829,6 +836,8 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I30** — **`elementsOf` and the ownership question are one answer about one block.** A throwing `elements` makes *that* block atomic for the dispatch (C26 I12) and leaves its children reachable: ownership is decided by what resolution **returned**, never by whether the member is declared. The two catches disagreed — `elementsOf` caught the throw and answered *no elements*, while the ownership question answered *it owns them, do not descend* — and the pair costs a whole subtree rather than a block: measured, a container whose `elements` threw yielded **0 elements against a control's 4**, with nothing said and `↓` skipping the lot (F224). I11's class in a different member, and it is stated here rather than left to C26 because the invariant is C26's and the mechanism is this file's.
 - **I31** — **The `status` box occupies exactly `measure(b, w)` rows, and its two ladders live on different axes: height allocates rows, width decides what fills them.** The row count is never a width decision, because `measure` has already answered and I1 is what the whole error path exists to preserve — so where the width ladder drops the tag row, the row goes to the message rather than going blank. **The height ladder needs six rows for the full figure** — two borders, two blanks and the tag row — and the padding is dropped as a pair, the tag row next, the border after that; at one row the message wins and the retry line is dropped, because a countdown without its cause is a number nobody can act on. **The width ladder was missing and would have shipped broken**: ` ERROR ` is 7 cells and a rule needs 9, against a `group: row` that can hand a block five columns. It is a *structural* interaction — two rules both holding at rest, no event between them — and a figure indexed on height cannot reach one however many rungs it has (C19 §8a's lesson in the other axis). **`H ≤ 2` has no border and therefore no evidence the height was honoured**; that is stated rather than left to be noticed, because it is the one place the argument for the border does not hold.
 - **I32** — **`status` animates unconditionally, its interval belongs to its set, and its numbers are fields rather than either.** No state-dependent branch: `retrying` is the error box plus a spinner line, so excluding `error` from animating breaks the state composed out of it and needs a per-state exception where a simple rule would do — and `error` drawing the same bytes every tick makes its stickiness free rather than a mechanism. The set is named by the block and defaults to what `steps` resolves to, so one glyph means *waiting* in three places; `spinnerIntervalMs` is the same lookup as `spinnerFrames`, so a caller cannot hold one set's frames against another's tick. **`retryInMs`, `attempt` and `elapsedMs` are supplied, never derived** — `tick` cannot carry a duration because C03 coalesces and drops commits under load, and this layer may not read a clock, so the only honest source is whoever holds one. **The counter does not currently advance at all** (F227), and the kind is written against one that does.
+
+- **I33** — **The registry applies C04's `minHeight` floor on both sides, so I1 holds by construction.** `measure` returns `max(definition.measure(…), block.minHeight ?? 0)` and `render` wraps a floored element in a box with the same minimum, which pads a short child and leaves a tall one alone. **Padding and never bounding is the whole of it**, and the alternative was measured: a fixed height drops an over-full box's **first** row rather than its last, and `overflowY: "hidden"` does not change that — so a bound would silently behead a block that grew. **A windowed piece carries no floor** (C04 I68), because I26 is an identity about a slice. **The floor is applied outside the definition** so that I2 survives it and `scroll`'s §3c purity argument is not reopened.
 
 ---
 
@@ -864,6 +873,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 28. **The two element answers are one answer** (I30). Ownership is read from what resolution returned rather than from whether the member is declared, so a throwing `elements` costs its own block and never its children — 0 against a control's 4 (F224).
 29. **A degradation ladder is owed on every axis the figure varies along, not on the one it was drawn against** (I31, §3a). The `status` box was specified with a height ladder and no width ladder, and the missing one is the axis that wraps: ` ERROR ` is 7 cells, a rule needs 9, and a `row` group hands out `floor((w − gaps) / n)`. Both ladders are rulings taken before the code, and the second exists because a classification table was run beside the height trace rather than instead of it.
 30. **A kind that composes one state out of another animates unconditionally** (I32). `retrying` is `error` plus a line, so any rule that excludes `error` needs an exception the moment the composition is drawn — and the still frame it was meant to buy is already free, because identical bytes write no diff.
+31. **A floor set above the registry is honoured on both sides of the pair, by the registry** (I33), and the field it honours is C04's (→ C04 I67). One number reaches `measure` and the element's padding through one line each, so a floored block cannot measure one height and draw another — which is the failure I1 exists for, arriving through the mechanism added to serve it.
 
 ---
 
@@ -921,6 +931,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 ### Tier 3 — edge cases
 
 - **T3.1**: `measure` before `seal` → works.
+- **T3.53** (I33, → C04 I67): `measure` returns `max(definition.measure(…), minHeight)`. A block already taller keeps its own number, which is the arm a floor-always-wins implementation passes the other rows with.
+- **T3.54** (I33, I1): **the render pads and never bounds.** A one-row block with a floor of three draws three; a four-row block with a floor of three draws **four, first row included**. The second half is the row that matters — a fixed height drops an over-full box's *first* row, measured, and `overflowY: "hidden"` does not change it.
+- **T3.55** (I33, I2): no definition sees the floor. `scrollDefinition.measure` returns the same number for a block with a floor and one without, so §3c's purity argument is not reopened by a mechanism that never reaches it.
 - **T3.2** (I12): `register` after `seal` → throws.
 - **T3.3**: `seal` twice → no-op.
 - **T3.4** (I5, the classic): a `logs` line truncated under ASCII → the marker is `~`, one cell, and the row count matches Unicode's. The `...` regression, tested directly.
@@ -978,6 +991,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I1): a measurer that under-counts wrapped lines by one → T2.1 fails at the wrapping width.
+- **T6.75** (I33): the `max` removed from `registry.measure` → T3.53 fails, and T4.49's second frame draws the one-row figure again — which is the defect as it shipped.
+- **T6.76** (I33, I1): the padding removed from `registry.render` → T3.54 fails. `measure` returns the floor and the element draws its own height, which is an I1 violation created by the mechanism built to keep I1 whole.
 - **T6.2** (I5): changing the ASCII ellipsis to `...` → T2.5 and T3.4 fail.
 - **T6.3** (I6): using `.length` for display width → T2.9 fails, and T3.6 fails on CJK.
 - **T6.4** (I3): reading `process.env` in a renderer → T2.7 fails.

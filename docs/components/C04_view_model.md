@@ -1253,13 +1253,92 @@ here: it is a surface, not a count.
 
 ---
 
+## 3d. `minHeight` — the field a layer above sets and no kind reads
+
+**`measure` commits a block's rows before anything is drawn, and a renderer that gives way is discovered after that number is fixed.** A `rule` measures one row, so a `rule` whose renderer throws has one row to say so in — no border, no tag, nothing but the message. The number cannot be raised inside the frame that discovers the problem: C14 has already indexed it, the viewport has already chosen `takeRows`, and a block drawing taller is cut with whatever followed it (F230).
+
+So the change is **deferred**. A block carries a floor; the frame that discovers the need completes single-pass at the committed height; the next frame honours it.
+
+```typescript
+type BlockBase = {
+  id: string;
+  gapBefore?: boolean;
+  /** A floor on the rows this block occupies, in rows. Set only by `op: "reserve"`. */
+  minHeight?: number;
+};
+```
+
+**Applied by the registry, outside the definition** (C09 I2, I33):
+
+```
+registry.measure(b, w) = max(definition.measure(b, w, measureChild), b.minHeight ?? 0)
+```
+
+**No kind reads it, and that is what keeps three things true at once.** `measure` stays a pure function of `(block, width)`, so C09 I2 holds and the published conformance suite's T2.2 passes for the right reason rather than by luck. `scroll`'s argument in §3c — that its residue row is a function of `(block, width)` and deliberately not of the offset, because a box that shrank as a reader scrolled would jitter — is not reopened, because `scrollDefinition.measure` never sees the field. And a container gets its child's floor for nothing: `measureChild` **is** `registry.measure`, so a floored child is counted by its parent without a rule saying so.
+
+**The render pads to the floor and never bounds it.** The registry wraps a floored block's element in a `minHeight` box, which is measured to pad a one-row child to three and to leave a four-row child alone. A fixed `height` would have been wrong in a way worth recording: an over-full box drops its **first** row, not its last, and `overflowY: "hidden"` does not change that. So I1 holds by construction rather than by the two sides agreeing.
+
+### It is view state, and it is the second member of a set
+
+`minHeight` is not data. Nothing on the far side knows a renderer threw, and an adapter that set the field would be declaring a layout it has no standing to declare. **Only `op: "reserve"` may write it**, and `validateDocument` refuses it on an inbound document — which is the half F231 found missing from `expanded`, whose op is unforgeable and whose field was never validated.
+
+### A floor survives only while the block is untouched
+
+Four operations produce a new block from an old one, and **none of them carries the floor**:
+
+| | why |
+|---|---|
+| `replace` | already covered — *replace is wholesale*, §4, no new sentence needed |
+| `merge` | the table has new content, and a floor raised for content that has gone is a block padded for nothing |
+| `expand` | the same argument: the rows changed, so the height that failed is not the height now |
+| `window` | a slice is not the block. C09 I26 is an identity about the slice — `measure(w.block, w) − skipRows === to − from` — and a floored slice fails it |
+
+That is the whole of the clearing rule, and it is why nothing needs to watch a condition: a floor cannot outlive a change to the thing it was about.
+
+**And it can outlive a change to something else, which is a limit rather than a bug.** A renderer that threw at one width may not throw at another; the floor is set from the frame that observed it and stays until the block is touched, so the block can be padded for a failure that would no longer happen. The cost is blank rows under a block that already failed once. Stated here rather than left implicit, because a condition nobody watches is how a deferral becomes permanent.
+
+### The walk — both artefacts, because a floor is structure and its arrival is an event
+
+**The classification table**, indexed by the cells where two rules both hold at rest:
+
+| | the two rules | the ruling |
+|---|---|---|
+| 1 | the floor × I1 | the registry pads the element to the floor; measure returns the same number. Neither side is trusted to agree with the other |
+| 2 | the floor × a kind's own `measure` | applied outside the definition, so C09 I2 is untouched and no kind can consult it even by accident |
+| 3 | the floor × the empty `group`'s legitimate zero | **the floor wins and the group becomes visible.** A block that failed and shows nothing is *absence indistinguishable from failure*; making it visible is the mechanism working. Stated because §3 documents that zero as legitimate |
+| 4 | the floor × `window` (C09 I26) | dropped — see the table above |
+| 5 | the floor × `merge` / `expand` / `replace` | dropped |
+| 6 | the floor × `gapBefore` | the gap is the sequence's (§3a) and is added by `sequenceHeight` **after** the block's rows, so `max` applies to the block alone. A floor applied to `block + gap` would be one row short at every gap |
+| 7 | the floor × a container's child | nothing propagates and nothing needs to: `measureChild` is the registry's own measurer, so the parent already counts the floored child, and the parent's own padding covers its frame |
+| 8 | the floor × a viewport shorter than it | set once, indexed, shown as far as the region allows. Nothing retries, because a field is not a request |
+
+**The sequence trace**, because the floor arrives through an event and the interesting rows are the ones with something in between:
+
+| | the sequence | the ruling |
+|---|---|---|
+| 1 | throw → request → patch → `rev` → both caches drop → the next frame honours it | the path. Measured: with the floor in effect and no invalidation, the second frame was still short; the frame after a width change drew it whole |
+| 2 | **two blocks in one entry throw on the same frame** | **tolerate, do not coalesce.** Two patches and two `rev` bumps cost one extra cache miss on an entry that has already failed twice; coalescing needs a plural op, which is a worse type for a rare case |
+| 3 | the entry is evicted between the frame and the patch | `{ ok: false, reason: "unknown" }`, dropped in silence. C13 already names it *ordinary, not a bug* |
+| 4 | **a far-side patch replaces the block between the frame and the patch** | the request carries the `rev` it was observed at and is **discarded if `rev` moved**. Without it the shell floors a block that never threw, and the block it floors is addressed by an id the far side has just reused. **This is where `(id, rev)` earns its place** — not in termination, which needs nothing |
+| 5 | a width change between them | the limit above. The floor is set for a condition that may no longer hold |
+| 6 | the block scrolls out of the window between them | the patch applies. The floor is on the document, not on the frame |
+| 7 | the entry has settled | accepted — the gate reads *who is writing* (C13 §6), and this is the shell speaking about an entry it holds |
+
+**Termination needs no rule, and that is the point of a field.** The shell raises a request only when `block.minHeight ?? 0` is below what it wants. On the next frame the field already holds the value, so there is no patch, so `rev` does not move, so nothing re-renders. A rule forbidding a second request would be a rule for stopping an **event** repeating, and a field cannot repeat.
+
+---
+
 ## 4. Patches
 
-**Four ops carry data and one carries view state, and that split is the whole reason the fifth exists.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
+**Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
 
 Expressing it as `replace` was the first draft and it fails on that gate: an app verb's result is settled the moment it lands, so every entry worth expanding rejects the operation. C11 T4.7 and C25 I11 both say expansion reaches a *frozen* entry, which is true and insufficient — frozen and settled are different states, and only the first still accepts patches.
 
 A `viewState: true` flag on `replace` was the smaller change and is the worse one: it leaves one op meaning two things, and an adapter could set it to slip data past the gate. A named op is unambiguous at the call site and unforgeable at the boundary — the same argument as `settle(id, doc)` over a fourth patch op, one layer down.
+
+**And the guarantee holds at the op and leaked at the field, for as long as this paragraph stood alone** (F231). Every sentence above is true about `replace`, and the conclusion a reader draws from it — *so this is unforgeable* — is about the **op**. `expanded` is where the op lands, and `validate.ts` did not contain the word: measured, an inbound document carrying `expanded: true` validated and the table measured **3 against 2**, so the far side set view state and was charged a real row for it. Nobody copying the argument would have noticed, because the argument is correct.
+
+**So a named op carries an obligation as well as a guarantee: the field it writes is refused on the way in.** `validateDocument` rejects `expanded` and `minHeight` on an inbound document, and the two are one rule rather than two — a set that grows whenever an op is added, which is what makes it a check over the kind rather than a line per field.
 
 ```typescript
 type ViewPatch =
@@ -1267,7 +1346,8 @@ type ViewPatch =
   | { op: "replace"; blockId: string; block: Block }
   | { op: "merge";   blockId: string; rows: readonly MergeRow[] }
   | { op: "status";  status: ViewDocument["status"] }
-  | { op: "expand";  blockId: string; rowId: string; expanded: boolean };
+  | { op: "expand";  blockId: string; rowId: string; expanded: boolean }
+  | { op: "reserve"; blockId: string; rows: number };
 
 type PatchResult =
   | Readonly<{ ok: true;  doc: ViewDocument }>
@@ -1307,6 +1387,16 @@ The earlier reading, in which an unknown `blockId` was a silent no-op (T1.10), i
 `replace` substitutes the block entire. View state in the outgoing block is **not** carried over; the block is now a different block.
 
 The alternative — inheriting `expanded` for rows whose id survives — was rejected on its failure mode rather than its cost. It would leave `replace` and `merge` differing only in deletion semantics, and it would let an expansion survive onto a row that happens to share an id with something semantically different. Wholesale is the behaviour that can be reasoned about from the call site.
+
+### `reserve` is the second view-state op, and it exists because a height is discovered late
+
+`reserve` sets `minHeight` on a block (§3d). It is the shell speaking about a block it holds — a renderer gave way and the rows the error needs are more than the rows the block measured — and it is on the same side of C13's gate as `expand`, for the same reason: the entries worth reserving on are the settled ones.
+
+**It is `expand`'s shape and not `replace`'s**, on §3d's argument: nothing on the far side knows a renderer threw, and an adapter setting a layout floor is declaring something it has no standing to declare.
+
+`rows` is a floor and never a height. A block already taller keeps its own measurement; `registry.measure` takes the maximum and the registry pads the element to match, so the two sides cannot disagree.
+
+**A `reserve` naming an unknown `blockId` fails**, exactly as `replace` and `merge` do — the caller is addressing something that is not there. The shell's own caller tolerates that failure silently, because an entry evicted between a frame and its request is ordinary rather than a bug.
 
 ### The three operations compose
 
@@ -1538,6 +1628,11 @@ persisted document rests on.
 - **I65** — **A tree's layout is a member, and it was measured rather than reasoned about.** `treeLayout?: "auto" | "topDown" | "leftRight" | "outline"`, refused on every other form. **The three are not a ladder**: over four trees the top-down figure is the cheapest of the three in rows on a broad tree (3) and the dearest on a deep one (13) while its columns invert with it, so no ordering by budget exists — not even one depending only on the budget, since which layout is cheapest depends on the tree — and all three draw the same names and the same edges, which is C12 I34's own test for a rung failed three times in the same way. So `plotDetail` is refused on the form and this member carries the choice, on C12 §3w's ruling that a styling fork ships every option rather than asking which one. **A second member rather than one shared with a future `graph`**, because the value sets do not overlap: sharing would make a six-value union with two per-form refusal lists, which is a larger artefact and a worse message than two members each refused off everything but its own form. **`"auto"` is a fit**, the first whose natural size fits both axes and otherwise the one that keeps the most nodes; a named layout is honoured whatever the budget and the drawing is truncated rather than overflowing, exactly as an explicit `plotDetail: "full"` degrades (C12 I28). **And `hierarchy` stops being optional on this one form**: the three magnitude forms have something to fall back to — two draw their series and the third its empty message — and a form whose whole subject is the shape has nothing, so its absence is refused at both gates rather than drawn as an empty message. **The values are restated in `validate.ts` and held in `tree.ts`**, which is L1 and cannot be imported from L0, so the two must agree and a row asserts it rather than deriving one from the other.
 - **I66** — **`status` carries the state and the three numbers that describe it, and every one of them is supplied rather than derived.** The kind exists because only one of its three states is knowable where the block is drawn: L1 catches a throw and knows `error`, and *never fetched* and *backing off* are facts held by the builder and the refresh driver two layers up (C09 §3a). So the state travels in the block. `retryInMs`, `attempt` and `elapsedMs` are optional and **never computed from `ctx.tick`** — C03 coalesces and drops commits under load, so tick is not in a fixed ratio with wall-clock, and the layer that draws may not read a clock; `retryInMs` already arrives this way and the other two follow it rather than opening a second route. **`height` is required**, on `plot`'s argument: a box the framework sized by guess is silently wrong and nobody notices it is wrong. **An empty `message` and a non-positive `height` are construction errors naming their field** (I57) — a box that says something failed and not what is the objection C09 §3a's three-row rung already makes about dropping the rule.
 
+- **I67** — **`minHeight` is a floor a layer above sets, written only by `op: "reserve"`, and refused on an inbound document.** It is applied by the registry outside every definition — `max(definition.measure(b, w), b.minHeight ?? 0)` — so no kind reads it, C09 I2's purity is untouched, and `scroll`'s argument that its residue is a function of `(block, width)` and never of view state is not reopened (§3c, §3d). The render pads to the floor and never bounds it, so C09 I1 holds by construction rather than by the two sides agreeing. **An empty `group`'s legitimate zero gives way to a floor**, deliberately: a block that failed and shows nothing is absence indistinguishable from failure.
+
+- **I68** — **A floor survives only while the block is untouched.** `replace`, `merge`, `expand` and `window` each produce a new block from an old one and none carries `minHeight` — `replace` because it is wholesale, `merge` and `expand` because the content the floor was raised for has changed, and `window` because C09 I26 is an identity about a slice and a slice is not the block. Nothing watches a condition and nothing needs to. **The floor can outlive a change to something else** — a renderer that threw at one width may not throw at another — and that is a stated limit rather than a defect: the cost is blank rows under a block that already failed once.
+
+
 ## 7. Commitments
 
 1. `ViewDocument` is a pure, deeply immutable value with no reference to Ink, terminals or the network (I1).
@@ -1610,6 +1705,7 @@ persisted document rests on.
 64. **A field that carries a shape is checked like one** — `hierarchy` is walked at both gates, `value` is required exactly where the form's subject is magnitude and optional where it is not, and the depth is bounded because the walk that draws it recurses (I64).
 65. **A tree's layout is a member and not a rung** — measured over four trees rather than ordered, because the cheapest layout depends on the tree and not on the budget; `"auto"` is a fit, a named layout is honoured and truncated, and `hierarchy` is required on the one form with nothing to fall back to (I65).
 66. **A state only a higher layer can know travels in the block, not in a rendering mode** (I66). `status` is one kind for three states because the alternative is a registry reading upward for two of them; the numbers that describe those states are supplied by whoever holds the clock, since the animation counter cannot carry a duration and the drawing layer cannot read a clock.
+67. **A height discovered too late is deferred rather than forced** (I67, I68). The frame that finds the need completes single-pass at the committed height and the next frame honours the floor, because nothing re-enters the layout; the request is idempotent state rather than an event, so it terminates without a rule forbidding a second one, and it clears without anything watching a condition.
 
 ---
 
@@ -1667,6 +1763,10 @@ The generic suite. **These run against every registered block kind, including ap
 
 - **T3.25** (I57): `plotStyle: "candlestick"` with no `ohlc` is refused; on `form: "pie"` it is refused; and an `OHLC` whose `low` is above its `open` is refused. Both gates — `b.plot` throws and `validateBlock` reports — and the message names the field rather than the block.
 - **T3.26** (I57): `ohlc` with `series: []` validates. **The row that says the ordinary case is legal**, since every other refusal here is about a member that should not be there and this one is about a member that need not be.
+- **T3.49** (I67, F231): **`validateDocument` refuses `minHeight` and `expanded` on an inbound document, in one check over the set.** Two rows in one because they are one rule — a field a named op writes is refused on the way in — and F231 is what says the second was missing: measured, a document carrying `expanded: true` validated and its table measured **3 against 2**.
+- **T3.50** (I67): `op: "reserve"` sets the floor and takes the maximum against what is already there; a `reserve` naming an unknown `blockId` **fails**, on the same argument as `replace` and `merge`.
+- **T3.51** (I68): `merge`, `expand` and `replace` each produce a block with **no** floor. Asserted on all three, because the reason differs per op and a single case would pass on whichever one happens to rebuild the block wholesale.
+- **T3.52** (I68, → C09 I26): a windowed piece carries no floor, and the identity `measure(w.block, w) − skipRows === to − from` holds for a block that had one.
 
 - **T3.1**: `measure` at width 1 — every block returns ≥ 1 and does not divide by zero.
 - **T3.2**: `measure` at width 0 — treated as 1; no infinity, no NaN.
@@ -1703,6 +1803,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T4.3** (with C13): appending fifty documents and applying two hundred patches leaves every document valid and frozen.
 - **T4.4** (with C14): virtualisation over a 10,000-block transcript selects a visible range whose summed measured heights equal the viewport height, exactly.
 - **T4.5** (with C14): expanding a row mid-transcript changes measured height and shifts subsequent blocks by exactly that delta — no drift.
+- **T4.49** (I67, I68, with C09 and C22): **a `rule` whose renderer throws draws one row, then three, and the block after it is on the frame in both.** Read from a session's frame rather than from a count — the second frame is the whole subject and no arithmetic shows it.
+- **T4.55** (I68): a far-side patch replacing the block between the frame and the request **discards the request**. Without it the shell floors a block that never threw, addressed by an id the far side has just reused.
 - **T4.6** (with C10): the same document rendered under both themes produces identical line counts.
 
 ### Tier 5 — e2e
@@ -1719,6 +1821,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.3** (C10): an ASCII fallback glyph of a different width → T2.6 fails.
 - **T6.4** (I9): a `merge` that rebuilds every row → T1.6 fails on reference identity, catching the viewport-jump regression before anyone sees it.
 - **T6.5** (I1): returning a mutable block from any constructor → T1.1 fails.
+- **T6.73** (I68): a `merge` that carries `minHeight` through → T3.51 fails. The block keeps a floor raised for content that has gone, and pads under rows that are no longer the ones that failed.
+- **T6.74** (I67): `validateDocument` accepting `minHeight` inbound → T3.49 fails. This is F231's defect restored on the field that has not shipped with it yet.
 - **T6.6** (I5): adding a `colour` field to any block → T2.7 fails.
 - **T6.7** (§1): moving the registry into C04, or importing theme into `viewmodel/` → T2.9 fails.
 - **T6.8** (I3): allowing `error` on an `ok` document → T1.2 fails.
