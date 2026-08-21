@@ -10,6 +10,7 @@
  */
 
 export { DEFAULT_DEFINITIONS } from "./defaults.js";
+export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
 export {
   glyphs,
   glyphFor,

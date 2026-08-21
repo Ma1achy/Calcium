@@ -11150,8 +11150,39 @@ filed in the wrong tense — and that the tense is invisible from inside the com
 it. **Ask what a "not reachable" is not reachable *by*.** Row 10 answers *by an assertion in this
 file*, and the reader was never in scope.
 
-**Open.** The repair is C03 raising the commit, C22 threading the counter, and the cache
-admitting a per-kind animating axis — three places, because it is three links.
+**Fixed** — three places, because it is three links. C22's session arms a ticker from what the
+frame drew, commits `spinner` through the scheduler, supplies the counter to `visibleRows`, and
+keys the line cache on it **per kind** so an entry holding nothing animated keys as it did.
+
+**Measured again, the same way:**
+
+```
+before   SESSION  ⠋⠋⠋⠋⠋⠋⠋⠋⠋⠋      1 distinct
+after    SESSION  ⠋⠙⠹⠼⠴⠦⠇⠏⠋⠙      8 distinct over ten samples, and it wraps
+         DIRECT   ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏      10, unchanged throughout
+```
+
+The two repeats in the *after* row are the wrap, not a stall: ten samples at 250 ms against a
+cadence near 100 ms traverses the set and starts again. **T4.35 asserts all ten** by sampling
+thirty times rather than by tuning the interval.
+
+**And a number that was not stated anywhere before this.** The braille set declares **80 ms** and
+C03's `spinner` window is **100 ms**, so the observable cadence is `max(set, window)` — the
+default runs at 10 fps rather than 12.5. C03 §3 makes that trade explicitly for a spinner
+arriving under a stream commit and it is unconditional; C22 I60a is where it is now written down,
+because *the interval belongs to the set* and *the window floors it* are both true and neither
+mentioned the other.
+
+**The container walk came from the mutation pass, not from a test.** Removing the descent into
+containers survived every row until the fixture was changed to put the spinner inside a `panel` —
+which is not a contrived arrangement but exactly what `b.live` builds, because `Panel` is the only
+kind with a title and the title is where a live part says what state it is in. The fixture was
+testing the shape the framework does not produce.
+
+**The pair is removed together and the reason is fidelity, not redness.** `runPass` gained an
+`also` so one mutation can make two edits, and the run says plainly that removing either half
+alone *also* kills — measured — so nobody later simplifies it believing the pairing is what makes
+it red. What a single-half row would restore is a state the tree never shipped in.
 
 ---
 
