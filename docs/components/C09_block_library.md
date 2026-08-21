@@ -227,7 +227,7 @@ loading     no data yet, first fetch in flight. Not a failure at all
 ┌─────────────────────────────────────────┐
 │                                         │
 │  ─────────────[ERROR]─────────────      │
-│  ⚠ plot failed to render:               │
+│  ▲ plot failed to render:               │
 │    Cannot read properties of undefined  │
 │                                         │
 └─────────────────────────────────────────┘
@@ -235,15 +235,15 @@ loading     no data yet, first fetch in flight. Not a failure at all
 ┌─────────────────────────────────────────┐          retrying is the error box
 │                                         │          plus one line — compositional,
 │  ─────────────[ERROR]─────────────      │          not a third rendering
-│  ⚠ connection refused                   │
-│  ⠋ retrying in 8s · attempt 2           │
+│  ▲ connection refused                   │
+│  ⠋ retrying in 8s (attempt 2)           │
 │                                         │
 └─────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────┐          loading has no error, so no
 │                                         │          rule and no tag
 │                                         │
-│            ⠋ loading · 4s               │
+│            ⠋ loading (4s)               │
 │                                         │
 └─────────────────────────────────────────┘
 ```
@@ -304,7 +304,7 @@ border before content.**
 W ≥ 13   bordered, padded     content ≥ 9    ─── [ERROR] ───
 W 11–12  bordered, padded     content 7–8    [ERROR], no rule
 W 9–10   bordered, bare       content 7–8    [ERROR], no rule
-W 3–8    bordered, bare       content 1–6    no tag row — ⚠ carries it
+W 3–8    bordered, bare       content 1–6    no tag row — ▲ carries it
 W ≤ 2    unbordered           content W      the message, truncated
 ```
 
@@ -343,13 +343,26 @@ The kind is written against a working counter and degrades to a still frame with
 #### Degradation
 
 ```
-24 · 8-bit   the tag in the error tone; border, rule, message and blanks unpainted
+24 · 8-bit   the tag, the rule and the message in the error tone; the border
+             and the blank rows unpainted, and the activity line in the DEFAULT
+             tone — the error already said what went wrong
 4-bit        the same tone, curated — ansi16 index 9
 1-bit        tone("error") resolves to { bold: true }. TWO CHANNELS, the mark and
              bold — not `inverse`, which C10 already answered differently and
              which is written nowhere in the tree
-ascii        ┌─┐ → + - |  ·  ⚠ → !  ·  the spinner's own ASCII arm
+ascii        ┌─┐ → + - |  ·  ▲ → !  ·  the spinner's own ASCII arm
 ```
+
+**The separator is a parenthesis, not `·`.** A middle dot has no ASCII substitution and the
+ascii arm drew it unchanged — C09 I22's class, caught by T4.4 rather than by reading. `(` and `)`
+are one cell under both width conventions and need no arm, which is cheaper than a `GlyphSet`
+member for one separator.
+
+**The mark is `▲`, and it is the glyph set's `warning` rather than a character chosen for the
+figure.** `⚠` is in no file in this repository — the figures above carried it until the
+implementation was read against them, which is F161's class in a drawing rather than in a
+count. `glyphs().warning` is `▲` at unicode and `!` at ascii, both one cell, and a figure that
+names a mark the tree does not have is a figure nobody can build.
 
 **No background, and the measurement is why.** A painted tag wants a foreground and background
 *pair*, and `resolveBackground` admits a background only from a `surface.*` ref because §4's
@@ -369,7 +382,7 @@ Structural rather than event-mediated, because the box has structure and no even
 | 2 | `H = 1` × `retrying`, which has two content lines | the message. A countdown without its cause is unactionable |
 | 3 | `H ≤ 2` × §6's *the border is the evidence* | the evidence is unavailable, and the ladder says so rather than leaving it to be noticed |
 | 4 | a message wider than the box × the truncation marker | `fit`, which every single-row kind already ends at, and its capability-appropriate marker |
-| 5 | `W ≤ 10` × the tag | no tag row; `⚠` on the message row is the only marker, and at 1-bit it is one of the two channels rather than a decoration |
+| 5 | `W ≤ 10` × the tag | no tag row; `▲` on the message row is the only marker, and at 1-bit it is one of the two channels rather than a decoration |
 | 6 | `colourDepth: 1` × *only the tag is painted* | tag and message both resolve to `{ bold: true }`, so the **brackets** are what distinguish them. The paint carries no information at one bit and the glyphs do |
 | 7 | a narrow-only set × `ambiguousWidth: "wide"` × `unicode: "ascii"` | one answer — the set's own ASCII pair — reached by two routes, and `spinnerFrames` already resolves both |
 | 8 | a `spinner` naming a set that does not exist | the default, never a throw. A spinner is decoration and a session that will not start because a set was misspelled is worse than one that spins the wrong way |

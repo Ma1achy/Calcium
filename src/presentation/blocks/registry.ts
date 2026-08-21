@@ -17,7 +17,8 @@ import {
 } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
-import { fit, paint, rows, tone } from "./paint.js";
+import { paint, rows, tone } from "./paint.js";
+import { statusDefinition } from "./kinds/status.js";
 import type {
   BlockDefinition,
   BlockFault,
@@ -138,11 +139,20 @@ class Registry implements BlockRegistry {
    */
   #errorBlock(text: string, height: number, ctx: RenderContext): ReactElement {
     if (height <= 0) return createElement(Box, { flexDirection: "column" });
-    const line = fit(text, ctx.width, ctx.capabilities);
-    const style = tone("error", ctx.theme, ctx.capabilities);
-    const filled = [paint([{ text: line, style }])];
-    while (filled.length < height) filled.push(""); // cells-ok — a row count
-    return rows(filled);
+    // **Through the `status` definition, not a private figure** (C09 I31). The
+    // boundary's box and the box a live part draws while it is retrying are the
+    // same picture, so they are one implementation — and the height handed in is
+    // the one `measure` already committed, which is what makes the pair
+    // self-consistent by construction rather than by agreement.
+    //
+    // Called directly rather than through `this.render`: the definition is a
+    // different kind from the one being contained, so there is no re-entrancy,
+    // and going back through the registry would put a second catch between the
+    // boundary and the block it is drawing.
+    return statusDefinition.render(
+      { kind: "status", id: "status", state: "error", message: text, height },
+      ctx,
+    );
   }
 
   /**

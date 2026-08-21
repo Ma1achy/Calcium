@@ -848,8 +848,20 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     const rows = screen().rows;
     const at = rows.findIndex((r) => r.includes("failed to render"));
     expect(at, "the containment is on the screen").toBeGreaterThan(0);
-    expect(rows[at + 1]?.trim(), "and the second committed row is blank").toBe("");
-    expect(rows[at + 2]?.trim(), "and the third").toBe("");
+
+    // **The figure moved and the claim did not** (C09 I31). The boundary used to
+    // draw a bare message with blank rows below it, which is indistinguishable
+    // from a block that under-drew — so it now draws the `status` box, and the
+    // border is the evidence the height was honoured. The definition measures 3,
+    // so the box is border · message · border and the rows below sit where the
+    // measurement put them.
+    expect(rows[at - 1]?.trimStart().startsWith("┌"), "the box opens above it").toBe(true);
+    expect(rows[at + 1]?.trimStart().startsWith("└"), "and closes below it").toBe(true);
+    // **The prompt directly below the closing border is the height assertion.**
+    // Three rows measured, three drawn, and nothing between the box and what
+    // follows it — a stronger claim than a blank row, which a box one row short
+    // would also satisfy.
+    expect(rows[at + 2]?.trimStart().startsWith("❯"), "the prompt follows the box").toBe(true);
 
     const before = stdout.chunks.length;
     await tui.stop("exit");

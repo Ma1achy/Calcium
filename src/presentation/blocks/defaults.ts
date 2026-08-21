@@ -1,5 +1,5 @@
 /**
- * The fourteen kinds C09 ships.
+ * The sixteen kinds C09 ships.
  *
  * Seventeen are declared in C04's union. `table`, `plot` and `patch` are
  * registered by C11, C12 and C25 through the public `register` — they are
@@ -9,6 +9,7 @@
  */
 import { codeDefinition } from "./kinds/code.js";
 import { groupDefinition, panelDefinition, scrollDefinition } from "./kinds/containers.js";
+import { statusDefinition } from "./kinds/status.js";
 import {
   comparisonDefinition,
   eventsDefinition,
@@ -41,5 +42,6 @@ export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
   panelDefinition,
   groupDefinition,
   scrollDefinition,
+  statusDefinition,
   rawDefinition,
 ] as BlockDefinition[]);

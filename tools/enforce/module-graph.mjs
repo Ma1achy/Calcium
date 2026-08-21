@@ -584,6 +584,29 @@ export const BUILDER_OMISSIONS = Object.freeze({
   // two clauses expires one at a time**, and equality comparison cannot see that
   // — it notices an entry that became unnecessary, never one whose argument did
   // (FINDINGS F180).
+  // --- `status`: seven fields, and none of them a consumer's to hold ---------
+  //
+  // **The kind exists because its three states are the framework's facts.** A
+  // thrown renderer is the registry's, a first fetch in flight is the builder's,
+  // a backoff counting down is the refresh driver's — and a consumer holds none
+  // of the three. A `b.status()` would let one be claimed rather than observed,
+  // which is the opposite of what the kind is for: a box asserting *retrying* on
+  // a document nothing is retrying is a lie the framework wrote the type for.
+  //
+  // **This is not a deferral and there is no condition to watch.** A consumer
+  // who wants a bordered box with a message has `panel` and `notice`; one who
+  // wants a live part's failure to look different overrides `renderError` or
+  // `renderLoading` and returns any block at all, which is C24 §5's *behaviour
+  // is fixed, rendering is overridable* already working. Both routes exist
+  // today, so nothing here is owed a later step (C09 §3a, C04 I66).
+  "status.state": "C09 §3a — the state is observed, never declared; a builder would let it be claimed",
+  "status.message": "C09 §3a — as `state`: the message is what the boundary or the driver caught",
+  "status.height": "C09 I31 — the box is bound by what `measure` committed and cannot be given its own",
+  "status.retryInMs": "C09 I32 — the backoff is the source's, and only the driver can compute it",
+  "status.attempt": "C09 I32 — as `retryInMs`, and counted once per source rather than per part",
+  "status.elapsedMs": "C09 I32 — supplied by whoever holds the clock, which is never a builder",
+  "status.spinner": "C09 I32 — reachable when a consumer owns a `status` block, and none does",
+
   "plot.emptyMessage":
     "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
   "patch.numberWidth":
@@ -1595,14 +1618,17 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
 
   // --- dead everywhere, and each names its finding --------------------------
   //
-  // **Eleven members named nowhere in `src/`, `test/`, `tools/` or the reference
-  // app.** Gaps, not exemptions — listed so the suite is readable rather than
+  // **Ten members named nowhere in `src/`, `test/`, `tools/` or the reference
+  // app.** `GlyphSet.warning` was the eleventh and `status` consumed it — the
+  // equality arm fired on the commit that wired it, which is the expiry this
+  // list was designed for rather than a maintenance chore. **The count in this
+  // sentence is the fourth hand-maintained number to go stale today** (F228),
+  // and it is here rather than derived because the entries are prose. Gaps, not exemptions — listed so the suite is readable rather than
   // red, and the citation is what makes the entry expire: the equality arm fires
   // the day any of them gains a consumer. FINDINGS F99.
   "GlyphSet.blocked":
     "**F99** — and this one is *semantic* rather than box-drawing, so a theme declaring " +
     "it gets nothing and the absence reads as a theme error rather than a missing renderer",
-  "GlyphSet.warning": "**F99** — as `blocked`, semantic",
   // **`GlyphSet.bar` was here and MG24 can no longer see it.** It is still
   // unconsumed — nothing reads `g.bar`, the `▌`/`|` pair F99 recorded — but
   // `Cell.bar` landed and MG24 matches published members **by name**, so a read

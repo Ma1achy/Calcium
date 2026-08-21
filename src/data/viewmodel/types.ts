@@ -2055,6 +2055,44 @@ export type Scroll = Readonly<{
   children: readonly Block[];
 }> & Gap;
 
+/**
+ * The block a layer above knows about and the definition does not (C04 I66, C09 I31).
+ *
+ * **Three states, one kind, because only one of them is knowable where the box
+ * is drawn.** L1 catches a throw and knows `error`; *never fetched* and *backing
+ * off* are the builder's and the refresh driver's facts, two layers up, and a
+ * registry that could see them would be reading upward. So the state travels in
+ * the block and one definition draws all three.
+ */
+export type Status = Readonly<{
+  kind: "status";
+  id: string;
+  state: "error" | "loading" | "retrying";
+  message: string;
+  /**
+   * The rows the box occupies — required, on `plot`'s argument (C09 I31).
+   *
+   * A box the framework sized by guess is silently wrong and nobody notices it
+   * is wrong. On the error path the registry supplies the number `measure` has
+   * already committed, which is what makes the pair self-consistent by
+   * construction rather than by agreement.
+   */
+  height: number;
+  /**
+   * Supplied by whoever holds the clock, never derived from `ctx.tick` (C04 I66).
+   *
+   * C03 coalesces and drops commits under load, so tick is not in a fixed ratio
+   * with wall-clock and cannot carry a duration; this layer may not read a clock
+   * at all. `retryInMs` already arrives this way through `LiveSpec.renderError`
+   * and the other two follow it rather than opening a second route.
+   */
+  retryInMs?: number;
+  attempt?: number;
+  elapsedMs?: number;
+  /** A `SPINNER_SETS` name. Unknown resolves to the default rather than throwing. */
+  spinner?: string;
+}> & Gap;
+
 export type Block =
   | Rule
   | Notice
@@ -2073,6 +2111,7 @@ export type Block =
   | Panel
   | Group
   | Scroll
+  | Status
   | Raw;
 
 export type BlockKind = Block["kind"];

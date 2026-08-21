@@ -139,6 +139,26 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
     children: [{ kind: "raw", id: "panel-1-raw", text: "two lines\nof text" }],
   }),
 
+  // **`retrying` rather than `error`**, because it is the state composed out of
+  // the other one — the error box plus a spinner line (C09 I32) — so a corpus
+  // entry that draws it exercises both.
+  //
+  // **Seven rows and not six, and the golden frame is what said so.** Six is the
+  // full figure's minimum and it leaves exactly one content row, which the
+  // message wins — so the fixture drew the `error` figure while claiming to
+  // exercise the composition, and the comment above would have been the only
+  // record of an intention nothing carried out. A fixture has to be shown to
+  // respond to the thing under test before it is asserted against
+  // (`test/support/README.md`).
+  status: block({
+    kind: "status",
+    id: "status-1",
+    state: "retrying",
+    message: "connection refused",
+    height: 7,
+    retryInMs: 8000,
+    attempt: 2,
+  }),
   // A bounded region whose content overflows, so the corpus exercises the
   // residue row (C04 I49) rather than only the fitting case.
   scroll: block({

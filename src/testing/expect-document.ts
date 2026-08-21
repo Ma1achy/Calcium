@@ -115,6 +115,16 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
   ["tip", { premise: "no-field", why: "text only" }],
   ["raw", { premise: "no-field", why: "opaque by definition; the app owns what it renders" }],
   [
+    "status",
+    {
+      premise: "by-rendering",
+      why:
+        "`state` selects a tag, the glyph set's `warning` mark and an activity line, all of " +
+        "them text — `[ERROR]` and the mark for the two failing states, `loading` for the " +
+        "third — so the three are told apart at one bit with no colour at all (C09 §3a)",
+    },
+  ],
+  [
     "scroll",
     {
       premise: "no-field",

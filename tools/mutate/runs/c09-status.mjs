@@ -1,0 +1,111 @@
+// C09 I31, I32 — the two ladders and the animation.
+//
+// **The second and third rows restore defects that actually happened**, which is
+// the strongest form this pass takes. Both were found by reading a frame during
+// the build, not by any assertion: the width ladder decided only the tag, so a
+// bordered padded row was five cells of furniture drawn at width 3 — a row wider
+// than its frame, which Ink wraps, and the block rendered **ten rows against a
+// measured six**. Making the furniture affordable then drew **four** at width 9,
+// because the rows the border and padding gave up went nowhere.
+//
+// Every count in the renderer agreed through both defects. Only the figure
+// disagreed.
+//
+// **Anchors checked for uniqueness before the pass** (F219).
+import { readFileSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { report, runPass } from "../mutate.mjs";
+
+const ROOT = process.cwd();
+const SRC = "src/presentation/blocks/kinds/status.ts";
+
+const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
+const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
+const run = () => {
+  try {
+    return execSync("npx vitest run test/edge/status.test.ts test/revert/status.test.ts 2>&1", {
+      cwd: ROOT,
+      encoding: "utf8",
+      timeout: 300_000,
+    });
+  } catch (e) {
+    const out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    return e.code === "ETIMEDOUT" ? `${out}\nTIMED OUT` : out;
+  }
+};
+
+const results = runPass({
+  read,
+  write,
+  run,
+  control: {
+    file: SRC,
+    from: "  measure: (block: Status): number => Math.max(1, Math.floor(block.height)), // cells-ok — a row count",
+    to: "  measure: (): number => 1,",
+    why: "every box collapses to one row, which T3.38 asserts across seven heights and three states",
+  },
+  mutations: [
+    {
+      // **The rung as it was first written.** Two borders, two blanks and a tag
+      // row is six; the figure said five for as long as it existed on paper, and
+      // drawing it is the only thing that said otherwise.
+      name: "the height ladder's top rung is labelled five",
+      file: SRC,
+      from: "  if (height >= 6) return { border: true, pad: true, tag: tagged, content: height - 5 + tag(1) };",
+      to: "  if (height >= 5) return { border: true, pad: true, tag: tagged, content: height - 5 + tag(1) };",
+      expect: "T3.39",
+    },
+    {
+      // **The first of the two the frame read found**, and neither shipped —
+      // both were caught inside this commit. The width ladder spoke only about
+      // the tag and the height ladder alone decided the border, so a bordered
+      // padded row at width 3 was five cells of furniture in a three-cell frame.
+      name: "the width ladder does not decide whether the border is affordable",
+      file: SRC,
+      from: "  const border = frame.border && width >= 3;\n  const canPad = border && width >= 5;",
+      to: "  const border = frame.border;\n  const canPad = border;",
+      expect: "T3.40",
+    },
+    {
+      // **The second, and it only became reachable once the first was fixed**: furniture the width ladder took away has to give its
+      // rows back, or `render` draws fewer than `measure` committed.
+      name: "the content count is a rung rather than the remainder",
+      file: SRC,
+      from: "    const available = Math.max(1, height - furniture); // cells-ok — a row count",
+      to: "    const available = Math.max(1, frame.content); // cells-ok — a row count",
+      expect: "T3.40",
+    },
+    {
+      // C09 I31 — the tag row's reassignment. Without it a narrow box spends a
+      // row on nothing while its message is truncated.
+      name: "a dropped tag row is left blank rather than given to the message",
+      file: SRC,
+      from: '      (frame.border ? 2 : 0) + (frame.pad ? 2 : 0) + (frame.tag && tagFit !== "none" ? 1 : 0); // cells-ok — a row count',
+      to: "      (frame.border ? 2 : 0) + (frame.pad ? 2 : 0) + (frame.tag ? 1 : 0); // cells-ok — a row count",
+      expect: "T3.41",
+    },
+    {
+      // C09 I31 — at one row the message wins. The countdown is the actionable
+      // number and it is still worth less than the cause.
+      name: "the retry line wins the last row instead of the message",
+      file: SRC,
+      from: "    const forMessage = Math.max(1, available - (line === \"\" ? 0 : 1)); // cells-ok — a row count",
+      to: "    const forMessage = Math.max(0, available - (line === \"\" ? 0 : 1)); // cells-ok — a row count",
+      expect: "T3.42",
+    },
+    {
+      // **C09 I32, and the field was declared and unread when this was written.**
+      // `spinnerFrames(ctx.capabilities)` with no name ignores the block's set
+      // entirely — F227's class, caught by a test before it shipped rather than
+      // after.
+      name: "the block's spinner set is ignored and the default is always used",
+      file: SRC,
+      from: "activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), ctx.tick)",
+      to: "activityLine(block, spinnerFrames(ctx.capabilities), ctx.tick)",
+      expect: "T3.44",
+    },
+  ],
+});
+
+console.log(report(results));
+process.exit(results.some((r) => !r.killed) ? 1 : 0);

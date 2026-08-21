@@ -38,6 +38,7 @@ export type {
   Notice,
   Panel,
   Scroll,
+  Status,
   Valign,
   Share,
   Patch,

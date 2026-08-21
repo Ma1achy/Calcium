@@ -632,6 +632,25 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       }
     }
   },
+  status: (b, e, at) => {
+    // **Both refusals name their field** (C04 I57, I66). An empty message in an
+    // `error` box says something failed and not what — the same objection §3a's
+    // three-row rung makes about dropping the rule — and a height the framework
+    // guessed is silently wrong in a way nobody notices.
+    if (typeof b["message"] !== "string" || b["message"].trim() === "") {
+      e.push(
+        `${at}: "message" must be a non-empty string (C04 I66) — a status box with ` +
+          `nothing in it reports that something happened and not what`,
+      );
+    }
+    const height = b["height"];
+    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+      e.push(
+        `${at}: "height" must be a positive integer (C04 I66) — the box is bound by ` +
+          `the number \`measure\` committed and cannot choose its own`,
+      );
+    }
+  },
   steps: (b, e, at) => requireArray(b, "steps", e, at),
   logs: (b, e, at) => requireArray(b, "lines", e, at),
   events: (b, e, at) => requireArray(b, "events", e, at),

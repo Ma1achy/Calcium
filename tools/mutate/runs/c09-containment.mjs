@@ -50,8 +50,14 @@ const results = runPass({
       // real plot's 20, and at 3 against a sequence measuring 22.
       name: "the error block is one row regardless of what measure committed",
       file: REG,
-      from: 'while (filled.length < height) filled.push(""); // cells-ok — a row count',
-      to: "// cells-ok — a row count",
+      // **Re-pointed when the boundary moved into the `status` definition.** The
+      // padding loop this used to anchor on is gone; the same defect is now the
+      // boundary handing the box a constant instead of the number `measure`
+      // committed, which is the height it is bound by (C09 I31). The pass was
+      // re-run on the commit that moved it — an anchor changed without running
+      // the pass is a survivor nobody sees (F219).
+      from: '      { kind: "status", id: "status", state: "error", message: text, height },',
+      to: '      { kind: "status", id: "status", state: "error", message: text, height: 1 },',
       expect: "T3.33",
     },
     {
