@@ -75,6 +75,16 @@ const SHARP: readonly string[] = Object.freeze([
  * Between two consecutive sample columns the curve runs horizontally at the
  * first row, turns once, and runs horizontally at the second. Where it turns
  * is what separates a line from a step, and it is the only difference.
+ *
+ * **`caps` chooses the alphabet and `corners` chooses within it** (C12 I54).
+ * This function selected its table from `corners` alone while `glyphForMask`,
+ * twelve lines below, already took a capability and already had the `ASCII`
+ * table — the fix was made for the exported helper and never reached here, so an
+ * ASCII terminal kept getting the frame full of `╭─╯` that comment describes.
+ *
+ * **It degrades rather than yielding to `curveRows`**: the density ramp is ASCII
+ * and would lose the connectivity that is the whole content of
+ * `plotStyle: "line"`, and C02 §4 promises `+ - |` for exactly this.
  */
 export function lineDrawRows(
   series: Series,
@@ -84,6 +94,7 @@ export function lineDrawRows(
   corners: "rounded" | "sharp",
   facing: Facing,
   interpolation: Interpolation = "linear",
+  caps?: Pick<TerminalCapabilities, "unicode">,
 ): readonly string[] {
   const w = Math.max(0, Math.floor(areaWidth));
   const h = Math.max(0, Math.floor(areaRows));
@@ -156,8 +167,7 @@ export function lineDrawRows(
     if (mask[r]?.[col.x] === 0) mask[r]![col.x] = LEFT | RIGHT;
   }
 
-  const table = corners === "sharp" ? SHARP : ROUNDED;
-  return mask.map((row) => row.map((m) => table[m] ?? " ").join(""));
+  return mask.map((row) => row.map((m) => glyphForMask(m, corners, caps)).join(""));
 }
 
 /**

@@ -50,6 +50,126 @@ describe("plot-catalogue — the corpus renders", () => {
     expect(rendered).toBeGreaterThan(30); // cells-ok — a frame count
   });
 
+  it("AA1 (C12 I54): every frame at `unicode: \"ascii\"` is ASCII, at both widths", () => {
+    // **One row for four mechanisms** (C12 §3af, F216). `lineDrawRows` picked
+    // its glyph table with no capability at all, `styleRasteriser` branched on
+    // `ambiguousWidth` where the question is `unicode`, and the contour and
+    // violin arms read `plotStyle` while holding the record. Four different
+    // decisions, one shared output — so the assertion is about the output.
+    //
+    // Measured before the fix: **49 of 159 variants at narrow, 24 at wide**, and
+    // thirty-two of the wide ones were committed catalogue files nobody read.
+    const base = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
+      synchronisedUpdate: true, bracketedPaste: true, mouse: true,
+      imageProtocol: "none", altScreen: true } as const;
+
+    const offenders: string[] = [];
+    let rendered = 0; // cells-ok — a frame count
+    for (const [arm, over, w] of [
+      ["narrow", {}, 80],
+      ["wide", { ambiguousWidth: "wide" }, 60],
+    ] as const) {
+      for (const [form, variants] of Object.entries(forms)) {
+        for (const [variant, spec] of Object.entries(variants)) {
+          rendered += 1; // cells-ok — a frame count
+          const body = frame(spec, { ...base, ...over }, w).map(strip).join("\n");
+          const bad = [...new Set([...body].filter((c) => (c.codePointAt(0) ?? 0) > 127))];
+          if (bad.length > 0) offenders.push(`${arm} ${form}·${variant} ${bad.join("")}`);
+        }
+      }
+    }
+
+    // The corpus was rendered, so an empty offender list means *checked and
+    // clean* rather than *nothing ran* — the arm PC1 exists for, restated here
+    // because this row's whole content is an absence.
+    expect(rendered, "frames rendered").toBeGreaterThan(200); // cells-ok — a frame count
+    expect(offenders.join("\n")).toBe("");
+  });
+
+  it("AA2 (C12 I54): a line at ASCII is still *connected*, in `+ - |`", () => {
+    // **Falling back to the density ramp satisfies AA1 and loses the figure.**
+    // `plotStyle: "line"` means *draw this as a connected line*, so the row
+    // asserts the substitution C02 §4 names rather than merely the absence of
+    // box-drawing — `lineDrawRows` degrades in place instead of yielding.
+    const spec = {
+      form: "line",
+      series: [{ label: "a", values: [1, 3, 2, 6, 4, 8, 5, 9, 7, 10, 6, 3] }],
+      height: 6,
+    };
+    const ascii = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
+      synchronisedUpdate: true, bracketedPaste: true, mouse: true,
+      imageProtocol: "none", altScreen: true } as const;
+
+    const body = frame(spec, ascii, 60).map(strip).join("\n");
+    expect(body).toContain("+");
+    expect(body).toContain("|");
+    expect(body).toContain("---");
+    // Not the ramp: `.:-=+*#@` shares `-` and `+` with the box set, so the
+    // distinguishing rung is asserted instead.
+    expect(body, "the ramp's own glyphs are not what drew this").not.toContain("@");
+
+    // **The fixture responds**: the same series at full unicode is the rounded
+    // set, so the row is about the capability and not about this series.
+    const full = frame(spec, { ...ascii, unicode: "full", colourDepth: 24 }, 60)
+      .map(strip)
+      .join("\n");
+    expect(full).toContain("╭");
+    expect(full).toContain("╯");
+  });
+
+  it("AA3 (C12 I54): a style the terminal cannot honour degrades and never refuses", () => {
+    // **I18's precedent** — a caller cannot avoid the terminal they are on, so
+    // the block stays valid and only the alphabet changes. The row exists
+    // because the other reading is available and wrong: refusing
+    // `plotStyle: "braille"` at ASCII would make a document render on one
+    // terminal and fail on another for a reason the author cannot act on.
+    const ascii = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
+      synchronisedUpdate: true, bracketedPaste: true, mouse: true,
+      imageProtocol: "none", altScreen: true } as const;
+
+    const cases = {
+      "violin braille": {
+        form: "violin",
+        plotStyle: "braille",
+        categories: ["a", "b"],
+        series: [{ values: [1, 2, 2, 3, 3, 3, 4, 5] }, { values: [2, 3, 3, 4, 4, 5, 5, 6] }],
+        height: 10,
+      },
+      contour: {
+        form: "contour",
+        series: [
+          { values: [1, 2, 3, 4, 5, 4] },
+          { values: [2, 4, 6, 5, 3, 2] },
+          { values: [3, 6, 4, 2, 1, 3] },
+        ],
+        height: 6,
+      },
+    };
+
+    for (const [name, spec] of Object.entries(cases)) {
+      const lines = frame(spec, ascii, 60);
+      // It rendered — no throw, and a figure rather than a blank.
+      expect(lines.length, `${name} rendered`).toBeGreaterThan(3); // cells-ok — a row count
+      const body = lines.map(strip).join("\n");
+      expect(body.trim().length, `${name} drew something`).toBeGreaterThan(20); // cells-ok — a glyph count
+      expect(
+        [...body].filter((c) => (c.codePointAt(0) ?? 0) > 127),
+        `${name} at ascii`,
+      ).toEqual([]);
+    }
+
+    // **The fixture responds**: the violin's braille arm is a real arm, so the
+    // same spec at full unicode must come back in braille — otherwise the row
+    // above is asserting about a style nothing implements.
+    const full = frame(cases["violin braille"], { ...ascii, unicode: "full", colourDepth: 24 }, 60)
+      .map(strip)
+      .join("");
+    expect(
+      [...full].some((c) => { const p = c.codePointAt(0) ?? 0; return p >= 0x2800 && p <= 0x28ff; }),
+      "the braille arm draws braille where the terminal has it",
+    ).toBe(true);
+  });
+
   it("PC12a: some banded fixture reaches the padding loop, or PC12 is about nothing", () => {
     // **The corpus's coverage of `bandedForm`'s leftover rows is a property of
     // one fixture's height, and nothing asserted it.** `rowsPer` is

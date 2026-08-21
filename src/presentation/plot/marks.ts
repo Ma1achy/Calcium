@@ -117,6 +117,28 @@ const ASCII_MARKS: readonly string[] = Object.freeze([
 ]);
 
 /** The eight marks for a capability set, most contrasting first. */
+/**
+ * The separator between the parts of a legend, a level list or a compound
+ * category label — `·` where the terminal has it, `-` where it does not.
+ *
+ * **A mark, and it reached a frame** (C12 I54, §3af). `·` is written into five
+ * plot strings and every one of them passes `checkMarks`, correctly: `·` is in
+ * that rule's `PROSE_MARKS` and its comment records the blind spot with its
+ * figure — *106 literals carry prose punctuation and this passes every one … a
+ * real and much larger question, and not this rule's.*
+ *
+ * **`degradesToAscii` is the instrument that does see it**, because it is a
+ * contract on a rendered document and has no opinion about whether a codepoint
+ * is punctuation. Two instruments, two subjects, and the weaker one was the one
+ * being run. The five plot sites are fixed through here; the wider hundred are
+ * counted where the blind spot is declared.
+ *
+ * Spaced, so `+2 more - a - b` reads as a list rather than as arithmetic.
+ */
+export function partSeparator(caps: Pick<TerminalCapabilities, "unicode">): string {
+  return caps.unicode === "ascii" ? " - " : " \u00b7 ";
+}
+
 export function categoryMarks(caps: Alphabet): readonly string[] {
   if (caps.unicode === "ascii") return ASCII_MARKS;
   return caps.ambiguousWidth === "wide" ? WIDE_MARKS : UNICODE_MARKS;

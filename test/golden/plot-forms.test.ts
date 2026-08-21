@@ -12,6 +12,7 @@ import {
   DARK_THEME,
   FULL_CAPS,
   MONO_CAPS,
+  MONO_UNICODE_CAPS,
   measurable,
 } from "../support/render.js";
 
@@ -106,11 +107,25 @@ const STYLES = [
   }],
 ] as const;
 
+/**
+ * **One capability per row, and two of these names were lying** (C12 I54, §3af,
+ * F216). `MONO_CAPS` is `{colourDepth: 1, unicode: "ascii"}` — its own comment
+ * in `test/support/render.ts` says so and says nothing rendered the other rung —
+ * so the row called `1bit` was ascii · narrow · 1bit and the row called `ascii`
+ * was ascii · wide · 1bit. **There was no unicode 1-bit row at all**, and the
+ * one named `1bit` is what held `╭──────────╯` inside a `+------+` frame through
+ * review and commit.
+ *
+ * The names now say what the capability is, and `MONO_UNICODE_CAPS` — which
+ * exists for exactly this and had no caller here — gives the rung the old name
+ * claimed.
+ */
 const CANDLE_MODES = [
   { name: "24bit-narrow", capabilities: FULL_CAPS },
   { name: "24bit-wide", capabilities: { ...FULL_CAPS, ambiguousWidth: "wide" as const } },
-  { name: "1bit", capabilities: { ...MONO_CAPS, ambiguousWidth: "narrow" as const } },
-  { name: "ascii", capabilities: { ...MONO_CAPS, ambiguousWidth: "wide" as const } },
+  { name: "1bit-unicode", capabilities: MONO_UNICODE_CAPS },
+  { name: "ascii-narrow", capabilities: { ...MONO_CAPS, ambiguousWidth: "narrow" as const } },
+  { name: "ascii-wide", capabilities: { ...MONO_CAPS, ambiguousWidth: "wide" as const } },
 ] as const;
 
 describe("golden frames — the candlestick style", () => {

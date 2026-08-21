@@ -144,9 +144,14 @@ const results = runPass({
       // **The vertical arm's braille fork, which did not exist**: `violinColumn`
       // had no `braille` parameter at all, so `plotStyle` reached it and
       // nothing happened. Unwiring it is the shipped state (C12 I43, §3w).
+      //
+      // **Re-anchored** when C12 I54 lifted the four call sites onto one
+      // `brailleArm` predicate — `plotStyle` names the figure and the capability
+      // names the alphabet, so the expression moved one scope up. Same mutation,
+      // same subject; the pass was re-run rather than only re-anchored.
       name: "the vertical violin ignores plotStyle again",
       file: DEFN,
-      from: '          block.plotStyle === "braille", block.plotFill === "solid",\n        );',
+      from: '          brailleArm, block.plotFill === "solid",\n        );',
       to: "          false, false,\n        );",
       expect: "SA10",
     },
@@ -166,14 +171,14 @@ const results = runPass({
       // equal (C12 I43, §3w).
       name: "the horizontal raincloud keeps the height ladder",
       file: DEFN,
-      from: '          block.plotStyle === "braille", block.plotFill === "solid",\n          block.plotBox ?? "solid",\n        );',
+      from: '          brailleArm, block.plotFill === "solid",\n          block.plotBox ?? "solid",\n        );',
       to: '          false, false,\n          block.plotBox ?? "solid",\n        );',
       expect: "SA10",
     },
     {
       name: "the vertical raincloud keeps the width ladder",
       file: DEFN,
-      from: '            block.plotStyle === "braille", block.plotFill === "solid",\n            block.plotBox ?? "solid",\n          );',
+      from: '            brailleArm, block.plotFill === "solid",\n            block.plotBox ?? "solid",\n          );',
       to: '            false, false,\n            block.plotBox ?? "solid",\n          );',
       expect: "SA10",
     },
@@ -221,8 +226,8 @@ const results = runPass({
       // **Twelve spaces, because ten is the horizontal arm's** — the two call
       // sites differ only in indentation and `apply` takes the first match,
       // which is F208 exactly one turn after it was written down.
-      from: '            block.plotStyle === "braille", block.plotFill === "solid",\n            block.plotBox ?? "solid",\n          );',
-      to: '            block.plotStyle === "braille", block.plotFill === "solid",\n            "solid",\n          );',
+      from: '            brailleArm, block.plotFill === "solid",\n            block.plotBox ?? "solid",\n          );',
+      to: '            brailleArm, block.plotFill === "solid",\n            "solid",\n          );',
       expect: "SA11",
     },
     {

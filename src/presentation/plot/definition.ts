@@ -55,7 +55,7 @@ import {
 import { annotationRows } from "./annotate.js";
 import { FACING_DEFAULT, facingOf, rowOf, seriesRange, type Facing, type Range } from "./scale.js";
 import { bandRows, stackBands, stackRange } from "./stack.js";
-import { ROW_IS_AN_IDENTITY, markOf, refOf as slotOf } from "./marks.js";
+import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
@@ -934,7 +934,9 @@ function stackedRows(
     const first = series[0];
     const omitted = series.slice(1).map((s, i) => s.label ?? `series ${i + 2}`);
     const legend = truncate(
-      `+${omitted.length} more · ${omitted.join(" · ")}`, // cells-ok — a series count
+      // The separator degrades with the terminal (C12 I54) — `truncate` measures
+      // whatever this produces, so the two cannot disagree about the width.
+      `+${omitted.length} more${partSeparator(ctx.capabilities)}${omitted.join(partSeparator(ctx.capabilities))}`, // cells-ok — a series count
       layout.areaWidth,
       ctx.capabilities,
     );
@@ -1027,6 +1029,12 @@ function styleRasteriser(
   // moving average over candles is an ordinary curve and there is no reason for
   // it to be drawn differently from the same curve on its own.
   const auto = ps === "auto" || ps === "candlestick";
+  // **`ambiguousWidth` is the right question for `auto` and the wrong one for
+  // the alphabet** (C12 I54). *How wide is this glyph* is what decides whether
+  // an unstyled curve prefers box drawing to braille; *can this terminal draw
+  // one at all* is `unicode`, and it is asked inside `lineDrawRows` — which
+  // degrades to `+ - |` rather than refusing, so an explicit `plotStyle: "line"`
+  // still draws a connected line at ASCII.
   const useLineDraw = ps === "line" || (auto && caps.ambiguousWidth !== "wide");
   if (!useLineDraw) return base;
   const corners = block.plotCorners ?? "rounded";
@@ -1035,8 +1043,12 @@ function styleRasteriser(
   // carried the hold-then-jump and the replacement knew only how to slope, so
   // `step` and `line` drew the same frame. The form owns the rule, so the form
   // names it here.
-  return (series, range, areaWidth, areaRows, _caps, facing) =>
-    lineDrawRows(series, range, areaWidth, areaRows, corners, facing, interpolation);
+  // **The rasteriser's own `caps` and not the closed-over one.** They are the
+  // same record today; taking the parameter is what stops this becoming the
+  // discarded `_caps` it used to be, which is how the capability failed to
+  // reach the glyph table at all.
+  return (series, range, areaWidth, areaRows, rasterCaps, facing) =>
+    lineDrawRows(series, range, areaWidth, areaRows, corners, facing, interpolation, rasterCaps);
 }
 
 function overlaidRows(
@@ -2001,7 +2013,9 @@ const FORM_ROWS: Readonly<
       const grouped = {
         ...block,
         categories: cats.flatMap((c) =>
-          block.series.map((sr, k) => `${c} · ${sr.label ?? String(k + 1)}`),
+          block.series.map(
+            (sr, k) => `${c}${partSeparator(ctx.capabilities)}${sr.label ?? String(k + 1)}`,
+          ),
         ),
       };
       let oi = 0;
@@ -2421,6 +2435,13 @@ const FORM_ROWS: Readonly<
   violin: (block, width, ctx) => {
     const cats = block.categories ?? block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
     const qs = block.quartiles ?? [];
+    // **One predicate for the form's four call sites** (C12 I54, §3af).
+    // `plotStyle` names the figure and the capability names the alphabet, and
+    // each of the four routines below already holds `ctx.capabilities` — the
+    // decision was simply made before it got there, so an ASCII frame came back
+    // in braille. Degraded and never refused, on I18's precedent: a caller
+    // cannot avoid the terminal they are on.
+    const brailleArm = block.plotStyle === "braille" && ctx.capabilities.unicode !== "ascii";
     // One value axis for every band, so the categories can be compared — which
     // is what the form is for (C12 §3q).
     const shared = seriesRange(block.series, block) ?? undefined;
@@ -2448,14 +2469,14 @@ const FORM_ROWS: Readonly<
           return rainColumns(
             sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, cw, rows,
             ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,
-            block.plotStyle === "braille", block.plotFill === "solid",
+            brailleArm, block.plotFill === "solid",
             block.plotBox ?? "solid",
           );
         }
         return violinColumn(
           sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr),
           block.plotCorners ?? "rounded", block.bandwidth, shared,
-          block.plotStyle === "braille", block.plotFill === "solid",
+          brailleArm, block.plotFill === "solid",
         );
       });
     }
@@ -2479,7 +2500,7 @@ const FORM_ROWS: Readonly<
         return rainRows(
           sr, qs[i] ?? summaryOf(sr), shared?.min ?? 0, shared?.max ?? 1, aw,
           ctx.capabilities, i, rung.rung === "raindrop", block.bandwidth,
-          block.plotStyle === "braille", block.plotFill === "solid",
+          brailleArm, block.plotFill === "solid",
           block.plotBox ?? "solid",
         );
       }
@@ -2488,7 +2509,7 @@ const FORM_ROWS: Readonly<
       return violinRows(
         sr, aw, spent, ctx.capabilities, qs[i] ?? summaryOf(sr),
         block.plotCorners ?? "rounded", block.bandwidth, shared,
-        block.plotStyle === "braille", block.plotFill === "solid",
+        brailleArm, block.plotFill === "solid",
       );
     });
   },

@@ -27,7 +27,7 @@ import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
 import { calendarCaptions, calendarGrid } from "./calendar.js";
 import { parseStartDate } from "../../data/dates.js";
 import { slot } from "../blocks/paint.js";
-import { refOf } from "./marks.js";
+import { partSeparator, refOf } from "./marks.js";
 import {
   contourCellRows, contourDotRows, contourLevels, dimColour, dimFactorFor, fieldSampler,
   arrowsFor, fieldPaintsUnder, glyphLayerOrder, magnitudeAt, magnitudeSeries, mergeFieldLayers,
@@ -469,7 +469,9 @@ function matrixRows(
         "",
         [{
           text: truncate(
-            `+${String(omitted.length)} more · ${omitted.join(" · ")}`, // cells-ok — a row count
+            // C12 I54 — the separator is a mark and degrades with the terminal.
+            `+${String(omitted.length)} more${partSeparator(ctx.capabilities)}` + // cells-ok — a row count
+              `${omitted.join(partSeparator(ctx.capabilities))}`,
             layout.areaWidth,
             ctx.capabilities,
           ),
@@ -533,7 +535,9 @@ function matrixFurniture(
 
   const lo = formatValue(range.min, block.yFormat);
   const hi = formatValue(range.max, block.yFormat);
-  const clause = dropped === 0 ? "" : ` · ${String(dropped)} older not shown`; // cells-ok — a position count
+  const clause = dropped === 0 // cells-ok — a position count
+    ? ""
+    : `${partSeparator(ctx.capabilities)}${String(dropped)} older not shown`;
 
   /**
    * **The legend descends the same ladder as the cell** (C12 I29, C10 §4c).
@@ -578,7 +582,8 @@ function matrixFurniture(
   // outside the range is still named: dropping it makes an empty area
   // indistinguishable from a constant field.
   const levelText = block.form === "contour"
-    ? ` · ${contourLevels(block, range).map((v) => formatValue(v, block.yFormat)).join(" ")}`
+    ? `${partSeparator(ctx.capabilities)}` +
+      `${contourLevels(block, range).map((v) => formatValue(v, block.yFormat)).join(" ")}`
     : "";
   const rungs: readonly (readonly Span[])[] = [
     [muteds(`${lo} `), ...bar(), muteds(` ${hi}${levelText}${clause}`)],
@@ -628,7 +633,13 @@ function fieldLayers(
   const columns = block.series[0]?.values.length ?? 0; // cells-ok — a column count
   const span = { from: 0, to: Math.max(0, columns - 1), rows: block.series.length }; // cells-ok — a row count
   const levels = contourLevels(block, range);
-  const braille = (block.plotStyle ?? "auto") !== "line";
+  // **The style says which figure and the capability says which alphabet**
+  // (C12 I54, §3af). This read `plotStyle` alone while `contourCellRows` — the
+  // other arm, one call below — already took `ctx.capabilities` and already
+  // degraded correctly, so an ASCII frame came back in braille and thirty-two
+  // committed catalogue files carry it.
+  const braille =
+    (block.plotStyle ?? "auto") !== "line" && ctx.capabilities.unicode !== "ascii";
 
   const out: FieldLayer[] = [];
   for (const kind of order) {

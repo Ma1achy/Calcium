@@ -10514,9 +10514,15 @@ them is told their document is wrong.
 **F212 named half of it.** Its diagnosis was the missing arm — *the catalogue's ASCII arm is
 `ascii-wide`, so every ASCII frame is also a wide frame and the wide arm answers for the ASCII
 one* — and that is exactly right about sites 1 and 2. It could not reach sites 3 and 4, which are
-wrong in the arm that **is** rendered: **32 committed catalogue files carry braille inside a frame
-labelled `ascii`**, and nobody had read them. *A finding about a missing fixture is not a finding
-about the fixtures you have.*
+wrong in the arm that **is** rendered: **32 files of the rendered corpus carry braille inside a
+frame labelled `ascii`** — 16 variants in two formats — and nobody had read them. *A finding about a
+missing fixture is not a finding about the fixtures you have.*
+
+**Generated, not committed**, and the distinction is worth keeping: `.gitignore` line 18 is
+`docs/catalogue/`, so no diff ever carried one and only a reader who runs the generator could have
+seen them. Weaker than *shipped*, and stronger about the instrument — **a corpus is a thing you
+look at, so a defect in it survives exactly as long as nobody looks.** That is the argument for
+AA1 over another frame: an assertion does not have to be looked at.
 
 **The separator is the same class in prose.** `·` (U+00B7) is written into five plot strings and
 passes `checkMarks` correctly — `·` is in `PROSE_MARKS`, and that rule's comment records the blind

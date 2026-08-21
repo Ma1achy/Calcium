@@ -22,13 +22,32 @@ const theme = loaded.value.current;
 
 const FULL = { colourDepth: 24, unicode: "full", ambiguousWidth: "narrow", synchronisedUpdate: true, bracketedPaste: true, mouse: true, imageProtocol: "none", altScreen: true };
 const EIGHT = { ...FULL, colourDepth: 8 };
-const ASCII_WIDE = { ...FULL, unicode: "ascii", ambiguousWidth: "wide", colourDepth: 1 };
+/**
+ * **One capability per arm** (C12 I54, §3af, F212, F216).
+ *
+ * This was a single `ascii-wide` arm varying `unicode`, `ambiguousWidth` **and**
+ * `colourDepth` together, and two capabilities that always move together cannot
+ * be told apart by any number of frames. The corpus therefore had:
+ *
+ * - no `ascii · narrow` frame at all, which is where the box-drawing rasteriser
+ *   lives — 49 of 159 variants were emitting `╭─╯` into a frame labelled ascii
+ *   and nothing rendered it;
+ * - no `full · wide` frame at all, which is where the braille ramps live and
+ *   where F171's `RAMP_BRAILLE` defect lived.
+ *
+ * So `ascii` is narrow and a new `wide` arm carries the full repertoire. Each
+ * capability now varies on its own axis, and `1bit` keeps depth separate from
+ * both.
+ */
+const ASCII = { ...FULL, unicode: "ascii", colourDepth: 1 };
+const WIDE = { ...FULL, ambiguousWidth: "wide" };
 const MONO = { ...FULL, colourDepth: 1 };
 
 export const CAPS = [
   { name: "24bit", caps: FULL },
   { name: "8bit", caps: EIGHT },
-  { name: "ascii-wide", caps: ASCII_WIDE },
+  { name: "ascii", caps: ASCII },
+  { name: "wide", caps: WIDE },
   { name: "1bit", caps: MONO },
 ];
 
@@ -113,7 +132,10 @@ for (const [formName, variants] of Object.entries(FORMS)) {
   for (const [variantName, spec] of Object.entries(variants)) {
     for (const { name: capsName, caps } of CAPS) {
       const id = `cat-${formName}-${variantName}`;
-      const width = capsName === "ascii-wide" ? 60 : 80;
+      // The wide arm draws every ambiguous glyph two cells, so a figure needs
+      // the narrower frame to stay inside a comparable footprint. `ascii` is
+      // narrow and takes the ordinary width, which it never could before.
+      const width = capsName === "wide" ? 60 : 80;
       const lines = frameFor(spec, caps, width, id);
       const header = `── ${formName} · ${variantName} · ${capsName} · ${width}w`;
       const frame = [header, ...lines].join("\n");

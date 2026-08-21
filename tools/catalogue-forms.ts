@@ -335,6 +335,36 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ohlc: candles(24),
       series: [s(movingAverage(candles(24).map((b) => b.close), 3), "ma3")],
     },
+    // **`width`, `aspect` and `align` landed with no frame at all** — three of
+    // the eleven `Plot` members no catalogue variant sets, and the three this
+    // arc added. `align` needs a `width` narrower than the frame to have a
+    // subject, so the three placements are three variants rather than one.
+    "size-left": {
+      form: "line", height: 8, axes: true, width: 44, align: "left",
+      series: [s(sin50, "alpha")],
+    },
+    "size-centre": {
+      form: "line", height: 8, axes: true, width: 44, align: "centre",
+      series: [s(sin50, "alpha")],
+    },
+    "size-right": {
+      form: "line", height: 8, axes: true, width: 44, align: "right",
+      series: [s(sin50, "alpha")],
+    },
+    // `aspect` is the member that knows `CELL_ASPECT`, so its frame is the one
+    // a reader checks *visually* square rather than arithmetically — which is
+    // the whole reason it exists rather than a caller doing the division.
+    "aspect-square": {
+      form: "line", height: 12, axes: true, aspect: 1, align: "centre",
+      series: [s(sin50, "alpha")],
+    },
+    // **`plotCorners`, which §3af makes newly worth a frame**: at ASCII both
+    // arms collapse to `+`, so the pair says the member is a preference the
+    // capability can flatten rather than a second figure.
+    "corners-sharp": {
+      form: "line", height: 8, axes: true, plotCorners: "sharp",
+      series: [s(sin50, "alpha")],
+    },
   },
   sparkline: {
     default: { form: "sparkline", series: [s(sin50)] },
