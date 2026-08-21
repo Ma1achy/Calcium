@@ -82,6 +82,23 @@ export const HIGH_CONTRAST: ThemeTokens = Object.freeze({
     // §4b — `tone.default` is the only slot paired with it, and white on this
     // measures far above its 4.5 floor.
     selection: "#00405c",
+
+    // §4d — the error tag's pair, **and it inverts**.
+    //
+    // This theme's `tone.error` is `#ff7171`, a *light* red, and the ground is
+    // that value by equality like every other theme (I32). White on it is
+    // **2.67 : 1** and would fail; `#3d0000` on it is **6.55**. So the ink
+    // flips, and the ground still measures **7.85** against this theme's black
+    // page.
+    //
+    // **This is the alternative C10 §4d names, shipped.** A light ground with
+    // dark ink clears the meaning floor on both sides and needs no lowered floor
+    // at all — dark declines it to keep a red that reads as a failure rather
+    // than a warning, and that is a preference rather than a constraint. A
+    // single ink chosen once would have failed here and read as this theme's
+    // fault; the pair per theme is what makes it a choice.
+    errorGround: "#ff7171",
+    errorInk: "#3d0000",
   }),
 
   palettes: Object.freeze({
@@ -97,7 +114,7 @@ export const HIGH_CONTRAST: ThemeTokens = Object.freeze({
         muted: "#9f9f9f",
         ok: "#0ab827", // 7.90
         warn: "#c99700", // 7.91
-        error: "#ff7171", // 7.85
+        error: "#ff7171", // 7.85 — this theme's own promise is stricter than the floor
         info: "#2ea5fa", // 7.88
         accent: "#b887fc", // 7.91
         meta: "#eb68f7", // 7.86

@@ -7,6 +7,8 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 import {
   defaultTheme,
   diffPairs,
+  errorTagPairs,
+  validateTokens,
   selectionPairs,
   floorFor,
   ratio,
@@ -390,7 +392,65 @@ describe("C10 contract", () => {
     expect([...new Set(pairs.map(([, , surface]) => surface))].sort()).toEqual(["diffAdd", "diffRemove"]);
   });
 
-  it("T2.14c (I22, §4a, §4b): eight surfaces, and the withdrawn strong pair is absent", () => {
+  it("T2.14e (C10 I32, §4d): the tag's ground IS `tone.error`, in every theme", () => {
+    // **Two hex literals that must agree is a pair waiting to drift**, and this
+    // one drifted four times in one sitting — hue 0 against hue 9, then a
+    // hue-matched ground that read brick, then a tone the loader refused, then a
+    // ground and a tone one lightness step apart. Every round was two numbers
+    // being tuned toward each other by eye.
+    //
+    // They are one colour and this is what says so. The rule, the message and
+    // the tag's ground are the same value by assertion rather than by
+    // agreement, so a change to either has to be a change to both.
+    for (const [variant, tokens] of SHIPPED) {
+      expect(tokens.surfaces.errorGround, `${variant}: ground is the tone`).toBe(
+        tokens.palettes.tone?.slots["error"],
+      );
+    }
+  });
+
+  it("T2.14f (C10 I32, §4d): the tag's own check fires, and it reads both halves from `surfaces`", () => {
+    // **The mutation pass is what asked for this row.** Removing the floor
+    // comparison from `validateErrorTag` survived every other assertion here:
+    // the pair was measured nowhere and every row about it agreed, which is a
+    // check that cannot fire dressed as one that passes (A03 §2).
+    //
+    // A fabricated violation rather than an assertion about the shipped values,
+    // because the shipped values pass — and a check is proved by breaking what it
+    // covers, not by watching it agree.
+    for (const [variant, tokens] of SHIPPED) {
+      const ink = tokens.surfaces.errorInk;
+      const ground = tokens.surfaces.errorGround;
+      expect(validateTokens(tokens), `${variant}: the shipped pair is legal`).toEqual([]);
+
+      // Ink one shade off the ground: a real colour, plainly illegible on it.
+      const broken = {
+        ...tokens,
+        surfaces: { ...tokens.surfaces, errorInk: ground },
+      };
+      const errors = validateTokens(broken);
+      expect(
+        errors.some((e) => e.path === "surfaces.errorInk"),
+        `${variant}: ink on its own ground is caught, and named by path`,
+      ).toBe(true);
+      expect(ratio(ground, ground)).toBeCloseTo(1, 5);
+
+      // **And the pair is read from `surfaces`, both halves.** Written the first
+      // way this reached for `tokens.palettes[…].slots[…]` and `continue`d on a
+      // miss, so a foreground living in `surfaces` was skipped in silence. A
+      // ground the function cannot resolve must produce **no pair**, never a
+      // half-pair measured against a default.
+      const noGround = {
+        ...tokens,
+        surfaces: { ...tokens.surfaces, errorGround: "not-a-colour" },
+      };
+      expect(errorTagPairs(noGround), `${variant}: an unresolvable half is no pair`).toEqual([]);
+      expect(errorTagPairs(tokens).length, `${variant}: and the real one is one pair`).toBe(1);
+      expect(ink).not.toBe(ground);
+    }
+  });
+
+  it("T2.14c (C10 I22, §4a, §4b, §4d): ten surfaces, and the withdrawn strong pair is absent", () => {
     // The pair that was specified, measured and removed. Asserted absent rather
     // than merely unmentioned: a spec that measured something out and a token
     // file that quietly kept it is exactly the drift this suite exists to stop,
@@ -405,6 +465,12 @@ describe("C10 contract", () => {
         "borderStrong",
         "diffAdd",
         "diffRemove",
+        // §4a — the error tag's pair. **Two entries, and they are one thing**:
+        // a ground with no ink of its own borrows a foreground nothing measured
+        // against it, so `errorTagPairs` checks them together and neither may
+        // arrive alone. Sorted order puts the ground before the ink.
+        "errorGround",
+        "errorInk",
         // §4b — the selection wash. A text-bearing surface with a pairing of
         // its own (`selectionPairs`), not an eighth entry in the diff one.
         "selection",

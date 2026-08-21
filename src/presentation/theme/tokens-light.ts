@@ -43,6 +43,19 @@ export const LIGHT: ThemeTokens = Object.freeze({
     // selection and never inside one — the scope of a floor is where the text
     // goes (C10 §4a's own argument).
     selection: "#c9ddf5",
+
+    // §4d — the error tag's pair, and the ground is `tone.error` itself, as on
+    // every theme (I32). It moved here too: `#cd2d1e` was legible on a light
+    // page and too light to hold white, so the tone came down with the ground
+    // rather than the two being kept in step by hand.
+    //
+    // `#ffffff` on `#a81f12` is **7.32 : 1**, and the tone measures **7.01**
+    // against `bg` — **so this theme needs no lowered floor and never did.** On
+    // a light page a colour dark enough to hold white is also dark enough to be
+    // read, and the two constraints that have no common solution on dark have
+    // 81,907 of them here (C10 §4d).
+    errorGround: "#a81f12",
+    errorInk: "#ffffff",
   }),
 
   palettes: Object.freeze({
@@ -55,7 +68,7 @@ export const LIGHT: ThemeTokens = Object.freeze({
         muted: "#94959c", // was #a0a1a7 — 2.47, under its own 2.5 floor
         ok: "#3c793c", // was #50a14f — 3.07
         warn: "#916301", // was #c18401 — 3.06
-        error: "#cd2d1e", // was #e45649 — 3.51
+        error: "#a81f12", // the tag's ground, so text and block are one red
         info: "#0173a5", // was #0184bc — 4.00
         accent: "#1f60f0", // was #4078f2 — 3.88
         meta: "#a626a4",

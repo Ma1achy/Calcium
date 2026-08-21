@@ -39,6 +39,27 @@ export const DARK: ThemeTokens = Object.freeze({
     // selection and never inside one — the scope of a floor is where the text
     // goes (C10 §4a's own argument).
     selection: "#264057",
+
+    // §4d — the error tag's pair, and **the ground is `tone.error` itself**.
+    //
+    // Three earlier grounds were tried and every one was a second red beside the
+    // first — a hue-0 ground against a hue-9 tone, then a brick that read wrong,
+    // then a hue match the loader refused at **4.32 : 1** against `bgElev`, a
+    // surface the first measurement had not looked at. **The exact match is the
+    // only stable answer**, so the ground takes the tone's own value and the
+    // floor moved to let it: white on `#c62828` is **5.62 : 1** in the tag, and
+    // the tone measures **2.83** against `bgElev` (C10 §4d, I32).
+    //
+    // **Verified at the pixel, because identical values do not look identical.**
+    // The rendered frame carries one hex in three places — the rule, the tag's
+    // ground and the message's glyphs — and it still reads as two: the message
+    // is thin strokes at roughly a seventh of its row's coverage and the tag is
+    // a solid fill, and a fill of a colour always reads heavier than a stroke of
+    // it. That is a fact about text rendering and no hex can answer it, which is
+    // worth recording where the next person will otherwise change the number
+    // again.
+    errorGround: "#c62828",
+    errorInk: "#ffffff",
   }),
 
   palettes: Object.freeze({
@@ -55,7 +76,22 @@ export const DARK: ThemeTokens = Object.freeze({
         muted: "#626262",
         ok: "#87b86c",
         warn: "#d4b35a",
-        error: "#d47867",
+        // **The tag's ground itself, by equality** (C10 §4d, I32; T2.14e).
+        //
+        // It was `#d47867` — hue 9 against the ground's hue 0, two different
+        // reds with the rule running between them — and then a succession of
+        // near-matches, each correct on its own and wrong beside the other. Two
+        // hex literals in two files tuned toward each other by eye drift, and no
+        // assertion about either colour can see it.
+        //
+        // **So they are one value, and the floor moved instead.** On a dark page
+        // no colour is both legible on `bgElev` and dark enough to hold white at
+        // 4.5 — zero of 262,144 over the whole cube, measured — so the choice was
+        // never between reds. This one holds white at **5.62 : 1** in the tag and
+        // measures **2.83** against `bgElev`, the binding surface, with `bg` at
+        // **3.10** and the two diff grounds at **2.92** and **2.91**. C10 §4d has
+        // the trade and the alternative it declined.
+        error: "#c62828",
         info: "#7faecf",
         accent: "#e8a87c",
         meta: "#b89cd2",

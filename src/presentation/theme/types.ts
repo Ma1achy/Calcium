@@ -68,6 +68,38 @@ export type Surfaces = Readonly<{
    * `SELECTION_SLOTS`, and the same argument for its narrowness.
    */
   selection: string;
+  /**
+   * **The error tag's ground and its matched ink — one pair, checked together**
+   * (C10 §4d, I21, I32 · C09 §3a).
+   *
+   * The only painted run in a `status` box: the word `ERROR` and its two spaces,
+   * sitting in a gap in the rule. Everything else in that figure — the rule, the
+   * mark, the message, the border, the blanks — is unpainted and carries the
+   * error tone.
+   *
+   * **Two members rather than a ground beside the existing foreground**, and
+   * I21's own sentence is why: *a tone painted as a background is a tone nothing
+   * measured a floor for.* The inverse holds too — a ground with no ink of its
+   * own borrows one nobody measured against it, which is how a contrast floor
+   * gets missed. So they arrive together and `errorTagPairs` checks them
+   * together, at the meaning floor, because a tag that says *this failed*
+   * carries meaning rather than decoration.
+   *
+   * **The ground *is* `tone.error`**, asserted by equality per theme (T2.14e), so
+   * the tag and the message under it are one red by construction rather than by
+   * two literals being kept in step by hand. That is what made the slot a pair
+   * and what lowered its floor to 2.5; the trade, the cube sweep behind it and
+   * the alternative it declined are C10 §4d's, not repeated here.
+   *
+   * **The ink is not always white, and high contrast is the case that shows
+   * why.** Dark takes `#ffffff` on `#c62828` at **5.62 : 1** and light
+   * `#ffffff` on `#a81f12` at **7.32**; high contrast inverts — `#3d0000` on
+   * `#ff7171` at **6.55** — because its error tone is a *light* red and white on
+   * it would be 2.67. A pair per theme is what lets that be a choice rather than
+   * a failure.
+   */
+  errorGround: string;
+  errorInk: string;
 }>;
 
 export type ThemeTokens = Readonly<{

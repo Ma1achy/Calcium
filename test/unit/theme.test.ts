@@ -100,16 +100,28 @@ describe("C10 resolution", () => {
     expect(resolveTone("ok", themes.current, caps(24)).colour).toEqual({ kind: "rgb", hex: "#3c793c" });
   });
 
-  it("T1.7 (I3): a theme whose error fails 4.5:1 is rejected, naming error", () => {
-    // #6b3a34 against #1a1a1a measures well under the floor while still looking
-    // like a red someone might plausibly choose.
-    const loaded = loadTheme(withTone("error", "#6b3a34"));
+  it("T1.7 (I3, §4a): a theme whose error fails its 2.5 floor is rejected, naming error", () => {
+    // **The floor moved and this row moved with it, deliberately.** `error` is
+    // now the `status` tag's foreground *and* its ground (§4a), and those are
+    // held to opposite constraints — readable on the page, dark behind white
+    // text — so at 4.5 the two could share a hue and never a value. The slot
+    // sits at `muted`'s 2.5, and what still protects the word is
+    // `errorTagPairs`, which checks white on the ground at the full 4.5.
+    //
+    // **Both directions, because a floor that moved has to be shown to have
+    // moved.** `#c62828` is 2.97 against `bg` and 2.83 against `bgElev` — it
+    // failed at 4.5 and passes at 2.5, which is the whole of the change. The
+    // fabricated violation moved down with it, or this row would assert a check
+    // nothing can fail (A03 §2): `#3a2422` is 1.21 and still looks like a red
+    // someone might plausibly choose.
+    expect(loadTheme(withTone("error", "#c62828")).ok, "the shipped red passes at 2.5").toBe(true);
 
+    const loaded = loadTheme(withTone("error", "#3a2422"));
     expect(loaded.ok).toBe(false);
     if (!loaded.ok) {
       const text = loaded.error.map((e) => `${e.path}: ${e.message}`).join("\n");
       expect(text).toMatch(/error/);
-      expect(text).toMatch(/below its floor of 4\.5/);
+      expect(text).toMatch(/below its floor of 2\.5/);
     }
   });
 

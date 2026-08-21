@@ -184,11 +184,12 @@ Every tone is checked **at theme load**, not at render. A theme that fails is re
 
 | Slot group | Minimum ratio |
 |---|---|
-| `default` `ok` `warn` `error` `info` `accent` `meta` `identifier` | 4.5 : 1 |
+| `default` `ok` `warn` `info` `accent` `meta` `identifier` | 4.5 : 1 |
 | `dim` | 3 : 1 |
 | `muted` | 2.5 : 1 — intentionally recessive, but must remain readable |
 | every `syntax` slot except `comment` | 4.5 : 1 |
 | `syntax.comment` | 3 : 1 — recessive is the requirement, not a compromise on it. A comment that met 4.5 would not be a comment |
+| `error` | **2.5 : 1 — and it is the only floor lowered for a reason outside this table.** The slot became a *pair* when the `status` tag needed a ground (§4c), and the two halves pull opposite ways. The trade, the numbers and the alternative are in §4c and I32; it is here so the exception is visible from the table rather than discovered in it |
 
 The measured ratio of every shipped token is recorded in A01 A.1 beside its value, on both surfaces. A ratio with no number behind it cannot be seen to have regressed, and T2.4 recomputes all of them from the tokens the framework actually ships.
 
@@ -390,6 +391,73 @@ floor passes, and the screen is painted a colour no floor was measured against.
 
 ---
 
+## 4d. The error tag's pair, and the floor that was lowered to buy it
+
+C09's `status` box paints one thing and one thing only: the word `ERROR`, with a space either
+side, white on red. Nothing else in the box is painted — not the border, not the rule, not the
+message. **That single painted run is what forced a new surface pair**, and it is the only place
+in the theme where a ground and its foreground are authored together:
+
+| Surface | For |
+|---|---|
+| `errorGround` · `errorInk` | the `status` tag's cells, and only those |
+
+**Two members, minted together, checked together.** `tone.error` could not stand in as the
+ground: it is authored as a *foreground for a dark page* and is the wrong brightness to sit
+behind text, which is I21's rule — *a tone painted as a background is a tone nothing measured a
+floor for in that role* — arriving from the other direction. And a ground shipped without its
+matched ink is exactly how a contrast floor goes unmeasured, so neither may land alone.
+
+**The pair is checked at the full 4.5 meaning floor.** A tag that says *this failed* is meaning
+rather than decoration, and the place the word actually has to be read is unchanged by anything
+below. Shipped: dark **5.62 : 1**, light **7.32**, high-contrast **6.55**.
+
+### The floor on `error` is 2.5, and what that buys and costs
+
+**The ground is `tone.error` itself** — one hex per theme, so text and box are the same red by
+construction rather than by two literals being tuned toward each other, which is how they
+drifted for five rounds before T2.14e existed. That makes `tone.error` answer to two
+constraints at once, and on a dark page they are **incompatible**:
+
+- to be read *on* `bgElev` it has to be light
+- to hold **white** text it has to be dark
+
+**Measured over the whole 8-bit cube at step 4 — 262,144 candidates — not over reds:**
+
+| variant | `bgElev` | colours clearing 4.5 on the page **and** holding white at 4.5 |
+|---|---|---|
+| dark | `#222222` | **0** |
+| light | `#f0f0f0` | **81,907** |
+| high-contrast | `#121212` | **0** |
+
+So it is not a question of finding a better red. On a dark page **no colour exists** that does
+both, and the light theme escapes the conflict entirely because a light page lets a dark colour
+be legible — which is why light measures **6.42–7.01** against its surfaces and needs no
+exception at all.
+
+**What 2.5 buys**: `#c62828`, which holds white at **5.62 : 1** and is the red a reader
+recognises as an error. **What it costs**: the message text under the box measures **2.83 : 1**
+against `bgElev` — the binding surface — with `bg` at **3.10**, `diffAdd` at **2.92** and
+`diffRemove` at **2.91**. The floor is set at `muted`'s existing 2.5, so the slot is now held to
+the standard of *the quietest thing that must still be readable* rather than of body text.
+
+**And the alternative exists, which is why this is a preference honoured rather than a
+constraint discovered.** High-contrast takes it: a *light* ground with *dark* ink —
+`#3d0000` on `#ff7171`, which is **5.95** on the page and **6.55** in the tag, and needs no
+lowered floor. The same shape would work on dark: `#ff7171` measures 5.95 against `#222222`.
+What it gives up is the dark red, and a light red tag reads as a warning rather than a failure.
+
+**Recorded in that order deliberately.** Someone meeting `error: 2.5` in `FLOORS` and lightening
+the red to "fix" it would be undoing a decision, not repairing an oversight — and the numbers
+above are what tell them which.
+
+**The message text is not the only carrier**, which is what makes 2.83 a cost rather than a
+defect. The `▲` mark and the painted word `ERROR` both survive it, and both survive 1-bit where
+the colour does not (F34's two channels). A floor is a promise about text being readable; this
+one is being kept by a quieter promise, in a box whose whole subject is already visible.
+
+---
+
 ## 5. Switching
 
 `/theme` switches variant. The change is **atomic**: the store swaps a resolved theme in one assignment, so no frame is ever half-themed.
@@ -569,6 +637,9 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 
 ---
 
+- **I32** — **`errorGround` and `errorInk` are one pair, minted together, checked together at the full meaning floor — and the floor on `error` is 2.5 because the slot now answers to two constraints that a dark page cannot satisfy at once.** The tag is the only painted run in C09's `status` box, and `tone.error` cannot stand in as its ground: it is authored as a foreground for a dark page, which is I21's rule from the other direction. The **ground is `tone.error` itself**, so text and box are one red by construction rather than by two literals kept in step by hand. **Measured over the whole 8-bit cube rather than over reds**: on dark and on high-contrast, **zero of 262,144** colours are both legible on `bgElev` and dark enough to hold white at 4.5; on light, **81,907** are, which is why light clears 4.5 unaided at 6.42–7.01. So 2.5 buys `#c62828` at **5.62 : 1** in the tag and costs the message text **2.83** against `bgElev` — `muted`'s standard, the quietest thing that must still be readable. **The alternative is real and is shipped**: high-contrast takes a light ground with dark ink, `#3d0000` on `#ff7171`, and needs no exception; the same would work on dark and gives up the dark red, which reads as a warning rather than a failure. **So this is a preference honoured, not a constraint discovered** — stated here because someone lightening the red to satisfy `FLOORS` would be undoing a decision rather than repairing an oversight. What keeps it honest is that the text is never the only carrier: the `▲` and the painted word both survive it, and both survive 1-bit where colour does not (§4d, F34).
+
+
 ## 8. Commitments
 
 1. Tones resolve to styles; blocks never see colours (I14, I1).
@@ -598,6 +669,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 25. **`variant` is checked against `luminance(surfaces.bg)`**, and the checks every shipped theme must pass are driven by the set's own keys rather than by a list a test writes for itself (I28, §5a.4).
 26. **A theme is refused for a family the framework will ask for and it does not have** — a missing palette and a collapsed one are one value at paint time, so the check is at resolve time, and it found the high-contrast theme drawing every plot series in one colour (I29, I30, F172, F179).
 27. **A colormap is framework data, a second channel, and vacuous below 8-bit** — not a palette family, `decoration` because the contrast floor would delete the half of the range a map exists to encode, and nothing at 4-bit because an ordering over unknown luminances is not an ordering (I31, §6).
+28. **A ground and its foreground are one thing, and a floor lowered to buy one says what it bought** (I32, §4d). The `status` tag's pair is minted and measured together at the meaning floor, because a ground without its matched ink is how a contrast floor goes unmeasured; the exception on `error` carries its figures, the cube sweep behind them and the alternative it declined, so the next reader can tell a decision from an oversight.
 
 ---
 
@@ -647,7 +719,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.13** (§2): the `syntax` palette has exactly nine slots — keyword, string, comment, number, key, type, function, operator, punctuation — in every shipped theme. Adding a tenth without tokens fails the build, the same shape as T2.7.
 - **T2.14** (§2, I15): every `syntax` slot passes its §4 floor in both variants and against **both surfaces**, `syntax` being a `meaning` palette. `comment` is checked at 3 : 1 with the rest at 4.5.
 - **T2.14a** (I22, §4a): every `syntax` slot and each of `tone.ok`, `tone.error`, `tone.muted` passes its floor against both diff surfaces, in both variants — 48 ratios, recomputed from the shipped tokens rather than read from A01 A.1. The same shape as T2.4 and for the same reason.
-- **T2.14c** (I22, §4a): `surfaces` has exactly seven entries, and `diffAddStrong` and `diffRemoveStrong` are not among them. The withdrawn pair asserted absent rather than merely unmentioned — a spec that measured something out and a token file that quietly kept it is the drift this suite exists to stop.
+- **T2.14f** (I32, §4d): **the tag's own check fires, by fabricated violation.** The mutation pass asked for this row — removing the floor comparison from `validateErrorTag` survived every other assertion about the pair, which is a check that cannot fire dressed as one that passes. Two arms: an ink set to its own ground is caught and named by `path`, and a ground that does not resolve produces **no pair** rather than a half-pair measured against a default. The second is how it was first written — reading foregrounds from `tokens.palettes` where this one lives in `surfaces`, and `continue`ing on the miss.
+- **T2.14c** (I22, §4a, §4d): `surfaces` has exactly **ten** entries — eight, plus the tag's pair (§4d) — and `diffAddStrong` and `diffRemoveStrong` are not among them. The withdrawn pair asserted absent rather than merely unmentioned: a spec that measured something out and a token file that quietly kept it is the drift this suite exists to stop. **The count is the row's whole subject**, so it moves whenever a surface does and is the reason the pair could not land as one member.
+- **T2.14e** (I32, §4d): **the tag's ground *is* `tone.error`, asserted by equality in every theme.** Two hex literals in two files, tuned toward each other by eye, drifted for five rounds and no assertion about either could see it — a red is correct on its own and wrong beside another. Equality is the only form that catches it, and it is what makes *text and box are one red* true by construction rather than by care.
 - **T2.14b** (I22): the diff surfaces are checked against **exactly** those twelve slots and no others. Asserted on the pairing itself rather than on its results: widening the check to every `meaning` slot would fail on tones that never land on a diff background, and narrowing it to `syntax` alone would leave the gutter unchecked on the surface it is drawn on.
 - **T2.20** (I21): over every ref × every depth, a returned `background` is absent or a `ColourValue` — the T2.18 assertion for the second channel, with the kinds written out literally for the same reason.
 - **T2.16** (I17): per palette, per variant, no two slots share a 24-bit value. This is the test that caught `key`/`number` and, less obviously, light `number`/`type` — the second was created by the contrast correction itself, so nothing but recomputation could have found it.
@@ -691,6 +765,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 - **T6.1** (I2): emitting a colour at depth 1 → T1.2 and T5.3 fail.
 - **T6.2** (I5): replacing the curated 4-bit table with computed nearest-RGB → T2.3 fails on tone collision.
+- **T6.81** (I32, §4d): skipping `validateErrorTag`'s floor comparison → T2.14f fails. The pair ships unmeasured, which is where a ground authored without its ink always ends up: both halves look considered and neither was compared to the other.
+- **T6.82** (I32, §4d): reading the tag's ground from anywhere but `surfaces` → T2.14f fails, and the pair comes back empty rather than wrong — the failure mode that reads as coverage.
+- **T6.83** (I32, §4d): moving `errorGround` off `tone.error` → T2.14e fails. Two hex literals in two files, tuned toward each other by eye, drifted four times in one sitting and no assertion about either colour could see it.
 - **T6.3** (I3): validating contrast at render instead of load → T1.7 fails, and a broken theme reaches the screen.
 - **T6.4** (I4): applying an override before validating → T3.4 fails.
 - **T6.5** (I11): keying the cache on tone alone → T3.8 returns a stale style after a depth change.

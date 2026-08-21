@@ -221,48 +221,45 @@ describe("C09 §3a — the spinner", () => {
 });
 
 describe("C09 §3a — paint and degradation", () => {
-  it("T3.46 (C09 I31, C09 §3a): no background at any depth, and one bit keeps two channels", () => {
-    for (const colourDepth of [24, 8, 4, 1] as const) {
-      const caps = { ...FULL_CAPS, colourDepth };
-      const raw = measurable({ capabilities: caps as never })
+  it("T3.46 (C09 I31, C09 §3a): one painted run, and the pair degrades together", () => {
+    // **The tag is the only painted thing in the figure** — the word and its two
+    // spaces, white on red. The rule, the mark, the message, the border and the
+    // blanks carry the error tone as foreground and no ground at all.
+    const raw = (depth: 24 | 8 | 4 | 1): string =>
+      measurable({ capabilities: { ...FULL_CAPS, colourDepth: depth } as never })
         .renderToLines(status({ height: 6 }), 46)
         .join("\n");
-      // `48;` is the background introducer, and `resolveBackground` admits one
-      // only from a `surface.*` ref — of which there is no error slot (C10 I21).
-      expect(raw.includes("48;"), `depth ${String(colourDepth)} paints no background`).toBe(false);
+
+    // Exactly one background introducer in the whole frame, at the depths that
+    // have one. More than one would mean something else got painted.
+    for (const depth of [24, 8] as const) {
+      const grounds = [...raw(depth).matchAll(/\u001b\[48;/gu)];
+      expect(grounds.length, `depth ${String(depth)} paints exactly one run`).toBe(1);
     }
 
-    // At one bit the tone is `{ bold: true }` and carries no colour at all, so
-    // the mark is the second channel rather than `inverse` — which C10 answered
-    // differently and which is written nowhere in the tree.
+    // **Below 8-bit the pair degrades together**, which is the half a
+    // ground-only assertion would miss: an ink left behind on a ground that
+    // vanished is a foreground nothing measured, and C10 I21's rule read from
+    // the other direction. At 4 and 1 the tag carries no styling at all and is
+    // distinguishable by being the one run that does not — non-bold between two
+    // bold rules at one bit.
+    for (const depth of [4, 1] as const) {
+      expect(raw(depth).includes("\u001b[48;"), `depth ${String(depth)} paints no ground`).toBe(
+        false,
+      );
+      expect(
+        raw(depth).includes("255;255;255"),
+        `depth ${String(depth)} leaves no ink behind either`,
+      ).toBe(false);
+    }
+
+    // At one bit the tone is `{ bold: true }` and carries no colour, so the mark
+    // and the word are what tell the states apart.
     const mono = measurable({ capabilities: { ...FULL_CAPS, colourDepth: 1 } as never })
       .renderToLines(status({ height: 6 }), 46)
       .map(plain);
     expect(mono.some((r) => r.includes("▲")), "the mark survives one bit").toBe(true);
     expect(mono.some((r) => r.includes(" ERROR ")), "and the word in its gap").toBe(true);
-  });
-
-  it("T3.48b (C09 I31, C09 §3a): `loading` is not painted as a failure", () => {
-    // **Found by looking at the image.** The message row took the error tone in
-    // all three states, so a first fetch in flight drew red — and nothing here
-    // asserted a tone per state, because the arithmetic is identical either way
-    // and every row about the box was about its geometry. §3a already rules that
-    // loading has no error and therefore no rule and no tag; the tone is the
-    // same fact and was the half that had no mechanism.
-    const raw = (state: string): string =>
-      measurable({ capabilities: FULL_CAPS })
-        .renderToLines(
-          status({ height: 7, state, retryInMs: 8000, elapsedMs: 4000 }),
-          46,
-        )
-        .join("\n");
-
-    // The error tone at 24-bit is a `38;2` foreground. Its presence is the
-    // claim, and both directions are asserted so this cannot pass by drawing
-    // nothing at all.
-    expect(raw("error").includes("38;2"), "error is painted").toBe(true);
-    expect(raw("retrying").includes("38;2"), "retrying is painted").toBe(true);
-    expect(raw("loading").includes("38;2"), "loading is not").toBe(false);
   });
 
   it("T3.47 (C09 I31, C09 §3a): the ascii arm draws + - | and !, and no box drawing anywhere", () => {

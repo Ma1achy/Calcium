@@ -18,8 +18,9 @@ import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Status } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
 import { glyphs, spinnerFrames } from "../glyphs.js";
-import { fit, paint, rows, tone, type Span } from "../paint.js";
+import { background, fit, paint, rows, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
+import type { Style } from "../../theme/index.js";
 
 /**
  * The word, in a gap in the rule — `─── ERROR ───`.
@@ -172,12 +173,29 @@ export function activityLine(block: Status, frames: readonly string[], tick: num
   return "";
 }
 
-/** The tag row at its rung, filled to `width`. */
-function tagRow(tagFit: TagFit, width: number, rule: string): string {
-  if (tagFit === "bare") return TAG;
+/**
+ * The tag row, as spans — **the word and its two spaces painted, nothing else**.
+ *
+ * One painted run in the whole figure (C09 §3a). The rule either side carries
+ * the error tone as foreground; the tag carries `surfaces.errorInk` on
+ * `surfaces.errorGround`, which C10 checks as a pair at the meaning floor.
+ */
+function tagRow(
+  tagFit: TagFit,
+  width: number,
+  rule: string,
+  ink: Style,
+  tone: Style | undefined,
+): readonly Span[] {
+  const painted: Span = { text: TAG, style: ink };
+  if (tagFit === "bare") return [painted];
   const dashes = width - TAG_CELLS; // cells-ok — a cell count
   const left = Math.floor(dashes / 2);
-  return `${rule.repeat(left)}${TAG}${rule.repeat(dashes - left)}`; // cells-ok — a cell count
+  return [
+    { text: rule.repeat(left), ...(tone === undefined ? {} : { style: tone }) }, // cells-ok — a cell count
+    painted,
+    { text: rule.repeat(dashes - left), ...(tone === undefined ? {} : { style: tone }) }, // cells-ok — a cell count
+  ];
 }
 
 export const statusDefinition: BlockDefinition<Status> = {
@@ -210,6 +228,14 @@ export const statusDefinition: BlockDefinition<Status> = {
     // no error and therefore no rule and no tag; the tone follows the same fact.
     const failed = block.state !== "loading";
     const ink = failed ? tone("error", ctx.theme, ctx.capabilities) : undefined;
+    // **The tag's pair, both halves from `surfaces`** (C10 §4a). A ground taken
+    // without its matched ink borrows a foreground nothing measured against it,
+    // which is I21's rule from the other direction — so the two are resolved
+    // together here exactly as C10 checks them together.
+    const tagInk = withBackground(
+      surface("surface.errorInk", ctx.theme, ctx.capabilities),
+      background("surface.errorGround", ctx.theme, ctx.capabilities),
+    );
 
     const rowWidth = frame.border ? Math.max(1, width - 2) : width; // cells-ok — a cell count
     const gutter = frame.pad ? PAD : 0;
@@ -264,14 +290,23 @@ export const statusDefinition: BlockDefinition<Status> = {
     const span = (text: string, painted: boolean): readonly Span[] =>
       painted && ink !== undefined ? [{ text, style: ink }] : [{ text }];
 
-    const boxed = (text: string, painted: boolean): readonly Span[] =>
+    /** A row of spans framed by the border and gutter, at the interior width. */
+    const framed = (inner: readonly Span[]): readonly Span[] =>
       frame.border
         ? [
             { text: `${g.vertical}${" ".repeat(gutter)}` }, // cells-ok — a cell count
-            ...span(fit(text, textWidth, ctx.capabilities), painted),
+            ...inner,
             { text: `${" ".repeat(gutter)}${g.vertical}` }, // cells-ok — a cell count
           ]
-        : span(truncate(text, width, ctx.capabilities), painted);
+        : inner;
+
+    const boxed = (text: string, painted: boolean): readonly Span[] =>
+      framed(
+        span(
+          frame.border ? fit(text, textWidth, ctx.capabilities) : truncate(text, width, ctx.capabilities),
+          painted,
+        ),
+      );
 
     const edge = (left: string, right: string): readonly Span[] => [
       { text: `${left}${g.horizontal.repeat(rowWidth)}${right}` }, // cells-ok — a cell count
@@ -280,7 +315,9 @@ export const statusDefinition: BlockDefinition<Status> = {
     const out: (readonly Span[])[] = [];
     if (frame.border) out.push(edge(g.topLeft, g.topRight));
     for (let i = 0; i < above; i += 1) out.push(boxed("", false));
-    if (tagRows === 1) out.push(boxed(tagRow(tagFit, textWidth, g.horizontal), true));
+    if (tagRows === 1) {
+      out.push(framed(tagRow(tagFit, textWidth, g.horizontal, tagInk, ink)));
+    }
     for (const row of body) out.push(boxed(row, true));
     // **The activity line takes the default tone, not the error tone** — the
     // error already said what went wrong, and this says what is happening now.
