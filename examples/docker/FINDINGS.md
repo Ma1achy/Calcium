@@ -11152,3 +11152,49 @@ file*, and the reader was never in scope.
 
 **Open.** The repair is C03 raising the commit, C22 threading the counter, and the cache
 admitting a per-kind animating axis — three places, because it is three links.
+
+---
+
+## F228 — a shipped kind absent from the table that enumerates the kinds, and from the row that walks it ★★★☆☆
+
+C09 §3 is *The seventeen kinds* — the enumeration of what the registry renders, one row per kind,
+each row the obligation its implementation is written against. **`scroll` is a C09 default and has
+no row in it.**
+
+```
+DEFAULT_DEFINITIONS           15 entries — scrollDefinition is the fifteenth
+C04's Block union             18 members
+C09 §1                        "ships fourteen default kinds … union to seventeen"
+C09 §3 table                  16 rows — no `scroll`, no `patch`
+C09 T1.4                      "each of the fourteen kinds" — 14 cases, no `scroll`
+grep scroll C09 spec          9 hits, every one the verb
+```
+
+**The kind is not unspecified** — C04 I47 and I49 govern it, and its `window` refusal is argued at
+length in `containers.ts` against C04 §3c cell 1. What is missing is C09's own enumeration of its
+own registry, and everything downstream that counts it.
+
+**T1.4 is the sharp end, and it had already been bitten from the other side.** Its job is one case
+per kind, read back from §3's table. Its own comment records the earlier failure: a `comparison`
+rename left `ONE_PER_KIND["diff"]` undefined, `measure` answered `1` rather than raising, and
+**seven entries would each have passed against no fixture at all**. The repair was
+`expect(fixture).toBeDefined()` — *every listed kind has a fixture*.
+
+**That guard runs in one direction only.** Nothing asks whether every *registered* kind is listed,
+so a kind can join the registry and never join the row that claims to cover the registry. The
+coverage set is the test's own table, which is the shape where a suite tests each rule against
+itself and agrees: `scroll` has no documented height, so nothing asserts one, so nothing failed.
+
+**The remedy is equality, not another entry.** The set of keys in T1.4's `documented` record is
+compared to the kinds in `DEFAULT_DEFINITIONS` — both directions, on `BUILDER_OMISSIONS`'
+precedent — so a kind added without a documented height fails the day it is registered rather than
+whenever someone recounts. Adding `scroll` alone closes the instance and leaves the class.
+
+**Third instance of one class today, which is why it is being closed rather than filed.** F227
+carried two: `spinners.test.ts`'s `COUNTERS` exemption names `binary4` and `braille2`, neither of
+which ships; and group 2's two open-counts disagreed by one until a new finding made them agree by
+arrival. **All three are a hand-maintained list beside a generated one**, and in all three the
+hand-maintained list is the one that reads as authoritative.
+
+**Fixed** — the counts corrected to fifteen and eighteen, `scroll` given its row, and T1.4's
+obligation rewritten from a number to a comparison. The comparison itself lands with the code.

@@ -4,6 +4,7 @@ import { displayCells } from "../../src/presentation/text.js";
 import { block, validateBlock } from "../../src/data/viewmodel/index.js";
 import {
   createBlockRegistry,
+  DEFAULT_DEFINITIONS,
   DEFAULT_LANGUAGES,
   registerGrammar,
   tokenise,
@@ -161,7 +162,7 @@ describe("C09 §6 — the registry's transition table", () => {
     ).toHaveLength(2);
   });
 
-  it("T1.4: each of the fourteen kinds measures its documented height", () => {
+  it("T1.4: each of the fifteen kinds measures its documented height", () => {
     // §3's table, read back as assertions. The fixture is the canonical one, so
     // a change to a kind's height rule fails here with the kind named rather
     // than as one line of a conformance report.
@@ -180,8 +181,26 @@ describe("C09 §6 — the registry's transition table", () => {
       tip: 1, // ceil(cells / w)
       panel: 4, // children + 2
       group: 1, // row: max of children
+      scroll: 3, // height, plus a residue row where the content overflows
       raw: 2, // lines
     };
+
+    // **Compared to the registry by equality, and the guard below runs the other
+    // way** (F228). *Every listed kind has a fixture* was added after a rename
+    // left seven entries measuring against `undefined`; it says nothing about a
+    // kind that joins the registry and never joins this list, and `scroll` did
+    // exactly that — shipped in `DEFAULT_DEFINITIONS`, absent from §3's table and
+    // from these cases, so the one kind with no documented height was the one
+    // nothing asserted a height for. A coverage set drawn from the test's own
+    // table covers the table.
+    //
+    // Equality rather than a subset, on `BUILDER_OMISSIONS`' precedent: a subset
+    // lets a dead entry outlive its reason unread, and both directions are the
+    // point here.
+    expect(
+      Object.keys(documented).sort(),
+      "§3's table and DEFAULT_DEFINITIONS name the same kinds",
+    ).toEqual(DEFAULT_DEFINITIONS.map((d) => d.kind).sort());
 
     for (const [kind, height] of Object.entries(documented)) {
       const fixture = ONE_PER_KIND[kind as "raw"];

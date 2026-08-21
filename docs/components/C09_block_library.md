@@ -14,7 +14,7 @@
 
 ## 1. Purpose
 
-C09 is where a `Block` becomes rows on a screen. It owns the **registry** — the pairing of each block kind with a `measure` and a `render` — and ships fourteen default kinds; `table`, `plot` and `patch` bring the union to seventeen.
+C09 is where a `Block` becomes rows on a screen. It owns the **registry** — the pairing of each block kind with a `measure` and a `render` — and ships **fifteen** default kinds; `table`, `plot` and `patch` bring the union to **eighteen**.
 
 The registry lives here rather than in C04 because `render` needs theme (L1) and capabilities (L0 terminal), and a registry at L0 data would import upward and sideways. C04 owns the schema and the measurement *contract*; C09 owns the implementations that satisfy it.
 
@@ -180,7 +180,7 @@ removes, and an absent member is not.
 
 ---
 
-## 3. The seventeen kinds
+## 3. The eighteen kinds
 
 Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an obligation on the implementation.
 
@@ -200,6 +200,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
 | `panel` | children + 2 | Border, title and footer; children measured at `w - 2` |
+| `scroll` | `height`, plus one residue row when the content overflows | A bounded box: `height` rows of content, and the marker is chrome the container adds on top (C04 I47, C04 I49). **Declares `elements` at block level and no `window`** — a region whose height is declared cannot measure less without becoming a different box |
 | `group` | sum or max of children | `column` sums children measured at `w`; `row` takes the max of children measured at `floor((w - gaps) / n)`, one cell of gutter between each pair (C04 §3) |
 | `raw` | lines | Pre-formatted, emitted as-is with control characters stripped |
 
@@ -207,7 +208,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 
 **Container widths are C04 §3's, not each measurer's invention** — `panel` and a table's expanded detail at `w - 2`, a `column` group at `w`, a `row` group at the equal split. A measurer that passes `w` through unchanged to a child agrees with nothing that renders, and it is the failure mode I1 cannot catch on its own, because it only shows once a child wraps.
 
-`table`, `plot` and `patch` are declared in C04's union but registered by C11, C12 and C25. C09 owns the registry and fourteen kinds; those three are large enough to be their own components and register into the same registry as an app-defined kind would — which is the proof that the extension mechanism is real rather than privileged.
+`table`, `plot` and `patch` are declared in C04's union but registered by C11, C12 and C25. C09 owns the registry and fifteen kinds; those three are large enough to be their own components and register into the same registry as an app-defined kind would — which is the proof that the extension mechanism is real rather than privileged.
 
 That it is three rather than one matters. A single privileged exception is indistinguishable from a special case; three components using the same public `register`, each removable by deleting its call, is the mechanism being exercised rather than described.
 
@@ -694,7 +695,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.1**: `register` in open state → `get` returns it, `kinds` includes it.
 - **T1.2**: `seal` → `sealed` true, existing kinds still resolve.
 - **T1.3**: `measure`/`render` after seal → work normally.
-- **T1.4**: each of the fourteen kinds measures its documented height on a canonical fixture — fourteen cases.
+- **T1.4**: each of the fifteen kinds measures its documented height on a canonical fixture — **one case per registered kind, and the set is compared to `DEFAULT_DEFINITIONS` by equality**. A hand-written list is what this row was, and it drifted: `scroll` shipped as a default and was in neither the table above nor this row's fourteen cases, so the kind with no documented height also had no case asserting one (F228). The row already guarded the other direction — every listed kind must have a fixture, added after a rename made seven entries pass against `undefined` — and a guard in one direction is what let the other drift.
 - **T1.5**: `keyValue` key column caps at 20 cells; longer keys truncate, values still align.
 - **T1.6**: `logs` line longer than `w` → one row, ending in the truncation marker.
 - **T1.6b**: a `code` block with `wrap: false` truncates; the same content with `wrap: true` wraps, and both measure to their rendered height.
