@@ -3255,6 +3255,26 @@ that have a duration.
 blank cells and weeks of unequal width is a frame-read question, and §3z's ruling 4 was written the
 same way and corrected by the 1-bit frame. Both frames are rendered before this is called settled.
 
+**Read, and it holds — the frame shows the fabrication rather than implying it.** Fifty-three weeks
+over seventy-five cells under `stretch`: `⠄⠄⠖⠷⠷⠿⠷⠷⠖⠔⠶⠶` — twenty-two of the fifty-three weeks are
+two cells wide, and every one of those pairs reads as two consecutive weeks holding one value. The
+`uniform` frame is fifty-three single cells and twenty-two blank, and blank is not a reading.
+
+**And it moves two shipped frames, because the ruling is about the form rather than the member.** A
+calendar's columns are periods whether or not a `calendarUnit` derived them, so `MATRIX_LAYOUT`
+changes for `calendar` and the pre-unit fixture moves with it: seven readings over seventy-five
+cells were drawn at widths **11 · 11 · 11 · 10 · 11 · 11 · 10** and are now **10 × 7 with a
+five-cell fringe**. The other two arms of that fixture — both at width 40, where seven readings
+divide the area exactly — are byte-identical, which is the useful half of the measurement: the two
+anchors agree wherever the pitch divides, and the frames that move are exactly the frames that were
+carrying a spare cell.
+
+*The plan's verification note says a golden that moves under a commit which claims to move none is a
+defect in a total record. This commit claims two, names them, and the test that would otherwise have
+read as covering it — `startDate` with no unit renders today's frame — is corrected in the same
+breath: it compares the member's presence and never compared the anchor's default, so it passed
+while both of its frames moved together.*
+
 ### 3ae.6 — What a refusal leaves behind, and who sees it
 
 C13 `settle`'s question, and the calendar has two rejection paths.
