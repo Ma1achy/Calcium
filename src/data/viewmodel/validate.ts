@@ -24,6 +24,7 @@ import {
   type Glyph,
   COLORMAP_NAMES,
   HAS_CALLOUT,
+  HAS_X_TITLE,
   HAS_Y_GUTTER,
   HONOURS_AXIS_CROSS,
   ORIGIN_DEFAULT,
@@ -1277,6 +1278,26 @@ function plotAxisErrors(
     e.push(`${at}: "yAxis" must be "left", "right", "both" or false`);
   }
   const DRAWS = new Set(["last", "name", "both"]);
+  const xt = b["xTitle"];
+  if (xt !== undefined) {
+    if (!isString(xt)) {
+      e.push(`${at}: "xTitle" must be a string (C12 I56)`);
+    } else if (b["axes"] !== true) {
+      e.push(
+        `${at}: "xTitle" is ${JSON.stringify(xt)} with "axes" not true (C12 I56) — a title ` +
+          `names an axis, and there is none drawn to name`,
+      );
+    } else if (HAS_X_TITLE[form as PlotForm] === false) {
+      // **The record is measured and it is what keeps I1** — sixteen of the
+      // eighteen refused forms declare the title's row through `titleRows` and
+      // compose no row for it, so accepting one there is a block whose measured
+      // height and rendered height disagree.
+      e.push(
+        `${at}: "xTitle" on form ${JSON.stringify(form)} (C12 I56) — that form draws no row ` +
+          `beneath its plot area for a title to sit under`,
+      );
+    }
+  }
   if (yc !== undefined && yc !== "none" && !DRAWS.has(yc as string)) {
     e.push(`${at}: "yCallout" must be "none", "last", "name" or "both"`);
   }

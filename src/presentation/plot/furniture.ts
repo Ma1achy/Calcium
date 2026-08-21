@@ -639,14 +639,49 @@ export function furnitureFor(
   axis: XAxis,
   ctx: RenderContext,
   cursorAt: number | null = null,
+  title?: string,
 ): Furniture {
   return {
     top: frameTop(layout, ctx),
     bottom: [
       frameBottom(layout, axis.tickColumns, ctx, cursorAt),
       xLabelRowFor(axis.text, layout, ctx),
+      ...(title === undefined ? [] : [xTitleRow(title, layout, ctx)]),
     ],
   };
+}
+
+/**
+ * The abscissa's name, centred over the plot area (C12 I56, §3ag).
+ *
+ * **Below the labels and never above them**, because the labels are the scale
+ * and a name between a scale and the thing it measures separates the two. It is
+ * `tone.muted` for `xLabelRowFor`'s reason — furniture is not a series — and it
+ * is centred on the **area** rather than on the row, so it sits over the figure
+ * and not over the gutter.
+ *
+ * Truncated rather than wrapped: a second row would change a declared height
+ * (I1), and every other furniture row in this file makes the same choice.
+ */
+export function xTitleRow(title: string, layout: Layout, ctx: RenderContext): string {
+  // **`layout.gutter` is the whole left offset**, which is what `xLabelRowFor`
+  // one row above uses. The first draft added `labelColumn + AXIS_GUTTER` on top
+  // of it and pushed the title four cells right, off the area's centre and past
+  // its right edge into `clampSpans`' ellipsis. **A row-width assertion could
+  // not see it** — the row was exactly `width` either way; what separated the
+  // two was a title nearly as wide as the area, measured against the frame's own
+  // border columns.
+  const text = truncate(title, layout.areaWidth, ctx.capabilities);
+  const w = cells(text, ctx.capabilities.ambiguousWidth);
+  const lead = Math.max(0, Math.floor((layout.areaWidth - w) / 2)); // cells-ok — a cell count
+  return line(
+    [
+      { text: " ".repeat(layout.gutter + lead) },
+      { text, style: tone("muted", ctx.theme, ctx.capabilities) },
+    ],
+    layout,
+    ctx,
+  );
 }
 
 /**

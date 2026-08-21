@@ -398,6 +398,7 @@ function plot(
      * reason with two clauses expires one at a time.
      */
     xLabels?: Plot["xLabels"];
+    xTitle?: Plot["xTitle"];
     plotStyle?: Plot["plotStyle"];
     /** The interior of a shape, where the vocabulary can fill (C04 I59). */
     plotFill?: Plot["plotFill"];
@@ -437,7 +438,7 @@ function plot(
     startDate?: Plot["startDate"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
+  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -684,6 +685,7 @@ function plot(
       ...(annotations === undefined ? {} : { annotations }),
       ...(colormap === undefined ? {} : { colormap }),
       ...(xLabels === undefined ? {} : { xLabels }),
+      ...(xTitle === undefined ? {} : { xTitle }),
       ...(plotStyle === undefined ? {} : { plotStyle }),
       ...(ohlc === undefined ? {} : { ohlc }),
       ...(plotDetail === undefined ? {} : { plotDetail }),

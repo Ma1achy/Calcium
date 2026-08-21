@@ -17,7 +17,10 @@
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /** The fields a height depends on. Deliberately not `Plot`. */
-export type PlotGeometry = Pick<Plot, "form" | "height" | "axes" | "legend">;
+// `xTitle` is a **declaration** and not data — it costs a row the caller
+// stated, exactly as `legend` does — so it belongs in this Pick and the
+// guarantee above is untouched: the series is still unreachable from here.
+export type PlotGeometry = Pick<Plot, "form" | "height" | "axes" | "legend" | "xTitle">;
 
 /**
  * The rows a legend costs — one for a horizontal placement, none otherwise.
@@ -31,6 +34,17 @@ export type PlotGeometry = Pick<Plot, "form" | "height" | "axes" | "legend">;
  */
 export function legendRows(plot: PlotGeometry): number {
   return plot.legend === "above" || plot.legend === "below" ? 1 : 0; // cells-ok — a row count
+}
+
+/**
+ * The row an x-axis title costs (C12 I56, §3ag).
+ *
+ * **Added centrally, on `legendRows`' recorded reason**: every form that draws
+ * one pays it the same way, and a table of thirty-six entries each adding the
+ * same term is thirty-six chances to forget one.
+ */
+export function titleRows(plot: PlotGeometry): number {
+  return plot.xTitle === undefined ? 0 : 1; // cells-ok — a row count
 }
 
 /** The rows an axed plot spends below the plot area: the rule, then x-labels. */
@@ -170,7 +184,7 @@ export function plotHeight(plot: PlotGeometry): number {
   // **The legend's row is added here rather than per form**, because every form
   // pays it the same way and a table of thirty-six entries each adding the same
   // term is thirty-six chances to forget one.
-  return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot) + legendRows(plot);
+  return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot) + legendRows(plot) + titleRows(plot);
 }
 
 /**

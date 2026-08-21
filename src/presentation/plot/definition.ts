@@ -28,7 +28,7 @@ import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
 import { curveRows, isBlank } from "./curve.js";
-import { crossRow, gridRow, xRowFor } from "./furniture.js";
+import { crossRow, gridRow, xRowFor, xTitleRow } from "./furniture.js";
 import type { Axis, XAxis } from "./axes.js";
 import { formatReadout, labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
 import {
@@ -663,7 +663,7 @@ function axed(
     ? [" ".repeat(layout.gutter) + legendRow(entries, layout.areaWidth, ctx)]
     : [];
   // **Composed once**, where it used to be built twice for its two halves.
-  const furniture = block.axes === true ? furnitureFor(layout, xaxis, ctx) : null;
+  const furniture = block.axes === true ? furnitureFor(layout, xaxis, ctx, null, block.xTitle) : null;
   const top = furniture === null ? [] : [indent(furniture.top)];
   const bottom = furniture === null ? [] : furniture.bottom.map(indent);
   return composeRows(
@@ -692,7 +692,10 @@ function axedWithCursor(
   const furniture = furnitureFor(layout, xaxis, ctx, at);
   return composeRows(plotHeight(block), [furniture.top], area, [
     furniture.bottom[0] ?? "",
+    // The readout replaces the label row and never the title: one names a
+    // position the reader asked about, the other names the axis it is on.
     cursorReadout(block, cursorIdx, layout, ctx),
+    ...(block.xTitle === undefined ? [] : [xTitleRow(block.xTitle, layout, ctx)]),
   ]);
 }
 
@@ -1586,7 +1589,11 @@ function categoricalColumnForm(
     plotHeight(block),
     [frameTop(layout, ctx)],
     out,
-    [frameBottom(layout, ticks, ctx), xLabelRowFor(row, layout, ctx)],
+    [
+      frameBottom(layout, ticks, ctx),
+      xLabelRowFor(row, layout, ctx),
+      ...(block.xTitle === undefined ? [] : [xTitleRow(block.xTitle, layout, ctx)]),
+    ],
   );
 }
 

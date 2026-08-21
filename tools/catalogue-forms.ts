@@ -218,6 +218,14 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ],
       series: [s(sin50, "alpha")],
     },
+    // C12 I56 §3ag — the abscissa named under its own scale, which is how the
+    // two are read together: `epoch 0 … now` over `training step`.
+    "x-title": {
+      form: "line", height: 8, axes: true, legend: false,
+      xLabels: ["epoch 0", "epoch 20", "now"],
+      xTitle: "training step",
+      series: [s(sin50, "alpha")],
+    },
     "callout-last": {
       form: "line", height: 8, axes: true, yAxis: "both", yCallout: "last",
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta")],

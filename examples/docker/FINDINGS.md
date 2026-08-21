@@ -10657,3 +10657,45 @@ teeth rather than only noise.**
 **And it belongs to the group about instruments** rather than to the group about unconsumed
 members, which is the distinction the ranking rests on: the finding is not that `⊘` is undrawn —
 it is that the thing asking has an answer that depends on a variable in another file.
+
+
+## F219 — an ambiguous mutation anchor reports as a survivor, which a missing one does not ★★★★☆
+
+**Writing a mutation against `HAS_X_TITLE` produced a survivor that was not one.** The anchor
+was one row of a per-form record:
+
+```
+heatmap: false, calendar: false, correlation: false, confusion: false,
+```
+
+That line appears **four times** in `types.ts` — `HAS_X_TITLE`, `HAS_CALLOUT`, `IS_MATRIX` and one
+more all carry it verbatim, because the matrix family answers `false` to every one of those
+questions. `String.replace` takes the first, so the mutation flipped **a different record**, the
+suite passed, and the harness printed `SURVIVED`.
+
+**That is the wrong end of the report.** A *missing* anchor is reported as itself —
+`ANCHOR MISSED … those rows ran nothing and are not survivors` — and the distinction exists
+precisely so a row cannot read as verified when it ran nothing. An **ambiguous** anchor runs
+something, mutates the wrong thing, and lands in the one bucket that means *the tests have a
+gap*. So the reader's next move is to go and write a test for a defect that was never injected.
+
+**Neither `mutate.mjs` nor `anchors.mjs` checks uniqueness.** `anchors.mjs` answers *does this
+anchor still exist*, which is staleness, and the MA rows are about drift from a recorded list.
+Existence and uniqueness are different questions and only the first is asked.
+
+**Measured, as a floor rather than a total**: a parser over `tools/mutate/runs/*.mjs` resolved
+**471** anchors and found **5 ambiguous, across 5 runs** — `c04-round-trip`, `c10-colormap`,
+`c10-named-set`, `c12-absence`, `c12-origin`. `anchors.mjs` counts **744**, so the probe reaches
+63% of them and the real figure is higher. Each of the five is a row that may be mutating
+something other than what its name says.
+
+**Not fixed here.** The check belongs in `anchors.mjs` beside the staleness one — *this anchor
+matches N times* is the same walk over the same files — and it should be gated only once the five
+are re-anchored, or it fails the build on day one for reasons nobody asked for. That is a change
+to the instrument and wants its own commit, which is the same disposition F218 took one commit
+ago and for the same reason.
+
+**The pair is worth reading together.** F218 is an instrument answering a question about a
+*name*; this one is an instrument answering a question about a *string*. Both are exact enough
+to be trusted and neither says how exact it is at the point of use — F218 prints its precision
+on every run and this one prints nothing at all.

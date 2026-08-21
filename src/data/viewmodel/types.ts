@@ -682,6 +682,31 @@ export type Plot = Readonly<{
   axes?: boolean;
   xLabels?: readonly [string, string, string];
   /**
+   * What the abscissa is (C12 I56, §3ag).
+   *
+   * **Not a second way to spell `xLabels`**, which is three captions *along* the
+   * axis — a scale, in the caller's own words. This is one name *for* it, drawn
+   * centred under the labels, and the two are read together: `epoch 0 … now`
+   * over `training step`.
+   *
+   * **It costs a declared row**, so it is added by `titleRows` before any data is
+   * seen and I1 is untouched — the same shape a horizontal `legend` has, and the
+   * same reason that one can never turn itself on.
+   *
+   * **Refused with `axes: false` and on a form with no bottom axis**: a title for
+   * an axis that is not drawn names nothing, and the alternative — floating it at
+   * the foot of the block — is a second placement rule for one member.
+   *
+   * **There is no `yTitle`, and that is a ruling.** Rotated it is a column of
+   * single letters, which no terminal reader parses; horizontal above the gutter
+   * it is `xLabels`' shape and a second title member. **A y-axis title is a
+   * heading and C09 already has one** — the document puts a `heading` block above
+   * the plot, which costs the same row and is reusable by every other kind.
+   * `yAxis` makes the same argument about its own gutter: it costs width and
+   * never a row.
+   */
+  xTitle?: string;
+  /**
    * Pin the horizontal domain the samples span, independently and optionally
    * (I58, C12 I41, §3d.1).
    *
@@ -1346,6 +1371,49 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
  * ink at all. A total record over forms reads as a complete answer to a question
  * it cannot ask, which is C12 I43's finding one field along.
  */
+/**
+ * Whether this form draws a row beneath its plot area that a title can sit under
+ * (C12 I56, §3ag).
+ *
+ * **Every value here was measured, not reasoned.** Each form was rendered with
+ * an `xTitle` set and the frame searched for it: twenty-six draw one, eighteen
+ * do not, and **sixteen of those eighteen also broke `measure === rendered`**,
+ * because `titleRows` had already added the row to the declared height and
+ * nothing composed it. So this record is not a taste — it is what keeps C12 I1,
+ * and a form answering `true` without routing through `axed`, `axedWithCursor`
+ * or `categoricalColumnForm` produces a block whose declaration and drawing
+ * disagree.
+ *
+ * **The matrix family is a named gap and not an omission.** A heatmap does draw
+ * a column-label row and a title under it would read; it composes its own
+ * furniture and was not wired, and widening it is a change to that family's
+ * compositor rather than to this member. `pie`, `radar`, `waffle`, `treemap` and
+ * `horizon` have no abscissa to name at all, which is a different `false`.
+ *
+ * Total over `PlotForm`, so the thirty-fifth form declares which it is — and the
+ * sweep in C12 T2.9 re-measures it rather than trusting these values.
+ */
+export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // Composed by `axed`, `axedWithCursor` or `categoricalColumnForm` — the
+  // positional family and the categorical one.
+  line: true, scatter: true, step: true, ecdf: true,
+  density: true, slope: true, bubble: true, stackedarea: true,
+  streamgraph: true,
+  bar: true, histogram: true, boxplot: true, violin: true,
+  ridgeline: true, forest: true, dumbbell: true, lollipop: true,
+  dotplot: true, funnel: true,
+  gantt: true, waterfall: true, timeline: true, bullet: true,
+  autocorrelation: true, flame: true, icicle: true,
+  // **A matrix composes its own furniture and was not wired** — a named gap:
+  // its column-label row could carry a title and does not.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  contour: false, quiver: false,
+  // No abscissa to name: a disc, a polygon, a mosaic, one row, a composition.
+  pie: false, radar: false, waffle: false, treemap: false,
+  horizon: false, sparkline: false, smallmultiples: false, pairplot: false,
+});
+
 export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // Everything `positionalForm` renders, including the two that derive a block
   // first — an ECDF's last value is its own last reading, and a density's is the
