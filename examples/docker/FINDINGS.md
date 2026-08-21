@@ -11056,3 +11056,99 @@ requirement in their text, since the rows were right and the fixtures were not.
 **And it generalises past these two.** `measurable()`'s `definitions` is opt-in, so any test
 naming a kind it did not register is testing `raw`. The loud sink is now the standing check for
 the containment half of that, which is the half nothing could see.
+
+---
+
+## F227 — three links, two of them recorded as a hypothetical and the third recorded nowhere ★★★★☆
+
+`RenderContext.tick`'s own doc: *a monotonic counter, incremented by C03's spinner commit. A
+renderer computes `frames[tick % frames.length]`.* `steps` does exactly that
+(`blocks/kinds/structured.ts:461`), `b.spinner()` is public API built on it, and C09 T6.13
+covers it.
+
+**In a running session the counter is `0` and stays `0`.** Measured over ten real frames of a
+real session — a `steps` block with one `active` step, a keystroke between each frame:
+
+```
+SESSION  ⠋⠋⠋⠋⠋⠋⠋⠋⠋⠋      1 distinct
+DIRECT   ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏      10 distinct
+SET      ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏
+```
+
+Same block, same kind, same registry. `DIRECT` is `measurable({ tick })` — the harness every
+test uses — walking ticks 0…9. **The renderer is correct and the wiring is dead.**
+
+**Three links, and any one is sufficient:**
+
+```
+1  commit("spinner") appears in six test files and NOWHERE in src/. The reason
+   is in `CommitReason`, its 100 ms budget is at line 74, and three paragraphs
+   specify how it interacts with `stream`. Nothing raises it.
+2  visibleRows builds the render options as {theme, capabilities, focus,
+   scrollOffsets}. No tick, so every transcript render is at `?? 0`.
+3  the line cache is keyed on rev · width · focus · range+offsets · theme.
+   No tick axis, so a supplied one is served the held lines.
+```
+
+**Links 2 and 3 are already written down, correctly, and as a pair** — C22 I60 and §6c trace
+row 10. I60 states the coupling and the ruling it owes: *the axis is absent **and** the value is
+constant, so the day one is threaded the other is owed — either the key gains it or live entries
+stop being cached.* That is right, and it is the thing this finding would otherwise have
+claimed to discover.
+
+**What is wrong is the mood.** Row 10 is headed **"Not reachable, and recorded because it is one
+line from being reachable"**, and I60 says an animating block *would* serve its first frame.
+Both are conditional, and the condition is already met: `steps` ships, `b.spinner()` is public
+API, and a session drew one glyph across ten frames while both notes read as forward-looking.
+
+**The conflation is between two subjects sharing one phrase.** *A `steps` block animating through
+`ctx.tick`* names the **cache defect** and the **animation defect**, and nothing in the sentence
+forces a choice. Of the cache defect, *not reachable* is exactly true — no assertion there can
+fail while tick is constant. Of the animation, it is false and shipped. The note was written
+from the cache's point of view, which is the honest place to write it from and the one place the
+distinction does not show. F58's shape — two readings of one phrase, both about "an exit code",
+nothing in the prose choosing.
+
+**Link 1 is what makes the other two look dormant, and it is recorded nowhere.** With no producer
+raising `commit("spinner")`, tick never moves, so the cache never has to be right, so row 10's
+*not reachable* is locally true and globally false. C03's spec declares the reason, tunes its
+window and specifies its coalescing against `stream` — and never says that nothing supplies one.
+
+**And the correct half of the fix changes nothing.** Link 2 was patched alone and the frame did
+not move — still `⠋⠋⠋⠋⠋⠋⠋⠋⠋⠋`, one distinct. Adding the cache axis as well produced
+`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`, ten distinct and identical to the direct path, which is also what says there is
+**no fourth break in the render path**. *Two blockers read as one, and a correct fix that
+changes nothing observable is the signal* — anyone repairing this from the grep alone would have
+written the right patch, watched a static spinner and looked elsewhere.
+
+**Why a full suite is green over it.** Every test drives the renderer through
+`measurable({ tick })`, which passes tick directly — the mechanism is called and the wiring is
+not. C09 T6.13 is the row that looks like coverage: *a renderer calling a clock for its spinner
+frame → T2.7's environment scan fails*. **True, and it does not constrain whether tick moves** —
+it forbids a clock and says nothing about the counter advancing, so it reads as coverage of the
+animation while covering only where the number is computed. A03 §2's vacuity class, in prose.
+
+**Two smaller things found in the same pass, recorded here rather than filed:**
+
+- **`tools/spinner.js` carries its own `SEQ` and `UNSAFE` tables**, written before
+  `SPINNER_SETS` shipped. Two sources of truth for one subject, and the playground is the one
+  that drifts silently, because nothing runs it and no rule reaches it.
+- **`spinners.test.ts`'s `COUNTERS` exemption is `{decimal, hex, binary4}` and `binary4` does
+  not ship** — nor does `braille2`, named in the same comment. A dead member of an exemption
+  list, which is the class where a subset check lets an entry outlive its reason unread.
+- **Group 2's two counts disagreed by one before this finding, and adding it made them agree.**
+  The ranking table read *6 open* and the group heading *5 open*; the group's own rows give five,
+  so the table was stale — F165 is dispositioned **fixed** in its own cell and was still being
+  counted. F227 is the sixth, so both now read 6 and the disagreement is gone **without anyone
+  having corrected it**. That is worse than a count that stays wrong, because a stale number that
+  becomes true by arrival is one nothing will ever look at again. SP6 cannot see it: it compares
+  the *ids keyed* column against the keyed set and does not check per-group open counts, for the
+  reason its own limits section gives — keys and mentions are indistinguishable in prose.
+
+**The reusable part is not the defect.** It is that a note can be accurate, well-argued, and
+filed in the wrong tense — and that the tense is invisible from inside the component that wrote
+it. **Ask what a "not reachable" is not reachable *by*.** Row 10 answers *by an assertion in this
+file*, and the reader was never in scope.
+
+**Open.** The repair is C03 raising the commit, C22 threading the counter, and the cache
+admitting a per-kind animating axis — three places, because it is three links.

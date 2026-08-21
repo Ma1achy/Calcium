@@ -68,6 +68,19 @@ function createFrameScheduler(opts: {
 | `stream` | 33 ms | ~30 frames/s ceiling, matching the A02 §7 budget. Configurable down to 16 ms, but terminals generally benefit from fewer, larger writes — the default is the conservative end deliberately |
 | `spinner` | 100 ms | Animation only; a faster tick conveys nothing |
 
+**And no producer raises it.** `commit("spinner")` appears in six of this component's own test
+files and nowhere in `src/` — the reason is declared, its window is tuned, its interaction with
+`stream` is specified in three paragraphs below, and nothing in the product ever supplies one.
+So `RenderContext.tick` is `0` for the life of a session and `steps` cannot animate: measured at
+**one distinct spinner glyph across ten real frames**, against ten through the test harness
+(F227). Two of the three links are elsewhere — C22 omits `tick` from the render options and its
+line cache has no tick axis — which is why patching either one alone leaves the frame unchanged.
+
+**This is the link recorded nowhere, and that is why the other two read as dormant.** C22 I60 and
+its §6c row 10 both state their halves correctly and call them *not reachable*, which is true
+only while nothing here raises a commit. A missing producer makes every consumer downstream of it
+look like a decision deferred rather than a chain broken.
+
 **Immediate reasons cannot be made coalesced.** `windows` may tune `stream` and `spinner` only; supplying a window for `input`, `completion` or `resize` is rejected at construction. A config file must not be able to introduce input lag (I2).
 
 **Windows are throughput ceilings, not deadlines.** `stream`'s 33 ms exists to cap streaming at ~30 fps; `spinner`'s 100 ms is an animation cadence. They encode different kinds of requirement, so the shortest ceiling governs: a pending timer is re-armed when a commit arrives whose window is **strictly shorter**, and left alone otherwise.

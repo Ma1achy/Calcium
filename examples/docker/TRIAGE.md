@@ -30,7 +30,7 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 10 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 22 | **6 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 23 | **6 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
@@ -100,7 +100,7 @@ view's** producer is defined by the region and has no other bound.
 ---
 
 <a id="2"></a>
-## 2 · A complete mechanism, unreachable from the other side of a seam — **5 open, 7 closed** ⚠
+## 2 · A complete mechanism, unreachable from the other side of a seam — **6 open, 7 closed** ⚠
 
 The type carries the field, the renderer honours it, the tests cover it, and no consumer can
 reach it. **Seven closes is the strongest evidence in this document that a shape generalises.**
@@ -119,6 +119,7 @@ reach it. **Seven closes is the strongest evidence in this document that a shape
 | **F41** | `Patch.collapsedAfter`, `actions` | open |
 | **F21** | the action model, from a keystroke | open — the dispatch route |
 | **F23** | `view: true` on a local tool | open — accepted, does nothing |
+| **F227** | **`RenderContext.tick` — declared, honoured by `steps`, covered by C09 T6.13, and never advanced.** Ten real frames drew `⠋⠋⠋⠋⠋⠋⠋⠋⠋⠋`, **one distinct**, against the same block through `measurable({tick})` giving **ten**. Three links: nothing calls `commit("spinner")` in `src/`; `visibleRows` omits `tick`; the line cache has no tick axis. **Two of the three were already written down** — C22 I60 and §6c row 10, correctly and as a coupled pair — **and filed as a hypothetical**: row 10 reads *not reachable*, which is exactly true of the cache defect and false of the animation, and one phrase names both. The unrecorded link is the first, and it is what makes the other two look dormant. **Patching link 2 alone moves nothing**, which is *two blockers reading as one* | open — three places |
 | **F165** | **`ErrorLike.code`, `.stage`, `.details` — set by three producers, the adapter mapping and the app's own twelve sites; rendered by nothing.** The first thing roadmap 48's residue was read for, and it listed one of the three: the other two were *cleared* by the app naming them, which is the instrument's direction working as described. **The twelve sites were then read, and they split the three**: `stage` is a per-file constant restating the kind of function it sits in, so the framework already knows it (F13's class, group 1); `code` and `details` come off the far side's own envelope and are the one place narrowing costs something | **partly fixed** — `code` is rendered beside the message and all three members are kept. **The removal of `stage` was ruled and the compiler falsified it**: eight framework sites write real runtime values (`parse`, `spawn`, `handoff`, `local`, `transport`), so the axis keeps the field and moves the app's twelve writes. **Fixed** — the twelve are gone, and the app's suite is 308 before and 308 after: fourteen assertions touch `.error` and every one reads `message`, so the field was write-only for its whole life. What moved is the instrument — roadmap 48's residue went 88 → 89 candidates, and the one member that moved is `ErrorLike.stage`, cleared until now by the app's own writes |
 
 **F78 is the sharpest instance yet and it is worse than the others by a specific mechanism.**

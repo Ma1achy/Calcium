@@ -107,6 +107,22 @@ side, so a gap before one of them is ignored rather than being an error.
 
 **Animation state arrives through `ctx.tick`.** `steps` shows a spinner, and a renderer must stay pure, so the frame index cannot come from a clock inside the block. `tick` is a monotonic counter incremented by C03's `spinner` commit; a renderer computes `frames[tick % frames.length]`. Nothing else in C09 reads it, and `measure` never does — animation must never change height.
 
+**And nothing increments it, which this section asserted for as long as it has existed.** *A
+monotonic counter incremented by C03's `spinner` commit* describes a chain with three links and
+none of them is joined: `commit("spinner")` is called from six test files and nowhere in `src/`;
+C22's `visibleRows` omits `tick` from the render options, so every block in the transcript
+renders at `?? 0`; and the line cache has no tick axis, so a supplied one is served the held
+lines. Measured over ten real frames of a real session, `steps` drew **one distinct spinner
+glyph** where the same block through the test harness drew **ten** (F227).
+
+**Patching the omission alone moves nothing** — two of the three are each sufficient, so the
+obvious repair is indistinguishable from doing nothing until the cache admits the axis too.
+
+**Two of the three were already recorded** — C22 I60 and its §6c trace row 10, correctly and as
+a coupled pair, and filed as a hypothetical because from inside a cache they are one. The link
+recorded nowhere is C03's, and it is the one that made the other two look dormant. **The sentence
+above is C09's own**, and it asserted a chain this component cannot see the far end of.
+
 ### 2a. `window` — a block reduced to a valid smaller block
 
 **The transcript virtualises at *entry* granularity and then renders each entry
@@ -781,7 +797,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.14** (§3): ignoring `wrap` on `code` → T1.6b fails, and a YAML manifest renders truncated.
 - **T6.11** (I18): passing control characters through → T1.11 fails.
 - **T6.12** (I8): reading `tick` inside a measurer → T2.12 fails, and a spinner starts shifting the viewport.
-- **T6.13**: a renderer calling a clock for its spinner frame → T2.7's environment scan fails, and golden frames flake.
+- **T6.13**: a renderer calling a clock for its spinner frame → T2.7's environment scan fails, and golden frames flake. **It covers where the frame index is computed and not whether the counter moves**, which is why a shipped `steps` drew one glyph across ten frames with this row green (F227): every test supplies `tick` through `measurable({ tick })`, so the mechanism is called and the wiring is not. The row is right and its reach is narrower than its subject.
 - **T6.15** (§3): setting an Ink colour prop instead of emitting SGR → T2.17 fails, and every golden frame renders monochrome while production renders truecolour.
 - **T6.17** (I17): counting `gapBefore` inside `measure` instead of at the sequence → a block measures differently in a document than in a panel, and T2.18 fails.
 - **T6.16** (§3): letting Ink wrap or truncate rather than pre-breaking through `cells()` → T2.1 fails at the wrapping widths, and T3.4's ASCII marker becomes `…` again.
