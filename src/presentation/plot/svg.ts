@@ -36,6 +36,7 @@ import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
 import { refOf } from "./marks.js";
+import { ORIGIN_DEFAULT } from "../../data/viewmodel/index.js";
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /**
@@ -366,9 +367,45 @@ export function plotToSvg(
   layout: SvgLayout = SVG_DEFAULT_LAYOUT,
 ): string | null {
   if (svgFamilyOf(block.form) === null) return null;
+
+  // **A datum this path cannot see is a refusal, not a blank** (F259).
+  //
+  // `ohlc` is the candles' own data and nothing here reads it. A `line` with
+  // `plotStyle: "candlestick"` therefore took the curve arm, found `series: []`
+  // — which is legal precisely because plain candles are the ordinary case
+  // (C04 I57) — and drew **a fully furnished plot with an axis running 0 to 1**
+  // while the terminal drew three candles over 8 to 16.
+  //
+  // **And the moving-average case is worse than the empty one.** A non-empty
+  // `series` beside `ohlc` is an average *over* the candles, so the range came
+  // from the average alone: ticks 11 to 12 against data spanning 8 to 16. Not a
+  // blank frame a reader questions but **a confident chart of the wrong thing**,
+  // which is the plausible wrong figure the `null` arm exists to refuse.
+  if (block.ohlc !== undefined) return null;
+
+  // **A flipped ordinate is the same class, found by asking the same question**
+  // (F259). `svgPoints` passes `invert: true` unconditionally — the comment
+  // beside it says it is spelling `FACING_DEFAULT` out because L0 does not hold
+  // `Facing` — so **all four `origin` values produce byte-identical output**,
+  // measured. A block asking for a top-left origin draws flipped in the
+  // terminal and unflipped here: the same data, upside down between the arms.
+  //
+  // Refused rather than honoured, because honouring it is the families' work
+  // and a wrong-way-up chart is a plausible wrong figure today.
+  if (block.origin !== undefined && block.origin !== ORIGIN_DEFAULT[block.form]) return null;
+
   const range = seriesRange(block.series, block) ?? { min: 0, max: 1 };
   const axis = niceAxis(range, 5, block);
   const box = area(layout);
+
+  // **Furniture is not a picture**, and this is the second clause because it is
+  // a second failure. `series: []` on a plain form, and a series that is all
+  // `null`, both reach here with a range nobody declared — `seriesRange`
+  // returns `null` and the `?? { min: 0, max: 1 }` above furnishes an axis out
+  // of nothing. Drawn, that is five gridlines labelled 0 to 1 over an empty
+  // box: a plot of a range the block never had.
+  const body = marks(block, range, layout, theme);
+  if (body.length === 0) return null; // cells-ok — a count of SVG elements
 
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(layout.width)} ${n(layout.height)}" ` +
@@ -402,6 +439,6 @@ export function plotToSvg(
     }
   }
 
-  parts.push(...marks(block, range, layout, theme), "</svg>");
+  parts.push(...body, "</svg>");
   return parts.join("\n");
 }

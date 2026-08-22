@@ -14,6 +14,7 @@ import { sourceOf } from "../support/source.js";
 import sharp from "sharp";
 import {
   plotToSvg,
+  svgFamilyOf,
   svgLayout,
   svgPoints,
   SVG_DEFAULT_LAYOUT,
@@ -27,6 +28,7 @@ import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/col
 import { rgbOf } from "../support/theme.js";
 import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
+import { ONE_PER_FORM } from "../support/plot-forms.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 
 const VALUES = [1, 4, 2, 8, 5, 9, 3, 7];
@@ -326,6 +328,111 @@ describe("G6b — the two assertions containment could not make", () => {
   });
 });
 
+/**
+ * G8 — **a form is claimed and its datum is not** (F259).
+ *
+ * G7 asks whether the *form* is one this path draws. That is one of two
+ * questions, and the corpus behind it — `ONE_PER_FORM`, one representative
+ * block per member — cannot ask the second, because `plotStyle` is an axis it
+ * never crosses. A `line` is claimed; a `line` **carrying candles** is a
+ * different block that the same claim covers.
+ */
+describe("G8 — a claimed form whose datum this path cannot read", () => {
+  const OHLC = [
+    { open: 10, high: 14, low: 8, close: 12 },
+    { open: 12, high: 16, low: 11, close: 11 },
+    { open: 11, high: 13, low: 9, close: 13 },
+  ] as const;
+
+  it("G8a: candles are refused rather than drawn as an empty axis", () => {
+    // **Measured before it was fixed**: this returned a full frame with five
+    // gridlines labelled 0, 0.25, 0.5, 0.75, 1 — `seriesRange([])` is `null`
+    // and the fallback furnished an axis out of nothing — while the terminal
+    // drew three candles spanning 8 to 16.
+    const candles = b.plot({
+      id: "c", form: "line", height: 6, plotStyle: "candlestick", series: [], ohlc: [...OHLC],
+    });
+    expect(plotToSvg(candles, THEME), "the datum is ohlc and nothing here reads it").toBeNull();
+  });
+
+  it("G8b: a moving average over candles is refused too — the worse of the two", () => {
+    // **The range came from the average alone.** Ticks 11 to 12 against data
+    // spanning 8 to 16, with a line drawn confidently across them: not a blank
+    // a reader questions but a chart of the wrong thing. The empty-marks clause
+    // cannot reach this one, because the average draws a mark.
+    const withMa = b.plot({
+      id: "m", form: "line", height: 6, plotStyle: "candlestick",
+      series: [{ label: "ma", values: [11, 12, 12] }], ohlc: [...OHLC],
+    });
+    expect(plotToSvg(withMa, THEME), "an average is not a picture of the candles").toBeNull();
+  });
+
+  it("G8c: furniture with no ink is a refusal, and that is a second clause", () => {
+    // `series: []` on a plain form and an all-`null` series both reach the
+    // renderer with a range nobody declared. Two clauses because two failures:
+    // this one is caught by counting marks and G8b is not.
+    const bare = b.plot({ id: "d", form: "line", height: 6, series: [] });
+    expect(plotToSvg(bare, THEME), "no series is no picture").toBeNull();
+
+    const nulls = b.plot({ id: "f", form: "line", height: 6, series: [{ label: "n", values: [null, null, null] }] });
+    expect(plotToSvg(nulls, THEME), "a series that draws nothing is no picture").toBeNull();
+  });
+
+  it("G8e: a flipped ordinate is refused, and all four origins were identical", () => {
+    // **Measured**: `svgPoints` passes `invert: true` unconditionally, so
+    // `top-left`, `bottom-left`, `top-right` and `bottom-right` produced
+    // byte-identical output — the first sample's y was 288 in every one. The
+    // terminal honours `origin`; this arm did not, so the same block drew the
+    // right way up in one and upside down in the other.
+    const flipped = b.plot({
+      id: "o", form: "line", height: 6, origin: "top-left",
+      series: [{ label: "s", values: [1, 9] }],
+    });
+    expect(plotToSvg(flipped, THEME), "an ordinate this path cannot flip").toBeNull();
+
+    // And the default is not refused, which is what makes the clause a clause
+    // rather than a ban on the field.
+    const upright = b.plot({
+      id: "u", form: "line", height: 6, origin: "bottom-left",
+      series: [{ label: "s", values: [1, 9] }],
+    });
+    expect(plotToSvg(upright, THEME), "the default origin still renders").not.toBeNull();
+  });
+
+  it("G8f: an annotation is DROPPED, and that is recorded rather than refused", () => {
+    // **The third axis, and the line falls differently here.** A reference line
+    // at 5 labelled `target` reaches the renderer and nothing draws it — the
+    // six `<line>` elements in the output are gridlines. Measured, like the
+    // other two.
+    //
+    // **It is not refused, because the picture it leaves is true.** A dropped
+    // `ohlc` leaves a chart of the wrong thing and a flipped ordinate leaves one
+    // upside down; a missing annotation leaves a correct curve with a claim
+    // absent from beside it. **Refuse a false figure, record an incomplete
+    // one** — and this row is the record, so the day annotations land it fails
+    // and says what changed.
+    const annotated = b.plot({
+      id: "a", form: "line", height: 6,
+      series: [{ label: "s", values: [1, 9] }],
+      annotations: [{ kind: "line", value: 5, label: "target" }],
+    });
+    const svg = plotToSvg(annotated, THEME);
+    expect(svg, "the curve still renders").not.toBeNull();
+    expect((svg ?? "").includes("target"), "and the annotation is not in it — F259's residue").toBe(false);
+  });
+
+  it("G8d: and a form that does draw is untouched by any clause", () => {
+    // **The control.** Every clause refuses, so a bug in any of them reads as
+    // *everything is refused*, which passes every row above.
+    expect(plotToSvg(block, THEME), "the ordinary curve still renders").not.toBeNull();
+    const heat = b.plot({
+      id: "h", form: "heatmap", height: 4, colormap: "viridis",
+      series: [{ label: "r", values: [0, 1, 2, 3] }],
+    });
+    expect(plotToSvg(heat, THEME), "and so does a matrix").not.toBeNull();
+  });
+});
+
 describe("G7 — the partition itself", () => {
   it("is exhaustive over PlotForm, and every refusal has a reason in the table", () => {
     // **The compiler already proved exhaustiveness** — `satisfies Record<
@@ -337,12 +444,45 @@ describe("G7 — the partition itself", () => {
     expect(supported.length, "and the claimed set is not empty").toBeGreaterThan(15);
     const refused = all.filter((f) => SVG_FAMILY[f] === null);
     expect(refused.length, "nor is the refused set").toBeGreaterThan(15);
-    for (const form of refused.slice(0, 6)) {
-      const made = b.plot({ id: `r-${form}`, form, height: 4, series: [{ label: "s", values: [1, 2, 3] }] });
+    // **Every one, not the first six.** A sample is the same blind spot one
+    // level down from the one G8 is about: it tests the rule against the forms
+    // you already had in mind.
+    //
+    // The sample was there for a reason — `b.plot({ form: "tree", series })`
+    // throws, because a tree with no `hierarchy` has no figure to fall back to
+    // (C04 I65) — and the reason is `ONE_PER_FORM`'s whole job. It is a
+    // `Record<PlotForm, Plot>`, so a member with no representative does not
+    // compile, and the six became twenty-seven for the cost of an import.
+    for (const form of refused) {
+      expect(svgFamilyOf(form), `${form} is refused by the table`).toBeNull();
       // **A refusal, not a fallback.** A treemap drawn by the curve family
       // measures, rasterises and reads as a chart of something — the plausible
       // wrong figure the placeholder encoding refuses a wrap for.
-      expect(plotToSvg(made, THEME), `${form} carries its own geometry`).toBeNull();
+      expect(plotToSvg(ONE_PER_FORM[form], THEME), `${form} carries its own geometry`).toBeNull();
+    }
+  });
+
+  it("G7b: a CLAIMED form draws marks, so a missing family branch cannot hide", () => {
+    // **This row exists because a mutation survived** and the survivor was
+    // right about the code. Disabling the partition — `svgFamilyOf(form) ===
+    // null → null` — changed nothing, because `marks()` switches on the family
+    // and returns `[]` for an unclaimed one, so G8c's empty-marks clause
+    // refuses it a few lines later. **Two guards, one ruling**, and the
+    // partition is the one §3aj.3 commits to.
+    //
+    // They agree today by construction and they will stop agreeing the moment a
+    // family is claimed in `SVG_FAMILY` before its branch exists in `marks()`
+    // — which is what every family in the completion plan does on its first
+    // commit. Then the block refuses **as though the form were unclaimed**, and
+    // the empty-marks clause has masked an unbuilt renderer as an empty plot.
+    //
+    // So the guard is here rather than in the mutation pass: a claimed form
+    // must put ink on the page.
+    for (const form of supported) {
+      const svg = plotToSvg(ONE_PER_FORM[form], THEME);
+      expect(svg, `${form} is claimed, so it renders`).not.toBeNull();
+      const ink = (svg ?? "").split("\n").filter((l) => /^<(path|rect x|circle)/u.test(l));
+      expect(ink.length, `${form} puts ink on the page rather than furniture alone`).toBeGreaterThan(0);
     }
   });
 });

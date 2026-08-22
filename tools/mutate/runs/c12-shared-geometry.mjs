@@ -190,14 +190,61 @@ const results = runPass({
       expect: "TC5b",
     },
     {
-      // **A refused form drawn by the curve family.** A treemap that measures,
-      // rasterises and reads as a chart of something is the plausible wrong
-      // figure the `null` arm exists to refuse.
-      name: "a form with its own geometry falls back to a family instead of refusing",
+      // **The candles dropped again**, which is how the arm shipped: a `line`
+      // carrying `ohlc` takes the curve family, finds `series: []` and draws a
+      // furnished plot with an axis running 0 to 1 while the terminal draws
+      // three candles over 8 to 16. **G7's partition cannot see this** — the
+      // form *is* claimed — and neither can a corpus with one variant per form.
+      name: "a block whose datum is ohlc is drawn by the curve family",
       file: SVG,
-      from: "  if (svgFamilyOf(block.form) === null) return null;",
+      from: "  if (block.ohlc !== undefined) return null;",
       to: "  if (false) return null;",
-      expect: "G7",
+      expect: "G8a",
+    },
+    {
+      // **Furniture with no ink.** `seriesRange` returns null, the fallback
+      // furnishes 0..1, and the output is five gridlines over an empty box —
+      // valid SVG, and a plot of a range the block never had.
+      name: "an empty series is furnished with a range nobody declared",
+      file: SVG,
+      from: "  if (body.length === 0) return null;",
+      to: "  if (body.length < 0) return null;",
+      expect: "G8c",
+    },
+    {
+      // **The ordinate unflipped.** All four `origin` values drew identically
+      // before this clause, so the mutation restores a state in which the two
+      // arms disagree about which way up the data goes — and every assertion
+      // about *where the ink is* still passes, because the ink is somewhere
+      // legal.
+      name: "a non-default origin is drawn with the default facing",
+      file: SVG,
+      from: "  if (block.origin !== undefined && block.origin !== ORIGIN_DEFAULT[block.form]) return null;",
+      to: "  if (block.origin === undefined) return null;",
+      expect: "G8e",
+    },
+    {
+      // **This row replaces one that survived, and the survivor was right.**
+      //
+      // *A form with its own geometry falls back to a family instead of
+      // refusing* used to disable `svgFamilyOf(block.form) === null → null` and
+      // be caught by G7. It stopped being catchable the moment G8c landed:
+      // `marks()` switches on the family and returns `[]` for an unclaimed one,
+      // so the empty-marks clause refuses the same block a few lines later and
+      // **no fixture can tell the two apart**. Two guards, one ruling.
+      //
+      // Removed rather than declared an expected survivor — the same call this
+      // run made for `rowOf` — and the guard that keeps the two from being
+      // confused is G7b instead: **a claimed form must put ink on the page.**
+      // That is the arm that will stop agreeing, because a family claimed in
+      // `SVG_FAMILY` before its branch exists in `marks()` refuses *as though
+      // the form were unclaimed*, and every family in the completion plan does
+      // exactly that on its first commit.
+      name: "a claimed family draws no marks, and the refusal reads as unclaimed",
+      file: SVG,
+      from: '      const d = curvePath(points, block.form === "step" || block.form === "ecdf");',
+      to: "      const d = \"\";",
+      expect: "G7b",
     },
   ],
 });
