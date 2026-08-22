@@ -4196,6 +4196,49 @@ and a mutation replacing it with `box.bottom` changed nothing, which is what sai
 is now zero where the range holds it, so a bar of `-3` grows *down* — which is what a bar chart
 means and what the first draft could not draw.
 
+### 3aj.4 — hazard 5: the colour is C10's, and the four hazards were written for geometry
+
+**§3aj lists four hazards and every one of them is about position.** That was right for the two
+paths it was written against, and it left the second channel unnamed — so the SVG arm shipped
+**four hex literals**: a ground, a rule, a label, and `SERIES_INK`, a five-slot palette standing
+beside C10's eight.
+
+**A hazard nobody wrote is not a hazard anybody fails**, which is §3aj.1's own finding about the
+gate, arriving one channel along.
+
+> **Hazard 5 · A colour is a palette slot, and only C10 resolves it.** `resolve()` returns a
+> `Style`; a cell renderer turns it into SGR and the SVG renderer turns the same `Style` into
+> `fill` and `stroke`. **One resolution, two emitters.** A renderer that chooses is a second
+> source of truth for a colour C10 owns, and nothing can assert a colour it also chose.
+
+**The defect the palette produced was not a wrong shade.** `CATEGORY_REFS` has eight slots and
+`SERIES_INK` had five, so **series six took series one's colour in the SVG and `categorical.c6` in
+the terminal** — *two series reading as one*, which is the exact failure C04 I50a caps the count at
+eight to prevent, arriving through the second renderer's back door. **The wrap was at five and the
+cap is eight, so it was reachable at six series** and invisible at five, which is every fixture in
+the per-form corpus.
+
+**Four differences between the arms are legitimate and each is named**, so that a fifth is a
+finding rather than a judgement call:
+
+| | |
+|---|---|
+| antialiasing | an SVG curve is smooth and a braille curve is dots. Same colour, different edge — resolution, not styling |
+| stroke width | a cell is one unit wide; an SVG stroke is a **ratio of the box**, never a constant, or it changes with the output size |
+| font | the terminal's is the reader's and SVG names a family. **The metrics differ and the colour does not** |
+| no ladder | **the SVG arm does not degrade at all.** It pins truecolour, so there is one rung and nothing below it |
+
+**The last is the one with a consequence.** A form whose terminal rendering leans on a degradation
+rung — stacked strips at 1-bit, `CATEGORY_MARKS` where colour cannot carry a category — draws the
+24-bit answer in SVG and never the fallback. **So the two arms are not byte-comparable below
+24-bit**, and a row claiming *the same picture* compares at that depth or compares structure.
+
+**And membership is not enough.** `tone.error` is C10's, so a label drawn in it passes every
+*is this colour in the theme* check while telling the reader the axis is wrong. **Which palette and
+which slot are two claims**, and the furniture's slots are named for the terminal's own reason —
+*furniture is not a series*, so labels are `tone.muted`, and the rule and the ground are surfaces
+because they are drawn on the page rather than said about the data.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
