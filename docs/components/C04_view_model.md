@@ -1821,6 +1821,57 @@ not review — it was going to look at whether the mechanism already existed. Th
 spot pointed at a **member** rather than at a claim: not *where is this written down*, but **who
 else already solved this, and did they call it something**.
 
+### 3ak. *Drawn mid-ramp* reached the range and not the coordinate
+
+**The table above rules a constant field `{v, v}` drawn mid-ramp, and `pinnedRange` implements it.
+`normalisedOf` — the next function in the same file — returns `NaN`.**
+
+`(v - min) / (max - min)` is `0 / 0`, and the clamp cannot repair it: `NaN < 0` is false and
+`NaN > 1` is false, so it passes through both arms unchanged. **A guard written as a range check
+does not catch a value that fails every comparison.**
+
+**Measured, and the arm that has no local guard draws nothing:**
+
+```
+plotToSvg, series [5, 5, 5]  ->  <path d="M89.6 NaN L352 NaN L614.4 NaN"/>
+```
+
+A well-formed `<path>` that paints no pixels — so it survives every containment assertion, every
+element count and the empty-marks refusal, and rasterises to a blank plot area with correct
+furniture around it.
+
+**The terminal path never saw it because `rowOf` guards first**, returning `Math.floor(last / 2)`
+before it calls the shared function. That guard is correct and stays: §3aj hazard 1 rules that the
+**rounding** belongs to each renderer, and `Math.floor(0.5 · last)` differs from
+`Math.round(0.5 · last)` at every even height, which is what the gate's own G0 row exists to catch.
+
+### The count, because one disagreement is a bug and nine is a missing ruling
+
+**Nine open-coded normalisations in `src/presentation/plot/`, and five answers at zero span:**
+
+| answer | where |
+|---|---|
+| **mid** | `scale.ts`'s `rowOf` (`floor(last/2)`), `glyph-row.ts`'s `scaleX` (`floor(width/2)`) |
+| **0.5** | `strip.ts`, `image/overlay.ts` (twice, *"a constant field says nothing"*) |
+| **0** | `axes.ts`, `bar.ts`, `glyph-row.ts`'s two `at` closures |
+| **the last row** | `stack.ts` |
+| **`NaN`** | `normalisedOf`, the shared one |
+
+`0` and *the last row* are one decision seen through an inversion, and it is the decision this
+section's own table calls wrong: *puts a field that never varied at the bottom of the scale, which
+says all minimum about data that says nothing*. **So the spec ruled it, two files implement it,
+five files contradict it, and the function every renderer is being extracted onto returns the one
+answer that is not a number.**
+
+> **The ruling: `normalisedOf` answers `0.5` at a zero span.** It is the only answer that is
+> renderer-independent — `0` means *the floor* to a position and *the coldest colour* to a field,
+> and neither is a reading of *every value is the same* — and it is what the two implementations
+> that wrote their reason down already do.
+
+**A renderer's own degenerate rounding is untouched**, which is what makes this a change to one
+function rather than to nine: `rowOf` and `scaleX` guard before they call, so the terminal's
+arithmetic is unchanged by construction and the gate's evidence is that no frame moves.
+
 
 ## 4. Patches
 
