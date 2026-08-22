@@ -1347,6 +1347,21 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- published one commit ahead of its consumer ---------------------------
+  //
+  // **The codec lands before the renderer that draws with it**, because the
+  // dither arm is built first (C09 I36) and it is the arm most readers see. The
+  // consumer is `imageDefinition`, and that is written as a **symbol rather than
+  // a sentence** so the deferral can be grepped: when it exists this entry is
+  // itself a violation, which is the bidirectional arm doing the watching a
+  // comment would not.
+  //
+  // The alternative was a fake read in the dither — `decodePng(...).pixels`
+  // threaded through a function that already takes `Pixels` — which satisfies
+  // the gate and decides nothing.
+  "Decoded.pixels":
+    "the renderer that consumes it is `imageDefinition`, built in the same phase; " +
+    "a read added now would be a check that cannot fire",
   // --- published ahead of the value that makes it readable ------------------
   //
   // **A single-value union has nothing for a consumer to branch on**, which is
