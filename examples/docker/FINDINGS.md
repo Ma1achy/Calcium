@@ -12411,3 +12411,48 @@ than attempted at the queue's**, which is the only useful thing to say about it 
 `graph`'s zigzag: built, and the assertion written for it found a defect in its own first
 implementation inside a minute (§3ai.6). **The three that needed nothing and the one that needed a
 pass were indistinguishable from the queue.**
+
+
+## F247 — the measurement that gates images, and the two implementations that had to agree before the terminal was asked ★★★★☆
+
+`CALCIUM_ROADMAP.md` prices images on three *free* rows, and the first is the one everything else
+rests on:
+
+> **Measurement is free** — the placeholder grid *is* `rows` x `cols` of ordinary characters, so
+> `measure` returns `rows` because that is literally how many rows were emitted.
+
+**True of the terminal, and a claim about three width implementations rather than one.** `cells()`
+is what every `measure` in this tree uses (SS23); Ink's own string width lays out the `Box` the
+placeholder sits in; the terminal's is what draws. **Two of the three are checkable here, and they
+are the two where a plane-16 private-use character is most likely to be wrong** — a width table with
+no entry for `U+10EEEE` is the ordinary case, not the exotic one.
+
+```
+one placeholder                    cells()=1  .length=2  codepoints=1
+placeholder + row/col diacritics   cells()=1  .length=4  codepoints=3
+four placeholders                  cells()=4  .length=8  codepoints=4
+a plain 4-cell run                 cells()=4  .length=4  codepoints=4
+
+Ink's layout, against cells():     n=1 -> 1    n=2 -> 2    n=4 -> 4    n=8 -> 8
+```
+
+**The gate is open.** `cells()` gives one cell per placeholder and nothing for the diacritics that
+carry row and column, Ink lays out exactly what `cells()` measures at every size, and the text path
+survives the surrogate pair — `stripControl` leaves it alone and `truncate` does not split it. So an
+image declares a height in cells and participates in the grid, and the roadmap's three free rows are
+free for the reason it gives. **Nothing floats, and the phasing behind that measurement stands.**
+
+**The blind spot, stated rather than left out**: the third implementation is the terminal's, and it
+is the protocol's guarantee rather than something this repo can measure. What was reachable is what
+would have broken silently.
+
+**And `.length` is exactly 2x wrong on an image.** SS23 already forbids it for display width, and
+every previous instance has been incidental — a CJK run, an emoji. A placeholder grid is the first
+content where the error is *systematic and proportional*: every image, at every size, off by a
+factor of two. The rule was right and this is the first subject that makes it unmissable.
+
+**A literal BEL reached the probe by being typed**, and the width table disagreeing with `.length` is
+what surfaced it — `a`, `U+0007`, `b` where `"ab"` was intended. F236's class in miniature, on the
+smallest possible scale, found by an instrument pointed somewhere else. It is kept as the contrast
+row and written as an escape, because a zero-width control is the *other* way `cells()` and `.length`
+come apart and it is the one that has nothing to do with images.
