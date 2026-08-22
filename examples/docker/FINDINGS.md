@@ -12149,3 +12149,164 @@ guard**, which is what it looks like now.
 Cycle removal never reversing, the medians read against a half-applied order, and the ordering pass
 never running — all three moved the golden frame. So the corpus *is* sensitive to the pipeline; what
 it cannot reach is one row's worth of it, at one size.
+
+
+## F244 — the mosaic composites, and the precedent that warned against it was measured on a different mechanism ★★★★☆
+
+D1 is a spike: measurements taken before a mosaic's spec rests on them, and nothing built. Three
+were asked for. A fourth is what the frame produced, and a fifth corrected a sentence that was
+already written.
+
+### 0 · The mosaic has a subject, and this is the measurement that could have cancelled the phase
+
+**"The pinwheel" is in no file and no commit in this repository** — not case-insensitively, not in
+the archive, not under `git log -S`, not in `node_modules`. The name arrived carried, which is F161's
+shape, so the figure is *defined* here rather than assumed and probe 0 is what makes the definition
+load-bearing instead of decorative.
+
+A `group` divides its region into full-width columns or full-height rows and recurses, so every
+figure any nesting of them can draw is a **slicing** floorplan. The pinwheel — four cells rotating
+around a centre, five rectangles — admits **no guillotine cut at all**:
+
+```
+  AAAAAABBB      top-level guillotine cut : NONE
+  DDDEEEBBB      slicing (nested groups)  : false
+  DDDCCCCCC
+```
+
+**The control is what makes that a proof rather than an observation.** A search that merely gave up
+at five rectangles would read identically, so the same search runs over a five-rectangle floorplan
+that *is* slicing:
+
+```
+  PPPQQQQQQ      top-level guillotine cut : x=1
+  PPPRRRSSS      slicing (nested groups)  : true
+  PPPRRRTTT
+```
+
+Same count, same tiling, opposite answer. **The difference is the figure and not the count**, so no
+nesting of `group`s expresses the pinwheel and the mosaic is not a `group` change.
+
+### 1 · It composites whole, and the overlap rule is order rather than mechanism
+
+Five `Box`es at `position: 'absolute'` in one container at 60 x 12, through `renderToString`: five
+cells drawn, borders intact, every label present. Declared `A B C D E` and declared `E D C B A` give
+**byte-identical frames**, so the figure is a function of the geometry and not of the declaration
+order.
+
+**Overlap is the arm that separates the two questions**, because *absolute positioning does not
+work* and *they were drawn in the wrong order* look the same in a frame. Two 20-cell boxes
+overlapping by ten:
+
+```
+X at 0, Y at 10, declared X then Y   XXXXXXXXXXYYYYYYYYYYYYYYYYYYYY
+the same two, declared Y then X      XXXXXXXXXXXXXXXXXXXXYYYYYYYYYY
+```
+
+**Painter's algorithm — the last declaration wins.** Overlap is an ordering rule, it is well
+defined, and a mosaic that tiles has no overlap for it to bite on. A relative-positioned control
+drew, so *nothing appeared* stayed distinguishable from *the harness drew nothing*.
+
+### 2 · The declared height is honoured exactly, and it is not optional
+
+`top`/`left` — the API Ink's types declare — gives a **byte-identical** frame to `marginLeft`/
+`marginTop`, so the declared edges work and the margin workaround is unnecessary.
+
+| container | content | frame |
+|---|---|---|
+| no `height` | 12 rows | **one blank row** |
+| `height: 6` | 12 rows | rows 0-5, contiguous |
+| `height: 20` | 12 rows | 12 rows then 8 blanks |
+
+**A mosaic must declare a height or it draws nothing.** An absolutely positioned child contributes
+nothing to its parent's content size, so Yoga computes 0 and `renderer.js` builds its `Output` from
+`getComputedHeight()`. That is not a limitation — `Scroll.height` is the same field for the same
+reason — but omitting it is a construction error rather than a default.
+
+Through the real path, `measure` against `renderToLines(...).length` at four heights x four widths:
+**equal at all sixteen.** C09 I1 holds.
+
+### 3 · It composes with the cache, and the key is not the triple it was said to be
+
+**The gate first, because a purity count taken on a harness that collapses renders is clean about
+nothing** — F227's ten-frames-one-glyph is that failure exactly. A definition whose `render` reads a
+counter reports **10 distinct over 10 renders**, so the harness does not collapse them.
+
+Against that gate the mosaic gives **1 distinct over 10 renders**, and a fresh registry gives the
+same frame as a reused one. The render is a function of `(block, width, ctx)`.
+
+**And the key it composes with is five-way rather than three.** `(entry, rev, width)` is
+`HeightCache`'s triple; `render-cache.ts` is `(id, rev, width, focus, theme)`, and `session.ts`
+passes a composite in the focus slot — `key\0range\0offsets[\0tick]` — so the window range, the
+per-container scroll offsets and a per-kind tick are folded in already. The mosaic reads `block` and
+`ctx.width`, and through `renderChild` exactly what every container reads. **Nothing new**, so
+nothing is owed where the slot is built.
+
+That is what the shape of D2 was waiting on: **the mosaic is not a `raw`-block path.**
+
+### 4 · What the frame found and the numbers could not: the axis I1 does not constrain
+
+Every row of section 2 agreed, and the frame at width 40 is **60 cells wide** — measured with
+`cells()` rather than `.length`, because the figure is being cited.
+
+```
+ 0|╭──────────────────────────────────────╮╭──────────────────╮
+ 1|│A                                     ││B│
+```
+
+**An absolutely positioned child is not clipped to its parent's width.** Isolated: one child at
+`left: 20, width: 40` in a container of 40 draws 60 columns; the same figure with
+`overflowX: "hidden"` draws exactly 40 and costs no rows. **The relative control never over-draws at
+all** — flex shrinks it to fit — so the clip is doing real work rather than the figure happening to
+fit inside it.
+
+C09 I1 is about rows, so it is satisfied and silent here. C09 I34 names this as *I1's over-draw in
+the other axis*, and the group renderer already carries `overflowX: "hidden"` for the relative
+version of the same hazard. So the remedy exists and is a row in D2's table: **a mosaic computes its
+geometry from the width it is handed and clips as a backstop, because nothing below it will.**
+
+### 5 · The precedent that warned against a declared height, re-measured
+
+The scroll renderer rejected `height` on a Box and says why: *"`height` on the Box does pad, and it
+also clips **bottom-anchored**: a child of five rows in a box of two drew rows three and four."*
+Probe 2 found top-anchored, so the two disagree — and **the sentence about to be written here, that
+the anchor is a property of the position type, is wrong.** Measured with `flexShrink` as the only
+variable:
+
+| one child of five rows, in a box of two | drew |
+|---|---|
+| relative, `flexShrink: 0` | `r0, r1` |
+| relative, **default shrink** | **`r2, r4`** |
+| absolute, `flexShrink: 0` | `a0, a1` |
+| absolute, default shrink | `a0, a1` |
+
+**The position type does not change the anchor. Shrink does** — and an absolute child is out of flex
+flow, so shrink never reaches it.
+
+**The precedent's decision stands and its characterisation understates the fault.**
+*Bottom-anchored* would at least be contiguous; a shrinkable relative child drops rows out of the
+**middle** — `r2, r4`, with `r0`, `r1` and `r3` gone. Padding with blank rows is the right remedy,
+and the comment argues for it against a milder fault than the one it actually has.
+
+**None of it transfers to the mosaic**, whose children cannot shrink. The warning was real and it
+was about a mechanism the mosaic does not use.
+
+**The wrong fixture is worth recording too**, because it is the reason this was caught: the first
+control was five one-row siblings rather than one child of five rows, and it answered `r2, r4` —
+neither anchor. A fixture that reproduces neither reading is the signal that it is not the shape
+under test.
+
+### Carried into D2's table rather than discovered during D3
+
+- **A block inside a mosaic is sized by the mosaic** — `facetAt`'s precedent at `facet.ts:76`, which
+  hands down the parent's budget *minus the child's own furniture*, because a parent declaring 5
+  whose children each declare 5 gets children of 8. `scroll`'s residue row is the shape for a child
+  that measures from content.
+- **A mosaic cell holding an error block is F239, measured** — `measure=4 rendered=8`, C25 I1
+  knowingly false there, C04 §3c trace 1's windowing seam the remedy, T2.28b holding it open.
+- **The width clamp of section 4**, which is new here.
+
+### What this did not do
+
+No spec, no `src/` change, no block kind, no D2 table. Five probes and a finding — and D2 is written
+against these numbers rather than against the plan that asked for them.
