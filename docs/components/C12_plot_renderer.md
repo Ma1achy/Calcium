@@ -4048,6 +4048,49 @@ layout ladder is not, **which makes this a small refactor rather than a large on
 **And confirm the catalogue is still reproducible** by running it twice and diffing. A
 non-reproducible catalogue makes this entire gate worthless.
 
+
+### 3aj.1 — the gate was run, and it passed against a broken refactor
+
+**Both preconditions came back the way the section hoped, and the gate itself did not.**
+
+| measured | |
+|---|---|
+| the catalogue is reproducible | 1780 files, two runs, **zero diff** — so the gate's own instrument is sound |
+| `niceAxis` is unit-free | `(range, maxTicks, pin)`. No width, no capabilities, no `cells()`. **Already shared** |
+| `layoutFor` is cell-bound throughout | `labelWidth`, `AXIS_GUTTER`, `MIN_AREA`, `calloutWidth`, `ambiguousWidth`. **Hazard 3 says it stays that way** |
+| **the gate** | **zero golden frames changed — and zero changed for a deliberately broken refactor too** |
+
+**`rowOf` was the one function holding both stages**, so the refactor is exactly hazard 1's
+subject: `normalisedOf` produces `[0, 1]` and `rowOf` is the rounding. It landed with **0 of 377
+golden rows and 0 of 1780 catalogue frames moving**, which is what the gate asks for.
+
+**Then the same gate was run against the violation hazard 1 describes** — the flat-line answer
+moved into the normalised layer, which is wrong at **every even row count**, `floor(last / 2)`
+against `round(0.5 · last)`. It also moved nothing. Counting the branch says why: **0 hits across
+1780 catalogue frames and 0 across the golden suite.** Neither corpus contains a constant series,
+so the case the hazard names is never constructed.
+
+> **`zero golden frames change` is evidence about the cases the frames construct, and about
+> nothing else.** A corpus is a sample, and a gate phrased over a corpus inherits its coverage
+> without inheriting a way to see it.
+
+**So the gate keeps its wording and gains a companion.** `test/unit/plot-shared-geometry.test.ts`
+constructs what the corpus does not — the flat line at every height 1–12, the clamp at both
+facings, and G5 asserted directly as *`rowOf` is `normalisedOf` and a rounding, nothing else*.
+`tools/mutate/runs/c12-shared-geometry.mjs` is what says those rows can fail.
+
+**And a row was written and removed rather than declared an expected survivor.** *`rowOf`
+normalises for itself again* leaves every frame byte-identical, so nothing can catch it; a
+permanently surviving mutation turns a pass's one-bit signal off for good. **The split is a
+structural commitment and its record is this paragraph** — which is the honest place for a
+claim no instrument can hold.
+
+**What this changes for the second commit.** The image path can be added knowing the shared
+coordinate is `normalisedOf` and that the terminal path is reconstructible from it by one
+rounding — asserted, not assumed. **What it does not change**: the corpus still cannot see a flat
+line, so any further shared-geometry work owes its own constructed rows rather than a green
+catalogue.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The

@@ -188,11 +188,40 @@ export function rowOf(v: number, range: Range, rows: number, facing: Facing): nu
   // is before the facing on purpose: the centre row is the answer under all four
   // origins, and mirroring it afterwards would move a constant series sideways
   // at an even height under a member that cannot mean anything for it.
+  //
+  // **And it stays here rather than moving into `normalisedOf`** — which is
+  // §3aj hazard 1 arriving at the one place it bites. Normalised, a flat line is
+  // `0.5`; in cells it is `Math.floor(last / 2)`, and the two disagree at every
+  // even height: at `rows = 4`, `floor(3 / 2) = 1` and `round(0.5 · 3) = 2`. A
+  // rounding stage moved is not a rounding stage preserved, and the difference
+  // is invisible in the code and visible in every frame.
   if (range.max === range.min) return Math.floor(last / 2);
 
+  return Math.round(normalisedOf(v, range, facing) * last);
+}
+
+/**
+ * A value's position on its axis in `[0, 1]`, `0` at the top — **the shared
+ * layer's coordinate** (C12 §3aj hazard 1).
+ *
+ * **The gate's rule, applied to the one function that had both stages in it**:
+ * the shared layer produces normalised coordinates and each renderer does its
+ * own rounding, so the terminal path's arithmetic is unchanged by construction.
+ * `rowOf` is now that rounding and nothing else.
+ *
+ * **The clamp is here and not at the renderer**, because an out-of-range value
+ * clamping to the edge is a statement about the *pin* rather than about cells
+ * (C04 I29): the sample is pressed against the bound it exceeded, and a
+ * rasteriser that received `1.4` would have to know that rule to draw it.
+ *
+ * **A flat line is deliberately not this function's case.** It has no direction
+ * to reverse and its cell answer is `floor(last / 2)`, which is not
+ * `round(0.5 · last)` at an even height — see `rowOf`.
+ */
+export function normalisedOf(v: number, range: Range, facing: Facing): number {
   const t = (v - range.min) / (range.max - range.min);
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
-  return Math.round((facing.y === "down" ? clamped : 1 - clamped) * last);
+  return facing.y === "down" ? clamped : 1 - clamped;
 }
 
 /**

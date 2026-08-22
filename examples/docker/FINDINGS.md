@@ -12773,3 +12773,44 @@ than an audit of a claim. Two greps found all four here.
 `seriesRange` calls it. **Zero golden frames changed**, which is the only evidence that a refactor
 of a resolver 47 plot forms depend on was a refactor — and it is the rehearsal for C12 §3aj's gate,
 which demands exactly that and has never been run.
+
+## F256 — the gate was written, found, run — and passed against the violation it names ★★★★★
+
+**C12 §3aj is the best-placed gate in this repository.** It was written two phases before anything
+could invoke it, put beside the geometry it governs rather than in the plan that produced it,
+carries four named hazards and five rows, and names its own preconditions. *A gate nobody can find
+is a gate that will not be run.* It was found, and it was run.
+
+**Both preconditions held.** The catalogue is reproducible — 1780 files, two runs, zero diff.
+`niceAxis` is unit-free, so most of the geometry was already shared and the refactor was small,
+exactly as the section predicted. `layoutFor` is cell-bound throughout, which hazard 3 says it
+should stay.
+
+**The refactor passed: 0 of 377 golden rows and 0 of 1780 catalogue frames moved.**
+
+**Then the same gate was run against hazard 1's own violation, and it passed that too.** Moving
+the flat-line answer into the normalised layer gives `round(0.5 · last)` where cells want
+`floor(last / 2)` — wrong at **every even row count**, not at a rare boundary. Zero frames moved.
+
+**Counting the branch says why: 0 hits across 1780 catalogue frames and 0 across the golden
+suite.** Neither corpus contains a constant series. The case the hazard names is never
+constructed, so the gate's subject does not exist in its evidence.
+
+**This is A03 §2's vacuity class arriving in a gate rather than in a rule or a sentence.** A rule
+with nothing to be wrong about passes exactly like a satisfied one; so does a gate whose corpus
+never reaches its hazard. And it is the *good* gate this happened to — the one written early,
+placed well, and hedged with its own preconditions. **None of that is evidence about coverage**,
+because a gate phrased over a corpus inherits the corpus's blind spots without inheriting a way to
+see them.
+
+**What separated the readings was a fabricated violation**, which is the instrument that was
+missing and the one A03 already asks for everywhere else: *state a rule's blind spot, with a
+fabricated violation.* The gate had hazards, rows and preconditions and no fabricated violation —
+so a zero meant *clean* and *did not run* with the same bit.
+
+**The remedy is a companion, not a rewording.** *Zero golden frames change* is still the right
+demand; it is now paired with rows that construct what the corpus does not, and a mutation run
+that says those rows can fail. **And one row was removed rather than declared an expected
+survivor** — *`rowOf` normalises for itself again* is byte-identical and uncatchable, and a
+permanently surviving mutation turns a pass's signal off for good. A survivor has three
+dispositions and *expected* is not one of them.
