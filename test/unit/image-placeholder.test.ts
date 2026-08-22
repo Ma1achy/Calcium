@@ -18,12 +18,31 @@ import { describe, expect, it } from "vitest";
 import { Box, Text, renderToString } from "ink";
 import { createElement as h } from "react";
 import { cells, truncate, stripControl } from "../../src/presentation/text.js";
-import { FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
 /** The placeholder, and the diacritics that carry row and column. */
 const PH = String.fromCodePoint(0x10eeee);
 const ROW0 = "̅"; // U+0305 COMBINING OVERLINE — kitty's row/column encoding
 const COL0 = "̅";
+
+
+/** kitty's row/column diacritics — the first of the standard table. */
+const DIAC = [0x0305, 0x030d, 0x030e, 0x0310, 0x0312, 0x033d, 0x033e, 0x033f];
+const cellAt = (row: number, col: number): string =>
+  PH + String.fromCodePoint(DIAC[row] ?? 0x0305) + String.fromCodePoint(DIAC[col] ?? 0x0305);
+const gridRow = (row: number, cols: number): string =>
+  Array.from({ length: cols }, (_, c) => cellAt(row, c)).join("");
+
+/** A cluster is intact when its base is followed by exactly its two marks. */
+function clustersIntact(s: string): boolean {
+  const parts = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)].map((g) => g.segment);
+  for (const g of parts) {
+    const cps = [...g].map((c) => c.codePointAt(0) ?? 0);
+    if (cps[0] === 0x10eeee && cps.length !== 3) return false;
+    if (cps[0] !== 0x10eeee && cps.some((cp) => cp >= 0x0300 && cp <= 0x036f)) return false;
+  }
+  return true;
+}
 
 describe("images — the gating measurement", () => {
   it("the placeholder's width, by every implementation this framework holds", () => {
@@ -73,5 +92,41 @@ describe("images — the gating measurement", () => {
     expect(truncate(PH.repeat(8), 4, FULL_CAPS), "and does not split the surrogate pair").not.toMatch(
       /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u,
     );
+  });
+});
+
+describe("images S0 · probe 2 — truncation and the window", () => {
+  it("a placeholder row truncated to every width keeps whole clusters", () => {
+    const row = gridRow(0, 12);
+    expect(cells(row, "narrow"), "twelve cells before anything happens").toBe(12);
+    const broken: number[] = [];
+    for (let w = 1; w <= 12; w += 1) {
+      const cut = truncate(row, w, FULL_CAPS);
+      if (!clustersIntact(cut)) broken.push(w);
+      expect(cells(cut, "narrow"), `truncated to ${String(w)}`).toBeLessThanOrEqual(w);
+    }
+    console.log(`\ntruncate at widths 1..12: ${broken.length === 0 ? "no cluster split" : `SPLIT at ${broken.join(", ")}`}`);
+    expect(broken, "a split cluster draws a different image cell, not a shorter row").toEqual([]);
+  });
+
+  it("the ascii arm truncates with a marker and still does not split", () => {
+    const row = gridRow(0, 12);
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+      const cut = truncate(row, 6, caps);
+      console.log(`unicode=${caps.unicode}: ${JSON.stringify(cut)} -> cells ${String(cells(cut, "narrow"))}`);
+      expect(clustersIntact(cut.replace(/[…~]/gu, "")), `${caps.unicode} keeps clusters`).toBe(true);
+    }
+  });
+
+  it("a row of the grid is self-describing, so dropping rows is lossy and not wrong", () => {
+    // C14 slices whole rows. Each cell carries its own row AND column, so the
+    // surviving rows still address correctly — which is why a window is safe
+    // where a truncation is not.
+    const rows = Array.from({ length: 6 }, (_, r) => gridRow(r, 4));
+    const windowed = rows.slice(2, 5);
+    for (const [i, r] of windowed.entries()) {
+      const first = [...r][1]?.codePointAt(0) ?? 0;
+      expect(first, `row ${String(i + 2)} still names its own row`).toBe(DIAC[i + 2]);
+    }
   });
 });

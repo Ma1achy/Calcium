@@ -12456,3 +12456,60 @@ what surfaced it — `a`, `U+0007`, `b` where `"ab"` was intended. F236's class 
 smallest possible scale, found by an instrument pointed somewhere else. It is kept as the contrast
 row and written as an escape, because a zero-width control is the *other* way `cells()` and `.length`
 come apart and it is the one that has nothing to do with images.
+
+
+## F248 — the three measurements images rest on, and the first one nearly reported the harness ★★★★☆
+
+Taken before phase 1's design rested on them, ranked so the two that could change the shape went
+first.
+
+### 1 · A partial row rewrite — the one that could have changed the shape
+
+**It is Ink's diff and not this framework's**: `terminal/` has no row-level rewriting, `Output`
+and `log-update` own it. A twelve-row placeholder grid, one row changed:
+
+```
+CONTROL — first render:  4 writes, 418 chars, 96 placeholders
+one row of twelve:       516 chars, 96 placeholders, 12 cursor-ups, 13 erase-lines
+```
+
+**Full frame.** Every row is re-emitted, so an image is cheap and the placeholder grid never has
+to survive being written a row at a time — the branch where the diacritic encoding would have had
+to carry the whole burden does not arise.
+
+**The first run of this reported `NOTHING re-emitted` and that was the harness.** A fake stdout
+without `isTTY` makes Ink take a different path and write nothing at all, so a zero was
+indistinguishable from a full frame of nothing. **The control is not a courtesy** — it is the row
+that turns "0 placeholders" into a fact about Ink rather than a fact about the probe, and it is
+the third instrument this session to have needed one.
+
+### 2 · Truncation and the window — the failure mode no other kind has
+
+Every other block degrades by losing content. **A placeholder grid degrades by lying**, because its
+cells carry their own coordinates: a split cluster does not shorten the row, it addresses a
+different part of the image.
+
+```
+truncate at widths 1..12   no cluster split, at either unicode arm
+unicode=full   5 cells + …      unicode=ascii   5 cells + ~
+a windowed row             still names its own row — row 2 carries row 2's diacritic
+```
+
+**Both are safe, and for different reasons.** Truncation is safe because `truncate` is grapheme-
+aware and the marker replaces a whole cell rather than half of one. The window is safe because
+**each cell names its row *and* its column**, so a surviving row addresses correctly with no
+knowledge of the rows that were dropped. A truncated row shows five image cells and one text
+glyph, which is honest degradation rather than a wrong picture.
+
+### 3 · The decoder against a real file
+
+`sharp` already drives `tools/catalogue-png.mjs`, so the reference costs nothing new. An 8x4 PNG
+reads back with the signature intact and chunks `IHDR pHYs IDAT IEND` — **`pHYs` is the useful
+part of that answer**: a decoder walks chunks and must skip ancillary ones rather than assuming
+`IHDR` is followed by `IDAT`.
+
+### What the three together settle
+
+The shape in the plan holds unchanged: the dither arm is buildable without a decoder dependency,
+the grid survives every path the framework already puts a row through, and nothing about the
+protocol arm needs the diff to be smarter than it is.
