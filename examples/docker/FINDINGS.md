@@ -11780,3 +11780,82 @@ named — was read as *plausibly the known contention class* and it was **piped 
 which discarded the diagnosis along with the exit code. That is this repository's own recorded
 lesson about pipes arriving again, and the honest version of the timeline is that the failing row
 was never identified: the tree was damaged before it could be re-run, and it stayed unidentified.
+
+---
+
+## F238 — the cap was a guess, and the width it is worst at is the one nobody tests ★★★☆☆
+
+The error box is about to ask for the height its message needs, capped so a stack trace does not
+make a forty-row block. **Four lines was the proposed number and it was named as a guess.**
+Measured, wrapping `plot failed to render: ${message}` at the top rung's content width:
+
+```
+message                              w=40   w=80   w=120
+short — ENOENT                          1      1       1
+typical — Cannot read properties …      3      2       1
+a path — ENOENT: no such file …         4      2       2
+a three-frame stack trace               6      3       3
+```
+
+**Four is right, and the measurement is what makes that a ruling rather than a preference.** At 80
+columns four lines holds a whole three-frame stack trace; at 120 it holds it with a line to spare.
+**At 40 it holds a path and nothing else** — a *typical* message is already three lines there, so
+the cap binds at exactly the width where the message matters most and the room is least.
+
+**It is still four, and not width-scaled.** The cap is about how much a reader will take in before
+going to the sink, which is a property of the reader; a rule with a second axis is one more thing
+to get wrong, and the honest cost is stated instead: **at 40 columns a capped stack trace shows the
+error and one frame, at 80 the error and two.** The frames it keeps are the outermost, which are
+the ones that name the failing call.
+
+**And the newlines survive the wrap**, which was not obvious and is why a stack trace is three
+lines at 80 rather than one long fold: `wrapCells` breaks on `\n`, so a multi-line message keeps
+its shape and the cap counts real lines rather than fold artefacts.
+
+**A second argument for the cap turned up while confirming something else, and it is the stronger
+one.** See F239: a bounded container draws an over-tall child **whole**, and C25 I1 is knowingly
+false for that case. The floor is 3 today, so the divergence is small; fitted and uncapped it would
+be unbounded. **Capped at four lines the error box is at most seven rows, so the worst over-draw
+inside a `scroll` is bounded by a number rather than by the length of an exception.** The cap was
+proposed for readability and it is load-bearing for containment.
+
+---
+
+## F239 — the plan cited the wrong mechanism for a bounded container, and the right one is already written down ★★★★☆
+
+Asked what happens to a floored error box inside a bounded container, the plan answered **C09
+I33** — *a floored block is kept whole and paid for out of `skipRows`*. That is the **transcript
+viewport's** rule, in `windowSequence`. A `scroll` is a different mechanism and gives a different
+answer.
+
+**Measured, through the real containment path** — a definition that throws, floored, inside
+`scroll { height: 3 }`:
+
+```
+bare, floor 7            measure=7  rendered=7
+scroll h=3, child f=7    measure=4  rendered=8      <-- diverges by four
+scroll h=3, child f=3    measure=3  rendered=3
+```
+
+**Neither clipped nor kept whole: over-drawn.** And it is not a defect anyone missed — C04 §3c
+trace 1 rules it and names why:
+
+> **RULING NAMES AN OPERATION THAT DOES NOT EXIST** — taking a child's top `n` rows needs a
+> windowing seam, and `RenderContext` offers `measureChild` and `renderChild` and nothing that
+> slices. So the child is drawn whole and C25 I1 is false for that one case, held open by T2.28b,
+> which expires by asserting the disagreement.
+
+**Three things follow.**
+
+- **The classification table's row was wrong and would have shipped as a ruling.** *Where a
+  finding's answer is already written down in another component* is the sixth blind spot arriving
+  in a walk artefact: the row cited a real invariant that governs a real mechanism, and not the
+  mechanism in the cell.
+- **The fitted height makes an existing, named divergence bigger** — four rows over instead of one
+  — which is the whole argument for the cap being a bound rather than a preference (F238).
+- **It is exactly the case the mosaic work will hit**, because a mosaic cell is a bounded region
+  and a cell holding a failed renderer is not exotic. Better found here than there.
+
+**What it does not do is change the ruling.** The remedy for the divergence is the windowing seam
+C04 §3c already names, and the error box has no business inventing one. T2.28b expires when the
+seam lands, which is the mechanism that already exists for this.
