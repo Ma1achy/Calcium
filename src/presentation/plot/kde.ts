@@ -3,6 +3,7 @@
  *
  * Gaussian kernel density estimation, then three folds over the curve.
  */
+import { normalisedSummary } from "../../data/viewmodel/distribution.js";
 import type { QuartileSummary, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { curveRows } from "./curve.js";
@@ -498,18 +499,25 @@ export function violinColumn(
   );
 
   if (quartiles !== undefined) {
-    const span = hi - lo + 2 * pad;
-    const at = (v: number): number =>
-      Math.max(0, Math.min(n - 1, n - 1 - Math.round(((v - (lo - pad)) / (span || 1)) * (n - 1)))); // cells-ok — a row index
+    // **The family's coordinate; the inversion and the rounding stay here.**
+    //
+    // The `span || 1` this replaces looked like a fourth answer at a zero span
+    // and **was dead code**: `pad = (hi - lo) * 0.1 || 1` is at least 1 exactly
+    // when `hi - lo` is 0, so `span = hi - lo + 2·pad` is never zero and the
+    // guard cannot fire. These functions already reached mid-ramp — by a route
+    // nothing stated — which is why the extraction moved no frame.
+    const ns = normalisedSummary(quartiles, { min: lo - pad, max: hi + pad });
+    const at = (t: number): number =>
+      Math.max(0, Math.min(n - 1, n - 1 - Math.round(t * (n - 1)))); // cells-ok — a row index
     const put = (r: number, ch: string): void => {
       if (r >= 0 && r < n) grid[r]![spineCol] = ch; // cells-ok — a row index
     };
-    put(at(quartiles.q1), gl.horizontal);
-    put(at(quartiles.q3), gl.horizontal);
-    put(at(quartiles.median), gl.teeRight);
-    if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
-      const rm = at(quartiles.mean);
-      if (rm !== at(quartiles.median)) put(rm, gl.diamond);
+    put(at(ns.q1), gl.horizontal);
+    put(at(ns.q3), gl.horizontal);
+    put(at(ns.median), gl.teeRight);
+    if (ns.mean !== undefined) {
+      const rm = at(ns.mean);
+      if (rm !== at(ns.median)) put(rm, gl.diamond);
     }
   }
 
@@ -741,20 +749,20 @@ function boxOnSpineColumn(
   pad: number,
 ): readonly string[] {
   if (quartiles === undefined) return rows;
-  const span = hi - lo + 2 * pad;
-  const at = (v: number): number =>
-    Math.max(0, Math.min(n - 1, n - 1 - Math.round(((v - (lo - pad)) / (span || 1)) * (n - 1)))); // cells-ok — a row index
+  const ns = normalisedSummary(quartiles, { min: lo - pad, max: hi + pad });
+  const at = (t: number): number =>
+    Math.max(0, Math.min(n - 1, n - 1 - Math.round(t * (n - 1)))); // cells-ok — a row index
   const out = rows.map((r) => [...r]);
   const put = (r: number, ch: string): void => {
     const row = out[r];
     if (row !== undefined && spineCol < row.length) row[spineCol] = ch; // cells-ok — a column index
   };
-  put(at(quartiles.q1), gl.horizontal);
-  put(at(quartiles.q3), gl.horizontal);
-  put(at(quartiles.median), gl.teeRight);
-  if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
-    const rm = at(quartiles.mean);
-    if (rm !== at(quartiles.median)) put(rm, gl.diamond);
+  put(at(ns.q1), gl.horizontal);
+  put(at(ns.q3), gl.horizontal);
+  put(at(ns.median), gl.teeRight);
+  if (ns.mean !== undefined) {
+    const rm = at(ns.mean);
+    if (rm !== at(ns.median)) put(rm, gl.diamond);
   }
   return out.map((r) => r.join(""));
 }
@@ -771,22 +779,23 @@ function boxOnSpine(
 ): readonly string[] {
   if (quartiles === undefined) return rows;
   const line = [...(rows[spineRow] ?? " ".repeat(w))];
-  const span = hi - lo + 2 * pad;
-  const at = (v: number): number =>
-    Math.max(0, Math.min(w - 1, Math.round(((v - (lo - pad)) / (span || 1)) * (w - 1)))); // cells-ok — a column index
+  // Not inverted: a column index grows the way a value does.
+  const ns = normalisedSummary(quartiles, { min: lo - pad, max: hi + pad });
+  const at = (t: number): number =>
+    Math.max(0, Math.min(w - 1, Math.round(t * (w - 1)))); // cells-ok — a column index
   const put = (x: number, ch: string): void => {
     if (x >= 0 && x < w) line[x] = ch; // cells-ok — a column index
   };
-  put(at(quartiles.q1), gl.vertical);
-  put(at(quartiles.q3), gl.vertical);
-  put(at(quartiles.median), gl.teeDown);
+  put(at(ns.q1), gl.vertical);
+  put(at(ns.q3), gl.vertical);
+  put(at(ns.median), gl.teeDown);
   // **When the mean lands on the median, say so.** Skipping the diamond avoided
   // hiding the median tee, which was right, and left a band with no mean mark
   // beside two that had one — so *they coincide* read as *it is missing*. A cell
   // holds one glyph, so the glyph names both.
-  if (quartiles.mean !== undefined && Number.isFinite(quartiles.mean)) {
-    const xm = at(quartiles.mean);
-    put(xm, xm === at(quartiles.median) ? gl.diamondTee : gl.diamond);
+  if (ns.mean !== undefined) {
+    const xm = at(ns.mean);
+    put(xm, xm === at(ns.median) ? gl.diamondTee : gl.diamond);
   }
   return rows.map((r, i) => (i === spineRow ? line.join("") : r));
 }

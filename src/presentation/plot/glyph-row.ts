@@ -5,6 +5,8 @@
  * available width. The category label sits in the gutter; the glyphs fill the
  * plot area.
  */
+import { normalisedSummary } from "../../data/viewmodel/distribution.js";
+import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { QuartileSummary, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { glyphs } from "../blocks/glyphs.js";
@@ -43,11 +45,41 @@ function glyphCharsFor(caps: Caps): GlyphChars {
   };
 }
 
+/**
+ * A value's column, from the shared coordinate.
+ *
+ * **The degenerate answer stays here** (§3aj hazard 1), and the reason it gives
+ * is the second one it was given.
+ *
+ * The first read *`Math.floor(width / 2)` and `Math.round(0.5 · (width - 1))`
+ * differ at every even width*. **They are equal at every width** — measured,
+ * 1 through 12 — so the sentence named a distinction that does not exist and
+ * the mutation written from it changed nothing. A03 §2's vacuity class in a
+ * justification, and the mutation pass is the only thing that asks a sentence
+ * whether it can be violated.
+ *
+ * **What is true**: a shared degenerate answer arrives as `0.5`, and the guard
+ * that consumes it is this renderer's. `Math.round(0.5 · width)` differs from
+ * `Math.floor(width / 2)` at **every odd width** — 1, 3, 5, 7 — which is the
+ * mutation that now runs. The rounding stage is the thing hazard 1 protects,
+ * and *which* arithmetic reads it is exactly the choice it must not move.
+ */
 function scaleX(value: number, min: number, max: number, width: number): number {
   if (max === min) return Math.floor(width / 2);
-  const t = (value - min) / (max - min);
-  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
-  return Math.round(clamped * Math.max(0, width - 1));
+  return Math.round(normalisedOf(value, { min, max }, false) * Math.max(0, width - 1));
+}
+
+/**
+ * A normalised position as a row index, **inverted by hand**.
+ *
+ * `L - Math.round(t · L)` is **not** `Math.round((1 - t) · L)`: at `t · L = 2.5`
+ * and `L = 6` the first is 3 and the second 4, because a half rounds away from
+ * zero. So this takes an uninverted `[0, 1]` and does the subtraction itself,
+ * which is the arithmetic every one of these call sites already had.
+ */
+function rowAt(t: number, rows: number): number {
+  const last = rows - 1; // cells-ok — a row count
+  return Math.max(0, Math.min(last, last - Math.round(t * last))); // cells-ok — a row index
 }
 
 
@@ -77,13 +109,16 @@ export function forestRow(
     if (x >= 0 && x < w) row[x] = g.dashedVertical; // cells-ok — a column index
   }
 
-  const lower = q.lower ?? q.min;
-  const upper = q.upper ?? q.max;
-  const centre = q.centre ?? q.median;
+  // **The three fallbacks are the shared summary's**, not this row's: an
+  // interval falls back to the whiskers and an estimate to the median (C12
+  // I31), and the same three lines were written out in each renderer.
+  const ns = normalisedSummary(q, { min, max });
+  const last = Math.max(0, w - 1); // cells-ok — a column count
+  const atX = (t: number): number => (max === min ? Math.floor(w / 2) : Math.round(t * last)); // cells-ok — a column index
 
-  const xLower = scaleX(lower, min, max, w);
-  const xUpper = scaleX(upper, min, max, w);
-  const xCentre = scaleX(centre, min, max, w);
+  const xLower = atX(ns.lower);
+  const xUpper = atX(ns.upper);
+  const xCentre = atX(ns.centre);
 
   // The interval, with a tee at each end — a plain `─` at the end of a run does
   // not say the interval stops there.
@@ -218,14 +253,12 @@ export function boxplotColumn(
     return cells.join("");
   };
 
-  // Inverted: a value grows upwards and a row index grows down.
-  const at = (v: number): number => {
-    const span = max - min;
-    const t = span <= 0 ? 0 : (v - min) / span;
-    return Math.max(0, Math.min(n - 1, n - 1 - Math.round(t * (n - 1)))); // cells-ok — a row index
-  };
-  const yMax = at(q.max), yQ3 = at(q.q3), yMed = at(q.median);
-  const yQ1 = at(q.q1), yMin = at(q.min);
+  // Inverted: a value grows upwards and a row index grows down. The inversion
+  // and the rounding are this renderer's; the positions are the family's.
+  const ns = normalisedSummary(q, { min, max });
+  const at = (t: number): number => rowAt(t, n);
+  const yMax = at(ns.max), yQ3 = at(ns.q3), yMed = at(ns.median);
+  const yQ1 = at(ns.q1), yMin = at(ns.min);
 
   const blank = " ".repeat(w);
   const grid = Array.from({ length: n }, () => blank);
@@ -263,10 +296,13 @@ export function boxplotColumn(
     grid[r] = cells.join("");
   };
   // Mean on median gets its own glyph rather than no glyph — see `kde.ts`.
-  if (q.mean !== undefined && Number.isFinite(q.mean)) {
-    punch(at(q.mean), at(q.mean) === yMed ? g.diamondTee : g.diamond);
+  // **`ns.mean` is absent where the summary had none or had a non-finite one**,
+  // so *no mean* and *a mean at the median* stay distinguishable here rather
+  // than at each call site.
+  if (ns.mean !== undefined) {
+    punch(at(ns.mean), at(ns.mean) === yMed ? g.diamondTee : g.diamond);
   }
-  for (const o of q.outliers ?? []) punch(at(o), g.dotted);
+  for (const o of ns.outliers) punch(at(o), g.dotted);
   return grid.map((r) => " ".repeat(padL) + r + " ".repeat(padR));
 }
 
@@ -310,14 +346,14 @@ export function boxplotBand(
   // happen to line up; ASCII collapses the corners it cannot spell and the
   // figure still reads.
   const g = glyphs(caps);
-  const at = (v: number): number => {
-    const span = max - min;
-    const t = span <= 0 ? 0 : (v - min) / span;
-    return Math.max(0, Math.min(w - 1, Math.round(t * (w - 1))));
-  };
+  // **Not inverted**, which is the whole difference between this and its
+  // transpose: a column index grows the way a value does.
+  const ns = normalisedSummary(q, { min, max });
+  const last = Math.max(0, w - 1); // cells-ok — a column count
+  const at = (t: number): number => Math.max(0, Math.min(last, Math.round(t * last))); // cells-ok — a column index
 
-  const xMin = at(q.min), xQ1 = at(q.q1), xMed = at(q.median);
-  const xQ3 = at(q.q3), xMax = at(q.max);
+  const xMin = at(ns.min), xQ1 = at(ns.q1), xMed = at(ns.median);
+  const xQ3 = at(ns.q3), xMax = at(ns.max);
 
   // The interquartile run's ink, for the compact arm. `pairFor` is the gauge
   // vocabulary and this *is* a gauge: a span of the axis that is filled or not.
@@ -388,8 +424,8 @@ export function boxplotBand(
     row[xMed] = T.median[r]!;
     // The mean last and only on the spine — a second centre needs its own mark
     // (C04 I53), and drawn on an edge row it would read as a corner.
-    if (q.mean !== undefined && Number.isFinite(q.mean) && r === 1) {
-      const xm = at(q.mean);
+    if (ns.mean !== undefined && r === 1) {
+      const xm = at(ns.mean);
       // **Mean on median gets its own glyph rather than none** (C12 I33,
       // C04 I53) — the same ruling `boxplotColumn` and `kde.ts` already carry.
       // This arm dropped it instead: `xm !== xMed` meant a distribution whose
@@ -398,7 +434,7 @@ export function boxplotBand(
       // claim that `◈` landed in both was true of the vertical one.
       row[xm] = xm === xMed ? T.meanTee : T.mean;
     }
-    for (const o of q.outliers ?? []) {
+    for (const o of ns.outliers) {
       const xo = at(o);
       if (xo >= 0 && xo < w && r === 1) row[xo] = T.outlier;
     }
