@@ -1685,6 +1685,37 @@ precision the terminal cannot show while giving up the palette, the ramp and the
 ladder. It is not a cost argument: an overlay that stops being a Calcium render stops degrading,
 and at 1-bit it would be baked into the dither and indistinguishable from the picture.
 
+### 3h.2 — and the ruling above is right at one arm of two
+
+**The measurement that produced it answered a question about geometry, and the overlay asks one
+about rendering.** `imageCells` being capability-independent says where an image *lands*; it says
+nothing about what a cell *shows*, and the two are different questions with different answers.
+
+**At `kitty` a placeholder cell cannot be painted over.** `placeholderCell`'s own comment says
+why, written for the id and true of the overlay: *the id travels as a colour because the cell has
+nowhere else to put it* — the two diacritics are spent on position, the 24-bit foreground on the
+image id, and **the cell's rendering is the terminal's**. Anything this framework draws there is
+replaced by the image tile. So a Calcium heatmap over a kitty placement is not merely inexact; it
+is not visible.
+
+**At the dither it works exactly as 3h.1 describes**, because this framework owns the glyph and
+the colour: the braille cell carries the picture and the tone carries the overlay, with the
+palette, the ramp and every degradation rung applying.
+
+| arm | the overlay |
+|---|---|
+| dither, every capability set | **placed** — a Calcium render over the image's own cell rectangle |
+| `kitty` | **composited** into the pixels before transmission, because the cell is not ours to draw |
+
+**So the overlay is a field on the block rather than a composition**, and its rendering differs by
+arm — which is the first thing in this phase that needs a mechanism rather than an arrangement.
+**3h's closing claim is therefore already qualified**: the overlay is not one of the compositions,
+and whether the remaining three need a mechanism is still open, with `image + histogram` the one
+to watch — its data lives in the document and its pixels live in `presentation/`.
+
+**The correction is worth more than the ruling was.** A geometry measurement is exactly the kind
+that reads as settling a rendering question, because both are about where things are.
+
 **The blind spot, stated rather than assumed.** Whether the terminal scales the image to fill the
 declared cell box or letterboxes it is the protocol's guarantee and is not measurable here — the
 same class as the plane-16 width guarantee (C09 §4c). **Placed degrades gracefully either way**,

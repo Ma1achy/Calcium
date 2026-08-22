@@ -12586,3 +12586,40 @@ separates them is *which* glyph, and the row asserts mid-ramp.
 **Two of the three were the test and one was the harness. None was the code.** That is the pass
 doing what it is for, and it took two rounds because the first repair fixed the fixture and left
 the assertion that could not tell the difference.
+
+
+## F250 — a geometry measurement answered a rendering question, and the ruling was right at one arm of two ★★★★★
+
+**The fork was ruled PLACED on a measurement that could not see it.** `imageCells` is a pure
+function of `(block, width)` — no capability reaches it — so an image occupies the same cell
+rectangle at `kitty` and at the dither alike: `w=40 h=4 → 8x4` both ways. That is true, it is
+measured, and it settles **where an image lands**.
+
+**The overlay asks what a cell *shows*.** Different question, different answer.
+
+**At `kitty` a placeholder cell cannot be painted over**, and the reason was already written down —
+in `placeholderCell`'s own comment, composed the same session for a different purpose:
+
+> **The id travels as a colour because the cell has nowhere else to put it.** The two diacritics
+> are spent on position, so the terminal reads the image from the 24-bit foreground — which is why
+> this arm needs no palette from C10 and **why C10 owns no part of it**.
+
+That last clause is the overlay's answer. The cell's rendering is the terminal's; anything this
+framework draws there is replaced by the image tile. A Calcium heatmap over a kitty placement is
+not inexact — **it is not visible**.
+
+**So the ruling holds at the dither and inverts at kitty**: placed where this framework owns the
+glyph and the colour, composited where it does not. The overlay becomes a field on the block whose
+rendering differs by arm — **a mechanism rather than an arrangement**, which is what §3h's closing
+claim about compositions was already hedging toward without knowing it.
+
+**The reusable shape.** *A measurement about geometry reads as settling a question about
+rendering*, because both are about where things are — and the sentence that would have caught it
+was already in the repository, written for the id, one file away from the ruling it contradicts.
+**Nothing indexed by rule interaction reaches that**: the two statements are in different
+components, agree completely about their own subjects, and only meet when a third thing — an
+overlay — needs both at once.
+
+**Third correction of a same-session ruling in this phase** — after the mosaic's clip, `graph`'s
+clamp and the APC transmission — and the first where the falsifier was a comment I had written
+myself rather than a measurement I had not taken.
