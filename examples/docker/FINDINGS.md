@@ -11861,59 +11861,82 @@ C04 §3c already names, and the error box has no business inventing one. T2.28b 
 seam lands, which is the mechanism that already exists for this.
 
 
-## F240 — the tag is the only painted run, and at the two lower rungs it is the only unpainted one ★★★★☆
+## F240 — a degradation is ruled for two rungs with a reason that is forced at one ★★★★☆
 
-The frame read C10 §4d's paint slot owed, at HEAD, four capability sets. The tag row's bytes:
+**Filed with the wrong headline and corrected before anything was built on it.** The frame read
+found the tag unpainted at 4-bit and 1-bit and this said *nobody gave it an arm*. C09 §3a had
+already ruled it:
 
-```
-24bit   38;2;198;40;40 ──── 38;2;255;255;255 48;2;198;40;40 " ERROR " 49    painted
-8bit    38;5;124       ──── 38;5;231         48;5;124       " ERROR " 49    painted
-4bit    91m            ---- 39m                             " ERROR "       DEFAULT
-1bit    1m             ──── 22m                             " ERROR "       BOLD OFF
-```
+> **And the pair degrades together.** At 4-bit and 1-bit there is no ground *and no ink*: the tag
+> carries no styling and is distinguishable by being the one run that does not — non-bold between
+> two bold rules at one bit.
 
-I32 calls the tag **the only painted run in C09's `status` box**. At the two lower rungs it is the
-only *un*painted one — and at 1-bit it does not merely fail to gain emphasis, it **cancels the
-emphasis the rule around it carries**. The word naming the failure is the lightest thing in the
-box, which is visible in `status-error-1bit.png` without measuring anything.
+I31 cites it and **T3.46 asserts both halves' absence at depth 4 and 1**, two-armed and on
+purpose. So the behaviour is specified, invariant-backed and tested. **The code, the tokens, the
+maps and four frames were all measured and the one instrument not run was the one that asks where
+the behaviour is written down** — the sixth blind spot, on the claim I was most confident about.
 
-**Two causes, and they are not the same defect.**
+**The finding survives and is a better one.** The ruling's reason is right about the *pair* and
+silent about the *rung*:
 
-- **At 4-bit**, `surface()` reads `theme.tokens.fourBit[ref]` and neither `surface.errorGround`
-  nor `surface.errorInk` is in any of the three maps, so both resolve to `NO_STYLE`.
-- **At 1-bit**, no map could help: `withBackground(NO_STYLE, NO_STYLE)` returns `{}`. **A pair that
-  resolves to nothing yields *no style* rather than *the tone*** — so the tag drops below its own
-  rule rather than levelling with it. Fixing the 4-bit map leaves this exactly as it is.
+- **At 1-bit it is forced.** C10 I8 vanishes every surface, so there is nothing to degrade to and
+  distinction-by-absence is the only answer. Correct, and unchanged.
+- **At 4-bit nothing forces it.** The ladder has a rung for surfaces — `bg`, `bgElev`, `bgDeep`,
+  `border`, `borderStrong`, `diffAdd`, `diffRemove` all carry curated indices — and `diffAdd` and
+  `diffRemove` are text-bearing grounds chosen at exactly this depth, in the same file, under a
+  comment that argues how to pick one. The pair is not degraded there; **it is unfilled.**
 
-**And the 4-bit half is a class.** `Surfaces` declares ten slots; every `*_FOUR_BIT` map answers
-seven, identically:
+One sentence covers two depths with a reason that holds at one of them, which is *a correct
+sentence justifying the wrong decision*: **an ink left behind on a vanished ground is an
+unmeasured foreground** is true, load-bearing, and an argument for the pair moving *together* —
+not for the ground vanishing where the rung exists. The pair can degrade together **into a 4-bit
+pair** and honour it exactly.
+
+**What the frame shows, which is what makes it worth changing.** At 4-bit the rule, the mark and
+the message are all bright red and the word `ERROR` is plain default — the one unmarked run in a
+red box, inverting §3a's own *the tag is painted and nothing else is*. A failure notice whose tag
+is the quietest thing in it is backwards, and it is visible in `status-error-ascii.png` without
+measuring anything. At 1-bit the same mechanism reads correctly, because there everything else is
+bold and absence is the only channel left.
+
+**And the mechanism underneath is a class.** `Surfaces` declares ten slots; every `*_FOUR_BIT` map
+answers seven, identically:
 
 ```
 missing in all three:   selection · errorGround · errorInk
 ```
 
 Nothing could have asked. `FourBitMap = Readonly<Record<string, number>>` is partial over an open
-key, so a new surface slot compiles with no 4-bit answer. And C10 §3's *"Surfaces degrade too"*
-**enumerates** — `bg`, `bgElev`, `bgDeep`, `border` and `borderStrong`, the five that existed when
-it was written — where it means to quantify. Five slots landed after it; two were given arms by
-whoever added them and three were not. The sentence is satisfied by the five it names.
+key, so **an unanswered slot and a deliberately unpainted one resolve identically** — which is why
+this took a frame read to notice and why the spec sentence above was so easy to write. And C10 §3's
+*"Surfaces degrade too"* **enumerates** — `bg`, `bgElev`, `bgDeep`, `border` and `borderStrong`,
+the five that existed when it was written — where it means to quantify. Five slots landed after it;
+two were given arms by whoever added them and three were not.
 
 **Three missing arms are probably three cases, and lumping them is how the wrong fix ships for
 two of them.** `selection` is a **wash behind arbitrary text** — its 4-bit answer has to leave
-legible whatever it washes, and it has no ink of its own to compensate with. The error pair is a
+legible whatever it washes and it has no ink of its own to compensate with. The error pair is a
 **tag that brings its own ink and washes nothing**. One is constrained by text it does not own;
 the other owns both halves. `selection` is roadmap 23's subject and is named here rather than
 folded in.
 
-**What is not owed is a measurement.** I26 already rules the contrast floor *best-effort at 4-bit*,
-0–15 being the emulator's palette — so the arm costs a human decision and no computation, which is
-what §3 says the curated map is for.
+**Ruled: the 4-bit arm lands, 1-bit is untouched.** Four reasons, in order of weight — the stated
+reason argues for the pair and not for the rung; the rung exists and this file already uses it for
+the only other text-bearing surfaces; I26 makes the floor *best-effort at 4-bit*, so nothing is
+promised that cannot be kept; and §3a's own claim about the tag is false at that depth today.
+**The withdrawn half is a fallback in `withBackground`** — making a pair that resolves to nothing
+fall back to the tone would have "fixed" 1-bit as well, and 1-bit is right.
 
-**The 24-bit construction survives the rung and settles the ground without a choice.** §4d makes
-the ground `tone.error` *by equality*, asserted by T2.14e — so the 4-bit ground is `tone.error`'s
-own index, per theme, and only the ink is chosen. That flips dark's ink from white to black, and
-the flip is the construction working rather than a divergence: at 24-bit `tone.error` is a dark
-red that needs white on it, and at 4-bit it is bright red that needs black.
+**What is not owed is a measurement, and the 24-bit construction settles the ground without a
+choice.** §4d makes the ground `tone.error` *by equality*, asserted by T2.14e — so the 4-bit
+ground is `tone.error`'s own index per theme and only the ink is chosen. That flips dark's ink
+from white to black, and the flip is the construction working rather than a divergence: at 24-bit
+`tone.error` is a dark red needing white on it, and at 4-bit it is bright red needing black.
+
+**T3.46's second arm changes and that is the point of finding this first.** It asserts no ground
+*and* no ink at depths 4 and 1; it becomes a 1-bit assertion plus a 4-bit assertion that the pair
+arrives whole. Landing the arm without touching it would have turned a deliberate two-armed row
+into a failing one, and read as the arm being wrong.
 
 ---
 
