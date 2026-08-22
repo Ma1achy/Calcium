@@ -12814,3 +12814,38 @@ that says those rows can fail. **And one row was removed rather than declared an
 survivor** — *`rowOf` normalises for itself again* is byte-identical and uncatchable, and a
 permanently surviving mutation turns a pass's signal off for good. A survivor has three
 dispositions and *expected* is not one of them.
+
+## F257 — three commit messages cited a gitignored directory as evidence ★★★★★
+
+**`docs/catalogue/` is in `.gitignore`.** It is generated output and is not committed, so
+`git status --porcelain docs/catalogue | wc -l` returns **0 whether a frame moved or not**.
+
+That command appears in three commit messages from this session as half of the §3aj gate's
+evidence — *zero of 1780 catalogue frames moved* — and it could not have said anything else.
+**It is the same bit for *clean* and for *cannot see***, which is exactly the class F256 was
+filed about, committed three times by the person who filed it.
+
+**What survives and what does not.**
+
+| claim | evidence | holds? |
+|---|---|---|
+| zero golden rows moved | `test/golden/` is **tracked**, 20 snapshot files, 377 rows | **yes** — this is the refactor's real evidence |
+| zero of 1780 catalogue frames moved | a gitignored path | **no** — the command was blind |
+| the flat-line branch is never taken | counted **during rendering**, 0 hits | **yes** — never went through git |
+
+**So the refactor's conclusion stands on the goldens**, and the catalogue sentence was
+decoration that read as corroboration. *Repetition is not corroboration* — F58's lesson, and
+here the repetition was of one blind command across three commits.
+
+**Why it survived writing it three times**: `git status <path>` *looks* like it is checking that
+path. The failure has no output to inspect — a blind check and a passing check are both an empty
+string — and the surrounding claim was true, so nothing about the result contradicted anything.
+
+**The remedy is a digest, not a discipline.** `tools/catalogue-hash.mjs` prints one sha256 over
+every frame: 956 frames, `e25a2defe7da643d`, reproducible across runs. A number that differs is a
+frame that moved, and a tool that cannot see the directory cannot print a number at all.
+
+**And the ordering hazard beside it**, found the same hour: `plot-catalogue.mjs` clears every
+generated file before it writes, so running it *after* `phase-catalogue.mjs` deletes all 66 phase
+frames. Measured by watching 66 become 1. Two tools writing into one directory and only one of
+them sweeps it — now recorded in the header of the one that must run second.
