@@ -12352,3 +12352,62 @@ bounds the spill and the cell's clip has nothing to do. The row asserted the rig
 not construct the state it claimed; `AB/CB` gives the tall child the top half so an unclipped cell
 writes into the row below, and the mutation dies. **The convenient fixture is the one where both
 readings agree**, and a single-cell mosaic is as convenient as it gets.
+
+
+## F246 — three of four queue items were already done, and each was stale in a different way ★★★★☆
+
+A four-item queue, picked up in order. **Three needed no code**, and the three staleness mechanisms
+are different enough to be worth separating.
+
+### S5 — a sentence carried without its second half
+
+The claim: *`elapsedMs` and `attempt` have no writer, so two of `activityLine`'s three arms are
+unreachable from any session.* It is written down — C23 §3d-bis — as:
+
+> Two of the three had no producer **until now**: `elapsedMs` and `attempt` were fields nothing in
+> `src/` wrote, so two of `activityLine`'s three arms could not be reached from any session.
+
+**The clause that retires it is two words long.** Both are built, both frame-read (F234, F235), and
+both driven end to end rather than at the seam: `T3.56` writes `elapsedMs` *through `declare` and the
+sweep, never by calling the writer* — its own comment says so, and gives F227 as the reason — and
+`T1.40a` gets `attempt: 1` out of a source that actually fails. This is F86/F89/F92's compression
+class a fourth time, and the cheapest instance yet: the body was correct, the summary kept the
+claim and dropped the tense.
+
+### F240's residue — the arm is missing and the answer is not
+
+`selection` has no entry in any of the three 4-bit maps, which is true and was the whole of the
+item. Measured at every rung:
+
+```
+depth 24 -> {"kind":"rgb","hex":"#264057"}       depth  4 -> undefined -> {inverse: true}
+depth  8 -> {"kind":"ansi256","index":237}       depth  1 -> undefined -> {inverse: true}
+```
+
+**`selectionStyle` carries its own fallback** — *the wash, or reverse video where there is no colour
+to wash with* (§4b) — so the wash is painted at every depth. A missing map entry and an unpainted
+surface are not the same fact, and the error pair was the case where they coincided.
+
+**And it is the better answer, which is what makes this more than a correction.** F240 argued the two
+cases differ because a wash *has to leave legible whatever it washes and has no ink of its own to
+compensate with*. Reverse video is exactly the answer to that constraint and a curated index cannot
+be: inversion guarantees contrast against arbitrary text by construction. **F240 withdrew a fallback
+for the error pair** — in `withBackground`, because a resolver-level fallback would have "fixed"
+1-bit too — and `selection`'s lives at its *call site*, so it reaches 4-bit and 1-bit alike, which
+for a wash is right at both. **One case already has the mechanism the other was deliberately
+denied**, and that is a stronger form of *these are not one case* than the finding had.
+
+So the residue is closed by ruling rather than by code: **the map entry is not added**, because it
+would replace a guaranteed answer with a chosen one, and the choice could not be read off a frame.
+
+### The label pass — real, and not small
+
+`shiftInward` resolves to one line in `src/`: the deferral comment that names it. The pass is *shift,
+drop and count* over a label taxonomy — a C12 subsystem, not a rewire. **Reported at its size rather
+than attempted at the queue's**, which is the only useful thing to say about it here.
+
+### The fourth was real, and the golden was hiding it
+
+`graph`'s zigzag: built, and the assertion written for it found a defect in its own first
+implementation inside a minute (§3ai.6). **The three that needed nothing and the one that needed a
+pass were indistinguishable from the queue.**
