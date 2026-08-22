@@ -4091,6 +4091,55 @@ rounding — asserted, not assumed. **What it does not change**: the corpus stil
 line, so any further shared-geometry work owes its own constructed rows rather than a green
 catalogue.
 
+
+### 3aj.2 — the second commit: SVG, and hazard 3 is what makes hazard 4 free
+
+**SVG rather than PNG, and it was measured rather than assumed.** A rasterised label needs font
+metrics to be placed; an SVG label is a `<text>` element that places itself, so the whole of what
+`cells()` does for the terminal path has no counterpart here and needs none. `sharp` turns the
+result into a PNG for the kitty path at **no new dependency** — it is already in `DEPENDENCIES.md`
+for the catalogue's own frames.
+
+**But the two hazards are not independent, and the gate lists them as though they are.** An SVG
+label needs no metrics *because this layout never sizes anything to fit a label* — `svgLayout`'s
+gutter is a **fraction of the width**, which a cell layout cannot express because a gutter of 3.4
+columns is not a gutter. The moment a layout sized a gutter to its longest label, this path would
+need metrics to agree with it. **Hazard 3 is what makes hazard 4 free, and violating either
+violates both** — measured, because the mutation that sizes the gutter to the output is the one
+that would drag metrics back in.
+
+**Hazard 4's seam is structural and was already in the architecture.** `src/data/` contains no
+call to `cells()` and no import from `presentation/` — the layer rule forbids it — so the shared
+coordinate living in L0 means a shared layout reaching for `cells()` **would not compile**. Not a
+wrong-looking image, not an error: a build failure. The hazard asked for a seam and the
+architecture already held one; the coordinate only had to be put where it applies.
+
+**What this is not: `ansiToSvg`.** `tools/catalogue-png.mjs` already writes SVG and writes a
+*picture of a terminal* — `maxCols · CELL_W`, one glyph per cell, every coordinate a cell
+coordinate scaled up. It inherits every cell-shaped decision the frame made, which is exactly what
+this path exists not to be. **Two things called SVG in one repository and only one is a second
+renderer**, which is worth writing down because the other one is older, larger and easy to mistake
+for progress.
+
+### What the rows cost, and the two that failed first
+
+**Both source-level rows failed on their own documentation.** `svg.ts` explains *why `layoutFor` is
+not reachable from this file*; `range.ts` explains *`cells()` is not reachable here*. A matcher over
+the raw text reported the violation each was written to deny. **An assertion about a source file
+that does not strip comments is measuring the prose**, and prose about a mechanism is denser than
+the mechanism — so the false positive is the likely direction rather than the unlucky one.
+
+**And G5 survived its first mutation.** The row asserted that both paths agree on a sample's
+position, using values `1..9` on a range of `1..9` — where the clamp never fires, so open-coded
+arithmetic gives identical numbers and a copy of the shared layer is indistinguishable from the
+shared layer. The fixture had to construct a **pinned** range with samples outside it, which is
+C04 I29 and the only thing a copy gets wrong. *The convenient setup is the one where both readings
+agree*, arriving in the row written to prove two paths share a coordinate.
+
+**One form, not forty-seven.** The point of this commit is that the hazards have subjects; every
+other form is the same three ingredients — the shared range, the shared coordinate, and a layout in
+fractions — and adding them is work rather than a decision.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The

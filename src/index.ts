@@ -285,6 +285,18 @@ export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.
  * the renderer's ASCII switch is C02 I9's tier (box drawing is ambiguous
  * throughout), and a `ProducerContext` carries them.
  */
+/**
+ * A plot as SVG — **the second renderer** (C12 §3aj.2, phase 3).
+ *
+ * **On the surface because the consumer boundary is the point.** A reader who
+ * wants a figure outside a terminal is what phase 3 exists for, and the path
+ * has no other caller by design: the layout ladder is not shared, so nothing
+ * inside the framework composes an SVG on a consumer's behalf.
+ *
+ * `sharp` or any SVG rasteriser turns the result into a PNG; `b.image` takes it
+ * from there, which is how a plot becomes an image inside a transcript.
+ */
+export { plotToSvg, svgLayout, SVG_FONT_SIZE, type SvgLayout } from "./presentation/plot/svg.js";
 export { mermaidCode } from "./presentation/mermaid.js";
 /**
  * A banner, from a sparse set of variants (roadmap 22).

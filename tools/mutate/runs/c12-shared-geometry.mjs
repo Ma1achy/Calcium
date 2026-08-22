@@ -26,11 +26,13 @@ const SCALE = "src/presentation/plot/scale.ts";
 // **The shared coordinate lives in L0**, where `cells()` is not reachable — that
 // is §3aj hazard 4's seam, structural rather than asserted.
 const SHARED = "src/data/viewmodel/range.ts";
+const SVG = "src/presentation/plot/svg.ts";
 
 // **The goldens are in the file list on purpose.** They cannot catch the flat
 // line — that is the finding — and their presence is what makes each row's
 // `expect` a claim about *which* instrument caught it.
-const FILES = "test/unit/plot-shared-geometry.test.ts test/golden/plots.test.ts";
+const FILES =
+  "test/unit/plot-shared-geometry.test.ts test/unit/plot-svg-path.test.ts test/golden/plots.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -73,6 +75,37 @@ const results = runPass({
       from: "  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;",
       to: "  const clamped = t;",
       expect: "G2",
+    },
+    {
+      // **Hazard 3 violated at its own boundary**: a gutter sized to content is
+      // where font metrics come back, and it is the *only* thing that makes an
+      // SVG label need measuring. The layout stops being size-independent.
+      name: "the image path sizes its gutter to the output rather than by fraction",
+      file: SVG,
+      from: "  return { ...SVG_DEFAULT_LAYOUT, width: Math.max(1, width), height: Math.max(1, height) };",
+      to: "  return { ...SVG_DEFAULT_LAYOUT, width: Math.max(1, width), height: Math.max(1, height), gutter: 8 / Math.max(1, width) };",
+      expect: "G3",
+    },
+    {
+      // **The shared coordinate abandoned by the image path.** Every frame still
+      // looks like a plot — the curve is monotone in the value either way — and
+      // the two paths now disagree about where a sample sits, which is the
+      // divergence §3aj exists to prevent.
+      name: "the image path normalises for itself instead of the shared layer",
+      file: SVG,
+      from: "    const y = top + (bottom - top) * normalisedOf(v, range, true);",
+      to: "    const y = top + (bottom - top) * (1 - (v - range.min) / Math.max(1, range.max - range.min));",
+      expect: "G5",
+    },
+    {
+      // **The label anchored at the start.** It runs into the plot area rather
+      // than sitting against the gutter — the failure hazard 4 says is
+      // discovered as a wrong-looking image, caught here at the seam.
+      name: "a label is anchored at its start and needs its width to sit right",
+      file: SVG,
+      from: "`<text x=\"${n(left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" text-anchor=\"end\" ` +",
+      to: "`<text x=\"${n(left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" ` +",
+      expect: "G5c",
     },
   ],
 });
