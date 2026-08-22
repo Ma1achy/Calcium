@@ -110,6 +110,38 @@ const results = runPass({
       expect: "D3",
     },
     {
+      // **The two arms collapsed into one.** A forest plot ranging over its
+      // whiskers clips every interval wider than the observed data — and the
+      // catalogue's five summaries have no explicit bounds, where the two arms
+      // agree, so the frames say nothing about the difference.
+      name: "the forest plot ranges over its whiskers rather than its interval",
+      file: SHARED,
+      from: "    const low = interval ? q.lower ?? q.min : q.min;",
+      to: "    const low = q.min;",
+      expect: "D8",
+    },
+    {
+      // **Outliers dropped from the extent.** They then clamp to the whiskers
+      // and draw *on* them — a plausible figure, and one that says the sample
+      // had no outliers when it had two.
+      name: "outliers do not widen the extent",
+      file: SHARED,
+      from: "    lo = Math.min(lo, low, ...(q.outliers ?? []));",
+      to: "    lo = Math.min(lo, low);",
+      expect: "D8",
+    },
+    {
+      // **An empty set given a range instead of `null`.** `{0, 1}` is what the
+      // call sites fall back to, so the difference is invisible at the seam and
+      // shows up as an axis of 0 to 1 over a plot with nothing in it — C04
+      // §3ak's shape, one function along.
+      name: "no summaries yields a range rather than nothing",
+      file: SHARED,
+      from: "  return Number.isFinite(lo) && Number.isFinite(hi) ? { min: lo, max: hi } : null;",
+      to: "  return { min: Number.isFinite(lo) ? lo : 0, max: Number.isFinite(hi) ? hi : 1 };",
+      expect: "D8",
+    },
+    {
       // **The band inverted like its transpose.** Its first form was
       // algebraically the identity — `(t·(max-min) + min - min) / (max-min)` is
       // `t` — so it survived by changing nothing, the second no-op in this run

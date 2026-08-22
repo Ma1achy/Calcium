@@ -61,6 +61,7 @@ import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf } from "./ma
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
+import { quartileRange } from "../../data/viewmodel/distribution.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { pairFor } from "./ramp.js";
@@ -2357,11 +2358,8 @@ const FORM_ROWS: Readonly<
   boxplot: (block, width, ctx) => {
     const qs = block.quartiles ?? [];
     if (qs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx); // cells-ok — a quartile count
-    let lo = Infinity, hi = -Infinity;
-    for (const q of qs) {
-      lo = Math.min(lo, q.min, ...(q.outliers ?? []));
-      hi = Math.max(hi, q.max, ...(q.outliers ?? []));
-    }
+    // **The family's extent** — the whiskers, plus outliers (C12 §3aj).
+    const { min: lo, max: hi } = quartileRange(qs) ?? { min: 0, max: 1 };
     const cats = block.categories ?? qs.map((_q, i) => `series ${String(i + 1)}`);
     if (block.orientation === "vertical") {
       // The same figure stood up: one column band per category, the value scale
@@ -2385,11 +2383,9 @@ const FORM_ROWS: Readonly<
   forest: (block, width, ctx) => {
     const qs = block.quartiles ?? [];
     if (qs.length === 0) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx); // cells-ok — a quartile count
-    let lo = Infinity, hi = -Infinity;
-    for (const q of qs) {
-      lo = Math.min(lo, q.lower ?? q.min, ...(q.outliers ?? []));
-      hi = Math.max(hi, q.upper ?? q.max, ...(q.outliers ?? []));
-    }
+    // **The interval arm**: a confidence bound is not a whisker and can reach
+    // past it, so a forest plot ranges over `lower`/`upper` where they are set.
+    const { min: lo, max: hi } = quartileRange(qs, true) ?? { min: 0, max: 1 };
     // A forest plot's null is an `Annotation` — C04 already means *a claim about
     // the ordinate drawn beside the data* by it, and inventing `nullValue` beside
     // that would be the second way to say one thing. The value maps to a

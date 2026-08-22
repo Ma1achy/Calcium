@@ -18,7 +18,7 @@
  * it governs is taken by nothing. These are the rows that take it.
  */
 import { describe, expect, it } from "vitest";
-import { normalisedSummary } from "../../src/data/viewmodel/distribution.js";
+import { normalisedSummary, quartileRange } from "../../src/data/viewmodel/distribution.js";
 import { pinnedRange } from "../../src/data/viewmodel/range.js";
 import { boxplotColumn, boxplotBand, forestRow, dumbbellRow } from "../../src/presentation/plot/glyph-row.js";
 import { rainColumns } from "../../src/presentation/plot/kde.js";
@@ -209,6 +209,33 @@ describe("D — the distribution family's positions", () => {
     // representative block has no distribution in it to draw.
     const withQuartiles = DIST.filter((f) => (ONE_PER_FORM[f] as Record<string, unknown>)["quartiles"] !== undefined);
     expect(withQuartiles, "only two of five").toEqual(["boxplot", "forest"]);
+  });
+
+  it("D8: the family's extent, and its two arms differ on purpose", () => {
+    // **Two inline loops in `definition.ts` that nearly agreed.** A boxplot
+    // ranges over its whiskers; a forest plot ranges over its interval, because
+    // a confidence bound is not a whisker and can reach past one.
+    const wide: QuartileSummary = { min: 4, q1: 5, median: 6, q3: 7, max: 8, lower: 1, upper: 11 };
+    expect(quartileRange([wide]), "the whisker arm ignores the interval").toEqual({ min: 4, max: 8 });
+    expect(quartileRange([wide], true), "and the interval arm takes it").toEqual({ min: 1, max: 11 });
+
+    // Outliers widen both, which is what makes them visible rather than clipped.
+    const out: QuartileSummary = { ...Q, outliers: [-3, 20] };
+    expect(quartileRange([out])).toEqual({ min: -3, max: 20 });
+    expect(quartileRange([out], true)).toEqual({ min: -3, max: 20 });
+
+    // **`mean` is outside the extent in both arms, deliberately.** A mean past
+    // the whiskers is not reachable from real samples and is expressible, so it
+    // clamps rather than widening the axis of every plot that has one. Asserted
+    // so the omission is a decision rather than something read as an oversight.
+    expect(quartileRange([{ ...Q, mean: 99 }]), "a mean does not widen the axis").toEqual({ min: 1, max: 9 });
+
+    // **No summaries is not a range**, which a caller must tell from a summary
+    // of zero width — the second is a legitimate figure and the first is not a
+    // plot.
+    expect(quartileRange([]), "nothing to range over").toBeNull();
+    expect(quartileRange([{ min: 5, q1: 5, median: 5, q3: 5, max: 5 }]), "zero width is a range")
+      .toEqual({ min: 5, max: 5 });
   });
 
   it("D7: a forest row's interval and estimate come from the shared summary", () => {

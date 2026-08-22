@@ -71,3 +71,43 @@ export function normalisedSummary(q: QuartileSummary, range: PinnedRange): Norma
     outliers: (q.outliers ?? []).filter((o) => Number.isFinite(o)).map(at),
   };
 }
+
+/**
+ * The extent a set of summaries occupies — **the family's range** (C12 §3aj).
+ *
+ * This was two inline loops in `definition.ts`, and they differ **on purpose**:
+ *
+ * ```
+ * boxplot   min … max, plus outliers          the whiskers are the extent
+ * forest    lower ?? min … upper ?? max       an interval can reach past them
+ * ```
+ *
+ * A confidence bound is not a whisker, so a forest plot whose interval is wider
+ * than its observed range must still fit — which is the second arm, and naming
+ * it is the point of one function rather than two loops that nearly agree.
+ *
+ * **`mean` and `centre` are deliberately outside the extent**, exactly as both
+ * loops had them. A mean beyond the whiskers is not reachable from real samples
+ * and is expressible, so it clamps rather than widening the axis for every plot
+ * that has one. Recorded because it is the kind of omission that reads as an
+ * oversight later.
+ *
+ * `null` where there is nothing to range over, so a caller distinguishes *no
+ * summaries* from *a summary of zero width* — the second is a legitimate figure
+ * and the first is not a plot.
+ */
+export function quartileRange(
+  summaries: readonly QuartileSummary[],
+  /** Take `lower`/`upper` as the extent where present. A forest plot's arm. */
+  interval = false,
+): PinnedRange | null {
+  let lo = Number.POSITIVE_INFINITY;
+  let hi = Number.NEGATIVE_INFINITY;
+  for (const q of summaries) {
+    const low = interval ? q.lower ?? q.min : q.min;
+    const high = interval ? q.upper ?? q.max : q.max;
+    lo = Math.min(lo, low, ...(q.outliers ?? []));
+    hi = Math.max(hi, high, ...(q.outliers ?? []));
+  }
+  return Number.isFinite(lo) && Number.isFinite(hi) ? { min: lo, max: hi } : null;
+}
