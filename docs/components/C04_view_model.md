@@ -1642,6 +1642,61 @@ drawing there.
 | I6 | a decoded size past the cap × `alt` | refused at both gates, so the render never sees it |
 
 
+## 3h. Plots of images — the sample grid, and the registration fork
+
+**A sample grid is a builder over the mosaic, not a kind**, and the premise was re-taken with
+kitty placing rather than inherited from the dither measurement: `areas` names **62** regions, and
+a 2x2 captioned grid renders at `measured 10 · rendered 10` under both arms with the captions on
+their own rows. So `b.samples` composes `mosaic` and `image` and adds no definition, no
+enumeration sweep and no walk.
+
+**What it adds is the arithmetic nobody should do twice**: the spec string, the row shares, and
+the **reading order** — `AB/ab` maps as `A B a b`, so a band contributes its pictures and then its
+labels. Getting that wrong puts every caption under the wrong picture *with every count
+agreeing*, which is a frame-read row rather than an assertion.
+
+**The band's height is declared and the width follows.** A generous height makes `imageCells`
+scale the image to fill its column exactly — but the row count would then depend on the render
+width, which a mosaic's declared row shares cannot express. So an image fits its band vertically
+and may be narrower than its column, left-aligned. **It does not reopen C12 I1**, which forbids a
+*plot* deriving a height from a width.
+
+**The pool is a refusal rather than a wrap.** Two regions per item against 62 names, so 31 samples
+is the bound; reusing a character merges two samples into one region and draws a plausible grid of
+the wrong pictures. A short last band is **holes** — named by no child, so the arity check stays
+exact.
+
+### 3h.1 — the overlay registers by PLACEMENT, not by compositing
+
+**The fork was answerable once a real image landed in the grid, and the measurement is in-repo.**
+`imageCells` is a pure function of `(block, width)` — no capability reaches it — so an image
+occupies **the same cell rectangle whichever arm draws it**: `w=40 h=4` is `8x4` at `kitty` and at
+the dither alike.
+
+| | |
+|---|---|
+| **placed** ✓ | the heatmap is a Calcium render over the image's own cell rectangle. The palette, the ramp and every degradation rung apply |
+| composited | the overlay is drawn into the pixels before transmission. Exact to the pixel, one blob, and **none** of the palette work applies |
+
+**Placed, and the reason is that the registration is cell-to-cell between two grids this framework
+declares** — the image's `cols x rows` and the heatmap's — never pixel-to-pixel against the
+terminal's rasterisation. **A cell is the medium's resolution limit**, so compositing buys
+precision the terminal cannot show while giving up the palette, the ramp and the whole capability
+ladder. It is not a cost argument: an overlay that stops being a Calcium render stops degrading,
+and at 1-bit it would be baked into the dither and indistinguishable from the picture.
+
+**The blind spot, stated rather than assumed.** Whether the terminal scales the image to fill the
+declared cell box or letterboxes it is the protocol's guarantee and is not measurable here — the
+same class as the plane-16 width guarantee (C09 §4c). **Placed degrades gracefully either way**,
+because the cell alignment is this framework's and only the image's fit inside its own rectangle
+would move. The first real-terminal test is where it is checked.
+
+**And the remaining four are compositions rather than features**: before/after/residual is three
+samples with a shared scale, a confusion matrix of examples is a sample grid whose bands are the
+confused classes, and image-plus-histogram is a `row` group holding an `image` and a `plot`. Each
+is worth building when a consumer asks; none needs a mechanism this section does not already have.
+
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
