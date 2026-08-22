@@ -382,6 +382,56 @@ shape as the counter above, one field down.
 `spinner` window is 100, so the default runs at 10 fps rather than 12.5 — C03 §3's trade, applied
 unconditionally, and written down in C22 I60a because neither half mentioned the other.
 
+#### 3a-bis. The height the message needs, and the width it does not get
+
+**Height fits the content; width never does, and the asymmetry is the ruling.** A block does not
+choose its width — the region does. A 40-column terminal, a `group: row` handing out
+`floor((w − gaps) / n)`, a panel's border taking two cells: there is nothing to expand into, and a
+block wider than its region is I1's over-draw in the other axis. **So: wrap to the width you have,
+grow the height to fit the wrap.**
+
+The mechanism is C04's `minHeight`, which already exists and already works — the registry takes
+`max(definitionRows, floor)` on both sides of I1 (I33) and the shell issues the request after the
+frame (C22 I69). **Only the number was wrong**: it was the constant `ERROR_MIN_ROWS` whatever the
+box had to say, so a long message was cut with no mark.
+
+**`rowsFor` wraps at the top rung's content width, and that dissolves a fixed point.** The rung
+decides the padding, the padding decides the content width, the width decides the wrap, and the
+wrap decides the rung. Wrapping at `width − 4` — the narrowest width any rung offers — makes the
+answer an over-estimate in the safe direction: every lower rung is *wider*, so it wraps to fewer
+lines and the granted height still shows all of them. At worst one row of slack, which the render
+centres and reads as deliberate.
+
+```
+n    = wrapCells(`${mark}${message}`, width − 4).length,  capped
+rows = n + 2 (border) + tagRows + lineRows
+```
+
+`n + 3` for `error`, whose activity line is empty. **The vertical blanks are not in the sum**:
+they are slack the render computes, so they appear when the message is short and give way as it
+grows, which is what the ladder already does with them. Counting them would make a two-line
+failure seven rows rather than five.
+
+**Which rung applies changes, and that is the point.** The ladder was indexed on the height a
+block happened to have; now the block asks for the height its content needs. A `rule` throwing
+asks for five and draws the full figure; a block in a three-row region asks for five, cannot have
+it, and draws the `H = 3` rung. **The low rungs stop being the common case and become the refused
+case**, which is where they earn themselves.
+
+**The cap is four message lines and it is load-bearing twice** (F238, F239). Measured, four holds
+a three-frame stack trace at 80 columns and a path and nothing else at 40 — so it binds at exactly
+the width where the room is least, and it is *not* width-scaled because the cap is a property of
+the reader rather than of the terminal. The second reason is containment: a bounded container
+draws an over-tall child **whole** and C25 I1 is knowingly false there (C04 §3c trace 1, T2.28b),
+so capping the box at seven rows bounds that divergence by a number instead of by the length of an
+exception.
+
+**A cut carries its mark.** `wrapCells(...).slice(...)` dropped the remainder in silence at every
+height, not only at the cap — the same class as F230 one level down. The mark comes from
+`truncate`, so it is `…` at unicode and `~` at `ascii` and is capability-resolved rather than a
+literal (I22). **A message of exactly the cap carries no mark**, because a truncation that did not
+happen sends the reader to the sink for text already on screen.
+
 #### Degradation
 
 ```
@@ -880,6 +930,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I32** — **`status` animates unconditionally, its interval belongs to its set, and its numbers are fields rather than either.** No state-dependent branch: `retrying` is the error box plus a spinner line, so excluding `error` from animating breaks the state composed out of it and needs a per-state exception where a simple rule would do — and `error` drawing the same bytes every tick makes its stickiness free rather than a mechanism. The set is named by the block and defaults to what `steps` resolves to, so one glyph means *waiting* in three places; `spinnerIntervalMs` is the same lookup as `spinnerFrames`, so a caller cannot hold one set's frames against another's tick. **`retryInMs`, `attempt` and `elapsedMs` are supplied, never derived** — `tick` cannot carry a duration because C03 coalesces and drops commits under load, and this layer may not read a clock, so the only honest source is whoever holds one. **The counter advances, and for the life of the project it did not** (F227) — C03's commit is raised from C22's ticker, `visibleRows` supplies it, and the line cache carries the axis per kind. The kind was written against a working counter and drew a still frame instead, which is why sixteen tested spinner sets and a green suite said nothing: **`error` drawing the same bytes every tick is indistinguishable from `error` drawing them because nothing moved.** The property that makes stickiness free is the one that hid the break.
 
 - **I33** — **The registry applies C04's `minHeight` floor on both sides, so I1 holds by construction.** `measure` returns `max(definition.measure(…), block.minHeight ?? 0)` and `render` wraps a floored element in a box with the same minimum, which pads a short child and leaves a tall one alone. **Padding and never bounding is the whole of it**, and the alternative was measured: a fixed height drops an over-full box's **first** row rather than its last, and `overflowY: "hidden"` does not change that — so a bound would silently behead a block that grew. **A block carrying a floor is not windowed** (C04 I68). I26's identity is about rows the *definition* can produce, and `windowSequence` derives its `to` from the floored height — so a `window` that can only reach the definition's own rows breaks the identity from outside the definition. Kept whole and paid out of `skipRows`, as a kind declaring no `window` already is. **The floor is applied outside the definition** so that I2 survives it and `scroll`'s §3c purity argument is not reopened.
+- **I34** — **The contained box asks for the height its message needs at the width it was given, capped at four message lines, and marks a cut.** Height fits and width does not: a block does not choose its width, the region does, and a block wider than its region is I1's over-draw in the other axis (§3a-bis). The request wraps at the **top rung's** content width — `width − 4`, the narrowest any rung offers — which dissolves the fixed point between the rung, its padding and the wrap by erring in the safe direction: every lower rung is wider, wraps to fewer lines, and still shows all of them, at a cost of at most one row of slack that the render centres. `rows = n + 2 + tagRows + lineRows`, and **the vertical blanks are not summed** — they are slack, appearing when the message is short and giving way as it grows, which is what the ladder already does with them; counting them would make a two-line failure seven rows rather than five. **The cap is measured rather than chosen** (F238): four lines holds a three-frame stack trace at 80 columns and a path and nothing else at 40, so it binds where the room is least — and it is not width-scaled, because how much a reader takes in before going to the sink is a property of the reader. **It is also a containment bound** (F239): a bounded container draws an over-tall child whole and C25 I1 is knowingly false there (C04 §3c trace 1, T2.28b), so seven rows bounds that divergence by a number rather than by the length of an exception. **A cut carries its mark** through `truncate`, so `…` at unicode and `~` at `ascii` (I22) — and **a message of exactly the cap carries none**, because a truncation that did not happen sends the reader to the sink for text already on screen. **One layout function serves `render` and the request**, on `cells()`'s argument: a second walk over the same arithmetic rounds differently at the boundary.
 
 ---
 
@@ -916,8 +967,40 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 29. **A degradation ladder is owed on every axis the figure varies along, not on the one it was drawn against** (I31, §3a). The `status` box was specified with a height ladder and no width ladder, and the missing one is the axis that wraps: ` ERROR ` is 7 cells, a rule needs 9, and a `row` group hands out `floor((w − gaps) / n)`. Both ladders are rulings taken before the code, and the second exists because a classification table was run beside the height trace rather than instead of it.
 30. **A kind that composes one state out of another animates unconditionally** (I32). `retrying` is `error` plus a line, so any rule that excludes `error` needs an exception the moment the composition is drawn — and the still frame it was meant to buy is already free, because identical bytes write no diff.
 31. **A floor set above the registry is honoured on both sides of the pair, by the registry** (I33), and the field it honours is C04's (→ C04 I67). One number reaches `measure` and the element's padding through one line each, so a floored block cannot measure one height and draw another — which is the failure I1 exists for, arriving through the mechanism added to serve it.
+32. **A contained failure asks for the height its message needs and marks what it cannot show** (I34). Height fits the content and width never does — the region owns the width, so a block that grew into it would be I1's over-draw in the other axis. The request is capped at four message lines, measured rather than chosen, and the cap is what bounds the divergence a bounded container already has (→ C04 I49, FINDINGS F238 · F239).
 
 ---
+
+## 8a. The fitted height — a table and a trace
+
+**A classification table is primary.** Message length against width against rung is structure at
+rest: no event separates *this message is four lines* from *this width cannot hold the tag*. The
+trace is short and covers the one thing that is event-mediated, which is that the request lands a
+frame later than the fault.
+
+### The table
+
+| # | cell | two rules meeting | ruling |
+|---|---|---|---|
+| D1 | a message needing more lines than the cap | `rowsFor` caps × the render slices | the box is `cap + 3`, and **the render marks the cut** — the cap is a silent truncation until it does |
+| D2 | a message of **exactly** the cap | the cap × the mark | **no mark.** An off-by-one draws `…` on a complete message, which claims a truncation that did not happen and sends the reader to the sink for text already on screen — worse than a silent cut |
+| D3 | a width too narrow for the tag | `widthRung` drops it × the request sums it | `tagRows` comes **from `widthRung`**, so the sum follows the ladder rather than assuming a tag |
+| D4 | a width too narrow for a border | `heightRung` × `widthRung`'s affordability arm | no border, no tag, `rows = n` — and the wrap width is `width`, not `width − 4`, which the top-rung rule over-estimates safely |
+| D5 | `width − 4 ≤ 0` | the top-rung width × `wrapCells`' own floor | `wrapCells` clamps to 1, so a one-cell column wraps to one character per line — the cap is what stops that being a hundred rows |
+| D6 | a granted height larger than the viewport | the floor × `windowSequence` | **the transcript keeps a floored block whole and pays from `skipRows`** (I33). It is the *viewport's* rule and D7 is a different mechanism |
+| D7 | a floored block inside a **bounded container** | the floor × `scroll`'s declared height | **Neither clipped nor kept whole: over-drawn**, measured at `measure=4, rendered=8`. C04 §3c trace 1 already rules it — *taking a child's top `n` rows needs a windowing seam `RenderContext` does not have* — with C25 I1 knowingly false there and T2.28b holding it open. **The first draft of this row cited I33 and was wrong**: a real invariant, governing a real mechanism, and not the one in the cell (F239) |
+| D8 | the `measure`-fault path | `#measured`'s text × `rowsFor` | its message is `${kind} failed to measure` with no detail, so `n` is 1 and the box is 4. The fitting applies to both halves and is only *interesting* for `render` |
+| D9 | a floor already held from an earlier frame | the new number × `reserveNeeded` | `(block.minHeight ?? 0) < req.rows` still refuses, so a re-fit at the same width is a no-op and termination is unchanged |
+| D10 | a `loading` or `retrying` box | the activity line × the sum | `lineRows` is the same emptiness test the render uses, so there is no second rule — but **nothing constructs one through this path today**, and that is stated rather than left to look like coverage |
+
+### The trace
+
+| # | sequence | rules meeting | outcome |
+|---|---|---|---|
+| E1 | throw → request → patch → `rev` → frame 2 | the fit at frame 1's width × the floor applied at frame 2's | **the ruling already taken** (F230): frame 1 is the committed height, frame 2 the fitted one |
+| E2 | a **width change** between the two frames | the fitted number × the new width | the floor is a row count and rows do not rescale. A narrower frame 2 wraps to more lines than the floor allows and cuts — **with a mark**, which is why D1 is not optional. A re-fit at the new width is a second request, and `reserveNeeded` allows it because the number grew |
+| E3 | the far side replaces the block between the frames | the request's `rev` × the new document | dropped, unchanged (C22 I69) |
+| E4 | two blocks in one entry throw with **different** fitted heights | one patch per block × `rev` per patch | two requests, two frames, converging — measured for the constant case (T4.56) and the number does not change the shape |
 
 ## 9. Tests
 
