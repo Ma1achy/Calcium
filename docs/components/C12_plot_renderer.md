@@ -3985,6 +3985,69 @@ list from the rules; it is the shape where a correct fix changes nothing observa
 it reports is right the whole time.
 
 
+## 3aj. The gate for phase 3's shared-geometry refactor — written now, run later
+
+**A gate nobody can find is a gate that will not be run**, and this one has to survive two phases
+before anything invokes it. It is recorded here, beside the geometry it governs, because that is
+where the refactor will be read — not in the note, and not in the plan that produced it.
+
+**Phase 1 writes this and does not run it.** Nothing shares geometry yet. The dither arm (C09 §4c)
+is the first thing that will want to, which is exactly when an unwritten gate gets skipped.
+
+### The gate
+
+> **The shared-geometry refactor lands in its own commit and zero golden frames change.** Two
+> commits, never one. Make the geometry unit-agnostic and prove nothing moved; *then* add the
+> image path. **If both land together a moved frame is ambiguous** between refactor and feature,
+> and that ambiguity is how a regression ships. **Byte-identical, not *looks the same*** —
+> `git diff --stat` reports zero, and a frame that moves is a finding read before anything else
+> happens.
+
+### The four hazards, because a gate without its content is a slogan
+
+**1 · Where the rounding happens.** Cell coordinates are integers and pixel coordinates are
+floats. The tempting refactor makes the shared code float and rounds at the output — **and that
+moves every boundary case by one cell.** `Math.round` at the end is not `Math.round` at each
+stage, and the difference is invisible in the code and visible in every frame. **The rule: the
+shared layer produces normalised coordinates in `[0, 1]` and each renderer does its own
+rounding**, so the terminal path's arithmetic is unchanged by construction.
+
+**2 · Aspect ratio is a terminal fact.** `circle.ts`'s `rx = 2·ry`, braille's 2:4 cancellation,
+the waffle's square mosaic — all of it compensates for a 1×2 cell, and **none of it belongs in a
+shared layer** where a pixel is 1×1.
+
+**3 · Anything measured in cells stays in cells.** `labelWidth`, the axis gutter, the minimum
+area, the truncation ladder. The image renderer needs its own in pixels from font metrics; if one
+ends up shared, the terminal version starts sizing by something that is not cells.
+
+**4 · `cells()` itself.** Ambiguous width, grapheme clustering, the wide arm — none of it applies
+to a rasterised label. **A shared layout that calls `cells()` cannot serve the image path**, and
+that is discovered as a wrong-looking image rather than as an error.
+
+### The rows that catch a divergence at the shared layer
+
+Render one block through both paths and assert the **normalised** geometry agrees, before either
+rasteriser runs:
+
+| | |
+|---|---|
+| G1 | `niceAxis` returns the same ticks for both targets |
+| G2 | normalised sample positions are identical |
+| G3 | the legend entry list is identical |
+| G4 | annotation positions are identical in normalised space |
+| G5 | only the **rasterisation** differs — asserted by diffing the two stages' inputs |
+
+**That is what stops a divergence being found as a wrong picture three components away.**
+
+### Measure before starting
+
+**Whether `layoutFor` and `niceAxis` already assume cell units throughout.** If `niceAxis` is
+unit-free — it takes a range and a count — most of the geometry is already shared and only the
+layout ladder is not, **which makes this a small refactor rather than a large one**.
+
+**And confirm the catalogue is still reproducible** by running it twice and diffing. A
+non-reproducible catalogue makes this entire gate worthless.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The

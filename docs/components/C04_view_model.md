@@ -1557,6 +1557,91 @@ so there is no pair of rules that meet because something happened in between.
 | M12 | `ambiguousWidth: "wide"` x the grid's column arithmetic | the grid divides **cells**, and a child's own content is its own problem — the standing risk does not reach the geometry here, which is the first container for which that is true |
 
 
+## 3g. `image` — a block that declares a height in cells and draws pixels into them
+
+Not a floating overlay and not a separate surface: **a block, in the transcript, that measures,
+scrolls, degrades and caches like every other kind.** The precondition was measured before this
+was designed (F247, F248) — `cells(placeholder)` is 1, the row/column diacritics add nothing, Ink
+lays out exactly what `cells()` measures, and Ink re-emits the whole frame when one row changes.
+**An image participates in the grid.**
+
+```typescript
+export type Image = Readonly<{
+  kind: "image";
+  id: string;
+  /** PNG bytes, base64. The builder reads a path into this. */
+  data: string;
+  /** Rows, declared. A positive integer — `Scroll.height`'s precedent (I47). */
+  height: number;
+  /** Required. It is what a reader without pixels gets, and it is the only thing they get. */
+  alt: string;
+  /** The identity, derived once at construction — never the data (§3g.2). */
+  digest: string;
+}>;
+```
+
+### 3g.1 — the path is the builder's arm, because a renderer may not read a file
+
+`node:fs` appears in `src/shell/` and `src/data/process/` and **nowhere in `src/presentation/`**.
+A renderer that opened a file would be doing I/O at frame cadence in the layer forbidden it, and
+worse, `measure` and `render` would disagree the moment the file changed between them. So
+`b.image({ path })` reads at **construction**, where the shell already reads files, and the block
+carries bytes. **One block, one array of bytes, decided once.**
+
+**Refused at both gates**, each naming its own part: neither `data` nor `path`; both together; a
+non-positive or non-integer `height`; an empty `alt`; bytes that are not a PNG; and a decoded
+pixel count past a cap. **`alt` is required rather than optional** because it is not a courtesy —
+at `imageProtocol: "none"` with no dither it is the whole of what the reader receives.
+
+### 3g.2 — the identity is a digest, and the data is never a key
+
+The render cache holds lines per entry against `(id, rev, width, focus, theme)` with a composite
+slot (C22 §6c). **A megabyte of base64 in a key is a cache that costs more than it saves**, and it
+is the wrong question besides: two blocks holding the same pixels should hit, and the same block
+re-encoded should not miss. So a **digest is computed at construction and carried on the block** —
+FNV-1a over the bytes, internal, because a hash is the *sixty lines internal* side of the
+dependency ledger's own test and `node:crypto` would be a builtin reached for a non-cryptographic
+need.
+
+**It is what the protocol arm keys transmission on**, so the same image twice transmits once, and
+what the slot composes, so a changed image invalidates and an unchanged one does not.
+
+### 3g.3 — the width is derived and `measure` is what clamps it
+
+An image declares **rows**. Its natural cell width is `columnsForAspect(height, pixelAspect)` —
+already built, C12 §3ab, on `CELL_ASPECT = 2`. **If that exceeds the region the whole image scales
+down and `measure(block, width)` returns the reduced row count.** `measure` receives the width, so
+this needs no second pass and keeps both axes of C09 I1.
+
+**The mosaic's lesson one component over** (C09 I35, F245): the geometry is the guarantee and a
+clip is not a backstop. An image is the one kind where over-drawing the width would be worse than
+wrong — a placeholder outside its rectangle addresses a part of an image the terminal is not
+drawing there.
+
+### The walk — both artefacts, because this has state and structure
+
+**A trace**, because the transmission is event-mediated:
+
+| | sequence | ruling |
+|---|---|---|
+| T1 | transmit → place → evict → the same digest arrives again | the id is keyed by digest and released with the **last** block holding it, so this re-transmits and does not leak |
+| T2 | two blocks, one digest, in one document | one transmission, two placements. The case that looks like a leak answers itself |
+| T3 | a resume between transmit and place | **re-transmit.** A resumed session may be a new terminal and the id space is the terminal's |
+| T4 | a resume into the **same** terminal | the id may still be live. **Re-transmitting is correct and idempotent**: kitty replaces the image at that id, so the cost is one transmission and never a wrong picture |
+| T5 | an entry evicted while its image is on screen | the placement rows go with the entry; the id is released after, so the last frame drawn is never missing its image |
+
+**A table**, because the placeholder grid is structural:
+
+| | two rules that both apply | ruling |
+|---|---|---|
+| I1 | an image wider than its region × §3g.3's clamp | scale down, and `measure` returns the smaller row count |
+| I2 | `imageProtocol: "kitty"` × `unicode: "ascii"` | **the protocol wins.** A placeholder is not text a reader reads, so the ASCII arm has nothing to substitute; C09 I36 says the choice is the protocol's and not the vocabulary's |
+| I3 | `height: 1` × an image whose aspect needs more | legal. One row is a thumbnail, and a floor that refused it would refuse the sparkline case |
+| I4 | a corrupt PNG × the error path | the `status` block that already exists (C09 §3a), at `error`, with `alt` as the message |
+| I5 | an image inside a mosaic cell × C09 I35 | the cell bounds it, and the image's own clamp has already sized it to the cell's width |
+| I6 | a decoded size past the cap × `alt` | refused at both gates, so the render never sees it |
+
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -1864,6 +1949,7 @@ persisted document rests on.
 - **I70** — **A graph's layout is a member whose choice arm is vacuous today and whose refusal arm is not.** `graphLayout?: "layered"`, default `"layered"`, refused on every form but `graph`. **One value and one default forbids nothing** — A03 §2's vacuity class in a field, stated rather than left to be noticed — and what is testable is the refusal on the other forms and the compile error it makes of `graphLayout: "force"`. **A second member rather than a widened `treeLayout`** is I65's ruling from the other side, and it was recorded there so this would not be re-opened. **The member exists before its second value because the alternative is worse at the moment it changes**: adding it with `force` widens a union that did not exist, and every exhaustive consumer becomes a compile error that says nothing about what moved. Its expiry is C12 §3ai's label pass, which is a symbol rather than a condition (§3e.2).
 - **I71** — **A mosaic is a grid named by a string, and it exists because nested rows and columns draw only slicing figures.** `areas` splits rows on `/`, one character per column, `.` a hole; the distinct regions in reading order map onto `children` positionally, and the field is **`children`** because `validate.ts`'s `childBlocksOf` recurses structurally on that name and skips any other in silence. **Four refusals at both gates**, each naming the part at fault: an empty grid, ragged rows, a region that is not a solid rectangle, and a region count differing from `children.length` — the third is the one a reader cannot see, since `"ABA"` names a region in two pieces and reads as ordinary. **`height` is required and positive**, because measured rather than argued a container of absolutely positioned children computes a content height of zero and draws **one blank row** (F244 §2) — `Scroll.height`'s precedent, with a sharper reason: a scroll without one is unbounded and a mosaic without one is empty. `measure` returns `height` at every width.
 - **I72** — **The grid's two axes divide by `Share`, and a spanning region takes the sum of what it spans.** `columns` and `rows` are one entry per grid line rather than per child, so a region covering two columns is weighted by both; absent is an equal split, a mismatched length is refused on `flex`'s precedent, and fixed `{cells: n}` shares come off the budget before the weights divide the remainder because any other order makes a cell count a suggestion (I44). **The arithmetic is extracted and not copied** — one `divideShares` for the group's widths and both of the mosaic's axes — which is the four-gutter hazard of `presentation/plot/` named where it can still be avoided. **The vertical axis is the new half**: a column group has no height to divide, because its height is what its children measure; a mosaic declares one, so `rows` divides a known budget with the same rule against a different total. **The remainder is distributed after the division and not inside it** — `facetWidths`' ruling, because a mosaic tiles and its lines must reach the edge, while a `row` group has a gutter and T3.16 pins its remainder where it is; the leftover goes one cell each to the earliest non-fixed lines, so a cell count stays a cell count. **A shared scale across cells is refused and `yMin`/`yMax` are the answer** (I29), because harmonising means measuring both children's data before laying either out — a pass over content this layer does not read — and the field that says it already exists.
+- **I73** — **An image is a block that declares rows and carries bytes, an identity and an `alt`.** It measures, scrolls, degrades and caches like every other kind, which F247 and F248 established before it was designed: `cells(placeholder)` is 1, the diacritics add 0, Ink lays out what `cells()` measures, Ink re-emits the full frame on a one-row change, and both `truncate` and the window leave the grid addressing correctly. **`path` is the builder's arm and `data` is the block's**, because `node:fs` appears nowhere in `src/presentation/` and a renderer reading a file would make `measure` and `render` disagree the moment the file changed between them. **The identity is a digest computed once at construction, never the data** — a megabyte of base64 in a cache key costs more than it saves, and the digest is what the protocol keys transmission on, so two blocks of one image transmit once. **The width is derived from `columnsForAspect` and clamped by `measure`**, which receives the width: over-drawing here is worse than wrong, because a placeholder outside its rectangle addresses part of an image the terminal is not drawing there (C09 I35, F245). **Refused at both gates**, each naming its part: neither `data` nor `path`, both together, a non-positive `height`, an empty `alt`, bytes that are not a PNG, and a decoded size past a cap. **`alt` is required rather than optional** because at `imageProtocol: "none"` with no dither it is the whole of what the reader receives.
 
 
 ## 7. Commitments
@@ -1943,6 +2029,7 @@ persisted document rests on.
 69. **A graph's layout is a member, and the half of it that forbids nothing says so** (I70). `graphLayout?: "layered"` — the refusal arm is testable on every other form, the choice arm is A03 §2's vacuity class in a field, and the member exists ahead of its second value because adding it later widens a union that did not exist.
 70. **A mosaic is a grid named by a string, refused four ways at both gates** (I71). It exists because every nesting of rows and columns is a slicing figure and the pinwheel is not one — measured, against a five-rectangle slicing control, so the difference is the figure and not the size. `height` is required because omitting it draws one blank row rather than a degenerate box, and `children` is the field name because the validator's recursion reads it structurally (→ FINDINGS F244).
 71. **The grid divides both axes by `Share`, with one arithmetic serving the group and the mosaic** (I72). A spanning region takes the sum of what it spans; fixed shares precede weights; a shared scale is refused with `yMin`/`yMax` named as the answer already built (→ I29, I44).
+72. **An image is a block, and the three things that make it one are the digest, the derived width and the builder's path** (I73). It measures before it draws, its identity is not its data, and its geometry is clamped rather than clipped — the mosaic's ruling one component over (→ C09 I35, I36, FINDINGS F247 · F248).
 
 ---
 

@@ -737,6 +737,81 @@ mark it actually wanted — and `… n more` becomes ASCII. **A vocabulary that 
 character its callers reach for stops being a vocabulary**, and the refusal is what keeps
 the 1:1 rule true.
 
+## 4c. `image` — two arms, and the dither is the first one
+
+**Two capability arms, not four**, and that is what this simplifies:
+
+```
+imageProtocol: "kitty"                    the protocol arm
+"none" | "iterm2" | "sixel"               the DITHER arm
+```
+
+### iTerm2 and sixel are refused for composition, and the reason is not the obvious one
+
+**Sixel draws at a cursor position and does not participate in the grid at all** — no placeholders,
+so it does not scroll with the content above it, and a block that does not scroll with its
+transcript is not a block.
+
+**iTerm2 is the one whose refusal needs its reason stated correctly.** Its inline images take a
+declared cell size, occupy cells and scroll — so *draws at the cursor and does not participate* is
+false of it, and a refusal resting on that would be reversed by the first reader who checked.
+**What iTerm2 lacks is per-cell addressability.** A kitty placeholder is ordinary text: any row is
+independently re-emittable, and text can sit *inside* the rectangle. An iTerm2 image is one escape
+at one cursor position, so a row-level rewrite of its region destroys it and nothing can be drawn
+into it.
+
+**That is a fit argument and it settles a measurement by construction.** F248 asked whether images
+and the frame diff compose and measured Ink re-emitting the whole frame — safe for placeholders,
+and *fatal* for one blob, because a full-frame rewrite re-emits the image's rows as text. Recorded
+here so a later reader can argue with it rather than assume nobody tried.
+
+### The dither is built first, because most terminals are not kitty
+
+**A feature that shows nothing at `imageProtocol: "none"` is a feature most readers never see.**
+
+| arm | what it draws |
+|---|---|
+| `kitty` | the protocol — transmit once by digest, place with placeholders |
+| dither, unicode | braille 2x4, monochrome, nine intensity levels per cell |
+| dither, `ascii` | `.:-=+*#@`, ordered by the same matrix |
+| 1-bit | the same dither — **colour was never the carrier here** |
+
+**The 1-bit row is not a further degradation.** Every other kind loses colour at 1-bit and keeps
+its shape; a dither *is* shape, so it is unchanged. Worth stating because C10 I8 vanishes surfaces
+at 1-bit and a reader would expect this to vanish with them.
+
+### The matrix, designed here because it is designed nowhere
+
+`CALCIUM_IMAGES_NOTE.md` says *the braille dither is already designed — the 3D renderer's
+ordered-dither over a 2x4 Bayer matrix*. **There is no 3D renderer**, no such design in any file,
+and the roadmap lists 3D plots under *deliberately not doing*. The note's own preface records it.
+
+**A 4x4 ordered Bayer matrix supplies a per-cell threshold offset**, indexed by
+`(cellX % 4, cellY % 4)`; within a cell the 2x4 subcell grid takes the intensity. **The pattern
+varying with grid position is the whole point** — a flat threshold bands a gradient into stripes,
+and the offset breaks them into texture. Nine levels per braille cell, because eight dots plus
+empty is nine.
+
+**The rasteriser is not written twice.** `plot/raster.ts` already holds `BRAILLE_DOTS = {x: 2,
+y: 4}`, the standard bit assignment, `createGrid`, `setDot` and `foldBraille` — *one grid, two
+folders*. The dither sets dots and folds; no braille code is added.
+
+### The ramp is a third ladder axis, and widening the record is the check
+
+C12's `LadderAxis` is two axes today and `Serves` is a `Record` over it. Adding a dither axis makes
+**every existing ladder fail to compile until it answers**, which is what stops a dither ramp being
+indexed as a density ramp. They look interchangeable and are not: a density ramp encodes a
+magnitude at a position, a dither ramp encodes a **threshold against a position-varying offset**.
+**The type is what tells them apart, because the eye does not.**
+
+### The blind spot, stated rather than assumed
+
+**Three width implementations matter and two are reachable here** — `cells()`, which every
+`measure` uses, and Ink's, which lays out the box. F247 measured both agreeing at n = 1, 2, 4, 8.
+**The third is the terminal's own guarantee about a plane-16 private-use character**, and it is not
+measurable in this repository. **The first real-terminal test is where it is checked**, and until
+then two of three is not three.
+
 ## 4a. Syntax tokenisation
 
 C10 defines a `syntax` palette; this is where the tokens come from. `Code` is `{kind, id, language, text, wrap}` — text and a language name, no spans — so something has to turn one into the other, and it is not the adapter.
@@ -948,6 +1023,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I33** — **The registry applies C04's `minHeight` floor on both sides, so I1 holds by construction.** `measure` returns `max(definition.measure(…), block.minHeight ?? 0)` and `render` wraps a floored element in a box with the same minimum, which pads a short child and leaves a tall one alone. **Padding and never bounding is the whole of it**, and the alternative was measured: a fixed height drops an over-full box's **first** row rather than its last, and `overflowY: "hidden"` does not change that — so a bound would silently behead a block that grew. **A block carrying a floor is not windowed** (C04 I68). I26's identity is about rows the *definition* can produce, and `windowSequence` derives its `to` from the floored height — so a `window` that can only reach the definition's own rows breaks the identity from outside the definition. Kept whole and paid out of `skipRows`, as a kind declaring no `window` already is. **The floor is applied outside the definition** so that I2 survives it and `scroll`'s §3c purity argument is not reopened.
 - **I34** — **The contained box asks for the height its message needs at the width it was given, capped at four message lines, and marks a cut.** Height fits and width does not: a block does not choose its width, the region does, and a block wider than its region is I1's over-draw in the other axis (§3a-bis). The request wraps at the **top rung's** content width — `width − 4`, the narrowest any rung offers — which dissolves the fixed point between the rung, its padding and the wrap by erring in the safe direction: every lower rung is wider, wraps to fewer lines, and still shows all of them, at a cost of at most one row of slack that the render centres. `rows = n + 2 + tagRows + lineRows`, and **the vertical blanks are not summed** — they are slack, appearing when the message is short and giving way as it grows, which is what the ladder already does with them; counting them would make a two-line failure seven rows rather than five. **The cap is measured rather than chosen** (F238): four lines holds a three-frame stack trace at 80 columns and a path and nothing else at 40, so it binds where the room is least — and it is not width-scaled, because how much a reader takes in before going to the sink is a property of the reader. **It is also a containment bound** (F239): a bounded container draws an over-tall child whole and C25 I1 is knowingly false there (C04 §3c trace 1, T2.28b), so seven rows bounds that divergence by a number rather than by the length of an exception. **A cut carries its mark** through `truncate`, so `…` at unicode and `~` at `ascii` (I22) — and **a message of exactly the cap carries none**, because a truncation that did not happen sends the reader to the sink for text already on screen. **One layout function serves `render` and the request**, on `cells()`'s argument: a second walk over the same arithmetic rounds differently at the boundary.
 - **I35** — **A mosaic's cell bounds its own child, and the two properties that do it are not interchangeable.** The cell is `overflow: "hidden"` **and** its content carries `flexShrink: 0`, in that pairing: a relative child in a cell shorter than itself is **squashed by flex before it can overflow**, so the clip alone changes nothing and the child draws rows from the *middle* of itself — measured at `row2, row5` out of six, the same mechanism F244 §5 found under `scroll`'s bottom-anchored precedent. **The row count agrees in all three arms**, so the frame is the only instrument that separates them, and the failure is at its worst on the block that most needs reading: a bare cell drew an error box's fragment and its bottom border, which looks like a complete box. **So C04 §3c trace 1's divergence does not transfer** — F239 is `scroll`'s, whose need is a windowed slice at an arbitrary offset and whose seam genuinely does not exist; a mosaic needs a clip at the child's own row 0, which is exactly what Ink offers. `measure` equals the rendered count through an over-tall child and through a throwing one, and C25 I1 holds rather than being knowingly false. **The width axis is the geometry's guarantee and not the clip's, and the build is what said so.** F244 §4 measured an absolutely positioned child running past its parent's width — 60 cells at width 40, every count agreeing — and the remedy looked like `overflowX: "hidden"` on the container, which is what the group renderer already carries. **It does not compose.** Ink keeps a stack of clipping regions and applies `clips.at(-1)`, the *innermost*, so a cell that clips its own child **shadows** the container's clip instead of intersecting with it: three 1-wide cells in a container of 1 draw `"A"` when only the container clips and `"ABC"` once the cells clip too. Since every cell must clip — the first half of this invariant — the container's clip is shadowed everywhere it matters. **So `mosaicRects` clamps** and a cell with no room is zero-wide and not drawn, which is the only one of three answers keeping both axes of I1; the container's clip stays as the cheap arm of a rule enforced by the arithmetic. **The ruling named an operation that does not do what it appears to** — C23 §8a A4's class arriving from the implementation rather than the walk, and the reachable case is the floor of 1 per grid line, which asks a three-column grid for three cells at any width including one.
+- **I36** — **An image has two arms and the dither is the first of them.** `imageProtocol: "kitty"` takes the protocol; `"none"`, `"iterm2"` and `"sixel"` take an ordered dither. **Two arms rather than four, and the refusals are for composition rather than effort.** Sixel draws at a cursor and does not participate in the grid. **iTerm2 does participate** — declared cell size, occupies cells, scrolls — and what it lacks is **per-cell addressability**: a kitty placeholder is ordinary text so any row is independently re-emittable and text can sit inside the rectangle, while an iTerm2 image is one escape at one cursor position that a row-level rewrite destroys. **That settles F248's diff measurement by construction**, since a full-frame rewrite is safe for placeholders and fatal for one blob. **The dither is built first because most terminals are `"none"`** and a feature that shows nothing there is one most readers never see; **1-bit is not a further degradation**, because a dither is shape and colour was never its carrier. **The matrix is designed here because it is designed nowhere** — the note citing *the 3D renderer's ordered dither* cites a renderer the roadmap refuses — and it is a 4x4 Bayer offset indexed by `(cellX % 4, cellY % 4)` over the 2x4 subcell grid, nine levels per cell, **varying with grid position so a gradient reads as texture rather than banding**. `plot/raster.ts` is reused rather than reimplemented. **The ramp is a third ladder axis**, and widening the `Serves` record is the check that a dither ramp cannot be indexed as a density ramp: one encodes a magnitude at a position, the other a threshold against a position-varying offset, and the type tells them apart because the eye does not (§4c).
 
 ---
 
@@ -986,6 +1062,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 31. **A floor set above the registry is honoured on both sides of the pair, by the registry** (I33), and the field it honours is C04's (→ C04 I67). One number reaches `measure` and the element's padding through one line each, so a floored block cannot measure one height and draw another — which is the failure I1 exists for, arriving through the mechanism added to serve it.
 32. **A contained failure asks for the height its message needs and marks what it cannot show** (I34). Height fits the content and width never does — the region owns the width, so a block that grew into it would be I1's over-draw in the other axis. The request is capped at four message lines, measured rather than chosen, and the cap is what bounds the divergence a bounded container already has (→ C04 I49, FINDINGS F238 · F239).
 33. **A mosaic's cell bounds its child with two properties rather than one, and the frame is what says so** (I35). `flexShrink: 0` before `overflow: "hidden"`, because a squashed child never overflows and draws its own middle; the container clips the width separately, because I1 is rows only. `measure` equals the rendered count through an over-tall child and a throwing one, so C25 I1 holds here where §3c's trace leaves it knowingly false (→ C04 I71, FINDINGS F244).
+34. **An image degrades to an ordered dither before it degrades to nothing, and both refusals are stated with reasons that survive checking** (I36). The dither is the first arm because most terminals are not kitty; iTerm2 is refused for per-cell addressability rather than for a participation it actually has; and the dither ramp is a third ladder axis so the type refuses what the eye would accept (→ C04 I73, FINDINGS F248).
 
 ---
 
