@@ -12078,6 +12078,12 @@ lostNode   0     every real node appears exactly once
 dupEdge   24     <-- a two-node cycle reversed onto an edge that already existed
 ```
 
+**Corrected by F243 before anything rested on it: *drawn twice* is false.** An edge sets mask
+bits with `|=`, so laying the same one down twice is idempotent and invisible. The cost is entirely
+in the **counting** — a duplicate inflates the crossing figure, which steers the ordering — and the
+pass earns its place on that alone. The wrong half is the one that made this sound visual, and a
+reader chasing the drawing would have found nothing and called the pass dead.
+
 **The stated recipe — *layer assignment by longest path, ordering by median heuristic, two
 sweeps* — is short by three passes, and the third came from checking the instrument rather than
 from reading the recipe.** Cycle removal and dummy nodes are structural and were named before the
@@ -12085,3 +12091,61 @@ probe ran; **deduplication after reversal was not.** Reversing `b→a` where `a�
 yields the same edge twice, which is drawn twice, counted twice in every crossing figure above,
 and looks exactly like a correct edge. 24 in 360 is small and the point is that nothing in the
 recipe asks.
+
+
+## F243 — three survivors, three dispositions, and one of them corrects the finding above ★★★★☆
+
+`c12-graph`, six mutations against the four passes the recipe does not name. Three caught, three
+survived — and **the three survivors are three different things**, which is the whole reason the
+disposition is asked per row rather than per pass.
+
+### 1 · Drawing an edge twice is a no-op, so F242's stated cost is half wrong
+
+Removing deduplication changed **nothing in the frame**. The reason is the mask: an edge sets bits
+with `|=`, so laying the same edge down twice is idempotent, and the second one is invisible by
+construction.
+
+**F242 said a duplicate is "drawn twice and counted twice".** *Counted* twice is true and is where
+the cost is — a duplicated edge inflates the crossing count, which steers the ordering. *Drawn*
+twice is false, and it was the half that made the finding sound visual. **The pass still earns its
+place** on the counting alone, and the correction matters because a reader chasing the drawing
+would find nothing and conclude the pass is dead.
+
+**It is the mutation pass indicting the sentence rather than the test**, one level down from where
+that usually happens: not a rule with nothing to be wrong about, but a *consequence* asserted
+without being run.
+
+### 2 · The corpus cannot reach the defect the sweep trace predicted
+
+`best = rows` instead of `best = rows.map((r) => [...r])` — §3ai.5 S5, the reference-not-a-copy that
+reports the right number and returns the wrong order — **survived, and correctly**. With two sweeps
+on a five-node and a fourteen-node fixture the last ordering *is* the best one, so reference and
+copy agree and no frame can tell them apart.
+
+**The defect is only expressible where sweep 2 is worse than sweep 1**, which F242 measured and
+located: near-path at *n* = 50, 17 trials in 40. **Both fixtures are far below it.** *A fixture must
+be shown to respond to the thing under test* — and this is the sharper form of that rule, because
+the fixture responds to everything else in the pipeline and only this one row needs a bigger graph.
+
+**Owed: a fixture in the near-path family at a size where the second sweep can lose**, and the row
+that reads its frame. Recorded rather than fixed, because adding it means re-measuring which *n*
+still fits a golden frame.
+
+### 3 · The drop's guard is doubled, and the mutation indicts the subject
+
+Removing `if (!keep.has(a) || !keep.has(b)) continue;` from `lay` changed nothing either — because
+the drawing loop already refuses a segment whose endpoints have no entry in `centre`, and a dropped
+node has none. **Two guards for one rule**, and the second is load-bearing while the first reads as
+the one that matters.
+
+**That is a mutation's third disposition** — not a weak test and not a stale anchor, but a second
+defence masking the first. The honest resolutions are opposite and both are defensible: delete the
+redundant guard and let the drawing loop own the rule, or keep it and say in the comment that it is
+the cheap arm of a rule enforced twice. **What is not defensible is leaving it looking like the only
+guard**, which is what it looks like now.
+
+### The three that were caught
+
+Cycle removal never reversing, the medians read against a half-applied order, and the ordering pass
+never running — all three moved the golden frame. So the corpus *is* sensitive to the pipeline; what
+it cannot reach is one row's worth of it, at one size.
