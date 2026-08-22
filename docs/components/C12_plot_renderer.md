@@ -4140,6 +4140,62 @@ agree*, arriving in the row written to prove two paths share a coordinate.
 other form is the same three ingredients — the shared range, the shared coordinate, and a layout in
 fractions — and adding them is work rather than a decision.
 
+
+### 3aj.3 — the remaining forms, and the two rules that had to be carried
+
+**Four families, not forty-seven renderers**, because the forms inside a family differ only in what
+they put at a position the shared coordinate already gave them: a joined path, a mark, a rectangle,
+a painted cell. `SVG_FAMILY` is exhaustive over `PlotForm` by `satisfies`, so **adding a form to
+the union fails to compile until someone decides** — the enumeration the builders and the validator
+already use.
+
+| family | forms | what it spends the coordinate on |
+|---|---|---|
+| curve | line, sparkline, step, ecdf, density, autocorrelation | a `y`, joined |
+| scatter | scatter, bubble | a `y`, unjoined |
+| bar | bar, histogram, lollipop, dotplot | a `y` and a baseline |
+| matrix | heatmap, correlation, confusion, spectrogram, density2d, latency, utilisation | **a colour** |
+
+**The matrix family is the one that generalises the claim.** The shared coordinate is
+`value → [0, 1]`; what a renderer does with the `[0, 1]` is its own. A curve spends it on a
+position and a matrix on a colour — which is the overlay's ruling from phase 2 arriving one
+component along (C04 §3h.2).
+
+**And roughly half the union is refused, each with a reason.** Cumulative forms — a sample's
+position is not a function of its own value. Distribution forms — the datum is a shape derived from
+the samples. Hierarchy and topology — position comes from structure. Its own domain — a date grid,
+a time span, an angle. **`plotToSvg` returns `null` rather than a fallback picture**, because a
+treemap drawn by the curve family measures, rasterises and reads as a chart of something: the
+plausible wrong figure the placeholder encoding refuses a wrap for (C04 I73). Calling that group
+*application* would be §3h's claim again, and §3h.3 is what measuring it costs.
+
+### The two carried rules, and what they caught
+
+**1 · The gutter-in-fractions rule is what convenience violates**, so the mutation runs against
+every form by construction: `describe.each` over the claimed set, and the mutation is on
+`svgLayout`, so a row per form is a check per form.
+
+**2 · A form whose samples sit inside its range cannot tell a shared coordinate from an
+open-coded one.** Every row pins `2..8` and passes `-40` and `40`.
+
+**Both were necessary and neither was sufficient**, which is the finding. Two mutations survived
+the parameterised rows, and they are the same class:
+
+> **The per-form rows assert that ink stays *inside the plot area*. That is a containment claim,
+> and every wrong answer that is also inside the area satisfies it.**
+
+The matrix's colour was never read — a `<rect fill>` has coordinates the rows checked and a datum
+they did not. And `continuousColour` clamps for its own reasons, so the out-of-range samples the
+second rule demands could not see it either: the difference is the **span**, and a density field
+over `0..0.3` is where `Math.max(1, span)` squashes every reading into the bottom third of the map.
+
+**The bar survivor was about the source rather than the row.** The baseline read
+`normalisedOf(range.min, range, true)` — which is `1` by construction, so the expression was
+`box.bottom` written the long way round. **Dead arithmetic wearing the shared layer's clothes**,
+and a mutation replacing it with `box.bottom` changed nothing, which is what said so. The baseline
+is now zero where the range holds it, so a bar of `-3` grows *down* — which is what a bar chart
+means and what the first draft could not draw.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The

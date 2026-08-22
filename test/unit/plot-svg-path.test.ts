@@ -12,11 +12,20 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
-import { plotToSvg, svgLayout, svgPoints, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import {
+  plotToSvg,
+  svgLayout,
+  svgPoints,
+  SVG_DEFAULT_LAYOUT,
+  SVG_FAMILY,
+  SVG_FONT_SIZE,
+} from "../../src/presentation/plot/svg.js";
 import { rowOf, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { normalisedOf } from "../../src/data/viewmodel/range.js";
 import { decodePng } from "../../src/presentation/image/index.js";
+import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/colormap.js";
 import { b } from "../../src/shell/builders/index.js";
+import type { PlotForm } from "../../src/data/viewmodel/index.js";
 
 const VALUES = [1, 4, 2, 8, 5, 9, 3, 7];
 const RANGE = { min: 1, max: 9 };
@@ -33,6 +42,9 @@ const block = b.plot({ id: "p", form: "line", height: 8, series: [{ label: "s", 
  * mechanism is denser than the mechanism, so the false positive is the likely
  * direction rather than the unlucky one.
  */
+const sampleHex = (map: Parameters<typeof sampleMap>[0] | undefined, t: number): string =>
+  map === undefined ? "" : sampleMap(map, t);
+
 const src = (rel: string): string =>
   readFileSync(new URL(rel, import.meta.url), "utf8")
     .replace(/\/\*[\s\S]*?\*\//gu, "")
@@ -134,7 +146,8 @@ describe("G3–G5 — the second renderer", () => {
     // be a picture of nothing — `sharp` is the reader, already in the ledger for
     // the catalogue's own frames, so this costs no dependency.
     const svg = plotToSvg(block);
-    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    expect(svg, "a curve form renders").not.toBeNull();
+    const png = await sharp(Buffer.from(svg ?? "")).png().toBuffer();
     const decoded = decodePng(new Uint8Array(png));
     expect(decoded.ok, "the SVG is a valid picture").toBe(true);
     if (!decoded.ok) return;
@@ -170,11 +183,160 @@ describe("G3–G5 — the second renderer", () => {
     // A `<text>` with `text-anchor="end"` needs no width to sit right-aligned
     // against the gutter. Nothing computed its extent, and that is hazard 4's
     // answer visible in one attribute.
-    const svg = plotToSvg(block);
+    const svg = plotToSvg(block) ?? "";
     expect(svg).toContain('text-anchor="end"');
     expect(svg.match(/<text /gu)?.length ?? 0, "one per tick").toBeGreaterThan(1);
     // And a label that would break the document is escaped rather than measured.
     const risky = b.plot({ id: "r", form: "line", height: 4, series: [{ label: "a<b&c", values: [1, 2] }] });
-    expect(plotToSvg(risky).includes("a<b&c"), "raw markup never reaches the output").toBe(false);
+    expect((plotToSvg(risky) ?? "").includes("a<b&c"), "raw markup never reaches the output").toBe(false);
+  });
+});
+/**
+ * **Every form the path claims, driven by one table** (§3aj.3).
+ *
+ * Two rules carried from the first form, and both are the reason this is
+ * parameterised rather than written per form:
+ *
+ *   1  **the gutter-in-fractions rule is the one convenience violates** — the
+ *      mutation that pins it to the output must run against *every* form, not
+ *      the first. One `describe.each` makes that structural: the mutation is on
+ *      `svgLayout`, so a row per form is a check per form by construction
+ *   2  **a form whose samples sit inside its range cannot tell a shared
+ *      coordinate from an open-coded one** (G5's survivor). So every row pins a
+ *      range and puts samples outside it
+ */
+const SAMPLES = [-40, 2, 5, 8, 40];
+const PIN = { yMin: 2, yMax: 8 } as const;
+
+const supported = (Object.entries(SVG_FAMILY) as [PlotForm, string | null][])
+  .filter(([, family]) => family !== null)
+  .map(([form]) => form);
+
+describe.each(supported)("G6 — %s", (form) => {
+  const made = b.plot({
+    id: `f-${form}`,
+    form,
+    height: 8,
+    ...PIN,
+    series: [{ label: "s", values: SAMPLES }],
+  });
+
+  it("renders, and its ink stays inside the fractional plot area", () => {
+    const layout = svgLayout(600, 300);
+    const svg = plotToSvg(made, layout);
+    expect(svg, "a claimed form draws something").not.toBeNull();
+    if (svg === null) return;
+    const left = layout.width * (layout.gutter + layout.pad);
+    const right = layout.width * (1 - layout.pad);
+    // **Every x in the document, checked against the fractional bounds.** A
+    // gutter pinned to a label's width moves `left` and this fails — which is
+    // the point of running it per form rather than once.
+    const xs = [...svg.matchAll(/(?:\bx|cx|x1|x2)="([-\d.]+)"/gu)]
+      .map((m) => Number(m[1]))
+      .filter((v) => Number.isFinite(v) && v !== 0);
+    expect(xs.length, "the form drew marks with coordinates").toBeGreaterThan(0);
+    for (const x of xs) {
+      expect(x, `${form}: an x left of the gutter`).toBeGreaterThanOrEqual(left - 8);
+      expect(x, `${form}: an x past the right pad`).toBeLessThanOrEqual(right + 1);
+    }
+    // The gutter is a share: the same fractions at a different output size.
+    expect(svgLayout(1200, 600).gutter).toBe(layout.gutter);
+  });
+
+  it("clamps a sample outside the pinned range — the shared coordinate, not a copy", () => {
+    // **The fixture lesson generalised.** `-40` and `40` against a pin of `2..8`
+    // are the only samples an open-coded normalisation gets wrong, and without
+    // them this row passes for both readings.
+    const layout = SVG_DEFAULT_LAYOUT;
+    const range = { min: PIN.yMin, max: PIN.yMax };
+    const points = svgPoints(SAMPLES, range, layout);
+    const top = layout.height * layout.pad;
+    const bottom = layout.height * (1 - layout.gutter);
+    expect(points[0]?.[1], `${form}: far below pins to the floor`).toBeCloseTo(bottom, 6);
+    expect(points[4]?.[1], `${form}: far above pins to the ceiling`).toBeCloseTo(top, 6);
+    expect(points[0]?.[1]).toBe(points[1]?.[1]);
+    expect(points[4]?.[1]).toBe(points[3]?.[1]);
+    // And the drawn document never puts ink outside the area either.
+    const svg = plotToSvg(made, layout) ?? "";
+    const ys = [...svg.matchAll(/(?:\by|cy|y1|y2)="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+    for (const y of ys) {
+      // Tick labels sit a third of a glyph below their line, so the bound is the
+      // area plus that — a number from the type size and never from a metric.
+      expect(y, `${form}: ink above the area`).toBeGreaterThanOrEqual(top - 1);
+      expect(y, `${form}: ink below the area`).toBeLessThanOrEqual(bottom + SVG_FONT_SIZE);
+    }
+  });
+});
+
+describe("G6b — the two assertions containment could not make", () => {
+  // **Both came from survivors, and both are the same class.** The per-form rows
+  // assert ink stays *inside the plot area*, which is a containment claim: every
+  // wrong answer that is also inside the area satisfies it. A mutation is what
+  // separates *correct* from *contained*.
+
+  it("a matrix cell's colour is the coordinate, at a span the open-coded form gets wrong", () => {
+    // `continuousColour` clamps for its own reasons, so an unclamped `t` draws
+    // the same colour — the mutation bites only where the **span** does, and a
+    // density field over `0..0.3` is where. Open-coded, `Math.max(1, span)`
+    // squashes every reading into the bottom third of the map.
+    const narrow = b.plot({
+      id: "m",
+      form: "heatmap",
+      height: 4,
+      colormap: "viridis",
+      series: [{ label: "r", values: [0, 0.15, 0.3] }],
+    });
+    const svg = plotToSvg(narrow) ?? "";
+    const fills = [...svg.matchAll(/<rect x=[^>]*fill="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
+    expect(fills, "one cell per reading").toHaveLength(3);
+    expect(new Set(fills).size, "and three different colours, not three near-black ones").toBe(3);
+    // The extremes reach the map's ends, which is what a full span means and
+    // what a squashed one cannot do.
+    const map = COLORMAPS["viridis"];
+    expect(fills[0], "the floor is the map's floor").toBe(sampleHex(map, 0));
+    expect(fills[2], "the ceiling is the map's ceiling").toBe(sampleHex(map, 1));
+  });
+
+  it("a bar's baseline is zero where the range holds it, not the area's floor", () => {
+    // The first draft computed `normalisedOf(range.min, …)`, which is `1` by
+    // construction — `box.bottom` the long way round. Signed data is what tells
+    // the difference: a bar of `-3` grows *down* from zero.
+    const signed = b.plot({
+      id: "bz",
+      form: "bar",
+      height: 6,
+      series: [{ label: "s", values: [-3, 0, 5] }],
+    });
+    const layout = SVG_DEFAULT_LAYOUT;
+    const svg = plotToSvg(signed, layout) ?? "";
+    const rects = [...svg.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/gu)];
+    expect(rects, "three bars").toHaveLength(3);
+    const bottom = layout.height * (1 - layout.gutter);
+    const [neg, , pos] = rects.map((m) => ({ y: Number(m[2]), h: Number(m[4]) }));
+    // The negative bar's *top* is the baseline; the positive bar's *bottom* is.
+    expect(neg?.y, "the negative bar hangs from the baseline").toBeGreaterThan(layout.height * layout.pad);
+    expect((pos?.y ?? 0) + (pos?.h ?? 0), "and the positive one stands on it").toBeCloseTo(neg?.y ?? -1, 3);
+    expect(neg?.y, "which is not the area's floor").toBeLessThan(bottom - 1);
+  });
+});
+
+describe("G7 — the partition itself", () => {
+  it("is exhaustive over PlotForm, and every refusal has a reason in the table", () => {
+    // **The compiler already proved exhaustiveness** — `satisfies Record<
+    // PlotForm, …>` fails to build otherwise — so this row asserts the part it
+    // cannot: that the partition is not secretly empty on one side, and that a
+    // refused form refuses rather than drawing a plausible wrong figure.
+    const all = Object.keys(SVG_FAMILY) as PlotForm[];
+    expect(all.length, "every form in the union is keyed").toBeGreaterThan(40);
+    expect(supported.length, "and the claimed set is not empty").toBeGreaterThan(15);
+    const refused = all.filter((f) => SVG_FAMILY[f] === null);
+    expect(refused.length, "nor is the refused set").toBeGreaterThan(15);
+    for (const form of refused.slice(0, 6)) {
+      const made = b.plot({ id: `r-${form}`, form, height: 4, series: [{ label: "s", values: [1, 2, 3] }] });
+      // **A refusal, not a fallback.** A treemap drawn by the curve family
+      // measures, rasterises and reads as a chart of something — the plausible
+      // wrong figure the placeholder encoding refuses a wrap for.
+      expect(plotToSvg(made), `${form} carries its own geometry`).toBeNull();
+    }
   });
 });

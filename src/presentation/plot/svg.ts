@@ -26,7 +26,8 @@
 import { normalisedOf, type PinnedRange } from "../../data/viewmodel/range.js";
 import { seriesRange } from "./scale.js";
 import { niceAxis } from "./axes.js";
-import type { Plot } from "../../data/viewmodel/index.js";
+import { COLORMAPS, continuousColour } from "../theme/colormap.js";
+import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /**
  * The image path's layout — **its own units, and no cells anywhere** (§3aj
@@ -78,6 +79,75 @@ function escape(text: string): string {
   return text.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;");
 }
 
+/**
+ * Which of the three ingredients a form is made of, **exhaustively over the
+ * union** (C12 §3aj.3).
+ *
+ * *Every other form is the same three ingredients — shared range, shared
+ * coordinate, layout in fractions* is true of the forms whose datum is **a value
+ * on one axis over an ordered domain**, and false of the ones that carry their
+ * own geometry. Calling the second group *application* would be the claim §3h
+ * made about the compositions, which measuring falsified.
+ *
+ * **`satisfies Record<PlotForm, …>` is the mechanism**, not the comment: adding
+ * a form to the union fails to compile until someone decides, which is the same
+ * enumeration the builders and the validator use. `null` is a decision with a
+ * reason, never an omission.
+ *
+ * **The matrix family is here because the shared coordinate is `value → [0, 1]`
+ * and not `value → position`.** What a renderer does with the `[0, 1]` is its
+ * own: a curve spends it on a y, a matrix spends it on a colour. That is the
+ * overlay's ruling from phase 2 arriving one component along (C04 §3h.2).
+ */
+export type SvgFamily = "curve" | "scatter" | "bar" | "matrix";
+
+export const SVG_FAMILY = {
+  // **Curve** — samples in order, joined. `step` differs only in the path
+  // command, which is rasterisation and not geometry.
+  line: "curve", sparkline: "curve", step: "curve", ecdf: "curve",
+  density: "curve", autocorrelation: "curve",
+
+  // **Scatter** — the same points, unjoined. `bubble`'s radius is a second
+  // encoding this path does not carry yet and its positions are these.
+  scatter: "scatter", bubble: "scatter",
+
+  // **Bar** — a rectangle from the range's floor to the sample.
+  bar: "bar", histogram: "bar", lollipop: "bar", dotplot: "bar",
+
+  // **Matrix** — series are rows, values are columns, and the coordinate is
+  // spent on colour.
+  heatmap: "matrix", correlation: "matrix", confusion: "matrix",
+  spectrogram: "matrix", density2d: "matrix", latency: "matrix",
+  utilisation: "matrix",
+
+  // **Its own geometry, each with a reason.** None of these is a value on one
+  // axis over an ordered domain, so none is application.
+  //
+  // *Cumulative*: the coordinate is a running total, so a sample's position is
+  // not a function of its own value.
+  waterfall: null, streamgraph: null, stackedarea: null,
+  // *Distribution*: the datum is a shape derived from the samples — quartiles,
+  // a kernel estimate — rather than the samples.
+  boxplot: null, violin: null, ridgeline: null,
+  // *Hierarchy and topology*: position comes from structure, not from a value.
+  flame: null, icicle: null, treemap: null, tree: null, graph: null,
+  // *Its own domain*: a date grid, a time span, a category ring, an angle.
+  calendar: null, gantt: null, timeline: null, pie: null, radar: null,
+  waffle: null, funnel: null,
+  // *Paired or banded*: two positions per datum, or a band ladder.
+  slope: null, dumbbell: null, forest: null, bullet: null, horizon: null,
+  // *A composition of other forms*, so it is whatever they are.
+  smallmultiples: null, pairplot: null,
+  // *A field with layers over it* — the arrows and contours are a second
+  // geometry the matrix family does not carry.
+  contour: null, quiver: null,
+} satisfies Record<PlotForm, SvgFamily | null>;
+
+/** The family, or `null` where the form carries geometry this path does not. */
+export function svgFamilyOf(form: PlotForm): SvgFamily | null {
+  return SVG_FAMILY[form];
+}
+
 /** A number with three decimals, so the output is byte-stable across platforms. */
 function n(v: number): string {
   return (Math.round(v * 1000) / 1000).toString();
@@ -112,20 +182,135 @@ export function svgPoints(
   });
 }
 
+/** The plot area in px, from the layout's fractions. Never a cell count. */
+function area(layout: SvgLayout): Readonly<{ left: number; right: number; top: number; bottom: number }> {
+  return {
+    left: layout.width * (layout.gutter + layout.pad),
+    right: layout.width * (1 - layout.pad),
+    top: layout.height * layout.pad,
+    bottom: layout.height * (1 - layout.gutter),
+  };
+}
+
+const SERIES_INK = ["#6ea8fe", "#f7a072", "#8fd694", "#c792ea", "#e5c07b"] as const;
+
+/** The path a curve family form draws: `step` is square, everything else is straight. */
+function curvePath(points: readonly (readonly [number, number] | null)[], square: boolean): string {
+  const out: string[] = [];
+  let open = false;
+  for (const [i, p] of points.entries()) {
+    if (p === null) {
+      open = false;
+      continue;
+    }
+    if (!open) {
+      out.push(`M${n(p[0])} ${n(p[1])}`);
+      open = true;
+      continue;
+    }
+    // **A step's corner is two commands and not a curve.** Which command runs is
+    // rasterisation; where the corner is came from the shared coordinate, so a
+    // step and a line disagree about ink and agree about every sample.
+    if (square) out.push(`H${n(p[0])}`, `V${n(p[1])}`);
+    else out.push(`L${n(p[0])} ${n(p[1])}`);
+    void i;
+  }
+  return out.join(" ");
+}
+
 /**
- * A line plot as SVG.
+ * A form's marks, by family.
  *
- * **One form**, because the point of the second commit is that the hazards get
- * subjects rather than that the catalogue gets a second output. Every other form
- * is the same three ingredients — the shared range, the shared coordinate, and a
- * layout in fractions — and adding them is work rather than a decision.
+ * **One function per family and not one per form**, because the forms inside a
+ * family differ only in what they put at a position the shared coordinate
+ * already gave them — a joined path, a mark, a rectangle, a painted cell.
  */
-export function plotToSvg(block: Plot, layout: SvgLayout = SVG_DEFAULT_LAYOUT): string {
+function marks(block: Plot, range: PinnedRange, layout: SvgLayout): readonly string[] {
+  const family = svgFamilyOf(block.form);
+  const box = area(layout);
+  const out: string[] = [];
+
+  if (family === "matrix") {
+    const map = COLORMAPS[block.colormap ?? "viridis"];
+    const rows = block.series.length; // cells-ok — a series count
+    const cols = block.series.reduce((m, r) => Math.max(m, r.values.length), 0); // cells-ok — a column count
+    if (map === undefined || rows === 0 || cols === 0) return out;
+    const w = (box.right - box.left) / cols;
+    const h = (box.bottom - box.top) / rows;
+    for (const [r, series] of block.series.entries()) {
+      for (const [c, v] of series.values.entries()) {
+        if (v === null || !Number.isFinite(v)) continue;
+        // **The shared coordinate, spent on colour.** `invert` is false: a
+        // matrix reads low-to-high up the map rather than up the page.
+        const t = normalisedOf(v, range, false);
+        const colour = continuousColour(map, t, { colourDepth: 24 });
+        if (colour === undefined || colour.kind !== "rgb") continue;
+        out.push(
+          `<rect x="${n(box.left + c * w)}" y="${n(box.top + r * h)}" width="${n(w)}" height="${n(h)}" ` +
+            `fill="${colour.hex}"/>`,
+        );
+      }
+    }
+    return out;
+  }
+
+  for (const [si, series] of block.series.entries()) {
+    const points = svgPoints(series.values, range, layout);
+    const ink = SERIES_INK[si % SERIES_INK.length] ?? SERIES_INK[0]; // cells-ok — a series index
+    if (family === "curve") {
+      const d = curvePath(points, block.form === "step" || block.form === "ecdf");
+      if (d !== "") out.push(`<path d="${d}" fill="none" stroke="${ink}" stroke-width="2"/>`);
+      continue;
+    }
+    if (family === "scatter") {
+      for (const p of points) {
+        if (p !== null) out.push(`<circle cx="${n(p[0])}" cy="${n(p[1])}" r="3" fill="${ink}"/>`);
+      }
+      continue;
+    }
+    if (family === "bar") {
+      // **The baseline is zero where the range contains it, and the floor
+      // otherwise** — because a bar's length *is* its value, so signed data
+      // grows both ways from zero.
+      //
+      // **The first draft used `normalisedOf(range.min, …)`, which is not a
+      // coordinate at all**: it is `1` by construction, so the expression was
+      // `box.bottom` written the long way round. A mutation replacing it with
+      // `box.bottom` changed nothing and survived — and that survivor is what
+      // said the line was dead arithmetic wearing the shared layer's clothes.
+      const zero = range.min <= 0 && range.max >= 0 ? 0 : range.min;
+      const base = box.top + (box.bottom - box.top) * normalisedOf(zero, range, true);
+      const slot = (box.right - box.left) / Math.max(1, points.length); // cells-ok — a sample count
+      const w = Math.max(1, slot * 0.7);
+      for (const [i, p] of points.entries()) {
+        if (p === null) continue;
+        const x = box.left + slot * i + (slot - w) / 2;
+        const top = Math.min(p[1], base);
+        const height = Math.max(0.5, Math.abs(base - p[1]));
+        out.push(
+          block.form === "lollipop" || block.form === "dotplot"
+            ? `<circle cx="${n(x + w / 2)}" cy="${n(p[1])}" r="3" fill="${ink}"/>`
+            : `<rect x="${n(x)}" y="${n(top)}" width="${n(w)}" height="${n(height)}" fill="${ink}"/>`,
+        );
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * A plot as SVG, or `null` where the form carries its own geometry.
+ *
+ * **`null` rather than a fallback picture**, because a form drawn by the wrong
+ * family is a plausible wrong figure — a treemap rendered as a curve measures,
+ * rasterises and reads as a chart of something. The refusal is the same argument
+ * the placeholder encoding makes for a wrapped diacritic (C04 I73).
+ */
+export function plotToSvg(block: Plot, layout: SvgLayout = SVG_DEFAULT_LAYOUT): string | null {
+  if (svgFamilyOf(block.form) === null) return null;
   const range = seriesRange(block.series, block) ?? { min: 0, max: 1 };
   const axis = niceAxis(range, 5, block);
-  const left = layout.width * (layout.gutter + layout.pad);
-  const top = layout.height * layout.pad;
-  const bottom = layout.height * (1 - layout.gutter);
+  const box = area(layout);
 
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(layout.width)} ${n(layout.height)}" ` +
@@ -136,28 +321,22 @@ export function plotToSvg(block: Plot, layout: SvgLayout = SVG_DEFAULT_LAYOUT): 
   // **The labels place themselves.** `text-anchor="end"` at the gutter's right
   // edge, and nothing here knows or asks how wide the string is — which is the
   // whole of hazard 4's answer, visible in one attribute.
-  for (const tick of axis.ticks) {
-    const y = top + (bottom - top) * normalisedOf(tick, range, true);
-    parts.push(
-      `<line x1="${n(left)}" y1="${n(y)}" x2="${n(layout.width * (1 - layout.pad))}" y2="${n(y)}" ` +
-        `stroke="#2a2a33" stroke-width="1"/>`,
-      `<text x="${n(left - 6)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
-        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="#8a8a99">` +
-        `${escape(String(tick))}</text>`,
-    );
-  }
-
-  for (const series of block.series) {
-    const points = svgPoints(series.values, range, layout);
-    const d = points
-      .map((p, i) => (p === null ? "" : `${i === 0 || points[i - 1] === null ? "M" : "L"}${n(p[0])} ${n(p[1])}`))
-      .filter((seg) => seg !== "")
-      .join(" ");
-    if (d !== "") {
-      parts.push(`<path d="${d}" fill="none" stroke="#6ea8fe" stroke-width="2"/>`);
+  //
+  // A matrix has no value axis to tick: its ordinate is the series and its
+  // readings are the colours, which is C12's own ruling for a field form.
+  if (svgFamilyOf(block.form) !== "matrix") {
+    for (const tick of axis.ticks) {
+      const y = box.top + (box.bottom - box.top) * normalisedOf(tick, range, true);
+      parts.push(
+        `<line x1="${n(box.left)}" y1="${n(y)}" x2="${n(box.right)}" y2="${n(y)}" ` +
+          `stroke="#2a2a33" stroke-width="1"/>`,
+        `<text x="${n(box.left - 6)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="#8a8a99">` +
+          `${escape(String(tick))}</text>`,
+      );
     }
   }
 
-  parts.push("</svg>");
+  parts.push(...marks(block, range, layout), "</svg>");
   return parts.join("\n");
 }

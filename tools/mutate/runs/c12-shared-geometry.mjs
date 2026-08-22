@@ -103,9 +103,48 @@ const results = runPass({
       // discovered as a wrong-looking image, caught here at the seam.
       name: "a label is anchored at its start and needs its width to sit right",
       file: SVG,
-      from: "`<text x=\"${n(left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" text-anchor=\"end\" ` +",
-      to: "`<text x=\"${n(left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" ` +",
+      from: "        `<text x=\"${n(box.left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" text-anchor=\"end\" ` +",
+      to: "        `<text x=\"${n(box.left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" ` +",
       expect: "G5c",
+    },
+    {
+      // **The matrix family's coordinate open-coded.** Every cell is still
+      // coloured and the picture still reads as a field. `continuousColour`
+      // clamps for its own reasons, so an out-of-range value draws the same —
+      // the difference is the **span**: `Math.max(1, span)` squashes a density
+      // field over `0..0.3` into the bottom third of the map. The first fixture
+      // had a span of 6 and could not see it.
+      name: "the matrix family normalises its colour for itself",
+      file: SVG,
+      from: "        const t = normalisedOf(v, range, false);",
+      to: "        const t = (v - range.min) / Math.max(1, range.max - range.min);",
+      expect: "G6",
+    },
+    {
+      // **The bar baseline taken from the plot area.** Correct for every plot
+      // whose data does not cross zero, which is most of them — and wrong in
+      // the one place a bar chart says something: a bar of `-3` grows *down*
+      // from the baseline rather than up from the floor.
+      //
+      // **This row's first form survived, and the survivor was about the
+      // source.** `normalisedOf(range.min, …)` is `1` by construction, so the
+      // expression it mutated was `box.bottom` written the long way round —
+      // dead arithmetic wearing the shared layer's clothes.
+      name: "a bar's baseline is the area's floor rather than zero",
+      file: SVG,
+      from: "      const base = box.top + (box.bottom - box.top) * normalisedOf(zero, range, true);",
+      to: "      const base = box.bottom;",
+      expect: "G6",
+    },
+    {
+      // **A refused form drawn by the curve family.** A treemap that measures,
+      // rasterises and reads as a chart of something is the plausible wrong
+      // figure the `null` arm exists to refuse.
+      name: "a form with its own geometry falls back to a family instead of refusing",
+      file: SVG,
+      from: "  if (svgFamilyOf(block.form) === null) return null;",
+      to: "  if (false) return null;",
+      expect: "G7",
     },
   ],
 });
