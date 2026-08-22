@@ -94,6 +94,31 @@ const results = runPass({
       expect: "golden",
     },
     {
+      // **Pass 7 removed entirely** (§3ai.6). The figure still fits, still has
+      // the same crossing count and still measures nine rows — it just steps
+      // sideways as it descends. GG7 reads the columns, which is the assertion
+      // the golden cannot make: a snapshot agrees with whatever it recorded, and
+      // the zigzag survived review and a commit inside one.
+      name: "the layers are not pulled toward their neighbours",
+      file: GRAPH,
+      from: "  for (let pass = 0; pass < 4; pass += 1) { // cells-ok — a sweep count",
+      to: "  for (let pass = 0; pass < 0; pass += 1) { // cells-ok — a sweep count",
+      expect: "GG7",
+    },
+    {
+      // **The clamp restored**, which is the defect the first build of pass 7
+      // shipped and GG7 found within a minute. It looks like a safety floor and
+      // it is a relative move: the figure is shifted as a whole afterwards, so
+      // flooring one node at zero displaces it against every other and nothing
+      // downstream can undo it. Three centres agreed and the fourth was one cell
+      // out — which no count reports.
+      name: "a node pulled left of the origin is floored there",
+      file: GRAPH,
+      from: "        if (line !== undefined) line[i] = m - Math.floor((cw(row[i] ?? 0) - 1) / 2); // cells-ok — a column position",
+      to: "        if (line !== undefined) line[i] = Math.max(0, m - Math.floor((cw(row[i] ?? 0) - 1) / 2)); // cells-ok — a column position",
+      expect: "GG7",
+    },
+    {
       // **The sweep count taken to zero.** F242 measured one sweep cutting
       // crossings four- to fivefold, so this is the figure the number was chosen
       // against rather than an arbitrary knob.

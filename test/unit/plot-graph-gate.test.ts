@@ -14,6 +14,16 @@ import { describe, expect, it } from "vitest";
 import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { FULL_CAPS, measurable } from "../support/render.js";
+
+const kit = measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
+
+/** A graph's figure, plain. */
+function renderGraph(graph: unknown, width: number): readonly string[] {
+  const block = b.plot({ form: "graph", height: 9, series: [], graph: graph as never });
+  return kit.renderToLines(block, width).map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+}
 
 /** The validator's complaints about a plot block, as raw text. */
 function errs(over: Record<string, unknown>): readonly string[] {
@@ -113,6 +123,31 @@ describe("GG — the graph gate, at both ends", () => {
     expect(errs({ ...good, graphLayout: "force" }).join("\n"), "and force is not one").toContain(
       "\"graphLayout\" must be \"layered\"",
     );
+  });
+
+  it("GG7 (C12 I58, §3ai.6): a chain's nodes share a column", () => {
+    // **The assertion the golden cannot make.** A snapshot records the figure
+    // and agrees with whatever it recorded, so the zigzag survived review and a
+    // commit inside one. This reads the columns instead: a path graph has one
+    // node per layer, so every label must start at the same column, and before
+    // pass 7 they stepped 37, 35, 34 as each layer centred on its own width.
+    const chain = { nodes: [{ id: "aaaaaaaa" }, { id: "bb" }, { id: "cccccc" }, { id: "d" }],
+      edges: [{ from: "aaaaaaaa", to: "bb" }, { from: "bb", to: "cccccc" }, { from: "cccccc", to: "d" }] };
+    const rows = renderGraph(chain, 60);
+    const starts = rows
+      .filter((r) => /[a-z]/u.test(r))
+      .map((r) => r.search(/[a-z]/u)); // cells-ok — a column position
+    expect(starts.length, "one labelled row per layer").toBe(4); // cells-ok — a row count
+    // **Centres, not left edges** — the labels are different widths, so a common
+    // left edge would be the wrong claim and would pass for the wrong reason.
+    const centres = rows
+      .filter((r) => /[a-z]/u.test(r))
+      .map((r) => {
+        const from = r.search(/[a-z]/u);
+        const to = r.length - [...r].reverse().findIndex((c) => /[a-z]/u.test(c)); // cells-ok — a column position
+        return Math.floor((from + to - 1) / 2); // cells-ok — a column position
+      });
+    expect(new Set(centres).size, `the chain is one column: ${centres.join(", ")}`).toBe(1);
   });
 
   it("GG6 (C04 I69): the fixture the sweeps use exercises the passes it is under test for", () => {

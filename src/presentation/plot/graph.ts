@@ -344,17 +344,119 @@ export function graphArea(
     return { rows: paint(canvas, corners, caps), dropped, reversed: laid.reversed };
   }
 
+  // ----------------------------------------------------------- pass 7
+  //
+  // **X-coordinate assignment, and the six-pass pipeline was five and a
+  // packing.** Every layer was centred on its **own** width, so a chain whose
+  // layers hold different numbers of nodes zigzags: one 8-cell node centres at
+  // `(width - 8) / 2` and the three-node layer under it centres somewhere else,
+  // and the edge between them is a diagonal staircase drawn between two nodes
+  // that should have been in a column.
+  //
+  // **Arithmetically correct and reading worse than it should**, which is why no
+  // count found it and the figure did (C12 I58 §3ai.6). The remedy is the phase
+  // Sugiyama names and this pipeline skipped: the **priority/median** method —
+  // pull each node toward the median of its neighbours, then restore the
+  // separation the pull broke, alternating direction so neither end wins.
+  const cw = (id: number): number =>
+    id < g.nodes.length ? cells(labelOf(g, id), caps.ambiguousWidth) : 1; // cells-ok — a cell count
+
+  /** Left edges per layer, packed from zero. The pull below moves them. */
+  const xs = laid.rows.map((row) => {
+    let x = 0; // cells-ok — a column position
+    return row.map((id) => {
+      const at = x;
+      x += cw(id) + GAP; // cells-ok — a cell count
+      return at;
+    });
+  });
+
+  const mid = (l: number, i: number): number =>
+    (xs[l]?.[i] ?? 0) + Math.floor((cw(laid.rows[l]?.[i] ?? 0) - 1) / 2); // cells-ok — a column position
+
+  /**
+   * Separation restored **without reordering** — the ordering pass owns that,
+   * and a placement that reordered would throw away the crossings it bought.
+   */
+  const separate = (l: number): void => {
+    const row = laid.rows[l] ?? [];
+    const line = xs[l] ?? [];
+    for (let i = 1; i < row.length; i += 1) { // cells-ok — a node count
+      const floor = (line[i - 1] ?? 0) + cw(row[i - 1] ?? 0) + GAP; // cells-ok — a column position
+      if ((line[i] ?? 0) < floor) line[i] = floor;
+    }
+    for (let i = row.length - 2; i >= 0; i -= 1) { // cells-ok — a node count
+      const ceiling = (line[i + 1] ?? 0) - cw(row[i] ?? 0) - GAP; // cells-ok — a column position
+      if ((line[i] ?? 0) > ceiling) line[i] = ceiling; // cells-ok — a column position
+    }
+  };
+
+  // **Neighbours in the adjacent layer, from the segments** — the same list the
+  // ordering pass used, so the two passes cannot disagree about who is adjacent.
+  const at = new Map<number, { l: number; i: number }>();
+  laid.rows.forEach((row, l) => row.forEach((id, i) => at.set(id, { l, i })));
+  const near = laid.rows.map((): number[][] => []);
+  laid.rows.forEach((row, l) => (near[l] = row.map((): number[] => [])));
+  for (const [a, bb] of laid.seg) {
+    const pa = at.get(a);
+    const pb = at.get(bb);
+    if (pa === undefined || pb === undefined || pb.l !== pa.l + 1) continue;
+    near[pa.l]?.[pa.i]?.push(bb);
+    near[pb.l]?.[pb.i]?.push(a);
+  }
+
+  // **Four sweeps, alternating**, which is the count `graph`'s own sweep
+  // measurement argues for: past the second the gain falls off, and an odd
+  // number leaves the last-swept end privileged.
+  for (let pass = 0; pass < 4; pass += 1) { // cells-ok — a sweep count
+    const order = pass % 2 === 0
+      ? laid.rows.map((_r, l) => l)
+      : laid.rows.map((_r, l) => laid.rows.length - 1 - l); // cells-ok — a row count
+    for (const l of order) {
+      const row = laid.rows[l] ?? [];
+      for (let i = 0; i < row.length; i += 1) { // cells-ok — a node count
+        const ns = (near[l]?.[i] ?? [])
+          .map((id) => {
+            const p = at.get(id);
+            return p === undefined ? null : mid(p.l, p.i);
+          })
+          .filter((v): v is number => v !== null)
+          .sort((x, y) => x - y);
+        if (ns.length === 0) continue; // cells-ok — a neighbour count
+        const m = ns[Math.floor((ns.length - 1) / 2)] ?? 0; // cells-ok — a column position
+        const line = xs[l];
+        // **No clamp at zero.** The figure is shifted as a whole below, so a
+        // floor here does not keep it on the canvas — it moves one node
+        // relative to the others and the shift cannot undo it. A wide label
+        // pulled to a negative x is normalised with everything else.
+        if (line !== undefined) line[i] = m - Math.floor((cw(row[i] ?? 0) - 1) / 2); // cells-ok — a column position
+      }
+      separate(l);
+    }
+  }
+
+  // **Centred once, on the whole figure** — which is the difference the pass
+  // exists for. Centring each layer on its own width is what produced the
+  // zigzag, and centring the bounding box keeps the columns the sweeps built.
+  // **Normalised before it is centred**, which is the other half of dropping the
+  // clamp: the sweeps work in a coordinate space that may start left of zero,
+  // and the figure is placed by moving all of it at once.
+  const left = xs.reduce((m, line) => line.reduce((n, x) => Math.min(n, x), m), 0); // cells-ok — a column position
+  const right = xs.reduce(
+    (m, line, l) =>
+      line.reduce((n, x, i) => Math.max(n, x - left + cw(laid.rows[l]?.[i] ?? 0)), m), // cells-ok — a column position
+    0,
+  );
+  const shift = Math.max(0, Math.floor((width - right) / 2)) - left; // cells-ok — a column position
+
   const centre = new Map<number, number>();
   laid.rows.forEach((row, l) => {
-    let x = Math.max(0, Math.floor((width - widthOf([row], g, caps)) / 2)); // cells-ok — a column position
-    for (const id of row) {
+    row.forEach((id, i) => {
+      const x = shift + (xs[l]?.[i] ?? 0); // cells-ok — a column position
       const real = id < g.nodes.length; // cells-ok — an edge count
-      const body = real ? labelOf(g, id) : "";
-      const cw = real ? cells(body, caps.ambiguousWidth) : 1; // cells-ok — a cell count
-      if (real) write(canvas.text[2 * l] ?? [], x, body, caps); // cells-ok — a row index
-      centre.set(id, x + Math.floor((cw - 1) / 2)); // cells-ok — a column position
-      x += cw + GAP; // cells-ok — a cell count
-    }
+      if (real) write(canvas.text[2 * l] ?? [], x, labelOf(g, id), caps); // cells-ok — a row index
+      centre.set(id, x + Math.floor((cw(id) - 1) / 2)); // cells-ok — a column position
+    });
   });
 
   const lat = new Map<number, number>();
