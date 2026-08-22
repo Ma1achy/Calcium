@@ -4278,6 +4278,62 @@ from being confused is **a claimed form must put ink on the page**: a family cla
 `SVG_FAMILY` before its branch exists in `marks()` would otherwise refuse *as though the form were
 unclaimed*, which is what every new family does on its first commit.
 
+### 3aj.6 — family 2, where the extraction is a measurement
+
+**The plan called hierarchy *the closest to free* because the layout is already shared and
+unit-free.** Half of that is exactly right and half is wrong, and the half that is wrong is wrong
+for hazard 3's reason.
+
+| | `cells()` calls | `caps` threaded |
+|---|---|---|
+| `hierarchy.ts` — treemap · flame · icicle | **0** | **0** |
+| `graph.ts`'s Sugiyama pipeline — `acyclic`, `layerOf`, `expand`, `positions`, `crossings`, `order`, `lay` | **0** | **0** |
+| `graph.ts`'s `widthOf` | 1 | 1 |
+| `tree.ts`'s placement — `tdWidth`, `sizeOf`, `widestPerDepth` | **5** | 40 references |
+
+**A treemap's geometry comes from *values*; a tree's comes from *labels*.** `tdWidth` is a
+subtree's width measured as the widest label under it, `widestPerDepth` is a column's width, and
+both are `cells(label, ambiguousWidth)`. So a tree's node positions are **a function of text
+measurement**, which is hazard 4 in one sentence: *a shared layout that calls `cells()` cannot
+serve the image path*.
+
+> **The ruling: the topology is shared and the placement is not.** Parent, child, depth, layer,
+> ordering and dummy nodes are structure and belong to both arms. **Where a node goes is a
+> function of how wide its label is**, and the two arms measure text differently by construction —
+> so each computes its own placement from the same structure.
+
+**And pruning is a terminal fact**, hazard 2's shape one family along. `subsetAt`, `fitTo` and
+`chooseLayout` drop nodes to fit a cell budget; an SVG has no budget and draws the whole tree. A
+shared pruner would put a terminal's constraint into a renderer that does not have it.
+
+### What the extraction commit is, and why it is not a refactor
+
+**Nothing needs moving.** `hierarchy.ts` is already unit-free and already exported; graph's
+pipeline is already unit-free and **private**; `tree.ts`'s `flatten` is already unit-free and
+private. So the work is *making the topology reachable*, and an export that nothing consumes is
+refused by MG25 until the renderer that consumes it exists.
+
+**So family 2's first commit is this section and no code.** The gate's purpose — *a moved frame is
+never ambiguous between refactor and feature* — is served exactly, and better than by
+manufacturing a refactor: a commit that touches no source cannot move a frame.
+
+**Stating that is the point.** The alternative is an extraction commit whose diff is four `export`
+keywords, which reads as the gate being satisfied and proves nothing.
+
+### The field question, measured before the renderer
+
+| axis | `ONE_PER_FORM` | the catalogue |
+|---|---|---|
+| `treeLayout` | **`undefined` on all five forms** | crossed for `tree` alone — `auto`, `topDown`, `leftRight`, `outline` |
+| `graphLayout` | `undefined` | **never set anywhere**, and C04 I70 already rules the choice arm vacuous: one value, and `"force"` is a compile error |
+| `hierarchy` depth | **0 for flame, icicle and graph** | depth-3 variants exist for all of them |
+
+**`treeLayout` is `plotDetail` again** — a rung ladder the per-form corpus does not cross, one
+family later. **And the depth-0 representatives are the sharper one**: a row over `ONE_PER_FORM`
+for flame or icicle exercises a hierarchy with no nesting, so *it draws something* and `G7b` passes
+while the figure is a single strip. **A guard that a claimed form puts ink on the page is satisfied
+by one rectangle.**
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
