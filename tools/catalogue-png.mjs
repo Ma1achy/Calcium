@@ -10,8 +10,24 @@
  * What is parsed:
  *   38;2;R;G;Bm · 38;5;Nm   foreground, 24-bit and indexed
  *   48;2;R;G;Bm · 48;5;Nm   background, both
+ *   30-37 · 90-97           foreground, the sixteen
+ *   40-47 · 100-107         background, the sixteen
  *   1m · 2m · 22m           bold, dim, normal intensity
  *   39m · 49m · 0m          defaults and reset
+ *
+ * **That list is complete for what the framework emits, and the claim is
+ * checked rather than made here** — `unparsedSgr` below, swept over every
+ * catalogue frame by PC11. It has to be said, because the list being accurate
+ * is not the same as the list being sufficient and a reader takes the second
+ * from the first. **The sixteen arrived late and F241 is why**: they were the
+ * whole `colourDepth: 4` vocabulary, absent, and a 4-bit frame drew with its
+ * colour silently removed. The watcher existed and swept a directory the only
+ * 4-bit frames in the tree were not in.
+ *
+ * **The sixteen resolve to the standard values and a real emulator's differ** —
+ * which is C10 I26's *best-effort at 4-bit* in the instrument: the image is a
+ * model of a 16-colour terminal, not a photograph of one, and no contrast
+ * measured off it would mean anything.
  *
  * **This list said *three forms* and the body handled seven**, which is how the
  * indexed arm came to be reported missing during F227's proof: the abstract was
@@ -116,6 +132,14 @@ export function parseLine(raw) {
       colour = `rgb(${params[2]},${params[3]},${params[4]})`;
     } else if (params[0] === 38 && params[1] === 5 && params.length >= 3) {
       colour = colour256(params[2]);
+    } else if (params[0] >= 30 && params[0] <= 37) {
+      colour = colour256(params[0] - 30);
+    } else if (params[0] >= 90 && params[0] <= 97) {
+      colour = colour256(params[0] - 82);
+    } else if (params[0] >= 40 && params[0] <= 47) {
+      background = colour256(params[0] - 40);
+    } else if (params[0] >= 100 && params[0] <= 107) {
+      background = colour256(params[0] - 92);
     } else if (params[0] === 1) {
       // **Bold, and at one bit it is the entire signal.** `tone("error")`
       // resolves to `{ bold: true }` below `colourDepth: 4` — no colour at all —
@@ -147,7 +171,11 @@ export function parseLine(raw) {
  * a comment. If a renderer ever emits inverse, this reports it by number and the
  * arm gets built then, against something that exercises it.
  */
-const KNOWN_SGR = new Set([0, 1, 2, 22, 38, 39, 48, 49]);
+const KNOWN_SGR = new Set([
+  0, 1, 2, 22, 38, 39, 48, 49,
+  30, 31, 32, 33, 34, 35, 36, 37, 90, 91, 92, 93, 94, 95, 96, 97,
+  40, 41, 42, 43, 44, 45, 46, 47, 100, 101, 102, 103, 104, 105, 106, 107,
+]);
 
 export function unparsedSgr(raw) {
   const seen = new Set();

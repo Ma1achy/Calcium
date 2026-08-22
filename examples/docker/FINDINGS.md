@@ -11859,3 +11859,103 @@ trace 1 rules it and names why:
 **What it does not do is change the ruling.** The remedy for the divergence is the windowing seam
 C04 §3c already names, and the error box has no business inventing one. T2.28b expires when the
 seam lands, which is the mechanism that already exists for this.
+
+
+## F240 — the tag is the only painted run, and at the two lower rungs it is the only unpainted one ★★★★☆
+
+The frame read C10 §4d's paint slot owed, at HEAD, four capability sets. The tag row's bytes:
+
+```
+24bit   38;2;198;40;40 ──── 38;2;255;255;255 48;2;198;40;40 " ERROR " 49    painted
+8bit    38;5;124       ──── 38;5;231         48;5;124       " ERROR " 49    painted
+4bit    91m            ---- 39m                             " ERROR "       DEFAULT
+1bit    1m             ──── 22m                             " ERROR "       BOLD OFF
+```
+
+I32 calls the tag **the only painted run in C09's `status` box**. At the two lower rungs it is the
+only *un*painted one — and at 1-bit it does not merely fail to gain emphasis, it **cancels the
+emphasis the rule around it carries**. The word naming the failure is the lightest thing in the
+box, which is visible in `status-error-1bit.png` without measuring anything.
+
+**Two causes, and they are not the same defect.**
+
+- **At 4-bit**, `surface()` reads `theme.tokens.fourBit[ref]` and neither `surface.errorGround`
+  nor `surface.errorInk` is in any of the three maps, so both resolve to `NO_STYLE`.
+- **At 1-bit**, no map could help: `withBackground(NO_STYLE, NO_STYLE)` returns `{}`. **A pair that
+  resolves to nothing yields *no style* rather than *the tone*** — so the tag drops below its own
+  rule rather than levelling with it. Fixing the 4-bit map leaves this exactly as it is.
+
+**And the 4-bit half is a class.** `Surfaces` declares ten slots; every `*_FOUR_BIT` map answers
+seven, identically:
+
+```
+missing in all three:   selection · errorGround · errorInk
+```
+
+Nothing could have asked. `FourBitMap = Readonly<Record<string, number>>` is partial over an open
+key, so a new surface slot compiles with no 4-bit answer. And C10 §3's *"Surfaces degrade too"*
+**enumerates** — `bg`, `bgElev`, `bgDeep`, `border` and `borderStrong`, the five that existed when
+it was written — where it means to quantify. Five slots landed after it; two were given arms by
+whoever added them and three were not. The sentence is satisfied by the five it names.
+
+**Three missing arms are probably three cases, and lumping them is how the wrong fix ships for
+two of them.** `selection` is a **wash behind arbitrary text** — its 4-bit answer has to leave
+legible whatever it washes, and it has no ink of its own to compensate with. The error pair is a
+**tag that brings its own ink and washes nothing**. One is constrained by text it does not own;
+the other owns both halves. `selection` is roadmap 23's subject and is named here rather than
+folded in.
+
+**What is not owed is a measurement.** I26 already rules the contrast floor *best-effort at 4-bit*,
+0–15 being the emulator's palette — so the arm costs a human decision and no computation, which is
+what §3 says the curated map is for.
+
+**The 24-bit construction survives the rung and settles the ground without a choice.** §4d makes
+the ground `tone.error` *by equality*, asserted by T2.14e — so the 4-bit ground is `tone.error`'s
+own index, per theme, and only the ink is chosen. That flips dark's ink from white to black, and
+the flip is the construction working rather than a divergence: at 24-bit `tone.error` is a dark
+red that needs white on it, and at 4-bit it is bright red that needs black.
+
+---
+
+## F241 — the instrument reassembled real bytes with a model missing the whole 4-bit vocabulary, and the watcher for that never opens the directory ★★★★☆
+
+F240's 4-bit row was nearly read off `status-error-ascii.png`, which draws the rule in **grey**
+where the frame's bytes say `91m` — bright red. The image is not the frame.
+
+**`ansiToSvg` has no arm for 4-bit colour at all.**
+
+```
+KNOWN_SGR = { 0, 1, 2, 22, 38, 39, 48, 49 }
+
+absent:  30-37  40-47  90-97  100-107      the entire sixteen-colour vocabulary
+```
+
+**The watcher exists, is correct about the thing it was built for, and cannot see this.** PC11
+sweeps for exactly this failure, carries counters against the *did-not-run* green, and names `7m`
+as the deferral it is watching. It sweeps `readdirSync(join(..., "docs", "catalogue"))` —
+**non-recursively**. `docs/catalogue/status/` holds the only 4-bit frames in the tree and PC11
+never opens it.
+
+**And made recursive yesterday it would still have passed.** Measured over the 880 top-level
+frames, the distinct SGR first-parameters are
+
+```
+[1, 2, 22, 38, 39, 48, 49]        — exactly KNOWN_SGR, less 0
+```
+
+so the gate is green because **nothing in its corpus is rendered at `colourDepth: 4`**, not
+because the parser is complete. Coverage was a property of the fixtures the whole time.
+
+**Two recorded classes meeting, which is why neither caught it.** *A gate that exists and is not
+run* — coverage is where a target sits relative to the gate's default path, and a subdirectory is
+outside `readdirSync`. And *an instrument can manufacture evidence*, third shape: real bytes
+reassembled by a wrong model. The first made the second invisible.
+
+**The header is not what is wrong this time, and that is worth saying** — it lists what is parsed
+and the list is accurate. What is missing is any sentence claiming the list is **complete for what
+the framework emits**, which is the claim a reader takes from it. The same file already records
+one instance of an abstract read instead of its body; this is the mirror, where the abstract is
+true and the reader's inference is not.
+
+**Read before anything else is read through it**, which is why this lands ahead of F240's fix
+rather than beside it.

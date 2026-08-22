@@ -563,11 +563,18 @@ describe("catalogue-png — the parser that failed silently", () => {
     const unknown = new Set<number>();
     let swept = 0;
     let withSgr = 0;
-    for (const file of readdirSync(CATALOGUE)) {
-      if (!file.endsWith(".txt")) continue;
-      const raw = readFileSync(join(CATALOGUE, file), "utf8");
+    let fourBit = 0;
+    // **Recursive, and F241 is the whole reason.** `readdirSync` over the
+    // catalogue root skips its subdirectories, and `status/` is where the only
+    // frames rendered at `colourDepth: 4` live — so the one corpus carrying the
+    // sixteen-colour vocabulary was the one this sweep could not open. A gate's
+    // coverage is where its target sits relative to its default path.
+    for (const entry of readdirSync(CATALOGUE, { withFileTypes: true, recursive: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".txt")) continue;
+      const raw = readFileSync(join(entry.parentPath, entry.name), "utf8");
       swept += 1;
       if (raw.includes(String.fromCharCode(27))) withSgr += 1;
+      if (/\u001b\[(?:3[0-7]|9[0-7]|4[0-7]|10[0-7])[;m]/u.test(raw)) fourBit += 1;
       for (const n of (unparsedSgr as (s: string) => readonly number[])(raw)) unknown.add(n);
     }
 
@@ -578,6 +585,12 @@ describe("catalogue-png — the parser that failed silently", () => {
     // observed.
     expect(swept, "the sweep found catalogue frames").toBeGreaterThan(0);
     expect(withSgr, "and they carry SGR, so there was something to parse").toBeGreaterThan(0);
+    // **The third counter is F241's own.** Across the 880 top-level frames the
+    // distinct first-parameters were exactly `KNOWN_SGR`, so this row was green
+    // because nothing it read was 4-bit rather than because the parser was
+    // complete — coverage as a property of the fixtures. Asserting a 4-bit
+    // frame is *present* is what makes the arms below load-bearing.
+    expect(fourBit, "and at least one is rendered at colourDepth 4").toBeGreaterThan(0);
     expect([...unknown], "every SGR code in the catalogue has an arm").toEqual([]);
   });
 });
