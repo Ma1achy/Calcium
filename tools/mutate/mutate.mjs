@@ -23,7 +23,7 @@
 // passes, and a mutation whose kill is not in doubt is seen to be killed. The
 // caller supplies that second one and says why it cannot survive — a generic
 // sentinel would be the harness marking its own homework.
-
+import { readFileSync, writeFileSync, renameSync } from "node:fs";
 /** vitest colours its summary; the codes sit between the word and the count. */
 export function strip(output) {
   return output.replace(/\[[0-9;]*m/g, "");
@@ -114,6 +114,37 @@ export function editsOf(m) {
  * @param {(file:string,src:string)=>void} opts.write
  * @param {()=>string} opts.run             runs the suite, returns its output
  */
+/**
+ * `read`/`write` for a run, with an **atomic** write (F237).
+ *
+ * **The restore is the dangerous write, and it was not atomic.** `runPass` holds
+ * each file's original text and puts it back with a plain `writeFileSync`; a
+ * `SIGKILL` landing mid-write leaves whatever had been flushed, which is a
+ * *prefix*. Measured: five source files lost their tails — `types.ts` at 1297
+ * lines against 2218 — when two-day-old runs sitting mid-pass were killed. Every
+ * gate had been green ten minutes earlier, because the damage arrives after the
+ * last check and before the next.
+ *
+ * Write-to-temp then `rename`, which is atomic on any POSIX filesystem: a kill
+ * at any instant leaves either the old file or the new one, never half of one.
+ *
+ * **Not yet adopted by every run.** 91 of the 92 still define their own
+ * `writeFileSync` pair inline, and the sweep is a mechanical commit of its own
+ * rather than a rider on this one — the number is here so it is a residue and
+ * not a silence.
+ */
+export function fsIo(root) {
+  return {
+    read: (f) => readFileSync(`${root}/${f}`, "utf8"),
+    write: (f, s) => {
+      const path = `${root}/${f}`;
+      const tmp = `${path}.mutate-tmp`;
+      writeFileSync(tmp, s);
+      renameSync(tmp, path);
+    },
+  };
+}
+
 export function runPass({ mutations, control, read, write, run }) {
   const files = [
     ...new Set([control.file, ...mutations.flatMap((m) => editsOf(m).map((e) => e.file))]),

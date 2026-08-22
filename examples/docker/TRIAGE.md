@@ -37,7 +37,7 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 27 | **19** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 18 | **6 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 39 | **15** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **9** | [**The instrument was wrong**](#9) | 40 | **16** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 16 | **8** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
 | **11** | [A gate that passes without checking](#11) | 56 | **15** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
@@ -470,6 +470,18 @@ says a demo of a plot should have a shape.
 | **F120** | the mutation harness reported one pre-existing error six times |
 | **F130** | the grant's own tests could not see it, because the double was narrower |
 
+
+**F237** is the group's own harness damaging the tree it tests. `runPass` restores each file with
+a plain `writeFileSync`, so a `SIGKILL` mid-write leaves a **prefix** — measured at five source
+files losing their tails, `types.ts` at 1297 lines against 2218, when two-day-old runs sitting
+mid-pass were killed. **Every gate had been green ten minutes earlier**, because the damage
+arrives after the last check and before the next; what caught it was `git diff HEAD --stat`
+reading 3042 deletions in files nobody had touched. Underneath it: the devcontainer's PID 1 is
+`sleep infinity`, so nothing reaps — **9087 zombies**, which is how two-day-old runs persisted —
+and the first e2e failure of the session was piped through `tail -6`, discarding the row name
+along with the exit code, so that row was never identified. **Fixed** by an atomic `fsIo`
+(write-to-temp then `rename`); adopted by 1 of 92 runs, and **the other 91 are a named residue
+rather than a silence.**
 
 **F236** is the group's first about **an instrument that is not ours and cannot be fixed** — `grep`
 skipping a file with a NUL byte, in silence. Three of them made 14 KB of C09's status ladder rows

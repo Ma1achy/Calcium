@@ -11720,3 +11720,63 @@ corpus was read. Every other instrument here checks a thing that exists — the 
 output, the mutation pass checks tests, the audit checks code, *where is this written down* checks
 the record. **This is the first about whether the reading happened at all**, and the near-miss it
 produced was a finding about eleven missing tests that were never missing.
+
+---
+
+## F237 — a SIGKILL during a mutation pass truncated five source files, and `git status` was the only thing that noticed ★★★★☆
+
+Two concurrent `npm run e2e` runs were racing in the devcontainer, alongside sixteen vitest
+processes two days old. `pkill -9 -f vitest` cleared them. Some minutes later the build failed on
+types that have shipped for months:
+
+```
+src/data/viewmodel/construct.ts: Module './types.js' has no exported member 'IS_MATRIX'
+src/shell/builders/index.ts:     'PlotForm' and '"tree"' have no overlap
+```
+
+**Five files had lost their tails, and none of them was in the change being made:**
+
+```
+                                    HEAD    disk
+src/data/viewmodel/types.ts         2218    1297
+src/data/viewmodel/validate.ts      1805     961
+src/presentation/plot/definition.ts 2980    2343
+src/presentation/plot/kde.ts        1136     956
+src/presentation/plot/circle.ts      979     861
+```
+
+**The mechanism is the mutation harness's restore.** `runPass` holds each file's original text in
+a `Map` and puts it back with a plain `writeFileSync` (`mutate.mjs:123`) — not a write-to-temp and
+rename. A `SIGKILL` landing mid-write leaves whatever had been flushed, which is a **prefix**. Two
+days of stale `plot-style-arms` runs were sitting mid-pass, and killing them stopped the restore
+halfway through.
+
+**Every gate was green ten minutes before and none of them could have seen it coming**, because
+the damage arrives *after* the last check and *before* the next. What caught it was `npm run e2e`
+building first — and the diagnosis came from `git diff HEAD --stat` reading **3042 deletions** in
+files nobody had touched.
+
+**The instrument that found it is the cheapest one there is, and it was nearly skipped.** *Read
+the diff, including files nothing intended to touch* is already a standing rule here, and it is
+the fourth time it has been the only thing to notice something. It was very nearly missed again:
+the build errors read as a resolution problem, and two rounds went into `--traceResolution` before
+`git status` was consulted at all. **A compiler error naming a symbol that obviously exists is a
+statement about the file, not about the resolver.**
+
+**Three things follow, and the first is the fix.**
+
+- **The restore should be atomic** — write to a sibling temp file and `rename`, which is atomic on
+  every POSIX filesystem. The harness's own header already argues that *a run whose child was
+  killed before it wrote a summary* is the strongest failure mode it has; this is the same
+  observation about the file rather than about the report.
+- **The devcontainer's PID 1 is `sleep infinity`, so nothing reaps.** Measured at the same moment:
+  **9087 zombie processes.** That is what let two-day-old runs persist, and it is why `TaskStop`
+  on the host looked like it had worked — it kills the `docker exec`, not the process inside.
+- **`pkill -9` in a tree that tools write to is not a neutral act.** `pkill` first, `-9` only if it
+  does not answer, and check `git status` afterwards either way.
+
+**And the near-miss underneath it**: the first e2e failure of the session — *1 failed*, no row
+named — was read as *plausibly the known contention class* and it was **piped through `tail -6`**,
+which discarded the diagnosis along with the exit code. That is this repository's own recorded
+lesson about pipes arriving again, and the honest version of the timeline is that the failing row
+was never identified: the tree was damaged before it could be re-run, and it stayed unidentified.

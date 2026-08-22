@@ -1709,6 +1709,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // plausible empty panel rather than a failure. `fetch` is required now.
     fetch: spec.fetch,
     render: spec.render,
+    // **Threaded so the driver knows whose block is in the panel** (C23 I52).
+    // It is never called from there — `b.live` resolves the placeholder at
+    // construction — but resolution consumes the one bit the elapsed counter
+    // needs, and a `status` at `loading` cannot be inspected for it: a
+    // consumer's own `renderLoading` may return exactly that shape.
+    renderLoading: spec.renderLoading ?? null,
     /**
      * **A `status`, and its state is read rather than asserted** (C23 I51).
      *

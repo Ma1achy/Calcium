@@ -138,8 +138,19 @@ export function widthRung(width: number, frame: Frame): Readonly<{ frame: Frame;
   return { frame: { ...frame, border, pad }, tag };
 }
 
-/** `4s`, `47s`, `2m 14s` — minutes past 99, because three digits read worse. */
-function elapsed(ms: number): string {
+/**
+ * `4s`, `47s`, `2m 14s` — minutes past 99, because three digits read worse.
+ *
+ * **Exported so the writer can ask whether the figure moved**, not so anyone
+ * else formats a duration. C23's counter patches the transcript once a second
+ * and a patch that changes nothing observable is still a `rev` bump — it
+ * invalidates C14's height cache and says the document changed when it did not.
+ * The guard has to compare *what would be drawn*, and this is the only thing
+ * that knows: `elapsed` is deliberately coarser than its input below one second
+ * and past ninety-nine, so a clock comparison and a figure comparison disagree
+ * in exactly the cases the guard exists for (C23 I52, F234).
+ */
+export function elapsed(ms: number): string {
   const s = Math.floor(ms / SECOND);
   if (s < 1) return "";
   return s <= 99 ? `${String(s)}s` : `${String(Math.floor(s / 60))}m ${String(s % 60)}s`;

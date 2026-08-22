@@ -410,6 +410,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
         title: id,
         intervalMs: SWEEP,
         staleAfterMs: SWEEP * 2,
+        renderLoading: null,
         source: null,
         derive: null,
         fetch: h.countFetch,
