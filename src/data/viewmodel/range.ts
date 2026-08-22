@@ -123,7 +123,27 @@ export function sharedRange(fields: readonly (readonly (readonly number[])[])[])
  * renderer's — so L0 holding it would contradict the ruling that put it there.
  */
 export function normalisedOf(v: number, range: PinnedRange, invert: boolean): number {
-  const t = (v - range.min) / (range.max - range.min);
+  const span = range.max - range.min;
+  // **Mid-ramp at a zero span** (C04 §3ak). `pinnedRange` already collapses a
+  // constant field to `{v, v}` because `{v, v+1}` *puts a field that never
+  // varied at the bottom of the scale, which says all minimum about data that
+  // says nothing* — and this function then computed `0 / 0`.
+  //
+  // **The clamp could not repair it.** `NaN < 0` is false and `NaN > 1` is
+  // false, so it passed through both arms: a guard written as a range check
+  // does not catch a value that fails every comparison. `plotToSvg` on a flat
+  // series emitted `<path d="M89.6 NaN L352 NaN L614.4 NaN"/>` — well-formed,
+  // painting nothing, and past every containment assertion there is.
+  //
+  // **0.5 rather than 0, and it is the only renderer-independent answer.** `0`
+  // means *the floor* to a position and *the coldest colour* to a field, and
+  // neither reads as *every value is the same*. It is what `strip.ts` and
+  // `image/overlay.ts` already do, each with its reason written down.
+  //
+  // **A renderer's degenerate *rounding* is still its own** (C12 §3aj hazard 1):
+  // `rowOf` guards before it calls here, because `Math.floor(0.5 · last)` and
+  // `Math.round(0.5 · last)` differ at every even height.
+  const t = span === 0 ? 0.5 : (v - range.min) / span;
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
   return invert ? 1 - clamped : clamped;
 }

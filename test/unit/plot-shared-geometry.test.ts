@@ -13,10 +13,13 @@
  * are it.
  */
 import { describe, expect, it } from "vitest";
-import { rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
+import { rowOf, seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { niceAxis } from "../../src/presentation/plot/axes.js";
 import { normalisedOf, pinnedRange } from "../../src/data/viewmodel/range.js";
 import type { Facing } from "../../src/presentation/plot/scale.js";
+import { plotToSvg, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import { b } from "../../src/shell/builders/index.js";
+import { DARK_THEME } from "../support/render.js";
 
 const DOWN: Facing = { x: "right", y: "down" };
 const UP: Facing = { x: "right", y: "up" };
@@ -97,5 +100,59 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     // the value axis and take no width at all.
     expect(seriesRange.length, "series, pin, bars — no width").toBe(3);
     expect(pinnedRange.length, "min, max, pin").toBe(3);
+  });
+});
+
+describe("G9 — the shared coordinate at a zero span (C04 §3ak)", () => {
+  it("G9a: a constant range is mid-ramp, not NaN", () => {
+    // `pinnedRange` collapses a constant field to `{v, v}` — C04's own table,
+    // *drawn mid-ramp* — and this is the function that turned it into `0 / 0`.
+    const flat = pinnedRange(5, 5, {});
+    expect(flat, "the range collapses rather than widening").toEqual({ min: 5, max: 5 });
+    expect(normalisedOf(5, flat, false)).toBe(0.5);
+    expect(normalisedOf(5, flat, true), "and inverting the midpoint is the midpoint").toBe(0.5);
+  });
+
+  it("G9b: the clamp cannot repair a NaN, which is why the guard is before it", () => {
+    // **The mechanism, stated so a future `??`-style repair does not read as
+    // equivalent.** `NaN < 0` is false and `NaN > 1` is false, so a value that
+    // fails every comparison passes a guard written as a range check.
+    expect(Number.NaN < 0, "a range check cannot see it").toBe(false);
+    expect(Number.NaN > 1, "in either direction").toBe(false);
+    for (const invert of [false, true]) {
+      const t = normalisedOf(5, { min: 5, max: 5 }, invert);
+      expect(Number.isNaN(t), `invert=${invert} yields a number`).toBe(false);
+    }
+  });
+
+  it("G9c: the SVG arm drew a path that painted nothing", () => {
+    // The measured defect. A well-formed `<path>` with NaN coordinates is past
+    // every containment assertion, every element count and the empty-marks
+    // refusal — it rasterises to a blank plot area with correct furniture.
+    const flat = b.plot({ id: "flat", form: "line", height: 6, series: [{ label: "s", values: [5, 5, 5] }] });
+    const svg = plotToSvg(flat, DARK_THEME) ?? "";
+    const d = /<path d="([^"]*)"/u.exec(svg)?.[1] ?? "";
+    expect(d, "the curve is drawn").not.toBe("");
+    expect(d.includes("NaN"), "and every coordinate is a number").toBe(false);
+
+    // And it sits mid-area, which is where the terminal puts a flat line.
+    const ys = [...d.matchAll(/[ML](?:[\d.]+) ([\d.]+)/gu)].map((m) => Number(m[1]));
+    const mid = (SVG_DEFAULT_LAYOUT.height * SVG_DEFAULT_LAYOUT.pad
+      + SVG_DEFAULT_LAYOUT.height * (1 - SVG_DEFAULT_LAYOUT.gutter)) / 2;
+    for (const y of ys) expect(y, "mid-ramp").toBeCloseTo(mid, 6);
+  });
+
+  it("G9d: rowOf keeps its own degenerate rounding, so no terminal frame moves", () => {
+    // **The half that makes this one function rather than nine** (§3aj hazard 1).
+    // `Math.floor(0.5 · last)` and `Math.round(0.5 · last)` differ at every even
+    // height, which is what G0 catches — so the guard stays in the renderer and
+    // the shared answer is what everything *without* a guard now gets.
+    for (const rows of [2, 3, 4, 5, 6, 7, 8]) {
+      const last = rows - 1;
+      expect(rowOf(5, { min: 5, max: 5 }, rows, FACING_DEFAULT), `${rows} rows`).toBe(Math.floor(last / 2));
+    }
+    // The two disagree at every even row count, which is the whole reason.
+    const differ = [2, 4, 6, 8].filter((rows) => Math.floor((rows - 1) / 2) !== Math.round(0.5 * (rows - 1)));
+    expect(differ, "even heights are where the rounding stage shows").toEqual([2, 4, 6, 8]);
   });
 });

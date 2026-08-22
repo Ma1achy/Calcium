@@ -75,6 +75,31 @@ const results = runPass({
       expect: "G0",
     },
     {
+      // **The zero span back to `0 / 0`** (C04 §3ak). The clamp cannot repair a
+      // NaN — `NaN < 0` and `NaN > 1` are both false — so it passes through
+      // both arms and the SVG emits a well-formed `<path>` that paints
+      // nothing. **Past every containment assertion, every element count and
+      // the empty-marks refusal**, which is why the row reads the coordinate
+      // rather than the picture.
+      name: "the shared coordinate divides by a zero span again",
+      file: SHARED,
+      from: "  const t = span === 0 ? 0.5 : (v - range.min) / span;",
+      to: "  const t = (v - range.min) / span;",
+      expect: "G9",
+    },
+    {
+      // **The other plausible answer, and C04's own table calls it wrong**:
+      // `{v, v+1}` *puts a field that never varied at the bottom of the scale,
+      // which says all minimum about data that says nothing*. Five files in
+      // `plot/` open-code exactly this, which is what made it a missing ruling
+      // rather than a bug.
+      name: "a constant field is drawn at the floor rather than mid-ramp",
+      file: SHARED,
+      from: "  const t = span === 0 ? 0.5 : (v - range.min) / span;",
+      to: "  const t = span === 0 ? 0 : (v - range.min) / span;",
+      expect: "G9",
+    },
+    {
       // **The clamp moved to the renderer.** A normalised coordinate outside
       // `[0, 1]` makes the rasteriser responsible for C04 I29, which it has no
       // way to know — and in cells `Math.round` hides it inside the grid at

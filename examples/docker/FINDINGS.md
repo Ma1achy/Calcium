@@ -12955,3 +12955,105 @@ its first commit.**
 **Widening G7 to all 27 refused forms turned up why it had sampled six**: `b.plot({ form: "tree",
 series })` throws, because a tree with no `hierarchy` has no figure to fall back to (C04 I65).
 `ONE_PER_FORM` is a `Record<PlotForm, Plot>` and already had them all.
+
+## F260 — the shared coordinate returns NaN at a zero span, and the spec had ruled it ★★★★★
+
+**C04's own table rules a constant field `{v, v}` drawn mid-ramp.** `pinnedRange` implements it —
+collapsing rather than widening to `{v, v+1}`, because *that puts a field that never varied at the
+bottom of the scale, which says all minimum about data that says nothing*. **`normalisedOf`, the
+next function in the same file, computes `0 / 0`.**
+
+**The clamp cannot repair it, and that is the mechanism worth keeping.**
+
+```ts
+const clamped = t < 0 ? 0 : t > 1 ? 1 : t;   // NaN < 0 is false. NaN > 1 is false.
+```
+
+**A guard written as a range check does not catch a value that fails every comparison.** It passes
+through both arms unchanged and arrives at the renderer as a coordinate.
+
+### What it drew
+
+```
+plotToSvg, series [5, 5, 5]  ->  <path d="M89.6 NaN L352 NaN L614.4 NaN"/>
+```
+
+**A well-formed `<path>` that paints no pixels.** It survives the element count, every containment
+assertion, and the empty-marks refusal that landed one commit earlier — `d` is a non-empty string,
+so the mark is *there*. It rasterises to a blank plot area with correct furniture around it: axis,
+gridlines, labels, and no curve.
+
+**The terminal never saw it** because `rowOf` guards before it calls, returning
+`Math.floor(last / 2)`. So the defect lived exactly in the arm with no local guard, which is the
+arm that was extracted onto the shared function.
+
+### Nine open-coded normalisations, five answers
+
+| answer | where |
+|---|---|
+| **mid** | `scale.ts`'s `rowOf`, `glyph-row.ts`'s `scaleX` |
+| **0.5** | `strip.ts`, `image/overlay.ts` (twice, each with its reason written down) |
+| **0** | `axes.ts`, `bar.ts`, `glyph-row.ts`'s two `at` closures |
+| **the last row** | `stack.ts` |
+| **`NaN`** | `normalisedOf`, the shared one |
+
+`0` and *the last row* are one decision seen through an inversion, and it is the decision C04's
+table calls wrong. **So the spec ruled it, two files implement it, five contradict it, and the
+function every renderer is being extracted onto returns the answer that is not a number.**
+
+**One disagreement is a bug; nine is a missing ruling.** The count is what turned this from *fix
+`normalisedOf`* into a section in C04 — and the count only exists because the distribution family's
+extraction made someone grep for the arithmetic rather than for the name.
+
+### Found by the extraction it was blocking
+
+**Not by a test and not by a frame.** Family 1's extraction is *pull the five positions out of
+`glyph-row.ts`*, and reading the file to do it turned up `scaleX` and two `at` closures computing
+the same figure three ways. Asking which was right sent the question to the shared function, which
+answered `NaN`.
+
+**Routing three more renderers onto it would have spread the NaN to the distribution family**,
+where `boxplotColumn`'s local `t = span <= 0 ? 0` is currently masking it — so the extraction would
+have been *correct* and the result would have been blank box plots.
+
+### The ruling, and what it deliberately does not touch
+
+**`normalisedOf` answers `0.5`.** The only renderer-independent answer: `0` means *the floor* to a
+position and *the coldest colour* to a field, and neither reads as *every value is the same*.
+
+**A renderer's degenerate *rounding* stays its own** (C12 §3aj hazard 1). `rowOf` keeps
+`Math.floor(last / 2)`, because `Math.floor(0.5 · last)` and `Math.round(0.5 · last)` differ **at
+every even height** — which is exactly what the gate's `G0` row exists to catch. So this is a
+change to one function and not to nine, and the evidence is **377 golden rows with zero snapshots
+written**.
+
+## F261 — a tool that runs on import, and a fixture that passed on a directory's state ★★★☆☆
+
+**`contact-defaults.mjs` had its whole sheet build at module top level, with a top-level `await`.**
+So `import { tileAt } from "./contact-defaults.mjs"` — three pure helpers — **rendered two
+megabytes of PNG as a side effect.**
+
+Its own fixture did exactly that, **and passed**, because `docs/catalogue` held 956 tiles at the
+moment it was written. `plot-catalogue.mjs` clears every `.txt`, `.plain` and `.png` in that
+directory before writing, so the next full suite found none: `Math.max(...[])` returned `-Infinity`
+and sharp refused the width.
+
+**A test that passes because of the state of a generated directory, and the tool that generates it
+sweeps.** The failure is not in the assertions — it is in the import.
+
+**The shape is the one worth keeping.** `catalogue-hash.mjs` was given an `isMain` guard **in the
+same commit**, for the same reason, and this one was not: the fix was applied where the flaw was
+noticed rather than to the pair. Both tools were touched in that commit, both read the same
+directory, and only one question was asked of one of them.
+
+**Caught by the suite one commit later**, which is the argument for running every target rather
+than the three that seem relevant — `make instruments` and `npm test` both went red, and the
+targets that had been run in isolation stayed green.
+
+**Fixed** — the build moves behind `buildSheet()` and an `isMain` guard, an empty tile set is
+**named** rather than thrown at by sharp (*Expected valid width, height and channels* says nothing
+about the ordinary state between two generators), and `CG1` asserts the rule over all five
+catalogue tools. `CG2` is its control: the loop filters on *does this file export anything*, so a
+filter that matched nothing would pass over an empty set in the same green — it asserts the subject
+count, and names `phase-catalogue.mjs` as the one that exports nothing and therefore cannot be
+imported for a helper.

@@ -107,6 +107,55 @@ describe("CD — the defaults sheet's geometry", () => {
   });
 });
 
+describe("CG — a tool that exports a helper does not run on import", () => {
+  const TOOLS = [
+    "tools/catalogue-hash.mjs",
+    "tools/contact-defaults.mjs",
+    "tools/catalogue-png.mjs",
+    "tools/plot-catalogue.mjs",
+    "tools/phase-catalogue.mjs",
+  ] as const;
+
+  it("CG1: every catalogue tool with an export guards its work behind isMain", () => {
+    // **This row exists because the suite caught the fixture** (F261).
+    // `contact-defaults.mjs` had its whole sheet build at module top level with
+    // a top-level `await`, so importing three pure helpers **rendered two
+    // megabytes of PNG**. It passed alone, because `docs/catalogue` held 956
+    // tiles at that moment; `plot-catalogue.mjs` clears every `.png` in that
+    // directory, so the next full run found none and sharp refused the width.
+    //
+    // **A test that passes because of the state of a generated directory**, and
+    // the tool that generates it sweeps. `catalogue-hash.mjs` got its guard in
+    // the same commit and this one did not — the fix applied where the flaw was
+    // noticed rather than to the pair, which is what this row is for.
+    for (const tool of TOOLS) {
+      const src = sourceOf(tool);
+      const exports = /^export /mu.test(src);
+      if (!exports) continue;
+      expect(src, `${tool} exports a helper, so it must not run on import`).toMatch(/isMain/u);
+    }
+  });
+
+  it("CG2: the scan sees the exports it is filtering on", () => {
+    // **The control.** `CG1` is a loop with a `continue`, so a filter that
+    // matched nothing would pass over an empty set in exactly the same green.
+    const withExports = TOOLS.filter((t) => /^export /mu.test(sourceOf(t)));
+    expect(withExports.length, "the rule has subjects").toBeGreaterThan(2);
+
+    // And the one that does not export anything is named rather than silently
+    // skipped: it cannot be imported for a helper, which is the whole hazard.
+    const without = TOOLS.filter((t) => !/^export /mu.test(sourceOf(t)));
+    expect(without, "phase-catalogue exports nothing, so nothing can import it")
+      .toEqual(["tools/phase-catalogue.mjs"]);
+  });
+
+  it("CG3: an empty tile set is named, not thrown at by sharp", () => {
+    // *Expected valid width, height and channels* says nothing about the
+    // ordinary state between `plot-catalogue.mjs` and `catalogue-png.mjs`.
+    expect(sourceOf("tools/contact-defaults.mjs")).toMatch(/no default tiles in/u);
+  });
+});
+
 describe("PC — the phase catalogue's two claims", () => {
   it("PC1: the refused list is derived from SVG_FAMILY, not written beside it", () => {
     // The tool writes a `refused forms` note. **It must be computed from the

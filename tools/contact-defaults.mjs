@@ -16,9 +16,6 @@ import { join } from "node:path";
 import sharp from "sharp";
 
 const OUT = join(import.meta.dirname, "..", "docs", "catalogue");
-const tiles = readdirSync(OUT)
-  .filter((f) => f.endsWith("-default-24bit.png"))
-  .sort();
 
 export const COLS = 5;
 const PAD = 14;
@@ -44,6 +41,31 @@ export function sheetSize(count, cellW, cellH) {
   const rows = Math.ceil(count / COLS);
   return { width: COLS * (cellW + PAD) + PAD, height: rows * (cellH + LABEL + PAD) + PAD, rows };
 }
+
+/**
+ * **Behind an `isMain` guard, and it was not** (F261).
+ *
+ * The whole sheet build sat at module top level with a top-level `await`, so
+ * `import { tileAt } from "./contact-defaults.mjs"` **rendered two megabytes of
+ * PNG as a side effect**. Its own fixture did that, and passed — because
+ * `docs/catalogue` happened to hold 956 tiles at the time. Running
+ * `plot-catalogue.mjs` clears every `.png` in that directory, so the next full
+ * suite found none, `Math.max(...[])` returned `-Infinity`, and sharp refused
+ * the width. **A test that passes because of the state of a generated
+ * directory** — and the tool that generates it sweeps.
+ *
+ * `catalogue-hash.mjs` got its guard in the same commit and this one did not,
+ * which is the shape: the fix was applied where the flaw was noticed rather
+ * than to the pair.
+ */
+async function buildSheet() {
+  const tiles = readdirSync(OUT).filter((f) => f.endsWith("-default-24bit.png")).sort();
+  // **Named rather than thrown at by sharp.** An empty directory is the
+  // ordinary state after `plot-catalogue.mjs` and before `catalogue-png.mjs`,
+  // and *Expected valid width, height and channels* says nothing about that.
+  if (tiles.length === 0) {
+    throw new Error(`no default tiles in ${OUT} — run catalogue-png.mjs first`);
+  }
 
 const metas = await Promise.all(
   tiles.map(async (f) => ({ file: f, name: f.replace(/^cat-|-default-24bit\.png$/gu, ""), m: await sharp(join(OUT, f)).metadata() })),
@@ -71,3 +93,8 @@ await sharp({ create: { width: W, height: H, channels: 3, background: "#0b0b0f" 
   .toFile(join(OUT, "_contact-sheet-defaults.png"));
 
 console.log(`defaults sheet: ${metas.length} forms, ${W}x${H}`);
+}
+
+const isMain = process.argv[1] !== undefined
+  && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (isMain) await buildSheet();
