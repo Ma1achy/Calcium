@@ -428,6 +428,32 @@ function plot(
      * average goes in, drawn over them on the shared axis.
      */
     ohlc?: Plot["ohlc"];
+    /**
+     * The distribution family's datum, and **four fields that were on `Plot`
+     * and not here** (F263).
+     *
+     * This is the `form` field's own finding one field along, and it survived
+     * the same way. *`"heatmap"` was buildable by nothing in the public
+     * surface — after a walk, a type, a validator arm, a renderer, three golden
+     * frames and a mutation pass*, because **every fixture that draws one
+     * reaches past `b` to `block()`**. So does every fixture that draws a box
+     * plot, a forest plot, a pie and a horizon chart.
+     *
+     * `quartiles` is the datum of **five forms** — boxplot, violin, ridgeline,
+     * forest, bullet — and `categories` names the axis every categorical form
+     * puts them on. Without the pair, none of the five is expressible by a
+     * consumer at all; with `quartiles` alone the categories fall back to
+     * `series 1`, `series 2`, which is a figure with no labels.
+     *
+     * **MG27 passed throughout, for the reason it passed on `form`**: the rule
+     * asks whether a builder's constructed literal *mentions* the field, and a
+     * field nobody can pass is not mentioned rather than mentioned wrongly.
+     * A name-based seam check cannot see an omission.
+     */
+    quartiles?: Plot["quartiles"];
+    categories?: Plot["categories"];
+    segments?: Plot["segments"];
+    bands?: Plot["bands"];
     plotDetail?: Plot["plotDetail"];
     plotCorners?: Plot["plotCorners"];
     orientation?: Plot["orientation"];
@@ -448,7 +474,7 @@ function plot(
     startDate?: Plot["startDate"];
   },
 ): Plot {
-  const { graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -762,6 +788,10 @@ function plot(
       ...(xTitle === undefined ? {} : { xTitle }),
       ...(plotStyle === undefined ? {} : { plotStyle }),
       ...(ohlc === undefined ? {} : { ohlc }),
+      ...(quartiles === undefined ? {} : { quartiles }),
+      ...(categories === undefined ? {} : { categories }),
+      ...(segments === undefined ? {} : { segments }),
+      ...(bands === undefined ? {} : { bands }),
       ...(plotDetail === undefined ? {} : { plotDetail }),
       ...(plotCorners === undefined ? {} : { plotCorners }),
       ...(orientation === undefined ? {} : { orientation }),

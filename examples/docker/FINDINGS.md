@@ -13101,3 +13101,67 @@ its exceptions rather than globbing narrowly.
 verdict costs a session. **And a hang still fails, six seconds later** — what this removes is a
 default nobody chose deciding whether the suite means anything. Three consecutive runs after the
 change: **226 files, green, green, green.**
+
+## F263 — a builder gap I got wrong, and the rule I said had passed is what disproved it ★★★☆☆
+
+**The claim as first written**: `quartiles`, `categories`, `segments` and `bands` are on `Plot` and
+absent from `b.plot`, so the distribution family's five forms are *buildable by nothing in the
+public surface* — the `form` field's own finding one field along — and **MG27 passed throughout**
+because a name-based check cannot see an omission.
+
+**Two of those three are false**, and `make enforce` said so on the first run after the fix.
+
+| the claim | what measuring says |
+|---|---|
+| absent from `b.plot` | **true**, field by field |
+| buildable by nothing public | **false** — `b.figure(…).setQuartiles([…])`, `.setCategories`, `.setSegments`, `.setBands` have all been there |
+| MG27 passed throughout | **false** — all four were on `BUILDER_OMISSIONS` with a stated reason, and the list's bidirectional arm **refused the commit** the moment the builder set them |
+
+**So this is not a defect arriving; it is scheduled work arriving early.** The exemptions read
+*step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one*, which was accurate.
+What lands here is the shorthand.
+
+### The part worth keeping is how the wrong claim was reached
+
+**One builder file was read and there are two.** The rule's own doc comment records exactly this
+about itself — *it reads one of the two builder files … which is why ten of the entries below say
+shorthand lands in step 11 and are true about `b.plot` while `b.figure(…).setQuartiles([…])` has
+been setting the field all along*. **The limitation was written down, in the file I was citing as
+evidence, and I cited the rule's silence instead of reading its list.**
+
+**A grep for a field name in one file answers *is it in this file*, and it was read as *is it
+reachable*.** The measurement was correct and narrow; the conclusion was wide.
+
+**The instrument that caught it is the one that costs nothing**: an exemption compared by
+**equality in both directions**, so a list entry whose reason has expired is a violation. Nobody
+had to remember. That is the third entry disposed of this way — `plot.yFormat` and MG25's
+`isUsable` were the first two — and it is the argument for equality over a subset check, which
+would have let all four sit unread.
+
+**What actually lands**: the four fields on `b.plot`, so the shorthand exists beside the chain; the
+four expired entries removed; and family 1's SVG arm draws something both builders can express.
+
+## F264 — the digest that could not tell an addition from a change ★★★☆☆
+
+**F257's remedy hashes two populations as one.** `docs/catalogue/` holds 890 frames from
+`plot-catalogue.mjs` — the **terminal** arm — and 66 `phase*` frames from `phase-catalogue.mjs`,
+which are the **SVG** arm's own output. `catalogue-hash.mjs` hashed every `.txt` together.
+
+**So a frame the SVG arm was meant to add is indistinguishable from a terminal frame that moved**,
+and *the terminal arm is untouched* is the gate this tool exists for.
+
+**It happened on the first commit that added one.** Claiming three forms for the distribution
+family took the digest from `e25a2defe7da643d` to `9be0fef40a38305e` — read as the gate failing.
+Measured by stashing the change, regenerating, and hashing the 890 alone: **`64b8845e6408c819`
+on both sides, every frame byte-identical.**
+
+**The tool built to be precise about *did a frame move* was imprecise about exactly that**, and its
+own fixture could not see it because the fixture wrote two files into one temp directory and asked
+for one number.
+
+**Fixed** — `digestOf(dir, group)` and a report that always prints both, because a flag would make
+the split something a caller has to remember at the moment it matters. `CH4` asserts that adding to
+one population leaves the other's digest alone; `CH5` asserts the empty case, because `sha256("")`
+is `e3b0c44298fc1c14…` and **prints exactly like an answer** — the frame count is the only thing
+that distinguishes a clean population from one the tool could not see, which is F257's one bit
+inside the tool built to fix it.

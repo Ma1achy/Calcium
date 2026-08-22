@@ -25,9 +25,26 @@ import { join } from "node:path";
 
 const DEFAULT_DIR = join(import.meta.dirname, "..", "docs", "catalogue");
 
-/** `n frames · <16 hex>` over every `.txt` in `dir`, in name order. */
-export function digestOf(dir = DEFAULT_DIR) {
-  const files = readdirSync(dir).filter((f) => f.endsWith(".txt")).sort();
+/**
+ * A digest over the `.txt` frames in `dir`, in name order.
+ *
+ * **`group` splits two populations that share a directory** (F264). The
+ * catalogue's 890 frames are the *terminal* arm and `plot-catalogue.mjs` writes
+ * them; the 66 `phase*` frames are the SVG arm's and `phase-catalogue.mjs`
+ * writes them. Hashed as one, **a frame the SVG arm was meant to add is
+ * indistinguishable from a terminal frame that moved** — and the gate this tool
+ * exists for is *the terminal arm is untouched*.
+ *
+ * It happened on the first commit that added one: claiming three forms took the
+ * total from `e25a2defe7da643d` to `9be0fef40a38305e` with **every one of the
+ * 890 byte-identical**, measured by stashing and regenerating. A digest that
+ * cannot tell an addition from a change reports the gate failing when it held.
+ */
+export function digestOf(dir = DEFAULT_DIR, group = "all") {
+  const keep = group === "catalogue" ? (f) => !f.startsWith("phase")
+    : group === "phase" ? (f) => f.startsWith("phase")
+    : () => true;
+  const files = readdirSync(dir).filter((f) => f.endsWith(".txt") && keep(f)).sort();
   const all = createHash("sha256");
   // **The name goes into the digest as well as the bytes**, so a frame renamed
   // and a frame rewritten are both a change. Hashing contents alone would call
@@ -40,6 +57,11 @@ const isMain = process.argv[1] !== undefined
   && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {
   const i = process.argv.indexOf("--dir");
-  const { frames, digest } = digestOf(i === -1 ? DEFAULT_DIR : process.argv[i + 1]);
-  console.log(`${frames} frames · ${digest}`);
+  const dir = i === -1 ? DEFAULT_DIR : process.argv[i + 1];
+  // **Both, always.** A single line is what conflated them, and a flag would
+  // make the split something a caller has to remember at the moment it matters.
+  for (const group of ["catalogue", "phase"]) {
+    const { frames, digest } = digestOf(dir, group);
+    console.log(`${group.padEnd(9)} ${String(frames).padStart(4)} frames · ${digest}`);
+  }
 }

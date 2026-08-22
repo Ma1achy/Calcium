@@ -653,15 +653,11 @@ export const BUILDER_OMISSIONS = Object.freeze({
   // now points at a step that has passed, which is a justification the next
   // reader checks and cannot reproduce (CLAUDE.md). Kept, with the schedule
   // struck: each is a builder that has not been written, and no plan owes it.
-  "plot.categories": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
   "plot.layout": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
   "plot.binning": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.quartiles": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
   "plot.offsets": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
   "plot.totals": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.bands": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
   "plot.facets": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.segments": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
   "plot.xScale": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
   "plot.yScale": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
 });

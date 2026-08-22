@@ -24,9 +24,11 @@ const ROOT = process.cwd();
 const SHARED = "src/data/viewmodel/distribution.ts";
 const GLYPH = "src/presentation/plot/glyph-row.ts";
 const KDE = "src/presentation/plot/kde.ts";
+const SVG = "src/presentation/plot/svg.ts";
 
 const FILES =
   "test/unit/plot-distribution-geometry.test.ts test/unit/plot.test.ts " +
+  "test/unit/plot-svg-path.test.ts " +
   "test/golden/plot.test.ts test/golden/plot-forms.test.ts";
 
 const { read, write } = fsIo(ROOT);
@@ -108,6 +110,69 @@ const results = runPass({
       from: "  return Math.max(0, Math.min(last, last - Math.round(t * last))); // cells-ok — a row index",
       to: "  return Math.max(0, Math.min(last, Math.round((1 - t) * last))); // cells-ok — a row index",
       expect: "D3",
+    },
+    {
+      // **The SVG arm ranging over `series` like every other family.** A
+      // boxplot's `series` is `[]`, so `seriesRange` answers `null` and the
+      // fallback furnishes 0..1 — the figure draws, entirely inside the plot
+      // area, at a scale nothing in the block has.
+      name: "the distribution family takes seriesRange like everything else",
+      file: SVG,
+      from: "  if (svgFamilyOf(block.form) !== \"distribution\" || block.form === \"dumbbell\") {",
+      to: "  if (true) {",
+      expect: "G6",
+    },
+    {
+      // **The forest plot's interval arm dropped at the seam.** `quartileRange`
+      // has both and this is the caller that chooses — so the clip happens with
+      // the shared function behaving correctly, which is the divergence a
+      // per-family renderer is most likely to introduce.
+      // **Its first form survived and the survivor was right**: an interval
+      // ranged over the whiskers still reaches both area edges, because
+      // `normalisedOf` clamps. The row now reads the estimate, where the two
+      // arms genuinely differ.
+      name: "the SVG arm ranges a forest plot over its whiskers",
+      file: SVG,
+      from: "  return quartileRange(block.quartiles ?? [], block.form === \"forest\");",
+      to: "  return quartileRange(block.quartiles ?? []);",
+      expect: "G6c4",
+    },
+    {
+      // **The transpose lost.** A box plot's value axis runs bottom-to-top and
+      // its transpose runs left-to-right; dropping the inversion draws every
+      // figure upside down **inside the area**, so every containment assertion
+      // and every element count still passes.
+      // **Also survived first.** A mirrored figure has the same extremes, so
+      // the rows that read min and max agreed with both readings — containment
+      // one level up. The killer is *which* median is drawn higher.
+      name: "the vertical arm stops inverting its value axis",
+      file: SVG,
+      from: "    vertical ? value.to - (value.to - value.from) * t : value.from + (value.to - value.from) * t;",
+      to: "    value.from + (value.to - value.from) * t;",
+      expect: "G6c2",
+    },
+    {
+      // **The box drawn to the full slot.** `boxplotColumn`'s own ruling and
+      // matplotlib's `widths=0.6`: categories drawn to the full slot touch, and
+      // a categorical axis whose categories touch is not saying they are
+      // separate. Still inside the area, still one figure per category.
+      name: "a category's figure takes the whole slot",
+      file: SVG,
+      from: "  return { centre: from + slot * (index + 0.5), half: (slot * 0.6) / 2 };",
+      to: "  return { centre: from + slot * (index + 0.5), half: slot / 2 };",
+      expect: "G6c",
+    },
+    {
+      // **The mean drawn whether or not there is one.** `ns.mean` is absent for
+      // *no mean* and for a non-finite one, and `?? ns.median` puts a marker on
+      // the median of every summary that has neither — which is the reading
+      // *the mean coincides with the median*, said about data that never had a
+      // mean (C04 I53).
+      name: "a summary with no mean gets one at its median",
+      file: SVG,
+      from: "  if (ns.mean !== undefined) {\n    const r = Math.max(2, slot.half * 0.3);",
+      to: "  {\n    const r = Math.max(2, slot.half * 0.3);\n    ns = { ...ns, mean: ns.mean ?? ns.median };",
+      expect: "G6c3",
     },
     {
       // **The two arms collapsed into one.** A forest plot ranging over its

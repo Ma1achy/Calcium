@@ -60,6 +60,46 @@ describe("CH — the catalogue digest, because git cannot see the directory (F25
     writeFileSync(join(dir, "b.txt"), "two\n");
   });
 
+  it("CH4: the two populations are hashed apart (F264)", () => {
+    // **The catalogue's frames are the terminal arm; `phase*` is the SVG arm's
+    // own output.** Hashed as one, a frame the SVG arm was meant to add is
+    // indistinguishable from a terminal frame that moved — and *the terminal
+    // arm is untouched* is the gate this tool exists for.
+    //
+    // Measured on the first commit that added one: the total went from
+    // `e25a2defe7da643d` to `9be0fef40a38305e` with **every one of the 890
+    // byte-identical**, confirmed by stashing and regenerating.
+    writeFileSync(join(dir, "phase3-new-cells.txt"), "added by the other arm\n");
+    const cat = digestOf(dir, "catalogue");
+    const phase = digestOf(dir, "phase");
+    expect(cat.frames, "the addition is not counted as a catalogue frame").toBe(2);
+    expect(phase.frames, "it is counted where it belongs").toBe(1);
+    expect(digestOf(dir, "all").frames, "and the whole is still available").toBe(3);
+
+    // The gate's own claim: adding to one leaves the other's digest alone.
+    const before = digestOf(dir, "catalogue").digest;
+    writeFileSync(join(dir, "phase3-another-cells.txt"), "and another\n");
+    expect(digestOf(dir, "catalogue").digest, "the terminal arm did not move").toBe(before);
+    expect(digestOf(dir, "phase").digest, "and the SVG arm did").not.toBe(phase.digest);
+
+    rmSync(join(dir, "phase3-new-cells.txt"));
+    rmSync(join(dir, "phase3-another-cells.txt"));
+  });
+
+  it("CH5: an empty group is a count, and the count is what says so", () => {
+    // `sha256("")` is `e3b0c44298fc1c14…` and it prints exactly like an answer.
+    // **The frame count is the only thing that distinguishes a clean population
+    // from one the tool could not see** — the same one bit F257 was about, in
+    // the tool built to fix it.
+    const empty = mkdtempSync(join(tmpdir(), "cat-empty-"));
+    const d = digestOf(empty, "catalogue");
+    expect(d.frames, "zero, and visible").toBe(0);
+    expect(d.digest, "the digest of nothing is still a digest").toBe(
+      digestOf(empty, "phase").digest,
+    );
+    rmSync(empty, { recursive: true, force: true });
+  });
+
   it("CH3: a non-frame in the directory is not counted", () => {
     const before = digestOf(dir);
     writeFileSync(join(dir, "sheet.png"), "not a frame");
@@ -163,8 +203,16 @@ describe("PC — the phase catalogue's two claims", () => {
     // 26 of 34 — so this asserts the source, not the note.
     const src = sourceOf("tools/phase-catalogue.mjs");
     expect(src, "the refusal list comes from the table").toMatch(/SVG_FAMILY\)\.filter/u);
-    const refused = Object.entries(SVG_FAMILY).filter(([, f]) => f === null);
-    expect(refused.length, "27 of 46 carry their own geometry").toBe(27);
+    // **A total partition, not a count.** The refused set shrinks by design as
+    // each family lands — 27 at phase 3, 24 once distribution claimed three —
+    // so a number here would be a row that fails on every commit that works.
+    // What holds is that the two sides are exhaustive and disjoint.
+    const forms = Object.keys(SVG_FAMILY);
+    const refused = forms.filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] === null);
+    const claimed = forms.filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] !== null);
+    expect(refused.length + claimed.length, "every form is on exactly one side").toBe(forms.length);
+    expect(forms.length, "and the union is 46").toBe(46);
+    expect(refused.length, "some are still refused").toBeGreaterThan(0);
   });
 
   it("PC2: the ordering hazard is real — the sweeper would delete these frames", () => {

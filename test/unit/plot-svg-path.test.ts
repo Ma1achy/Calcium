@@ -220,14 +220,56 @@ const supported = (Object.entries(SVG_FAMILY) as [PlotForm, string | null][])
   .filter(([, family]) => family !== null)
   .map(([form]) => form);
 
+/**
+ * **A form's datum, which this table assumed there was one of.**
+ *
+ * Every row here built `series: [{ values: SAMPLES }]`, and the distribution
+ * family's is `quartiles` — a boxplot's `series` is `[]` and its summaries are
+ * the data (C04 I57's shape). So the first three forms of family 1 rendered
+ * `null` against a table that had already claimed them, and `G7b` said so.
+ *
+ * **The samples-outside-the-pin rule needs its equivalent here.** A quartile
+ * form ranges over `quartileRange`, which no `yMin`/`yMax` reaches, so the
+ * thing that plays the clamp's part is an **outlier past the whiskers** — the
+ * one member that widens the extent. Every summary below has one.
+ */
+const datumFor = (form: PlotForm): Record<string, unknown> => {
+  if (svgFamilyOf(form) !== "distribution") return { series: [{ label: "s", values: SAMPLES }], ...PIN };
+  if (form === "dumbbell") {
+    return { series: [{ label: "a", values: [2, 5, 8] }, { label: "b", values: [8, 3, 4] }], ...PIN };
+  }
+  // **A forest plot has no outliers to draw**, so giving it some widens the
+  // axis by data its figure has no place for — and the terminal does the same,
+  // which is why the fixture rather than the renderer is what was wrong. Its
+  // equivalent of *a sample outside the pin* is an **interval past the
+  // whiskers**, the one member `quartileRange`'s second arm exists for.
+  if (form === "forest") {
+    return {
+      series: [],
+      categories: ["one", "two"],
+      quartiles: [
+        { min: 4, q1: 5, median: 6, q3: 7, max: 8, lower: -40, upper: 9, centre: 6 },
+        { min: 4, q1: 5, median: 6, q3: 7, max: 8, lower: 3, upper: 40, centre: 6, weight: 0.8 },
+      ],
+    };
+  }
+  return {
+    series: [],
+    categories: ["one", "two"],
+    quartiles: [
+      { min: 2, q1: 3, median: 5, q3: 7, max: 8, mean: 5.2, outliers: [-40] },
+      { min: 3, q1: 4, median: 5, q3: 6, max: 7, outliers: [40] },
+    ],
+  };
+};
+
 describe.each(supported)("G6 — %s", (form) => {
   const made = b.plot({
     id: `f-${form}`,
     form,
     height: 8,
-    ...PIN,
-    series: [{ label: "s", values: SAMPLES }],
-  });
+    ...datumFor(form),
+  } as Parameters<typeof b.plot>[0]);
 
   it("renders, and its ink stays inside the fractional plot area", () => {
     const layout = svgLayout(600, 300);
@@ -255,6 +297,36 @@ describe.each(supported)("G6 — %s", (form) => {
     // **The fixture lesson generalised.** `-40` and `40` against a pin of `2..8`
     // are the only samples an open-coded normalisation gets wrong, and without
     // them this row passes for both readings.
+    //
+    // **The distribution family has no clamp to fire, and that is a claim
+    // rather than an exemption.** Its range is `quartileRange`, which no
+    // `yMin`/`yMax` reaches and which *includes the outliers* — so nothing is
+    // ever outside it. The equivalent assertion is the other side of the same
+    // mechanism: the extreme outlier **defines** the edge, so its mark sits on
+    // it. A row that skipped these forms would be an exemption with no claim in
+    // it, and the mutation *outliers do not widen the extent* would have no
+    // killer here.
+    if (svgFamilyOf(form) === "distribution") {
+      const layout = SVG_DEFAULT_LAYOUT;
+      const top = layout.height * layout.pad;
+      const bottom = layout.height * (1 - layout.gutter);
+      const left = layout.width * (layout.gutter + layout.pad);
+      const right = layout.width * (1 - layout.pad);
+      const svg = plotToSvg(made, THEME, layout) ?? "";
+      // **Horizontal is the family's default**, matching the terminal, so the
+      // value axis is x and the two outliers define its ends.
+      const xs = [...svg.matchAll(/(?:\bcx|\bx)="([-\d.]+)"/gu)]
+        .map((m) => Number(m[1]))
+        .filter((x) => x >= left - 1 && x <= right + 1);
+      expect(xs.length, `${form}: the figure has extent along the value axis`).toBeGreaterThan(0);
+      // A mark is centred on its value and is a pixel wide, so its left edge is
+      // half a pixel short — the bound names that rather than rounding it away.
+      expect(Math.min(...xs), `${form}: the extreme reaches the left edge`).toBeLessThanOrEqual(left + 1);
+      expect(Math.min(...xs), `${form}: and does not overrun it`).toBeGreaterThanOrEqual(left - 1);
+      expect(Math.max(...xs), `${form}: the other extreme reaches the right`).toBeGreaterThanOrEqual(right - 2);
+      void top; void bottom;
+      return;
+    }
     const layout = SVG_DEFAULT_LAYOUT;
     const range = { min: PIN.yMin, max: PIN.yMax };
     const points = svgPoints(SAMPLES, range, layout);
@@ -430,6 +502,123 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
       series: [{ label: "r", values: [0, 1, 2, 3] }],
     });
     expect(plotToSvg(heat, THEME), "and so does a matrix").not.toBeNull();
+  });
+});
+
+describe("G6c — the distribution family, where containment says nothing", () => {
+  const QS = [
+    { min: 2, q1: 3, median: 5, q3: 7, max: 8, mean: 6 },
+    { min: 1, q1: 2, median: 3, q3: 4, max: 9 },
+  ];
+  const boxplot = (extra: Record<string, unknown> = {}): Parameters<typeof plotToSvg>[0] =>
+    b.plot({
+      id: "bx", form: "boxplot", height: 8, series: [],
+      categories: ["a", "b"], quartiles: QS, ...extra,
+    } as Parameters<typeof b.plot>[0]);
+  const layout = svgLayout(600, 300);
+  const box = {
+    left: layout.width * (layout.gutter + layout.pad),
+    right: layout.width * (1 - layout.pad),
+    top: layout.height * layout.pad,
+    bottom: layout.height * (1 - layout.gutter),
+  };
+  const rects = (svg: string): Array<Record<string, number>> =>
+    [...svg.matchAll(/<rect ([^>]*)\/>/gu)].map((m) => {
+      const out: Record<string, number> = {};
+      for (const a of m[1]?.matchAll(/(\w[\w-]*)="([-\d.]+)"/gu) ?? []) out[a[1] as string] = Number(a[2]);
+      return out;
+    });
+
+  it("G6c: a category's figure takes three fifths of its slot, not the slot", () => {
+    // **Containment cannot see this.** A box drawn to the full slot is inside
+    // the plot area and inside its own category — and the categories touch,
+    // which is a categorical axis saying they are not separate.
+    // Horizontal by default, so a category's slot runs down the area and the
+    // figure's extent across it is a **height**.
+    const svg = plotToSvg(boxplot(), THEME, layout) ?? "";
+    const slot = (box.bottom - box.top) / 2;
+    const bodies = rects(svg).filter((r) => (r["width"] ?? 0) > 1 && (r["height"] ?? 0) > 1);
+    const tallest = Math.max(...bodies.map((r) => r["height"] ?? 0));
+    expect(tallest, "three fifths of the slot").toBeCloseTo(slot * 0.6, 3);
+    expect(tallest, "and not the whole slot").not.toBeCloseTo(slot, 3);
+  });
+
+  it("G6c2: the vertical arm inverts, so the maximum sits above the minimum", () => {
+    // **The transpose lost draws every figure upside down inside the area**,
+    // which every containment assertion and every element count still passes.
+    // Built `vertical` explicitly, because the family's default is horizontal
+    // and a horizontal figure has no inversion to lose.
+    const svg = plotToSvg(boxplot({ orientation: "vertical" }), THEME, layout) ?? "";
+    const ys = rects(svg).map((r) => r["y"] ?? 0).filter((y) => y >= box.top - 1 && y <= box.bottom + 1);
+    // Category b spans 1..9 against a's 2..8 on a range of 1..9, so b reaches
+    // both the ceiling and the floor — the extremes, not a count.
+    expect(Math.min(...ys), "something reaches the ceiling").toBeLessThan(box.top + (box.bottom - box.top) * 0.1);
+    expect(Math.max(...ys), "and something the floor").toBeGreaterThan(box.top + (box.bottom - box.top) * 0.85);
+
+    // **A mirrored figure has the same extremes**, which is why the two lines
+    // above survived the mutation that drops the inversion. What differs is
+    // *which* value is at the top: category a's median is 5 and b's is 3 on a
+    // range of 1..9, so a's median rail sits **above** b's — and reflected, it
+    // sits below. Asserted through the widest rails, which are the medians.
+    // The median rail is the **widest** horizontal mark — the full box width,
+    // where a whisker cap is half of it. Filtering on *wide and thin* alone
+    // caught the caps too, which is how the first attempt compared a cap to a
+    // median and read 141 against 11.5.
+    const thin = rects(svg).filter((r) => (r["height"] ?? 0) <= 2 && (r["width"] ?? 0) > 2);
+    const widest = Math.max(...thin.map((r) => r["width"] ?? 0));
+    const rails = thin
+      .filter((r) => Math.abs((r["width"] ?? 0) - widest) < 0.01)
+      .sort((p, q) => (p["x"] ?? 0) - (q["x"] ?? 0));
+    expect(rails.length, "a median rail per category").toBe(2);
+    expect(rails[0]?.["y"] ?? 0, "category a's median is 5 and b's is 3, so a's rail is higher")
+      .toBeLessThan(rails[1]?.["y"] ?? 0);
+  });
+
+  it("G6c3: a mean is drawn only where the summary has one", () => {
+    // A circle per mean, and `QS` has exactly one. `?? ns.median` would put a
+    // marker on every summary — the reading *the mean coincides with the
+    // median*, said about data that never had a mean (C04 I53).
+    const svg = plotToSvg(boxplot(), THEME, layout) ?? "";
+    // **A diamond, not a circle** — the terminal draws the mean as the glyph
+    // and the outliers as dots, so the two are told apart by shape at the same
+    // colour. A grey circle inside a filled box was the first version and the
+    // frame is what said it was invisible.
+    expect([...svg.matchAll(/<polygon /gu)].length, "one mean").toBe(1);
+    expect([...svg.matchAll(/<circle /gu)].length, "and no outliers in this fixture").toBe(0);
+
+    const both = plotToSvg(boxplot({ quartiles: [QS[0], { ...QS[1], mean: 3 }] }), THEME, layout) ?? "";
+    expect([...both.matchAll(/<polygon /gu)].length, "two means").toBe(2);
+  });
+
+  it("G6c4: a forest plot ranges over its interval, not its whiskers", () => {
+    // The clip happens with `quartileRange` behaving correctly — the caller
+    // chooses the arm, which is where a per-family renderer diverges.
+    const wide = b.plot({
+      id: "fr", form: "forest", height: 6, series: [], categories: ["a"],
+      quartiles: [{ min: 4, q1: 5, median: 6, q3: 7, max: 8, lower: 1, upper: 11, centre: 5 }],
+    } as Parameters<typeof b.plot>[0]);
+    const svg = plotToSvg(wide, THEME, layout) ?? "";
+    const xs = rects(svg).flatMap((r) => [r["x"] ?? 0, (r["x"] ?? 0) + (r["width"] ?? 0)])
+      .filter((x) => x >= box.left - 1 && x <= box.right + 1);
+    // The interval is the extent, so it spans the area edge to edge. Ranged
+    // over the whiskers instead, 4..8 would sit in the middle third.
+    // Half a pixel short at each end, because a tee is one pixel wide centred
+    // on its value. Ranged over the whiskers instead, 4..8 would sit inside the
+    // middle third of an area the interval spans end to end.
+    expect(Math.min(...xs), "the interval's left end is the area's left").toBeLessThanOrEqual(box.left + 1);
+    expect(Math.min(...xs), "and not inside it").toBeGreaterThanOrEqual(box.left - 1);
+    expect(Math.max(...xs), "and its right end the area's right").toBeGreaterThanOrEqual(box.right - 1);
+
+    // **The ends clamp under either arm, so they cannot tell them apart.** An
+    // interval of 1..11 ranged over the whiskers 4..8 still reaches both edges,
+    // because `normalisedOf` clamps — the survivor that said so. The
+    // **estimate** is where the two disagree: `centre: 5` is 0.4 of 1..11 and
+    // 0.25 of 4..8.
+    const estimate = rects(svg).filter((r) => (r["width"] ?? 0) > 2 && (r["height"] ?? 0) > 2);
+    expect(estimate.length, "the estimate is drawn").toBeGreaterThan(0);
+    const cx = (estimate[0]?.["x"] ?? 0) + (estimate[0]?.["width"] ?? 0) / 2;
+    const t = (cx - box.left) / (box.right - box.left);
+    expect(t, "0.4 of the interval, not 0.25 of the whiskers").toBeCloseTo(0.4, 2);
   });
 });
 
