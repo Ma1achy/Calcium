@@ -31,8 +31,17 @@ const SVG = "src/presentation/plot/svg.ts";
 // **The goldens are in the file list on purpose.** They cannot catch the flat
 // line — that is the finding — and their presence is what makes each row's
 // `expect` a claim about *which* instrument caught it.
+//
+// **And for two commits they were not in it.** The list said `test/golden/
+// plots.test.ts`; the files are `plot.test.ts` and `plot-forms.test.ts`, and
+// **vitest drops a path that resolves to nothing whenever another one does** —
+// no warning, no non-zero exit, three files run where four were named. So every
+// row's `expect` was a claim about an instrument set that did not include the
+// goldens, and the comment above argued *from* their presence. Found by a
+// missing file in a different list, not by anything watching this one.
 const FILES =
-  "test/unit/plot-shared-geometry.test.ts test/unit/plot-svg-path.test.ts test/golden/plots.test.ts";
+  "test/unit/plot-shared-geometry.test.ts test/unit/plot-svg-path.test.ts " +
+  "test/unit/plot-svg-colour.test.ts test/golden/plot.test.ts test/golden/plot-forms.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -135,6 +144,50 @@ const results = runPass({
       from: "      const base = box.top + (box.bottom - box.top) * normalisedOf(zero, range, true);",
       to: "      const base = box.bottom;",
       expect: "G6",
+    },
+    {
+      // **The palette open-coded again**, which is the shape the arm shipped
+      // with: five literals where C10 has eight slots. The picture still reads
+      // as a chart and every curve is still a curve — the difference is that
+      // the legend and the figure name different colours for series six.
+      name: "a series takes a colour this file chose",
+      file: SVG,
+      from: "    const ink = inkOf(refOf(si), theme);",
+      to: '    const ink = "#6ea8fe";',
+      expect: "TC4",
+    },
+    {
+      // **The wrap point, and it is the whole of F-this-commit.** `% 5` is
+      // indistinguishable from `% 8` on every fixture with five series or
+      // fewer, which is every fixture the per-form corpus has.
+      name: "the slot index wraps at five rather than at the palette's size",
+      file: SVG,
+      from: "    const ink = inkOf(refOf(si), theme);",
+      to: "    const ink = inkOf(refOf(si % 5), theme);",
+      expect: "TC2",
+    },
+    {
+      // **A slot that is in the theme and says the wrong thing.** Every
+      // membership check passes — `tone.error` is C10's — and the axis labels
+      // now tell the reader something is wrong with the scale. *Which palette*
+      // and *which slot* are two claims, and only the second catches this.
+      name: "the furniture takes a tone that carries meaning",
+      file: SVG,
+      from: 'const LABEL: ColourRef = "tone.muted";',
+      to: 'const LABEL: ColourRef = "tone.error";',
+      expect: "TC1",
+    },
+    {
+      // **The arm's one rung unpinned.** At depth 4 every slot resolves to an
+      // `ansi16` index, `inkOf` returns `undefined`, and the renderer skips
+      // every element it was going to paint. **The output is still valid SVG**
+      // — an empty frame is a well-formed document — so nothing about parsing
+      // it says anything, and only a row that counts elements can.
+      name: "the SVG arm degrades like the terminal instead of pinning truecolour",
+      file: SVG,
+      from: "const SVG_CAPS = Object.freeze({ colourDepth: 24 as const });",
+      to: "const SVG_CAPS = Object.freeze({ colourDepth: 4 as const });",
+      expect: "TC5b",
     },
     {
       // **A refused form drawn by the curve family.** A treemap that measures,

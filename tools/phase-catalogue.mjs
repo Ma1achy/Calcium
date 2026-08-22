@@ -221,7 +221,7 @@ for (const [form] of supported) {
   const blk = block({ kind: "plot", id: form, ...rest });
   const cells = draw(blk, capsBy["24bit"], 68);
   write(`phase3-${form}-cells`, cells);
-  const svg = plotToSvg(blk, layout);
+  const svg = plotToSvg(blk, theme, layout);
   if (svg === null) continue;
   // **Side by side, which is the phase's whole argument.** The terminal frame
   // goes through the same `ansiToSvg` the catalogue uses, so what is compared is

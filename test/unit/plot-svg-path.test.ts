@@ -9,8 +9,8 @@
  * its violation *is discovered as a wrong-looking image rather than as an
  * error* — an assertion about pixels would be discovering it exactly that way.
  */
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { sourceOf } from "../support/source.js";
 import sharp from "sharp";
 import {
   plotToSvg,
@@ -24,6 +24,8 @@ import { rowOf, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { normalisedOf } from "../../src/data/viewmodel/range.js";
 import { decodePng } from "../../src/presentation/image/index.js";
 import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/colormap.js";
+import { rgbOf } from "../support/theme.js";
+import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 
@@ -45,10 +47,7 @@ const block = b.plot({ id: "p", form: "line", height: 8, series: [{ label: "s", 
 const sampleHex = (map: Parameters<typeof sampleMap>[0] | undefined, t: number): string =>
   map === undefined ? "" : sampleMap(map, t);
 
-const src = (rel: string): string =>
-  readFileSync(new URL(rel, import.meta.url), "utf8")
-    .replace(/\/\*[\s\S]*?\*\//gu, "")
-    .replace(/^\s*\/\/.*$/gmu, "");
+const src = sourceOf;
 
 describe("G3–G5 — the second renderer", () => {
   it("G3 (§3aj hazard 3): the image path's layout is its own, in its own units", () => {
@@ -68,7 +67,7 @@ describe("G3–G5 — the second renderer", () => {
     // **`layoutFor` is not reachable from this file**, which is the ruling
     // rather than an accident — asserted on the artefact, because "we did not
     // import it" is exactly the kind of claim that quietly stops being true.
-    const svg = src("../../src/presentation/plot/svg.ts");
+    const svg = src("src/presentation/plot/svg.ts");
     expect(/\blayoutFor\b/u.test(svg), "the cell ladder stays in the cell path").toBe(false);
     expect(/\bAXIS_GUTTER\b|\bMIN_AREA\b|\blabelWidth\b/u.test(svg), "and so do its constants").toBe(false);
   });
@@ -79,7 +78,7 @@ describe("G3–G5 — the second renderer", () => {
     // way. The seam is structural: `data/` may not import `presentation/`, so
     // `cells()` is not reachable from the shared layer and a shared layout
     // that reached for it would not compile.
-    const shared = src("../../src/data/viewmodel/range.ts");
+    const shared = src("src/data/viewmodel/range.ts");
     expect(/\bcells\s*\(/u.test(shared), "the shared layer does not measure cells").toBe(false);
     expect(/from "\.\.\/\.\.\/presentation/u.test(shared), "and could not if it wanted to").toBe(false);
 
@@ -87,13 +86,13 @@ describe("G3–G5 — the second renderer", () => {
     // it is asserted directly. `cells()` means nothing to a `<text>` element:
     // ambiguous width, grapheme clustering and the wide arm are all facts about
     // a terminal grid.
-    const svg = src("../../src/presentation/plot/svg.ts");
+    const svg = src("src/presentation/plot/svg.ts");
     expect(/\bcells\s*\(/u.test(svg), "the image path never measures a label").toBe(false);
     expect(/ambiguousWidth|TerminalCapabilities/u.test(svg), "and holds no terminal fact").toBe(false);
 
     // **The control**: the terminal path *does* measure, so the rows above are
     // about the seam rather than about `cells(` being a rare string.
-    expect(/\bcells\s*\(/u.test(src("../../src/presentation/plot/axes.ts")), "the cell path measures").toBe(true);
+    expect(/\bcells\s*\(/u.test(src("src/presentation/plot/axes.ts")), "the cell path measures").toBe(true);
   });
 
   it("G5 (§3aj): one block, two paths, one coordinate — only the rasterisation differs", () => {
@@ -145,7 +144,7 @@ describe("G3–G5 — the second renderer", () => {
     // **Read the frame, not the string.** An SVG that asserts as text can still
     // be a picture of nothing — `sharp` is the reader, already in the ledger for
     // the catalogue's own frames, so this costs no dependency.
-    const svg = plotToSvg(block);
+    const svg = plotToSvg(block, THEME);
     expect(svg, "a curve form renders").not.toBeNull();
     const png = await sharp(Buffer.from(svg ?? "")).png().toBuffer();
     const decoded = decodePng(new Uint8Array(png));
@@ -157,13 +156,20 @@ describe("G3–G5 — the second renderer", () => {
     // The curve's ink, found by its own colour, and compared against the
     // coordinate rather than against a golden.
     const px = decoded.pixels;
+    const [ir, ig, ib] = rgbOf("categorical.c1", THEME);
     let inkTop = px.height;
     let inkBottom = -1;
     for (let y = 0; y < px.height; y += 1) {
       for (let x = 0; x < px.width; x += 1) {
         const i = (y * px.width + x) * 4;
-        // #6ea8fe, with the rasteriser's antialiasing tolerated.
-        if ((px.data[i + 2] ?? 0) > 200 && (px.data[i] ?? 0) < 160 && (px.data[i] ?? 0) > 60) {
+        // The first categorical slot, with the rasteriser's antialiasing
+        // tolerated. The ground and the rule are more than 40 per channel away
+        // from it, so the window cannot pick up furniture.
+        if (
+          Math.abs((px.data[i] ?? 0) - ir) < 40 &&
+          Math.abs((px.data[i + 1] ?? 0) - ig) < 40 &&
+          Math.abs((px.data[i + 2] ?? 0) - ib) < 40
+        ) {
           if (y < inkTop) inkTop = y;
           if (y > inkBottom) inkBottom = y;
         }
@@ -183,12 +189,12 @@ describe("G3–G5 — the second renderer", () => {
     // A `<text>` with `text-anchor="end"` needs no width to sit right-aligned
     // against the gutter. Nothing computed its extent, and that is hazard 4's
     // answer visible in one attribute.
-    const svg = plotToSvg(block) ?? "";
+    const svg = plotToSvg(block, THEME) ?? "";
     expect(svg).toContain('text-anchor="end"');
     expect(svg.match(/<text /gu)?.length ?? 0, "one per tick").toBeGreaterThan(1);
     // And a label that would break the document is escaped rather than measured.
     const risky = b.plot({ id: "r", form: "line", height: 4, series: [{ label: "a<b&c", values: [1, 2] }] });
-    expect((plotToSvg(risky) ?? "").includes("a<b&c"), "raw markup never reaches the output").toBe(false);
+    expect((plotToSvg(risky, THEME) ?? "").includes("a<b&c"), "raw markup never reaches the output").toBe(false);
   });
 });
 /**
@@ -223,7 +229,7 @@ describe.each(supported)("G6 — %s", (form) => {
 
   it("renders, and its ink stays inside the fractional plot area", () => {
     const layout = svgLayout(600, 300);
-    const svg = plotToSvg(made, layout);
+    const svg = plotToSvg(made, THEME, layout);
     expect(svg, "a claimed form draws something").not.toBeNull();
     if (svg === null) return;
     const left = layout.width * (layout.gutter + layout.pad);
@@ -257,7 +263,7 @@ describe.each(supported)("G6 — %s", (form) => {
     expect(points[0]?.[1]).toBe(points[1]?.[1]);
     expect(points[4]?.[1]).toBe(points[3]?.[1]);
     // And the drawn document never puts ink outside the area either.
-    const svg = plotToSvg(made, layout) ?? "";
+    const svg = plotToSvg(made, THEME, layout) ?? "";
     const ys = [...svg.matchAll(/(?:\by|cy|y1|y2)="([-\d.]+)"/gu)].map((m) => Number(m[1]));
     for (const y of ys) {
       // Tick labels sit a third of a glyph below their line, so the bound is the
@@ -286,7 +292,7 @@ describe("G6b — the two assertions containment could not make", () => {
       colormap: "viridis",
       series: [{ label: "r", values: [0, 0.15, 0.3] }],
     });
-    const svg = plotToSvg(narrow) ?? "";
+    const svg = plotToSvg(narrow, THEME) ?? "";
     const fills = [...svg.matchAll(/<rect x=[^>]*fill="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
     expect(fills, "one cell per reading").toHaveLength(3);
     expect(new Set(fills).size, "and three different colours, not three near-black ones").toBe(3);
@@ -308,7 +314,7 @@ describe("G6b — the two assertions containment could not make", () => {
       series: [{ label: "s", values: [-3, 0, 5] }],
     });
     const layout = SVG_DEFAULT_LAYOUT;
-    const svg = plotToSvg(signed, layout) ?? "";
+    const svg = plotToSvg(signed, THEME, layout) ?? "";
     const rects = [...svg.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/gu)];
     expect(rects, "three bars").toHaveLength(3);
     const bottom = layout.height * (1 - layout.gutter);
@@ -336,7 +342,7 @@ describe("G7 — the partition itself", () => {
       // **A refusal, not a fallback.** A treemap drawn by the curve family
       // measures, rasterises and reads as a chart of something — the plausible
       // wrong figure the placeholder encoding refuses a wrap for.
-      expect(plotToSvg(made), `${form} carries its own geometry`).toBeNull();
+      expect(plotToSvg(made, THEME), `${form} carries its own geometry`).toBeNull();
     }
   });
 });

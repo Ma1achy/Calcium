@@ -16,6 +16,12 @@
  * path would need metrics to agree with it, and hazard 4 would be back. **Hazard
  * 3 is what makes hazard 4 free**, and violating either violates both.
  *
+ * **And the colour is C10's, not this file's** (§3aj hazard 5). `resolve`
+ * returns a `Style` and a cell renderer turns it into SGR; this one turns the
+ * same `Style` into `fill` and `stroke`. **One resolution, two emitters**, which
+ * is the shared coordinate's shape one channel along — and the reason the arms
+ * cannot drift is that neither of them chooses.
+ *
  * **What this is not: `ansiToSvg`.** `tools/catalogue-png.mjs` already writes
  * SVG, and it writes a *picture of a terminal* — `maxCols · CELL_W`, one glyph
  * per cell, every coordinate a cell coordinate scaled up. It inherits every
@@ -27,6 +33,9 @@ import { normalisedOf, type PinnedRange } from "../../data/viewmodel/range.js";
 import { seriesRange } from "./scale.js";
 import { niceAxis } from "./axes.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
+import { resolve } from "../theme/resolve.js";
+import type { ColourRef, ResolvedTheme } from "../theme/types.js";
+import { refOf } from "./marks.js";
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /**
@@ -192,7 +201,48 @@ function area(layout: SvgLayout): Readonly<{ left: number; right: number; top: n
   };
 }
 
-const SERIES_INK = ["#6ea8fe", "#f7a072", "#8fd694", "#c792ea", "#e5c07b"] as const;
+/**
+ * **The only rung this arm has** (§3aj hazard 5).
+ *
+ * The terminal path degrades through `colourDepth` and `unicode`; an SVG is
+ * always truecolour, so there is no ladder to walk and nothing to fall back to.
+ * That is why the two arms are **not byte-comparable below 24-bit**: a cross-arm
+ * row compares at this depth or compares structure, never output.
+ */
+const SVG_CAPS = Object.freeze({ colourDepth: 24 as const });
+
+/**
+ * **Furniture takes the slots the terminal's furniture takes.**
+ *
+ * `tone.muted` for the labels is `xTitleRow`'s own reason — *furniture is not a
+ * series* — and the rule and the ground are surfaces because they are drawn on
+ * the page rather than said about the data.
+ *
+ * **These four were hex literals, and one of them was a second palette.**
+ * `SERIES_INK` held five colours beside C10's eight, so a sixth series wrapped
+ * to a different slot in each arm and the legend disagreed with the figure it
+ * labels. A literal is a second source of truth for a colour C10 owns, and
+ * nothing can assert a colour it also chose.
+ */
+const GROUND: ColourRef = "surface.bgDeep";
+const RULE: ColourRef = "surface.border";
+const LABEL: ColourRef = "tone.muted";
+
+/**
+ * A slot's ink as a hex string, or `undefined` where the theme has no such slot.
+ *
+ * **`undefined` rather than a default**, which is `marks`' own handling of a
+ * colormap miss one function down: a default would be a literal, and a literal
+ * is what this file no longer has. The caller omits the element and the rows
+ * assert the elements are present — so a mistyped ref is a **missing** rectangle
+ * a test counts rather than an invisible one on a page. `ColourRef` is
+ * `${string}.${string}`, so a typo compiles and `resolve` is total: nothing
+ * but the output can say the slot was real.
+ */
+function inkOf(ref: ColourRef, theme: ResolvedTheme): string | undefined {
+  const { colour } = resolve(ref, theme, SVG_CAPS);
+  return colour?.kind === "rgb" ? colour.hex : undefined;
+}
 
 /** The path a curve family form draws: `step` is square, everything else is straight. */
 function curvePath(points: readonly (readonly [number, number] | null)[], square: boolean): string {
@@ -225,7 +275,7 @@ function curvePath(points: readonly (readonly [number, number] | null)[], square
  * family differ only in what they put at a position the shared coordinate
  * already gave them — a joined path, a mark, a rectangle, a painted cell.
  */
-function marks(block: Plot, range: PinnedRange, layout: SvgLayout): readonly string[] {
+function marks(block: Plot, range: PinnedRange, layout: SvgLayout, theme: ResolvedTheme): readonly string[] {
   const family = svgFamilyOf(block.form);
   const box = area(layout);
   const out: string[] = [];
@@ -243,7 +293,7 @@ function marks(block: Plot, range: PinnedRange, layout: SvgLayout): readonly str
         // **The shared coordinate, spent on colour.** `invert` is false: a
         // matrix reads low-to-high up the map rather than up the page.
         const t = normalisedOf(v, range, false);
-        const colour = continuousColour(map, t, { colourDepth: 24 });
+        const colour = continuousColour(map, t, SVG_CAPS);
         if (colour === undefined || colour.kind !== "rgb") continue;
         out.push(
           `<rect x="${n(box.left + c * w)}" y="${n(box.top + r * h)}" width="${n(w)}" height="${n(h)}" ` +
@@ -256,7 +306,11 @@ function marks(block: Plot, range: PinnedRange, layout: SvgLayout): readonly str
 
   for (const [si, series] of block.series.entries()) {
     const points = svgPoints(series.values, range, layout);
-    const ink = SERIES_INK[si % SERIES_INK.length] ?? SERIES_INK[0]; // cells-ok — a series index
+    // **The terminal arm's own slot chooser**, and `refOf` is `marks.ts`'s: the
+    // legend a reader compares the figure against is drawn from this same call,
+    // so the two arms cannot give series three different colours.
+    const ink = inkOf(refOf(si), theme);
+    if (ink === undefined) continue;
     if (family === "curve") {
       const d = curvePath(points, block.form === "step" || block.form === "ecdf");
       if (d !== "") out.push(`<path d="${d}" fill="none" stroke="${ink}" stroke-width="2"/>`);
@@ -306,7 +360,11 @@ function marks(block: Plot, range: PinnedRange, layout: SvgLayout): readonly str
  * rasterises and reads as a chart of something. The refusal is the same argument
  * the placeholder encoding makes for a wrapped diacritic (C04 I73).
  */
-export function plotToSvg(block: Plot, layout: SvgLayout = SVG_DEFAULT_LAYOUT): string | null {
+export function plotToSvg(
+  block: Plot,
+  theme: ResolvedTheme,
+  layout: SvgLayout = SVG_DEFAULT_LAYOUT,
+): string | null {
   if (svgFamilyOf(block.form) === null) return null;
   const range = seriesRange(block.series, block) ?? { min: 0, max: 1 };
   const axis = niceAxis(range, 5, block);
@@ -315,8 +373,13 @@ export function plotToSvg(block: Plot, layout: SvgLayout = SVG_DEFAULT_LAYOUT): 
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(layout.width)} ${n(layout.height)}" ` +
       `width="${n(layout.width)}" height="${n(layout.height)}">`,
-    `<rect width="100%" height="100%" fill="#101014"/>`,
   ];
+  // **The ground is painted rather than inherited**, and it is the one place
+  // this arm cannot follow `resolveBase`: a theme declaring `background:
+  // "inherit"` means *the terminal's own background shows*, and an SVG has no
+  // terminal underneath it. So the surface resolves directly.
+  const ground = inkOf(GROUND, theme);
+  if (ground !== undefined) parts.push(`<rect width="100%" height="100%" fill="${ground}"/>`);
 
   // **The labels place themselves.** `text-anchor="end"` at the gutter's right
   // edge, and nothing here knows or asks how wide the string is — which is the
@@ -324,19 +387,21 @@ export function plotToSvg(block: Plot, layout: SvgLayout = SVG_DEFAULT_LAYOUT): 
   //
   // A matrix has no value axis to tick: its ordinate is the series and its
   // readings are the colours, which is C12's own ruling for a field form.
-  if (svgFamilyOf(block.form) !== "matrix") {
+  const rule = inkOf(RULE, theme);
+  const label = inkOf(LABEL, theme);
+  if (svgFamilyOf(block.form) !== "matrix" && rule !== undefined && label !== undefined) {
     for (const tick of axis.ticks) {
       const y = box.top + (box.bottom - box.top) * normalisedOf(tick, range, true);
       parts.push(
         `<line x1="${n(box.left)}" y1="${n(y)}" x2="${n(box.right)}" y2="${n(y)}" ` +
-          `stroke="#2a2a33" stroke-width="1"/>`,
+          `stroke="${rule}" stroke-width="1"/>`,
         `<text x="${n(box.left - 6)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
-          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="#8a8a99">` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
           `${escape(String(tick))}</text>`,
       );
     }
   }
 
-  parts.push(...marks(block, range, layout), "</svg>");
+  parts.push(...marks(block, range, layout, theme), "</svg>");
   return parts.join("\n");
 }
