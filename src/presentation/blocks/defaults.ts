@@ -9,6 +9,7 @@
  */
 import { codeDefinition } from "./kinds/code.js";
 import { groupDefinition, mosaicDefinition, panelDefinition, scrollDefinition } from "./kinds/containers.js";
+import { imageDefinition } from "./kinds/image.js";
 import { statusDefinition } from "./kinds/status.js";
 import {
   comparisonDefinition,
@@ -43,6 +44,7 @@ export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
   groupDefinition,
   scrollDefinition,
   mosaicDefinition,
+  imageDefinition,
   statusDefinition,
   rawDefinition,
 ] as BlockDefinition[]);

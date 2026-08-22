@@ -38,7 +38,8 @@
  */
 
 import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
-import { parseAreas } from "../../data/viewmodel/index.js";
+import { readFileSync } from "node:fs";
+import { digestOf, parseAreas } from "../../data/viewmodel/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
   Action,
@@ -57,6 +58,7 @@ import type {
   Logs,
   Notice,
   Panel,
+  Image,
   Mosaic,
   Scroll,
   Patch,
@@ -948,6 +950,51 @@ function panel(
  * the constructor is where an author finds out.
  */
 /**
+ * An image: PNG bytes or a path, a declared height, and required alt text
+ * (C04 I73, §3g).
+ *
+ * **`path` is read here and nowhere below.** `node:fs` appears in `shell/` and
+ * `data/process/` and never in `presentation/` — a renderer that opened a file
+ * would be doing I/O at frame cadence in the layer forbidden it, and `measure`
+ * and `render` would disagree the moment the file changed between them.
+ *
+ * **The digest is derived here too**, once, so the identity travels with the
+ * block rather than being recomputed by every consumer that needs it.
+ */
+function image(
+  opts: BlockOpts &
+    Readonly<{ data?: string; path?: string; height: number; alt: string }>,
+): Image {
+  const { data, path, height, alt } = opts;
+  if ((data === undefined) === (path === undefined)) {
+    throw new TypeError(
+      `b.image: exactly one of "data" or "path" — got ${data === undefined ? "neither" : "both"} (C04 I73)`,
+    );
+  }
+  if (!Number.isInteger(height) || height < 1) {
+    throw new TypeError(`b.image: height is a positive integer — got ${JSON.stringify(height)} (C04 I73)`);
+  }
+  if (typeof alt !== "string" || alt.trim() === "") {
+    throw new TypeError(
+      "b.image: alt is required and cannot be empty (C04 I73) — at imageProtocol \"none\" with no " +
+        "dither it is the whole of what the reader receives",
+    );
+  }
+  const bytes = data ?? readFileSync(path ?? "").toString("base64");
+  if (!bytes.startsWith("iVBORw0KGgo")) {
+    throw new TypeError(
+      "b.image: the bytes are not a PNG (C04 I73) — phase 1 reads PNG only, and a signature that " +
+        "does not match is a format this cannot draw rather than an image that is broken",
+    );
+  }
+  return finish<Image>(
+    { kind: "image", id: idOf(opts, "image"), data: bytes, height, alt, digest: digestOf(bytes) } as Image,
+    opts,
+    false,
+  );
+}
+
+/**
  * A mosaic: a declared grid holding a figure nested rows and columns cannot draw
  * (C04 I71, C04 I72, C04 §3f).
  *
@@ -1266,6 +1313,7 @@ export const b = {
   group,
   scroll,
   mosaic,
+  image,
   raw,
   spinner,
 

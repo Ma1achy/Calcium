@@ -10,7 +10,8 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { decodePng, ditherAscii, ditherBraille, bayer, luminance, type Pixels } from "../../src/presentation/image/index.js";
+import { deflateSync, inflateSync } from "node:zlib";
+import { decodePng, ditherAscii, ditherBraille, bayer, luminance, DITHER_ASCII, type Pixels } from "../../src/presentation/image/index.js";
 
 /** A PNG from `sharp`, which already drives `tools/catalogue-png.mjs`. */
 function png(script: string, out: string): Uint8Array {
@@ -32,6 +33,100 @@ function synth(w: number, h: number, f: (x: number, y: number) => readonly [numb
     }
   }
   return { width: w, height: h, data };
+}
+
+/**
+ * A PNG whose scanlines use **every** filter type, hand-encoded.
+ *
+ * **Because the encoder would not.** `sharp` wrote filter 0 on every row of the
+ * gradient fixture — measured, `filters sharp used: 0` — so ID2 asserted against
+ * a decoder path it never entered, and a mutation breaking Paeth survived it.
+ * Choosing the filters here makes each arm reachable by construction rather than
+ * by hoping an encoder picks it.
+ */
+function pngWithEveryFilter(w: number, h: number, px: (x: number, y: number) => number): Uint8Array {
+  const stride = w * 3;
+  const raw = Buffer.alloc((stride + 1) * h);
+  const prior = Buffer.alloc(stride);
+  for (let y = 0; y < h; y += 1) {
+    const kind = y % 5; // 0 None, 1 Sub, 2 Up, 3 Average, 4 Paeth
+    const line = Buffer.alloc(stride);
+    for (let x = 0; x < w; x += 1) {
+      const v = px(x, y);
+      line[x * 3] = v;
+      line[x * 3 + 1] = v;
+      line[x * 3 + 2] = v;
+    }
+    raw[y * (stride + 1)] = kind;
+    for (let i = 0; i < stride; i += 1) {
+      const cur = line[i] ?? 0;
+      const a = i >= 3 ? (line[i - 3] ?? 0) : 0;
+      const b = prior[i] ?? 0;
+      const c = i >= 3 ? (prior[i - 3] ?? 0) : 0;
+      let out = cur;
+      if (kind === 1) out = cur - a;
+      else if (kind === 2) out = cur - b;
+      else if (kind === 3) out = cur - ((a + b) >> 1);
+      else if (kind === 4) {
+        const pp = a + b - c;
+        const pa = Math.abs(pp - a);
+        const pb = Math.abs(pp - b);
+        const pc = Math.abs(pp - c);
+        out = cur - (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+      }
+      raw[y * (stride + 1) + 1 + i] = out & 0xff;
+    }
+    line.copy(prior);
+  }
+  const chunk = (type: string, body: Buffer): Buffer => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(body.length);
+    const tagged = Buffer.concat([Buffer.from(type, "ascii"), body]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(tagged) >>> 0);
+    return Buffer.concat([len, tagged, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return new Uint8Array(
+    Buffer.concat([
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      chunk("IHDR", ihdr),
+      chunk("IDAT", deflateSync(raw)),
+      chunk("IEND", Buffer.alloc(0)),
+    ]),
+  );
+}
+
+function crc32(buf: Buffer): number {
+  let c = ~0;
+  for (const byte of buf) {
+    c ^= byte;
+    for (let k = 0; k < 8; k += 1) c = (c >>> 1) ^ (0xed_b8_83_20 & -(c & 1));
+  }
+  return ~c;
+}
+
+/** The per-row filter byte of every scanline, read off the inflated stream. */
+function filterTypes(png: Uint8Array): readonly number[] {
+  const idat: Buffer[] = [];
+  let at = 8;
+  let stride = 0;
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  while (at + 8 <= png.length) {
+    const len = view.getUint32(at);
+    const type = String.fromCharCode(png[at + 4] ?? 0, png[at + 5] ?? 0, png[at + 6] ?? 0, png[at + 7] ?? 0);
+    if (type === "IHDR") stride = view.getUint32(at + 8) * ((png[at + 17] ?? 0) === 6 ? 4 : 3);
+    if (type === "IDAT") idat.push(Buffer.from(png.subarray(at + 8, at + 8 + len)));
+    at += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const out: number[] = [];
+  for (let i = 0; i < raw.length; i += stride + 1) out.push(raw[i] ?? 0);
+  return out;
 }
 
 const show = (label: string, rows: readonly string[]): void => {
@@ -62,20 +157,28 @@ describe("ID — the codec", () => {
     // **A gradient is what exercises the filters.** A flat colour encodes as
     // filter 0 on every row; a gradient makes the encoder reach for Sub, Up and
     // Paeth, which is where a decoder that never read the row above breaks.
-    const out = "/tmp/id2.png";
-    const bytes = png(
-      `const s=require("sharp");const w=32,h=16;const b=Buffer.alloc(w*h*4);` +
-        `for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;b[i]=x*8;b[i+1]=y*16;b[i+2]=128;b[i+3]=255;}` +
-        `s(b,{raw:{width:w,height:h,channels:4}}).png().toFile(${JSON.stringify(out)}).then(()=>0)`,
-      out,
-    );
+    const bytes = pngWithEveryFilter(32, 16, (x, y) => (x * 8 + y * 16) & 0xff);
     const r = decodePng(bytes);
     expect(r.ok, r.ok ? "" : r.fault).toBe(true);
     if (!r.ok) return;
     expect([r.pixels.width, r.pixels.height]).toEqual([32, 16]);
-    for (const [x, y] of [[0, 0], [31, 0], [0, 15], [31, 15], [17, 9]] as const) {
-      const i = (y * 32 + x) * 4;
-      expect([r.pixels.data[i], r.pixels.data[i + 1]], `at ${String(x)},${String(y)}`).toEqual([x * 8, y * 16]);
+
+    // **The fixture is shown to reach the arm before it is asserted against.**
+    // A mutation breaking Paeth survived five sampled pixels, because nothing
+    // said the encoder had used Paeth at all — the filter bytes are read off the
+    // inflated stream so the row fails loudly if the encoder ever changes.
+    const filters = new Set(filterTypes(bytes));
+    console.log(`filters exercised: ${[...filters].sort().join(", ")}`);
+    expect([...filters].sort(), "all five arms, by construction").toEqual([0, 1, 2, 3, 4]);
+
+    // **Every pixel, not five.** A wrong predictor drifts progressively, so a
+    // sampled check passes on the rows that happen to agree.
+    for (let y = 0; y < 16; y += 1) {
+      for (let x = 0; x < 32; x += 1) {
+        const i = (y * 32 + x) * 4;
+        const want = (x * 8 + y * 16) & 0xff;
+        expect(r.pixels.data[i], `at ${String(x)},${String(y)}`).toBe(want);
+      }
     }
   });
 
@@ -195,5 +298,28 @@ describe("ID — the ordered dither", () => {
     expect(ink(rows[4] ?? ""), "the middle is the widest").toBeGreaterThan(ink(rows[0] ?? ""));
     expect(luminance(d, 60, 60), "the centre is white").toBeCloseTo(1, 5);
     expect(luminance(d, 0, 0), "and the corner is not").toBeCloseTo(0, 5);
+
+    // **A hard-edged disc cannot see point-sampling**, which a mutation proved:
+    // reading one pixel instead of averaging its rectangle changed nothing,
+    // because a binary source has no detail to alias. **Fine stripes at a
+    // fraction of the output resolution is the case that does** — averaged they
+    // resolve to an even mid-tone, point-sampled they alias into bands.
+    const stripes = synth(240, 32, (x) => {
+      const v = x % 2 === 0 ? 255 : 0;
+      return [v, v, v, 255];
+    });
+    const striped = ditherAscii(stripes, 30, 4);
+    show("1px stripes · ascii 30x4 — averaged, this is flat mid-tone", striped);
+
+    // **The value, not the variety.** Counting distinct glyphs accepts both
+    // readings: point-sampling lands on the even pixel of every cell, so it
+    // returns one glyph — `@` — and averaging returns one or two mid-ramp ones.
+    // A "few distinct glyphs" assertion passes either way, which is what let the
+    // mutation survive. What separates them is *which* glyph.
+    const mid = Math.floor((DITHER_ASCII.length - 1) / 2); // cells-ok — a ramp index
+    for (const ch of new Set(striped.join(""))) {
+      const at = DITHER_ASCII.indexOf(ch);
+      expect(Math.abs(at - mid), `${JSON.stringify(ch)} is mid-ramp, not an extreme`).toBeLessThanOrEqual(2);
+    }
   });
 });

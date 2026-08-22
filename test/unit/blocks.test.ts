@@ -162,7 +162,7 @@ describe("C09 §6 — the registry's transition table", () => {
     ).toHaveLength(2);
   });
 
-  it("T1.4: each of the seventeen kinds measures its documented height", () => {
+  it("T1.4: each of the eighteen kinds measures its documented height", () => {
     // §3's table, read back as assertions. The fixture is the canonical one, so
     // a change to a kind's height rule fails here with the kind named rather
     // than as one line of a conformance report.
@@ -183,6 +183,7 @@ describe("C09 §6 — the registry's transition table", () => {
       group: 1, // row: max of children
       scroll: 3, // height, plus a residue row where the content overflows
       mosaic: 4, // `height`, exactly — declared and never derived (C04 I71)
+      image: 3, // `height`, clamped by the width — 8x8 at 3 rows needs 6 columns (C04 I73)
       status: 7, // the declared height — six is the figure, seven shows its line
       raw: 2, // lines
     };

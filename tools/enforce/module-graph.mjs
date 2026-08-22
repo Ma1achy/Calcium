@@ -1347,21 +1347,6 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
-  // --- published one commit ahead of its consumer ---------------------------
-  //
-  // **The codec lands before the renderer that draws with it**, because the
-  // dither arm is built first (C09 I36) and it is the arm most readers see. The
-  // consumer is `imageDefinition`, and that is written as a **symbol rather than
-  // a sentence** so the deferral can be grepped: when it exists this entry is
-  // itself a violation, which is the bidirectional arm doing the watching a
-  // comment would not.
-  //
-  // The alternative was a fake read in the dither — `decodePng(...).pixels`
-  // threaded through a function that already takes `Pixels` — which satisfies
-  // the gate and decides nothing.
-  "Decoded.pixels":
-    "the renderer that consumes it is `imageDefinition`, built in the same phase; " +
-    "a read added now would be a check that cannot fire",
   // --- published ahead of the value that makes it readable ------------------
   //
   // **A single-value union has nothing for a consumer to branch on**, which is
@@ -2430,6 +2415,26 @@ export function publicSurfaceUseSignal(
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // --- the kitty arm: built, proven, and waiting on a seam L4 owes -----------
+  //
+  // **These cannot be called from where they would be called.** Ink strips APC
+  // escapes — an `ESC _G` inside a `Text` node renders to the empty string,
+  // measured (C09 §4c) — so a transmission cannot travel in the frame, and a
+  // placement without one draws nothing at all. `imageDefinition` therefore
+  // takes the dither at every protocol including `kitty`, because **nothing is
+  // worse than a dither on a terminal that could have shown one**.
+  //
+  // **The seam is named as a symbol so the deferral can be grepped**:
+  // `transmitImage`, which writes once per digest through `lifecycle.ts`'s
+  // privileged handle. The bidirectional arm is what will remove these — as it
+  // removed `Decoded.pixels` the moment `imageDefinition` landed, inside this
+  // same phase, which is the mechanism working rather than being trusted.
+  //
+  // The alternative was a branch emitting placeholders for an image nothing
+  // sent: a feature that draws blanks and reads as a broken terminal.
+  imageId: "the L4 seam that would call it is `transmitImage`, and it does not exist",
+  transmit: "same seam — and Ink strips the escape it produces, so the frame cannot carry it",
+  placementRows: "same seam — placement without transmission draws nothing",
   // `renderToLines` was here and the equality arm removed it on the commit that
   // moved the conformance suites into `src/testing/` — which is the arm working,
   // and also **the rule's known false negative, shared with MG24.**

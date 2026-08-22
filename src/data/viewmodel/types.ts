@@ -2130,6 +2130,46 @@ export type Scroll = Readonly<{
 }> & Gap & Floor;
 
 /**
+ * A block that declares a height in cells and draws pixels into them (C04 §3g, I73).
+ *
+ * **Not a floating overlay and not a separate surface**: a block, in the
+ * transcript, that measures, scrolls, degrades and caches like every other kind.
+ * The precondition was measured before this was designed (F247, F248) —
+ * `cells(placeholder)` is 1, the row and column diacritics add nothing, Ink lays
+ * out exactly what `cells()` measures, and Ink re-emits the whole frame when one
+ * row changes.
+ */
+export type Image = Readonly<{
+  kind: "image";
+  id: string;
+  /**
+   * PNG bytes, base64.
+   *
+   * **`b.image({ path })` reads into this at construction.** `node:fs` appears
+   * nowhere in `src/presentation/`, and a renderer that opened a file would make
+   * `measure` and `render` disagree the moment it changed between them.
+   */
+  data: string;
+  /** Rows, declared. A positive integer — `Scroll.height`'s precedent (I47). */
+  height: number;
+  /**
+   * Required, and it is what a reader without pixels gets.
+   *
+   * Not a courtesy: at `imageProtocol: "none"` with no dither this is the whole
+   * of what arrives.
+   */
+  alt: string;
+  /**
+   * The identity, derived once at construction — **never the data** (§3g.2).
+   *
+   * A megabyte of base64 in a cache key costs more than it saves, and it asks the
+   * wrong question: two blocks holding the same pixels should hit, and the same
+   * block re-encoded should not miss.
+   */
+  digest: string;
+}> & Gap & Floor;
+
+/**
  * A declared grid of cells, holding a figure nested rows and columns cannot draw
  * (C04 §3f, I71, I72).
  *
@@ -2254,6 +2294,7 @@ export type Block =
   | Group
   | Scroll
   | Mosaic
+  | Image
   | Status
   | Raw;
 

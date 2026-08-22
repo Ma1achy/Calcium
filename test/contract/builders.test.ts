@@ -147,6 +147,20 @@ const BUILDERS: readonly Readonly<{
   // is what the builder passes.
   { name: "scroll", gaps: false, kind: "scroll", make: (o) => b.scroll(2, [b.raw("x")], o) },
   {
+    name: "image",
+    gaps: false,
+    kind: "image",
+    make: (o) =>
+      b.image({
+        height: 2,
+        alt: "a red square",
+        data:
+          "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEU" +
+          "lEQVQImWO4o6GBFTEMLQkAe3tLAeVPQpUAAAAASUVORK5CYII=",
+        ...o,
+      }),
+  },
+  {
     name: "mosaic",
     gaps: false,
     kind: "mosaic",
@@ -156,8 +170,8 @@ const BUILDERS: readonly Readonly<{
   { name: "spinner", gaps: false, kind: "steps", make: (o) => b.spinner("pulling", o) },
 ];
 
-describe("C24 §4 — the twenty builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and twenty is the count", () => {
+describe("C24 §4 — the twenty-one builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty-one is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.

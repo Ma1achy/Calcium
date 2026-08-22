@@ -134,6 +134,15 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
     },
   ],
   [
+    "image",
+    {
+      premise: "no-field",
+      why:
+        "pixels and an alt string — the picture carries whatever meaning it has, and there is no " +
+        "field here that could convey one by colour alone",
+    },
+  ],
+  [
     "mosaic",
     {
       premise: "no-field",

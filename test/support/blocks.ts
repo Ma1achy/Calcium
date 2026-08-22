@@ -161,6 +161,17 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
   }),
   // A bounded region whose content overflows, so the corpus exercises the
   // residue row (C04 I49) rather than only the fitting case.
+  image: {
+    kind: "image",
+    id: "image-1",
+    height: 3,
+    // A real 8x8 PNG from `sharp`, so the corpus exercises the decoder rather
+    // than the `alt` fallback — the first draft was a blob typed from memory
+    // and every row of the suite took the fallback path instead.
+    data: "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWO4o6GBFTEMLQkAe3tLAeVPQpUAAAAASUVORK5CYII=",
+    alt: "an eight by eight red square",
+    digest: "00000001",
+  },
   mosaic: {
     kind: "mosaic",
     id: "mosaic-1",

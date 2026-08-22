@@ -1054,6 +1054,44 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
    * about `children.length`.
    */
   /**
+   * C04 I73, §3g.1 — refused at both gates, each naming its own part.
+   *
+   * **The PNG check is a signature check and not a decode.** `data/` may not
+   * import the codec — that is L1's — and a gate that decoded would do the
+   * expensive half of the work twice. The eight signature bytes are what
+   * separates *this is not a PNG* from *this PNG is broken*, and the second is
+   * the renderer's to report through the status block.
+   */
+  image: (b, e, at) => {
+    requireString(b, "data", e, at);
+    requireString(b, "alt", e, at);
+    const alt = b["alt"];
+    if (typeof alt === "string" && alt.trim() === "") {
+      e.push(
+        `${at}: "alt" cannot be empty (C04 I73) — at imageProtocol "none" with no dither it is ` +
+          `the whole of what the reader receives`,
+      );
+    }
+    const height = b["height"];
+    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+      e.push(`${at}: "height" must be a positive integer (C04 I73) — got ${JSON.stringify(height)}`);
+    }
+    const data = b["data"];
+    if (typeof data === "string") {
+      // The base64 of the eight-byte PNG signature. Checked as a prefix so a
+      // truncated or mislabelled file is refused here rather than drawn.
+      if (!data.startsWith("iVBORw0KGgo")) {
+        e.push(
+          `${at}: "data" is not a PNG (C04 I73) — phase 1 reads PNG only, and a signature that ` +
+            `does not match is a format this cannot draw rather than an image that is broken`,
+        );
+      }
+    }
+    if (typeof b["digest"] !== "string" || b["digest"] === "") {
+      e.push(`${at}: "digest" is derived at construction and must be present (C04 I73)`);
+    }
+  },
+  /**
    * C04 I71, I72, §3f.1 — **four refusals, ordered so each one's premise holds.**
    *
    * A ragged grid has no column count, so every rule after it would be

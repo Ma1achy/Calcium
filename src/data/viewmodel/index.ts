@@ -37,6 +37,7 @@ export type {
   MergeRow,
   Notice,
   Panel,
+  Image,
   Mosaic,
   Scroll,
   Status,
@@ -108,3 +109,5 @@ export {
   type MosaicRect,
   type MosaicRegion,
 } from "./mosaic.js";
+
+export { digestOf } from "./digest.js";
