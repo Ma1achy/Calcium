@@ -4239,6 +4239,45 @@ which slot are two claims**, and the furniture's slots are named for the termina
 *furniture is not a series*, so labels are `tone.muted`, and the rule and the ground are surfaces
 because they are drawn on the page rather than said about the data.
 
+### 3aj.5 — the partition is about the form, and a block is a form *and a datum*
+
+**`SVG_FAMILY` answers *is this form claimed*. That is one of two questions**, and the second is
+what F259 came out of: a `line` **carrying candles** is a different block that the same claim
+covers. `plotStyle: "candlestick"` is a style and not a thirty-third form (C04 I57), so the
+partition cannot reach it — and neither can a corpus indexed by form.
+
+| | terminal | SVG, before the ruling |
+|---|---|---|
+| candles only | three candles, 8 to 16 | an axis of 0 · 0.25 · 0.5 · 0.75 · 1, no ink |
+| candles + a moving average | three candles and a line | **a line on an axis of 11 to 12** |
+
+**The second row is the one to read.** A non-empty `series` beside `ohlc` is an average *over* the
+candles, so the range came from the average alone — not a blank a reader questions but a confident
+chart of the wrong thing, on an axis wrong by a factor of eight in span.
+
+**Asked of the other block-level fields, three of three came back.** `origin`: all four values
+produced byte-identical output, because `svgPoints` passes `invert: true` unconditionally, so the
+same data draws upside down between the arms. `annotations`: a reference line draws nothing.
+
+> **The ruling: refuse a false figure, record an incomplete one.** A datum this path cannot read
+> and would draw *around* — `ohlc`, a non-default `origin` — is a refusal, for the same reason a
+> treemap drawn by the curve family is. A datum whose absence leaves the picture **true but
+> partial** — an annotation — is drawn without and **asserted absent**, so the row fails the day it
+> lands and names what changed.
+
+**A second clause, because it is a second failure.** `series: []` on a plain form and an all-`null`
+series reach the renderer with a range nobody declared; `seriesRange` returns `null` and the
+fallback furnishes an axis out of nothing. Counting marks catches those and cannot reach the
+moving-average case; refusing `ohlc` catches that and cannot reach these.
+
+**And the partition stopped being independently observable.** Every unclaimed form also draws no
+marks — `marks()` switches on the family — so disabling `svgFamilyOf(form) === null → null` changes
+nothing any fixture can see. **Two guards, one ruling**, and the ruling is this section's. The
+mutation was removed rather than declared an expected survivor, and the guard that keeps the two
+from being confused is **a claimed form must put ink on the page**: a family claimed in
+`SVG_FAMILY` before its branch exists in `marks()` would otherwise refuse *as though the form were
+unclaimed*, which is what every new family does on its first commit.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
