@@ -161,6 +161,29 @@ const BUILDERS: readonly Readonly<{
       }),
   },
   {
+    // **Returns a `mosaic`, and that is the point** — a composition rather than
+    // a kind (C04 §3h). The enumeration is over builders, so it gets a row
+    // whatever it returns.
+    name: "samples",
+    gaps: false,
+    kind: "mosaic",
+    make: (o) =>
+      b.samples({
+        columns: 2,
+        cellRows: 2,
+        items: [
+          {
+            alt: "a red square",
+            label: "red 1.00",
+            data:
+              "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEU" +
+              "lEQVQImWO4o6GBFTEMLQkAe3tLAeVPQpUAAAAASUVORK5CYII=",
+          },
+        ],
+        ...o,
+      }),
+  },
+  {
     name: "mosaic",
     gaps: false,
     kind: "mosaic",
@@ -170,8 +193,8 @@ const BUILDERS: readonly Readonly<{
   { name: "spinner", gaps: false, kind: "steps", make: (o) => b.spinner("pulling", o) },
 ];
 
-describe("C24 §4 — the twenty-one builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and twenty-one is the count", () => {
+describe("C24 §4 — the twenty-two builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty-two is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.

@@ -38,6 +38,7 @@
  */
 
 import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { samplesChildren, samplesLayout, type Sample, type SamplesOptions } from "./samples.js";
 import { readFileSync } from "node:fs";
 import { digestOf, parseAreas } from "../../data/viewmodel/index.js";
 import { parseStartDate } from "../../data/dates.js";
@@ -995,6 +996,50 @@ function image(
 }
 
 /**
+ * A sample grid: N pictures with a label under each (§3f, §3g · `samples.ts`).
+ *
+ * **A composition rather than a kind**, and the premise was re-taken with kitty
+ * placing rather than inherited from the dither. What it adds over writing the
+ * mosaic by hand is the arithmetic nobody should do twice: the spec string, the
+ * row shares, and the **reading order** — `AB/ab` maps as `A B a b`, so a band
+ * contributes its pictures and then its labels, and getting that wrong puts
+ * every caption under the wrong picture with every count agreeing.
+ */
+function samples(opts: BlockOpts & SamplesOptions): Mosaic {
+  const cellRows = opts.cellRows ?? 4;
+  const layout = samplesLayout(opts.items.length, opts.columns, cellRows);
+  if (typeof layout === "string") throw new TypeError(`b.samples: ${layout}`);
+  const at = (i: number): Sample => opts.items[i] as Sample;
+  // **`opts` is not spread, and the reason is a name collision that type-checks
+  // in the other direction.** `SamplesOptions.columns` is a *count* and
+  // `Mosaic.columns` is a `Share[]`; spreading carries the count into the field
+  // and the compiler caught it, which is the enumeration working on a field
+  // rather than on a kind.
+  return mosaic({
+    ...(opts.id === undefined ? {} : { id: opts.id }),
+    ...(opts.gapBefore === undefined ? {} : { gapBefore: opts.gapBefore }),
+    height: layout.height,
+    areas: layout.areas,
+    rows: layout.rows,
+    children: samplesChildren(
+      opts.items.length,
+      opts.columns,
+      (i) => {
+        const item = at(i);
+        return image({
+          id: `${idOf(opts, "samples")}-i${String(i)}`,
+          height: cellRows,
+          alt: item.alt,
+          ...(item.data === undefined ? {} : { data: item.data }),
+          ...(item.path === undefined ? {} : { path: item.path }),
+        });
+      },
+      (i) => raw(at(i).label, { id: `${idOf(opts, "samples")}-l${String(i)}` }),
+    ),
+  });
+}
+
+/**
  * A mosaic: a declared grid holding a figure nested rows and columns cannot draw
  * (C04 I71, C04 I72, C04 §3f).
  *
@@ -1314,6 +1359,7 @@ export const b = {
   scroll,
   mosaic,
   image,
+  samples,
   raw,
   spinner,
 
