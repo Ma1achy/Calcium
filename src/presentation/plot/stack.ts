@@ -20,6 +20,7 @@
  * band's bounds independently would produce crossings for the same input and no
  * count would notice.
  */
+import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { Series } from "../../data/viewmodel/index.js";
 
 /** One band's bounds at every column: `lower[i]` to `upper[i]`. */
@@ -92,10 +93,12 @@ export function bandRows(
 ): readonly string[] {
   const w = Math.max(1, Math.floor(width));
   const n = Math.max(1, Math.floor(rows));
-  const span = max - min;
-  // Inverted: a value grows upwards and a row index grows down.
+  // Inverted: a value grows upwards and a row index grows down. **The
+  // inversion and the rounding are this renderer's; the coordinate is not**
+  // (C12 §3aj hazard 1, C04 §3ak). The degenerate arm read `n - 1` — a band of
+  // no extent pinned to the floor, which is the answer C04's table calls wrong.
   const rowOf = (v: number): number =>
-    span <= 0 ? n - 1 : Math.max(0, Math.min(n - 1, n - 1 - Math.round(((v - min) / span) * (n - 1)))); // cells-ok — a row index
+    Math.max(0, Math.min(n - 1, n - 1 - Math.round(normalisedOf(v, { min, max }, false) * (n - 1)))); // cells-ok — a row index
 
   const grid = Array.from({ length: n }, () => new Array<string>(w).fill(" "));
   for (let x = 0; x < w; x += 1) {

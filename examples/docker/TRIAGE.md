@@ -40,7 +40,7 @@ type change.
 | **9** | [**The instrument was wrong**](#9) | 43 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 22 | **10** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
 | **11** | [A gate that passes without checking](#11) | 63 | **15** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
-| **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
+| **12** | [**A time-based assertion under contention**](#12) | 3 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 4 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 21 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
@@ -729,7 +729,11 @@ reads goes through the entry point a user has.
 | **F142** | a derived count is derived once, and nothing re-derives it |
 
 
-## 12 · A time-based assertion under contention — **2** · new at F80
+## 12 · A time-based assertion under contention — **3** · new at F80
+
+| | | |
+|---|---|---|
+| **F262** | **six rows whose verdict is a function of machine load** | `vitest.config.ts` sets no `testTimeout`, so 5000ms governs, and six rows parse or shell over the whole tree: the module graph, the commitment scan, the anchor sweep across 98 runs, the catalogue's SGR parser. **`MA4` is 1539ms alone and 5033–7345ms in the suite; `T6.5/T6.6` is 1723ms alone and 5114–5489ms.** Three consecutive runs, three different failing sets — five rows, then three, then two — every one passing alone. **The config already reasons about flakiness and this walked past it**: its comment is about a clock a test asks for, and the clock these race is one nobody chose. **It cost three red runs against a change that moved zero frames**, which is what a real regression looks like from outside. **Fixed** — `testTimeout: 30_000` with both figures beside it, a ceiling rather than six arguments because the rule is *a row that reads the whole tree needs room* and a per-row list stops seeing the seventh. Three runs after: green, green, green |
 
 **Calcium's own suite, not the app's**, and it is here because a failure of this kind names an
 enforcement rule and sends a reader looking for a violation that does not exist.

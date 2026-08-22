@@ -19,6 +19,7 @@
  * and it would fail nothing: every count would agree, both frames would be
  * plausible, and the difference would only show when someone rendered twice.
  */
+import { normalisedOf } from "../../data/viewmodel/range.js";
 import { BRAILLE_DOTS, createGrid, foldBraille, foldPresence, RAMP_DOTS, setDot } from "./raster.js";
 import { BRAILLE_BLANK } from "./curve.js";
 import { glyphs } from "../blocks/glyphs.js";
@@ -61,8 +62,11 @@ export function jitterOf(series: number, index: number, positions: number): numb
  * to the others is a different figure (§3i).
  */
 function dotAt(v: number, min: number, max: number, extent: number): number {
-  const span = max - min;
-  const t = span === 0 ? 0.5 : (v - min) / span;
+  // **Already the family's answer, and now the family's function.** This was
+  // one of the two sites that had `0.5` written down with a reason (C04 §3ak),
+  // so nothing here moves — what changes is that there is no longer a second
+  // copy of the arithmetic to drift.
+  const t = normalisedOf(v, { min, max }, false);
   return Math.max(0, Math.min(extent - 1, Math.round(t * (extent - 1)))); // cells-ok — a dot index
 }
 

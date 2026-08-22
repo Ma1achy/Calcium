@@ -80,9 +80,18 @@ export function valueBar(
 
   const min = spec.min ?? 0;
   const span = spec.max - min;
+  // **The one site that does not take the family's coordinate, and it is an
+  // exception with a reason rather than a straggler** (C04 §3ak).
+  //
   // No division by a zero span (C12 I3's rule, one form over): a scale with no
   // extent has no proportion, and the run is empty rather than full — an empty
   // run is *zero of nothing*, which is the honest reading.
+  //
+  // **A bar's datum is a magnitude, not a position**, which is why mid-ramp is
+  // wrong here and right everywhere else: a half-filled run says *fifty per
+  // cent* about data that has no extent to be a percentage of. Every other site
+  // places something on an axis, where *the middle* is the only reading a
+  // constant admits. Counted rather than excluded — `SS48` names it.
   const t = span <= 0 ? 0 : (spec.value - min) / span;
   const fill = Math.round(Math.min(1, Math.max(0, t)) * run);
 

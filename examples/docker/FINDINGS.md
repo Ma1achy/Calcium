@@ -13057,3 +13057,47 @@ catalogue tools. `CG2` is its control: the loop filters on *does this file expor
 filter that matched nothing would pass over an empty set in the same green — it asserts the subject
 count, and names `phase-catalogue.mjs` as the one that exports nothing and therefore cannot be
 imported for a helper.
+
+## F262 — six rows whose verdict is a function of machine load ★★★★☆
+
+**`vitest.config.ts` sets no `testTimeout`, so the default 5000ms governs — and six rows do
+whole-tree work.** The module graph over every source file, the commitment scan, the anchor sweep
+across 98 runs, the catalogue's SGR parser. Each is **1.5 to 2 seconds in isolation and past five
+under a full parallel run.**
+
+| row | alone | in the suite |
+|---|---|---|
+| `MA4` | **1539ms** | 5033 · 7345ms |
+| `T6.5 / T6.6` | **1723ms** | 5114 · 5373 · 5489ms |
+
+**Three consecutive runs gave three different failing sets** — five rows, then three, then two —
+and every one passed on its own. *A changed set is the signature of contention; an identical one
+would have been evidence.*
+
+**The config already reasons about flakiness and this class walked past it.** Its comment says
+*real timers here would make the suite flaky in exactly the components that inject one*, which is
+true and is about a clock a test asks for. **The clock these rows race is one nobody chose.**
+
+### What it cost, which is the argument
+
+**Three red runs against a change that moved zero frames.** A sweep routing three normalisations
+onto the shared coordinate came back red three times out of three while `HEAD` came back green two
+of three — and at n=3 on a noisy process that difference is not measurement, but it is exactly what
+a real regression looks like from outside. **Twenty minutes went into separating them**, ending at
+*every failing row passes alone and the set is different every time*.
+
+**A gate whose verdict is a function of machine load is not evidence about the code**, and
+`make all` is where this repository's evidence comes from.
+
+### The remedy is a ceiling, not six arguments
+
+`testTimeout: 30_000`, in the config, with both figures beside it.
+
+**Why not `{ timeout: … }` on the six**: the rule is *a row that reads the whole tree needs room*,
+and a per-row list stops seeing the seventh — the same reason a scan covers a directory and names
+its exceptions rather than globbing narrowly.
+
+**The number is the asymmetry, not the odds.** A green run costs nothing extra; a load-dependent
+verdict costs a session. **And a hang still fails, six seconds later** — what this removes is a
+default nobody chose deciding whether the suite means anything. Three consecutive runs after the
+change: **226 files, green, green, green.**

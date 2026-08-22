@@ -6,6 +6,7 @@
  * here. A new rôle would need a fallback decided for it (C09 §4); reusing the
  * box-drawing ones needs nothing, and an axis *is* box drawing.
  */
+import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { AmbiguousWidth } from "../text.js";
 import { cells, truncate } from "../text.js";
 import type { Plot, ScaleType } from "../../data/viewmodel/index.js";
@@ -671,8 +672,10 @@ const X_LABEL_PITCH = 8;
  * that does not agree with its samples.
  */
 function xPositionOf(value: number, range: Range, scale?: ScaleType): number {
-  const span = range.max - range.min;
-  const linear = span <= 0 ? 0 : (value - range.min) / span;
+  // **The shared coordinate** (C04 §3ak). This read `span <= 0 ? 0`, which puts
+  // every tick of a constant range at the axis's left edge; mid-ramp is the
+  // family's answer and the one C04's table gives.
+  const linear = normalisedOf(value, { min: range.min, max: range.max }, false);
   const isLog = scale === "log" || scale === "log2" || scale === "ln"
     || (typeof scale === "object" && "log" in scale);
   if (!isLog || range.min <= 0 || range.max <= 0) return linear;
