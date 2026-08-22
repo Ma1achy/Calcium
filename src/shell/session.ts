@@ -28,6 +28,7 @@ import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
+import { transmitImage, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
 import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
@@ -160,6 +161,15 @@ class Session implements TuiInstance {
    * it is the only place C03's flag needs an expression here.
    */
   #lastFrame: readonly string[] | null = null;
+
+  /**
+   * Digests this session has transmitted (C09 I36).
+   *
+   * **Session-scoped, because the id space is the terminal's.** An entry evicted
+   * from the transcript does not un-send its image, and a document redrawn does
+   * not need to re-send one.
+   */
+  readonly #sentImages: SentImages = new Set<string>();
 
   /**
    * C03's spinner counter, and **the one thing F227 was about**.
@@ -551,7 +561,31 @@ class Session implements TuiInstance {
     // the rows the partial write got wrong. This way a throw is a full repaint
     // by construction rather than by a handler someone must remember to add.
     this.#lastFrame = null;
-    graph.lifecycle.writer.write(result.write);
+    // **The transmission leads the frame, in the same write** (C09 §4c).
+    // Ink strips APC escapes, so this cannot travel inside a `Text` node and
+    // does not: it is prefixed to the bytes here, where the shell already owns
+    // the write, and only the placeholders go through Ink as ordinary text.
+    //
+    // **Before rather than after**, because placeholders addressing an image
+    // that has not been sent draw nothing — and the frame reaches an absolute
+    // address before any row content, so a cursor the escape might have moved is
+    // corrected by the next byte written. Measured: `session.ts` is the only
+    // path that writes block rows; `drawFallback` writes a fixed message with no
+    // blocks, and C03's sink writes its own control bytes.
+    //
+    // **On entry into the DOCUMENT rather than into the viewport**, and the
+    // `#sentImages` set is what makes that affordable: each digest transmits
+    // once for the session, so an image scrolled into view later costs nothing
+    // at the moment it appears. Keying on the windowed set instead would put a
+    // transmission in a frame where nothing else changed — a scroll that emits
+    // a payload — which is the worse of the two.
+    graph.lifecycle.writer.write(
+      transmitImage(
+        graph.transcript.entries.flatMap((e) => e.doc.blocks),
+        graph.capabilities,
+        this.#sentImages,
+      ) + result.write,
+    );
     this.#lastFrame = result.lines;
 
     // **After the write, and that is the whole of why the frame stays one pass**

@@ -18,13 +18,14 @@ const ROOT = process.cwd();
 const DITHER = "src/presentation/image/dither.ts";
 const IMAGE = "src/presentation/blocks/kinds/image.ts";
 const CODEC = "src/presentation/image/codec.ts";
+const SEAM = "src/shell/transmit-image.ts";
 
 // **`contract/blocks.test.ts` is here because T2.1b lives in it.** The first run
 // of this pass named that row as the expected killer and did not include the file
 // holding it — so the clamp mutation survived against a suite that could not have
 // caught it, which is a fact about the harness and not about the code.
 const FILES =
-  "test/unit/image-dither.test.ts test/unit/image-kitty.test.ts test/unit/image-placeholder.test.ts " +
+  "test/unit/image-dither.test.ts test/unit/image-kitty.test.ts test/unit/image-placeholder.test.ts test/unit/image-seam.test.ts " +
   "test/contract/blocks.test.ts test/golden/blocks.test.ts";
 
 const { read, write } = fsIo(ROOT);
@@ -104,6 +105,35 @@ const results = runPass({
       from: '    else if (type === "IEND") break;',
       to: '    else break;',
       expect: "ID1",
+    },
+    {
+      // **The seam's dedup removed.** Every frame re-sends the payload, which is
+      // correct on the wire — `a=T` replaces at that id — and wrong about cost:
+      // a megabyte per frame for a picture that has not changed.
+      name: "the transmission is not deduplicated by digest",
+      file: SEAM,
+      from: "    if (sent.has(image.digest)) continue;",
+      to: "    if (false) continue;",
+      expect: "IK7",
+    },
+    {
+      // **The protocol guard removed**, so every terminal receives an APC it
+      // cannot read — printed as text on anything but kitty.
+      name: "the seam transmits at every protocol",
+      file: SEAM,
+      from: '  if (capabilities.imageProtocol !== "kitty") return "";',
+      to: '  if (false) return "";',
+      expect: "IK7",
+    },
+    {
+      // **The recursive walk flattened**, so an image inside a mosaic or a panel
+      // places without transmitting — which draws nothing, on the one path a
+      // reader would blame the image for.
+      name: "the walk does not descend into containers",
+      file: SEAM,
+      from: "  if (kids !== undefined) for (const child of kids) imagesIn(child, out);",
+      to: "  void kids;",
+      expect: "IK8",
     },
   ],
 });

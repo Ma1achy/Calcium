@@ -8,6 +8,7 @@ import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { columnsForAspect } from "../../plot/aspect.js";
 import { decodePng, ditherAscii, ditherBraille, type Pixels } from "../../image/index.js";
+import { imageId, placementRows } from "../../image/kitty.js";
 import type { Image } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
@@ -94,15 +95,23 @@ export const imageDefinition: BlockDefinition<Image> = {
       );
     }
 
-    // **The dither at every protocol, including `kitty`** (C09 §4c). The arm that
-    // would branch here is built and cannot be called: Ink strips APC escapes —
-    // an `ESC _G` in a `Text` node renders to nothing — so a transmission cannot
-    // travel in the frame, and placeholders without one draw nothing at all.
-    // **Nothing is worse than a dither on a terminal that could have shown one**,
-    // so the branch waits for `transmitImage`, the L4 seam that writes once per
-    // digest through the privileged handle.
+    // **The protocol arm, restored now that `transmitImage` exists** (C09 §4c).
+    // Only the *placeholders* travel through Ink — they are ordinary text. The
+    // transmission is the shell's, prefixed to the frame's bytes, because Ink
+    // strips APC escapes and a placement without one draws nothing.
+    //
+    // **A placement past the encoding falls back to the dither** rather than
+    // wrapping a diacritic: a wrapped one addresses the wrong part of the image,
+    // which is a plausible wrong picture — the failure this arm is built to
+    // avoid, and the one a reader cannot diagnose.
+    const placed =
+      ctx.capabilities.imageProtocol === "kitty" ? placementRows(imageId(block.digest), cols, rows) : null;
     const lines =
-      ctx.capabilities.unicode === "ascii" ? ditherAscii(px, cols, rows) : ditherBraille(px, cols, rows);
+      placed !== null && "rows" in placed
+        ? placed.rows
+        : ctx.capabilities.unicode === "ascii"
+          ? ditherAscii(px, cols, rows)
+          : ditherBraille(px, cols, rows);
 
     return createElement(
       Box,

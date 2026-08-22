@@ -24,6 +24,8 @@ import { renderToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
+import { transmitImage } from "../../src/shell/transmit-image.js";
+import { b } from "../../src/shell/builders/index.js";
 
 const ESC = String.fromCharCode(27);
 const KITTY_CAPS = { ...FULL_CAPS, imageProtocol: "kitty" as const };
@@ -124,15 +126,46 @@ describe("IK — the kitty arm, as properties", () => {
     expect(sgr, "SGR survives unchanged").toContain(`${ESC}[38;2;1;2;3m`);
   });
 
-  it("IK6 (C09 §4c): so the block draws the dither at every protocol, kitty included", () => {
-    // **Nothing is worse than a dither on a terminal that could have shown one.**
-    // A placement with no transmission addresses an image that was never sent, so
-    // the branch waits for `transmitImage` rather than drawing blanks.
+  it("IK6 (C09 §4c): the placeholders go through Ink and the transmission does not", () => {
+    // **This row asserted the opposite until `transmitImage` landed** — *the
+    // same frame at both protocols* was true while the arm was parked, and the
+    // row is what said the state had changed rather than a comment going stale.
     const kitty = frame(KITTY_CAPS);
     const plain = frame(FULL_CAPS);
-    expect(kitty, "the same frame at both protocols").toEqual(plain);
-    expect(kitty.join("").includes(PLACEHOLDER), "no placeholders reach the frame").toBe(false);
+    expect(kitty, "the protocols now differ").not.toEqual(plain);
+    expect(kitty.join("").includes(PLACEHOLDER), "kitty places").toBe(true);
+    expect(plain.join("").includes(PLACEHOLDER), "and everything else dithers").toBe(false);
+
+    // **No transmission in the frame**, because Ink would strip it and the
+    // shell writes it instead. This is the property that keeps the two halves
+    // in their own layers.
+    expect(kitty.join("").includes(`${ESC}_G`), "the escape is not in the rendered lines").toBe(false);
     const { rows } = imageCells(block, 40);
     expect(kitty, "and it is the committed height").toHaveLength(rows);
+  });
+
+  it("IK7 (C09 §4c): the seam transmits once per digest, and only at kitty", () => {
+    const sent = new Set<string>();
+    const twice = [block, { ...block, id: "other" } as Image];
+    const first = transmitImage(twice, KITTY_CAPS, sent);
+    const count = [...first.matchAll(new RegExp(`${ESC}_G`, "gu"))].length;
+    expect(count, "two blocks of one image transmit once").toBe(1);
+    expect(first).toContain(`i=${String(imageId(block.digest))}`);
+
+    // **The set is session-scoped**, so a redraw sends nothing.
+    expect(transmitImage(twice, KITTY_CAPS, sent), "a second frame owes nothing").toBe("");
+
+    // And at every other protocol there is nothing to send.
+    expect(transmitImage(twice, FULL_CAPS, new Set<string>()), "no protocol, no payload").toBe("");
+  });
+
+  it("IK8 (C09 §4c): the seam reaches an image nested inside a container", () => {
+    // **The walk is structural, on `children`** — the same field the validator
+    // and the animation walk read, which is the third mechanism that turns on
+    // that name (C04 I73).
+    const wrapped = b.mosaic({ height: 4, areas: "AB", children: [block, b.raw("x")] });
+    const out = transmitImage([wrapped], KITTY_CAPS, new Set<string>());
+    expect(out, "an image inside a mosaic still transmits").toContain(`${ESC}_G`);
+    expect(out).toContain(`i=${String(imageId(block.digest))}`);
   });
 });
