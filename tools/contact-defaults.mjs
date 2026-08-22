@@ -20,34 +20,51 @@ const tiles = readdirSync(OUT)
   .filter((f) => f.endsWith("-default-24bit.png"))
   .sort();
 
-const COLS = 5;
+export const COLS = 5;
 const PAD = 14;
 const LABEL = 22;
+
+/**
+ * Where tile `i` sits, and where its caption's baseline goes.
+ *
+ * **Exported so the geometry has a fixture** — the sheet itself is 2 MB of
+ * pixels and asserting against it would be asserting a picture, which is what
+ * `make instruments` exists to stop a generator getting away with. What can be
+ * wrong here is arithmetic: a caption colliding with the row below it, a tile
+ * past the sheet's edge, a wrap at the wrong column.
+ */
+export function tileAt(i, cellW, cellH) {
+  const left = PAD + (i % COLS) * (cellW + PAD);
+  const top = PAD + Math.floor(i / COLS) * (cellH + LABEL + PAD);
+  return { left, top, labelY: top + cellH + 15 };
+}
+
+/** The sheet's extent for `count` tiles of that size. */
+export function sheetSize(count, cellW, cellH) {
+  const rows = Math.ceil(count / COLS);
+  return { width: COLS * (cellW + PAD) + PAD, height: rows * (cellH + LABEL + PAD) + PAD, rows };
+}
 
 const metas = await Promise.all(
   tiles.map(async (f) => ({ file: f, name: f.replace(/^cat-|-default-24bit\.png$/gu, ""), m: await sharp(join(OUT, f)).metadata() })),
 );
 const cellW = Math.max(...metas.map((t) => t.m.width ?? 1));
 const cellH = Math.max(...metas.map((t) => t.m.height ?? 1));
-const rows = Math.ceil(metas.length / COLS);
-const W = COLS * (cellW + PAD) + PAD;
-const H = rows * (cellH + LABEL + PAD) + PAD;
+const { width: W, height: H } = sheetSize(metas.length, cellW, cellH);
 
 const labels = metas
   .map((t, i) => {
-    const x = PAD + (i % COLS) * (cellW + PAD);
-    const y = PAD + Math.floor(i / COLS) * (cellH + LABEL + PAD) + cellH + 15;
+    const { left: x, labelY: y } = tileAt(i, cellW, cellH);
     return `<text x="${x}" y="${y}" font-family="monospace" font-size="13" fill="#9aa0b4">${t.name}</text>`;
   })
   .join("");
 
 await sharp({ create: { width: W, height: H, channels: 3, background: "#0b0b0f" } })
   .composite([
-    ...metas.map((t, i) => ({
-      input: join(OUT, t.file),
-      left: PAD + (i % COLS) * (cellW + PAD),
-      top: PAD + Math.floor(i / COLS) * (cellH + LABEL + PAD),
-    })),
+    ...metas.map((t, i) => {
+      const { left, top } = tileAt(i, cellW, cellH);
+      return { input: join(OUT, t.file), left, top };
+    }),
     { input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${labels}</svg>`), left: 0, top: 0 },
   ])
   .png()

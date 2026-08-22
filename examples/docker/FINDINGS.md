@@ -12849,3 +12849,109 @@ frame that moved, and a tool that cannot see the directory cannot print a number
 generated file before it writes, so running it *after* `phase-catalogue.mjs` deletes all 66 phase
 frames. Measured by watching 66 become 1. Two tools writing into one directory and only one of
 them sweeps it — now recorded in the header of the one that must run second.
+
+## F258 — a mutation run named a test file that is not there, and vitest said nothing ★★★★☆
+
+**`tools/mutate/runs/c12-shared-geometry.mjs` listed `test/golden/plots.test.ts`.** The files are
+`plot.test.ts` and `plot-forms.test.ts`. **vitest drops a filter that resolves to nothing whenever
+another one does** — no warning, no non-zero exit, three files run where four were named — so the
+pass had been running without the goldens for two commits.
+
+**And the run's header argued *from* their presence:**
+
+> The goldens are in the file list on purpose. They cannot catch the flat line — that is the
+> finding — and their presence is what makes each row's `expect` a claim about *which* instrument
+> caught it.
+
+Every `caught` in that report was a claim about an instrument set the run did not have.
+
+**A second instance, in a different run.** `c04-weights.mjs` named
+`examples/docker/test/banner.test.ts`; the file is at `examples/docker/test/repo/banner.test.ts`
+and had moved. Two of 97, found by one scan.
+
+**Why an anchor is louder than a suite.** `tools/mutate/anchors.mjs` already sweeps these files —
+an anchor that will not apply throws and stops the run, and the sweeper catches the ones that
+rotted between runs. **A missing test path does none of that.** It changes nothing anyone can see,
+and the pass reports `caught` in exactly the font it uses when it is right.
+
+| what rots | what happens | who says |
+|---|---|---|
+| the anchor | `runPass` throws before the first mutation | the harness, loudly |
+| the **test path** | the corpus is quietly short | **nothing, until now** |
+
+**The remedy is in the sweeper that already reads these files.** `anchors.mjs` gains the second
+question: 97 runs, 882 anchors, **184 test paths**, every one resolved against the same two roots
+the anchors use. Its fixture gains `MA5` — the fabricated violation, one letter changed in a real
+path — and `MA5b`, which asserts the *count*, because a scan that reads nothing exits 0 exactly as
+a clean one does.
+
+**Found sideways**, which is worth recording: not by anything watching these lists, but by writing
+a throwaway scan for a *different* question and reading its output. The first version of that scan
+reported eight instances and six were its own regex matching the tail of a longer path — so the
+count that mattered came from tightening the instrument, not from the first number it printed.
+
+## F259 — the two arms disagree about a candlestick, and one variant per form is why ★★★★★
+
+**A `line` carrying candles draws three candles in the terminal and an empty axis in SVG.**
+`plotToSvg` never reads `ohlc`. The block takes the curve family — the form *is* claimed — finds
+`series: []`, which is legal precisely because plain candles are the ordinary case (C04 I57), and
+draws **a fully furnished plot with an axis running 0 to 1** while the data spans 8 to 16.
+
+**The moving-average case is worse and it is the one to look at.** A non-empty `series` beside
+`ohlc` is an average *over* the candles (C04 I57), so the range came from the average alone:
+
+| | terminal | SVG |
+|---|---|---|
+| candles only | three candles, 8 to 16 | axis 0 · 0.25 · 0.5 · 0.75 · 1, no ink |
+| candles + a moving average | three candles and a line | **a line, on an axis of 11 to 12** |
+
+Not a blank frame a reader questions — **a confident chart of the wrong thing**, on an axis wrong
+by a factor of eight in span. That is the plausible wrong figure the `null` arm exists to refuse,
+produced by the arm that refuses it.
+
+### The more useful half: `plotStyle` is an axis the per-form corpus does not cross
+
+**G7 asks whether the *form* is claimed. That is one of two questions.** The corpus behind it —
+`ONE_PER_FORM`, one representative block per `PlotForm` — cannot ask the second, because a `line`
+and a `line carrying candles` are different blocks that the same claim covers. **`candlestick` is
+a `plotStyle`, not a thirty-third form** (C04 I57), and the corpus is indexed by form.
+
+**So the question was asked of the other block-level fields, and two more came back:**
+
+| axis | measured | what it leaves |
+|---|---|---|
+| `plotStyle` | `ohlc` never read | a chart of the wrong thing, or of nothing |
+| `origin` | **all four values byte-identical** — `svgPoints` passes `invert: true` unconditionally | the same data upside down between the arms |
+| `annotations` | a reference line at 5 labelled `target` draws nothing | a correct curve with a claim missing beside it |
+
+**Three of three, once the question was asked.** Nothing indexed by form could reach any of them.
+
+### The ruling: refuse a false figure, record an incomplete one
+
+**`ohlc` and a non-default `origin` are refused** — each leaves a picture that is wrong rather than
+partial, and a wrong-way-up chart is a plausible wrong figure exactly as a treemap drawn by the
+curve family is. **A dropped annotation is not refused**, because what it leaves is a true curve
+with a claim absent from beside it, and `G8f` is the record: the row asserts the absence, so the
+day annotations land it fails and names what changed.
+
+**A second clause, because it is a second failure.** `series: []` on a plain form and a series that
+is all `null` both reach the renderer with a range nobody declared — `seriesRange` returns `null`
+and the fallback furnishes an axis out of nothing. Counting marks catches those and cannot reach
+the moving-average case; refusing `ohlc` catches that and cannot reach these.
+
+### And it cost a mutation, which is the third finding inside the second
+
+**G7's mutation stopped being catchable.** Disabling the form partition changes nothing now:
+`marks()` switches on the family and returns `[]` for an unclaimed one, so the empty-marks clause
+refuses the same block a few lines later. **Two guards, one ruling**, and no fixture can tell them
+apart.
+
+Removed rather than declared an expected survivor — this run made the same call for `rowOf` — and
+replaced by **G7b: a claimed form must put ink on the page.** That is the arm that will stop
+agreeing, because a family claimed in `SVG_FAMILY` before its branch exists in `marks()` refuses
+*as though the form were unclaimed*, and **every family in the completion plan does exactly that on
+its first commit.**
+
+**Widening G7 to all 27 refused forms turned up why it had sampled six**: `b.plot({ form: "tree",
+series })` throws, because a tree with no `hierarchy` has no figure to fall back to (C04 I65).
+`ONE_PER_FORM` is a `Record<PlotForm, Plot>` and already had them all.

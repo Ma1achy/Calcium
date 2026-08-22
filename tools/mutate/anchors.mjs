@@ -148,6 +148,40 @@ function anchorsOf(src) {
   return out;
 }
 
+/**
+ * Every test path a run hands to `vitest`.
+ *
+ * **The second thing that rots in these files, and it rots more quietly than an
+ * anchor.** `c12-shared-geometry.mjs` named `test/golden/plots.test.ts`; the
+ * files are `plot.test.ts` and `plot-forms.test.ts`. **vitest drops a filter
+ * that resolves to nothing whenever another one does** — no warning, no
+ * non-zero exit — so the run executed three files where four were named, went
+ * green, and its header argued *from* the goldens being in the corpus.
+ * `c04-weights.mjs` had the same defect on a file that had moved a directory.
+ *
+ * An anchor that will not apply throws and stops the run. **A test file that is
+ * not there changes nothing anyone can see**, and the pass reports `caught`
+ * against a corpus it does not have: every row's `expect` becomes a claim about
+ * which instrument caught it, made against an instrument set that is short.
+ *
+ * All 97 runs name their files after `vitest run`, and eight of them through a
+ * `FILES` const — so concatenation is collapsed and single-string consts are
+ * substituted before the tokens are read.
+ */
+function testPathsOf(src) {
+  const flat = src.replace(/"\s*\+\s*\n?\s*"/g, "");
+  const consts = {};
+  for (const m of flat.matchAll(/^const ([A-Z_][A-Z_0-9]*) =\s*\n?\s*"([^"]*)";/gm)) consts[m[1]] = m[2];
+  const out = new Set();
+  for (const m of flat.matchAll(/vitest run ([^"`]+)/g)) {
+    const expanded = m[1].replace(/\$\{([A-Z_][A-Z_0-9]*)\}/g, (whole, name) => consts[name] ?? whole);
+    for (const token of expanded.trim().split(/\s+/)) {
+      if (/\.test\.[cm]?tsx?$/.test(token)) out.add(token);
+    }
+  }
+  return [...out];
+}
+
 // An absolute `--dir` is used as given; the default is repo-relative.
 const RUNS_AT = DIR.startsWith("/") ? DIR : `${ROOT}/${DIR}`;
 
@@ -156,6 +190,7 @@ const runs = readdirSync(RUNS_AT)
   .sort();
 
 let checked = 0;
+let suites = 0;
 const missing = {};
 const unresolvable = [];
 
@@ -166,7 +201,13 @@ const unresolvable = [];
 const rootsFor = (file) => [`${ROOT}/${file}`, `${ROOT}/examples/docker/${file}`];
 
 for (const run of runs) {
-  for (const { file, from } of anchorsOf(readFileSync(`${RUNS_AT}/${run}`, "utf8"))) {
+  const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  for (const path of testPathsOf(src)) {
+    suites += 1;
+    if (rootsFor(path).some((p) => existsSync(p))) continue;
+    unresolvable.push(`${run}: names ${path}, which does not exist — vitest drops it silently`);
+  }
+  for (const { file, from } of anchorsOf(src)) {
     const path = rootsFor(file).find((p) => existsSync(p));
     if (path === undefined) {
       unresolvable.push(`${run}: ${file} does not exist under either root`);
@@ -182,6 +223,7 @@ const runsWith = Object.keys(missing).length;
 const total = Object.values(missing).reduce((a, n) => a + n, 0);
 console.log(
   `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
+    `${String(suites)} test paths · ` +
     `${String(total)} missing across ${String(runsWith)} run(s)`,
 );
 

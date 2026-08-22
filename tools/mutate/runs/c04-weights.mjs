@@ -18,7 +18,7 @@ const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/edge/view-model.test.ts test/unit/view-model.test.ts " +
   "test/contract/view-model.test.ts test/integration/blocks.test.ts " +
-  "examples/docker/test/banner.test.ts";
+  "examples/docker/test/repo/banner.test.ts";
 
 // **The example's rows import `@fmx/calcium` and run against `dist/`**, so a
 // mutation to `src/` cannot reach them — which the pass found by leaving one

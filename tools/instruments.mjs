@@ -86,6 +86,14 @@ const COVERED = [
   // **The equality comparison paid out a third time.** `tools/refdiff/` landed
   // as two files and `make instruments` went 24 found / 22 with a fixture,
   // naming both — on the day they landed, not the day someone noticed.
+  // **The fourth time this target went red on the day a tool landed**, and the
+  // third with a comment about it in this file. The gate is not missing — it is
+  // in `make all` — so what failed is that three of seven targets were run and
+  // reported as per-target verification. A generator's fixture asserts the
+  // arithmetic and the correspondence, never the picture.
+  ["tools/catalogue-hash.mjs", ["npx", "vitest", "run", "test/unit/catalogue-tools.test.ts"]],
+  ["tools/contact-defaults.mjs", null], // same fixture — the sheet's geometry
+  ["tools/phase-catalogue.mjs", null], // same fixture — the refusal list and the ordering
   ["tools/refdiff/pair.mjs", ["npx", "vitest", "run", "test/unit/refdiff.test.ts"]],
   ["tools/refdiff/reference.py", null], // same fixture — the two halves of one grid
   ["tools/refdiff/export-fixtures.ts", null], // same fixture — our half and the grid
