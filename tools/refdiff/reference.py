@@ -403,6 +403,19 @@ RENDERERS = {
 # Stated, not silently dropped. A form absent from a comparison reads as one
 # that passed it.
 SKIPPED = {
+    # `graph` is the shape family's fifth, and its two candidate references are
+    # refused for different reasons. The desktop one is networkx, which is a pip
+    # line here plus a renderer beside it, and what it would settle is a
+    # *drawing* of a layered graph rather than the layering — which is Sugiyama,
+    # a published algorithm we implement and would then be checking against our
+    # own implementation of, the treemap's objection one form along. The
+    # terminal one SHIPS: `renderMermaidASCII`, at exactly one call site, and
+    # `mermaid.ts`'s whole argument is that if the package dies what is lost is
+    # one function's body. A second call site spends that, and the transitive
+    # EPL-2.0 with it.
+    "graph": "no matplotlib primitive; the reference is the Sugiyama pipeline "
+             "and F242 measures it directly — crossings, fit and collisions "
+             "over 360 graphs",
     "smallmultiples": "a composition of other forms; matplotlib's subplot grid "
                       "shares no geometry with ours to diff",
     "pairplot": "same — seaborn's PairGrid is furniture-dominated at this size",

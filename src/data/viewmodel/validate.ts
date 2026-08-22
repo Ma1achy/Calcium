@@ -350,6 +350,129 @@ function checkTreeLayout(
   }
 }
 
+/**
+ * `graph` and `graphLayout` — the document-side gate (C04 I69, C04 I70, §3e.1).
+ *
+ * **One walk read by both gates**, on `hierarchy`'s own precedent: the builder
+ * asks the same questions and this reports the same faults, because a one-line
+ * predicate written twice can be compared by eye and a walk over a node set
+ * cannot. The message names the path to the member rather than the block, and
+ * the walk stops at the first fault, because a graph is malformed in one place.
+ */
+/** `hierarchy`'s bound, for its reason (C04 I69). */
+const MAX_GRAPH_NODES = 256;
+
+function plotGraphErrors(
+  b: Record<string, unknown>,
+  e: string[],
+  at: string,
+  form: unknown,
+): void {
+  const gl = b["graphLayout"];
+  if (gl !== undefined) {
+    if (gl !== "layered") {
+      e.push(`${at}: "graphLayout" must be "layered" (C04 I70)`);
+      return;
+    }
+    if (form !== "graph") {
+      e.push(
+        `${at}: "graphLayout" on form ${JSON.stringify(form)} (C04 I70) — only a graph takes ` +
+          `a graph layout, and an ignored member reads as one not yet implemented`,
+      );
+      return;
+    }
+  }
+
+  const g = b["graph"];
+  if (g === undefined) {
+    // **A form whose whole subject is the shape has nothing to fall back to**,
+    // which is I65's ruling for `tree` one form along.
+    if (form === "graph") {
+      e.push(
+        `${at}: form "graph" with no "graph" (C04 I69) — that form draws a node set and ` +
+          `nothing else, so there is no figure to fall back to`,
+      );
+    }
+    return;
+  }
+  if (form !== "graph") {
+    e.push(
+      `${at}: "graph" on form ${JSON.stringify(form)} (C04 I69) — it is that form's data ` +
+        `rather than a modifier, and accepted-and-ignored is worse than refused`,
+    );
+    return;
+  }
+  // **A form has one data shape**, so two is a document that means two things.
+  if (b["hierarchy"] !== undefined) {
+    e.push(`${at}: both "graph" and "hierarchy" on form "graph" (C04 I69) — a form has one data shape`);
+    return;
+  }
+  if (typeof g !== "object" || g === null || Array.isArray(g)) {
+    e.push(`${at}.graph: must be an object with "nodes" and "edges" (C04 I69)`);
+    return;
+  }
+  const { nodes, edges } = g as { nodes?: unknown; edges?: unknown };
+  if (!Array.isArray(nodes) || nodes.length === 0) { // cells-ok — a node count
+    e.push(`${at}.graph.nodes: must be a non-empty array (C04 I69)`);
+    return;
+  }
+  if (nodes.length > MAX_GRAPH_NODES) { // cells-ok — a node count
+    e.push(
+      `${at}.graph.nodes: ${String(nodes.length)} nodes, over the ${String(MAX_GRAPH_NODES)} ` + // cells-ok — a node count
+        `bound (C04 I69) — the bound is for a builder call handing over something unbounded`,
+    );
+    return;
+  }
+  const ids = new Set<string>();
+  for (const [i, n] of nodes.entries()) { // cells-ok — a node index
+    const node = n as { id?: unknown } | null;
+    if (typeof node !== "object" || node === null || typeof node.id !== "string" || node.id === "") {
+      e.push(`${at}.graph.nodes[${String(i)}]: must be an object with a non-empty "id" (C04 I69)`);
+      return;
+    }
+    if (ids.has(node.id)) {
+      e.push(
+        `${at}.graph.nodes[${String(i)}]: duplicate id ${JSON.stringify(node.id)} (C04 I69) — ` +
+          `an edge naming it would name both`,
+      );
+      return;
+    }
+    ids.add(node.id);
+  }
+  if (!Array.isArray(edges)) {
+    e.push(`${at}.graph.edges: must be an array (C04 I69)`);
+    return;
+  }
+  for (const [i, x] of edges.entries()) { // cells-ok — an edge index
+    const edge = x as { from?: unknown; to?: unknown } | null;
+    if (typeof edge !== "object" || edge === null) {
+      e.push(`${at}.graph.edges[${String(i)}]: must be an object with "from" and "to" (C04 I69)`);
+      return;
+    }
+    for (const end of ["from", "to"] as const) {
+      const v = edge[end];
+      if (typeof v !== "string" || !ids.has(v)) {
+        e.push(
+          `${at}.graph.edges[${String(i)}].${end}: ${JSON.stringify(v)} names no declared node ` +
+            `(C04 I69) — the commonest malformed graph, and it is silent otherwise`,
+        );
+        return;
+      }
+    }
+    // **Refused rather than dropped** (C04 I69). Longest-path layering needs
+    // `layer(b) > layer(a)` and `a -> a` has no solution, so the member has no
+    // arm — and accepted at construction and ignored at render is the worst of
+    // the three answers (F207). The expiry is a node-mark vocabulary.
+    if (edge.from === edge.to) {
+      e.push(
+        `${at}.graph.edges[${String(i)}]: a self-edge on ${JSON.stringify(edge.from)} (C04 I69) — ` +
+          `a layered figure has no row for an edge that starts and ends in one place`,
+      );
+      return;
+    }
+  }
+}
+
 function plotHierarchyErrors(
   b: Record<string, unknown>,
   e: string[],
@@ -856,6 +979,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "plotBox" must be "solid" or "line"`);
     }
     plotHierarchyErrors(b, e, at, form);
+    plotGraphErrors(b, e, at, form);
     plotAxisErrors(b, e, at, form);
     plotFieldErrors(b, e, at, form);
     plotHorizonErrors(b, e, at, form);
@@ -1534,7 +1658,7 @@ const PLOT_FORM_MEMBERS = {
   scatter: true, step: true, ecdf: true,
   bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
   lollipop: true, dotplot: true, waffle: true,
-  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true, graph: true,
   slope: true, bubble: true, autocorrelation: true, timeline: true, bullet: true, utilisation: true,
   calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
   density: true, violin: true, ridgeline: true,

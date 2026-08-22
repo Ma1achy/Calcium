@@ -784,6 +784,58 @@ exports[`golden frames — every form > gantt · full · 80 1`] = `
 "
 `;
 
+exports[`golden frames — every form > graph · ascii-1bit-wide · 40 1`] = `
+"── graph · measured 9 · rendered 9
+                 parse
+                 +-+---+
+               render
+                ++----++-+
+              layout
+                +-----++-+
+              paint  cache
+
+[1m1 reversed[22m"
+`;
+
+exports[`golden frames — every form > graph · ascii-1bit-wide · 80 1`] = `
+"── graph · measured 9 · rendered 9
+                                     parse
+                                     +-+---+
+                                   render
+                                    ++----++-+
+                                  layout
+                                    +-----++-+
+                                  paint  cache
+
+[1m1 reversed[22m"
+`;
+
+exports[`golden frames — every form > graph · full · 40 1`] = `
+"── graph · measured 9 · rendered 9
+                 parse
+                 ╭─┴───╮
+               render
+                ╭┴────╮╰─╮
+              layout
+                ├─────┴┬─╯
+              paint  cache
+
+[38;2;212;179;90m1 reversed[39m"
+`;
+
+exports[`golden frames — every form > graph · full · 80 1`] = `
+"── graph · measured 9 · rendered 9
+                                     parse
+                                     ╭─┴───╮
+                                   render
+                                    ╭┴────╮╰─╮
+                                  layout
+                                    ├─────┴┬─╯
+                                  paint  cache
+
+[38;2;212;179;90m1 reversed[39m"
+`;
+
 exports[`golden frames — every form > heatmap · ascii-1bit-wide · 40 1`] = `
 "── heatmap · measured 5 · rendered 5
 [2ma +[22m..........---------*********@@@@@@@@@

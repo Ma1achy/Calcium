@@ -824,6 +824,43 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ],
     },
   },
+  graph: {
+    // Five nodes, seven edges, and each variant is chosen to make one pass
+    // visible: `cache` has two parents, `parse -> cache` spans two layers so a
+    // dummy is inserted, and `render`/`layout` are a two-cycle so the reversal
+    // pass fires and the notice row carries a count (C12 §3ai).
+    default: {
+      form: "graph", height: 9, series: [],
+      graph: {
+        nodes: [
+          { id: "parse" }, { id: "render" }, { id: "layout" },
+          { id: "cache" }, { id: "paint" },
+        ],
+        edges: [
+          { from: "parse", to: "render" },
+          { from: "render", to: "layout" },
+          { from: "layout", to: "render" },
+          { from: "render", to: "cache" },
+          { from: "layout", to: "cache" },
+          { from: "parse", to: "cache" },
+          { from: "layout", to: "paint" },
+        ],
+      },
+    },
+    // **Sized past what fits**, because the drop is the ordinary case past about
+    // a dozen nodes (F242) and a corpus that only holds figures which fit
+    // records the notice row nowhere.
+    crowded: {
+      form: "graph", height: 7, series: [],
+      graph: {
+        nodes: Array.from({ length: 14 }, (_n, i) => ({ id: `service-${String(i + 1).padStart(2, "0")}` })),
+        edges: Array.from({ length: 13 }, (_n, i) => ({
+          from: `service-${String(i + 1).padStart(2, "0")}`,
+          to: `service-${String(i + 2).padStart(2, "0")}`,
+        })),
+      },
+    },
+  },
   tree: {
     // The catalogue's own tree, and C12 §3ah.1's measurements are taken on it:
     // 9 nodes, 5 leaves, depth 3, leaf names totalling 27 cells. **Three

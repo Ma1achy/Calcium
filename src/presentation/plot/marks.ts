@@ -230,6 +230,7 @@ export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.fre
   // No cartesian abscissa at all — a disc, a polygon, a mosaic, a tree.
   pie: false, radar: false, waffle: false, flame: false, icicle: false, treemap: false,
   tree: false,
+  graph: false,
   // One row, no furniture.
   sparkline: false, horizon: false,
   // Composition: each facet answers this for itself.
@@ -252,6 +253,7 @@ export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.fr
   // the honest answer if it ever becomes live, on `contour`'s and `quiver`'s
   // reason one family along.
   tree: false,
+  graph: false,
   // A curve is not a row. These have no per-row category axis, so the entry is
   // stated rather than meaningful — which is what a total record costs and why
   // it is worth it: nothing here is answered by omission.
@@ -284,7 +286,7 @@ export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // One row per category, named in the gutter.
   boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
   lollipop: false, dotplot: false, funnel: false, gantt: false, waterfall: false,
-  flame: true, icicle: true, treemap: true, tree: true,
+  flame: true, icicle: true, treemap: true, tree: true, graph: true,
   autocorrelation: false, timeline: false, bullet: false, utilisation: false,
   // One row per series, named in the gutter, and a scale legend beneath.
   heatmap: false, calendar: false, correlation: false, confusion: false,

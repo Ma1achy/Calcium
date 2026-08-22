@@ -3058,7 +3058,7 @@ it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and ca
     const refused = (Object.keys(ORIGIN_DEFAULT) as PlotForm[]).filter(
       (f) => ORIGIN_DEFAULT[f] === null,
     );
-    expect(refused.length).toBe(30); // cells-ok — a form count
+    expect(refused.length).toBe(31); // cells-ok — a form count
     // **A form with a required member needs it here, or this row asserts about
     // a different refusal.** `tree` is the first: without a `hierarchy` the
     // constructor complains about that instead, and the row would pass on a
@@ -3307,7 +3307,7 @@ describe("C12 §3ad — axisCross, and the two conditions that are not one condi
   it("AC11 (§3ad A14): every form outside the seven refuses at both gates", () => {
     const forms = Object.keys(HONOURS_AXIS_CROSS) as PlotForm[];
     const refused = forms.filter((f) => !HONOURS_AXIS_CROSS[f]);
-    expect(refused.length, "38 of 45").toBe(38); // cells-ok — a form count
+    expect(refused.length, "39 of 46").toBe(39); // cells-ok — a form count
     // **A form with a required member needs it here, or this row asserts about
     // a different refusal.** `tree` is the first: without a `hierarchy` the
     // constructor complains about that instead, and the row would pass on a

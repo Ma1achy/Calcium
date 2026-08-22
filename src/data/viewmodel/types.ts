@@ -605,6 +605,7 @@ export type PlotForm =
   | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
   | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
   | "tree"
+  | "graph"
   | "slope" | "bubble" | "autocorrelation" | "timeline" | "bullet" | "utilisation"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
   | "contour" | "quiver"
@@ -1044,6 +1045,23 @@ export type Plot = Readonly<{
    * yet implemented.
    */
   treeLayout?: "auto" | "topDown" | "leftRight" | "outline";
+
+  /**
+   * A graph's nodes and edges — **required** on `form: "graph"` and refused on
+   * every other form, with `hierarchy` refused on it (C04 I69, §3e).
+   */
+  graph?: Graph;
+
+  /**
+   * A graph's layout (C04 I70, §3e.2).
+   *
+   * **One value, so the choice arm forbids nothing** — A03 §2's vacuity class in
+   * a field, said here rather than left to be noticed. The refusal arm is
+   * testable on every other form, and `graphLayout: "force"` is a compile error
+   * rather than a value nothing honours. `force` is refused on the labels alone
+   * and its expiry is `shiftInward` (C12 I58, §3ai.2).
+   */
+  graphLayout?: "layered";
   /**
    * The vector field a `quiver` draws (C04 I61, C12 I50).
    *
@@ -1287,7 +1305,7 @@ export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.
   // Their own renderer (14).
   boxplot: null, flame: null, histogram: null, horizon: null, icicle: null,
   pie: null, radar: null, ridgeline: null, sparkline: null, stackedarea: null,
-  streamgraph: null, treemap: null, tree: null, violin: null, waffle: null,
+  streamgraph: null, treemap: null, tree: null, graph: null, violin: null, waffle: null,
 
   // Facet containers — each facet is a `Plot` and declares its own.
   smallmultiples: null, pairplot: null,
@@ -1335,7 +1353,7 @@ export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.fr
   // Own renderer — a disc, a mosaic, a tree, a band, a single row.
   boxplot: false, flame: false, histogram: false, horizon: false, icicle: false,
   pie: false, radar: false, ridgeline: false, sparkline: false, stackedarea: false,
-  streamgraph: false, treemap: false, tree: false, violin: false, waffle: false,
+  streamgraph: false, treemap: false, tree: false, graph: false, violin: false, waffle: false,
 
   // Facet containers — each facet is a `Plot` and declares its own.
   smallmultiples: false, pairplot: false,
@@ -1399,7 +1417,7 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   contour: true, quiver: true,
   // One row, or a figure that bounds itself: no gutter to put a label beside.
   sparkline: false, horizon: false, waffle: false,
-  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
   // Composition: the facets carry the gutters and each declares its own.
   smallmultiples: false, pairplot: false,
 });
@@ -1483,6 +1501,7 @@ export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.free
   // resolution — is failed by all three in the same way. The choice is
   // `treeLayout`, and this record's first new question is answered `false`.
   tree: false,
+  graph: false,
   autocorrelation: false, timeline: false, bullet: false, utilisation: false,
   calendar: false, correlation: false, confusion: false, spectrogram: false,
   latency: false, density2d: false, contour: false, quiver: false,
@@ -1531,6 +1550,11 @@ export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | "structure"
   // number every caller of that form has to invent is worse than a member that
   // does nothing — a member that does nothing can at least be left out.
   tree: "structure",
+  // **`null`, where `tree` is `"structure"`.** A graph does not read
+  // `hierarchy` at all — it has its own shape, and this record answers a
+  // question about the field a form consumes rather than about the family it
+  // belongs to (C04 I69).
+  graph: null,
   // Everything else draws a series, a matrix or a field.
   line: null, sparkline: null, heatmap: null, scatter: null, step: null,
   ecdf: null, bar: null, histogram: null, forest: null, dumbbell: null,
@@ -1561,7 +1585,7 @@ export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   spectrogram: false, latency: false, density2d: false, utilisation: false,
   contour: false, quiver: false,
   // No abscissa to name: a disc, a polygon, a mosaic, one row, a composition.
-  pie: false, radar: false, waffle: false, treemap: false, tree: false,
+  pie: false, radar: false, waffle: false, treemap: false, tree: false, graph: false,
   horizon: false, sparkline: false, smallmultiples: false, pairplot: false,
 });
 
@@ -1583,7 +1607,7 @@ export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   contour: false, quiver: false,
   // No cartesian area, or one row, or a composition.
   sparkline: false, horizon: false, waffle: false,
-  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
   smallmultiples: false, pairplot: false,
 });
 
@@ -1624,7 +1648,7 @@ export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   line: false, sparkline: false, scatter: false, step: false, ecdf: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
-  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
   funnel: false, gantt: false, waterfall: false, streamgraph: false,
   stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
   radar: false, horizon: false, slope: false, bubble: false,
@@ -1641,7 +1665,7 @@ export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze(
   line: false, sparkline: false, scatter: false, step: false, ecdf: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
-  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
   funnel: false, gantt: false, waterfall: false, streamgraph: false,
   stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
   radar: false, horizon: false, slope: false, bubble: false,
@@ -1685,7 +1709,7 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   // rather than omitted — an empty list is an answer, and the vocabulary here
   // is the form's own.
   quiver: [],
-  flame: [], icicle: [], treemap: [], tree: [],
+  flame: [], icicle: [], treemap: [], tree: [], graph: [],
   sparkline: [], horizon: [],
   smallmultiples: [], pairplot: [],
 });
@@ -1779,6 +1803,30 @@ export type HierarchyNode = Readonly<{
   value?: number;
   children?: readonly HierarchyNode[];
 }>;
+
+/**
+ * A node in a `graph` (C04 I69, §3e).
+ *
+ * **`id` is separate from `label` and in `HierarchyNode` it is not.** A tree
+ * node's identity is its position, so its label may repeat freely; an edge names
+ * its endpoints, so a graph needs a name that does not. Two nodes labelled
+ * `retry` is ordinary data, and `from: "retry"` would be a document that means
+ * two things.
+ */
+export type GraphNode = Readonly<{ id: string; label?: string }>;
+
+/** A directed edge. Both endpoints must name a declared node (C04 I69). */
+export type GraphEdge = Readonly<{ from: string; to: string }>;
+
+/**
+ * The shape a `hierarchy` cannot express (C04 I69, §3e).
+ *
+ * `HierarchyNode` is label-and-children, so a node reachable from two places has
+ * to be written twice — and two writings are two nodes, with two sets of
+ * children and nothing telling a reader or a renderer they are one thing. A call
+ * graph, a dependency graph and a state machine are all that shape.
+ */
+export type Graph = Readonly<{ nodes: readonly GraphNode[]; edges: readonly GraphEdge[] }>;
 
 export type Progress = Readonly<{
   kind: "progress";

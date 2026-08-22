@@ -28,6 +28,7 @@ import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
 import { treeArea } from "./tree.js";
+import { graphArea } from "./graph.js";
 import { curveRows, isBlank } from "./curve.js";
 import { crossRow, gridRow, xRowFor, xTitleRow } from "./furniture.js";
 import type { Axis, XAxis } from "./axes.js";
@@ -1874,6 +1875,41 @@ function treeRows(block: Plot, width: number, ctx: RenderContext): readonly stri
   return composeRows(plotHeight(block), [], out, []);
 }
 
+/**
+ * `graph` — the layered figure, and the row that says what is not in it.
+ *
+ * **The notice carries two counts, not one** (C12 §3ai.3). What was dropped for
+ * space is the ordinary case past about a dozen nodes; what the cycle pass
+ * reversed is the one thing the figure would otherwise misstate, because the
+ * drawing takes its direction from the layering and a reversed edge runs against
+ * it. A second row would cost a row of the drawing, so the row that already
+ * exists says both.
+ */
+function graphRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
+  const g = block.graph;
+  const areaRows = plotAreaRows(block);
+  const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (g === undefined) return emptyRows(block, layout, ctx);
+
+  const drawn = graphArea(g, areaRows, width, ctx.capabilities, block.plotCorners ?? "rounded");
+  const out = drawn.rows.map((r) => line([{ text: r }], layout, ctx));
+  const sep = partSeparator(ctx.capabilities);
+  const parts: string[] = [];
+  if (drawn.dropped.length > 0) parts.push(`+${String(drawn.dropped.length)} more`); // cells-ok — a node count
+  if (drawn.reversed > 0) parts.push(`${String(drawn.reversed)} reversed`); // cells-ok — an edge count
+  if (drawn.dropped.length > 0) parts.push(drawn.dropped.join(sep)); // cells-ok — a node count
+  if (parts.length > 0) { // cells-ok — a part count
+    out.push(
+      line(
+        [{ text: areaText(parts.join(sep), layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) }],
+        layout,
+        ctx,
+      ),
+    );
+  }
+  return composeRows(plotHeight(block), [], out, []);
+}
+
 function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
   const root = block.hierarchy;
   const areaRows = plotAreaRows(block);
@@ -2481,6 +2517,7 @@ const FORM_ROWS: Readonly<
       : legacyDepthBars(block, width, ctx, true),
   treemap: (block, width, ctx) => treemapRows(block, width, ctx),
   tree: (block, width, ctx) => treeRows(block, width, ctx),
+  graph: (block, width, ctx) => graphRows(block, width, ctx),
 
   // --- the six that had no renderer -------------------------------------
   //

@@ -185,6 +185,32 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
   }),
   // **No `value` anywhere in it**, which is the fourth form's whole point: a
    // tree is placed by shape alone, and the member is optional for it (C04 I64).
+  // **The fixture exercises what the form is under test for**, which is
+  // `test/support/README.md`'s rule and not a courtesy: a graph fixture that is
+  // a tree tests `tree`'s code path with a different field name. So `cache` has
+  // two parents — the thing `hierarchy` cannot express — `parse` reaches `cache`
+  // across two layers, so a dummy node is inserted, and `render -> layout` with
+  // `layout -> render` is a cycle, so the reversal pass fires and the notice row
+  // has something to say (C12 §3ai).
+  graph: block({
+    kind: "plot", id: "form-graph", form: "graph", height: 9,
+    series: [],
+    graph: {
+      nodes: [
+        { id: "parse" }, { id: "render" }, { id: "layout" },
+        { id: "cache" }, { id: "paint" },
+      ],
+      edges: [
+        { from: "parse", to: "render" },
+        { from: "render", to: "layout" },
+        { from: "layout", to: "render" },
+        { from: "render", to: "cache" },
+        { from: "layout", to: "cache" },
+        { from: "parse", to: "cache" },
+        { from: "layout", to: "paint" },
+      ],
+    },
+  }),
   tree: block({
     kind: "plot", id: "form-tree", form: "tree", height: 7,
     series: [],

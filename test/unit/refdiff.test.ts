@@ -133,7 +133,15 @@ describe("refdiff — the grid is the model, not the answer", () => {
     // neither place is an unrecorded gap.
     // Kept in step with `reference.py`'s own list — the two halves of one
     // record, and a form in neither is the gap this row exists for.
-    const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle", "tree"]);
+    // `graph` joins the shape family here rather than getting a reference: the
+    // desktop one is networkx, which is a pip line in the throwaway image and a
+    // renderer beside it, and the terminal one is `renderMermaidASCII` — which
+    // ships, and which a plot form must not call, because `mermaid.ts`'s whole
+    // argument is exactly one call site and a second spends it along with the
+    // transitive EPL-2.0. Named so the gap is recorded rather than silent, and
+    // it sits beside `tree` for the same reason: a figure whose subject is a
+    // shape has no reference that renders to a cell grid.
+    const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle", "tree", "graph"]);
     // `contour` is not here: it is *unisolable* rather than unreferenced, so it
     // leaves through `excluded` above. Both halves of the record still name it.
     expect(new Set(missing), "forms with neither a reference nor a recorded reason").toEqual(recorded);

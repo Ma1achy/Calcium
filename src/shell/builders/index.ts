@@ -427,6 +427,8 @@ function plot(
     bandwidth?: Plot["bandwidth"];
     hierarchy?: Plot["hierarchy"];
     treeLayout?: Plot["treeLayout"];
+    graph?: Plot["graph"];
+    graphLayout?: Plot["graphLayout"];
     matrixAnchor?: Plot["matrixAnchor"];
     legend?: Plot["legend"];
     plotFrame?: Plot["plotFrame"];
@@ -439,7 +441,7 @@ function plot(
     startDate?: Plot["startDate"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
+  const { graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -529,6 +531,22 @@ function plot(
   // copies of it are two walks, and the second one drifts.
   {
     const drawn = form ?? "line";
+    // **`graph` and `graphLayout` are refused off their own form** — C04 I69 and
+    // C04 I70 — which is `treeLayout`'s guard one form along. The `graph` arm is
+    // the one that matters: a node set accepted on a `line` is data the
+    // renderer never opens, and accepted-and-ignored is the worst of three
+    // answers (F207).
+    if (graph !== undefined && drawn !== "graph") {
+      throw new Error(
+        `b.plot: "graph" is set on form "${drawn}" (C04 I69) — only a graph reads it`,
+      );
+    }
+    if (graphLayout !== undefined && drawn !== "graph") {
+      throw new Error(
+        `b.plot: "graphLayout" is "${graphLayout}" on form "${drawn}" (C04 I70) — only a graph ` +
+          `takes a graph layout`,
+      );
+    }
     if (treeLayout !== undefined && drawn !== "tree") {
       throw new TypeError(
         `b.plot: "treeLayout" is "${treeLayout}" on form "${drawn}" (C04 I65) — only a tree ` +
@@ -743,6 +761,8 @@ function plot(
       ...(bandwidth === undefined ? {} : { bandwidth }),
       ...(hierarchy === undefined ? {} : { hierarchy }),
       ...(treeLayout === undefined ? {} : { treeLayout }),
+      ...(graph === undefined ? {} : { graph }),
+      ...(graphLayout === undefined ? {} : { graphLayout }),
       ...(matrixAnchor === undefined ? {} : { matrixAnchor }),
       ...(legend === undefined ? {} : { legend }),
       ...(plotFrame === undefined ? {} : { plotFrame }),

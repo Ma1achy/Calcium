@@ -1347,6 +1347,23 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- published ahead of the value that makes it readable ------------------
+  //
+  // **A single-value union has nothing for a consumer to branch on**, which is
+  // A03 §2's vacuity class arriving in a field rather than in a rule. Reading
+  // `block.graphLayout ?? "layered"` in the renderer would satisfy this gate
+  // exactly and decide nothing — a check that cannot fire, dressed as one that
+  // passes — so the exemption is taken instead of the fake read.
+  "Plot.graphLayout":
+    "C04 I70, C12 §3ai.2 — one value and one default, so nothing can branch on " +
+    "it. The half that is NOT vacuous is the refusal, which `b.plot` enforces on " +
+    "every other form and `validate.ts` on every document, and the compile error " +
+    "it makes of `graphLayout: \"force\"`. It is published ahead of its second " +
+    "value because adding it WITH `force` widens a union that did not exist, and " +
+    "every exhaustive consumer becomes a compile error saying nothing about what " +
+    "moved. **The expiry is a symbol**: `shiftInward` and the label taxonomy, " +
+    "which is what `force` is refused on (F242). Grep it when picking this up.",
+
   // --- consumed, and not from `src/` ----------------------------------------
   //
   // **The first entry of a category the header already counted and had no
