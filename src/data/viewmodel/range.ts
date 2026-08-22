@@ -91,3 +91,39 @@ export function sharedRange(fields: readonly (readonly (readonly number[])[])[])
   }
   return seen ? pinnedRange(min, max, {}) : { min: 0, max: 0 };
 }
+
+/**
+ * A value's position on its axis in `[0, 1]`, `0` at the top — **the shared
+ * layer's coordinate** (C12 §3aj hazards 1 and 4).
+ *
+ * **The gate's rule, applied to the one function that had both stages in it**:
+ * the shared layer produces normalised coordinates and each renderer does its
+ * own rounding, so the terminal path's arithmetic is unchanged by construction.
+ * `rowOf` is now that rounding and nothing else.
+ *
+ * **The clamp is here and not at the renderer**, because an out-of-range value
+ * clamping to the edge is a statement about the *pin* rather than about cells
+ * (C04 I29): the sample is pressed against the bound it exceeded, and a
+ * rasteriser that received `1.4` would have to know that rule to draw it.
+ *
+ * **A flat line is deliberately not this function's case.** It has no direction
+ * to reverse and its cell answer is `floor(last / 2)`, which is not
+ * `round(0.5 · last)` at an even height — see `rowOf`.
+ *
+ * **It lives in L0, and that is hazard 4's seam rather than a filing decision.**
+ * *A shared layout that calls `cells()` cannot serve the image path, and that is
+ * discovered as a wrong-looking image rather than as an error.* Here it is
+ * discovered as neither: `data/` may not import `presentation/`, so `cells()` is
+ * not reachable from this file and a shared layer that reached for it **would
+ * not compile**. The architecture already held the guarantee the hazard asks
+ * for; the shared coordinate only had to be put where it applies.
+ *
+ * **`invert` is a boolean rather than a `Facing`** because §3ac rules `Facing`
+ * *the renderer's* vocabulary — `origin` is the caller's and `Facing` is the
+ * renderer's — so L0 holding it would contradict the ruling that put it there.
+ */
+export function normalisedOf(v: number, range: PinnedRange, invert: boolean): number {
+  const t = (v - range.min) / (range.max - range.min);
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  return invert ? 1 - clamped : clamped;
+}

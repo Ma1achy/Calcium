@@ -10,7 +10,7 @@
  * content of its values.
  */
 import { ORIGIN_DEFAULT, type OHLC, type Origin, type Plot, type Series } from "../../data/viewmodel/index.js";
-import { pinnedRange } from "../../data/viewmodel/range.js";
+import { normalisedOf, pinnedRange } from "../../data/viewmodel/range.js";
 
 /**
  * Which way each axis runs, derived from `origin` (C12 §3ac).
@@ -197,32 +197,12 @@ export function rowOf(v: number, range: Range, rows: number, facing: Facing): nu
   // is invisible in the code and visible in every frame.
   if (range.max === range.min) return Math.floor(last / 2);
 
-  return Math.round(normalisedOf(v, range, facing) * last);
+  // `Facing` stays here: §3ac rules it *the renderer's* vocabulary, so L0
+  // cannot hold it without contradicting that. The shared layer takes the
+  // one fact it needs — which way the axis runs — and nothing else.
+  return Math.round(normalisedOf(v, range, facing.y !== "down") * last);
 }
 
-/**
- * A value's position on its axis in `[0, 1]`, `0` at the top — **the shared
- * layer's coordinate** (C12 §3aj hazard 1).
- *
- * **The gate's rule, applied to the one function that had both stages in it**:
- * the shared layer produces normalised coordinates and each renderer does its
- * own rounding, so the terminal path's arithmetic is unchanged by construction.
- * `rowOf` is now that rounding and nothing else.
- *
- * **The clamp is here and not at the renderer**, because an out-of-range value
- * clamping to the edge is a statement about the *pin* rather than about cells
- * (C04 I29): the sample is pressed against the bound it exceeded, and a
- * rasteriser that received `1.4` would have to know that rule to draw it.
- *
- * **A flat line is deliberately not this function's case.** It has no direction
- * to reverse and its cell answer is `floor(last / 2)`, which is not
- * `round(0.5 · last)` at an even height — see `rowOf`.
- */
-export function normalisedOf(v: number, range: Range, facing: Facing): number {
-  const t = (v - range.min) / (range.max - range.min);
-  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
-  return facing.y === "down" ? clamped : 1 - clamped;
-}
 
 /**
  * Samples to dot columns, preserving per-column extremes and endpoints (I5).

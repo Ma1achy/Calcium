@@ -13,9 +13,9 @@
  * are it.
  */
 import { describe, expect, it } from "vitest";
-import { normalisedOf, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
+import { rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
 import { niceAxis } from "../../src/presentation/plot/axes.js";
-import { pinnedRange } from "../../src/data/viewmodel/range.js";
+import { normalisedOf, pinnedRange } from "../../src/data/viewmodel/range.js";
 import type { Facing } from "../../src/presentation/plot/scale.js";
 
 const DOWN: Facing = { x: "right", y: "down" };
@@ -51,7 +51,7 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
             expect(
               rowOf(v, range, rows, facing),
               `v=${String(v)} rows=${String(rows)} ${facing.y}`,
-            ).toBe(Math.round(normalisedOf(v, range, facing) * Math.max(0, rows - 1)));
+            ).toBe(Math.round(normalisedOf(v, range, facing.y !== "down") * Math.max(0, rows - 1)));
           }
         }
       }
@@ -63,12 +63,12 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     // statement about the pin and not about cells — so a rasteriser receiving
     // `1.4` would have to know C04 I29 to draw it. It never receives one.
     const range = { min: 0, max: 10 };
-    expect(normalisedOf(-5, range, DOWN), "below clamps").toBe(0);
-    expect(normalisedOf(15, range, DOWN), "above clamps").toBe(1);
-    expect(normalisedOf(15, range, UP), "and the facing mirrors after the clamp").toBe(0);
+    expect(normalisedOf(-5, range, false), "below clamps").toBe(0);
+    expect(normalisedOf(15, range, false), "above clamps").toBe(1);
+    expect(normalisedOf(15, range, true), "and the facing mirrors after the clamp").toBe(0);
     for (const v of [-1e9, 1e9]) {
-      expect(normalisedOf(v, range, DOWN)).toBeGreaterThanOrEqual(0);
-      expect(normalisedOf(v, range, DOWN)).toBeLessThanOrEqual(1);
+      expect(normalisedOf(v, range, false)).toBeGreaterThanOrEqual(0);
+      expect(normalisedOf(v, range, false)).toBeLessThanOrEqual(1);
     }
   });
 

@@ -23,6 +23,9 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const SCALE = "src/presentation/plot/scale.ts";
+// **The shared coordinate lives in L0**, where `cells()` is not reachable — that
+// is §3aj hazard 4's seam, structural rather than asserted.
+const SHARED = "src/data/viewmodel/range.ts";
 
 // **The goldens are in the file list on purpose.** They cannot catch the flat
 // line — that is the finding — and their presence is what makes each row's
@@ -44,8 +47,8 @@ const results = runPass({
   write,
   run,
   control: {
-    file: SCALE,
-    from: "  return facing.y === \"down\" ? clamped : 1 - clamped;",
+    file: SHARED,
+    from: "  return invert ? 1 - clamped : clamped;",
     to: "  return clamped;",
     why: "the vertical facing ignored — every `origin` that flips the ordinate draws upside down",
   },
@@ -66,7 +69,7 @@ const results = runPass({
       // way to know — and in cells `Math.round` hides it inside the grid at
       // most heights.
       name: "the shared layer emits an unclamped coordinate",
-      file: SCALE,
+      file: SHARED,
       from: "  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;",
       to: "  const clamped = t;",
       expect: "G2",
