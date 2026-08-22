@@ -1420,6 +1420,132 @@ a widening of a union that did not exist, and every consumer's exhaustive switch
 that says nothing about what changed.
 
 
+## 3f. The mosaic — the figure nested rows and columns cannot draw
+
+A `group` divides its region into full-width columns or full-height rows and recurses, so every
+figure any nesting of them can produce is a **slicing** floorplan — one decomposable by guillotine
+cuts all the way down. **That is a real limit and not a stylistic one**, and the measurement is what
+makes it a ruling: the pinwheel, four cells rotating around a centre, admits **no guillotine cut at
+all**, while a *five*-rectangle floorplan that is slicing cuts at its first interior edge (F244 §0).
+
+```
+  AAAAAABBB      no cut          PPPQQQQQQ      cut at x=1
+  DDDEEEBBB      not slicing     PPPRRRSSS      slicing
+  DDDCCCCCC                      PPPRRRTTT
+```
+
+Same count, same tiling, opposite answer — **so the difference is the figure and not the size**, and
+no arrangement of `group`s expresses the left one. That is the whole case for a second container,
+and it is why this kind is not a `Group` field.
+
+```typescript
+export type Mosaic = Readonly<{
+  kind: "mosaic";
+  id: string;
+  /** Interior rows. A positive integer, and **required** — see 3f.2. */
+  height: number;
+  /** The spec string: rows separated by `/`, one character per column. */
+  areas: string;
+  /** One per named region, in first-appearance order. */
+  children: readonly Block[];
+  /** How the grid's columns divide the width, and its rows the height (3f.3). */
+  columns?: readonly Share[];
+  rows?: readonly Share[];
+}>;
+```
+
+**`children` and not `cells`, and the reason is a mechanism rather than a convention.**
+`childBlocksOf` in `validate.ts` walks a block's children by reading `b["children"]` structurally,
+so an app-registered kind gets recursion for free — and a kind naming them anything else is **skipped
+silently**, taking id-uniqueness (I14) and every nested refusal with it. The field name is load-bearing.
+
+### 3f.1 — the spec string, and its four refusals
+
+`areas: "AAB/DEB/DCC"` is the pinwheel. Rows split on `/`; each character is one grid column; `.` is
+a **hole**, drawn as blanks and named by no child. Every other character names a region, and the
+distinct regions in reading order — left to right, then top to bottom — map onto `children` by index.
+
+**Four refusals, and four is what the design produces rather than a count that was aimed for.** Each
+is at **both gates**, on `hierarchy`'s T2.29 precedent, and each names the part at fault:
+
+| | refused | why it cannot be a warning |
+|---|---|---|
+| 1 | `areas` is empty, or any row has no columns | there is no grid, so there is no geometry to divide and every later rule is vacuous |
+| 2 | rows of unequal length | a ragged grid has no column count, so `columns` cannot be checked and the cell rectangles are not well defined |
+| 3 | a region whose cells are not a solid rectangle | an L-shape or a split region is not a box, and a cell is what a child is drawn into. **This is the one a reader cannot see**: `"ABA"` looks like a spec string and names a region in two pieces |
+| 4 | the region count differs from `children.length` | positional mapping with a length mismatch is F207's accepted-and-ignored — a child that is never drawn, or a region drawn empty, with nothing said |
+
+**Holes are exempt from 3 by construction**, because nothing is drawn there: `.` is not a region, it
+is the absence of one, and requiring it to be rectangular would forbid the ordinary case of a blank
+corner.
+
+### 3f.2 — `height` is required, and omitting it is a construction error
+
+**Measured, not inferred** (F244 §2): a container whose children are all absolutely positioned
+computes a content height of **zero**, because an absolutely positioned child contributes nothing to
+its parent's content size — so a mosaic with no declared height draws **one blank row** and reports
+it. That is not a degenerate rendering to tolerate; it is the block silently drawing nothing.
+
+So `height` is required and positive, on `Scroll.height`'s precedent and for a sharper reason: a
+scroll without one would be unbounded, and a mosaic without one is **empty**. `measure(block, width)`
+returns `height` at every width — roadmap 38's resolve-then-measure, the fourth ruling in this
+project with that shape.
+
+### 3f.3 — the weights are `Share`, and the arithmetic is one implementation
+
+`columns` and `rows` are `readonly Share[]` — the type `Group.flex` already uses (I44) — with one
+entry per grid **column** and per grid **row**, not per child: a region spanning two columns takes
+both their shares. Absent is an equal split. A length that does not match the grid is refused, on
+`flex`'s own precedent.
+
+**`Share`'s rule travels with the type and is not restated**: fixed `{cells: n}` shares come off the
+budget first and the numeric weights divide what remains, because any other order makes a cell count
+a suggestion. **The arithmetic is extracted rather than copied** — `divideShares` serves the group's
+widths and the mosaic's two axes alike, which is the standing hazard in this tree named where it can
+still be avoided: four independent gutter implementations already exist one directory over.
+
+**The vertical axis is new and the horizontal one is not.** `Group` has no height to divide because
+a column group's height is the sum of what its children measure; a mosaic declares its height, so
+`rows` divides a known budget. That is the same arithmetic against a different total, which is the
+argument for one function rather than two.
+
+### 3f.4 — what is refused, with the answer already built
+
+**A shared scale across cells is refused, and `yMin`/`yMax` are the answer** (I29). Two plots in two
+cells do not harmonise their ranges: doing so means measuring both children's data before laying
+either out, which is a second measure pass over content this layer does not read, and the field that
+expresses the intent exists. This is §3's *already built — nothing to do, and stated so a second
+spelling is not added*, applied to a container.
+
+**Nesting is allowed and is not a special case.** A mosaic in a mosaic's cell is sized by the cell,
+exactly as a `scroll` or a `table` in that cell is — its own `height` governs what it draws inside
+the cell and not how much room it gets. Stating it as a general rule rather than a nesting carve-out
+is what keeps it from being read as a property of mosaics.
+
+### The walk — a classification table, because the kind has structure and no state
+
+**Asked rather than assumed** (C26 §8a): a trace finds event-mediated interactions and a table finds
+structural ones, and this kind has no view state to mediate anything. Every field is geometry —
+`areas`, `columns`, `rows`, `height` — and geometry does not change between events. A child's
+`rev`, a cell's scroll offset and a spinner's tick all move *inside* a cell without moving the grid,
+so there is no pair of rules that meet because something happened in between.
+
+| | two rules that both apply | ruling |
+|---|---|---|
+| M1 | a region spanning columns x `columns` weights | the region takes **the sum** of the spans it covers, gutters included if any. Not its own share — a spanning region has no single column to be weighted by |
+| M2 | a hole x the rectangle rule (3f.1 row 3) | exempt, and 3f.1 says so. A hole is the absence of a region rather than a region drawn blank |
+| M3 | a hole x `children` arity (row 4) | a hole is not counted, so `"A.B"` has two regions and takes two children |
+| M4 | a fixed `{cells: n}` share x a width too narrow to honour it | the floor of 1 answers, as it does for a group. **A cell count is a suggestion only at a width where nothing could honour it** |
+| M5 | `rows` weights x a `height` too small for the grid | the same floor, on the same argument, in the axis `Group` does not have |
+| M6 | a child taller than its cell x C25 I1 | the cell bounds it and I1 **holds** — see C09 I35, and it is the row that corrects a carried claim |
+| M7 | a child wider than its cell x I1's other axis | the cell bounds it too; and the **mosaic** needs its own clip as well, because a cell's overflow does not reach the frame's width (F244 §4) |
+| M8 | a nested mosaic x its own declared `height` | 3f.4 — sized by the cell, and this is the general rule rather than a nesting rule |
+| M9 | two regions x painter's order | a tiling figure has no overlap, so the order rule is stated and never reached. **It is a rule to record and not a mechanism to design** (F244 §1) |
+| M10 | `areas` naming a region x an empty `children` | refusal 4, and it is why arity is checked rather than defaulted |
+| M11 | a 1x1 grid | legal, and it is a `panel` without a border. Not refused, because refusing the degenerate case of a general mechanism costs a rule and buys nothing |
+| M12 | `ambiguousWidth: "wide"` x the grid's column arithmetic | the grid divides **cells**, and a child's own content is its own problem — the standing risk does not reach the geometry here, which is the first container for which that is true |
+
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -1725,6 +1851,8 @@ persisted document rests on.
 - **I68** — **A floor survives only while the block is untouched.** `replace`, `merge`, `expand` and `window` each produce a new block from an old one and none carries `minHeight` — `replace` because it is wholesale, `merge` and `expand` because the content the floor was raised for has changed, and `window` by not windowing a floored block at all — the identity C09 I26 states is about rows a definition can produce, and a floor's rows are the registry's. Nothing watches a condition and nothing needs to. **The floor can outlive a change to something else** — a renderer that threw at one width may not throw at another — and that is a stated limit rather than a defect: the cost is blank rows under a block that already failed once.
 - **I69** — **A graph is a node set and an edge set, and it is a new shape because `hierarchy` cannot say two parents.** `graph?: { nodes, edges }`, required on `form: "graph"` and refused on every other form; `hierarchy` is refused *on* it, because a form has one data shape. **`id` is separate from `label` and in `hierarchy` it is not**: a tree node's identity is its position so its label may repeat, and an edge names its endpoints so a graph needs a name that does not — two nodes labelled `retry` is ordinary data. **Refused at both gates from one walk** (T2.29's precedent, and the fault names the path to the member): an empty `nodes`, a node with no `id`, two nodes sharing one, an edge naming an undeclared endpoint, more than 256 nodes, and **a self-edge**. *The self-edge is refused rather than dropped* — longest-path layering needs `layer(b) > layer(a)` and `a → a` cannot satisfy it, so the member has no arm, and accepted-and-ignored is the worst of three answers (F207). Its expiry is a node-mark vocabulary, which no form in the tree has. **One form rather than two, measured**: a new `PlotForm` member is refused by the compiler until it declares in 20 total records in `src/` and three more in test and tools, which is I65's arithmetic applied to the forms rather than the members (§3e).
 - **I70** — **A graph's layout is a member whose choice arm is vacuous today and whose refusal arm is not.** `graphLayout?: "layered"`, default `"layered"`, refused on every form but `graph`. **One value and one default forbids nothing** — A03 §2's vacuity class in a field, stated rather than left to be noticed — and what is testable is the refusal on the other forms and the compile error it makes of `graphLayout: "force"`. **A second member rather than a widened `treeLayout`** is I65's ruling from the other side, and it was recorded there so this would not be re-opened. **The member exists before its second value because the alternative is worse at the moment it changes**: adding it with `force` widens a union that did not exist, and every exhaustive consumer becomes a compile error that says nothing about what moved. Its expiry is C12 §3ai's label pass, which is a symbol rather than a condition (§3e.2).
+- **I71** — **A mosaic is a grid named by a string, and it exists because nested rows and columns draw only slicing figures.** `areas` splits rows on `/`, one character per column, `.` a hole; the distinct regions in reading order map onto `children` positionally, and the field is **`children`** because `validate.ts`'s `childBlocksOf` recurses structurally on that name and skips any other in silence. **Four refusals at both gates**, each naming the part at fault: an empty grid, ragged rows, a region that is not a solid rectangle, and a region count differing from `children.length` — the third is the one a reader cannot see, since `"ABA"` names a region in two pieces and reads as ordinary. **`height` is required and positive**, because measured rather than argued a container of absolutely positioned children computes a content height of zero and draws **one blank row** (F244 §2) — `Scroll.height`'s precedent, with a sharper reason: a scroll without one is unbounded and a mosaic without one is empty. `measure` returns `height` at every width.
+- **I72** — **The grid's two axes divide by `Share`, and a spanning region takes the sum of what it spans.** `columns` and `rows` are one entry per grid line rather than per child, so a region covering two columns is weighted by both; absent is an equal split, a mismatched length is refused on `flex`'s precedent, and fixed `{cells: n}` shares come off the budget before the weights divide the remainder because any other order makes a cell count a suggestion (I44). **The arithmetic is extracted and not copied** — one `divideShares` for the group's widths and both of the mosaic's axes — which is the four-gutter hazard of `presentation/plot/` named where it can still be avoided. **The vertical axis is the new half**: a column group has no height to divide, because its height is what its children measure; a mosaic declares one, so `rows` divides a known budget with the same rule against a different total. **A shared scale across cells is refused and `yMin`/`yMax` are the answer** (I29), because harmonising means measuring both children's data before laying either out — a pass over content this layer does not read — and the field that says it already exists.
 
 
 ## 7. Commitments
@@ -1802,6 +1930,8 @@ persisted document rests on.
 67. **A height discovered too late is deferred rather than forced** (I67, I68). The frame that finds the need completes single-pass at the committed height and the next frame honours the floor, because nothing re-enters the layout; the request is idempotent state rather than an event, so it terminates without a rule forbidding a second one, and it clears without anything watching a condition.
 68. **A graph is a node set and an edge set with named identities, refused at both gates from one walk** (I69). `hierarchy` cannot say two parents, so the field is new rather than widened; a self-edge is refused rather than accepted-and-ignored, with its expiry named as a symbol.
 69. **A graph's layout is a member, and the half of it that forbids nothing says so** (I70). `graphLayout?: "layered"` — the refusal arm is testable on every other form, the choice arm is A03 §2's vacuity class in a field, and the member exists ahead of its second value because adding it later widens a union that did not exist.
+70. **A mosaic is a grid named by a string, refused four ways at both gates** (I71). It exists because every nesting of rows and columns is a slicing figure and the pinwheel is not one — measured, against a five-rectangle slicing control, so the difference is the figure and not the size. `height` is required because omitting it draws one blank row rather than a degenerate box, and `children` is the field name because the validator's recursion reads it structurally (→ FINDINGS F244).
+71. **The grid divides both axes by `Share`, with one arithmetic serving the group and the mosaic** (I72). A spanning region takes the sum of what it spans; fixed shares precede weights; a shared scale is refused with `yMin`/`yMax` named as the answer already built (→ I29, I44).
 
 ---
 
