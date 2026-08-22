@@ -3844,6 +3844,122 @@ The third is the one to state, because a refusal at two gates reads as a guarant
 
 ---
 
+## 3ai. `graph` — a layered layout, and the refusal that survived being re-asked
+
+`tree.ts` is the template and most of it transfers: a **character grid with a box-drawing mask**
+(`grid`, `paint`, `glyphForMask`), a fit that drops what does not fit, and a row spent on `+N more`
+(I8). `graphArea` is the same signature and the same primitives, so a graph is not a new drawing
+technology — it is a new **placement**.
+
+### 3ai.1 — six passes, and the recipe named three
+
+Layer assignment by longest path and ordering by median heuristic are the two anybody names. The
+other four are load-bearing and three of them were found before any code (F242):
+
+```
+1  cycle removal      longest path presupposes a DAG and nothing in `graph` forbids a cycle
+2  deduplication      reversing b->a where a->b exists yields the same edge twice — 24 in 360
+3  layer assignment   longest path
+4  dummy nodes        an edge spanning layers has nothing for the median to order
+5  ordering           median heuristic, two sweeps, BEST-KEPT
+6  placement          left to right within a layer, label width plus a gap
+```
+
+**Pass 2 came from checking the instrument rather than from reading the recipe**, which is why it
+is listed beside the two that were reasoned about: a duplicated edge is drawn twice, counted twice
+in every crossing figure, and looks exactly like a correct one.
+
+**Two sweeps is a number chosen, not a recipe followed.** One sweep never hurts — 0 of 40 trials in
+every cell of the corpus — and cuts crossings four- to fivefold. **Two, taken plainly, is worse than
+one in a whole family**: at near-path *n* = 50 the mean rises from 36.5 to 38.1 and 17 trials of 40
+come out worse. *Best-kept* — keep the ordering with the fewest crossings seen rather than the last
+produced — makes it monotone by construction for one crossing count and one array copy a sweep, and
+past two the marginal gain is 3–6% where the first buys 80%. At the sizes that fit a terminal it is
+already at the floor (F242).
+
+### 3ai.2 — `force` is refused on the labels, and the refusal has been moved once already
+
+**It used to rest on the edges** — *`strokePolyline` steps orthogonally, so angles render as
+staircases* — which is a fact about **the tool** and not about force layouts: `drawLine` strokes
+arbitrary angles at 2 × 4 and is on every line plot's default path. Four of the five reasons that
+refusal ever carried have expired, and each was written by somebody who found the last one thin.
+
+**What stands is that the labels collide, measured at three densities**: 0% on a near-path graph,
+0% on a complete one, and **17.4% of label pairs at a third of the edges present, *n* = 20** — and
+both ends reading clean is why the first probe, run at one extreme, moved the refusal off the
+labels before the middle was measured.
+
+**And the same question, asked of the layout being kept, comes back clean for a structural reason**
+(F242). A layered layout places a layer's labels side by side with a gap, so an overlap is **not
+expressible** — zero in 360 graphs — and the failure mode is a layer wider than the area, which is
+overflow and has an answer in I8's row. *A refusal that survives being re-asked of the alternative
+is a stronger refusal than one that was never tested*, which is the reason to record it here rather
+than in a plan.
+
+**The expiry is the label pass and it is written as a symbol**: when `shiftInward` and the label
+taxonomy can shift, drop and count, a force graph draws the nodes it can label and counts the rest
+on I8's mechanism. *A deferral names a condition and nothing watches it*, so the condition is a
+name that can be grepped rather than a sentence about capability.
+
+### 3ai.3 — the figure does not claim direction, and that is a ruling rather than an omission
+
+**The layout is directed** — layering uses edge direction, and top-to-bottom is what the reader
+reads. **The drawing is not**, because carrying direction explicitly needs an arrowhead, and `▼` is
+in no file in this repository while `▲`, `↑` and `↓` are `East_Asian_Width=Ambiguous` throughout
+(`glyphs.ts`). That is the ambiguous-width arm again — the standing risk with three defects already
+— and a mark chosen for a figure rather than taken from the glyph set is F161's class in a drawing.
+
+**So the convention carries it and the exception is counted.** Every edge in the laid-out graph runs
+forward by construction, so downward *is* the direction — except for an edge the cycle pass
+reversed, which is the one case the figure would misstate. Those are named in the notice row
+alongside what was dropped, because the row already exists and a second one would cost a row of the
+drawing:
+
+    +4 more · 2 reversed
+
+**The expiry is a symbol**: `GlyphSet` gaining an arrowhead member with its wide arm and its ascii
+arm, at which point the convention becomes a fallback rather than the whole story.
+
+### 3ai.4 — §8a, the classification table
+
+**Structure at rest, so the table is primary** — the form has no session state, and the cells are
+where two rules both hold. A row governed by one rule restates that rule and finds nothing.
+
+| | two rules | the cell | ruling |
+|---|---|---|---|
+| **G1** | cycle removal · dedupe | `a→b` and `b→a`: reversal makes `a→b` twice | dedupe **after** reversal. Before it, both are legal distinct edges and removing one is data loss |
+| **G2** | reversal · drawing | a reversed edge points the wrong way down the page | §3ai.3 — counted in the notice, not marked, and the expiry is a glyph |
+| **G3** | longest path · a self-edge | `layer(a) > layer(a)` has no solution | refused at both gates (C04 I69), not dropped |
+| **G4** | drop · dummies | a dropped node leaves dummy chains in the layers that remain | dropping a node drops its edges *and their dummies*, or a chain leads nowhere and draws as a stray line |
+| **G5** | median · dummies | a node whose neighbours are all dummies | fine, and it is why dummies exist: the median is over **positions**, which a dummy has |
+| **G6** | median · an isolated node | no neighbour in the adjacent layer, so no median | keep its index. Any other answer migrates a node with no edges on every sweep, and two renders of one input differ — I11 |
+| **G7** | drop · the notice row | nothing was dropped, so nothing to say | the row is spent only when something is dropped, which is §3ah.4's ruling one form along |
+| **G8** | drop · a non-empty graph | every node dropped | draw nothing and give the whole area to the notice — `tree`'s `keptCount === 0` arm |
+| **G9** | longest path · disconnected components | two components with no edge between them | they **share** layers, laid out together from 0. Stacking would need a second placement pass and a component is not a unit the caller named |
+| **G10** | box drawing · `ambiguousWidth: "wide"` | every edge glyph doubles | `glyphForMask`'s existing arms — inherited from `tree`, and the reason §3ai.3 refuses to add a new character |
+| **G11** | a two-cell label · edge routing | an edge walks into the `""` continuation cell | `tree`'s `write` already leaves it unwalkable (§3n) |
+| **G12** | declared height · the drop | the height is C12 I1's promise | area rows are the declared height less furniture, and the fit drops until it holds |
+| **G13** | `graph` present · `hierarchy` present | both on `form: "graph"` | refused — a form has one data shape (C04 I69) |
+| **G14** | `graphLayout` present · `graph` absent | two faults in one document | the missing `graph` is reported; the walk stops at the first |
+
+### 3ai.5 — §8a-bis, the sweep trace
+
+**The ordering pass is event-mediated inside itself**, which is the half no table reaches: a sweep
+moves a node, and what the next median sees depends on whether that has happened yet.
+
+| | sequence | the interaction | ruling |
+|---|---|---|---|
+| **S1** | down sweep orders layer *L*+1, then *L*+2 | *L*+2's medians are read against *L*+1's **new** order | intended — a sweep propagates, so the layers are visited in sequence and not independently |
+| **S2** | within one layer: X's median computed, the sort moves X, Y's median computed | Y's median would read a **half-applied** order | compute every median first, then sort once. *Deltas read as state*, in an ordering pass |
+| **S3** | sweep 1 down, then sweep 2 up | sweep 2 can undo sweep 1 | measure after each and keep the minimum (§3ai.1) |
+| **S4** | two nodes with equal medians | the tie | current position, so the sort is stable — otherwise two renders of one input differ (I11) |
+| **S5** | best-kept records the winning order, a later sweep mutates the rows | **the record must be a copy** | copy on record. Holding a reference makes best-kept a no-op that reports the right number and returns the wrong order — every crossing assertion passes and only the frame disagrees |
+
+**S5 is the one this artefact was worth running for.** It is not a rule interaction anybody would
+list from the rules; it is the shape where a correct fix changes nothing observable, and the number
+it reports is right the whole time.
+
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -5081,6 +5197,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I55** — **A label is placed once, marked where it displaces another, and never sized into the thing that sizes it.** Six kinds share one anchor vocabulary — a value and a series name at the series' own inked row, an annotation's in a legend row, a node's inside its own figure, a point's beside its sample, an axis title in a declared row — and a **tick is not one of them**, because a tick is *at* a coordinate and a label is *near* one, which is the whole difference between moving a tick (a lie) and moving a name (still the name). **A point label takes one of two positions and never slides**: right of its sample, else left of it, else dropped — a label slid inward from the right edge covers the sample it names, and an anchor hidden by its own label is worse than no label. **Placement is a single pass in series order onto free cells only**, so no label displaces one already placed and the output does not depend on which of two independent labels was considered first. **A displaced label is marked with a one-cell `+` at the survivor and is never a legend entry**, which is I48's clause inherited rather than re-derived: a vertical legend sizes itself to its longest entry, that width sets `areaWidth`, `areaWidth` sets where samples land, and what collides sets what would be counted — *`+N`'s count needs the ink that needs the width that needs the column being sized.* **The legend is sized from series, segments and annotations alone**, all knowable before a label is placed. **I8 does not reach a dropped label**: it governs a series given no row, and a tile whose name did not fit is still drawn and still carries its extent — so a treemap tile with no padding ring drops its name and says nothing, and §3n's first wording said *counted* by borrowing an invariant one case too far. **A label draws over the data and an annotation line draws behind it** (C04 I23), because a reference line is a claim the curve is compared against and a name is the curve's own. **At one bit the leader survives and the identity does not** — `─ │ ╰` degrade to `- | +` through `linedraw.ts`'s ASCII table, so the arm at risk is `unicode` and it is already built. **The remedy this clause first named cannot fire and is struck**: it said a label takes its series' `markOf` glyph as a prefix *on the same predicate the swatch uses*, which is `colourDepth >= 4` — and above that floor colour separates the categories, while below it `positionalForm` stops overlaying and **stacks into strips the gutter already names**. Every form that accepts a point label is in `POSITIONAL_STACKS`, so the two arms meet with nothing between them. **The identity is carried at one bit, by the strip's own gutter label**, which is a mechanism that already shipped — and the prefix was a member that would have done nothing at any capability (§3ag). *The cycle is broken by this invariant and not by a signature, which is weaker than `measure`'s purity and is recorded as weaker* (§3ag).
 - **I56** — **The abscissa is named in one declared row beneath its labels, and the forms that can carry one were measured rather than reasoned about.** `xTitle?: string`, drawn centred over the **plot area** — `layout.gutter` is the whole left offset, which is what `xLabelRowFor` one row above uses — truncated and never wrapped, because a second row would change a declared height (I1). **Below the labels and never above them**: the labels are the scale, and a name between a scale and the thing it measures separates the two. **The row is added by `titleRows` centrally**, on `legendRows`' recorded reason — every form that draws one pays it the same way, and thirty-six entries each adding the same term is thirty-six chances to forget one. **`HAS_X_TITLE` is total over `PlotForm` and every value in it was measured**: each form was rendered with a title and the frame searched for it, giving **26 true and 18 false** — and **16 of those 18 also broke `measure === rendered`**, because the row was declared and nothing composed it. So the record is not a taste, it is what keeps I1, and the **refusal is the mechanism**: a `true` in the wrong place is a block whose declaration and drawing disagree. *The matrix family is a named gap and not an omission* — a heatmap draws a column-label row a title could sit under, and wiring it is a change to that family's compositor. **`axes: false` is refused**, because a title for an axis that is not drawn names nothing and the alternative is a second placement rule for one member. **There is no `yTitle`**: rotated it is a column of single letters no terminal reader parses, horizontal above the gutter it is `xLabels`' shape and a second title member — and **a y-axis title is a heading, which C09 already has**, costing the same row and reusable by every kind. *The first draft offset the row by `labelColumn + AXIS_GUTTER` on top of the gutter and pushed it four cells right, off the area's centre and past its right edge into `clampSpans`' ellipsis; a row-width assertion cannot see that, because the row is exactly `width` either way* (§3ag).
 - **I57** — **A tree is one drawing in three layouts, chosen to fit and never as a rung.** `tree` is the fourth reading of `hierarchy` and the first whose subject is structure rather than magnitude: it takes `label` and `children`, and **`value` is ignored** — optional on the node for it (C04 I64), with the answer beside the ruling in the member's own doc, because *put it in the name* costs nothing and a bare refusal leaves *a field that does nothing* reading as one not yet implemented. **Top-down Reingold–Tilford, left-to-right, and `tree(1)`'s indented outline**, with natural sizes `2·depth + 1` × `W(root)`, `leaves` × `Σ_d max label + 2·depth`, and `nodes` × `max(4·depth + label)` — where **`W(node) = max(cells(label), Σ W(children) + gaps)`**, because a parent's own name can be wider than everything beneath it and then the parent sets the width: measured at 20 columns against a plan formula's 5, with the leaf positions, the depth and the node total agreeing either way. **They are not a ladder, and `HAS_DETAIL_RUNGS.tree` is `false`.** Measured over four trees, the top-down figure is the cheapest of the three in rows on a broad tree (3) and the dearest on a deep one (13) while its columns invert with it, so no ordering by budget exists — **not even one that depends only on the budget**, since which layout is cheapest depends on the tree; and all three draw the same names and the same edges, which is I34's own test for a rung failed three times in the same way. **The choice is `treeLayout` and `"auto"` is a fit**: the first of top-down, left-to-right, outline whose natural size fits both axes, else the one that keeps the most nodes at the budget. **What does not fit is a `warn`-toned row inside the area** (I8), and **the row is spent before the choice rather than after it**, so the notice cannot remove itself by making the drawing fit — §3ag.4's cycle in a second place, ruled the same way. **Truncation runs before placement**, or a surviving parent is centred over a span that includes the subtree that is gone, with every count agreeing; and an edge is derived from the kept set rather than from `children`, which is that defect one pass along and a separate ruling because the first fix does not make the second. A fan is three orthogonal moves through `strokePolyline` and `glyphForMask`, **a fan of one is `│` and never a zero-length bar**, the outline's indent is four cells because `├── ` and `|-- ` both are, and edges are `tone.muted` with no categorical palette — **so I25 has nothing to carry here**, the name being the identity at every depth and drawn at every capability. `hierarchy` absent is refused at both gates and drawn as `emptyRows` on the third path, where a fixture reaches the renderer without passing either (I2).
+- **I58** — **A graph is one drawing in one layout, and the layered pipeline is six passes rather than the three it is usually named with.** Cycle removal, deduplication, longest-path layering, dummy nodes, ordering and placement — and *deduplication* is there because reversing `b→a` where `a→b` exists yields the same edge twice, drawn twice and counted twice, which was found by checking the instrument rather than by reading the recipe (F242, §3ai.1). **Two sweeps is a number chosen and best-kept is what makes it safe**: one sweep never hurts and cuts crossings four- to fivefold, two taken plainly is worse than one in a whole family — near-path *n* = 50, mean 36.5 to 38.1, worse in 17 trials of 40 — and keeping the ordering with the fewest crossings seen makes it monotone for one crossing count a sweep. Past two the gain is 3–6% where the first buys 80%, and at the sizes that fit a terminal it is already at the floor. **`force` is refused on the labels alone and the refusal has been moved once**: it rested on `strokePolyline` stepping orthogonally, which is a fact about the tool — `drawLine` strokes arbitrary angles at 2 × 4 — and what stands is 17.4% of label pairs overlapping at a third of the edges present, *n* = 20. **The same question asked of `layered` comes back clean structurally**: a layer's labels sit side by side with a gap, so an overlap is not expressible — zero in 360 graphs — and the failure mode is overflow, which I8's row answers. Its expiry is `shiftInward` and the label taxonomy, written as a symbol because a deferral names a condition and nothing watches it. **The figure does not claim direction**, because an arrowhead needs a glyph the set does not have and `▲`, `↑` and `↓` are ambiguous-width throughout; the layering carries it, and edges the cycle pass reversed are counted in the notice row rather than marked (§3ai.3).
 
 ## 8. Commitments
 
@@ -5135,6 +5252,7 @@ orientation — and belongs in the classification table as its own rows.
 49. **Six kinds of label become one pass with one collision rule** — two positions and never a slide, a single pass onto free cells, a one-cell `+` where one displaces another, and no label outcome that can widen the legend that decides where labels go; and the tick stays outside it, because *at* a coordinate and *near* one are different rules (I55, §3ag).
 50. **The abscissa gets a name, in a row declared before the data and drawn only by the forms that were measured to draw it** — 26 of 44, with the other 18 refused because 16 of them would otherwise declare a row nothing composes; and there is no `yTitle`, because a y-axis title is a heading and C09 has one (I56, §3ag).
 51. **A tree is one drawing in three layouts, chosen to fit** — measured over four trees rather than ordered into a ladder, because the cheapest layout depends on the tree and not on the budget; the choice is a member, the overflow row is spent before the choice so it cannot remove itself, and truncation runs before placement so no parent is centred over a subtree that is gone (I57, §3ah).
+52. **A graph is one form with a layered layout, its pipeline is six passes, and its sweep count is a measured number rather than a recipe** (I58). `force` stays refused on the labels alone, with the label pass named as its expiry; the figure does not claim direction, and the reversed edges are counted rather than marked.
 
 ---
 

@@ -1359,6 +1359,67 @@ replaces a pending block with a result is the first row of the table rather than
 
 ---
 
+## 3e. `graph` — the shape a hierarchy cannot express, and one form rather than two
+
+**`hierarchy` cannot say two parents.** `HierarchyNode` is `{ label, value?, children? }`, so a
+node reachable from two places has to be written twice — and two writings are two nodes, with two
+sets of children and no way for a reader or a renderer to know they are one thing. A call graph, a
+dependency graph and a state machine are all that shape, so the field is new rather than widened.
+
+    graph?:       { nodes: readonly GraphNode[]; edges: readonly GraphEdge[] }
+    graphLayout?: "layered"
+
+**`id` is separate from `label`, and in `hierarchy` it is not.** A tree node's identity is its
+position, so its label may repeat freely; an edge names its endpoints, so a graph needs a name that
+does not. Two nodes labelled `retry` is ordinary data and `from: "retry"` would be a document that
+means two things.
+
+**One form, not two, and the cost is measured.** A new `PlotForm` member is refused by the compiler
+until it declares in **20 total records in `src/`** — ten in this file, three in `marks.ts`, two
+each in `height.ts` and `heatmap.ts`, and one each in `construct.ts`, `validate.ts` and
+`definition.ts` — plus `ONE_PER_FORM`, `FIXED_HEIGHT` and `CATALOGUE_FORMS`. Twenty-three
+declarations to express one difference is what a second form costs, which is the same arithmetic
+I65 used to keep `treeLayout` and `graphLayout` apart and applied to the forms rather than the
+members.
+
+### 3e.1 — what is refused, at both gates
+
+On `hierarchy`'s own precedent (T2.29): the fault names the path to the member, the walk stops at
+the first, and both the builder and the document validator ask the same questions from one walk.
+
+| refused | why |
+|---|---|
+| `graph` absent on `form: "graph"` | a form whose whole subject is the shape has nothing to fall back to — I65's ruling for `tree`, one form along |
+| `graph` present on any other form | it is this form's data, not a modifier |
+| `graphLayout` on any other form | I65's split, from the other side |
+| `hierarchy` **and** `graph` on `form: "graph"` | a form has one data shape, and two would be a document that means two things |
+| `nodes` empty, or a node with no `id` | there is no figure and no name to draw |
+| two nodes with one `id` | an edge naming it would name both |
+| an edge naming an undeclared endpoint | the commonest malformed graph, and it is silent otherwise: the node is simply not drawn |
+| more than 256 nodes | `hierarchy`'s bound, for its reason — what the bound is for is a builder call handing over something unbounded, not any depth anybody's data has |
+| a self-edge | **below** |
+
+**A self-edge is refused rather than dropped, and the reason is F207's.** Longest-path layering
+needs `layer(b) > layer(a)` and `a → a` cannot satisfy it, so the edge has no arm — and *accepted
+at construction and ignored at render is the worst of the three answers*, worse than refusing,
+which tells the caller, and worse than degrading, which tells the reader. **The expiry is a
+symbol**: a node-mark vocabulary, which no form in the tree has.
+
+### 3e.2 — `graphLayout` is a single-value union, and half of it is vacuous
+
+`graphLayout?: "layered"`, default `"layered"`. **The choice arm forbids nothing** — one value and
+one default is A03 §2's vacuity class arriving in a field, and it is said here rather than left for
+a reader to notice. What is not vacuous is the **refusal** arm, which is testable on the other
+forms, and the compile error it makes of `graphLayout: "force"`.
+
+**It earns the rest of itself when `force` lands, and that is a condition with a watcher rather
+than a hope** — C12 §3ai names the refusal's expiry as the label pass, which is a symbol that can
+be grepped. The alternative was no member until there are two values, which is CLAUDE.md's *add an
+export nothing consumes* read strictly; it was refused because the day `force` arrives the field is
+a widening of a union that did not exist, and every consumer's exhaustive switch is a compile error
+that says nothing about what changed.
+
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -1662,6 +1723,8 @@ persisted document rests on.
 - **I67** — **`minHeight` is a floor a layer above sets, written only by `op: "reserve"`, and refused on an inbound document.** It is applied by the registry outside every definition — `max(definition.measure(b, w), b.minHeight ?? 0)` — so no kind reads it, C09 I2's purity is untouched, and `scroll`'s argument that its residue is a function of `(block, width)` and never of view state is not reopened (§3c, §3d). The render pads to the floor and never bounds it, so C09 I1 holds by construction rather than by the two sides agreeing. **An empty `group`'s legitimate zero gives way to a floor**, deliberately: a block that failed and shows nothing is absence indistinguishable from failure.
 
 - **I68** — **A floor survives only while the block is untouched.** `replace`, `merge`, `expand` and `window` each produce a new block from an old one and none carries `minHeight` — `replace` because it is wholesale, `merge` and `expand` because the content the floor was raised for has changed, and `window` by not windowing a floored block at all — the identity C09 I26 states is about rows a definition can produce, and a floor's rows are the registry's. Nothing watches a condition and nothing needs to. **The floor can outlive a change to something else** — a renderer that threw at one width may not throw at another — and that is a stated limit rather than a defect: the cost is blank rows under a block that already failed once.
+- **I69** — **A graph is a node set and an edge set, and it is a new shape because `hierarchy` cannot say two parents.** `graph?: { nodes, edges }`, required on `form: "graph"` and refused on every other form; `hierarchy` is refused *on* it, because a form has one data shape. **`id` is separate from `label` and in `hierarchy` it is not**: a tree node's identity is its position so its label may repeat, and an edge names its endpoints so a graph needs a name that does not — two nodes labelled `retry` is ordinary data. **Refused at both gates from one walk** (T2.29's precedent, and the fault names the path to the member): an empty `nodes`, a node with no `id`, two nodes sharing one, an edge naming an undeclared endpoint, more than 256 nodes, and **a self-edge**. *The self-edge is refused rather than dropped* — longest-path layering needs `layer(b) > layer(a)` and `a → a` cannot satisfy it, so the member has no arm, and accepted-and-ignored is the worst of three answers (F207). Its expiry is a node-mark vocabulary, which no form in the tree has. **One form rather than two, measured**: a new `PlotForm` member is refused by the compiler until it declares in 20 total records in `src/` and three more in test and tools, which is I65's arithmetic applied to the forms rather than the members (§3e).
+- **I70** — **A graph's layout is a member whose choice arm is vacuous today and whose refusal arm is not.** `graphLayout?: "layered"`, default `"layered"`, refused on every form but `graph`. **One value and one default forbids nothing** — A03 §2's vacuity class in a field, stated rather than left to be noticed — and what is testable is the refusal on the other forms and the compile error it makes of `graphLayout: "force"`. **A second member rather than a widened `treeLayout`** is I65's ruling from the other side, and it was recorded there so this would not be re-opened. **The member exists before its second value because the alternative is worse at the moment it changes**: adding it with `force` widens a union that did not exist, and every exhaustive consumer becomes a compile error that says nothing about what moved. Its expiry is C12 §3ai's label pass, which is a symbol rather than a condition (§3e.2).
 
 
 ## 7. Commitments
@@ -1737,6 +1800,8 @@ persisted document rests on.
 65. **A tree's layout is a member and not a rung** — measured over four trees rather than ordered, because the cheapest layout depends on the tree and not on the budget; `"auto"` is a fit, a named layout is honoured and truncated, and `hierarchy` is required on the one form with nothing to fall back to (I65).
 66. **A state only a higher layer can know travels in the block, not in a rendering mode** (I66). `status` is one kind for three states because the alternative is a registry reading upward for two of them; the numbers that describe those states are supplied by whoever holds the clock, since the animation counter cannot carry a duration and the drawing layer cannot read a clock.
 67. **A height discovered too late is deferred rather than forced** (I67, I68). The frame that finds the need completes single-pass at the committed height and the next frame honours the floor, because nothing re-enters the layout; the request is idempotent state rather than an event, so it terminates without a rule forbidding a second one, and it clears without anything watching a condition.
+68. **A graph is a node set and an edge set with named identities, refused at both gates from one walk** (I69). `hierarchy` cannot say two parents, so the field is new rather than widened; a self-edge is refused rather than accepted-and-ignored, with its expiry named as a symbol.
+69. **A graph's layout is a member, and the half of it that forbids nothing says so** (I70). `graphLayout?: "layered"` — the refusal arm is testable on every other form, the choice arm is A03 §2's vacuity class in a field, and the member exists ahead of its second value because adding it later widens a union that did not exist.
 
 ---
 

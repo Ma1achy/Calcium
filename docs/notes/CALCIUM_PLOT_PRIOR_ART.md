@@ -350,6 +350,8 @@ line.* Two instances is the minimum for noticing a shape and not evidence for on
 recorded and not promoted — but the answer it suggests for a graph is the same answer: **mark
 the nodes in the figure and name them in the legend**, which costs no placement pass at all.
 
+**The ruling now lives in C12 §3ai and I58; what is below is the measurement behind it.** This note is a record and not a contract, and a refusal carried only by a plan is a belief — which is the distinction this file's own fourth row is about, one level up.
+
 **So `force` is refused on the labels alone, and the refusal carries its expiry.** When a label
 pass can shift, drop and count — C12's label taxonomy, `shiftInward` — a force graph draws the
 nodes it can label and counts the rest, on I8's mechanism. Written as a symbol because **a
