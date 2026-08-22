@@ -465,11 +465,26 @@ the wrong brightness to sit behind text, which is C10 I21's rule from the other 
 ground with no ink of its own borrows a foreground nothing measured against it**, so neither
 arrives alone.
 
-**And the pair degrades together.** At 4-bit and 1-bit there is no ground *and no ink*: the tag
-carries no styling and is distinguishable by being the one run that does not — non-bold between
-two bold rules at one bit. An ink left behind on a ground that vanished would be the same missed
-floor in the other direction, which is why T3.46 asserts both halves' absence rather than the
-ground's alone.
+**And the pair degrades together — which is a rule about the pair and not about a depth, and this
+paragraph used to say it as one** (F240). An ink left behind on a ground that vanished is a
+foreground nothing measured against anything, C10 I21's rule read from the other direction, so the
+two halves arrive together or neither arrives. That reason is right and it says nothing about
+*which rungs have a ground to arrive with*, and the two lower ones differ:
+
+- **At 1-bit there is nothing to arrive.** C10 I8 vanishes every surface, so the tag carries no
+  styling and is distinguishable by being the one run that does not — non-bold between two bold
+  rules. Distinction by absence is the only channel left, and the `▲` and the word carry the rest.
+- **At 4-bit the pair arrives whole.** Surfaces have a rung there, and the only other text-bearing
+  ones — `diffAdd` and `diffRemove` — are curated at exactly that depth. **The ground is
+  `tone.error`'s own index**, per theme, by the same equality that makes it `tone.error`'s hex at
+  24-bit (C10 §4d, I32), and the ink is the half that reads on it; C10 I26 makes the floor
+  best-effort at this rung, so the choice is a human one and no ratio is claimed.
+
+**Read the frame for why the first wording could not stand.** With no arm at 4-bit the rule, the
+mark and the message are all bright red and the word `ERROR` is plain default — the one unmarked
+run inside a red box, which inverts *the tag is painted and nothing else is* at the one depth where
+that sentence had a rung to be true on. At 1-bit the same mechanism reads correctly, because there
+everything else is bold and absence is the only thing left to be.
 
 #### §3a classification table — the cells where two rules meet
 
@@ -1098,7 +1113,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.43** (I32): the same block at ten successive `tick` values draws ten distinct spinner frames, in **all three states** — `error` included, which is what says the kind animates unconditionally rather than by state.
 - **T3.44** (I32): the default set resolves to what `steps` resolves to, asserted against `spinnerFrames(caps)` rather than against a literal; a named set uses its own frames **and its own interval**; an unknown name is the default and never a throw.
 - **T3.45** (I32): `FULL_CAPS` and `WIDE_CAPS` give the default the same frames, and a `narrowOnly` set gives its ASCII pair at `wide`. **Both routes to the ASCII pair, because a set can reach it by width or by `unicode: "ascii"`** and one assertion cannot tell which fired.
-- **T3.46** (I31, §3a): at `colourDepth: 1` the tag and the message both resolve to `{ bold: true }` and the brackets are what distinguish them; no background is emitted at any depth.
+- **T3.46** (I31, §3a): the tag is the only painted run — **exactly one** background introducer in the whole frame at 24-, 8- and 4-bit — and the pair moves together at every rung, so a ground with no ink and an ink with no ground are both failures. At 1-bit neither arrives and the `▲` and the word are what carry it. **The depths are asserted apart and were not**: one arm covering 4 and 1 together stated a forced absence at a rung that has a ground (F240).
 - **T3.47** (I31, §3a): the ASCII arm draws `+ - |` and `!`, and **no box-drawing codepoint appears in the frame** — asserted over the whole frame rather than over the corners, because a border is four glyphs and a mistake is usually one of them.
 - **T2.10a** (I34, I11): **golden frames for the contained failure**, three messages × three widths × three variants, both frames of the two-frame path. **There were none**, through three commits about this path: nothing in `test/golden/` rendered a definition that throws, so golden passed each time on the absence of a subject rather than the absence of a change. Frame 1 is recorded too, because F230's ruling makes the short box a specified state rather than a transient.
 - **T3.48** (I31): `status` declares no `window`, and `windowSequence` keeps it whole and pays for it out of `skipRows` — `plot`'s and `scroll`'s case, and the same assertion.
