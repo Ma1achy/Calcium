@@ -1722,10 +1722,53 @@ same class as the plane-16 width guarantee (C09 §4c). **Placed degrades gracefu
 because the cell alignment is this framework's and only the image's fit inside its own rectangle
 would move. The first real-terminal test is where it is checked.
 
-**And the remaining four are compositions rather than features**: before/after/residual is three
+**And the remaining three are compositions rather than features**: before/after/residual is three
 samples with a shared scale, a confusion matrix of examples is a sample grid whose bands are the
 confused classes, and image-plus-histogram is a `row` group holding an `image` and a `plot`. Each
-is worth building when a consumer asks; none needs a mechanism this section does not already have.
+is worth building when a consumer asks. **Whether any needs a mechanism this section does not have
+was open, and §3h.3 is the measurement.**
+
+
+### 3h.3 — the three, built; one broke the claim, and not the predicted one
+
+**All three were built the way a consumer would build them — from `b` and nothing else** — because
+a builder added to the framework to make a composition work *is* the mechanism the claim denies.
+The predictions were written down first and two of the three were wrong.
+
+| | predicted | measured |
+|---|---|---|
+| image + histogram | **breaks the claim outright** — the pixels live behind `pixelsOf` in `presentation/`, a plot's data lives in the document, and there is no seam | **composes.** `measured 8 · rendered 8`, picture and histogram on the same rows, nothing added |
+| before / after / residual | shared normalisation needs a mechanism | **breaks the claim.** The one mechanism this phase owes |
+| confusion matrix | composes | **composes.** A mosaic with a header row and a label column, zero framework changes |
+
+**The histogram's premise was the thing that was wrong, not its reasoning.** *The consumer already
+holds the pixels.* An ML reader has an array; they encode a PNG to **show** it, and the histogram
+is of the array they had before there was a PNG at all. The seam the prediction went looking for is
+one nobody needs to cross, and a framework that decoded on their behalf would be doing work they
+had already done. **A layering argument can be exactly right about the layers and wrong about who
+is standing in them.**
+
+**The residue it does leave is a surface rather than a rendering.** `b.image({ path })` reads a
+file, so *that* consumer never sees a pixel, and `decodePng` is not on C24's surface: they can show
+the picture and can plot nothing about it. Recorded as a residue with a row that fails the day the
+export lands, rather than as a deferral nothing watches.
+
+**Before/after/residual is the one, and the frame is the argument.** Two panels spanning `0.7..157.7`
+and a residual spanning `0.7..14.1`. Read on its own extent — matplotlib's `imshow` default, and the
+obvious implementation — the residual's hottest cell renders at luminance **202** against the before
+panel's **224**: *a fourteen-unit difference drawn as loud as a hundred-and-fifty-eight-unit signal*,
+beside the two pictures it is the difference of. Declared on one scale it renders at **13**. Both
+frames are internally consistent and only one of them is true.
+
+**So `min`/`max` on the overlay is the mechanism §3h said was not needed**, and the shape of the
+finding is worth more than the field: **a shared scale is not a property any panel has.** Each of
+the three images is correct alone, each normalisation is correct alone, and the composition is
+where the falsehood appears — which is why no walk of the image block reaches it and why the
+measurement had to be the composition rather than the part.
+
+**The overlay itself is the fourth thing and it is a mechanism, not a composition** (§3h.2). It is
+counted separately because it was ruled before any of the three were built, and because its two
+arms are two renderings rather than two rungs.
 
 
 ## 4. Patches
@@ -2036,6 +2079,7 @@ persisted document rests on.
 - **I71** — **A mosaic is a grid named by a string, and it exists because nested rows and columns draw only slicing figures.** `areas` splits rows on `/`, one character per column, `.` a hole; the distinct regions in reading order map onto `children` positionally, and the field is **`children`** because `validate.ts`'s `childBlocksOf` recurses structurally on that name and skips any other in silence. **Four refusals at both gates**, each naming the part at fault: an empty grid, ragged rows, a region that is not a solid rectangle, and a region count differing from `children.length` — the third is the one a reader cannot see, since `"ABA"` names a region in two pieces and reads as ordinary. **`height` is required and positive**, because measured rather than argued a container of absolutely positioned children computes a content height of zero and draws **one blank row** (F244 §2) — `Scroll.height`'s precedent, with a sharper reason: a scroll without one is unbounded and a mosaic without one is empty. `measure` returns `height` at every width.
 - **I72** — **The grid's two axes divide by `Share`, and a spanning region takes the sum of what it spans.** `columns` and `rows` are one entry per grid line rather than per child, so a region covering two columns is weighted by both; absent is an equal split, a mismatched length is refused on `flex`'s precedent, and fixed `{cells: n}` shares come off the budget before the weights divide the remainder because any other order makes a cell count a suggestion (I44). **The arithmetic is extracted and not copied** — one `divideShares` for the group's widths and both of the mosaic's axes — which is the four-gutter hazard of `presentation/plot/` named where it can still be avoided. **The vertical axis is the new half**: a column group has no height to divide, because its height is what its children measure; a mosaic declares one, so `rows` divides a known budget with the same rule against a different total. **The remainder is distributed after the division and not inside it** — `facetWidths`' ruling, because a mosaic tiles and its lines must reach the edge, while a `row` group has a gutter and T3.16 pins its remainder where it is; the leftover goes one cell each to the earliest non-fixed lines, so a cell count stays a cell count. **A shared scale across cells is refused and `yMin`/`yMax` are the answer** (I29), because harmonising means measuring both children's data before laying either out — a pass over content this layer does not read — and the field that says it already exists.
 - **I73** — **An image is a block that declares rows and carries bytes, an identity and an `alt`.** It measures, scrolls, degrades and caches like every other kind, which F247 and F248 established before it was designed: `cells(placeholder)` is 1, the diacritics add 0, Ink lays out what `cells()` measures, Ink re-emits the full frame on a one-row change, and both `truncate` and the window leave the grid addressing correctly. **`path` is the builder's arm and `data` is the block's**, because `node:fs` appears nowhere in `src/presentation/` and a renderer reading a file would make `measure` and `render` disagree the moment the file changed between them. **The identity is a digest computed once at construction, never the data** — a megabyte of base64 in a cache key costs more than it saves, and the digest is what the protocol keys transmission on, so two blocks of one image transmit once. **The width is derived from `columnsForAspect` and clamped by `measure`**, which receives the width: over-drawing here is worse than wrong, because a placeholder outside its rectangle addresses part of an image the terminal is not drawing there (C09 I35, F245). **Refused at both gates**, each naming its part: neither `data` nor `path`, both together, a non-positive `height`, an empty `alt`, bytes that are not a PNG, and a decoded size past a cap. **`alt` is required rather than optional** because at `imageProtocol: "none"` with no dither it is the whole of what the reader receives.
+- **I74** — **An overlay is a scalar field over an image's cell rectangle, and its rendering differs by arm.** At the dither this framework owns the glyph and the colour, so the braille cell carries the picture and the foreground carries the field, with C10's colormap and its 8-bit floor applying unchanged and **no rung beneath it**: the cell's other axis is spent on the picture, and a threshold-to-tone fallback would put a binary mask on screen wearing a continuous field's clothes. At `kitty` the cell's rendering is the terminal's — the two diacritics are spent on position and the 24-bit foreground on the image id — so the overlay is **composited into the pixels before transmission**, which gives up the palette and the degradation at `kitty` specifically and loses nothing, because there is nothing below `kitty` for it to degrade *to*. **The values are the author's resolution and never the cell grid's**, since the rectangle is a function of the render width; the resample averages, because a point sample turns a gradient into a staircase and can lose a single hot cell entirely. **The scale is declared or derived, both bounds or neither**: a derived one is right for a single overlay and wrong for a set, and §3h.3 measures the residual that a per-panel extent draws as loud as the panels it is the difference of. **The picture's identity is not the image's** — `digest` keys the decode and `imageKey` keys the transmission, because two blocks of one image with different overlays otherwise transmit once and both draw the first, which is the wrong picture rather than none. **Refused at both gates from one function**: a non-rectangular or empty matrix, a non-finite value, an unknown colormap, half a scale, an inverted one, and an alpha outside `0..1` (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
 
 
 ## 7. Commitments
@@ -2116,6 +2160,7 @@ persisted document rests on.
 70. **A mosaic is a grid named by a string, refused four ways at both gates** (I71). It exists because every nesting of rows and columns is a slicing figure and the pinwheel is not one — measured, against a five-rectangle slicing control, so the difference is the figure and not the size. `height` is required because omitting it draws one blank row rather than a degenerate box, and `children` is the field name because the validator's recursion reads it structurally (→ FINDINGS F244).
 71. **The grid divides both axes by `Share`, with one arithmetic serving the group and the mosaic** (I72). A spanning region takes the sum of what it spans; fixed shares precede weights; a shared scale is refused with `yMin`/`yMax` named as the answer already built (→ I29, I44).
 72. **An image is a block, and the three things that make it one are the digest, the derived width and the builder's path** (I73). It measures before it draws, its identity is not its data, and its geometry is clamped rather than clipped — the mosaic's ruling one component over (→ C09 I35, I36, FINDINGS F247 · F248).
+73. **An overlay is a field on the image whose rendering differs by arm** (I74). Placed at the dither, composited at `kitty`, and the split is a mechanism rather than an arrangement — the one thing in phase 2 that is. Its declared scale is what a set of panels shares, and its identity is the picture's rather than the image's (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
 
 ---
 

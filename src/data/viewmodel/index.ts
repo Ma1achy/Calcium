@@ -38,6 +38,7 @@ export type {
   Notice,
   Panel,
   Image,
+  ImageOverlay,
   Mosaic,
   Scroll,
   Status,
@@ -109,5 +110,6 @@ export {
   type MosaicRect,
   type MosaicRegion,
 } from "./mosaic.js";
+export { overlayFault, overlayRange, DEFAULT_OVERLAY_COLORMAP } from "./overlay.js";
 
 export { digestOf } from "./digest.js";

@@ -2167,7 +2167,70 @@ export type Image = Readonly<{
    * block re-encoded should not miss.
    */
   digest: string;
+  /**
+   * A scalar field over the image's own cell rectangle — an attention map, a
+   * saliency mask, a class-activation map (C04 §3h.2, I74).
+   *
+   * **Its rendering differs by arm, which is what makes it a mechanism rather
+   * than an arrangement** — the only thing in this phase that does. At the
+   * dither this framework owns the glyph and the colour, so the braille cell
+   * carries the picture and the foreground carries the overlay, with C10's
+   * colormap and its floor applying unchanged. At `kitty` the cell's rendering
+   * is the terminal's — the two diacritics are spent on position and the 24-bit
+   * foreground on the image id — so the overlay is **composited into the pixels
+   * before transmission** and nothing this framework draws there is visible.
+   *
+   * **The composited arm gives up the palette and the degradation, at `kitty`
+   * specifically.** That is not a loss, because there is nothing below `kitty`
+   * for it to degrade *to*: the dither is a different rendering rather than a
+   * lower rung of the same one.
+   */
+  overlay?: ImageOverlay;
 }> & Gap & Floor;
+
+/**
+ * The overlay's data: a matrix at **its own** resolution, resampled to whatever
+ * rectangle the image occupies (C04 I74).
+ *
+ * **Its own resolution and never the cell grid's**, because the cell rectangle
+ * is `imageCells(block, width)` — a function of the render width, which a block
+ * cannot know at construction. A 7x7 attention map is a 7x7 attention map at
+ * every width, and the resample is the renderer's.
+ */
+export type ImageOverlay = Readonly<{
+  /**
+   * Row-major, rectangular, at least 1x1. Finite numbers.
+   *
+   * **Row-major and in the image's orientation** — `values[0][0]` is the
+   * top-left of the picture, which is the only reading that makes a mask line
+   * up with what it masks.
+   */
+  values: readonly (readonly number[])[];
+  /** A `ColormapName`. Absent takes the default, which is stated in one place. */
+  colormap?: string;
+  /**
+   * The scale, **declared rather than derived** — and both or neither.
+   *
+   * Absent, the field normalises over its own extent, which is matplotlib's
+   * `imshow` default and the right one for a single overlay. **It is the wrong
+   * one for a set**: three panels each normalised to their own range draw three
+   * different scales that look like one, and a residual is exactly the case
+   * where the third range is not the other two's. Declaring them is how a
+   * composition shares a scale (§3h.3).
+   */
+  min?: number;
+  max?: number;
+  /**
+   * How much of the composite is the overlay, at `kitty` only. `0..1`.
+   *
+   * **A field one arm reads and the other cannot**, which is stated rather than
+   * hidden: at the dither the picture survives in the glyph and the overlay in
+   * the colour, so there is nothing to blend and no number that would mean
+   * anything. matplotlib's two-`imshow` idiom is the reference and 0.5 its
+   * conventional value.
+   */
+  alpha?: number;
+}>;
 
 /**
  * A declared grid of cells, holding a figure nested rows and columns cannot draw

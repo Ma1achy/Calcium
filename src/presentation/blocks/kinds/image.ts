@@ -8,7 +8,9 @@ import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { columnsForAspect } from "../../plot/aspect.js";
 import { decodePng, ditherAscii, ditherBraille, type Pixels } from "../../image/index.js";
-import { imageId, placementRows } from "../../image/kitty.js";
+import { imageId, imageKey, placementRows } from "../../image/kitty.js";
+import { overlayColour, overlayField } from "../../image/overlay.js";
+import { paint, type Span } from "../paint.js";
 import type { Image } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
@@ -105,13 +107,45 @@ export const imageDefinition: BlockDefinition<Image> = {
     // which is a plausible wrong picture — the failure this arm is built to
     // avoid, and the one a reader cannot diagnose.
     const placed =
-      ctx.capabilities.imageProtocol === "kitty" ? placementRows(imageId(block.digest), cols, rows) : null;
+      ctx.capabilities.imageProtocol === "kitty"
+        ? placementRows(imageId(imageKey(block)), cols, rows)
+        : null;
+    if (placed !== null && "rows" in placed) {
+      // **The overlay is not here at `kitty` and that is the whole ruling**
+      // (C04 §3h.2): the cell's rendering is the terminal's, so it is composited
+      // into the pixels by `transmitImage` before the bytes ever leave L4.
+      return createElement(
+        Box,
+        { flexDirection: "column", width: cols },
+        placed.rows.map((line, i) => createElement(Text, { key: String(i) }, line)),
+      );
+    }
+
+    const dithered =
+      ctx.capabilities.unicode === "ascii" ? ditherAscii(px, cols, rows) : ditherBraille(px, cols, rows);
+
+    // **The dither arm places the overlay** — the glyph carries the picture and
+    // the foreground carries the field, so C10's colormap and its 8-bit floor
+    // apply unchanged. Below the floor `overlayColour` gives nothing and the
+    // picture is drawn plain, which is the honest rung: the cell's other axis is
+    // already spent, so there is nothing to degrade *to* (C10 I31).
     const lines =
-      placed !== null && "rows" in placed
-        ? placed.rows
-        : ctx.capabilities.unicode === "ascii"
-          ? ditherAscii(px, cols, rows)
-          : ditherBraille(px, cols, rows);
+      block.overlay === undefined
+        ? dithered
+        : ((): readonly string[] => {
+            const field = overlayField(block.overlay, cols, rows);
+            return dithered.map((line, r) => {
+              const spans: Span[] = [];
+              // Split by code point: a braille cell and a ramp glyph are both
+              // one cell and one code point, so the index is the column.
+              for (const [c, ch] of [...line].entries()) {
+                const t = field[r]?.[c] ?? 0;
+                const colour = overlayColour(block.overlay as NonNullable<typeof block.overlay>, t, ctx.capabilities);
+                spans.push(colour === undefined ? { text: ch } : { text: ch, style: { colour } });
+              }
+              return paint(spans);
+            });
+          })();
 
     return createElement(
       Box,

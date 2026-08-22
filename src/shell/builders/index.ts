@@ -40,9 +40,11 @@
 import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { samplesChildren, samplesLayout, type Sample, type SamplesOptions } from "./samples.js";
 import { readFileSync } from "node:fs";
-import { digestOf, parseAreas } from "../../data/viewmodel/index.js";
+import { digestOf, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
+import { COLORMAPS } from "../../data/colormaps/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
+  ImageOverlay,
   Action,
   Block,
   Cell,
@@ -964,9 +966,9 @@ function panel(
  */
 function image(
   opts: BlockOpts &
-    Readonly<{ data?: string; path?: string; height: number; alt: string }>,
+    Readonly<{ data?: string; path?: string; height: number; alt: string; overlay?: ImageOverlay }>,
 ): Image {
-  const { data, path, height, alt } = opts;
+  const { data, path, height, alt, overlay } = opts;
   if ((data === undefined) === (path === undefined)) {
     throw new TypeError(
       `b.image: exactly one of "data" or "path" — got ${data === undefined ? "neither" : "both"} (C04 I73)`,
@@ -988,8 +990,25 @@ function image(
         "does not match is a format this cannot draw rather than an image that is broken",
     );
   }
+  // **One refusal, thrown here and pushed by the validator** (C04 I74).
+  if (overlay !== undefined) {
+    const fault = overlayFault(overlay, new Set(Object.keys(COLORMAPS)));
+    if (fault !== null) throw new TypeError(`b.image: ${fault}`);
+  }
   return finish<Image>(
-    { kind: "image", id: idOf(opts, "image"), data: bytes, height, alt, digest: digestOf(bytes) } as Image,
+    {
+      kind: "image",
+      id: idOf(opts, "image"),
+      data: bytes,
+      height,
+      alt,
+      // **The digest stays the data's** and is not widened to cover the overlay
+      // (C04 §3g.2): it keys the decode, and two blocks of one image with
+      // different overlays should decode once. The *picture's* identity is
+      // `imageKey`, derived where it is needed and by one function.
+      digest: digestOf(bytes),
+      ...(overlay === undefined ? {} : { overlay }),
+    } as Image,
     opts,
     false,
   );

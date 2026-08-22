@@ -41,6 +41,7 @@ import {
   type ViewDocument,
 } from "./types.js";
 import { parseAreas } from "./mosaic.js";
+import { overlayFault } from "./overlay.js";
 import { parseStartDate } from "../dates.js";
 import { isContainerKind } from "./tree.js";
 // **The entries, not the names.** `COLORMAP_SET` above answers *is this a map*;
@@ -1089,6 +1090,13 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     }
     if (typeof b["digest"] !== "string" || b["digest"] === "") {
       e.push(`${at}: "digest" is derived at construction and must be present (C04 I73)`);
+    }
+    // **The same refusal the builder throws** (C04 I74), from one function — the
+    // mosaic's lesson, where a gate that landed on one side produced an
+    // invariant true at the builder and vacuous at the boundary.
+    if (b["overlay"] !== undefined) {
+      const fault = overlayFault(b["overlay"], new Set(Object.keys(COLORMAPS)));
+      if (fault !== null) e.push(`${at}: ${fault}`);
     }
   },
   /**

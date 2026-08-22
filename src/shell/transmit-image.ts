@@ -24,7 +24,9 @@
  * Property 3 is why the arm survives either answer. The first real-terminal test
  * is where it is checked, beside the plane-16 width guarantee.
  */
-import { imageId, payload, transmit } from "../presentation/image/kitty.js";
+import { imageId, imageKey, payload, transmit, transmitRgba } from "../presentation/image/kitty.js";
+import { compositeOverlay } from "../presentation/image/overlay.js";
+import { decodePng } from "../presentation/image/index.js";
 import type { Block, Image } from "../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
@@ -70,14 +72,34 @@ export function transmitImage(
   for (const block of blocks) imagesIn(block, found);
   let out = "";
   for (const image of found) {
-    if (sent.has(image.digest)) continue;
-    sent.add(image.digest);
+    // **Keyed by the picture and not by the data** (C04 I74). An overlay makes
+    // the transmitted picture a function of two things, and keying on the digest
+    // alone means two blocks of one image with different overlays transmit once
+    // and both draw the first — the wrong picture rather than none.
+    const key = imageKey(image);
+    if (sent.has(key)) continue;
+    sent.add(key);
     const bytes = Uint8Array.from(Buffer.from(image.data, "base64"));
     // The declared cell box is the placement's, and the renderer derives the
     // same numbers from the same block — so a mismatch here would be two
     // computations of one figure. `c` and `r` are advisory to kitty; the
     // placeholders are what address the cells.
-    out += transmit(imageId(image.digest), payload(bytes), 1, image.height);
+    if (image.overlay === undefined) {
+      out += transmit(imageId(key), payload(bytes), 1, image.height);
+      continue;
+    }
+    // **The composited arm** (C04 §3h.2). The decode is here rather than in the
+    // renderer because this is the only place the overlaid pixels exist: the
+    // renderer draws placeholders at `kitty` and never looks at a pixel.
+    //
+    // **A picture that does not decode falls through to the plain bytes.** The
+    // renderer's `alt` fallback is what the reader gets, and refusing here would
+    // leave a placement with no transmission — nothing drawn, blamed on the
+    // image. The overlay is lost and the picture is not.
+    const decoded = decodePng(bytes);
+    out += decoded.ok
+      ? transmitRgba(imageId(key), compositeOverlay(decoded.pixels, image.overlay), 1, image.height)
+      : transmit(imageId(key), payload(bytes), 1, image.height);
   }
   return out;
 }

@@ -18,6 +18,9 @@
  * **The failure this shape avoids is the one that is hard to notice**: placement
  * without transmission draws nothing at all, and a reader would blame the image.
  */
+import { deflateSync } from "node:zlib";
+import { digestOf } from "../../data/viewmodel/digest.js";
+import type { Image } from "../../data/viewmodel/types.js";
 import type { Pixels } from "./codec.js";
 
 /** The placeholder. One cell wide by `cells()` and by Ink's layout (F247). */
@@ -65,6 +68,66 @@ export function imageId(digest: string): number {
 }
 
 /**
+ * **The picture's identity, which is not the image's** (C04 I74).
+ *
+ * `digest` is the *data's* — that is what §3g.2 specifies and what the decode
+ * memo needs, since two blocks holding one image should decode once. **An
+ * overlay makes the transmitted picture a function of two things**, and keying
+ * on the data alone is a measured defect rather than an inefficiency: two blocks
+ * of one image with different overlays share a digest, the second is found in
+ * the sent set, nothing is transmitted, and **both placements draw the first
+ * block's overlay**. That is the wrong picture rather than no picture, which is
+ * the failure this whole arm is built to avoid.
+ *
+ * One function and two callers — the renderer's id and the shell's sent set —
+ * because two computations of one figure is how they would come to disagree.
+ */
+export function imageKey(block: Image): string {
+  return block.overlay === undefined
+    ? block.digest
+    : digestOf(`${block.digest}\u0000${JSON.stringify(block.overlay)}`);
+}
+
+/** The largest escape kitty accepts for a direct transmission, in bytes. */
+const CHUNK = 4096; // cells-ok — a byte count
+
+/**
+ * A transmission, **chunked**, because one escape has a length limit.
+ *
+ * **Found by building the composited arm and true of the arm that shipped.**
+ * Direct transmission (`t=d`) caps an escape at 4096 bytes, and the payload
+ * continues in further escapes carrying `m=1` until a final `m=0`. Phase 1
+ * emitted one escape with the whole payload, which is correct for the 70-byte
+ * corpus fixture and wrong for every real image — and the failure is *nothing
+ * drawn*, which no in-repo test can see because no in-repo test has a terminal.
+ *
+ * **A protocol claim, in the plane-16 class** (C09 §4c): it is not measurable
+ * here and the first real-terminal test is where it is checked. The chunked form
+ * is correct under both readings, which is why it is taken now — an unchunked
+ * escape is wrong if the limit is real and merely verbose if it is not.
+ */
+function chunked(opts: string, body: string): string {
+  const esc = String.fromCharCode(27);
+  // The options ride on the first escape only; continuations carry `m` alone,
+  // which is the format's rule and the reason `m=1` cannot be folded into
+  // `opts` for the single-chunk case.
+  // `ESC_G` (2) + `,m=1` (4) + `;` (1) + `ESC\\` (2). Counted rather than
+  // rounded: a reserve one byte short puts every first chunk at 4097, which is
+  // over a limit written down four lines above it.
+  const room = Math.max(1, CHUNK - opts.length - 9); // cells-ok — a byte count
+  const parts: string[] = [];
+  for (let i = 0; i < body.length; i += room) parts.push(body.slice(i, i + room)); // cells-ok — a byte index
+  if (parts.length === 0) parts.push(""); // cells-ok — a chunk count
+  let out = "";
+  for (const [i, part] of parts.entries()) {
+    const more = i < parts.length - 1 ? 1 : 0; // cells-ok — a flag
+    const head = i === 0 ? `${opts},m=${String(more)}` : `m=${String(more)}`;
+    out += `${esc}_G${head};${part}${esc}\\`;
+  }
+  return out;
+}
+
+/**
  * The transmit-and-create-a-virtual-placement escape.
  *
  * `f=100` is PNG, which is the only format the codec reads; `q=2` suppresses the
@@ -74,9 +137,30 @@ export function imageId(digest: string): number {
  * drawn at the cursor, which is the whole distinction from iTerm2 and sixel.
  */
 export function transmit(id: number, png: string, cols: number, rows: number): string {
-  const esc = String.fromCharCode(27);
   const opts = `a=T,f=100,t=d,i=${String(id)},U=1,c=${String(cols)},r=${String(rows)},q=2`;
-  return `${esc}_G${opts};${png}${esc}\\`;
+  return chunked(opts, png);
+}
+
+/**
+ * The same placement from **raw pixels**, which is what an overlay forces.
+ *
+ * **Raw rather than a re-encoded PNG, and that is a ruling.** Compositing
+ * happens after the decode, so the bytes on hand are RGBA; emitting a PNG would
+ * mean writing an encoder — a compressor, five filter heuristics and a CRC — to
+ * hand the terminal something it will immediately decompress. `f=32` with
+ * `s`/`v` is the format's own answer, and `o=z` puts the bytes through the
+ * `node:zlib` the codec already depends on, so this costs no dependency row.
+ *
+ * **The cost is stated**: raw RGBA deflates worse than a PNG of the same picture,
+ * because a PNG filters before it deflates. This arm is `kitty`'s and `kitty` is
+ * a local terminal, so the bytes are a pipe write rather than a network one.
+ */
+export function transmitRgba(id: number, px: Pixels, cols: number, rows: number): string {
+  const z = deflateSync(Buffer.from(px.data));
+  const opts =
+    `a=T,f=32,t=d,o=z,s=${String(px.width)},v=${String(px.height)},` +
+    `i=${String(id)},U=1,c=${String(cols)},r=${String(rows)},q=2`;
+  return chunked(opts, z.toString("base64"));
 }
 
 /**

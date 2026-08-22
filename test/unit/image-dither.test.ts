@@ -8,9 +8,10 @@
  * arrangement, and only the frame shows it.
  */
 import { describe, expect, it } from "vitest";
+import { rgbPng } from "../support/png.js";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { deflateSync, inflateSync } from "node:zlib";
+import { inflateSync } from "node:zlib";
 import { decodePng, ditherAscii, ditherBraille, bayer, luminance, DITHER_ASCII, type Pixels } from "../../src/presentation/image/index.js";
 
 /** A PNG from `sharp`, which already drives `tools/catalogue-png.mjs`. */
@@ -33,81 +34,6 @@ function synth(w: number, h: number, f: (x: number, y: number) => readonly [numb
     }
   }
   return { width: w, height: h, data };
-}
-
-/**
- * A PNG whose scanlines use **every** filter type, hand-encoded.
- *
- * **Because the encoder would not.** `sharp` wrote filter 0 on every row of the
- * gradient fixture — measured, `filters sharp used: 0` — so ID2 asserted against
- * a decoder path it never entered, and a mutation breaking Paeth survived it.
- * Choosing the filters here makes each arm reachable by construction rather than
- * by hoping an encoder picks it.
- */
-function pngWithEveryFilter(w: number, h: number, px: (x: number, y: number) => number): Uint8Array {
-  const stride = w * 3;
-  const raw = Buffer.alloc((stride + 1) * h);
-  const prior = Buffer.alloc(stride);
-  for (let y = 0; y < h; y += 1) {
-    const kind = y % 5; // 0 None, 1 Sub, 2 Up, 3 Average, 4 Paeth
-    const line = Buffer.alloc(stride);
-    for (let x = 0; x < w; x += 1) {
-      const v = px(x, y);
-      line[x * 3] = v;
-      line[x * 3 + 1] = v;
-      line[x * 3 + 2] = v;
-    }
-    raw[y * (stride + 1)] = kind;
-    for (let i = 0; i < stride; i += 1) {
-      const cur = line[i] ?? 0;
-      const a = i >= 3 ? (line[i - 3] ?? 0) : 0;
-      const b = prior[i] ?? 0;
-      const c = i >= 3 ? (prior[i - 3] ?? 0) : 0;
-      let out = cur;
-      if (kind === 1) out = cur - a;
-      else if (kind === 2) out = cur - b;
-      else if (kind === 3) out = cur - ((a + b) >> 1);
-      else if (kind === 4) {
-        const pp = a + b - c;
-        const pa = Math.abs(pp - a);
-        const pb = Math.abs(pp - b);
-        const pc = Math.abs(pp - c);
-        out = cur - (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
-      }
-      raw[y * (stride + 1) + 1 + i] = out & 0xff;
-    }
-    line.copy(prior);
-  }
-  const chunk = (type: string, body: Buffer): Buffer => {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(body.length);
-    const tagged = Buffer.concat([Buffer.from(type, "ascii"), body]);
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(crc32(tagged) >>> 0);
-    return Buffer.concat([len, tagged, crc]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0);
-  ihdr.writeUInt32BE(h, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 2;
-  return new Uint8Array(
-    Buffer.concat([
-      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-      chunk("IHDR", ihdr),
-      chunk("IDAT", deflateSync(raw)),
-      chunk("IEND", Buffer.alloc(0)),
-    ]),
-  );
-}
-
-function crc32(buf: Buffer): number {
-  let c = ~0;
-  for (const byte of buf) {
-    c ^= byte;
-    for (let k = 0; k < 8; k += 1) c = (c >>> 1) ^ (0xed_b8_83_20 & -(c & 1));
-  }
-  return ~c;
 }
 
 /** The per-row filter byte of every scanline, read off the inflated stream. */
@@ -157,7 +83,10 @@ describe("ID — the codec", () => {
     // **A gradient is what exercises the filters.** A flat colour encodes as
     // filter 0 on every row; a gradient makes the encoder reach for Sub, Up and
     // Paeth, which is where a decoder that never read the row above breaks.
-    const bytes = pngWithEveryFilter(32, 16, (x, y) => (x * 8 + y * 16) & 0xff);
+    const bytes = rgbPng(32, 16, (x, y) => {
+      const v = (x * 8 + y * 16) & 0xff;
+      return [v, v, v];
+    });
     const r = decodePng(bytes);
     expect(r.ok, r.ok ? "" : r.fault).toBe(true);
     if (!r.ok) return;

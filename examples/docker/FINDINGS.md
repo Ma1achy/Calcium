@@ -12623,3 +12623,111 @@ overlay — needs both at once.
 **Third correction of a same-session ruling in this phase** — after the mosaic's clip, `graph`'s
 clamp and the APC transmission — and the first where the falsifier was a comment I had written
 myself rather than a measurement I had not taken.
+
+## F251 — the picture's identity is not the image's, and the digest that was right became wrong ★★★★★
+
+**§3g.2 rules the identity a digest of the *data*, and gives three reasons that are all correct.**
+A megabyte of base64 in a cache key costs more than it saves; two blocks holding the same pixels
+should hit; the same block re-encoded should not miss. The kitty arm keys transmission on it, so
+one image in two blocks transmits once — and that is exactly what §3g.2 exists to buy.
+
+**The overlay makes the transmitted picture a function of two things, and nothing said so.** At
+`kitty` the overlay is composited into the pixels before transmission (§3h.2), so two blocks
+holding *one image* with *different overlays* share a digest. The second is found in the sent set,
+nothing is transmitted, and **both placements draw the first block's overlay**.
+
+**The wrong picture rather than no picture**, which is the failure this whole arm is built to
+avoid and the one a reader cannot diagnose: nothing drawn sends them to the image, and the wrong
+one sends them nowhere. Both frames are internally consistent; every count agrees.
+
+**The fix is one exported function and two callers** — `imageKey`, read by the renderer's id and by
+the shell's sent set — because two computations of one figure is how the two would come to disagree
+about which picture they were talking about. `digest` stays the data's, since it also keys the
+*decode*, and two blocks of one image should still decode once.
+
+**The shape.** *An identity is correct with respect to the things that existed when it was
+specified.* Adding a field that participates in what the identity identifies does not make the old
+reasoning wrong — every sentence in §3g.2 is still true — it makes the **scope** wrong, and a
+scope is what review does not check. The question that reaches it is not *is this digest right*
+but **what is this digest the identity of, and is that still the thing being sent**.
+
+## F252 — an escape with a length limit, emitted whole; correct for the fixture and wrong for every real image ★★★★☆
+
+**kitty's direct transmission caps an escape at 4096 bytes**, and the payload continues in further
+escapes carrying `m=1` until a final `m=0`. Phase 1's `transmit` emitted one escape with the entire
+base64 payload.
+
+**It passed everything, because the corpus fixture is an 8×8 PNG.** Seventy bytes of base64 fits
+comfortably, so IK2's structural assertions about `a=T`, `f=100`, `U=1` and the payload's position
+were all satisfied by a string that is legal at that size and illegal at any useful one. **No
+in-repo test can see this**, because no in-repo test has a terminal — it is the plane-16 class
+(C09 §4c), and the first real-terminal test is where it is checked.
+
+**Found by building the composited arm**, which sends raw RGBA rather than PNG and is therefore
+*larger*: 7595 bytes for a 64×32 picture against 1741 for the same image as PNG. Thinking about the
+payload size is what raised the question; the question is what found the shipped defect.
+
+**Taken now rather than deferred, on the asymmetry rather than on certainty.** The chunked form is
+correct under both readings of the limit — right if it is real, merely verbose if it is not — and
+the failure without it is *nothing drawn*, blamed on the image.
+
+**And the reserve was off by one in the first draft.** `CHUNK - opts.length - 8` against a frame
+that is `ESC_G` (2) + `,m=1` (4) + `;` (1) + `ESC\` (2) = **9**, so every first chunk came out at
+4097 — one byte over a limit named four lines above it. The row that found it is the one that
+asserted the limit rather than the chunking: *no escape exceeds 4096*. **An assertion about the
+mechanism agrees with an off-by-one; only an assertion about the bound disagrees.**
+
+## F253 — a shared scale is not a property any panel has, and two of three predictions were wrong ★★★★★
+
+**§3h closed with a claim** — *none of the three compositions needs a mechanism this section does
+not already have* — and the three were built to test it, each the way a consumer would, from `b`
+and nothing else. **Two predictions were wrong and the surviving one is the finding.**
+
+| | predicted | measured |
+|---|---|---|
+| image + histogram | breaks the claim outright | **composes**, nothing added |
+| before / after / residual | needs a mechanism | **breaks the claim** |
+| confusion matrix | composes | **composes** |
+
+**The histogram's premise was wrong, not its reasoning.** *The pixels live behind `pixelsOf` in
+`presentation/` and a plot's data lives in the document, with no seam between them* — all true, and
+irrelevant, because **the consumer already holds the pixels**. An ML reader has an array; they
+encode a PNG to *show* it, and the histogram is of the array they had before there was a PNG. The
+seam the prediction went looking for is one nobody needs to cross. **A layering argument can be
+exactly right about the layers and wrong about who is standing in them.**
+
+**The residual is the one that breaks it, and the frame is the argument.** Two panels spanning
+`0.7..157.7` and their difference spanning `0.7..14.1`. Read on its own extent — matplotlib's
+`imshow` default, and the obvious implementation — the residual's hottest cell renders at luminance
+**202** against the before panel's **224**. A fourteen-unit difference drawn as loud as a
+hundred-and-fifty-eight-unit signal, beside the two pictures it is the difference of. Declared on
+one scale: **13**.
+
+**Both frames are internally consistent and only one is true.** Each panel is correct alone, each
+normalisation is correct alone, and **the composition is where the falsehood appears** — which is
+why no walk of the image block reaches it, and why the measurement had to be the composition and
+not the part. The mechanism is `min`/`max` on the overlay, declared as a pair because one bound
+alone is half a scale.
+
+**The residue image + histogram leaves is a surface rather than a rendering.** `b.image({ path })`
+reads a file, so *that* consumer never sees a pixel and `decodePng` is not on C24's surface: they
+can show the picture and plot nothing about it. Recorded with a row that fails the day the export
+lands, because a negative claim passes hardest the day it becomes false.
+
+## F254 — an assertion that sees one encoding of a thing reports its absence ★★★☆☆
+
+**IO3 asks the sharpest question the overlay has**: below 8-bit is the field *absent*, or is it
+drawn in a vocabulary that says something it should not? The row read the frame for foreground
+colours with `\[38;2;` — the 24-bit SGR form — and reported **nothing drawn at 8-bit**, which is
+where `continuousColour` quantises to the 256-cube and emits `38;5;N`.
+
+**The reading was of the matcher, not of the frame.** A control is what separated them: the same
+row asserts the picture's glyphs are unchanged, and they were — so the cells existed and something
+about them was invisible to the instrument rather than missing from the output.
+
+**The shape is the fixture rule pointed at an assertion.** *A fixture must be shown to respond to
+the thing under test before it is asserted against* — and a matcher is a fixture. A regex that can
+see one encoding of the value it measures cannot distinguish **the rung is absent** from **the rung
+is a different escape**, and absence is exactly what the row was written to establish. The
+degradation ladder is the worst place for it, because every rung below the top is a different
+encoding by construction.
