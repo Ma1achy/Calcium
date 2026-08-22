@@ -11982,3 +11982,106 @@ true and the reader's inference is not.
 
 **Read before anything else is read through it**, which is why this lands ahead of F240's fix
 rather than beside it.
+
+
+## F242 — the layout that cannot collide, and the sweep count that is a number rather than a recipe ★★★★☆
+
+Three measurements taken before `graph`'s design rested on them, over 360 graphs — three densities
+(near-path, dense ~1/3, complete) × three sizes (12, 20, 50) × 40 seeded trials, deterministic.
+
+### 1 · Label collisions are not expressible under `layered`, and that is the whole case for it
+
+**Zero, in all 360.** A layered layout lays a layer's labels side by side with a gap, so two labels
+cannot overlap; the failure mode is the layer being **wider than the terminal**, which is overflow
+and has an answer. `force` places nodes continuously and was refused **on the labels alone** — one
+pair in six overlapping at a third of the edges present, n = 20 — so this is the same question
+asked of the layout being kept, and it comes back clean for a structural reason rather than a
+lucky one.
+
+**So the refusal and the choice are one measurement read twice**, which is worth saying because
+the refusal has already been moved once, off the edges and onto the labels, and a reason that
+survives being re-asked of the alternative is a stronger reason than one that was never tested.
+
+### 2 · What fits, so the drop threshold is chosen
+
+```
+kind          n   reversed  layers  width(med)  fits 80x24  fits 120x30
+near-path    12        0.5     5.6          38        100%         100%
+near-path    20        0.3     6.7          58        100%         100%
+near-path    50        0.5     9.1         136          0%          28%
+dense        12        3.0     7.5          29        100%         100%
+dense        20       20.9    15.6          42          0%          53%
+dense        50      190.6    45.5         203          0%           0%
+complete     12       28.9    12.0          38        100%         100%
+complete     20       90.5    20.0          98          0%           0%
+complete     50      608.3    50.0         608          0%           0%
+```
+
+**`+N more` is the ordinary case past about a dozen nodes, not an edge case.** At 80 columns a
+near-path graph fits to 20 and a dense one stops at 12. That makes I8's notice row load-bearing
+for this form rather than a courtesy, and it is why the row is spent before the drawing is chosen
+rather than clamped in afterwards.
+
+**The `reversed` column is a property of this corpus and not of real data**, and is recorded that
+way: the generator assigns each edge a random direction, so cycles are manufactured. What it
+establishes is that the pass must **exist** and be correct — nothing in a node-and-edge shape
+forbids a cycle — not how often it fires on a dependency graph.
+
+### 3 · Two sweeps ends worse than one, in a whole family
+
+```
+kind          n     none      one      two      one vs none      two vs one
+near-path    12      7.2      1.3      1.0      0/40 worse       3/40 worse
+near-path    20     25.8      4.3      3.1      0/40 worse       3/40 worse
+near-path    50    194.4     36.5     38.1      0/40 worse      17/40 worse
+dense        20    780.8    187.1    147.7      0/40 worse       1/40 worse
+complete     20  12588.6   2583.8   2397.1      0/40 worse       1/40 worse
+```
+
+**One sweep never hurts — 0 of 40 in every cell — and cuts crossings four- to fivefold.** The
+second is where a fixed count stops being safe: at near-path n = 50 the mean **rises**, 36.5 to
+38.1, and 17 trials of 40 come out worse than they went in. *Two sweeps* was a recipe, and the
+recipe is non-monotone.
+
+Extended to six, plain against **best-kept** — keep the ordering with the fewest crossings seen
+rather than the last one produced:
+
+```
+kind          n  |  plain   0      1      2      3      4      6  | best-kept  2      3      4      6
+near-path    50  |       194     37     38     32     35     33  |           34     31     30     29
+dense        20  |       781    187    148    139    134    133  |          148    135    129    127
+complete     12  |      1240    270    233    210    196    187  |          233    210    193    187
+```
+
+**Ruled: two sweeps, best-kept.** Three reasons, measured:
+
+- **Best-kept makes it monotone by construction**, for one crossing count and one array copy per
+  sweep — so the family where two was worse than one cannot occur at all.
+- **Past two the marginal gain is small**: 3–6% a sweep against a linear cost, where the first
+  sweep buys 80%.
+- **And at the sizes that fit a terminal it is already at the floor.** Probe 2 says a readable
+  graph is n ≲ 20; near-path 12 reaches 1 crossing at sweep 1 and stays, near-path 20 reaches 3 at
+  sweep 2 and stays. The extra sweeps only improve graphs that cannot be drawn — `complete` 12
+  goes 233 → 187, which is 20% of a number no reader can use.
+
+**The number is chosen and the argument is attached**, so a later change that makes sweeps cheaper
+has something to overturn rather than a convention to inherit.
+
+### 4 · The instrument's own invariants, and the third gap in the recipe
+
+Checked over the same 360 graphs rather than assumed:
+
+```
+cyclic     0     every edge runs strictly forward after removal — the pass yields a real DAG
+span       0     after dummies, every segment spans exactly one layer
+lostNode   0     every real node appears exactly once
+dupEdge   24     <-- a two-node cycle reversed onto an edge that already existed
+```
+
+**The stated recipe — *layer assignment by longest path, ordering by median heuristic, two
+sweeps* — is short by three passes, and the third came from checking the instrument rather than
+from reading the recipe.** Cycle removal and dummy nodes are structural and were named before the
+probe ran; **deduplication after reversal was not.** Reversing `b→a` where `a→b` already exists
+yields the same edge twice, which is drawn twice, counted twice in every crossing figure above,
+and looks exactly like a correct edge. 24 in 360 is small and the point is that nothing in the
+recipe asks.
