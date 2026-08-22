@@ -155,7 +155,7 @@ describe("phase 2 · the three compositions, against §3h's claim", () => {
     const lo = Math.min(...[beforeField, afterField, diffField].flat(2));
     const hi = Math.max(...[beforeField, afterField, diffField].flat(2));
     const shared = (values: number[][], id: string): Block =>
-      b.image({ id, data: before.png, height: 6, alt: id, overlay: { values, min: lo, max: hi } });
+      b.image({ id, data: before.png, height: 6, alt: id, overlay: { values, yMin: lo, yMax: hi } });
 
     const panels = (make: (v: number[][], id: string) => Block): Block =>
       b.group("row", [make(beforeField, "b"), make(afterField, "a"), make(diffField, "r")]);

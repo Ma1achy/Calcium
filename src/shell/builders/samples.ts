@@ -21,7 +21,8 @@
  * that forbids a *plot* deriving a height from a width, and an image's clamp
  * already does the opposite for its own reasons (C04 I73 §3g.3).
  */
-import type { Block, Image, Mosaic, Share } from "../../data/viewmodel/index.js";
+import { sharedRange } from "../../data/viewmodel/index.js";
+import type { Block, Image, ImageOverlay, Mosaic, Share } from "../../data/viewmodel/index.js";
 
 /** The characters `areas` can name a region with — 62, measured. */
 const POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -35,6 +36,17 @@ export type Sample = Readonly<{
   alt: string;
   /** The caption under the picture — a prediction, a score, a class. */
   label: string;
+  /**
+   * A field over this picture — an attention map, a saliency mask (C04 I74).
+   *
+   * **The builder pins the scale across the whole set** and that is the reason
+   * it is here rather than left to the caller: a grid of attention maps each
+   * normalised to its own extent draws N different scales that look like one,
+   * which is F253 arriving in the composition this builder exists for. A caller
+   * who pins a bound themselves keeps it — theirs is a statement about the
+   * world, and the computed one is only a default.
+   */
+  overlay?: ImageOverlay;
 }>;
 
 export type SamplesOptions = Readonly<{
@@ -125,12 +137,49 @@ export function samplesChildren(
   return out;
 }
 
+/**
+ * Every overlay in the set, read on **one** scale (C04 I74, F253).
+ *
+ * **A caller's own pin wins.** `yMin: 0` on one item is a statement about the
+ * world — *zero means zero* — and a computed default that overrode it would be
+ * this builder deciding something the caller already decided. So the set's range
+ * fills only the bounds nobody named, which is exactly `pinnedRange`'s rule one
+ * level up.
+ *
+ * **Returns the items unchanged when none carries an overlay**, so the common
+ * case allocates nothing and the grid is the same object it always was.
+ */
+export function samplesScale(items: readonly Sample[]): readonly Sample[] {
+  const fields = items.flatMap((i) => (i.overlay === undefined ? [] : [i.overlay.values]));
+  if (fields.length === 0) return items;
+  const pin = sharedRange(fields);
+  return items.map((item) =>
+    item.overlay === undefined
+      ? item
+      : {
+          ...item,
+          overlay: {
+            ...item.overlay,
+            yMin: item.overlay.yMin ?? pin.min,
+            yMax: item.overlay.yMax ?? pin.max,
+          },
+        },
+  );
+}
+
 /** The narrowed shape the builder hands back, so `b.samples` returns a `Mosaic`. */
 export type SamplesResult = Mosaic;
 
 /** What a caller needs to construct the two block kinds this composes. */
 export type SamplesMakers = Readonly<{
-  image: (opts: { id: string; data?: string; path?: string; height: number; alt: string }) => Image;
+  image: (opts: {
+    id: string;
+    data?: string;
+    path?: string;
+    height: number;
+    alt: string;
+    overlay?: ImageOverlay;
+  }) => Image;
   raw: (text: string, opts?: { id?: string }) => Block;
   mosaic: (opts: {
     id?: string;

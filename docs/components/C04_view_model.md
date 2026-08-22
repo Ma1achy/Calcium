@@ -1771,6 +1771,57 @@ counted separately because it was ruled before any of the three were built, and 
 arms are two renderings rather than two rungs.
 
 
+### 3h.4 — the ruling: it is the plot family's pinned range, and the name is theirs
+
+**A composition of images that are the difference of each other must share a normalisation**, and
+§3h.3 measured what happens when it does not. The mechanism is ruled in two halves, because a
+consumer composing three `b.image` blocks by hand should be able to say it and a consumer building
+a grid should not have to.
+
+| | |
+|---|---|
+| **the field** | `yMin` / `yMax` on `ImageOverlay`, independently optional. What makes a shared scale expressible with no builder at all |
+| **the builder** | `b.samples` pins the set's range across every item carrying an overlay, and a caller's own bound wins. `sharedRange` is on C24's surface for every other composition |
+
+**And it is not a new pair of members — C12 had already ruled the equivalence, and said so.**
+`heatmap.ts` carries the sentence that decides the name:
+
+> There is no `yMin`/`yMax` arm: on a field those two pin the **value** range — the levels and the
+> colour scale — and spending them on the ordinate as well would give one pair of members two
+> meanings on one form.
+
+**A field form spends `yMin`/`yMax` on the reading rather than on the ordinate.** An overlay *is* a
+field form — a scalar field over a grid, read through a colormap — that happens to sit over a
+picture. So this is the same mechanism on the same kind of datum, and `seriesRange`'s own comment
+is F253 written down before F253 was measured: *a pinned axis exists so two plots can be compared,
+and a range that grew to fit an outlier would defeat the only reason to pin one.*
+
+**Three of the four local decisions were worse versions of answers C12 already held**, which is the
+part worth carrying:
+
+| the local answer | the family's | why the family's is right |
+|---|---|---|
+| `min` / `max` | `yMin` / `yMax` | one pair of members, one meaning, already ruled for fields |
+| both or neither | independently optional | `yMin: 0` alone is a real single-panel use — *zero means zero* rather than *the least value observed means zero*, exactly as a loss curve pins its floor |
+| a constant field is `{v, v+1}` | `{v, v}`, drawn **mid-ramp** | `{v, v+1}` puts a field that never varied at the *bottom* of the scale, which says *all minimum* about data that says nothing |
+| a reversed pin is refused | collapses to a constant | C12 I2 — no series input throws, and a pin is series input by another route |
+
+**The fourth was right and is the reason the other three were reachable**: a pinned bound
+*replaces* rather than widens.
+
+**One resolver, not two that rhyme.** `pinnedRange` moved to `data/viewmodel/range.ts` and
+`seriesRange` calls it, because two computations of one figure is how the plot and the image would
+come to disagree about what a value means. **The extraction landed with zero golden frames
+changing**, which is the only evidence that a refactor of a resolver 47 forms depend on was a
+refactor.
+
+**The shape.** *A local answer and a family answer read identically when only the local one is in
+front of you.* Every one of the four was defensible, three were wrong, and what separated them was
+not review — it was going to look at whether the mechanism already existed. That is the sixth blind
+spot pointed at a **member** rather than at a claim: not *where is this written down*, but **who
+else already solved this, and did they call it something**.
+
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -2079,7 +2130,7 @@ persisted document rests on.
 - **I71** — **A mosaic is a grid named by a string, and it exists because nested rows and columns draw only slicing figures.** `areas` splits rows on `/`, one character per column, `.` a hole; the distinct regions in reading order map onto `children` positionally, and the field is **`children`** because `validate.ts`'s `childBlocksOf` recurses structurally on that name and skips any other in silence. **Four refusals at both gates**, each naming the part at fault: an empty grid, ragged rows, a region that is not a solid rectangle, and a region count differing from `children.length` — the third is the one a reader cannot see, since `"ABA"` names a region in two pieces and reads as ordinary. **`height` is required and positive**, because measured rather than argued a container of absolutely positioned children computes a content height of zero and draws **one blank row** (F244 §2) — `Scroll.height`'s precedent, with a sharper reason: a scroll without one is unbounded and a mosaic without one is empty. `measure` returns `height` at every width.
 - **I72** — **The grid's two axes divide by `Share`, and a spanning region takes the sum of what it spans.** `columns` and `rows` are one entry per grid line rather than per child, so a region covering two columns is weighted by both; absent is an equal split, a mismatched length is refused on `flex`'s precedent, and fixed `{cells: n}` shares come off the budget before the weights divide the remainder because any other order makes a cell count a suggestion (I44). **The arithmetic is extracted and not copied** — one `divideShares` for the group's widths and both of the mosaic's axes — which is the four-gutter hazard of `presentation/plot/` named where it can still be avoided. **The vertical axis is the new half**: a column group has no height to divide, because its height is what its children measure; a mosaic declares one, so `rows` divides a known budget with the same rule against a different total. **The remainder is distributed after the division and not inside it** — `facetWidths`' ruling, because a mosaic tiles and its lines must reach the edge, while a `row` group has a gutter and T3.16 pins its remainder where it is; the leftover goes one cell each to the earliest non-fixed lines, so a cell count stays a cell count. **A shared scale across cells is refused and `yMin`/`yMax` are the answer** (I29), because harmonising means measuring both children's data before laying either out — a pass over content this layer does not read — and the field that says it already exists.
 - **I73** — **An image is a block that declares rows and carries bytes, an identity and an `alt`.** It measures, scrolls, degrades and caches like every other kind, which F247 and F248 established before it was designed: `cells(placeholder)` is 1, the diacritics add 0, Ink lays out what `cells()` measures, Ink re-emits the full frame on a one-row change, and both `truncate` and the window leave the grid addressing correctly. **`path` is the builder's arm and `data` is the block's**, because `node:fs` appears nowhere in `src/presentation/` and a renderer reading a file would make `measure` and `render` disagree the moment the file changed between them. **The identity is a digest computed once at construction, never the data** — a megabyte of base64 in a cache key costs more than it saves, and the digest is what the protocol keys transmission on, so two blocks of one image transmit once. **The width is derived from `columnsForAspect` and clamped by `measure`**, which receives the width: over-drawing here is worse than wrong, because a placeholder outside its rectangle addresses part of an image the terminal is not drawing there (C09 I35, F245). **Refused at both gates**, each naming its part: neither `data` nor `path`, both together, a non-positive `height`, an empty `alt`, bytes that are not a PNG, and a decoded size past a cap. **`alt` is required rather than optional** because at `imageProtocol: "none"` with no dither it is the whole of what the reader receives.
-- **I74** — **An overlay is a scalar field over an image's cell rectangle, and its rendering differs by arm.** At the dither this framework owns the glyph and the colour, so the braille cell carries the picture and the foreground carries the field, with C10's colormap and its 8-bit floor applying unchanged and **no rung beneath it**: the cell's other axis is spent on the picture, and a threshold-to-tone fallback would put a binary mask on screen wearing a continuous field's clothes. At `kitty` the cell's rendering is the terminal's — the two diacritics are spent on position and the 24-bit foreground on the image id — so the overlay is **composited into the pixels before transmission**, which gives up the palette and the degradation at `kitty` specifically and loses nothing, because there is nothing below `kitty` for it to degrade *to*. **The values are the author's resolution and never the cell grid's**, since the rectangle is a function of the render width; the resample averages, because a point sample turns a gradient into a staircase and can lose a single hot cell entirely. **The scale is declared or derived, both bounds or neither**: a derived one is right for a single overlay and wrong for a set, and §3h.3 measures the residual that a per-panel extent draws as loud as the panels it is the difference of. **The picture's identity is not the image's** — `digest` keys the decode and `imageKey` keys the transmission, because two blocks of one image with different overlays otherwise transmit once and both draw the first, which is the wrong picture rather than none. **Refused at both gates from one function**: a non-rectangular or empty matrix, a non-finite value, an unknown colormap, half a scale, an inverted one, and an alpha outside `0..1` (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
+- **I74** — **An overlay is a scalar field over an image's cell rectangle, and its rendering differs by arm.** At the dither this framework owns the glyph and the colour, so the braille cell carries the picture and the foreground carries the field, with C10's colormap and its 8-bit floor applying unchanged and **no rung beneath it**: the cell's other axis is spent on the picture, and a threshold-to-tone fallback would put a binary mask on screen wearing a continuous field's clothes. At `kitty` the cell's rendering is the terminal's — the two diacritics are spent on position and the 24-bit foreground on the image id — so the overlay is **composited into the pixels before transmission**, which gives up the palette and the degradation at `kitty` specifically and loses nothing, because there is nothing below `kitty` for it to degrade *to*. **The values are the author's resolution and never the cell grid's**, since the rectangle is a function of the render width; the resample averages, because a point sample turns a gradient into a staircase and can lose a single hot cell entirely. **The scale is `yMin`/`yMax` — the plot family's members, resolved by the plot family's function** (I29, §3h.4): independently optional, replacing rather than widening, collapsing to a constant on a reversed pin, and drawn mid-ramp at a zero span. `heatmap.ts` had already ruled that a field form spends those two on the **value** range rather than on the ordinate, and an overlay is a field form over a picture. A derived range is right for a single overlay and wrong for a set: §3h.3 measures the residual that a per-panel extent draws as loud as the panels it is the difference of, and `sharedRange` is what a set is read on — computed by `b.samples` across its items, on C24's surface for every other composition, and **a caller's own bound always wins**. **The picture's identity is not the image's** — `digest` keys the decode and `imageKey` keys the transmission, because two blocks of one image with different overlays otherwise transmit once and both draw the first, which is the wrong picture rather than none. **Refused at both gates from one function**: a non-rectangular or empty matrix, a non-finite value, an unknown colormap, a non-finite pin, and an alpha outside `0..1` (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
 
 
 ## 7. Commitments

@@ -181,10 +181,10 @@ const results = runPass({
     {
       // **The declared scale ignored.** Every panel normalises to its own
       // extent again, which is exactly the residual that lies (F253).
-      name: "a declared scale falls back to the derived one",
+      name: "a declared pin is ignored and the extent is always the data's",
       file: "src/data/viewmodel/overlay.ts",
-      from: "  if (overlay.min !== undefined && overlay.max !== undefined) {",
-      to: "  if (false) {",
+      from: "  return pinnedRange(seen ? min : 0, seen ? max : 0, overlay);",
+            to: "  return { min: seen ? min : 0, max: seen ? max : 0 };",
       // C2 catches it too — the residual's hottest cell goes from 13 back to
       // 202 — but the named killer is the one that reads the range directly.
       expect: "IO9",
@@ -198,6 +198,16 @@ const results = runPass({
       from: "  return map === undefined ? undefined : continuousColour(map, t, caps);",
       to: '  return map === undefined ? undefined : (continuousColour(map, t, caps) ?? { kind: "ansi", index: 1 });',
       expect: "IO3",
+    },
+    {
+      // **The set's scale computed per item.** `b.samples` pins one range across
+      // every overlay it holds; taking each field's own extent is F253 arriving
+      // in the composition this builder exists for.
+      name: "the sample grid scales each overlay to its own extent",
+      file: "src/shell/builders/samples.ts",
+      from: "  const pin = sharedRange(fields);",
+      to: "  const pin = { min: Number.NaN, max: Number.NaN };",
+      expect: "IO11",
     },
   ],
 });

@@ -38,7 +38,7 @@
  */
 
 import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
-import { samplesChildren, samplesLayout, type Sample, type SamplesOptions } from "./samples.js";
+import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, samplesScale } from "./samples.js";
 import { readFileSync } from "node:fs";
 import { digestOf, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
 import { COLORMAPS } from "../../data/colormaps/index.js";
@@ -1028,7 +1028,10 @@ function samples(opts: BlockOpts & SamplesOptions): Mosaic {
   const cellRows = opts.cellRows ?? 4;
   const layout = samplesLayout(opts.items.length, opts.columns, cellRows);
   if (typeof layout === "string") throw new TypeError(`b.samples: ${layout}`);
-  const at = (i: number): Sample => opts.items[i] as Sample;
+  // **One scale across the set, computed once** (C04 I74, F253) — the shared
+  // normalisation the residual measurement made a ruling rather than a finding.
+  const items = samplesScale(opts.items);
+  const at = (i: number): Sample => items[i] as Sample;
   // **`opts` is not spread, and the reason is a name collision that type-checks
   // in the other direction.** `SamplesOptions.columns` is a *count* and
   // `Mosaic.columns` is a `Share[]`; spreading carries the count into the field
@@ -1051,6 +1054,7 @@ function samples(opts: BlockOpts & SamplesOptions): Mosaic {
           alt: item.alt,
           ...(item.data === undefined ? {} : { data: item.data }),
           ...(item.path === undefined ? {} : { path: item.path }),
+          ...(item.overlay === undefined ? {} : { overlay: item.overlay }),
         });
       },
       (i) => raw(at(i).label, { id: `${idOf(opts, "samples")}-l${String(i)}` }),

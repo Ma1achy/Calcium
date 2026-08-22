@@ -80,7 +80,11 @@ export function overlayField(
     const line: number[] = [];
     for (let c = 0; c < cols; c += 1) { // cells-ok — a cell index
       const v = region(overlay.values, c * sx, r * sy, (c + 1) * sx, (r + 1) * sy);
-      const t = (v - min) / span;
+      // **A zero span reads mid-ramp, not bottom** — `heatmap.ts`'s own answer
+      // for the same shape (`span <= 0 ? 0.5`). A constant field says *no
+      // variation*; drawing it at the cold end says *all minimum*, which is a
+      // claim about data that never varied.
+      const t = span <= 0 ? 0.5 : (v - min) / span;
       line.push(t < 0 ? 0 : t > 1 ? 1 : t);
     }
     out.push(line);
@@ -137,7 +141,7 @@ export function compositeOverlay(px: Pixels, overlay: ImageOverlay): Pixels {
   for (let y = 0; y < px.height; y += 1) { // cells-ok — a pixel index
     for (let x = 0; x < px.width; x += 1) { // cells-ok — a pixel index
       const v = region(overlay.values, x * sx, y * sy, (x + 1) * sx, (y + 1) * sy);
-      const t0 = (v - min) / span;
+      const t0 = span <= 0 ? 0.5 : (v - min) / span;
       const t = t0 < 0 ? 0 : t0 > 1 ? 1 : t0;
       const c = continuousColour(map, t, { colourDepth: 24 });
       if (c === undefined || c.kind !== "rgb") continue;

@@ -156,6 +156,16 @@ export { completeLocal } from "./shell/documents.js";
 // --- builders — §4 ----------------------------------------------------------
 
 export { b } from "./shell/builders/index.js";
+/**
+ * The one range a set of overlaid images must share (C04 I74, §3h.3).
+ *
+ * **On the surface because the composition that needs it is the consumer's.**
+ * `b.samples` computes it for a grid; three `b.image` blocks composed by hand are
+ * the case §3h.3 measured, and without this that consumer can only write the
+ * pins and not derive them. The type is `yMin`/`yMax`'s, so what comes out of
+ * here goes straight onto an overlay.
+ */
+export { sharedRange, type PinnedRange } from "./data/viewmodel/range.js";
 export type {
   BlockOpts,
   CellInput,

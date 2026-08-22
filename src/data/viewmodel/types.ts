@@ -2209,17 +2209,32 @@ export type ImageOverlay = Readonly<{
   /** A `ColormapName`. Absent takes the default, which is stated in one place. */
   colormap?: string;
   /**
-   * The scale, **declared rather than derived** — and both or neither.
+   * Pin the value range, independently and optionally — **the plot family's
+   * members, because it is the plot family's mechanism** (C04 I29, I74).
    *
    * Absent, the field normalises over its own extent, which is matplotlib's
    * `imshow` default and the right one for a single overlay. **It is the wrong
    * one for a set**: three panels each normalised to their own range draw three
    * different scales that look like one, and a residual is exactly the case
-   * where the third range is not the other two's. Declaring them is how a
-   * composition shares a scale (§3h.3).
+   * where the third range is not the other two's (§3h.3, F253).
+   *
+   * **Named `yMin`/`yMax` rather than `min`/`max` because C12 already ruled the
+   * equivalence.** `heatmap.ts` says it outright — *on a field those two pin the
+   * **value** range, the levels and the colour scale* — so a field form spends
+   * them on the reading rather than on the ordinate, and an overlay is a field
+   * form that happens to sit over a picture. `seriesRange` carries the argument
+   * this section rediscovered by measuring: *a pinned axis exists so two plots
+   * can be compared, and a range that grew to fit an outlier would defeat the
+   * only reason to pin one.*
+   *
+   * **Independently optional, and that was the family's ruling rather than
+   * this one's.** A first draft made them both-or-neither on the grounds that
+   * half a scale still moves between panels — true, and it forbids `yMin: 0`
+   * alone, which is a real single-panel use: *zero means zero* rather than *the
+   * least value observed means zero*, exactly as a loss curve pins its floor.
    */
-  min?: number;
-  max?: number;
+  yMin?: number;
+  yMax?: number;
   /**
    * How much of the composite is the overlay, at `kitty` only. `0..1`.
    *

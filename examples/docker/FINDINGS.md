@@ -12731,3 +12731,45 @@ see one encoding of the value it measures cannot distinguish **the rung is absen
 is a different escape**, and absence is exactly what the row was written to establish. The
 degradation ladder is the worst place for it, because every rung below the top is a different
 encoding by construction.
+
+## F255 — four local answers where the family already had them, and three were worse ★★★★★
+
+**The overlay's shared scale was ruled from first principles and the principles were already in
+the tree.** C12's `seriesRange` carries the sentence F253 was found by measuring — *a pinned axis
+exists so two plots can be compared, and a range that grew to fit an outlier would defeat the only
+reason to pin one* — and `heatmap.ts` carries the one that decides the naming:
+
+> There is no `yMin`/`yMax` arm: on a field those two pin the **value** range — the levels and the
+> colour scale — and spending them on the ordinate as well would give one pair of members two
+> meanings on one form.
+
+**A field form spends `yMin`/`yMax` on the reading.** An overlay is a field form — a scalar field
+over a grid read through a colormap — that happens to sit over a picture. Same mechanism, same
+datum, and the local pair was `min`/`max`.
+
+| the local answer | the family's | why the family's is right |
+|---|---|---|
+| `min` / `max` | `yMin` / `yMax` | one pair of members, one meaning, already ruled for fields |
+| both or neither | independently optional | `yMin: 0` alone is a real single-panel use — *zero means zero* rather than *the least observed value means zero* |
+| a constant field is `{v, v+1}` | `{v, v}`, drawn **mid-ramp** | `{v, v+1}` puts a field that never varied at the *bottom* of the scale |
+| a reversed pin is refused | collapses to a constant | C12 I2 — no series input throws, and a pin is series input by another route |
+
+**The fourth local decision was right** — a pinned bound replaces rather than widens — **and it is
+why the other three were reachable at all**: getting the load-bearing one right makes a cluster of
+wrong ones read as a considered design.
+
+**Each was defensible on its own terms and that is the whole difficulty.** *Both or neither*
+protects against a half-shared scale, which is a real hazard; it also forbids a loss curve's floor
+pin, which the family had already weighed and answered the other way. **A local answer and a family
+answer read identically when only the local one is in front of you**, and review compares a
+decision against its justification rather than against the tree.
+
+**The shape: the sixth blind spot, pointed at a member rather than at a claim.** *Where is this
+written down* asks whether a belief has a source. This asks **who else already solved this, and did
+they call it something** — and it is cheaper, because the answer is a grep for the mechanism rather
+than an audit of a claim. Two greps found all four here.
+
+**One resolver, not two that rhyme.** `pinnedRange` moved to `data/viewmodel/range.ts` and
+`seriesRange` calls it. **Zero golden frames changed**, which is the only evidence that a refactor
+of a resolver 47 plot forms depend on was a refactor — and it is the rehearsal for C12 §3aj's gate,
+which demands exactly that and has never been run.

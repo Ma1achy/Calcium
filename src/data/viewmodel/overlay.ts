@@ -10,6 +10,7 @@
  * matrix has no column count, so every rule after it reports about a shape that
  * does not exist.
  */
+import { pinnedRange, type PinnedRange } from "./range.js";
 import type { ImageOverlay } from "./types.js";
 
 /** The map an overlay takes when it names none. Stated in one place. */
@@ -53,18 +54,16 @@ export function overlayFault(value: unknown, names: ReadonlySet<string>): string
   if (map !== undefined && (typeof map !== "string" || !names.has(map))) {
     return `"overlay.colormap" names no colormap: ${JSON.stringify(map)} (C10 §6)`;
   }
-  const min = o["min"];
-  const max = o["max"];
-  // **Both or neither**, because one alone is half a scale: a declared floor
-  // with a derived ceiling still moves between panels, which is exactly the
-  // shared-scale failure the pair exists to prevent.
-  if ((min === undefined) !== (max === undefined)) {
-    return `"overlay.min" and "overlay.max" are declared together or not at all (C04 I74)`;
-  }
-  if (min !== undefined) {
-    if (typeof min !== "number" || !Number.isFinite(min)) return `"overlay.min" is a finite number`;
-    if (typeof max !== "number" || !Number.isFinite(max)) return `"overlay.max" is a finite number`;
-    if (!(max > min)) return `"overlay.max" is greater than "overlay.min" — got ${String(min)}..${String(max)}`;
+  // **Independently optional, and a reversed pin is not refused** — both are the
+  // plot family's rulings rather than this one's (C04 I29). `yMin: 0` alone is
+  // the single-panel case, and a reversed pin collapses to a constant range at
+  // `pinnedRange` because C12 I2 says no series input throws and a pin is series
+  // input by another route.
+  for (const key of ["yMin", "yMax"] as const) {
+    const v = o[key];
+    if (v !== undefined && (typeof v !== "number" || !Number.isFinite(v))) {
+      return `"overlay.${key}" is a finite number — got ${JSON.stringify(v)}`;
+    }
   }
   const alpha = o["alpha"];
   if (alpha !== undefined && (typeof alpha !== "number" || !(alpha >= 0 && alpha <= 1))) {
@@ -81,19 +80,21 @@ export function overlayFault(value: unknown, names: ReadonlySet<string>): string
  * one figure is how the two arms would come to draw different pictures from the
  * same numbers, and there is no frame in which both are visible at once.
  */
-export function overlayRange(overlay: ImageOverlay): Readonly<{ min: number; max: number }> {
-  if (overlay.min !== undefined && overlay.max !== undefined) {
-    return { min: overlay.min, max: overlay.max };
-  }
-  let min = Infinity;
-  let max = -Infinity;
+export function overlayRange(overlay: ImageOverlay): PinnedRange {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let seen = false;
   for (const row of overlay.values) {
     for (const v of row) {
+      if (!Number.isFinite(v)) continue;
+      seen = true;
       if (v < min) min = v;
       if (v > max) max = v;
     }
   }
-  // A constant field has no extent, and reading it as *all maximum* would paint
-  // a uniform wash of the hottest colour over a picture that says nothing.
-  return max > min ? { min, max } : { min, max: min + 1 };
+  // **The family's resolver, not a second one that rhymes.** A constant field
+  // collapses to `{v, v}` and every reader in this tree draws a zero span at the
+  // *middle* of the ramp — the first draft returned `{v, v + 1}`, which is the
+  // bottom, and said *all minimum* about a picture that varies nowhere.
+  return pinnedRange(seen ? min : 0, seen ? max : 0, overlay);
 }

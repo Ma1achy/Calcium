@@ -111,5 +111,6 @@ export {
   type MosaicRegion,
 } from "./mosaic.js";
 export { overlayFault, overlayRange, DEFAULT_OVERLAY_COLORMAP } from "./overlay.js";
+export { pinnedRange, sharedRange, type PinnedRange, type RangePin } from "./range.js";
 
 export { digestOf } from "./digest.js";
