@@ -48,6 +48,11 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 | - retrying in 8s (attempt 2)         |
 |                                      |
 +--------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                          B
+
+D             C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -107,6 +112,11 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 | - retrying in 8s (attempt 2)                             |
 |                                                          |
 +----------------------------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                                       B
+
+D                   C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -166,6 +176,11 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 | - retrying in 8s (attempt 2)                                                 |
 |                                                                              |
 +------------------------------------------------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                                                     B
+
+D                          C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -225,6 +240,11 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 | - retrying in 8s (attempt 2)                                                                                         |
 |                                                                                                                      |
 +----------------------------------------------------------------------------------------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                                                                               B
+
+D                                       C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -284,6 +304,11 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 40 1`] = `
 │ ⠋ retrying in 8s (attempt 2)         │
 │                                      │
 └──────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                          B
+
+D             C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -343,6 +368,11 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 60 1`] = `
 │ ⠋ retrying in 8s (attempt 2)                             │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                                       B
+
+D                   C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -402,6 +432,11 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 80 1`] = `
 │ ⠋ retrying in 8s (attempt 2)                                                 │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                                                     B
+
+D                          C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -461,6 +496,11 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 120 1`] = `
 │ ⠋ retrying in 8s (attempt 2)                                                                                         │
 │                                                                                                                      │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                                                                               B
+
+D                                       C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -520,6 +560,11 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 | - retrying in 8s (attempt 2)         |
 |                                      |
 +--------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                          B
+
+D             C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -579,6 +624,11 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 | - retrying in 8s (attempt 2)                             |
 |                                                          |
 +----------------------------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                                       B
+
+D                   C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -638,6 +688,11 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 | - retrying in 8s (attempt 2)                                                 |
 |                                                                              |
 +------------------------------------------------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                                                     B
+
+D                          C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -697,6 +752,11 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 | - retrying in 8s (attempt 2)                                                                                         |
 |                                                                                                                      |
 +----------------------------------------------------------------------------------------------------------------------+
+── mosaic · measured 4 · rendered 4
+A                                                                               B
+
+D                                       C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -756,6 +816,11 @@ exports[`C09 T2.10 — golden frames > light-unicode at 40 1`] = `
 │ ⠋ retrying in 8s (attempt 2)         │
 │                                      │
 └──────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                          B
+
+D             C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -815,6 +880,11 @@ exports[`C09 T2.10 — golden frames > light-unicode at 60 1`] = `
 │ ⠋ retrying in 8s (attempt 2)                             │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                                       B
+
+D                   C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -874,6 +944,11 @@ exports[`C09 T2.10 — golden frames > light-unicode at 80 1`] = `
 │ ⠋ retrying in 8s (attempt 2)                                                 │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                                                     B
+
+D                          C
+
 ── scroll · measured 3 · rendered 3
 one
 two
@@ -933,6 +1008,11 @@ exports[`C09 T2.10 — golden frames > light-unicode at 120 1`] = `
 │ ⠋ retrying in 8s (attempt 2)                                                                                         │
 │                                                                                                                      │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+── mosaic · measured 4 · rendered 4
+A                                                                               B
+
+D                                       C
+
 ── scroll · measured 3 · rendered 3
 one
 two

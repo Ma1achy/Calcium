@@ -133,6 +133,15 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
         "as blocks in their own right",
     },
   ],
+  [
+    "mosaic",
+    {
+      premise: "no-field",
+      why:
+        "pure geometry — a grid string, a height and two share arrays, none of which can carry " +
+        "a meaning that colour alone conveys; the children are swept as blocks in their own right",
+    },
+  ],
 ]);
 
 /** Any `tone` anywhere in a block, at any depth. The premise, falsifiable. */

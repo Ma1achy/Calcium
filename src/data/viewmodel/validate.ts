@@ -40,6 +40,7 @@ import {
   type Result,
   type ViewDocument,
 } from "./types.js";
+import { parseAreas } from "./mosaic.js";
 import { parseStartDate } from "../dates.js";
 import { isContainerKind } from "./tree.js";
 // **The entries, not the names.** `COLORMAP_SET` above answers *is this a map*;
@@ -1052,6 +1053,69 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
    * correspondence is what turns a question about elements into a question
    * about `children.length`.
    */
+  /**
+   * C04 I71, I72, §3f.1 — **four refusals, ordered so each one's premise holds.**
+   *
+   * A ragged grid has no column count, so every rule after it would be
+   * reporting about a shape that does not exist — which is why `parseAreas`
+   * returns the *first* fault rather than all of them, and why the arity and
+   * weight checks below run only once a grid exists.
+   */
+  mosaic: (b, e, at) => {
+    requireArray(b, "children", e, at);
+    const height = b["height"];
+    if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+      e.push(
+        `${at}: "height" must be a positive integer (C04 I71) — got ${JSON.stringify(height)}; ` +
+          `a mosaic with no declared height draws one blank row, because an absolutely ` +
+          `positioned child contributes nothing to its parent's content size`,
+      );
+    }
+    const areas = b["areas"];
+    if (typeof areas !== "string") {
+      e.push(`${at}: "areas" must be a string (C04 I71) — got ${JSON.stringify(areas)}`);
+      return;
+    }
+    const parsed = parseAreas(areas);
+    if (!parsed.ok) {
+      e.push(`${at}: ${parsed.fault}`);
+      return;
+    }
+    const { grid } = parsed;
+    const kids = b["children"];
+    // **Refusal 4 — arity.** A positional mapping with a length mismatch is
+    // accepted-and-ignored (F207): a child never drawn, or a region drawn
+    // empty, with nothing said either way.
+    if (isArray(kids) && kids.length !== grid.regions.length) {
+      e.push(
+        `${at}: "areas" names ${String(grid.regions.length)} regions ` +
+          `(${grid.regions.map((r) => JSON.stringify(r.name)).join(", ")}) for ` +
+          `${String(kids.length)} children (C04 I71) — the mapping is positional, so a ` +
+          `mismatch is a child that is never drawn or a region drawn empty`,
+      );
+    }
+    // The weights are per grid line and never per child (I72), so the count
+    // they are checked against is the grid's.
+    for (const [member, lines] of [
+      ["columns", grid.columns],
+      ["rows", grid.rows],
+    ] as const) {
+      const shares = b[member];
+      if (shares === undefined) continue;
+      if (!isArray(shares)) {
+        e.push(`${at}: ${JSON.stringify(member)} must be an array (C04 I72)`);
+        continue;
+      }
+      if (shares.length !== lines) {
+        e.push(
+          `${at}: ${JSON.stringify(member)} has ${String(shares.length)} entries for a grid ` +
+            `${String(lines)} ${member === "columns" ? "columns" : "rows"} deep (C04 I72) — ` +
+            `one per grid line, not per child, because a spanning region takes the sum of ` +
+            `what it spans`,
+        );
+      }
+    }
+  },
   scroll: (b, e, at) => {
     requireArray(b, "children", e, at);
     if (isArray(b["children"]) && b["children"].length === 0) {

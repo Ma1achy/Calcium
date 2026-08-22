@@ -2130,6 +2130,74 @@ export type Scroll = Readonly<{
 }> & Gap & Floor;
 
 /**
+ * A declared grid of cells, holding a figure nested rows and columns cannot draw
+ * (C04 §3f, I71, I72).
+ *
+ * **The case for a second container is a measurement.** Every nesting of `Group`
+ * produces a *slicing* floorplan — one decomposable by guillotine cuts — and the
+ * pinwheel, four cells rotating around a centre, admits no cut at all, while a
+ * five-rectangle floorplan that *is* slicing cuts at its first interior edge.
+ * Same count, same tiling, opposite answer, so the difference is the figure and
+ * not the size (FINDINGS F244).
+ *
+ * **Reach for one where the arrangement is the point** — a dashboard, a status
+ * wall, a figure with a centre. Where nested rows and columns can say it, they
+ * are cheaper and they compose with `Valign`, which this does not have.
+ */
+export type Mosaic = Readonly<{
+  kind: "mosaic";
+  id: string;
+  /**
+   * Interior rows. A positive integer, and **required** (I71).
+   *
+   * **Measured rather than argued.** A container whose children are all
+   * absolutely positioned computes a content height of zero, because such a
+   * child contributes nothing to its parent's content size — so a mosaic with no
+   * declared height draws **one blank row** and reports it. `Scroll.height`'s
+   * precedent with a sharper reason: a scroll without one is unbounded, and a
+   * mosaic without one is empty.
+   */
+  height: number;
+  /**
+   * The grid, as a string: rows separated by `/`, one character per column.
+   *
+   * `"AAB/DEB/DCC"` is the pinwheel. `.` is a hole — drawn as blanks, named by
+   * no child, and exempt from the rectangle rule, because a blank corner is
+   * ordinary and requiring it to be a rectangle would forbid it.
+   *
+   * Four refusals at both gates, each naming the part at fault: an empty grid,
+   * ragged rows, a region that is not a solid rectangle, and a region count
+   * differing from `children.length` (§3f.1).
+   */
+  areas: string;
+  /**
+   * One per named region, in **reading order** — left to right, then top to
+   * bottom, by where each region first appears.
+   *
+   * **`children` and not `cells`, and that is a mechanism rather than a
+   * convention.** `childBlocksOf` in `validate.ts` walks a block's children by
+   * reading `b["children"]` structurally, so a kind naming them anything else is
+   * skipped in silence and takes id-uniqueness (I14) and every nested refusal
+   * with it.
+   */
+  children: readonly Block[];
+  /**
+   * How the grid's columns divide the width, and its rows the height (I72).
+   *
+   * One entry per grid **line** rather than per child: a region spanning two
+   * columns takes the sum of both their shares, because a spanning region has no
+   * single column to be weighted by. Absent is an equal split; a length that
+   * does not match the grid is refused, on `flex`'s precedent.
+   *
+   * **`rows` is the half `Group` does not have.** A column group's height is
+   * whatever its children measure, so there is no budget to divide; a mosaic
+   * declares one, and the same arithmetic runs against a different total.
+   */
+  columns?: readonly Share[];
+  rows?: readonly Share[];
+}> & Gap & Floor;
+
+/**
  * The block a layer above knows about and the definition does not (C04 I66, C09 I31).
  *
  * **Three states, one kind, because only one of them is knowable where the box
@@ -2185,6 +2253,7 @@ export type Block =
   | Panel
   | Group
   | Scroll
+  | Mosaic
   | Status
   | Raw;
 

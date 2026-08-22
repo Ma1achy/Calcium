@@ -12310,3 +12310,45 @@ under test.
 
 No spec, no `src/` change, no block kind, no D2 table. Five probes and a finding — and D2 is written
 against these numbers rather than against the plan that asked for them.
+
+
+## F245 — a nested clip widens rather than intersects, and the spec sentence naming it as a backstop was an hour old ★★★★☆
+
+**F244 §4 measured the defect and proposed the remedy, and only the first half survived the build.**
+An absolutely positioned child is not constrained by its parent's width — 60 cells at width 40, every
+count agreeing, because C09 I1 is about rows. The remedy looked settled: `overflowX: "hidden"` on the
+container, which is what the group renderer already carries and which probe 4 measured working.
+
+**It does not compose.** Ink keeps a stack of clipping regions and applies `clips.at(-1)` — the
+**innermost** — so a descendant clip *replaces* its ancestor's rather than intersecting with it:
+
+```
+three 1-wide cells in a container of 1, container clips only   ->  "A"
+the same, once each cell clips its own child too               ->  "ABC"
+```
+
+And every cell **must** clip, because that is the other half of C09 I35: a cell bounds its child with
+`flexShrink: 0` and `overflow: "hidden"`. So the container's clip is shadowed in exactly the
+configuration the block always has, and the backstop protects nothing.
+
+**Three things follow.**
+
+- **The geometry is the guarantee.** `mosaicRects` clamps, and a cell with no room is zero-wide and
+  not drawn — the only one of three answers keeping both axes of I1, since drawing it over-runs the
+  region and widening the region is not this block's to do.
+- **The reachable case is the floor of 1 per grid line**, which asks a three-column grid for three
+  cells at any width including one. Not a width nobody uses: it is the width every narrow-terminal
+  row of the conformance sweep passes through, and `T2.1b` found it within a minute of the kind
+  being registered.
+- **It is C23 §8a A4's class arriving from the implementation rather than from the walk** — a ruling
+  naming an operation the layer below does not have, except that here the operation *exists* and does
+  something other than what its name suggests. The walk cannot reach that: no row of a classification
+  table asks whether two correct mechanisms compose, and the sentence was written the same hour the
+  code falsified it.
+
+**The mutation pass then indicted a row rather than the code.** `the cell does not clip` survived,
+because MG6 used `areas: "A"` — one region filling the frame, so the container's own height already
+bounds the spill and the cell's clip has nothing to do. The row asserted the right thing and could
+not construct the state it claimed; `AB/CB` gives the tall child the top half so an unclipped cell
+writes into the row below, and the mutation dies. **The convenient fixture is the one where both
+readings agree**, and a single-cell mosaic is as convenient as it gets.

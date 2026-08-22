@@ -38,6 +38,7 @@
  */
 
 import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { parseAreas } from "../../data/viewmodel/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
   Action,
@@ -56,6 +57,7 @@ import type {
   Logs,
   Notice,
   Panel,
+  Mosaic,
   Scroll,
   Patch,
   Pills,
@@ -946,6 +948,75 @@ function panel(
  * the constructor is where an author finds out.
  */
 /**
+ * A mosaic: a declared grid holding a figure nested rows and columns cannot draw
+ * (C04 I71, C04 I72, C04 §3f).
+ *
+ * **Refused at construction on exactly the terms `validateDocument` refuses it**,
+ * from the same parse — `graph`'s lesson read forward rather than repeated: the
+ * gate that landed with the builder and not with the validator produced an
+ * invariant that was true on one side and vacuous on the other.
+ */
+function mosaic(
+  opts: BlockOpts &
+    Readonly<{
+      height: number;
+      areas: string;
+      children: readonly Block[];
+      columns?: readonly Share[];
+      rows?: readonly Share[];
+    }>,
+): Mosaic {
+  const { height, areas, children, columns, rows } = opts;
+  if (!Number.isInteger(height) || height < 1) {
+    throw new Error(
+      `b.mosaic: height is a positive integer — got ${JSON.stringify(height)}; a mosaic with ` +
+        `no declared height draws one blank row (C04 I71)`,
+    );
+  }
+  const parsed = parseAreas(areas);
+  if (!parsed.ok) throw new Error(`b.mosaic: ${parsed.fault}`);
+  const { grid } = parsed;
+  if (children.length !== grid.regions.length) {
+    throw new Error(
+      // **The same fault, said the same way at both gates** — `hierarchy`'s HG4
+      // precedent. Naming the regions is what makes the message actionable: the
+      // author has to know *which* region has no child.
+      `b.mosaic: "areas" names ${String(grid.regions.length)} regions ` +
+        `(${grid.regions.map((r) => JSON.stringify(r.name)).join(", ")}) for ` +
+        `${String(children.length)} children (C04 I71) — the mapping is positional`,
+    );
+  }
+  for (const [member, lines, shares] of [
+    ["columns", grid.columns, columns],
+    ["rows", grid.rows, rows],
+  ] as const) {
+    if (shares !== undefined && shares.length !== lines) {
+      throw new Error(
+        `b.mosaic: ${JSON.stringify(member)} has ${String(shares.length)} entries for a grid ` +
+          `${String(lines)} deep (C04 I72) — one per grid line, not per child`,
+      );
+    }
+  }
+  // **Through `finish`, like every other builder** (I3, I15). Returning the
+  // literal skips the freeze and drops `gapBefore` — both caught by the
+  // enumeration's own rows rather than by anything written for this kind, which
+  // is what the table exists for.
+  return finish<Mosaic>(
+    {
+      kind: "mosaic",
+      id: idOf(opts, "mosaic"),
+      height,
+      areas,
+      children,
+      ...(columns === undefined ? {} : { columns }),
+      ...(rows === undefined ? {} : { rows }),
+    } as Mosaic,
+    opts,
+    false,
+  );
+}
+
+/**
  * A bounded region (C04 §3c, C04 I47).
  *
  * **Throws rather than returning an invalid block**, as `group` does for a bad
@@ -1194,6 +1265,7 @@ export const b = {
   panel,
   group,
   scroll,
+  mosaic,
   raw,
   spinner,
 

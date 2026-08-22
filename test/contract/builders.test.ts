@@ -146,12 +146,18 @@ const BUILDERS: readonly Readonly<{
   // inside a composition rather than a section heading, and `finish(..., false)`
   // is what the builder passes.
   { name: "scroll", gaps: false, kind: "scroll", make: (o) => b.scroll(2, [b.raw("x")], o) },
+  {
+    name: "mosaic",
+    gaps: false,
+    kind: "mosaic",
+    make: (o) => b.mosaic({ height: 2, areas: "AB", children: [b.raw("a"), b.raw("b")], ...o }),
+  },
   { name: "raw", gaps: false, kind: "raw", make: (o) => b.raw("plain text", o) },
   { name: "spinner", gaps: false, kind: "steps", make: (o) => b.spinner("pulling", o) },
 ];
 
-describe("C24 §4 — the nineteen builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and nineteen is the count", () => {
+describe("C24 §4 — the twenty builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.

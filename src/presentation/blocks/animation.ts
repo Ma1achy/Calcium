@@ -22,6 +22,7 @@ export const ANIMATES: Readonly<Record<BlockKind, boolean>> = Object.freeze({
   group: false,
   keyValue: false,
   logs: false,
+  mosaic: false,
   notice: false,
   panel: false,
   patch: false,

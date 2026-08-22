@@ -23,7 +23,8 @@ import {
   ROW_GUTTER,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
-import type { Block, Group, MeasureFn, Panel, Scroll } from "../../../data/viewmodel/index.js";
+import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll } from "../../../data/viewmodel/index.js";
+import { mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs } from "../glyphs.js";
@@ -403,6 +404,122 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     );
 
     return createElement(Box, { flexDirection: "column", width }, ...children, ...pads, ...residue);
+  },
+};
+
+// --- mosaic ------------------------------------------------------------------
+
+/**
+ * A declared grid of absolutely positioned cells (C04 I71, C04 I72 · C09 I35).
+ *
+ * **Every cell bounds its own child, and that takes two properties rather than
+ * one.** `overflow: "hidden"` alone changes nothing: a relative child in a cell
+ * shorter than itself is **squashed by flex before it can overflow**, so it
+ * draws rows out of its own middle — measured at `row2, row5` of six — and a
+ * child that was squashed to fit never overflows for the clip to catch.
+ * `flexShrink: 0` is what gives the clip something to do.
+ *
+ * **The row count agrees in all three arms**, so the frame is the only thing
+ * that separates them, and the failure is worst on the block that most needs
+ * reading: a bare cell drew an error box's fragment above its bottom border,
+ * which looks exactly like a complete box.
+ *
+ * **`overflowX` on the container is the other axis and a separate mechanism.**
+ * An absolutely positioned child is not constrained by its parent's width, a
+ * cell's own overflow does not reach the frame, and C09 I1 is about rows — so
+ * without this a mosaic at width 40 draws 60 cells with every count agreeing
+ * (FINDINGS F244 §4).
+ */
+export const mosaicDefinition: BlockDefinition<Mosaic> = {
+  kind: "mosaic",
+
+  /**
+   * `height`, at every width (C04 I71).
+   *
+   * Declared rather than derived, which is roadmap 38's resolve-then-measure
+   * and what makes the grid's arithmetic total: the rows divide a budget that
+   * is known before anything is laid out.
+   */
+  measure(block: Mosaic): number {
+    return Math.max(1, block.height); // cells-ok — a row count
+  },
+
+  /**
+   * One per child, at block level — `scroll`'s correspondence and its reason.
+   *
+   * The rectangle is the cell's, so a pointer landing inside a cell addresses
+   * the child drawn there rather than the row it happens to share with a
+   * neighbouring cell — which is the whole difference between a grid and a
+   * sequence.
+   */
+  elements(block: Mosaic, width: number): readonly NavElement[] {
+    const parsed = parseAreas(block.areas);
+    if (!parsed.ok) return Object.freeze([]);
+    const rects = mosaicRects(parsed.grid, normaliseWidth(width), block.height, block.columns, block.rows);
+    return Object.freeze(
+      block.children.flatMap((child, i) => {
+        const rect = rects[i];
+        if (rect === undefined) return [];
+        return [
+          Object.freeze({
+            id: child.id,
+            level: "block" as const,
+            rows: Object.freeze({ from: rect.top, to: rect.top + rect.height }),
+            cols: Object.freeze({ from: rect.left, to: rect.left + rect.width }),
+            copy: copyTextOf(child),
+          }),
+        ];
+      }),
+    );
+  },
+
+  render(block: Mosaic, ctx: RenderContext): ReactElement {
+    const width = normaliseWidth(ctx.width);
+    const parsed = parseAreas(block.areas);
+    // **A grid that does not parse is refused at both gates**, so this arm is
+    // unreachable from a validated document and from `b.mosaic`. It draws an
+    // empty box of the declared height rather than throwing, because a render
+    // that throws costs the whole entry an error box for a fault two gates
+    // already named.
+    const rects = parsed.ok
+      ? mosaicRects(parsed.grid, width, block.height, block.columns, block.rows)
+      : [];
+
+    const cellsDrawn = block.children.flatMap((child, i) => {
+      const rect = rects[i];
+      // **A cell with no room is not drawn** (C04 I72). `mosaicRects` clamps to
+      // the region because the container's clip cannot be relied on: a cell that
+      // clips its own child shadows the ancestor's clip rather than intersecting
+      // it, so the geometry is the guarantee (I35).
+      if (rect === undefined || rect.width < 1 || rect.height < 1) return [];
+      return [
+        createElement(
+          Box,
+          {
+            key: child.id,
+            position: "absolute" as const,
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            overflow: "hidden" as const,
+            flexDirection: "column" as const,
+          },
+          // **`flexShrink: 0` first, or the clip above has nothing to do** (I35).
+          createElement(
+            Box,
+            { flexShrink: 0, flexDirection: "column" as const },
+            ctx.renderChild(child, rect.width),
+          ),
+        ),
+      ];
+    });
+
+    return createElement(
+      Box,
+      { width, height: Math.max(1, block.height), overflowX: "hidden" as const }, // cells-ok — a row count
+      cellsDrawn,
+    );
   },
 };
 

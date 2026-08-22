@@ -25,6 +25,10 @@ const CMD =
 // alive. They stay in the command because they are the consumer's evidence, and
 // every mechanism they cover has a framework-side row that a mutation can touch.
 const MEASURE = "src/data/viewmodel/measure.ts";
+// **`divideShares` is where the share rule lives now** (C04 I72). It was
+// extracted from `groupChildWidths` so the group and both of the mosaic's axes
+// cannot drift, and these four anchors followed it rather than being dropped.
+const SHARES = "src/data/viewmodel/mosaic.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const BUILDERS = "src/shell/builders/index.ts";
 const CONTAINERS = "src/presentation/blocks/kinds/containers.ts";
@@ -45,9 +49,9 @@ const MUTATIONS = [
     // at every uneven one, so it passes every row that existed before this
     // entry — and T3.16 is the only shape that separates them.
     name: "the gutter is taken proportionally, not off the top",
-    file: MEASURE,
-    from: "  const budget = w - gaps - fixed;",
-    to: "  const budget = w - fixed;",
+    file: SHARES,
+    from: "  const budget = total - gaps - fixed;",
+    to: "  const budget = total - fixed;",
     expect: "T3.17",
   },
   {
@@ -67,9 +71,9 @@ const MUTATIONS = [
     // absent. T3.16 is what catches it, which is the row that exists for the
     // gutter.
     name: "the remainder goes to the leftmost child",
-    file: MEASURE,
-    from: "    return normaliseWidth(Math.floor((budget * share) / weights));",
-    to: "    const each = normaliseWidth(Math.floor((budget * share) / weights));\n    const spent = shares.reduce((sum, s) => sum + (isCells(s) ? 0 : Math.floor((budget * s) / weights)), 0);\n    return i === 0 ? each + (budget - spent) : each;",
+    file: SHARES,
+    from: "    return Math.max(1, Math.floor((budget * share) / weights)); // cells-ok — a cell count",
+    to: "    const each = Math.max(1, Math.floor((budget * share) / weights));\n    const spent = shares.reduce((sum, s) => sum + (isCells(s) ? 0 : Math.floor((budget * s) / weights)), 0);\n    return share === shares.find((x) => !isCells(x)) ? each + (budget - spent) : each;",
     expect: "T3.16",
   },
   {
@@ -113,17 +117,17 @@ const MUTATIONS = [
     // what the fixed children left — which makes a cell count a suggestion, and
     // is right at exactly one width per row.
     name: "the weights divide the budget the fixed children already took",
-    file: MEASURE,
-    from: "  const budget = w - gaps - fixed;",
-    to: "  const budget = w - gaps;",
+    file: SHARES,
+    from: "  const budget = total - gaps - fixed;",
+    to: "  const budget = total - gaps;",
     expect: "T3.20",
   },
   {
     // **A fixed share treated as a weight**, which is the state before this
     // half: the banner's whale drifts with the terminal.
     name: "a cell count is read as a weight",
-    file: MEASURE,
-    from: "    if (isCells(share)) return normaliseWidth(share.cells);",
+    file: SHARES,
+    from: "    if (isCells(share)) return Math.max(1, share.cells); // cells-ok — a declared cell count",
     to: "",
     expect: "T3.20",
   },

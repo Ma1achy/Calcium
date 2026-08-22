@@ -37,6 +37,7 @@ export type {
   MergeRow,
   Notice,
   Panel,
+  Mosaic,
   Scroll,
   Status,
   Valign,
@@ -96,3 +97,14 @@ export {
   insetWidth,
   normaliseWidth,
 } from "./measure.js";
+
+export {
+  divideShares,
+  mosaicRects,
+  parseAreas,
+  MOSAIC_HOLE,
+  type MosaicGrid,
+  type MosaicParse,
+  type MosaicRect,
+  type MosaicRegion,
+} from "./mosaic.js";

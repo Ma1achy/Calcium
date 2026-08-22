@@ -161,6 +161,18 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
   }),
   // A bounded region whose content overflows, so the corpus exercises the
   // residue row (C04 I49) rather than only the fitting case.
+  mosaic: {
+    kind: "mosaic",
+    id: "mosaic-1",
+    height: 4,
+    areas: "AAB/DCB",
+    children: [
+      { kind: "raw", id: "mos-a", text: "A" },
+      { kind: "raw", id: "mos-b", text: "B" },
+      { kind: "raw", id: "mos-d", text: "D" },
+      { kind: "raw", id: "mos-c", text: "C" },
+    ],
+  },
   scroll: block({
     kind: "scroll",
     id: "scroll-1",

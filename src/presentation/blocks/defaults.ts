@@ -8,7 +8,7 @@
  * (§3, commitment 2).
  */
 import { codeDefinition } from "./kinds/code.js";
-import { groupDefinition, panelDefinition, scrollDefinition } from "./kinds/containers.js";
+import { groupDefinition, mosaicDefinition, panelDefinition, scrollDefinition } from "./kinds/containers.js";
 import { statusDefinition } from "./kinds/status.js";
 import {
   comparisonDefinition,
@@ -42,6 +42,7 @@ export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
   panelDefinition,
   groupDefinition,
   scrollDefinition,
+  mosaicDefinition,
   statusDefinition,
   rawDefinition,
 ] as BlockDefinition[]);
