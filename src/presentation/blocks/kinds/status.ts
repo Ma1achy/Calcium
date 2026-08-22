@@ -49,20 +49,24 @@ const PAD = 1;
 const SECOND = 1000;
 
 /**
- * The fewest rows a failure can be *stated* in (C22 I69, C04 I67).
+ * The rung at which the ladder first draws a border, kept as prose rather than a
+ * constant (C09 I34).
  *
- * **Three, because three is where the ladder first draws a border** — below it
+ * **`ERROR_MIN_ROWS = 3` lived here and its own reason expired.** It read *it is
+ * exported because the shell reserves it: a `rule` measures one row, so a `rule`
+ * whose renderer gave way has one row until something asks for more, and this is
+ * the number it asks for* — and the shell no longer asks for a number, it is
+ * handed one. `statusRowsFor` computes what the message needs at the width in
+ * hand, so a floor that is three rows whatever the box has to say has no caller
+ * and, on this repository's own rule, no reason to be exported.
+ *
+ * **The fact it stated is still true and still load-bearing**: below three rows
  * the box is a bare message line and a reader cannot tell a contained failure
- * from a block that happens to say something red. It is exported because the
- * shell reserves it: a `rule` measures one row, so a `rule` whose renderer gave
- * way has one row until something asks for more, and this is the number it asks
- * for.
- *
- * **Not four.** The tag row costs the fourth and the ladder already gives it up
- * at three deliberately — a floor is the least that says *something failed
- * here*, not the height the figure would prefer.
+ * from a block that happens to say something red. That is why `heightRung`
+ * gives the border up at three and not at four — it is the least that says
+ * *something failed here*. It is a property of the ladder, and the ladder is
+ * where it now lives.
  */
-export const ERROR_MIN_ROWS = 3;
 
 /**
  * The height rungs (C09 I31).
@@ -79,8 +83,11 @@ export const ERROR_MIN_ROWS = 3;
  */
 type Frame = Readonly<{ border: boolean; pad: boolean; tag: boolean }>;
 
+/** The height the full figure needs — two borders, two blanks and the tag row. */
+export const FULL_FIGURE_ROWS = 6;
+
 export function heightRung(height: number, tagged: boolean): Frame {
-  if (height >= 6) return { border: true, pad: true, tag: tagged };
+  if (height >= FULL_FIGURE_ROWS) return { border: true, pad: true, tag: tagged };
   if (height >= 4) return { border: true, pad: false, tag: tagged };
   if (height === 3) return { border: true, pad: false, tag: false };
   return { border: false, pad: false, tag: false };
@@ -209,6 +216,123 @@ function tagRow(
   ];
 }
 
+/**
+ * The most message rows a contained failure will ask for (C09 I34, F238).
+ *
+ * **Four, and it is a measurement rather than a taste.** Wrapping
+ * `plot failed to render: …` at the top rung's content width, a typical message
+ * is **1** line at 120 columns, **2** at 80 and **3** at 40; a path is **4** at
+ * 40; a three-frame stack trace is **3** at 80 and **6** at 40. So four holds a
+ * whole stack trace at 80 and **a path and nothing else at 40** — the cap binds
+ * at exactly the width where the message matters most and the room is least.
+ *
+ * **Not width-scaled.** How much a reader takes in before going to the sink is a
+ * property of the reader, not of the terminal, and a rule with a second axis is
+ * one more thing to get wrong. The cost is stated instead: at 40 columns a
+ * capped stack trace shows the error and one frame, at 80 the error and two, and
+ * the frames kept are the outermost — the ones that name the failing call.
+ *
+ * **And it is a containment bound, which is the stronger argument** (F239). A
+ * bounded container draws an over-tall child **whole** and C25 I1 is knowingly
+ * false for that case (C04 §3c trace 1, T2.28b). Uncapped, a fitted box would
+ * make that divergence as large as an exception is long; at four lines the box
+ * is at most seven rows and the worst over-draw is a number.
+ */
+export const MESSAGE_LINE_CAP = 4;
+
+/**
+ * The wrapped message, cut to the rows available, **with a mark when it is cut**.
+ *
+ * **The silent slice is what this replaces**, and it was silent at every height
+ * rather than only at the cap: `wrapCells(...).slice(0, forMessage)` dropped the
+ * remainder and said nothing, which is F230's class one level down.
+ *
+ * **The mark comes from `truncate` and is therefore capability-resolved** — `…`
+ * at unicode and `~` at `ascii` (C09 I22) — rather than a literal this file
+ * writes and cannot substitute. The overflow is *joined* into the last kept row
+ * before truncating, so the marker lands on a row that genuinely overflows
+ * rather than being appended to one that fits.
+ *
+ * **A message of exactly `forMessage` rows carries no mark**, and the asymmetry
+ * is deliberate: a mark claiming a truncation that did not happen sends the
+ * reader to the sink for text already on screen, which is worse than a silent
+ * cut because it is confidently wrong.
+ *
+ * **And that off-by-one is impossible here rather than guarded against**, which
+ * is stronger and was found by a mutation surviving. At equality the two
+ * branches are the *same function*: `slice(0, n - 1)` plus `join` of a
+ * single-element tail is the original list, and `truncate` of a row that already
+ * fits returns it unchanged. So `<=` and `<` compute the same body, the pass
+ * could not kill the difference, and the reason is that there is none. The
+ * property does not rest on the comparison — it rests on the join degenerating
+ * to identity — and a row asserting the comparison would be asserting a rule
+ * with nothing to be wrong about (A03 §2).
+ */
+function bodyOf(
+  text: string,
+  textWidth: number,
+  forMessage: number,
+  caps: RenderContext["capabilities"],
+): readonly string[] {
+  if (forMessage === 0) return [];
+  const lines = wrapCells(text, textWidth);
+  if (lines.length <= forMessage) return lines; // cells-ok — a row count, not a width
+  const kept = lines.slice(0, forMessage - 1);
+  // Joined rather than sliced: the marker has to sit on a row that overflows.
+  // Two short tail rows that fit together lose only their line break, which is
+  // no text lost and correctly no mark.
+  kept.push(truncate(lines.slice(forMessage - 1).join(" "), textWidth, caps));
+  return kept;
+}
+
+/**
+ * The rows this box needs to say what it has to say, at the width it was given
+ * (C09 I34, §3a-bis).
+ *
+ * **Height fits and width does not.** A block does not choose its width — the
+ * region does, and a block wider than its region is I1's over-draw in the other
+ * axis. So the message is wrapped to the width in hand and the *height* grows to
+ * fit the wrap.
+ *
+ * **Wrapped at the top rung's content width, which dissolves a fixed point.**
+ * The rung decides the padding, the padding decides the content width, the width
+ * decides the wrap, and the wrap decides the rung. `width − 4` is the narrowest
+ * content width any rung offers, so this errs in the safe direction: every lower
+ * rung is *wider*, wraps to fewer lines, and still shows all of them. The cost
+ * is at most one row of slack, which the render centres and which reads as
+ * deliberate.
+ *
+ * **The vertical blanks are not in the sum.** They are slack the render
+ * computes, appearing when the message is short and giving way as it grows —
+ * which is what the ladder already does with them. Counting them would make a
+ * two-line failure seven rows rather than five.
+ */
+export function statusRowsFor(
+  block: Status,
+  width: number,
+  caps: RenderContext["capabilities"],
+): number {
+  const w = normaliseWidth(width);
+  // The **top** rung deliberately, not the rung this block currently has: the
+  // question is how tall the good figure needs to be, and the answer is read
+  // from the furniture that figure draws.
+  const rung = widthRung(w, heightRung(FULL_FIGURE_ROWS, block.state !== "loading"));
+  const rowWidth = rung.frame.border ? Math.max(1, w - 2) : w; // cells-ok — a cell count
+  const textWidth = Math.max(1, rowWidth - 2 * (rung.frame.pad ? PAD : 0)); // cells-ok — a cell count
+
+  const g = glyphs(caps);
+  const mark = block.state === "error" || block.state === "retrying" ? `${g.warning} ` : "";
+  // Tick zero: the *emptiness* of the line is a function of the state and the
+  // fields, never of which frame the spinner is on, so any tick answers it.
+  const line = activityLine(block, spinnerFrames(caps, block.spinner), 0);
+
+  const wrapped = wrapCells(`${mark}${stripControl(block.message)}`, textWidth).length; // cells-ok — a row count
+  const rows = Math.min(MESSAGE_LINE_CAP, Math.max(1, wrapped)); // cells-ok — a row count
+  const tagRows = rung.frame.tag && rung.tag !== "none" ? 1 : 0;
+  const lineRows = line === "" ? 0 : 1;
+  return rows + (rung.frame.border ? 2 : 0) + tagRows + lineRows; // cells-ok — a row count
+}
+
 export const statusDefinition: BlockDefinition<Status> = {
   kind: "status",
 
@@ -290,10 +414,7 @@ export const statusDefinition: BlockDefinition<Status> = {
     const lineWins = block.state === "loading";
     const lineRows = line !== "" && (interior - tagRows >= 2 || lineWins) ? 1 : 0;
     const forMessage = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count
-    const body =
-      forMessage === 0
-        ? []
-        : wrapCells(`${mark}${stripControl(block.message)}`, textWidth).slice(0, forMessage);
+    const body = bodyOf(`${mark}${stripControl(block.message)}`, textWidth, forMessage, ctx.capabilities);
 
     // **The whole group is centred, not the message inside the leftover.** The
     // two are the same picture at the full figure's six rows, which is why this

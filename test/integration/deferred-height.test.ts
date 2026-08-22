@@ -20,8 +20,12 @@ import type { Block } from "../../src/data/viewmodel/index.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import type { TuiConfig } from "../../src/shell/types.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
-import { ERROR_MIN_ROWS } from "../../src/presentation/blocks/index.js";
-import { reserveNeeded } from "../../src/shell/block-faults.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import type { BlockFault } from "../../src/presentation/blocks/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { BlockFaultLog, reserveNeeded } from "../../src/shell/block-faults.js";
 
 const settle = async (): Promise<void> => {
   await new Promise((r) => setImmediate(r));
@@ -301,7 +305,9 @@ describe("C04 I68 — a block failing once is not permanently tall", () => {
 });
 
 describe("C22 I69 — the guards, where they can be constructed", () => {
-  const req = { entryId: "e1", rev: 4, blockId: "b", rows: ERROR_MIN_ROWS };
+  // A literal, because the constant it used to name is gone: the shell is handed
+  // the number by the fault now rather than importing one it could not compute.
+  const req = { entryId: "e1", rev: 4, blockId: "b", rows: 3 };
 
   it("T4.55 (C22 I69): a request whose entry moved is discarded", () => {
     // **The row the sequence trace produced and no classification could.** A
@@ -318,8 +324,62 @@ describe("C22 I69 — the guards, where they can be constructed", () => {
     // **Termination, and the whole of it.** A field cannot repeat, so no rule
     // forbids a second request — the second frame finds it set. Asserted at
     // exactly the boundary, because `>=` and `>` differ only here.
-    expect(reserveNeeded({ rev: 4 }, { minHeight: ERROR_MIN_ROWS - 1 }, req)).toBe(true);
-    expect(reserveNeeded({ rev: 4 }, { minHeight: ERROR_MIN_ROWS }, req)).toBe(false);
-    expect(reserveNeeded({ rev: 4 }, { minHeight: ERROR_MIN_ROWS + 1 }, req)).toBe(false);
+    expect(reserveNeeded({ rev: 4 }, { minHeight: 2 }, req)).toBe(true);
+    expect(reserveNeeded({ rev: 4 }, { minHeight: 3 }, req)).toBe(false);
+    expect(reserveNeeded({ rev: 4 }, { minHeight: 4 }, req)).toBe(false);
+  });
+});
+
+describe("C09 I34 — the number the fault carries", () => {
+  // **The shell stopped importing a constant it had no way to compute.** The
+  // rows a containment needs are a function of the message *and* the width, and
+  // only the containment holds both: the drain runs after the frame has
+  // returned, deliberately, and by then the width is gone (C22 I69).
+  const faultsFrom = (message: string, width: number): readonly BlockFault[] => {
+    const seen: BlockFault[] = [];
+    const r = createBlockRegistry({ defaults: true, onError: (f) => void seen.push(f) });
+    r.register({
+      kind: "plot",
+      measure: () => 1,
+      render: () => {
+        throw new Error(message);
+      },
+    } as unknown as BlockDefinition);
+    r.seal();
+    renderToLines(r, block({ kind: "plot", id: "p" } as Block), width, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      tick: 0,
+    });
+    return seen;
+  };
+
+  it("T4.57 (C09 I34, C22 I69): the rows asked for follow the message and the width", () => {
+    const short = "ENOENT";
+    const long = "Cannot read properties of undefined (reading 'series') while drawing the axis";
+    // **Both axes, because one alone is satisfied by a constant.** A fault that
+    // always said 4 passes a message-only row at the width where 4 is right, and
+    // a width-only row on a message that happens not to wrap.
+    expect(faultsFrom(short, 80)[0]?.rows, "one line, so border + tag + one").toBe(4);
+    expect(faultsFrom(long, 80)[0]?.rows, "the same message wraps further").toBeGreaterThan(4);
+    expect(
+      faultsFrom(long, 40)[0]?.rows,
+      "and narrower asks for more, which is the whole rule",
+    ).toBeGreaterThan(faultsFrom(long, 80)[0]?.rows ?? 0);
+  });
+
+  it("T4.58 (C09 I34, C22 I69): two faults on one block keep the larger request", () => {
+    // A `measure` fault says `${kind} failed to measure` and a `render` fault
+    // carries the exception — different messages, different numbers. Last-write
+    // wins would let the short one shorten the box the reader needs, and two
+    // faults on one block are still one request and one `rev` bump.
+    const log = new BlockFaultLog();
+    log.within("e1", 1, () => {
+      log.report({ kind: "plot", id: "p", member: "render", error: new Error("x"), rows: 9 });
+      log.report({ kind: "plot", id: "p", member: "measure", error: new Error("y"), rows: 4 });
+    });
+    const out = log.drain();
+    expect(out, "one block, one request").toHaveLength(1);
+    expect(out[0]?.rows, "and the larger of the two").toBe(9);
   });
 });

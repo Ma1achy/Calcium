@@ -39,6 +39,24 @@ export type BlockFault = Readonly<{
   id: string;
   /** Which half gave way. Three, and the fourth was folded into `elements` (I30). */
   member: "measure" | "render" | "elements";
+  /**
+   * The rows the error box needs for the text it is about to draw (I34, C22 I69).
+   *
+   * **Computed here because this is the only place that can.** The number is a
+   * function of the message *and* the width, and the containment holds both: it
+   * is one line above the `#errorBlock` call that draws them. The shell drains
+   * the request after the frame has returned — deliberately, so the frame stays
+   * single-pass — and by then the width is gone.
+   *
+   * It replaced a constant the shell imported from this component. A floor that
+   * is the same three rows whatever the box has to say is a floor that cuts, and
+   * cut in silence at every height rather than only at a cap (F230's class, one
+   * level down).
+   *
+   * Zero for `elements`, which costs no rows: it makes a block atomic for
+   * keyboard and pointer (I30) and changes nothing about the frame.
+   */
+  rows: number;
   error: unknown;
 }>;
 

@@ -56,8 +56,12 @@ const results = runPass({
       // committed, which is the height it is bound by (C09 I31). The pass was
       // re-run on the commit that moved it — an anchor changed without running
       // the pass is a survivor nobody sees (F219).
-      from: '      { kind: "status", id: "status", state: "error", message: text, height },',
-      to: '      { kind: "status", id: "status", state: "error", message: text, height: 1 },',
+      // **Re-anchored a third time**, when the block's construction moved into
+      // `errorStatus` so the fitter and the draw take it from one place (F240).
+      // The pass was re-run: an anchor changed without running the pass is a
+      // survivor nobody sees.
+      from: "    return statusDefinition.render(errorStatus(text, height), ctx);",
+      to: "    return statusDefinition.render(errorStatus(text, 1), ctx);",
       expect: "T3.33",
     },
     {
@@ -71,8 +75,10 @@ const results = runPass({
       // three arguments came onto one line. **Re-run on each re-anchor**, which
       // is the standing rule: an anchor moved without the pass being run is a
       // row nothing has watched since the day it was written.
-      from: "this.#errorBlock(`${block.kind} failed to render: ${message}`, committed.rows, childContext)",
-      to: "this.#errorBlock(`${block.kind} failed to render: ${message}`, 1, childContext)",
+      // Re-pointed a third time, when the message became `Registry.#errorText`
+      // so the fault's row count and the drawn box take one string.
+      from: "return this.#floored(block, this.#errorBlock(text, committed.rows, childContext));",
+      to: "return this.#floored(block, this.#errorBlock(text, 1, childContext));",
       expect: "T3.34",
     },
     {
@@ -89,14 +95,14 @@ const results = runPass({
       // C09 I29 — the state both catches shipped in.
       name: "the render catch swallows without reporting",
       file: REG,
-      from: '      this.#report(block, "render", error);',
+      from: '      this.#report(\n        block,\n        "render",\n        error,\n        statusRowsFor(errorStatus(text, 1), width, childContext.capabilities),\n      );',
       to: "",
       expect: "T3.35",
     },
     {
       name: "the measure catch swallows without reporting",
       file: REG,
-      from: '      this.#report(block, "measure", error);',
+      from: '      this.#report(block, "measure", error, rows);',
       to: "",
       expect: "T3.14",
     },

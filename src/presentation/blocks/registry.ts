@@ -15,10 +15,10 @@ import {
   normaliseWidth,
   sequenceHeight,
 } from "../../data/viewmodel/index.js";
-import type { Block } from "../../data/viewmodel/index.js";
+import type { Block, Status } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { paint, rows, tone } from "./paint.js";
-import { statusDefinition } from "./kinds/status.js";
+import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
   BlockDefinition,
   BlockFault,
@@ -106,15 +106,29 @@ class Registry implements BlockRegistry {
    * cadence, so a flood is the default shape and L4's recorder already collapses
    * one by message.
    */
-  #report(block: Block, member: BlockFault["member"], error: unknown): void {
-    this.#onError(Object.freeze({ kind: block.kind, id: block.id, member, error }));
+  #report(block: Block, member: BlockFault["member"], error: unknown, rows = 0): void {
+    this.#onError(Object.freeze({ kind: block.kind, id: block.id, member, error, rows }));
+  }
+
+  /**
+   * What the error box will say — **one text, and the fault and the block both
+   * take it from here.**
+   *
+   * The rows a fault asks for are a function of this string, and the string the
+   * box draws has to be the same one or the height fits a message nobody sees.
+   * They were two literals a hundred lines apart before there was a number
+   * riding on them; `cells()`'s argument, applied to a sentence.
+   */
+  static #errorText(block: Block, member: "measure" | "render", error: unknown): string {
+    if (member === "measure") return `${block.kind} failed to measure`;
+    return `${block.kind} failed to render: ${error instanceof Error ? error.message : String(error)}`;
   }
 
   /**
    * `measure`, contained — and whether it gave way, which the error path needs
    * and the public member throws away.
    */
-  #measured(block: Block, width: number): Measured {
+  #measured(block: Block, width: number, caps?: RenderContext["capabilities"]): Measured {
     // **The floor is C04's and applying it is this function's** (I33, C04 I67).
     // In both arms rather than only the successful one: a floor is about the
     // block, not about which half of its definition gave way, and a measurer
@@ -129,7 +143,21 @@ class Registry implements BlockRegistry {
       // row. This protects virtualisation: C14 sums measured heights without
       // rendering, so a measurer that throws would take the viewport with it
       // (T3.14). Compute, so no retry (A02 §7 rule 2).
-      this.#report(block, "measure", error);
+      // **`caps` is absent on the public `measure` path and that is not a
+      // default standing in for a value** (I2). A fault seen there is a
+      // diagnostic and never a request: the shell only records one inside the
+      // scope a *render* opens, so a measure fault with no request is exactly
+      // the case that cannot produce one. Asking for rows would be answering a
+      // question nobody put.
+      const rows =
+        caps === undefined
+          ? 0
+          : statusRowsFor(
+              errorStatus(Registry.#errorText(block, "measure", error), 1),
+              width,
+              caps,
+            );
+      this.#report(block, "measure", error, rows);
       return { ok: false, rows: Math.max(1, floor) };
     }
   }
@@ -161,10 +189,7 @@ class Registry implements BlockRegistry {
     // different kind from the one being contained, so there is no re-entrancy,
     // and going back through the registry would put a second catch between the
     // boundary and the block it is drawing.
-    return statusDefinition.render(
-      { kind: "status", id: "status", state: "error", message: text, height },
-      ctx,
-    );
+    return statusDefinition.render(errorStatus(text, height), ctx);
   }
 
   /**
@@ -478,7 +503,7 @@ class Registry implements BlockRegistry {
     // here. The alternative — measuring only inside the catch — cannot see a
     // *measurer* that gave way while the renderer succeeded, which is the case
     // that drew a fifth of a figure and said nothing.
-    const committed = this.#measured(block, width);
+    const committed = this.#measured(block, width, childContext.capabilities);
 
     if (!committed.ok) {
       // A definition that threw in either half renders the error block (I11).
@@ -486,7 +511,7 @@ class Registry implements BlockRegistry {
       // level down: 4 of 5 rows dropped, in silence (F223).
       return this.#floored(
         block,
-        this.#errorBlock(`${block.kind} failed to measure`, committed.rows, childContext),
+        this.#errorBlock(Registry.#errorText(block, "measure", undefined), committed.rows, childContext),
       );
     }
 
@@ -498,12 +523,18 @@ class Registry implements BlockRegistry {
       // containment includes the row count**. The rest of the frame is
       // unaffected in position as well as in content, and the block says what
       // happened rather than vanishing.
-      this.#report(block, "render", error);
-      const message = error instanceof Error ? error.message : String(error);
-      return this.#floored(
+      // **The text first, because the number rides on it** (I34). The rows this
+      // fault asks for are a function of exactly this string at exactly this
+      // width, and the box below is drawn from the same one — so they are
+      // computed together rather than written twice.
+      const text = Registry.#errorText(block, "render", error);
+      this.#report(
         block,
-        this.#errorBlock(`${block.kind} failed to render: ${message}`, committed.rows, childContext),
+        "render",
+        error,
+        statusRowsFor(errorStatus(text, 1), width, childContext.capabilities),
       );
+      return this.#floored(block, this.#errorBlock(text, committed.rows, childContext));
     }
   };
 }
@@ -542,6 +573,18 @@ export function createBlockRegistry(
  * Total, because `measure` is: a malformed floor on a document that reached
  * here anyway is treated as none rather than throwing at frame cadence.
  */
+/**
+ * The `status` block a containment draws, and **the one the fitter measures.**
+ *
+ * One constructor for both, because the height a fault asks for is computed from
+ * this block and the box that arrives is drawn from it: two literals would let
+ * the request fit a message the frame does not show, and every count would agree
+ * (C09 I34).
+ */
+function errorStatus(text: string, height: number): Status {
+  return { kind: "status", id: "status", state: "error", message: text, height } as Status;
+}
+
 function floorOf(block: Block): number {
   const held = (block as { minHeight?: unknown }).minHeight;
   return typeof held === "number" && Number.isInteger(held) && held > 0 ? held : 0;

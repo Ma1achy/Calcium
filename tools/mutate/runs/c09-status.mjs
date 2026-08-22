@@ -51,7 +51,7 @@ const results = runPass({
       // drawing it is the only thing that said otherwise.
       name: "the height ladder's top rung is labelled five",
       file: SRC,
-      from: "  if (height >= 6) return { border: true, pad: true, tag: tagged };",
+      from: "  if (height >= FULL_FIGURE_ROWS) return { border: true, pad: true, tag: tagged };",
       to: "  if (height >= 4) return { border: true, pad: true, tag: tagged };",
       expect: "T3.39",
     },

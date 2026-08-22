@@ -24,7 +24,6 @@
  * wrong. Nothing else needs it, and termination in particular does not: a floor
  * is a field, and a field cannot repeat.
  */
-import { ERROR_MIN_ROWS } from "../presentation/blocks/index.js";
 import type { BlockFault } from "../presentation/blocks/index.js";
 
 /** One block, one entry, one floor — everything `op: "reserve"` needs. */
@@ -41,8 +40,8 @@ export type ReserveRequest = Readonly<{
  *
  * `elements` does not: it makes a block atomic for keyboard and pointer (C09
  * I30) and changes nothing about the frame, so a fault there is a diagnostic and
- * no more. The other two both end at the error box, which needs
- * `ERROR_MIN_ROWS` to say anything a reader can tell from an ordinary red line.
+ * no more. The other two both end at the error box, which asks for the rows its
+ * message needs — a number this layer cannot compute and does not try to.
  */
 const COSTS_ROWS: ReadonlySet<BlockFault["member"]> = new Set(["measure", "render"]);
 
@@ -69,14 +68,26 @@ export class BlockFaultLog {
 
     const scope = this.#scope;
     if (scope === null || !COSTS_ROWS.has(fault.member)) return;
-    // Last write wins on the same block, and there is nothing to choose between:
-    // the floor is a constant. What matters is that two faults on one block do
-    // not become two patches and two `rev` bumps.
-    this.#pending.set(`${scope.entryId}\u0000${fault.id}`, {
+    // **The number is the fault's** (C09 I34, I69). It is a function of the
+    // message and the width, and the containment holds both — this drain runs
+    // after the frame has returned, deliberately, and by then the width is gone.
+    // This layer used to import a constant instead, which is how a floor came to
+    // be the same three rows whatever the box had to say.
+    //
+    // **The larger of two faults on one block wins**, where it used to be the
+    // last write and there was nothing to choose between: a `measure` fault and
+    // a `render` fault carry different messages and therefore different numbers,
+    // and taking the second would let a short one shorten a long one. Two faults
+    // on one block are still one request and one `rev` bump, which is what this
+    // map is for.
+    const key = `${scope.entryId}\u0000${fault.id}`;
+    const held = this.#pending.get(key);
+    if (held !== undefined && held.rows >= fault.rows) return;
+    this.#pending.set(key, {
       entryId: scope.entryId,
       rev: scope.rev,
       blockId: fault.id,
-      rows: ERROR_MIN_ROWS,
+      rows: fault.rows,
     });
   };
 

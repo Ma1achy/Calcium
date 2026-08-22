@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { spinnerFrames } from "../../src/presentation/blocks/index.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
+import { MESSAGE_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
 
 const ESC = String.fromCharCode(27);
 const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "gu");
@@ -342,5 +343,158 @@ describe("C09 I31 — the one-row rung, and the state it was not reasoned about"
     expect(rows).toHaveLength(1);
     expect((rows[0] ?? "")).toContain("loading (4s)");
     expect((rows[0] ?? ""), "no fragment of the message survives").not.toContain("a message");
+  });
+});
+
+
+describe("C09 I34 — the height fits the message and the width does not", () => {
+  // **Read from the frame, because every count agrees either way.** A request
+  // that under-wraps — at `width` rather than `width - 4` — produces a plausible
+  // number, `measure` and `render` still agree on it, and the only thing that
+  // says otherwise is the last line of the message being absent. That is the
+  // class this component keeps producing (F235, and the width ladder before it).
+  const CAP = MESSAGE_LINE_CAP;
+  const errStatus = (message: string, height: number): never =>
+    block({ kind: "status", id: "s", state: "error", message, height } as never) as never;
+
+  const framed = (message: string, w: number, caps = FULL_CAPS): readonly string[] => {
+    const rows = statusRowsFor(errStatus(message, 1), w, caps);
+    return measurable({ capabilities: caps }).renderToLines(errStatus(message, rows), w).map(plain);
+  };
+
+  it("T3.60 (C09 I34): the box grows to hold the message, and the tag survives", () => {
+    // 40 columns is where it binds: a typical message is three lines there and
+    // one at 120, so the width that needs the growth most is the one with least
+    // room (F238).
+    const msg = "plot failed to render: Cannot read properties of undefined (reading 'series')";
+    const narrow = framed(msg, 40);
+    const wide = framed(msg, 80);
+
+    // **The whole message, at both widths** — the assertion the old constant
+    // failed: at three rows this ended at "Cannot read" with nothing to say so.
+    //
+    // On the **last token** rather than a phrase, because a phrase spans a wrap
+    // boundary and a border sits between its halves — the first draft asserted
+    // `(reading 'series')` and failed on a frame that showed every character of
+    // it, which is a fixture wrong about the thing it was watching.
+    expect(narrow.join(" "), "the tail of the message reached the frame").toContain("'series')");
+    expect(wide.join(" ")).toContain("'series')");
+    // And the figure it grew into, not merely more rows.
+    expect(narrow.some((r) => r.includes("ERROR")), "the tag is affordable now").toBe(true);
+    expect(narrow[0]).toContain("┌");
+    expect(narrow.at(-1)).toContain("└");
+    // Narrower wraps to more lines, so it is taller. The direction is the rule.
+    expect(narrow.length).toBeGreaterThan(wide.length);
+
+    // **Thirty columns, and the width is the assertion.** A fitter that wrapped
+    // at `width` rather than the top rung's `width - 4` is self-consistent
+    // almost everywhere: below six rows the rung has no gutter, so `width - 2`
+    // *is* the content width and the two agree. It parts company only where the
+    // under-estimate still lands in the padded rung — here it asks for six,
+    // the real wrap at 26 cells is four lines, three fit, and the fourth is cut.
+    // **Every count agrees and the frame does not**, which is why this row reads
+    // the text rather than the number (F235's class, and the width ladder's).
+    const thirty = framed(msg, 30);
+    expect(thirty.join(" "), "the last line survives at the width that discriminates").toContain(
+      "'series')",
+    );
+    expect(thirty.join(""), "and nothing was cut, so nothing claims to be").not.toContain("…");
+  });
+
+  it("T3.61 (C09 I34, C09 I1): `statusRowsFor` and `render` agree at the granted height", () => {
+    // **I1's pair asserted directly.** The request is a promise about what
+    // `render` will draw; if the two disagree the shell floors a block to a
+    // height the box does not fill, and the trim below deletes whatever follows.
+    const r = measurable({ capabilities: FULL_CAPS });
+    for (const w of [12, 20, 40, 80, 120]) {
+      for (const msg of ["ENOENT", "a message that needs a second line at eighty columns and several at twelve", "x\ny\nz\nq\nw"]) {
+        const asked = statusRowsFor(errStatus(msg, 1), w, FULL_CAPS);
+        const drawn = r.renderToLines(errStatus(msg, asked), w).length;
+        expect(drawn, `w=${w} asked ${asked} for ${JSON.stringify(msg.slice(0, 24))}`).toBe(asked);
+      }
+    }
+  });
+
+  it("T3.62 (C09 I34, C09 I22): a cut carries its mark, and it is capability-resolved", () => {
+    const long = Array.from({ length: CAP + 4 }, (_u, i) => `line number ${String(i)}`).join("\n");
+    const uni = framed(long, 40).join("");
+    const asc = framed(long, 40, ASCII_CAPS).join("");
+    expect(uni, "the unicode marker").toContain("…");
+    expect(asc, "and the ascii one, because the mark is drawn by the framework").toContain("~");
+    expect(asc, "which cannot be the codepoint").not.toContain("…");
+  });
+
+  it("T3.63 (C09 I34): a message of exactly the cap carries no mark", () => {
+    // **The off-by-one that is worse than the silent cut it replaces.** A mark on
+    // a complete message claims a truncation that did not happen and sends the
+    // reader to the sink for text already on screen — confidently wrong rather
+    // than quietly incomplete.
+    //
+    // Newlines survive the wrap, so the fixture is exact rather than tuned: `CAP`
+    // lines wrap to `CAP` rows at any width that holds one of them.
+    //
+    // **Each line nearly fills the row, and the first fixture did not.** With
+    // short lines the overflow *joins* into the last kept row and fits — so
+    // nothing is lost and correctly nothing is marked, and the row asserting a
+    // mark failed for the right reason. A fixture has to be shown to respond to
+    // the thing it watches.
+    const wide = (i: number): string => `line ${String(i)} ${"x".repeat(24)}`;
+    const exact = Array.from({ length: CAP }, (_u, i) => wide(i)).join("\n");
+    const drawn = framed(exact, 40);
+    expect(drawn.join(" "), "every line is there").toContain(`line ${String(CAP - 1)}`);
+    expect(drawn.join(""), "and nothing claims otherwise").not.toContain("…");
+
+    // The neighbour on the other side, so the row is a boundary and not a point.
+    const over = `${exact}\n${wide(CAP)}`;
+    expect(framed(over, 40).join(""), "one more line and the mark appears").toContain("…");
+  });
+
+  it("T3.64 (C09 I34): the request follows the width ladder rather than assuming a tag", () => {
+    // At a width that cannot hold ` ERROR ` and a rule, `widthRung` drops the tag
+    // — so the sum must drop it too, or the box asks for a row it will not draw.
+    const msg = "ENOENT";
+    expect(statusRowsFor(errStatus(msg, 1), 40, FULL_CAPS), "border, tag, one message row").toBe(4);
+
+    // **The property is that the tag is not *counted*, not that the box is
+    // shorter.** The first draft asserted the height shrinks and it grows: at
+    // eight columns the content is four cells wide, so `ENOENT` wraps to two
+    // rows and the wrap costs more than the dropped tag saves. A number moving
+    // the way you expected is not evidence about the rule you meant.
+    const narrow = statusRowsFor(errStatus(msg, 1), 8, FULL_CAPS);
+    const drawn = framed(msg, 8);
+    expect(drawn, "and the frame is the height that was asked for").toHaveLength(narrow);
+    expect(drawn.some((r) => r.includes("ERROR")), "no tag at this width").toBe(false);
+
+    // **The number, and three other assertions were tried first.** A row count
+    // cannot see this: `measure` and `render` still agree, because the box takes
+    // the uncounted row as a blank. Nor can the blank count — at eight columns
+    // the extra row turns the padding on, which narrows the content to four
+    // cells and the wrap grows to eat it. Nor can a fit boundary, because two
+    // rows below the granted height removes the *border*, which is furniture
+    // rather than slack, and the message still shows.
+    //
+    // So the assertion is the figure, recorded:
+    //
+    //     ┌──────┐        the tag is unaffordable at eight columns, so it is
+    //     │▲     │        not counted, and the content is six cells wide
+    //     │ENOENT│
+    //     │      │
+    //     └──────┘        five rows
+    //
+    // Counting it gives six, which turns the gutter on, narrows the content to
+    // four, and splits `ENOENT` across two rows to pay for a tag that is never
+    // drawn.
+    expect(statusRowsFor(errStatus(msg, 1), 8, FULL_CAPS), "border and two wrapped rows").toBe(5);
+
+    // And the half that is a property rather than a figure: the granted height
+    // shows the whole message at every width.
+    const r = measurable({ capabilities: FULL_CAPS });
+    for (const w of [8, 12, 20, 40, 80]) {
+      const asked = statusRowsFor(errStatus(msg, 1), w, FULL_CAPS);
+      expect(
+        r.renderToLines(errStatus(msg, asked), w).map(plain).join(""),
+        `w=${w}: the granted height shows it all`,
+      ).not.toContain("…");
+    }
   });
 });
