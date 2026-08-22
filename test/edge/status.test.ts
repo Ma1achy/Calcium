@@ -231,28 +231,45 @@ describe("C09 §3a — paint and degradation", () => {
         .renderToLines(status({ height: 6 }), 46)
         .join("\n");
 
-    // Exactly one background introducer in the whole frame, at the depths that
-    // have one. More than one would mean something else got painted.
-    for (const depth of [24, 8] as const) {
-      const grounds = [...raw(depth).matchAll(/\u001b\[48;/gu)];
+    // Exactly one background introducer in the whole frame, at every depth that
+    // has one. More than one would mean something else got painted.
+    //
+    // **The introducer's shape differs by rung and the pattern covers all
+    // three**, because a four-bit terminal is one that may not understand the
+    // 256-colour form at all, so `escapes.ts` emits `40-47`/`100-107` rather
+    // than `48;5;n` (C10 I5). A matcher written for the upper rungs alone reads
+    // a painted 4-bit tag as an unpainted one.
+    // **The source, and two regexes built from it.** A `/g/` literal shared
+    // between `matchAll` and `test` carries `lastIndex` between calls, so the
+    // absence assertion below would start mid-string and pass on a frame that
+    // paints — a stateful matcher answering the question it was not asked.
+    const GROUND_SRC = String.raw`\u001b\[(?:48;|4[0-7]m|10[0-7]m)`;
+    for (const depth of [24, 8, 4] as const) {
+      const grounds = [...raw(depth).matchAll(new RegExp(GROUND_SRC, "gu"))];
       expect(grounds.length, `depth ${String(depth)} paints exactly one run`).toBe(1);
     }
 
-    // **Below 8-bit the pair degrades together**, which is the half a
-    // ground-only assertion would miss: an ink left behind on a ground that
-    // vanished is a foreground nothing measured, and C10 I21's rule read from
-    // the other direction. At 4 and 1 the tag carries no styling at all and is
-    // distinguishable by being the one run that does not — non-bold between two
-    // bold rules at one bit.
-    for (const depth of [4, 1] as const) {
-      expect(raw(depth).includes("\u001b[48;"), `depth ${String(depth)} paints no ground`).toBe(
-        false,
-      );
-      expect(
-        raw(depth).includes("255;255;255"),
-        `depth ${String(depth)} leaves no ink behind either`,
-      ).toBe(false);
-    }
+    // **The pair arrives whole at 4-bit, and the ground alone does not say so**
+    // — a tag painted red with no ink is C10 I21 from the other direction, and
+    // the assertion above would pass on it. The ground is `tone.error`'s own
+    // index by construction, which on dark is 9 and emits `101m`; the ink is
+    // the half that reads on it, index 0, which emits `30m` (C10 I32, F240).
+    expect(/\u001b\[101m/u.test(raw(4)), "4-bit grounds the tag in tone.error's own index").toBe(
+      true,
+    );
+    expect(/\u001b\[30m/u.test(raw(4)), "and carries the ink that reads on it").toBe(true);
+
+    // **1-bit is the only rung with nothing to arrive** (C10 I8 vanishes every
+    // surface), and the pair still moves together there: no ground in either
+    // form, and no ink left behind. **Asserted apart from 4-bit rather than
+    // beside it** — one arm covering both stated a forced absence at a rung
+    // that has a ground, and read as a ruling for four years' worth of readers
+    // because the sentence under it is true of the pair (F240).
+    expect(raw(1).includes("\u001b[48;"), "one bit paints no ground").toBe(false);
+    expect(new RegExp(GROUND_SRC, "u").test(raw(1)), "and none in the four-bit form either").toBe(
+      false,
+    );
+    expect(raw(1).includes("255;255;255"), "one bit leaves no ink behind either").toBe(false);
 
     // At one bit the tone is `{ bold: true }` and carries no colour, so the mark
     // and the word are what tell the states apart.

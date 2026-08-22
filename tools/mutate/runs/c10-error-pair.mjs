@@ -14,18 +14,23 @@
 // and the mutation that separates them is the defect as it stood.
 //
 // **Anchors checked for uniqueness before the pass** (F219).
-import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
-import { report, runPass } from "../mutate.mjs";
+import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CONTRAST = "src/presentation/theme/contrast.ts";
 const DARK = "src/presentation/theme/tokens-dark.ts";
+const FOURBIT = "src/presentation/theme/four-bit.ts";
 
-const FILES = "test/contract/theme.test.ts test/unit/theme.test.ts";
+// **`test/edge/status.test.ts` is in the set because T3.46 is where the pair is
+// read off a frame.** The two theme suites check the pair as *values*; only the
+// rendered row can say the 4-bit arm reaches the tag, and a mutation run against
+// a suite that cannot see its subject reports a survivor about the tests.
+const FILES = "test/contract/theme.test.ts test/unit/theme.test.ts test/edge/status.test.ts";
 
-const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
-const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
+// **Atomic, per F237** — a kill mid-write leaves a prefix, and `runPass` restores
+// with whatever `write` it is handed. 90 runs still roll their own pair.
+const { read, write } = fsIo(ROOT);
 const run = () => {
   try {
     return execSync(`npx vitest run ${FILES} 2>&1`, {
@@ -78,6 +83,29 @@ const results = runPass({
       from: '    errorGround: "#c62828",',
       to: '    errorGround: "#b71c1c",',
       expect: "T2.14e",
+    },
+    {
+      // **The 4-bit rung, which shipped without one** (F240). The pair resolves
+      // to `NO_STYLE` at depth 4, so the tag draws with no styling at all inside
+      // a red box — the one unmarked run, inverting §3a's own claim. The row
+      // that catches it has to read a frame: `FourBitMap` is partial over an
+      // open key, so no value assertion can ask whether a slot has an answer.
+      name: "the 4-bit arm goes back to being absent",
+      file: FOURBIT,
+      from: 'not a measurement.\n  "surface.errorGround": 9,\n  "surface.errorInk": 0,',
+      to: "not a measurement.",
+      expect: "T3.46",
+    },
+    {
+      // **Half the pair, which is the shape the whole row exists for.** A ground
+      // with no ink is a foreground nothing measured against it — C10 I21 read
+      // from the other direction — and it is the direction an author adding an
+      // arm is most likely to take, because the ground is the visible half.
+      name: "the 4-bit ground arrives without its ink",
+      file: FOURBIT,
+      from: 'not a measurement.\n  "surface.errorGround": 9,\n  "surface.errorInk": 0,',
+      to: 'not a measurement.\n  "surface.errorGround": 9,',
+      expect: "T3.46",
     },
     {
       // **The floor put back to the default**, which is the state before §4d.
