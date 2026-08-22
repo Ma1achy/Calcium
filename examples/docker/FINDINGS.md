@@ -12513,3 +12513,76 @@ part of that answer**: a decoder walks chunks and must skip ancillary ones rathe
 The shape in the plan holds unchanged: the dither arm is buildable without a decoder dependency,
 the grid survives every path the framework already puts a row through, and nothing about the
 protocol arm needs the diff to be smarter than it is.
+
+
+## F249 — Ink strips APC, so the kitty arm has no call site — and three other things a fixture could not see ★★★★★
+
+### 1 · The ruling the implementation falsified, third time this phase
+
+The protocol arm shipped on a chain of true statements: `a=T` at a stable id **replaces**, Ink
+writes nothing when nothing changes (F248), therefore transmission can ride with placement and no
+session state is needed. **Every step holds and the conclusion is false.**
+
+```
+APC alone         in=27  out=0   ""
+APC then text     in=29  out=2   "xy"
+SGR then text     in=20  out=20  survives unchanged
+```
+
+**Ink's tokeniser understands SGR and discards `ESC _G … ESC \`.** A transmission in a `Text` node
+never reaches the terminal, and the placeholders after it address an image that was never sent.
+
+**So the arm is built and cannot be called from where it would be called** — C23 §8a A4's class,
+arriving from the implementation rather than the walk for the **third time this phase**, after the
+mosaic's clip and `graph`'s clamp. The shape is identical each time: a conclusion about a mechanism
+nobody had run. **The failure this shape produces is *nothing drawn***, which is at least the loud
+one; the alternative — shipping the branch — would have read as a broken terminal.
+
+`imageDefinition` takes the dither at every protocol including `kitty`, because **nothing is worse
+than a dither on a terminal that could have shown one**, and the expiry is `transmitImage`.
+
+### 2 · The exemption that removed itself inside one phase
+
+`Decoded.pixels` was exempted in `UNCONSUMED_MEMBERS` with `imageDefinition` named as its expiry —
+a symbol rather than a sentence, so the deferral could be grepped. **The bidirectional arm deleted
+it the moment `imageDefinition` landed**, three commits later, reporting *no longer an unconsumed
+published member — it is either wired now or gone*. The mechanism working rather than being
+trusted, and the shortest a deferral has ever lived here.
+
+### 3 · A fixture typed from memory, and the two faults it hid
+
+The corpus's first image was a base64 PNG written by hand rather than generated. It did not decode,
+so **every row of the suite took the `alt` fallback** — and that path had two faults of its own,
+both invisible while the main path was never entered:
+
+- **Ink's `wrap: "truncate"` emits `…` at every capability**, where C09 I22 substitutes `~` under
+  `ascii`. F6's class, in a prop rather than a literal.
+- **An empty `Text` occupies no row.** A three-row block drew one, so C09 I1 came apart on the whole
+  corpus at every width.
+
+**A fixture that cannot reach the code under test hides the code under test's bugs**, and here it
+hid two in the very path it was accidentally exercising.
+
+### 4 · Three mutation survivors, three different reasons, and one of them twice
+
+| survivor | why |
+|---|---|
+| the width clamp | **the harness.** `T2.1b` is the row that catches it and its file was not under the pass |
+| Paeth's predictor | **the fixture.** `sharp` wrote filter **0 on every scanline** — measured, `filters sharp used: 0` — so ID2 asserted against a decoder path it never entered |
+| point-sampling | **the fixture, then the assertion** |
+
+**The Paeth case is the one with the reusable shape.** *A fixture must be shown to respond to the
+thing under test* — so the row now reads the filter byte off each scanline and asserts all five
+arms appear. The encoder would not produce them, so the PNG is **hand-encoded**: choosing the
+filters makes each arm reachable by construction rather than by hoping an encoder picks one.
+
+**And point-sampling survived twice, which is the sharper lesson.** A hard-edged disc has no detail
+to alias, so the first fixture could not see it. The replacement — one-pixel stripes at a fraction
+of the output resolution — could, and the *assertion* still could not: counting distinct glyphs
+accepts both readings, because point-sampling lands on the even pixel of every cell and returns one
+glyph while averaging returns one or two. **A "few distinct glyphs" check passes either way.** What
+separates them is *which* glyph, and the row asserts mid-ramp.
+
+**Two of the three were the test and one was the harness. None was the code.** That is the pass
+doing what it is for, and it took two rounds because the first repair fixed the fixture and left
+the assertion that could not tell the difference.
