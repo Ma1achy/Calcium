@@ -73,11 +73,37 @@ describe("C02 detection", () => {
     expect(caps({}).altScreen).toBe(false);
   });
 
+  it("T1.11 (C02 I10): the background is COLORFGBG's last field, and only 0-15 answers", () => {
+    // **The rxvt row is the one that decides the rule.** Every other value here
+    // has two fields, where *last* and *second* agree — so a suite without
+    // `fg;default;bg` in it tests the last-field rule against itself.
+    expect(caps({ TERM: "xterm", COLORFGBG: "15;0" }).backgroundPolarity).toBe("dark");
+    expect(caps({ TERM: "xterm", COLORFGBG: "0;15" }).backgroundPolarity).toBe("light");
+    expect(caps({ TERM: "xterm", COLORFGBG: "0;default;15" }).backgroundPolarity).toBe("light");
+
+    // A background that is not a number is a background that says nothing.
+    expect(caps({ TERM: "xterm", COLORFGBG: "15;default" }).backgroundPolarity).toBe("unknown");
+    // **And one that only *starts* as a number.** Found by the mutation pass:
+    // `parseInt` reads `15x` as 15, so a rule written on it declines `default`
+    // and quietly answers for a value it did not understand. The digit test is
+    // the whole difference and nothing had asserted it.
+    expect(caps({ TERM: "xterm", COLORFGBG: "0;15x" }).backgroundPolarity).toBe("unknown");
+    expect(caps({ TERM: "xterm", COLORFGBG: "0;15.5" }).backgroundPolarity).toBe("unknown");
+    // A 256-colour index: knowable, and declined — the cube is C10's and C10 is
+    // a layer up (C02 I10).
+    expect(caps({ TERM: "xterm", COLORFGBG: "15;235" }).backgroundPolarity).toBe("unknown");
+    // No separator at all.
+    expect(caps({ TERM: "xterm", COLORFGBG: "15" }).backgroundPolarity).toBe("unknown");
+    // And the case the third value exists for.
+    expect(caps({ TERM: "xterm" }).backgroundPolarity).toBe("unknown");
+  });
+
   it("T1.9 (I4): every field can be overridden, including altScreen on TERM=dumb", () => {
     const overrides: TerminalCapabilities = {
       colourDepth: 24,
       unicode: "full",
       ambiguousWidth: "narrow",
+      backgroundPolarity: "light",
       synchronisedUpdate: true,
       bracketedPaste: true,
       mouse: true,
@@ -93,6 +119,7 @@ describe("C02 detection", () => {
       colourDepth: 1,
       unicode: "ascii",
       ambiguousWidth: "narrow",
+      backgroundPolarity: "unknown",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -108,6 +135,7 @@ describe("C02 detection", () => {
         colourDepth: 24,
         unicode: "full",
         ambiguousWidth: "narrow",
+        backgroundPolarity: "light",
         synchronisedUpdate: true,
         bracketedPaste: true,
         mouse: true,

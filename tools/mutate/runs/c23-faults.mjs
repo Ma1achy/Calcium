@@ -82,16 +82,35 @@ const results = runPass({
     {
       name: "step 3 drains the capability warnings only, as it did",
       file: "src/shell/construct.ts",
-      from: "        ...detection.warnings,\n        ...stores.history.warnings,\n        ...pipeline.faults,",
+      // Re-anchored when C09's containments became a fourth source (C09 I29,
+      // F223), and re-run rather than re-anchored blind. The list is kept
+      // contiguous for exactly this: a comment between two members makes a
+      // span anchor unmatchable, and an anchor that misses reports as a
+      // survivor (F219).
+      from:
+        "        ...detection.warnings,\n" +
+        "        ...stores.history.warnings,\n" +
+        "        ...built.blockFaults.messages,\n" +
+        "        ...pipeline.faults,",
       to: "        ...detection.warnings,",
       expect: "T4.20",
     },
     {
       name: "step 3 forgets C23's faults",
       file: "src/shell/construct.ts",
-      from: "        ...stores.history.warnings,\n        ...pipeline.faults,",
-      to: "        ...stores.history.warnings,",
+      from: "        ...built.blockFaults.messages,\n        ...pipeline.faults,",
+      to: "        ...built.blockFaults.messages,",
       expect: "T4.27",
+    },
+    {
+      // **The fourth source, and its absence was structural** — L1 cannot reach
+      // the diagnostics list, so a contained renderer had nowhere to report and
+      // reported nowhere for the life of the registry (F223).
+      name: "step 3 forgets what C09's containments swallowed",
+      file: "src/shell/construct.ts",
+      from: "        ...stores.history.warnings,\n        ...built.blockFaults.messages,",
+      to: "        ...stores.history.warnings,",
+      expect: "T4.28",
     },
     // --- the dedup, in both directions ---------------------------------------
     {

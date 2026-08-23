@@ -14,7 +14,7 @@ import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
 import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
-import type { ColourRef, ResolvedTheme } from "../theme/index.js";
+import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells, truncate } from "../text.js";
@@ -71,6 +71,30 @@ export function background(
  */
 export function withBackground(style: Style | undefined, surface: Style): Style {
   return surface.background === undefined ? (style ?? {}) : { ...style, background: surface.background };
+}
+
+/**
+ * A run of blank cells whose **background is the datum** (C10 §4c, C12 I29).
+ *
+ * **A `Span` rather than a `Style`, and that is the whole guarantee.** C10 I21
+ * admits a background only from a `surface` ref, because a tone painted behind
+ * text is a tone nothing measured a contrast floor for. A matrix cell painted
+ * with a colormap value has no text to be illegible — it is a blank cell whose
+ * colour *is* the reading — so the floor has nothing to constrain, and that is
+ * the one case I21 was widened for.
+ *
+ * Returning the span means the widening cannot be misused: the text is built
+ * here, blank, and there is no way to hand the colour to a glyph. The
+ * alternative — a `Style` the caller is trusted to pair with blanks — is a
+ * convention, and this component has already paid for four call sites each
+ * honouring one.
+ *
+ * `paint` emits `48` for the background exactly as it does for C25's wash, so
+ * nothing downstream changes.
+ */
+export function wash(width: number, colour: ColourValue): Span {
+  const cells = Math.max(0, Math.floor(width));
+  return { text: " ".repeat(cells), style: { background: colour } };
 }
 
 /** The display width of a row of spans, measured on the text and not the styling. */

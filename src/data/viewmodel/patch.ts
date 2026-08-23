@@ -58,6 +58,22 @@ function countId(blocks: readonly Block[], id: string, seen: Set<Block> = new Se
  * cache that did not need invalidating, and the viewport does work proportional
  * to the document rather than to the change.
  */
+/**
+ * The same block without its floor (I68).
+ *
+ * **Four operations produce a new block from an old one and none carries it.**
+ * `replace` is wholesale and needs no help; `merge` and `expand` rebuild in
+ * place, so they call this; C09's `windowSequence` drops it for the third
+ * reason, that a slice is not the block. A floor is something the shell did
+ * about content that has now changed, and one kept past its content is a block
+ * padded under rows that are no longer the ones that failed.
+ */
+function withoutFloor<B extends Block>(block: B): B {
+  if (block.minHeight === undefined) return block;
+  const { minHeight: _dropped, ...rest } = block;
+  return rest as B;
+}
+
 function rewrite(blocks: readonly Block[], id: string, f: (b: Block) => Block): readonly Block[] {
   let changed = false;
   const out = blocks.map((b) => {
@@ -193,7 +209,8 @@ export function applyPatch(doc: ViewDocument, patch: ViewPatch): PatchResult {
           return b;
         }
         const table = b satisfies Table;
-        return { ...table, rows: mergeRows(table.rows, patch.rows) };
+        // I68 — the rows are not the rows the floor was raised for.
+        return withoutFloor({ ...table, rows: mergeRows(table.rows, patch.rows) });
       });
 
       if (wrongKind !== null) {
@@ -228,16 +245,51 @@ export function applyPatch(doc: ViewDocument, patch: ViewPatch): PatchResult {
           ...doc,
           blocks: doc.blocks.map((b) =>
             b.id === patch.blockId && b.kind === "table"
-              ? {
+              ? // I68 — an expansion changes the rows, so the height that failed
+                // is not the height now.
+                withoutFloor({
                   ...b,
                   rows: b.rows.map((r) =>
                     r.id === patch.rowId ? { ...r, expanded: patch.expanded } : r,
                   ),
-                }
+                })
               : b,
           ),
         }),
       };
+    }
+
+    case "reserve": {
+      // View state, like `expand` beside it, so it neither validates against I3
+      // nor touches `error`. Through `rewrite` rather than a top-level scan, so
+      // a block inside a `panel` or a `scroll` can be floored — the containment
+      // that raised it descends, and a request that could not reach half the
+      // tree would fail exactly where a container is what broke.
+      const n = countId(doc.blocks, patch.blockId);
+      if (n === 0) return fail(unknownId(patch.blockId, "reserve"), "reserve");
+      if (n > 1) return fail(duplicateId(patch.blockId), "reserve");
+
+      // **A floor is rows, so it is a non-negative integer**, and a caller
+      // asking for a fractional or negative one is stating something the
+      // measurer cannot honour. Refused rather than clamped: clamping makes a
+      // caller's mistake indistinguishable from a caller's intent.
+      if (!Number.isInteger(patch.rows) || patch.rows < 0) {
+        return fail(
+          `reserve: "rows" must be a non-negative integer (C04 I67) — got ${String(patch.rows)}`,
+          "reserve",
+        );
+      }
+
+      // **The maximum, never the assignment.** Two blocks can be floored on one
+      // frame and the second must not lower the first, and a caller re-stating a
+      // floor it already holds must produce the same document — which is what
+      // makes the shell's guard a guard rather than a race.
+      const blocks = rewrite(doc.blocks, patch.blockId, (b) =>
+        Math.max(b.minHeight ?? 0, patch.rows) === (b.minHeight ?? 0)
+          ? b
+          : { ...b, minHeight: patch.rows },
+      );
+      return { ok: true, doc: deepFreeze({ ...doc, blocks }) };
     }
 
     case "status": {

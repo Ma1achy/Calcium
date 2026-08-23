@@ -3,6 +3,21 @@
 // waiting on the component that creates its scope.
 import { readFileSync } from "node:fs";
 
+/**
+ * The encoding vocabularies SS51 forbids reading directly — see that rule.
+ *
+ * **Exported so it can be checked against its subject rather than remembered.**
+ * `enforce-rules.test.ts` asserts this equals the string-valued `RAMP_*` exports
+ * in `ramp.ts`, both directions, so a fifth vocabulary fails a test instead of
+ * quietly falling outside a closed pattern.
+ */
+export const RAMP_VOCABULARIES = Object.freeze([
+  "RAMP_UNICODE",
+  "RAMP_ASCII",
+  "RAMP_BRAILLE",
+  "RAMP_DENSITY",
+]);
+
 /** allow: paths (or prefixes) exempt from the rule. */
 export const SCANS = [
   // --- ambient reads -------------------------------------------------------
@@ -810,6 +825,57 @@ export const SCANS = [
     ],
     why: "a display measurement says which ambiguous-width convention it is under, or says why it does not need to (C02 I9)" },
 
+  // --- SS51 — a vocabulary read directly, going round the axis ---------------
+  //
+  // **The type stops the mismatch; this stops going round the type.** `ladderFor`
+  // is a mapped type over the axis, so `ladderFor("density", caps)` returning a
+  // height ladder does not compile — measured, TS2322. What it cannot stop is a
+  // renderer never asking: `import { RAMP_BRAILLE }` and indexing it, which is
+  // the exact move that produced C12's second defect. The guarantee lives in a
+  // function, and a rule that forbids the import is what makes the function the
+  // only door.
+  //
+  // ## The subject is a vocabulary, and two `RAMP_` names are not one
+  //
+  // Measured across `src/` before the pattern was written, because a broad
+  // `\bRAMP_[A-Z_]+\b` reports five lines and none of them is this rule's:
+  //
+  // | name | what it is | in scope? |
+  // |---|---|---|
+  // | `RAMP_UNICODE` `RAMP_ASCII` `RAMP_BRAILLE` `RAMP_DENSITY` | glyph sets — a value picks *which* | **yes** |
+  // | `RAMP_DOTS` (`raster.ts`) | `{x:1,y:8}`, dots per cell for the ASCII fold | no — a **homonym** |
+  // | `RAMP_STEPS` | `8`, the rung count every ladder shares | no — about all of them, not one |
+  //
+  // `RAMP_DOTS` is F161's shape arriving in a scan's own scope: a name that
+  // matches the pattern and shares nothing with the class. Allow-listing
+  // `raster.ts` by file to excuse it would put a permanent hole in a *renderer*,
+  // which is the one place the rule is for — so the pattern names the four rather
+  // than the prefix.
+  //
+  // ## Which is a closed list, and therefore has an equality arm
+  //
+  // A named set stops seeing a fifth ramp, and silently. So `RAMP_VOCABULARIES`
+  // is exported and `enforce-rules.test.ts` asserts it equals the string-valued
+  // `RAMP_*` exports in `ramp.ts` — bidirectional, the shape `MARK_EXEMPTIONS`
+  // and `EXPECTED_SURVIVORS` already have. A fifth vocabulary fails a test rather
+  // than passing a scan, and the discriminator is honest: a vocabulary is a
+  // string of glyphs, `RAMP_STEPS` is a number.
+  //
+  // ## Blind spots, stated because an unrecorded limit reads as strength
+  //
+  // - **Lexical.** `ladderFor("height", caps).steps` handed onward, or the eight
+  //   glyphs pasted as a literal, both pass. SS47 catches the paste as a *mark*
+  //   and says nothing about which axis it encodes.
+  // - **`src/` only.** Three test files import the vocabularies to assert on
+  //   them, which is the vocabulary being pinned rather than a renderer going
+  //   round the door.
+  // - **Import-shaped, not use-shaped.** It reports the line that names the
+  //   constant. A re-export under another name would pass, and there is none.
+  { id: "SS51", spec: "C12 §3c · C12 I21",
+    pattern: new RegExp(`\\b(?:${RAMP_VOCABULARIES.join("|")})\\b`),
+    scope: "src/", allow: ["src/presentation/plot/ramp.ts"],
+    why: "a renderer names the axis it draws and never a vocabulary (C12 I21) — `ladderFor` is the door, and reading a ramp constant is the move that produced the heatmap's density-for-height defect" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],
@@ -868,8 +934,12 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "picks its rule character from the capability in the expression that draws it",
   "src/presentation/plot/ramp.ts":
     "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
+  "src/presentation/plot/marks.ts":
+    "the category ladders, one per capability arm, side by side in the file that *is* the vocabulary — `ramp.ts`'s premise exactly, and `markOf` is the only door. The premise to re-check: all three arms are eight long and `enforce-rules.test.ts` asserts it, so a ninth mark on one arm is a test failure rather than a silent ladder that runs out at a different index than its palette",
   "src/presentation/plot/curve.ts":
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
+  "src/presentation/plot/linedraw.ts":
+    "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`",
   "src/shell/config.ts":
     "`PROMPT_SUBSTITUTION` is the pair, and `frame.ts` asserts both forms are `PROMPT_GUTTER.first` cells (C22 I52)",
   "src/shell/paint.ts":
@@ -1029,6 +1099,69 @@ export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8"
             spec: scan.spec,
           });
         }
+      });
+    }
+  }
+  return violations;
+}
+
+/**
+ * SS52 — a literal NUL anywhere the repository's own tools have to read.
+ *
+ * **SS43 is the same class and its scope is `src/`, which is where the byte is
+ * least harmful.** In source a stray NUL is a wrong character inside a string.
+ * In a *test* file it is something else: `grep` classifies the file as binary
+ * and skips it **silently**, so every search for that file's subject returns
+ * nothing — and nothing reads exactly like *no coverage*.
+ *
+ * **Measured, and it produced a false conclusion during the work that found
+ * it.** `test/edge/status.test.ts` carried three literal NULs written as
+ * `?? " "` fallbacks — SS43's own stated failure mode, *a separator that reads
+ * as a space turns out to be a NUL* — in 14 KB of C09's status ladder rows.
+ * Searching for them returned nothing, and the conclusion drawn was *the eleven
+ * ledger rows T3.38-T3.48 have no tests*. They all do (F236).
+ *
+ * **Bytes rather than lines, and no comment exemption, which is where this
+ * differs from SS43 rather than merely extending it.** SS43 skips comment lines
+ * because a rule's own prose is not a violation of it — correct there and wrong
+ * here, since a NUL inside a comment makes the file just as invisible. The
+ * subject is not what the character means; it is that the file stops being
+ * readable by the tools everything else in this directory depends on.
+ *
+ * **NUL alone, and the narrowing is a measurement rather than caution.** The
+ * first draft took SS43's whole C0 class and reported **90** hits, every one a
+ * literal ESC in a test about escape sequences — and those files grep fine:
+ * `file` calls them *UTF-8 text, with escape sequences* and `grep -c` counts
+ * their rows. Only NUL flips a file to `data`. A rule whose subject is *the
+ * file became unreadable* and which fires on 90 readable files is a rule people
+ * turn off, and the ninety would have been silenced with an allow-list that
+ * hid the four real ones among them.
+ *
+ * **Its blind spot, stated because an unrecorded limit reads as strength**: a
+ * non-NUL control character in `test/` or `tools/` is invisible to a *reader*
+ * and is caught by nothing — SS43 has that class and stops at `src/`. It is
+ * left open deliberately, because the two rules answer different questions and
+ * merging them is what produced the ninety.
+ */
+const CONTROL_BYTES = /\u0000/u;
+
+export function checkControlBytes(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+  for (const file of files) {
+    const src = readFile(file);
+    const lines = src.split("\n");
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i] ?? "";
+      const at = CONTROL_BYTES.exec(line);
+      if (at === null) continue;
+      const code = (at[0].codePointAt(0) ?? 0).toString(16).padStart(4, "0").toUpperCase();
+      violations.push({
+        rule: "SS52",
+        file: `${file}:${i + 1}`,
+        message:
+          `a literal U+${code} makes this file binary to \`grep\`, which then skips it in ` +
+          `silence — write it as an escape. Column ${String(at.index + 1)}`,
+        spec: "C16 T2.10 · F236",
       });
     }
   }

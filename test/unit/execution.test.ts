@@ -2143,9 +2143,62 @@ describe("C23 §4 — the submit row's two other steps", () => {
       .find((bl) => bl.id === "failing");
     const child = panel?.kind === "panel" ? panel.children[0] : undefined;
 
-    expect(child?.kind, "the failure is rendered rather than thrown").toBe("notice");
-    expect(child).toMatchObject({ tone: "error", glyph: "error" });
-    expect((child as { text: string }).text).toContain("the far side is gone");
+    // **A `status` at `retrying`, because a countdown is coming** (C23 I51).
+    // `every: 1000` makes this a polling source, so `backoffOf` supplies a
+    // `retryInMs` and the box has an activity line to draw. The arm with no
+    // countdown is `error`, and T1.40b is that half — mapping both to
+    // `retrying` draws a blank row where the spinner goes.
+    expect(child?.kind, "the failure is rendered rather than thrown").toBe("status");
+    expect(child).toMatchObject({ state: "retrying", height: 2, attempt: 1 });
+    expect((child as { retryInMs?: number }).retryInMs, "the countdown is the driver's").toBeGreaterThan(0);
+    expect((child as { message: string }).message).toContain("the far side is gone");
+  });
+
+  it("T1.40b (C23 I51, F234): a one-shot's failure is `error`, not a blank retry row", async () => {
+    // **The classification table found this before any of it was written**, and
+    // no sequence could have: nothing *happens* between §3d rule 3 declaring a
+    // one-shot and the fallback picking a state. Two correct statements
+    // overlapping in a cell — *a one-shot never retries*, so `retryIn` is
+    // `null`, and *`activityLine` draws nothing for a `retrying` box with no
+    // countdown* — and the overlap is a `status` whose second row is blank,
+    // where the spinner goes (C23 §8a-bis C1).
+    //
+    // **No `every`**, which is what makes it one-shot: `intervalMs: spec.every ?? 0`.
+    const h = harness({
+      adapt: (ctx) =>
+        doc({
+          command: ctx.command,
+          blocks: [
+            b.live({
+              id: "once",
+              title: "ONCE",
+              fetch: () => Promise.reject(new Error("nothing there")),
+              render: () => block({ kind: "raw", id: "once-body", text: "x" }),
+            }),
+          ],
+        }),
+    });
+
+    h.pipeline.submit("/ps");
+    await settled();
+    h.tick(1500);
+    await settled();
+
+    const panel = h.transcript.entries
+      .flatMap((e) => e.doc.blocks)
+      .find((bl) => bl.id === "once");
+    const child = panel?.kind === "panel" ? panel.children[0] : undefined;
+
+    expect(child?.kind).toBe("status");
+    // **The height is the assertion, not a detail.** At 2 this draws the message
+    // and an empty row under it, because `error` has no activity line at all —
+    // and an empty row is exactly what the reader would read as *still working*.
+    expect(child, "no retry is coming, so no countdown and no second row").toMatchObject({
+      state: "error",
+      height: 1,
+    });
+    expect(child).not.toHaveProperty("retryInMs");
+    expect((child as { message: string }).message).toContain("nothing there");
   });
 
   it("T1.21b (I29): a refusal is a submission and is recorded", async () => {

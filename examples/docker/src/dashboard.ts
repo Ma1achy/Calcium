@@ -28,7 +28,7 @@ import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone, ViewDocume
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
-import { capFor, createRingSet } from "./history.ts";
+import { capFor, createRingSet, historyBlock } from "./history.ts";
 
 import type { LocalContext, ProducerContext } from "@fmx/calcium";
 const run = promisify(execFile);
@@ -102,6 +102,19 @@ export const percent = (raw: string): number | null => {
  * a *live* one moves a row out from under a reader mid-glance, and the fault
  * would be invisible in every test because the observed order is stable.
  */
+/**
+ * A container's name for the history's row label, or its short id.
+ *
+ * **The id is the fallback rather than the label**, because a row outlives the
+ * container it names: `createRingSet` keeps a ring for every id it has seen, so
+ * a stopped container's row is still drawn and `join` no longer has a name for
+ * it. Dropping the row instead would renumber the ordinate under the reader,
+ * which is the thing the set's own header refuses.
+ */
+function nameOf(live: readonly Joined[], id: string): string {
+  return live.find((c) => c.id === id)?.name ?? id.slice(0, 12);
+}
+
 export function join(snap: Snapshot): Joined[] {
   const byId = new Map(snap.stats.map((s) => [str(s, "Container"), s] as const));
   return snap.containers
@@ -161,34 +174,6 @@ const GLYPH_SLOT = 2;
 const CPU_WIDTH = GLYPH_SLOT + BAR_CELLS + 1 + 6;
 
 /**
- * A bar, drawn from block glyphs rather than from a palette ramp.
- *
- * **Gap 3, absorbed rather than solved.** Load is a continuum and Calcium's
- * palette is tone slots, so the tone is chosen at thresholds — and the thresholds
- * are arbitrary. That is the finding: not that 60 and 85 are wrong numbers, but
- * that the app had to invent numbers at all to express a quantity.
- *
- * Overflows visibly past 100 rather than clamping (walk A4): the bar fills and
- * the number keeps counting, which is the honest rendering of a figure whose
- * ceiling is the core count and is not knowable here.
- */
-/**
- * The bar's two alphabets, and **the choice is the app's because nothing else
- * can make it** (F43, F54).
- *
- * `█ ░ —` are block elements and an em-dash. Capability substitution covers the
- * glyphs C09 picks, **not text an adapter supplies** — so on a terminal
- * declaring `unicode: ascii` these pass through untouched and draw as garbage.
- * S12 measured it: at `LANG=C` the frame kept `░░░░░░░░` beside a plot that had
- * correctly become `.::-==++**##@@` and borders that had correctly become `+--+`.
- *
- * The framework was right about all of that and cannot help here: an adapter is
- * handed `AdapterContext`, which carries `width` and no capabilities, so the
- * flag is computed in `main.ts` from the environment and threaded in by hand.
- * That thread is the price of F43 and it is what makes F43 a finding rather
- * than a preference.
- */
-/**
  * The separator, on the same axis as the alphabet.
  *
  * `·` is U+00B7 — not a block element, and not ASCII either. It was the fourth
@@ -198,50 +183,23 @@ const CPU_WIDTH = GLYPH_SLOT + BAR_CELLS + 1 + 6;
  */
 export const dot = (unicode: boolean): string => (unicode ? "·" : "-");
 
+/** The absent mark, still read by the summary line. */
 const ALPHABET = {
   full: { filled: "█", empty: "░", absent: "—" },
   ascii: { filled: "#", empty: ".", absent: "-" },
 } as const;
 
-export function bar(
-  value: number | null,
-  unicode = true,
-): { text: string; tone: Tone; glyph?: Glyph } {
-  const mark = unicode ? ALPHABET.full : ALPHABET.ascii;
-  if (value === null) return { text: mark.absent.padEnd(CPU_WIDTH - GLYPH_SLOT), tone: "muted" };
-  const filled = Math.min(BAR_CELLS, Math.round((value / 100) * BAR_CELLS));
-  const glyphs = mark.filled.repeat(filled) + mark.empty.repeat(BAR_CELLS - filled);
-  const text = `${glyphs} ${value.toFixed(1)}%`.padEnd(CPU_WIDTH - GLYPH_SLOT);
-
-  // **A toned cell must carry a glyph, and finding that out cost nothing only
-  // because a test constructed a busy container.**
-  //
-  // C04 I6: `warn` and `error` require a non-empty glyph, because colour alone
-  // survives neither 1-bit nor a colour-blind reader. `block()` throws without
-  // one — and the throw lands inside C23's `appendAndCommit`, which catches it,
-  // discards it and commits the frame anyway. So **every container above 60%
-  // CPU would have produced no entry at all**, silently, on exactly the machine
-  // someone opens a dashboard to look at. This machine is idle, so no frame
-  // could ever have shown it.
-  //
-  // This is gap 3 arriving concretely. The app wants colour to encode a
-  // *quantity* and Calcium's tones encode *severity* — which is a coherent
-  // design, and it means a value-coloured bar has to borrow severity marks it
-  // does not quite mean. `▲` at 60% is an overstatement; it is also the only
-  // vocabulary there is.
-  // **`warn` at both levels, and the frame is why.** The first version used the
-  // `error` glyph above 85 and rendered `✗ ████████ 101.2%` — which reads as a
-  // container that has *failed*, when the truth is that it is working as hard as
-  // it can. The vocabulary is severity all the way down (`ok` `warn` `error`
-  // `pending` `working` `cancelled` …) and has no mark for *hot*, so the
-  // quantity has to borrow the nearest severity and `▲` is as close as it gets.
-  //
-  // The tone still carries two levels, so amber and red separate the bands
-  // without the mark claiming a failure that has not happened.
-  if (value >= 85) return { text, tone: "error", glyph: "warn" };
-  if (value >= 60) return { text, tone: "warn", glyph: "warn" };
-  return { text, tone: "ok" };
-}
+/**
+ * **`bar()` lived here and is gone** — C04 I51, F174.
+ *
+ * Nine lines of run-drawing plus its alphabet, which the CPU column stopped
+ * using when `Cell.bar` landed and `ioBlock` stopped using when a `keyValue` row
+ * gained one. It outlived both by a commit because three tests called it
+ * directly, so a function no frame drew went on passing six assertions.
+ *
+ * `BAR_CELLS` and `GLYPH_SLOT` stay: `CPU_WIDTH` is built from them and the
+ * column still declares it.
+ */
 
 /** The longest container name seen on this machine, and the glyph beside it. */
 const NAME_CELLS = 22;
@@ -281,13 +239,48 @@ export const COLUMNS: readonly ColumnDef[] = [
   b.col("usage", { label: "USAGE", priority: 40, minWidth: 18 }),
 ];
 
+/**
+ * The tone a load takes, and **it stays here on purpose** (C04 I50c, C12 §3b).
+ *
+ * `Cell.bar` draws the run and this decides what the colour means. A framework
+ * that shipped thresholds would ship arbitrary numbers for everyone, and gap 3's
+ * own statement is that the app should not have to *invent numbers to express a
+ * quantity* — not that 60 and 85 are wrong. So the drawing moved and the numbers
+ * did not.
+ *
+ * **`warn` at both levels, and the frame is why.** The first version used the
+ * `error` glyph above 85 and rendered `✗ ████████ 101.2%`, which reads as a
+ * container that has *failed* when the truth is that it is working as hard as it
+ * can. The tone still carries two levels, so amber and red separate the bands
+ * without the mark claiming a failure that has not happened.
+ *
+ * C04 I6 obliges a glyph on `warn` and `error`, and the throw lands inside C23's
+ * `appendAndCommit`, which catches and commits anyway — so a missing glyph here
+ * is every busy container producing no entry at all, silently.
+ */
+export const BUSY = 60;
+export const HOT = 85;
+
+function loadTone(value: number | null): { tone: Tone; glyph?: Glyph } {
+  if (value === null) return { tone: "muted" };
+  if (value >= HOT) return { tone: "error", glyph: "warn" };
+  if (value >= BUSY) return { tone: "warn", glyph: "warn" };
+  return { tone: "default" };
+}
+
 function rowOf(c: Joined, unicode: boolean): TableRow {
   const { glyph, tone } = stateOf(c.state);
   const absent = unicode ? ALPHABET.full.absent : ALPHABET.ascii.absent;
   return b.row(c.id, {
     name: { text: c.name, glyph, tone },
-    cpu: bar(c.cpu, unicode),
-    mem: bar(c.memPerc, unicode),
+    // **`Cell.bar` draws it now** (C04 I50c). Nine lines of hand-drawn run,
+    // `unicode` threaded from `main.ts` because an adapter has no capabilities
+    // (F43), and a `padEnd` to a width the column already plans — all of it the
+    // framework's, and the app keeps the one decision it is entitled to make.
+    // `text: ""` because a cell's `text` is required and a bar's value is its
+    // quantity — the same shape a `spark` cell has, and the same small friction.
+    cpu: { text: "", bar: { value: c.cpu, max: 100, format: "percent" }, ...loadTone(c.cpu) },
+    mem: { text: "", bar: { value: c.memPerc, max: 100, format: "percent" }, ...loadTone(c.memPerc) },
     usage: c.memText === "" ? { text: absent, tone: "muted" } : { text: c.memText },
   });
 }
@@ -474,7 +467,15 @@ export function dashboard(
           // `cpuFold` has, and the same reason: one shared `fetch` between two
           // parts would stop the ring silently.
           takeTick(s);
-          return livePanelBody(join(s).filter(isLive), unicode);
+          const live = join(s).filter(isLive);
+          // **The history, finally drawn** (C12 §3a). `createRingSet` has been
+          // filling a rectangular matrix since it landed and nothing rendered
+          // it: the table says which container is busy *now*, and the matrix is
+          // the only thing that says which has *been*.
+          const history = historyBlock(rings, (id) => nameOf(live, id), unicode);
+          return history === null
+            ? livePanelBody(live, unicode)
+            : b.group("column", [livePanelBody(live, unicode), history], { id: "live-body" });
         },
         // **Without this the first frame says `loading…` for two seconds**, and
         // the handler is holding a snapshot the whole time. `b.live` returns its

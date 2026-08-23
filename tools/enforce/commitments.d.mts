@@ -107,6 +107,22 @@ export declare function checkReferences(
   exceptions?: Readonly<Record<string, string>>,
 ): { violations: Violation[]; resolved: number };
 
+/**
+ * SP8 — every `§` reference resolves against the document that owns it.
+ *
+ * `checkReferences`' shape, for `Inn`'s question asked of a section, and
+ * `resolved` is here for the same reason: a rule reporting zero over a corpus
+ * it cannot read looks exactly like one reporting zero over a clean one.
+ */
+export declare function checkSectionReferences(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  exceptions?: Readonly<Record<string, string>>,
+): { violations: Violation[]; resolved: number };
+
+/** Files whose `§` references are deliberately unresolvable, each with why. */
+export declare const SECTION_EXCEPTIONS: Readonly<Record<string, string>>;
+
 /** SP1, SP2, SP3 — so A03 commitment 14b's equality can see the family. */
 export declare const SPEC_RULES: readonly string[];
 

@@ -11,7 +11,7 @@ import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
-import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, FULL_CAPS, QUIET, measurable, visible } from "../support/render.js";
 
 const FULL = { unicode: "full" } as const;
 const ASCII = { unicode: "ascii" } as const;
@@ -104,8 +104,33 @@ describe("C09 tier 6", () => {
     expect(last >= 0xd800 && last <= 0xdbff, "a dangling high surrogate").toBe(true);
   });
 
+  /**
+   * A definition that genuinely throws — **and it has to be registered**
+   * (F226).
+   *
+   * For as long as these two rows existed, `explodes` was named and never
+   * registered, so it resolved through `raw` (I10), rendered as its own JSON and
+   * measured 1. Both rows passed with the containment deleted: they were named
+   * for I11 and exercised I10. `not.toThrow()` cannot tell *contained* from
+   * *never thrown*, and the two heights are the same number — the contained
+   * fallback is 1 and a 29-character JSON string at width 80 is 1 — so T6.8's
+   * assertion agreed with both readings.
+   *
+   * `QUIET` because the containment is the subject here; the harness is
+   * otherwise `LOUD` (I29), which is what turned this up.
+   */
+  const explodes = {
+    kind: "explodes",
+    measure: (): number => {
+      throw new Error("measurer exploded");
+    },
+    render: (): never => {
+      throw new Error("renderer exploded");
+    },
+  };
+
   it("T6.7 (I11): letting a renderer's throw propagate → T3.13 fails and the frame dies", () => {
-    const kit = measurable();
+    const kit = measurable({ definitions: [explodes as never], onError: QUIET });
     const document = block({
       kind: "group",
       id: "t6-7",
@@ -118,12 +143,26 @@ describe("C09 tier 6", () => {
     });
 
     expect(() => kit.renderToLines(document, 60)).not.toThrow();
-    expect(kit.renderToLines(document, 60).map(visible).at(-1)).toContain("third");
+    const lines = kit.renderToLines(document, 60).map(visible);
+    // **The containment fired**, which is what the row is about. The absence of
+    // a throw is satisfied by a block that never threw, and was.
+    expect(lines.join("\n"), "the catch was reached").toMatch(/failed to (render|measure)/u);
+    expect(lines.at(-1)).toContain("third");
   });
 
   it("T6.8 (I11): letting a measurer's throw propagate → T3.14 fails and scrolling breaks", () => {
-    const kit = measurable();
-    expect(() => kit.measure({ kind: "explodes", id: "bad" } as never, 80)).not.toThrow();
+    const kit = measurable({ definitions: [explodes as never], onError: QUIET });
+    const bad = { kind: "explodes", id: "bad" } as never;
+
+    expect(() => kit.measure(bad, 80)).not.toThrow();
+    expect(kit.measure(bad, 80), "contained at one row").toBe(1);
+    // The control that separates *contained* from *never thrown*: an
+    // unregistered kind measures 1 too, so the number alone proves nothing.
+    // What proves it is that the fallback would have rendered the block's JSON.
+    expect(measurable().renderToLines(bad, 80).map(visible).join(""), "the fallback, for contrast")
+      .toContain('"kind":"explodes"');
+    expect(kit.renderToLines(bad, 80).map(visible).join(""), "and the containment instead")
+      .toContain("failed to measure");
   });
 
   it("T6.10 (§3): wrapping `logs` instead of truncating → T2.1 fails at narrow widths", () => {

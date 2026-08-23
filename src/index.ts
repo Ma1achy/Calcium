@@ -156,6 +156,16 @@ export { completeLocal } from "./shell/documents.js";
 // --- builders — §4 ----------------------------------------------------------
 
 export { b } from "./shell/builders/index.js";
+/**
+ * The one range a set of overlaid images must share (C04 I74, §3h.3).
+ *
+ * **On the surface because the composition that needs it is the consumer's.**
+ * `b.samples` computes it for a grid; three `b.image` blocks composed by hand are
+ * the case §3h.3 measured, and without this that consumer can only write the
+ * pins and not derive them. The type is `yMin`/`yMax`'s, so what comes out of
+ * here goes straight onto an overlay.
+ */
+export { sharedRange, type PinnedRange } from "./data/viewmodel/range.js";
 export type {
   BlockOpts,
   CellInput,
@@ -275,6 +285,18 @@ export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.
  * the renderer's ASCII switch is C02 I9's tier (box drawing is ambiguous
  * throughout), and a `ProducerContext` carries them.
  */
+/**
+ * A plot as SVG — **the second renderer** (C12 §3aj.2, phase 3).
+ *
+ * **On the surface because the consumer boundary is the point.** A reader who
+ * wants a figure outside a terminal is what phase 3 exists for, and the path
+ * has no other caller by design: the layout ladder is not shared, so nothing
+ * inside the framework composes an SVG on a consumer's behalf.
+ *
+ * `sharp` or any SVG rasteriser turns the result into a PNG; `b.image` takes it
+ * from there, which is how a plot becomes an image inside a transcript.
+ */
+export { plotToSvg, svgLayout, SVG_FONT_SIZE, type SvgLayout } from "./presentation/plot/svg.js";
 export { mermaidCode } from "./presentation/mermaid.js";
 /**
  * A banner, from a sparse set of variants (roadmap 22).

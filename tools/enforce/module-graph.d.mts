@@ -87,10 +87,24 @@ export declare function checkBuilderCoverage(
   files: readonly string[],
   readFile?: (f: string) => string,
   omissions?: Readonly<Record<string, string>>,
+  /**
+   * Injected for the same reason `omissions` is: a rule tested only against its
+   * real list tests one of its two arms. This one has two of its own — a builder
+   * that sets a field claimed unbuildable, and an entry naming a field no kind
+   * carries.
+   */
+  never?: Readonly<Record<string, string>>,
 ): Violation[];
 
 /** MG27's reasons, keyed `Kind.field`. */
 export declare const BUILDER_OMISSIONS: Readonly<Record<string, string>>;
+
+/**
+ * MG27's reasons keyed by **field**, for fields carried by an intersected base
+ * and therefore on every kind at once — one entry rather than nineteen copies
+ * of one sentence.
+ */
+export declare const BUILDER_NEVER: Readonly<Record<string, string>>;
 
 /**
  * Roadmap 48 — the public surface by **use**: members of the types

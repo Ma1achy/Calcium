@@ -33,7 +33,13 @@ import {
   checkSeamConsumers,
   publicSurfaceUseSignal,
 } from "../../tools/enforce/module-graph.mjs";
-import { checkMarks, checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
+import {
+  checkControlBytes,
+  checkMarks,
+  checkSourceScans,
+  RAMP_VOCABULARIES,
+  SCANS,
+} from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
@@ -463,6 +469,17 @@ const FABRICATED: readonly Fabrication[] = [
     source: "const short = width - cells(text);",
   },
   {
+    // **The move the type cannot refuse.** `ladderFor("density", caps)` cannot
+    // return a height ladder — the mapped type rejects it, TS2322 — but nothing
+    // in the type system makes a renderer *ask*. This is the import that skips
+    // the door, and it is how the heatmap came to draw a density field with the
+    // sparkline's bottom-filled ramp: correct next door, arithmetically sound,
+    // and rows of tiny bar charts on the screen.
+    rule: "SS51",
+    file: "src/presentation/plot/definition.ts",
+    source: 'const glyphs = [...RAMP_BRAILLE];',
+  },
+  {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
     // resolving its own variable, which reads as C22 owning the default rather
     // than as the framework reading the environment.
@@ -577,11 +594,14 @@ const scanIds = SCANS.map((s) => s.id);
  *
  * SS47's subject is a string literal's *contents* rather than a line, and its
  * exemptions carry reasons with a bidirectional arm — neither of which the shared
- * row shape can hold. Listed here for the same reason `MODULE_GRAPH_RULES` is a
+ * row shape can hold. SS52's reason is sharper: `FABRICATED` holds a `source`
+ * string in this file, and SS52's subject is the one byte that would make this
+ * file binary to `grep` if it were written literally — **the defect installing
+ * itself in the fixture that tests for it** (F236). Listed here for the same reason `MODULE_GRAPH_RULES` is a
  * list: a rule invisible to `implemented` is a rule the fabrication check does not
  * demand a violation for, which is A03 §2 arriving in the mechanism against it.
  */
-const STANDALONE_SCANS = ["SS47"];
+const STANDALONE_SCANS = ["SS47", "SS52"];
 
 const implemented = [
   ...scanIds,
@@ -623,10 +643,22 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // SS47 likewise: its subject is a string literal's contents rather than a
       // line, and its exemptions carry reasons the shared shape has nowhere to put.
       "SS47",
+      // SS52 likewise, and for a reason the shared table structurally cannot
+      // hold: `FABRICATED` is a `source` string in *this* file, and this rule's
+      // subject is a byte that would make this file binary to `grep` the moment
+      // it were written literally — the defect installing itself in the fixture
+      // that tests for it. Its own rows build the byte at runtime, and one of
+      // them is the negative arm, which the shared shape has no place for
+      // either (F236).
+      "SS52",
       // MG27 likewise: its subject is two whole files read together — a block
       // type and the builder that constructs it — so the shared `FABRICATED`
       // shape, which is one file's text, cannot express it.
       "MG27",
+      // MG28 for MG27's reason exactly, since it reads the same pair: the
+      // union's members come from `types.ts` and the builder's literals from
+      // `builders/index.ts`, and neither alone is the subject.
+      "MG28",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -1088,16 +1120,24 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // a `Hunk` whose line `kind` is `"add"` — which the first version read as a
     // block kind that does not exist — and a single-line `Readonly<{…}> & Gap`
     // declaration, which a multi-line body regex read straight past.
+    // **The bases are declared, and that is a control this fixture did not have.**
+    // The rule used to carry the literal string `"gapBefore"` in its loop, so a
+    // fixture with no `Gap` declaration still checked the field; the fields are
+    // derived from the intersection now, and a fixture that omits the base
+    // would silently stop exercising the shared half. `Floor` is here for the
+    // same reason and carries the second kind of exemption.
     const types = [
       'export type Hunk = Readonly<{ lines: readonly Readonly<{ kind: "add"; text: string }>[] }>;',
-      'export type Rule = Readonly<{ kind: "rule"; id: string; label: string }> & Gap;',
+      "export type Gap = Readonly<{ gapBefore?: boolean }>;",
+      "export type Floor = Readonly<{ shellOnly?: number }>;",
+      'export type Rule = Readonly<{ kind: "rule"; id: string; label: string }> & Gap & Floor;',
       "export type Widget = Readonly<{",
       '  kind: "widget";',
       "  id: string;",
       "  shown: string;",
       "  hidden: number;",
       "  excused: boolean;",
-      "}> & Gap;",
+      "}> & Gap & Floor;",
       "",
       "export type Block =",
       "  | Rule",
@@ -1122,7 +1162,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // With `excused` accounted for and `hidden` not, exactly one field is a
     // violation — which is the discriminator: a rule reporting both would be
     // ignoring the reason list, and one reporting neither would be vacuous.
-    const violations = checkBuilderCoverage(files, read, { "widget.excused": "no surface has one" });
+    const NEVER = { shellOnly: "only a named op writes it" };
+    const violations = checkBuilderCoverage(
+      files,
+      read,
+      { "widget.excused": "no surface has one" },
+      NEVER,
+    );
     expect(
       violations.map((v) => v.message.match(/`(\w+)` and no builder/u)?.[1]),
       "`hidden` alone — `shown` is set, `excused` has a reason, `rule` is intact",
@@ -1147,10 +1193,42 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry naming a
     // field the builder now sets is itself a violation, or the list stops being
     // read the first time someone closes a gap without tidying up.
+    // **The derived base half.** Without `shellOnly` excused it is a violation on
+    // both kinds — which is what says the intersection is being read at all. The
+    // literal-string version of this rule would report nothing here, and it is
+    // the state MG27 shipped in: exhaustive over a block's own braces, and aware
+    // of exactly one shared field because someone typed its name.
+    const bare = checkBuilderCoverage(files, read, { "widget.excused": "x" }, {});
+    expect(
+      bare.filter((v) => v.message.includes("`shellOnly`")).length,
+      "a field on an intersected base is checked on every kind carrying it",
+    ).toBe(2);
+    expect(
+      bare.some((v) => v.message.includes("`gapBefore`")),
+      "and `gapBefore` is still covered, now because the builder mentions it",
+    ).toBe(false);
+
+    // The field-level list's own two arms. It claims no builder *can* set the
+    // field, so a builder that does makes the reason false rather than stale —
+    // and an entry naming a field no kind carries is vacuous.
+    const setAnyway = checkBuilderCoverage(
+      files,
+      read,
+      { "widget.excused": "x" },
+      { shown: "claimed unbuildable, and the builder sets it" },
+    );
+    expect(setAnyway.some((v) => v.message.includes("and the builder mentions it"))).toBe(true);
+
+    const vacuous = checkBuilderCoverage(files, read, { "widget.excused": "x" }, {
+      ...NEVER,
+      nosuchfield: "names nothing",
+    });
+    expect(vacuous.some((v) => v.message.includes("which no block kind carries"))).toBe(true);
+
     const stale = checkBuilderCoverage(files, read, {
       "widget.excused": "no surface has one",
       "widget.shown": "this one is set, so the entry has outlived its reason",
-    });
+    }, NEVER);
     expect(
       stale.some((v) => v.message.includes("which the builder now sets")),
       "an exemption that outlives its reason is a violation of its own",
@@ -1239,6 +1317,84 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+  });
+
+  it("SS51's vocabulary list equals `ramp.ts`'s, both directions", () => {
+    // **The price of naming four constants instead of the `RAMP_` prefix.**
+    // Two `RAMP_*` names in the tree are not vocabularies — `raster.ts`'s
+    // `RAMP_DOTS` is a dot geometry and `ramp.ts`'s `RAMP_STEPS` is a rung
+    // count — so a prefix pattern reports five lines and none of them is the
+    // rule's, and excusing `raster.ts` by file would hole the rule in a
+    // renderer. A closed list is the honest pattern and it goes stale in one
+    // direction nobody would notice: a fifth ramp lands and SS51 does not see
+    // it, reporting compliance exactly as it did the day before.
+    //
+    // **The discriminator is the type of the value.** A vocabulary is a string
+    // of glyphs a normalised value indexes; `RAMP_STEPS = 8` is a number about
+    // all of them. So the subject is derived rather than restated, and both
+    // directions are asserted — a name dropped from `ramp.ts` and left in the
+    // list is a rule scanning for something that cannot exist (A03 §2's
+    // vacuity class), which is the failure MG20's `MODE_OWNERS` had.
+    const src = readFileSync("src/presentation/plot/ramp.ts", "utf8");
+    const declared = [...src.matchAll(/^export const (RAMP_[A-Z_]+)\s*=\s*"/gm)].map((m) => m[1]!);
+
+    expect(declared.length, "no vocabulary exports found — the pattern stopped matching").toBeGreaterThan(0);
+    expect([...declared].sort()).toEqual([...RAMP_VOCABULARIES].sort());
+  });
+
+  it("MG28 fires on F180's own state, and is silent on the tree that fixed it", () => {
+    // **Its own row, because the shared harness cannot build its subject.**
+    // `checkBuilderCoverage` reads `types.ts` *and* `builders/index.ts` in full
+    // — the union's members come from one and the builder's literals from the
+    // other — so a fabrication that supplies one file with one line gives it
+    // nothing to compare. MG24 and MG3 are here for the same reason.
+    const files = srcFiles();
+    const hardcoded = (f: string): string => {
+      const src = readFileSync(f, "utf8");
+      return f.endsWith("builders/index.ts")
+        ? src.replace('form: form ?? "line",', 'form: "line",')
+        : src;
+    };
+
+    const fired = checkBuilderCoverage(files, hardcoded).filter((v) => v.rule === "MG28");
+    expect(fired, "the state the heatmap shipped in").toHaveLength(1);
+    expect(fired[0]?.message).toContain("heatmap");
+    expect(fired[0]?.message).toContain("MG27 passes this");
+
+    // **And the control, which is the half that matters here.** A rule that
+    // reports on a patched tree and on the real one is reporting on neither.
+    expect(checkBuilderCoverage(files).filter((v) => v.rule === "MG28")).toEqual([]);
+  });
+
+  it("MG28 examines a population, and the number is small on purpose", () => {
+    // **Read rather than tuned.** Six top-level block fields are closed string
+    // unions; five thread a parameter and were already right, and the sixth was
+    // F180. A rule that examined two fields and found nothing looks identical to
+    // one that examined twenty, so the figure is asserted rather than implied.
+    //
+    // The reach is deliberately narrow and its limits are in the rule's header:
+    // top-level fields only, string-literal unions only, and a parameter is
+    // trusted. Widening it to make the count larger is the tuning A03 §2 warns
+    // about — the subject is *a vocabulary a consumer picks from*, and that is
+    // what six of them are.
+    const types = readFileSync("src/data/viewmodel/types.ts", "utf8");
+    const closed = [
+      "Notice.tone", "Plot.form", "Plot.yFormat",
+      "Plot.colormap", "Patch.layout", "Group.direction",
+    ];
+    for (const key of closed) {
+      const [type, field] = key.split(".");
+      expect(
+        new RegExp(`export type ${String(type)} = Readonly<`, "u").test(types),
+        `${key}'s type is gone`,
+      ).toBe(true);
+      // Required or optional — `Plot.form` is required and the rest are not,
+      // which is a fact about the schema and not about this rule's reach.
+      expect(
+        new RegExp(`^\\s*${String(field)}\\??:`, "mu").test(types),
+        `${key} is no longer declared`,
+      ).toBe(true);
+    }
   });
 
   it("MG3 fires on a fabricated *type-only* cross-half edge, which it could not see at all", () => {
@@ -1857,5 +2013,63 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     const unspecified = implemented.filter((id) => !inventoried.has(id));
 
     expect(unspecified, `${unspecified.join(", ")} is enforced but not inventoried`).toEqual([]);
+  });
+});
+
+/** The tool's own walk, so the row below reads the same tree `make enforce` does. */
+const walk = (dir: string, out: string[] = []): string[] => {
+  for (const name of readdirSync(dir)) {
+    const p = `${dir}/${name}`;
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (/\.(ts|tsx|mjs|js)$/u.test(name)) out.push(p);
+  }
+  return out;
+};
+
+describe("SS52 — a NUL makes a file invisible to every search", () => {
+  // **The rule exists because it produced a false conclusion, not because a byte
+  // is untidy** (F236). `test/edge/status.test.ts` carried three literal NULs;
+  // `file` calls such a file `data`, `grep` skips it in **silence**, and a
+  // search for C09's status ladder rows came back empty. The conclusion drawn
+  // was *the eleven ledger rows T3.38-T3.48 have no tests*. All eleven exist, in
+  // 14 KB, in the file the search could not read.
+  //
+  // **Nothing reads exactly like no coverage**, which is why this is a gate and
+  // not a habit: no amount of care at the keyboard makes an invisible file
+  // visible, and the reader has no signal that anything was skipped.
+
+  it("SS52 fires: a literal NUL in a test file", () => {
+    const source = ['expect(frames[0] ?? "', '").toBe(mark);'].join("\u0000");
+    const found = checkControlBytes(["test/edge/example.test.ts"], () => source);
+    expect(found.map((v: { rule: string }) => v.rule)).toEqual(["SS52"]);
+    // The column, because a NUL is invisible and "somewhere on line 1" is not
+    // actionable — finding it by eye is the exact thing that cannot be done.
+    expect(found[0]?.message).toContain("Column 22");
+    expect(found[0]?.file).toBe("test/edge/example.test.ts:1");
+  });
+
+  it("SS52 does not fire on an escape sequence test, which is the narrowing", () => {
+    // **The first draft took SS43's whole C0 class and reported 90 hits**, every
+    // one a literal ESC in a test about escape sequences — and those files grep
+    // perfectly well. A rule whose subject is *the file became unreadable*,
+    // firing on ninety readable files, is a rule someone turns off; the four
+    // real ones would then have been hidden inside the allow-list that silenced
+    // them.
+    const esc = String.fromCharCode(27);
+    const source = `const reset = "${esc}[0m";`;
+    expect(checkControlBytes(["test/contract/x.test.ts"], () => source)).toEqual([]);
+  });
+
+  it("SS52: the real tree is clean, and over a wider list than SCANS walks", () => {
+    // **`checkSourceScans` only ever receives `walk("src")`**, so widening
+    // SS43's scope string would have changed nothing at all — the rule would
+    // have read as tightened and been identical. This one takes its own list,
+    // and the assertion below is that the list actually reaches `test/`: a
+    // control-byte check that silently scanned `src/` alone would pass here
+    // exactly as it does now.
+    const tree = [...walk("src"), ...walk("test"), ...walk("tools")];
+    expect(tree.some((f) => f.startsWith("test/")), "the list reaches test/").toBe(true);
+    expect(tree.some((f) => f.startsWith("tools/")), "and tools/").toBe(true);
+    expect(checkControlBytes(tree)).toEqual([]);
   });
 });

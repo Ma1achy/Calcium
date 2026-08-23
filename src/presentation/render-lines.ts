@@ -41,6 +41,8 @@ export type RenderOptions = Readonly<{
   onAction?: RenderContext["onAction"];
   /** Per-container scroll offsets, in rows (C04 I48). Absent is none. */
   scrollOffsets?: RenderContext["scrollOffsets"];
+  /** Per-plot cursor positions, in sample indices. Absent is no cursor. */
+  cursorPositions?: RenderContext["cursorPositions"];
 }>;
 
 /**
@@ -64,6 +66,7 @@ export function renderToLines(
     capabilities: options.capabilities,
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
+    ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };
@@ -112,6 +115,7 @@ export function renderSequenceToLines(
     capabilities: options.capabilities,
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
+    ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };

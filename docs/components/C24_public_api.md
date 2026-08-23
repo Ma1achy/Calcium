@@ -497,7 +497,7 @@ type LiveSpec = Readonly<{
   source?: string;                                 // shared with every part naming it
   derive?: { key: string; compute: (data: unknown, prev: unknown) => unknown };
   render: (data: unknown, ctx: ProducerContext) => Block;
-  renderError?:   (err: ErrorLike, retryInMs: number | null) => Block;
+  renderError?:   (err: ErrorLike, retryInMs: number | null, attempt: number) => Block;
   renderLoading?: () => Block;
   staleAfter?: number;                             // default 2 × every
 }>;
@@ -601,6 +601,20 @@ both survived every reading this project gave them because reading is what they
 were consistent with.
 
 **Behaviour is fixed; rendering is overridable.** `renderError` and `renderLoading` are replaceable so an app can match its own voice. Backoff, isolation and teardown are not — a guarantee you can switch off is not one.
+
+**`renderError`'s third parameter is a deliberate widening, and the alternative is recorded
+because it is invisible from the result.** `attempt` is the source's consecutive failure count
+and the framework's own fallback draws it; an override that wants it would otherwise have to keep
+its own, against a backoff it does not own. Additive, so nothing breaks. **The shape it was
+chosen over** is moving both framework defaults into `refresh.ts`, so the fallbacks live in one
+place rather than one in `builders/index.ts` and one in `execution.ts` and `attempt` reaches the
+box without widening anything — tidier, and not what was asked for. Someone later collapsing the
+parameter back needs to be able to see that, or they will read it as incidental wiring (C23 §3d-bis).
+
+**And this is where `renderLoading` earns its keep twice.** Declaring either one takes the part
+out of the framework's counter entirely: C23's elapsed tick fires only where the default is still
+in place, because *rendering is overridable* means the block is the consumer's and a framework
+timer writing fields into it would be the guarantee reaching past its own boundary (C23 I52).
 
 **And two things do not retry, which is A02 §7 read exactly rather than
 generously.** A `render` that throws is deterministic — same data, same throw — so

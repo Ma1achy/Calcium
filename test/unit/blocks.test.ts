@@ -1,9 +1,10 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
 import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
-import { block } from "../../src/data/viewmodel/index.js";
+import { block, validateBlock } from "../../src/data/viewmodel/index.js";
 import {
   createBlockRegistry,
+  DEFAULT_DEFINITIONS,
   DEFAULT_LANGUAGES,
   registerGrammar,
   tokenise,
@@ -161,7 +162,7 @@ describe("C09 §6 — the registry's transition table", () => {
     ).toHaveLength(2);
   });
 
-  it("T1.4: each of the fourteen kinds measures its documented height", () => {
+  it("T1.4: each of the eighteen kinds measures its documented height", () => {
     // §3's table, read back as assertions. The fixture is the canonical one, so
     // a change to a kind's height rule fails here with the kind named rather
     // than as one line of a conformance report.
@@ -180,8 +181,29 @@ describe("C09 §6 — the registry's transition table", () => {
       tip: 1, // ceil(cells / w)
       panel: 4, // children + 2
       group: 1, // row: max of children
+      scroll: 3, // height, plus a residue row where the content overflows
+      mosaic: 4, // `height`, exactly — declared and never derived (C04 I71)
+      image: 3, // `height`, clamped by the width — 8x8 at 3 rows needs 6 columns (C04 I73)
+      status: 7, // the declared height — six is the figure, seven shows its line
       raw: 2, // lines
     };
+
+    // **Compared to the registry by equality, and the guard below runs the other
+    // way** (F228). *Every listed kind has a fixture* was added after a rename
+    // left seven entries measuring against `undefined`; it says nothing about a
+    // kind that joins the registry and never joins this list, and `scroll` did
+    // exactly that — shipped in `DEFAULT_DEFINITIONS`, absent from §3's table and
+    // from these cases, so the one kind with no documented height was the one
+    // nothing asserted a height for. A coverage set drawn from the test's own
+    // table covers the table.
+    //
+    // Equality rather than a subset, on `BUILDER_OMISSIONS`' precedent: a subset
+    // lets a dead entry outlive its reason unread, and both directions are the
+    // point here.
+    expect(
+      Object.keys(documented).sort(),
+      "§3's table and DEFAULT_DEFINITIONS name the same kinds",
+    ).toEqual(DEFAULT_DEFINITIONS.map((d) => d.kind).sort());
 
     for (const [kind, height] of Object.entries(documented)) {
       const fixture = ONE_PER_KIND[kind as "raw"];
@@ -218,6 +240,118 @@ describe("C09 §6 — kinds", () => {
     // point of a capped column rather than a longest-key column.
     expect(first?.indexOf("one")).toBe(second?.indexOf("two"));
     expect(first?.indexOf("one")).toBe(22); // 20 cells of key, two of gap
+  });
+
+  /**
+   * A `keyValue` row carrying a quantity — C04 I51.
+   *
+   * **Indexed by where the bar meets the remainder**, which is the only place
+   * this differs from `Cell.bar`: a table column *is* a width and a `keyValue`
+   * value is what the label leaves, so every row below is about that boundary
+   * rather than about the run.
+   */
+  const withBar = (barWidth: number, value = "1.2GiB / 4GiB"): ReturnType<typeof block> =>
+    block({
+      kind: "keyValue",
+      id: "kv-bar",
+      rows: [{ label: "MEM", value, bar: { value: 45.2, max: 100, format: "percent" }, barWidth }],
+    });
+
+  it("T1.5a (C04 I51): the bar takes what it declared and the value takes the rest", () => {
+    const kit = measurable();
+    const [row] = kit.renderToLines(withBar(15), 80).map(visible);
+
+    // **The finding this row exists for.** The value column here is 74 cells —
+    // 80 less a five-cell key and two of gap — and a bar handed the remainder
+    // draws a 68-cell run: right in every count, and a picture no surface
+    // asked for. The declared width is what stops it.
+    expect(row).toContain("45.2%");
+    expect(row).toContain("1.2GiB / 4GiB");
+    expect(row?.indexOf("1.2GiB")).toBeLessThan(30);
+    expect(cells(row ?? ""), "the row is its own content, not the column").toBeLessThan(40);
+  });
+
+  it("T1.5b (C04 I51): the row is exactly its width, and the gap comes out of the detail", () => {
+    const kit = measurable();
+    for (const width of [80, 44, 34, 30]) {
+      const [row] = kit.renderToLines(withBar(15), width).map(visible);
+      // Added outside the remainder the gap would put the row one cell over,
+      // and a row the terminal wraps adds a line no measurer counted (C09 I5).
+      expect(cells(row ?? ""), `at width ${String(width)}`).toBeLessThanOrEqual(width);
+    }
+    expect(kit.measure(withBar(15), 30)).toBe(1);
+  });
+
+  it("T1.5c (C04 I51): with no room for a real detail the row is the bar", () => {
+    const kit = measurable();
+    // Read from the frame, not derived: the remainder came to exactly one cell
+    // and the detail rendered as a lone `…` — a mark saying *there is more*
+    // while showing none of it.
+    //
+    // **Both sides of the threshold, or the row is a restatement of the
+    // constant.** At two cells a real character survives beside the mark and
+    // the detail is worth drawing; at one there is only the mark.
+    const [wide] = kit.renderToLines(withBar(15), 24).map(visible);
+    expect(wide, "two cells of remainder carry a character").toContain("1…");
+
+    const [narrow] = kit.renderToLines(withBar(15), 23).map(visible);
+    expect(narrow).toContain("45.2%");
+    expect(narrow, "an ellipsis alone is not a detail").not.toContain("…");
+  });
+
+  it("T1.5d (C04 I51): a bar wider than the column narrows rather than overflowing", () => {
+    const kit = measurable();
+    // Not a construction error — the same document is correct at a wider
+    // terminal — so the width clamps here and the bar degrades through
+    // `valueBar`'s own rungs.
+    const [row] = kit.renderToLines(withBar(60), 30).map(visible);
+    expect(cells(row ?? "")).toBeLessThanOrEqual(30);
+    expect(row).toContain("45.2%");
+  });
+
+  it("T1.5e (C04 I51): the bar substitutes at ascii, because the framework draws it", () => {
+    // The half F54 measured and could not fix from the app side: capability
+    // substitution covers glyphs C09 picks, and an app-drawn run is adapter
+    // text. Drawn here, it degrades.
+    const [row] = measurable({ capabilities: ASCII_CAPS })
+      .renderToLines(withBar(15), 80)
+      .map(visible);
+    expect(row).toContain("#");
+    expect(row, "no block elements survive an ascii terminal").not.toContain("░");
+  });
+
+  it("T1.5f (C04 I51): a bar with no width is refused, and the renderer invents nothing", () => {
+    // **Found as a mutation survivor**, not by reading: removing the renderer's
+    // `barWidth === undefined` arm changed no frame, because every fixture
+    // supplied both members. The state the row claims to cover was one nothing
+    // constructed.
+    //
+    // The type cannot carry the pair — a narrower `bar` breaks every `b.kv`
+    // taking a tone shorthand — so `validateBlock` is the gate, and the
+    // renderer must not make the refused document render anyway. A default
+    // here is how a gate stops being reached.
+    const broken = {
+      kind: "keyValue" as const,
+      id: "kv-halfbar",
+      rows: [{ label: "MEM", value: "1.2GiB / 4GiB", bar: { value: 45.2, max: 100 } }],
+    };
+
+    const verdict = validateBlock(broken);
+    expect(verdict.ok, "a bar with no width is not a document").toBe(false);
+    expect(verdict.ok ? [] : verdict.error).toContainEqual(expect.stringContaining("barWidth"));
+
+    // **Asserted as a difference, because each frame alone is plausible.** The
+    // first version checked that the row held its value and no run — and a
+    // renderer that computed a `NaN` width satisfies both, drawing an empty run
+    // and two spaces before the text. It survived the mutation. What separates
+    // *ignored the bar* from *drew a bar of no cells* is only the comparison.
+    const kit = measurable();
+    const plain = { ...broken, rows: [{ label: "MEM", value: "1.2GiB / 4GiB" }] };
+    const [row] = kit.renderToLines(broken as never, 80).map(visible);
+    const [same] = kit.renderToLines(plain as never, 80).map(visible);
+
+    expect(row, "an incomplete bar is no bar, cell for cell").toBe(same);
+    expect(row).toContain("1.2GiB / 4GiB");
   });
 
   it("T1.6 (§3): a logs line longer than w is one row, ending in the marker", () => {
@@ -555,5 +689,55 @@ describe("C09 §6 — kinds", () => {
     for (const line of asciiLines) {
       expect([...line].every((ch) => (ch.codePointAt(0) ?? 0) < 0x80), line).toBe(true);
     }
+  });
+});
+
+describe("C09 I28 — a progress bar clamps its fill and never its number", () => {
+  // **One ruling where there were two.** `progress` clamped the ratio, and
+  // `examples/docker`'s CPU bar deliberately overflows because `CPUPerc` is
+  // per-core-normalised. The docker argument is not about docker: `100/100` and
+  // `150/100` drawing identically is the same defect wherever it happens, and a
+  // bar reporting `100%` on an overshoot says *complete* about something that
+  // is not.
+  const draw = (current: number, total: number, width = 40): string =>
+    measurable({ theme: DARK_THEME, capabilities: FULL_CAPS })
+      .renderToLines(block({ kind: "progress", id: "p", label: "Build", current, total }), width)
+      .map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""))
+      .join("");
+
+  it("T1.24 (I28): an overshoot fills the bar and keeps counting", () => {
+    expect(draw(150, 100), "the number is the true fraction").toContain("150%");
+    expect(draw(100, 100), "and a complete bar is still 100%").toContain("100%");
+    // The pair that used to be one picture. Asserted as a *difference*, because
+    // each frame alone is plausible and the defect was that they matched.
+    expect(draw(150, 100)).not.toBe(draw(100, 100));
+  });
+
+  it("T1.24 (I28): the bar itself never exceeds its cells", () => {
+    // The half that must clamp: a bar has no cells past its last one, so the
+    // fill saturates while the number does not. Without this the row would run
+    // past the width and the terminal would wrap a line no measurer counted.
+    const drawn = draw(150, 100, 40);
+    expect(cells(drawn, "narrow"), "exactly the width, at any overshoot").toBeLessThanOrEqual(40);
+    expect(draw(1000, 1, 40)).toContain("100000%");
+  });
+
+  it("T1.24 (I28): a negative current is floored, and without the floor it throws", () => {
+    // **The mutation pass found this**: removing the `Math.max(0, …)` survived
+    // every row, because no fixture in the corpus carries a negative `current`.
+    // It is not a cosmetic guard — `bar.on.repeat(filled)` with a negative count
+    // is a `RangeError`, so the block that renders a bar backwards does not
+    // render at all, and C09 I2's *no block input throws* is what it breaks.
+    expect(() => draw(-5, 100)).not.toThrow();
+    expect(draw(-5, 100)).toContain("0%");
+  });
+
+  it("T1.24 (I28): a total of zero has no proportion — an empty bar and 0%", () => {
+    // A floor rather than a measurement, and recorded so it is not rediscovered
+    // as a defect. `current / 0` is what this exists to keep out of the frame.
+    const drawn = draw(5, 0);
+    expect(drawn).toContain("0%");
+    expect(drawn).not.toContain("NaN");
+    expect(drawn).not.toContain("Infinity");
   });
 });

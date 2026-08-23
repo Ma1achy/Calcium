@@ -12,13 +12,14 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import {
   checkCommitments,
   checkOrdering,
   checkTestRowIds,
   checkReferences,
+  checkSectionReferences,
   checkSeamFour,
   referenceFiles,
   specFiles,
@@ -45,6 +46,24 @@ const examples = [...walk("examples/minimal"), ...walk("examples/docker")];
 const specs = specFiles();
 const references = referenceFiles();
 const { violations: refViolations, resolved } = checkReferences(references);
+// SP8 — the same question for `§`, which nothing asked. **Reported and not
+// gated on its first landing**, and the reason is SP3's own history: SP3 shipped
+// with its two findings already fixed, and this one arrived with 120 across 58
+// targets. A gate that fails on a hundred pre-existing citations is switched off
+// rather than fixed, which is A03 §2's lesson about every rule in its list.
+// Numbering C04's `gapBefore` heading — a section 26 pointers already named —
+// closed the largest class on the first run; the counter is what keeps the rest
+// visible rather than quietly true.
+const sectionRefs = checkSectionReferences(
+  references.filter((f) =>
+    !f.startsWith("docs/notes/") && f !== "docs/COMMITMENT_INVARIANT_AUDIT.md"
+    && f !== "CLAUDE.md" && f !== "docs/README.md"),
+);
+const sectionsDangling = sectionRefs.violations.filter((v) => !/nothing before it says/u.test(v.message));
+const sectionsUnowned = sectionRefs.violations.length - sectionsDangling.length;
+const sectionTargets = new Set(
+  sectionsDangling.map((v) => /cites ([A-Z]\d\d §[\w.]+)/u.exec(v.message)?.[1] ?? v.file),
+).size;
 const violations = [
   ...checkModuleGraph(files),
   // MG23 — one store per component above L0. SS29 folded here: as a source
@@ -53,6 +72,12 @@ const violations = [
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
   ...checkSourceScans(files),
+  // SS52 — the control-character class over the tree the *tools* read, which is
+  // wider than the one `SCANS` walks. `files` is `walk("src")`, so widening
+  // SS43's scope string alone would have changed nothing; and putting `test/`
+  // into `files` would place every other scan in scope of the tests, which is a
+  // different decision (F236).
+  ...checkControlBytes([...files, ...walk("test"), ...walk("tools")]),
   // SS47 — a mark the framework draws and cannot substitute. Its own function
   // rather than a row of `SCANS`, for MG27's reason: the subject is a string
   // literal's contents, its exemptions carry reasons, and it has the
@@ -104,6 +129,10 @@ if (violations.length === 0) {
       // A02 Seam 4 describes a component one; this is the difference, printed so
       // the number is visible rather than buried in F94. It is a count and not a
       // verdict — most of it is legitimate — so what it is good for is movement.
+      `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
+      `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
+      `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +
+      `(SP8, reported not gated)${RESET}\n` +
       `  ${DIM}seam signal · ${seam.withinComponent.length}/${seam.members} published members ` +
       `never called outside their own component (F94, reported not gated)${RESET}\n` +
       `  ${DIM}name exactness · MG24 is exact for ${exactness.exact}/${exactness.members} ` +

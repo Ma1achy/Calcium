@@ -60,13 +60,15 @@ const results = runPass({
     },
 
     // --- the bar, and the ceiling that is not 100 ----------------------------
-    {
-      name: "CPU is clamped to 100, so busy and saturated render alike",
-      file: "src/dashboard.ts",
-      from: "  const text = `${glyphs} ${value.toFixed(1)}%`.padEnd(CPU_WIDTH - GLYPH_SLOT);",
-      to: "  const text = `${glyphs} ${Math.min(100, value).toFixed(1)}%`.padEnd(CPU_WIDTH - GLYPH_SLOT);",
-      expect: "A4",
-    },
+    // **The clamp mutation is gone with its subject** (C04 I51, F174). `bar()`
+    // drew this run and the app no longer has one — `Cell.bar` took the column
+    // and a `keyValue` row took `ioBlock`. The ruling did not move, it changed
+    // owner: `c12-value-bar.mjs`'s *THE DEFECT: the number is clamped with the
+    // fill* is the same mutation against the framework that now draws it.
+    //
+    // Deleted rather than re-anchored, because there is nothing here to anchor
+    // to. An anchor pointed at a plausible neighbouring line is the row that
+    // applies and asserts nothing.
     {
       name: "the glyph slot is not reserved, so the column reflows when a container gets hot",
       file: "src/dashboard.ts",

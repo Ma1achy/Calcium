@@ -14,23 +14,26 @@
  * drawn inside a twelve-cell table cell in three separate surface specs.
  */
 import { cells } from "../text.js";
-import { rampFor, RAMP_STEPS } from "./ramp.js";
+import { ladderFor, RAMP_STEPS } from "./ramp.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /**
  * The cell a position with no reading draws (I4, C12 §4).
  *
- * **A marker rather than a blank, and the row is right-anchored is why.** A
- * leading blank already means *fewer samples than cells*; a blank at a gap would
- * mean *a sample that is missing*. One character, two meanings — and the case is
+ * **A marker rather than a blank, and the padding is why.** A trailing blank
+ * already means *fewer samples than cells*; a blank at a gap would mean *a
+ * sample that is missing*. One character, two meanings — and the case is
  * ordinary rather than exotic, because a stalled fetch is bursty and a gap at
- * the window's left edge is where it lands. `ratatui` reached the same finding
+ * the window's trailing edge is where it lands. **The argument survived the
+ * anchor moving and only its side changed** (C12 §B3): under left-padding the
+ * collision was at the head, under right-padding it is at the tail, and a
+ * marker answers both. `ratatui` reached the same finding
  * from the other side and its sentence is the one to keep: **a missing sample is
  * not a zero.**
  *
  * **ASCII in every ramp, and that is a measurement.** It must be one cell under
  * both width conventions and collide with no step of `▁▂▃▄▅▆▇█`, `.:-=+*#@` or
- * the braille ramp `rampFor` returns at `wide`. `·` `∅` `⋮` `◌` are all
+ * the braille ramp `ladderFor` returns at `wide`. `·` `∅` `⋮` `◌` are all
  * `East_Asian_Width=Ambiguous`, and `text.ts`'s table deliberately covers only
  * *the part that is drawn as geometry* — so `cells()` calls them one cell at
  * `wide` by a documented ruling, and choosing one would be wrong on a CJK
@@ -80,7 +83,9 @@ export function rampRow(
   if (w === 0) return "";
 
   const window = values.slice(Math.max(0, values.length - w)); // cells-ok — a position count
-  const ramp = [...(style.ramp ?? rampFor(caps))];
+  // **The axis, not a ramp** (I21). A sparkline cell is a column of a vertical
+  // axis, so `height` is what it draws and what it asks for.
+  const ramp = [...(style.ramp ?? ladderFor("height", caps).steps)];
   const middle = Math.floor((RAMP_STEPS - 1) / 2);
 
   const glyph = (v: number | null): string => {
@@ -94,8 +99,13 @@ export function rampRow(
     return ramp[step] ?? " ";
   };
 
+  // **Padded on the right** (I13, §B3). The window is still of the last `width`
+  // positions; only the blank moved. Left-padded, a fourth arrival shifted every
+  // glyph already on screen one cell left — which is the opposite of what
+  // T1.13's *"growing rightward"* described, and identical to it once the row
+  // is full, which is why the two were never told apart.
   const drawn = window.map(glyph).join("");
-  return " ".repeat(Math.max(0, w - cells(drawn, caps.ambiguousWidth))) + drawn;
+  return drawn + " ".repeat(Math.max(0, w - cells(drawn, caps.ambiguousWidth)));
 }
 
 /**
@@ -112,10 +122,13 @@ export function rampRow(
  * block form's `yMin`/`yMax` reach the shared scaling core instead, and a fourth
  * argument would be one this function's only caller could never supply.
  *
- * Right-anchored when there are fewer values than cells, because the window is
- * of the *last* points: a series three samples into an eight-cell column reads
- * as three samples so far, growing rightward, rather than as a stretched curve
- * that will change shape as it fills.
+ * **Padded on the right** when there are fewer values than cells (I13, §B3):
+ * a series three samples into an eight-cell column reads as three samples so
+ * far, growing rightward, rather than as a stretched curve that will change
+ * shape as it fills. The window is still of the *last* points — that is what
+ * happens once the row is full, and it is why the two anchors were never told
+ * apart. Before it is full, left-padding moved every glyph already on screen
+ * each time a sample arrived, which is what *growing rightward* is not.
  */
 
 export function sparkline(
@@ -129,8 +142,8 @@ export function sparkline(
   // **The window is of POSITIONS, not of readings** (I4, I13). It was
   // `values.filter(Number.isFinite)` and then a slice, which is why a gap closed
   // and the row came back a glyph shorter — `[1,2,3,NaN,7,8,9]` drew six cells
-  // for seven positions, and the extra leading blank is indistinguishable from
-  // the right-anchor padding that means *fewer samples than cells*.
+  // for seven positions, and the extra blank is indistinguishable from the
+  // padding that means *fewer samples than cells*.
   //
   // **The line form never had this**: `finiteSamples` keeps each value's index
   // precisely so the curve breaks across the gap. So one block kind's two forms
@@ -156,7 +169,7 @@ export function sparkline(
   });
   // The padding is `rampRow`'s, measured with `cells()` and never `.length`
   // (A03 SS23) — the way the measurer measures, or a table cell containing one
-  // would disagree with its planned width. `rampFor` is what makes that agree
+  // would disagree with its planned width. `ladderFor` is what makes that agree
   // on a wide terminal: the block ramp is two cells per glyph there, so the fix
   // was the glyphs and the measurement together.
   return drawn;

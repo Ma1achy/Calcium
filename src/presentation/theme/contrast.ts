@@ -14,6 +14,7 @@
  */
 
 import type { PaletteSpec, ThemeError, ThemeTokens } from "./types.js";
+import { TONES } from "../../data/viewmodel/index.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -58,6 +59,30 @@ const FLOORS: Readonly<Record<string, number>> = Object.freeze({
   dim: 3,
   muted: 2.5,
   comment: 3,
+  /**
+   * **Lowered deliberately, and the whole argument is in C10 §4d and I32.**
+   *
+   * Not repeated here, because a floor lowered in a comment is a floor nobody
+   * can find later and C10's case for the meaning/decoration split is that a
+   * floor is a promise the *theme* makes. The two things a reader meeting this
+   * number needs are the trade and where it is written down:
+   *
+   * **`tone.error` is also the `status` tag's ground, and on a dark page the two
+   * constraints have no common solution.** Measured over the whole 8-bit cube at
+   * step 4 — 262,144 candidates, not reds — **zero** colours are both legible on
+   * `bgElev` and dark enough to hold white at 4.5, on dark and on high-contrast
+   * alike; on light, 81,907 are, which is why light clears 4.5 unaided.
+   *
+   * So this buys `#c62828` holding white at **5.62 : 1** in the tag, and costs
+   * the message text **2.83** against `bgElev` — the binding surface, with `bg`
+   * at 3.10 — which is `muted`'s existing standard rather than body text's.
+   *
+   * **The alternative is shipped and is not this**: high-contrast takes a light
+   * ground with dark ink and needs no exception. Lightening the red to satisfy
+   * this number would undo a decision rather than repair an oversight, and §4d
+   * carries the figures that say which.
+   */
+  error: 2.5,
 });
 
 export const DEFAULT_FLOOR = 4.5;
@@ -126,6 +151,54 @@ const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
 const SELECTION_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   tone: Object.freeze(["default"]),
 });
+
+/**
+ * §4d — the error tag, and it is the one pairing where **both** sides are new.
+ *
+ * `diffPairs` and `selectionPairs` each check existing palette slots against a
+ * new ground. This checks a ground against **its own ink**, because the tag has
+ * no slot it could borrow: `tone.error` is authored as a foreground for a dark
+ * page and is the wrong brightness to sit behind text, which is I21's rule
+ * arriving from the other direction.
+ *
+ * **A ground with no ink of its own is how a floor gets missed**, so the two
+ * land together and are checked together. At the meaning floor, because a tag
+ * reading *this failed* is meaning rather than decoration.
+ */
+export function errorTagPairs(
+  tokens: ThemeTokens,
+): readonly (readonly [string, string, string, string])[] {
+  const ground = tokens.surfaces.errorGround;
+  const ink = tokens.surfaces.errorInk;
+  if (!isHex(ground) || !isHex(ink)) return Object.freeze([]);
+  return Object.freeze([["errorInk", ink, "errorGround", ground] as const]);
+}
+
+/**
+ * The tag's own check, and it is **not** folded into `validateDiffSurfaces`.
+ *
+ * That function reads its value from `tokens.palettes[palette].slots[slot]` and
+ * `continue`s when it finds nothing — so a pair whose foreground lives in
+ * `surfaces` would be skipped in silence, which is a check that cannot fire
+ * dressed as one that passes (A03 §2). Written the first way and caught here:
+ * both sides come from `surfaces`, so both are read from `surfaces`.
+ */
+function validateErrorTag(tokens: ThemeTokens): readonly ThemeError[] {
+  const errors: ThemeError[] = [];
+  for (const [inkName, ink, groundName, ground] of errorTagPairs(tokens)) {
+    const measured = ratio(ink, ground);
+    if (measured >= DEFAULT_FLOOR) continue;
+    errors.push({
+      path: `surfaces.${inkName}`,
+      message:
+        `"${inkName}" (${ink}) is ${measured.toFixed(2)} : 1 against ${groundName} ` +
+        `(${ground}), below the ${DEFAULT_FLOOR} : 1 meaning floor — the tag says ` +
+        `something failed, so it carries meaning rather than decoration, and the ` +
+        `pair moves together because neither half is measured without the other`,
+    });
+  }
+  return errors;
+}
 
 /** The pairing, exposed so the suite can assert its shape rather than its results. */
 export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, string, string, string])[] {
@@ -199,6 +272,77 @@ function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
  * Every failure, not the first. A theme with four bad tones should be fixed in
  * one pass, and a validator that stops at the first turns that into four.
  */
+
+/**
+ * Every palette family the framework itself resolves against, and the slots it
+ * asks for (I30, F172).
+ *
+ * **The theme is checked here because a document cannot be.** `resolve` returns
+ * `NO_STYLE` when a palette is missing *and* when a decoration palette collapses
+ * at 1-bit, so *this reference does not exist* and *this reference means nothing
+ * here* are one value to every caller — a span painted in the default
+ * foreground, legible, plausible, and not what the block asked for. Nothing
+ * downstream can tell them apart and nothing downstream should have to: the set
+ * of references **the framework can produce** is closed, so it is checkable once,
+ * against the theme, at the moment the theme is resolved.
+ *
+ * **What it cannot reach, stated because an unrecorded limit reads as strength.**
+ * An *app* writing `continuous.s99` against a family that exists is still
+ * silent — `ColourRef` is `` `${string}.${string}` `` and published. What this
+ * closes is the case F172 was filed for: a family that is not there at all,
+ * which is what the first thing written against a new palette hits.
+ *
+ * **Derived rather than restated where the vocabulary has a value.** `TONES` is
+ * C04's, so a tone added without a theme slot fails here rather than rendering
+ * uncoloured. `syntax` and `categorical` are listed, and
+ * `theme-required.test.ts` holds them to the real vocabularies by equality —
+ * the arm `MARK_EXEMPTIONS` and `RAMP_VOCABULARIES` both have.
+ */
+export const REQUIRED_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  tone: TONES,
+  categorical: Object.freeze(["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"]),
+  syntax: Object.freeze([
+    "keyword", "string", "comment", "number", "key",
+    "type", "function", "operator", "punctuation",
+  ]),
+});
+
+/**
+ * The families and slots a theme must carry (I30).
+ *
+ * **At resolve time, which is where C10 already refuses a palette whose slots
+ * render as one another.** A theme that cannot answer a reference the framework
+ * will make is a theme that paints the wrong thing on every frame, and the
+ * failure it produces without this — an uncoloured span — is indistinguishable
+ * from a correct one at a glance and from a deliberate one at any distance.
+ */
+function validateRequiredSlots(tokens: ThemeTokens): readonly ThemeError[] {
+  const errors: ThemeError[] = [];
+  for (const [family, slots] of Object.entries(REQUIRED_SLOTS)) {
+    const palette = tokens.palettes[family];
+    if (palette === undefined) {
+      errors.push({
+        path: `palettes.${family}`,
+        message:
+          `the framework resolves \`${family}.*\` and this theme declares no such palette ` +
+          `(C10 I30) — every reference to it would return no style, which renders as the ` +
+          `default foreground and is indistinguishable from a block that asked for one`,
+      });
+      continue;
+    }
+    for (const slot of slots) {
+      if (palette.slots[slot] !== undefined) continue;
+      errors.push({
+        path: `palettes.${family}.${slot}`,
+        message:
+          `the framework resolves \`${family}.${slot}\` and this theme has no such slot ` +
+          `(C10 I30) — it would paint as the default foreground, silently`,
+      });
+    }
+  }
+  return Object.freeze(errors);
+}
+
 export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   const errors: ThemeError[] = [];
   const surfaces = Object.entries(tokens.surfaces);
@@ -218,7 +362,9 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
     errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg));
   }
 
+  errors.push(...validateRequiredSlots(tokens));
   errors.push(...validateDiffSurfaces(tokens));
+  errors.push(...validateErrorTag(tokens));
   errors.push(...validateVariant(tokens));
 
   return Object.freeze(errors);

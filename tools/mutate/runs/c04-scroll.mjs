@@ -84,8 +84,13 @@ const MUTATIONS = [
     // row could not be written until the store did.
     name: "the render cache key ignores the scroll offset",
     file: "src/shell/session.ts",
-    from: "\\u0000${offsets}`;",
-    to: "`;",
+    // **Re-pointed when the tick axis joined the slot** (F227). The line used to
+    // end at `${offsets}` and now carries `${animated}` after it, so the old
+    // anchor named a string that no longer exists. The mutation is unchanged —
+    // it still drops the offsets and leaves everything else — and the pass was
+    // re-run on the commit that moved it (F219).
+    from: "\\u0000${offsets}${animated}`;",
+    to: "${animated}`;",
     expect: "T4.41",
   },
   {
@@ -108,7 +113,10 @@ const MUTATIONS = [
     // coordinates the sequence never had. The condition is the definition's.
     name: "elementsIn walks into every container, answered or not",
     file: "src/presentation/blocks/registry.ts",
-    from: "        if (hasChildren(block) && !this.#ownsElements(block)) {",
+    // Re-anchored when the two element questions became one call (C09 I30,
+    // F224). The subject is unchanged — the condition is still the definition's
+    // — and this pass was re-run rather than re-anchored blind.
+    from: "        if (hasChildren(block) && !own.owned) {",
     to: "        if (hasChildren(block)) {",
     expect: "T2.34",
   },

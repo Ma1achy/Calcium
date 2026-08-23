@@ -33,10 +33,12 @@
 // What makes it cheap enough to be made: an entry is a name, a reason and a
 // function returning rows. Adding one is three lines and the frame comes free.
 import { block, type BlockKind } from "../../src/data/viewmodel/index.js";
+import { b } from "../../src/shell/builders/index.js";
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { measurable } from "./render.js";
 import { noticeDoc } from "../../src/shell/documents.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
@@ -149,6 +151,13 @@ export const STATES: readonly StateFixture[] = Object.freeze([
           yMin: 0,
           yMax: 100,
           xLabels: ["-60 ticks", "", "now"],
+          // **No `colormap` here, and the absence is the ruling.** This corpus
+          // strips SGR on purpose — *C10's own goldens own colour* — so adding
+          // one changes nothing in the snapshot, and a fixture that cannot
+          // respond to the member it declares is the shape `test/support/
+          // README.md` refuses. The second channel is measured in
+          // `test/contract/colormap.test.ts`, by SGR count at four depths and by
+          // the glyph stream being identical with and without it (C10 I31).
           series: [
             { values: [2, 9, 24, 61, 88, 97, 74, 30, 11, 4, 2, 3, 8, 19, 44, 70], label: "api" },
             { values: [40, 41, 39, 42, 40, 38, 41, 43, 40, 39, 41, 40, 42, 41, 39, 40], label: "worker" },
@@ -156,6 +165,141 @@ export const STATES: readonly StateFixture[] = Object.freeze([
             { values: Array.from({ length: 16 }, () => null), label: "db" },
           ],
         }),
+      ),
+  },
+  {
+    name: "plot-heatmap-overfull",
+    of: "plot",
+    why:
+      "every heatmap fixture had as many readings as cells, so the window did nothing and both " +
+      "anchorings agreed — a mutation left-anchoring the colour window survived. `capFor` is " +
+      "`max(24, width - 12)`, so below width 36 the ring is longer than the area with no resize " +
+      "involved: the ordinary case, and the window's only subject (C12 I13, C10 I31)",
+    rows: (w, caps, theme) =>
+      plot(
+        w,
+        caps,
+        theme,
+        block({
+          kind: "plot",
+          id: "st-heat-full",
+          form: "heatmap",
+          height: 3,
+          yMin: 0,
+          yMax: 100,
+          xLabels: ["-60 ticks", "", "now"],
+          // Sixty readings into an area that is never sixty cells at these
+          // widths. The newest are kept, so the right-hand edge is the present —
+          // and a row whose values climb makes that legible in the frame rather
+          // than only in an assertion.
+          series: [
+            { values: Array.from({ length: 60 }, (_, i) => Math.round((i / 59) * 100)), label: "climb" },
+            { values: Array.from({ length: 60 }, (_, i) => Math.round((1 - i / 59) * 100)), label: "fall" },
+            // And one that is shorter than the rest: back-filled to the same
+            // length by `createRingSet`, which is what keeps the matrix
+            // rectangular (C04 I50b).
+            { values: [...Array.from({ length: 40 }, () => null), ...Array.from({ length: 20 }, (_, i) => i * 5)], label: "late" },
+          ],
+        }),
+      ),
+  },
+  {
+    name: "table-value-bar",
+    of: "table",
+    why:
+      "the tree hand-wrote nine lines of this rather than bend `b.progress`, and the run is a " +
+      "picture — a fill that clamped its number would draw a busy container like a saturated one",
+    rows: (w, caps, theme) =>
+      measurable({ definitions: [tableDefinition], theme, capabilities: caps }).renderToLines(
+        block({
+          kind: "table",
+          id: "st-bar",
+          columns: [
+            b.col("name", { label: "NAME", priority: 90, minWidth: 8 }),
+            b.col("cpu", { label: "CPU", priority: 80, minWidth: 18 }),
+          ],
+          rows: [
+            { id: "r1", cells: { name: { text: "api" }, cpu: { text: "", bar: { value: 4.2, max: 100, format: "percent" } } } },
+            { id: "r2", cells: { name: { text: "worker" }, cpu: { text: "", bar: { value: 101.2, max: 100, format: "percent" }, tone: "error", glyph: "warn" } } },
+            { id: "r3", cells: { name: { text: "db" }, cpu: { text: "", bar: { value: null, max: 100 }, tone: "muted" } } },
+            { id: "r4", cells: { name: { text: "idle" }, cpu: { text: "", bar: { value: 0, max: 100, format: "percent" } } } },
+          ],
+        }),
+        w,
+      ),
+  },
+  {
+    name: "plot-annotated",
+    of: "plot",
+    why:
+      "an annotation must not read as data, and every way of getting that wrong renders — a " +
+      "solid line is a flat series, a ramp-folded one is heavier than the curve, and a clamped " +
+      "edge names a limit that is somewhere else. None is visible to a count (C12 I23)",
+    rows: (w, caps, theme) =>
+      measurable({ definitions: [plotDefinition], theme, capabilities: caps }).renderToLines(
+        block({
+          kind: "plot",
+          id: "st-ann",
+          form: "line",
+          height: 8,
+          axes: true,
+          yMin: 0,
+          yMax: 100,
+          yFormat: "percent",
+          series: [
+            {
+              values: Array.from({ length: 48 }, (_, i) =>
+                12 + 78 * (0.5 - 0.5 * Math.cos((i / 47) * Math.PI * 2))),
+              label: "CPU %",
+              tone: "ok",
+            },
+          ],
+          annotations: [
+            // The band docker declares, and a line at a ceiling the data crosses.
+            { kind: "band", from: 60, to: 85, tone: "warn" },
+            { kind: "line", value: 95, tone: "error" },
+            // And one off the scale, which must draw nothing rather than a line
+            // at the top saying the limit is there.
+            { kind: "line", value: 400, tone: "error" },
+          ],
+        }),
+        w,
+      ),
+  },
+  {
+    name: "kv-value-bar",
+    of: "keyValue",
+    why:
+      "the bar is a declared width inside a column that is a remainder, and every way of getting " +
+      "that wrong renders — a 68-cell run at width 80, a row one cell over, a detail that is a " +
+      "lone ellipsis. None of the three is visible to a count (C04 I51)",
+    rows: (w, caps, theme) =>
+      measurable({ theme, capabilities: caps }).renderToLines(
+        block({
+          kind: "keyValue",
+          id: "st-kv-bar",
+          rows: [
+            {
+              label: "MEM",
+              value: "1.2GiB / 4GiB",
+              bar: { value: 45.2, max: 100, format: "percent" },
+              barWidth: 15,
+            },
+            // The scale exceeded, which is the row `progress` would clamp.
+            {
+              label: "CPU",
+              value: "8 cores",
+              bar: { value: 101.2, max: 100, format: "percent" },
+              barWidth: 15,
+            },
+            // Absent, which draws a mark and never an empty run.
+            { label: "SWAP", value: "unavailable", bar: { value: null, max: 100 }, barWidth: 15 },
+            // And a row with no bar at all, beside them — the shape both
+            // measured consumers actually have.
+            { label: "PIDS", value: "12" },
+          ],
+        }),
+        w,
       ),
   },
   {

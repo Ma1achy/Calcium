@@ -61,29 +61,125 @@ const KNOWN_STALE = {
   // the list anyway, because repairing an anchor without running the pass
   // produces a mutation that applies and asserts nothing, and that reads as
   // coverage from the summary line. The repair belongs to whoever runs it.
-  "docker-dashboard.mjs": 1,
+  "docker-dashboard.mjs": 2,
   "c15-centred-width.mjs": 1,
   "c19-menu-window.mjs": 1,
-  "c22-construct.mjs": 2,
+  "c22-construct.mjs": 3,
   "c22-frame-session.mjs": 2,
   "c22-selection-wash.mjs": 1,
   "c23-refresh.mjs": 10,
+
+  // **Six of these arrived at once, and none of them rotted that day** (F173).
+  // They were stale already and the checker could not see them: it matched only
+  // double-quoted `from:` values, so 108 of 465 anchors across 30 of 54 runs
+  // were outside its reading. Widening the pattern turned 357 anchors into 465
+  // and 19 misses into 25 — the six below, plus one each already counted above.
+  //
+  // **The two this session owned were repaired rather than listed** —
+  // `c12-ramp.mjs` and `c12-value-bar.mjs`, both re-anchored onto where the
+  // encoding rule moved their subject and both re-run. These four are not, for
+  // the reason at the head of this list: repairing an anchor without running the
+  // pass produces a mutation that applies and asserts nothing, which reads as
+  // coverage from the summary line.
+  "c10-categorical.mjs": 1,
+  "c26-elements.mjs": 1,
+  "c26-focus-target.mjs": 1,
 };
 
-/** Every `{file, from}` pair a run declares, control included. */
+/**
+ * A quoted literal's body, whichever quote the author used.
+ *
+ * Both are turned into JSON's one escaping so a single parser reads them: a
+ * single-quoted body may hold a bare `"` (JSON's delimiter) and a `\'` (not a
+ * JSON escape at all), and each is the reason the naive wrap-in-quotes fails.
+ */
+function unquote(body, quote) {
+  if (quote === '"') return JSON.parse(`"${body}"`);
+  return JSON.parse(`"${body.replaceAll("\\'", "'").replaceAll('"', '\\"')}"`);
+}
+
+/**
+ * Every `{file, from}` pair a run declares, control included.
+ *
+ * **Both quote styles, and reading only one was this instrument's own blind
+ * spot.** The first version matched `from: "…"` alone, so **108 of 465 anchors
+ * across 30 of 54 runs were invisible** — a gate that ran, reported a count, and
+ * could not see 23% of its subject. It was found the way the sixth blind spot
+ * says: a real stale anchor in `c02-ambiguous.mjs` survived a commit and the
+ * checker said the tree was clean, so the number it printed was checked against
+ * the tree rather than trusted. FINDINGS F173.
+ *
+ * **A count is what a working gate looks like from outside**, which is why the
+ * MA4 arm asserts equality against the tree and this comment records the figure.
+ */
 function anchorsOf(src) {
   const consts = {};
-  for (const m of src.matchAll(/^const ([A-Z_][A-Z_0-9]*) = "([^"]+)";/gm)) consts[m[1]] = m[2];
+  for (const m of src.matchAll(/^const ([A-Z_][A-Z_0-9]*) = (["'])([^"']+)\2;/gm)) consts[m[1]] = m[3];
 
   const out = [];
-  const re = /file:\s*([A-Z_][A-Z_0-9]*|"[^"]+")\s*,\s*\n\s*from:\s*"((?:[^"\\]|\\.)*)"/g;
+  // **A branch per quote style rather than a backreference**, because a class
+  // cannot exclude `\2`: one pattern over both would have to allow the delimiter
+  // inside the body and stop at the first one followed by a comma, which a value
+  // containing `",` ends early and silently. Comment lines between `file:` and
+  // `from:` are skipped — a re-anchoring usually arrives with its reason.
+  // **And the value may be a concatenation, on its own lines** — the second form
+  // this instrument could not see (F232). Widening for both quote styles left
+  // `from:` followed by a newline and a `+`-joined run of literals outside the
+  // pattern: **6 of 838 anchors across 5 runs**, and one of them was stale on the
+  // day it was measured. The same shape as F173 one turn later — a widening that
+  // fixed the form in front of it and stopped there — which is why this matches a
+  // *sequence* of literals rather than a third alternative.
+  const LITERAL = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`;
+  const re = new RegExp(
+    String.raw`file:\s*([A-Z_][A-Z_0-9]*|"[^"]*"|'[^']*')\s*,\s*\n\s*(?:\/\/[^\n]*\n\s*)*from:\s*` +
+      String.raw`((?:(?:${LITERAL})\s*\+?\s*)+)`,
+    "g",
+  );
+  const pieces = new RegExp(LITERAL, "g");
   for (const m of src.matchAll(re)) {
     const raw = m[1];
-    const file = raw.startsWith('"') ? raw.slice(1, -1) : consts[raw];
+    const file = raw.startsWith('"') || raw.startsWith("'") ? raw.slice(1, -1) : consts[raw];
     if (file === undefined) continue;
-    out.push({ file, from: JSON.parse(`"${m[2]}"`) });
+    const from = (m[2].match(pieces) ?? [])
+      .map((lit) => unquote(lit.slice(1, -1), lit[0]))
+      .join("");
+    out.push({ file, from });
   }
   return out;
+}
+
+/**
+ * Every test path a run hands to `vitest`.
+ *
+ * **The second thing that rots in these files, and it rots more quietly than an
+ * anchor.** `c12-shared-geometry.mjs` named `test/golden/plots.test.ts`; the
+ * files are `plot.test.ts` and `plot-forms.test.ts`. **vitest drops a filter
+ * that resolves to nothing whenever another one does** — no warning, no
+ * non-zero exit — so the run executed three files where four were named, went
+ * green, and its header argued *from* the goldens being in the corpus.
+ * `c04-weights.mjs` had the same defect on a file that had moved a directory.
+ *
+ * An anchor that will not apply throws and stops the run. **A test file that is
+ * not there changes nothing anyone can see**, and the pass reports `caught`
+ * against a corpus it does not have: every row's `expect` becomes a claim about
+ * which instrument caught it, made against an instrument set that is short.
+ *
+ * All 97 runs name their files after `vitest run`, and eight of them through a
+ * `FILES` const — so concatenation is collapsed and single-string consts are
+ * substituted before the tokens are read.
+ */
+function testPathsOf(src) {
+  const flat = src.replace(/"\s*\+\s*\n?\s*"/g, "");
+  const consts = {};
+  for (const m of flat.matchAll(/^const ([A-Z_][A-Z_0-9]*) =\s*\n?\s*"([^"]*)";/gm)) consts[m[1]] = m[2];
+  const out = new Set();
+  for (const m of flat.matchAll(/vitest run ([^"`]+)/g)) {
+    const expanded = m[1].replace(/\$\{([A-Z_][A-Z_0-9]*)\}/g, (whole, name) => consts[name] ?? whole);
+    for (const token of expanded.trim().split(/\s+/)) {
+      if (/\.test\.[cm]?tsx?$/.test(token)) out.add(token);
+    }
+  }
+  return [...out];
 }
 
 // An absolute `--dir` is used as given; the default is repo-relative.
@@ -94,6 +190,7 @@ const runs = readdirSync(RUNS_AT)
   .sort();
 
 let checked = 0;
+let suites = 0;
 const missing = {};
 const unresolvable = [];
 
@@ -104,7 +201,13 @@ const unresolvable = [];
 const rootsFor = (file) => [`${ROOT}/${file}`, `${ROOT}/examples/docker/${file}`];
 
 for (const run of runs) {
-  for (const { file, from } of anchorsOf(readFileSync(`${RUNS_AT}/${run}`, "utf8"))) {
+  const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  for (const path of testPathsOf(src)) {
+    suites += 1;
+    if (rootsFor(path).some((p) => existsSync(p))) continue;
+    unresolvable.push(`${run}: names ${path}, which does not exist — vitest drops it silently`);
+  }
+  for (const { file, from } of anchorsOf(src)) {
     const path = rootsFor(file).find((p) => existsSync(p));
     if (path === undefined) {
       unresolvable.push(`${run}: ${file} does not exist under either root`);
@@ -120,6 +223,7 @@ const runsWith = Object.keys(missing).length;
 const total = Object.values(missing).reduce((a, n) => a + n, 0);
 console.log(
   `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
+    `${String(suites)} test paths · ` +
     `${String(total)} missing across ${String(runsWith)} run(s)`,
 );
 

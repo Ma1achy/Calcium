@@ -1,7 +1,7 @@
 // Fixtures for C10's suite. The shipped themes are the subject of most of it —
 // a theme that cannot ship failing its own rule is the point of T2.4 — so these
 // helpers mostly exist to build *broken* ones.
-import { defaultTheme, loadTheme, type ThemeSet, type ThemeStore, type ThemeTokens } from "../../src/presentation/theme/index.js";
+import { defaultTheme, loadTheme, resolve, type ColourRef, type ResolvedTheme, type ThemeSet, type ThemeStore, type ThemeTokens } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 export const DEPTHS = [1, 4, 8, 24] as const;
@@ -89,4 +89,34 @@ export function withTone(slot: string, value: string, name: string = "dark"): Th
   // **The whole set with one member replaced**, keyed by name — the two-theme
   // spelling of this was a ternary over `dark`/`light` (C10 I27).
   return Object.freeze({ ...defaultTheme, [name]: broken });
+}
+
+/**
+ * A slot's channels at 24-bit, **taken from C10 rather than written down**.
+ *
+ * G5b matched `#6ea8fe` by hand — the literal the SVG arm's own `SERIES_INK`
+ * used to hold — and the row went red the day the arm started resolving
+ * `categorical.c1` instead. That is the correct failure and the reason this is
+ * a helper: **a test that names a colour is a third source of truth**, and it
+ * drifts exactly the way the second one did.
+ */
+export function rgbOf(ref: ColourRef, theme: ResolvedTheme): readonly [number, number, number] {
+  const { colour } = resolve(ref, theme, { colourDepth: 24 });
+  if (colour === undefined || colour.kind !== "rgb") throw new Error(`no rgb for ${ref}`);
+  const h = colour.hex.replace("#", "");
+  return [
+    Number.parseInt(h.slice(0, 2), 16),
+    Number.parseInt(h.slice(2, 4), 16),
+    Number.parseInt(h.slice(4, 6), 16),
+  ] as const;
+}
+
+/** Every hex the theme's tokens hold — surfaces and every palette slot. */
+export function themeHexes(theme: ResolvedTheme): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const hex of Object.values(theme.tokens.surfaces as Readonly<Record<string, string>>)) out.add(hex.toLowerCase());
+  for (const palette of Object.values(theme.tokens.palettes)) {
+    for (const hex of Object.values(palette.slots)) out.add(hex.toLowerCase());
+  }
+  return out;
 }

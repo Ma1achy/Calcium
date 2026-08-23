@@ -11,6 +11,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/contract/categorical.test.ts";
 const PLOT = "src/presentation/plot/definition.ts";
+const MARKS = "src/presentation/plot/marks.ts";
 const VALID = "src/data/viewmodel/validate.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -62,9 +63,18 @@ const results = await runPass({
   write,
   run,
   control: {
-    file: PLOT,
-    from: "  if (series.tone !== undefined) return `tone.${series.tone}`;\n  return CATEGORY_REFS[index] ?? \"categorical.c1\";",
-    to: '  if (series.tone !== undefined) return `tone.${series.tone}`;\n  return "categorical.c1";',
+    // **Re-anchored to the door, and the first attempt showed why it had to
+    // be.** `CATEGORY_REFS` moved to `marks.ts` beside `markOf` — the two are
+    // one ladder and the legend needs the refs from a file `definition.ts`
+    // imports — and in moving, `refOf` stopped being the only way to a slot:
+    // the pie, the treemap, the stack and the legend all reach `marks.refOf`
+    // directly. Anchored on `definition.ts`'s wrapper the control **survived**,
+    // because every other consumer went on distinguishing colours and the frame
+    // still had eight of them. The harness reported itself blind, which is what
+    // that check is for.
+    file: MARKS,
+    from: '  return CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size',
+    to: '  return "categorical.c1";',
     why:
       "every series takes the first slot — if this survives, nothing asserts that the palette " +
       "distinguishes anything and the rows below are unearned",

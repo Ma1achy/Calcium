@@ -65,11 +65,12 @@ import { inkWidth } from "../support/ink.js";
 describe("harness parameters — fake-terminal", () => {
   it("capabilities(over): each field of the override reaches the record", () => {
     // Every field, not a sample. A spread that dropped one key would pass a
-    // spot check on the other six.
+    // spot check on the other eight.
     const all = capabilities({
       colourDepth: 1,
       unicode: "ascii",
       ambiguousWidth: "narrow",
+      backgroundPolarity: "light",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,
@@ -80,6 +81,7 @@ describe("harness parameters — fake-terminal", () => {
       colourDepth: 1,
       unicode: "ascii",
       ambiguousWidth: "narrow",
+      backgroundPolarity: "light",
       synchronisedUpdate: false,
       bracketedPaste: false,
       mouse: false,

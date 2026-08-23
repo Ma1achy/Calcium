@@ -315,6 +315,47 @@ The two harnesses are not a duplication to be merged. They encode the difference
 between the tiers, and merging them would mean one of the tiers stopped asserting
 what it is for.
 
+## Containment is not correctness — assert *which* primitive is where
+
+**Three families in a row have had a row survive a mutation because it asserted
+containment**, and that is a property of how these rows get written rather than
+three separate oversights.
+
+| family | the row that survived | what it claimed |
+|---|---|---|
+| curve · scatter · bar | the per-form SVG rows | *ink stays inside the plot area* |
+| matrix | the same row, one family along | *ink stays inside the plot area* |
+| distribution | the box plot's spine | *this row is inked* |
+
+**Every wrong answer that is also inside the bounds satisfies an inside-the-bounds
+claim.** The surviving mutations all moved a mark from one legal position to
+another: a matrix cell's colour squashed into the bottom third of a ramp, a bar's
+baseline at the area's floor instead of at zero, a median one row up where the
+box's own edges had already inked both candidate rows.
+
+**So the rows say which primitive is where.**
+
+- **A position is one row.** *The spine is at `L - round(t·L)`*, not *the spine is
+  somewhere in the figure* — and the height is part of the fixture, because at nine
+  rows every position of a five-number summary lands on an integer and both
+  readings agree.
+- **A fill is a different row from a position.** A `<rect>` has coordinates the
+  rows checked and a datum they did not, and a colour assertion cannot be a clause
+  inside a geometry assertion: the geometry passes and carries it.
+- **Where a figure is symmetric, assert its centre.** For a run of glyphs around
+  one collapsed value, *every column is mid* is a claim about the run's width;
+  *the run is centred on mid* is the claim that was meant.
+
+**And the fixture has to fire the difference.** A pinned range with every sample
+inside it cannot tell a shared coordinate from an open-coded copy; a height where
+no position lands on a half cannot tell two roundings apart.
+
+**Search for a case where the two readings differ and assert that one.** A stated
+counter-example that turns out not to be one reads exactly like a rule being
+obeyed — `t·L = 2.5, L = 6` was offered as proof that `L - round(t·L)` and
+`round((1-t)·L)` differ, and floating point makes them agree there. The row that
+caught it searched 23 heights instead.
+
 ## A test that calls the mechanism verifies the mechanism, never the wiring
 
 The newest rule, and it took four instances in one branch to name.

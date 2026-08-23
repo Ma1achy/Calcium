@@ -234,6 +234,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG24 | A member of an `export interface` under `src/` is named somewhere else under `src/` — a component complete on its own side of a seam, with nothing on the other | A02 Seam 4, C16 I23, C22 I38, I39 |
 | MG25 | An exported **function or class** under `src/` is named somewhere else under `src/`, comments excluded. MG24's blind spot: a producer expressed as free functions rather than as an interface | A02 Seam 4, C23 §3b, C24 I16 |
 | MG27 | A field a **block type** carries that no builder sets. The reasons live in `BUILDER_OMISSIONS`, keyed `Kind.field`, with the bidirectional arm `UNCONSUMED_MEMBERS` has: an entry the builder now sets is itself a violation | C24 I18, C24 commitment 16, FINDINGS F41 · F114 |
+| MG28 | A **closed string union** on a block field whose builders write only bare literals, reaching some of its arms. Top-level fields only; a builder threading a parameter opens them all | C24 I18, FINDINGS F180 |
 | MG26 | No module under `src/` outside `testing/` and `fixtures/` value-imports either of them | C24 I8, T2.3 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
@@ -274,6 +275,10 @@ So the arm is on, and the one edge that survives it is named rather than tolerat
 **The runtime edge stays forbidden in both directions**, which is what keeps A02 §1's parallel-build claim true: the halves still build independently as *modules*, and one name crosses as a *declaration*.
 
 **What the arm sees, measured, and it is not one thing.** Twenty-two type-only edges reach `terminal/` from above L0 — eleven from `presentation/`, nine from `shell/`, one each from `src/index.ts` and `src/testing/` — and thirteen files above L0 name both halves. **The arm forbids none of them**, because none is MG3's subject: L1 and L4 importing L0 is *downward*, and `presentation/` could not render C04's blocks onto a terminal without seeing both at once.
+
+**MG28 is MG27's subject read properly, and F84's shape one rule along.** MG27 asks whether a builder's constructed literal *mentions* each field. `form: "line"` mentions `form` — so a closed union with one hardcoded arm satisfies a check about **names** while its other arms are buildable by nothing public. `PlotForm` has three members and the heatmap shipped with a walk, an invariant, a validator arm, a renderer, three golden frames and a mutation pass, constructible only by reaching past `b` into `block()`. MG27 was right about what it checked; what it read as covering was wider.
+
+**Its population is six and that is deliberate.** Six top-level block fields are closed string unions — `Notice.tone`, `Plot.form`, `Plot.yFormat`, `Plot.colormap`, `Patch.layout`, `Group.direction` — and five thread a parameter and were already correct. A rule that examined two and found nothing is indistinguishable from one that examined twenty, so the figure is asserted in `enforce-rules.test.ts` rather than implied by a green run. **Widening it until the output looks larger is the tuning A03 §2 warns about**: the subject is a vocabulary a consumer picks from, and six of them are.
 
 **The rule's own name is what makes those look like violations.** MG3 forbids `data/` ↔ `terminal/`, and *"cross-half"* reads as forbidding any module that touches both. Third instance in this pass of a rule whose **name** did work its **body** did not, after MG24's *"unconsumed member"* and MG27's *"coverage"*.
 
@@ -364,16 +369,22 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
 | SS45 | A tone or glyph literal as an object-literal value | `src/shell/builders/` | C24 I5, T2.7 |
 | SS47 | A non-ASCII mark in a `src/` string literal that is not prose punctuation. The reasons live in `MARK_EXEMPTIONS`, keyed by file, with MG27's bidirectional arm: an entry whose file no longer carries a mark is itself a violation | `src/`, ten sites excused with reasons | C09 I22, C22 I52, FINDINGS F55 · F122 |
+| SS52 | A literal **NUL** anywhere the repository's own tools read — `src/`, `test/`, `tools/`. **Not SS43 widened**, and the difference is the subject: SS43 is about a character a *reader* cannot see, and NUL is about a file `grep` skips **in silence**, so a search for its contents returns nothing and nothing reads exactly like no coverage. Its own pass, because `SCANS` only ever receives `walk("src")` — widening SS43's scope string would have read as tightened and changed nothing. Narrowed to NUL by measurement: the whole C0 class reported **90** hits, every one a literal ESC in a test about escape sequences, and those files grep perfectly well | `src/`, `test/`, `tools/`, no exceptions | C16 T2.10, FINDINGS F236 |
 | SS48 | A second frame composition — a `paint(` call under `src/shell/` outside the unit that owns it. `composeFrame` in `render-frame.ts` is the one, and `session.ts` calls it | `src/shell/`, `render-frame.ts` and `paint.ts` excused | C22 I54, C24 I25, FINDINGS F126 |
 | SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
 | SS49 | `origin: "defect"` outside the one site that means it | `src/` outside `shell/execution.ts` | C23 §5a, I48 · C04 I13 |
 | SS50 | a `cells()` call naming neither the ambiguous-width convention nor `// narrow-ok` | `src/` outside `src/interaction/completion/menu.ts`, `src/interaction/history/layers.ts` and `src/shell/fallback.ts` | C02 I9 · C02 §3 |
+| SS51 | One of the four encoding vocabularies named by `RAMP_VOCABULARIES` — `RAMP_UNICODE`, `RAMP_ASCII`, `RAMP_BRAILLE`, `RAMP_DENSITY` | `src/` outside `src/presentation/plot/ramp.ts` | C12 §3c · C12 I21 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
 | SS38 | A bare import of a package that is not a declared runtime dependency | `src/` | A04 §2, C09 §4a |
 
 **SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
+
+**SS51 forbids going round a type rather than a mismatch, and that is why it is worth having when the type already holds.** `ladderFor` is a mapped type over the encoding axis, so asking for `density` and receiving a height ladder does not compile — measured, TS2322. The move it cannot stop is a renderer never asking: importing `RAMP_BRAILLE` and indexing it, which is exactly how C12's heatmap came to draw a density field with a height ramp. The type makes the mismatch unspellable; the scan makes the function the only door.
+
+**Its pattern names four constants rather than the `RAMP_` prefix, and the reason is a homonym in its own scope.** `raster.ts` exports `RAMP_DOTS` — `{x: 1, y: 8}`, dots per cell for the ASCII fold — and `ramp.ts` exports `RAMP_STEPS`, the rung count every ladder shares. Neither is a vocabulary. A prefix pattern would report five lines, none of this rule's, and excusing `raster.ts` by file would put a permanent hole in a renderer, which is the one place the rule is for. A closed list stops seeing a fifth ramp, so `RAMP_VOCABULARIES` is exported and asserted equal to the string-valued `RAMP_*` exports in `ramp.ts` in both directions — a fifth vocabulary fails a test rather than passing a scan, and the discriminator is that a vocabulary is a string of glyphs where `RAMP_STEPS` is a number.
 
 **SS34 is the two-owners check.** Ink 7 accepts `render({ alternateScreen })` and will enter and leave it itself. C01 holds the alternate screen, so Ink must not — `held` would stop describing what was taken, and release would emit sequences for state something else already released. The framework's own option is the tempting shortcut precisely because it looks simpler at the call site.
 
@@ -400,6 +411,15 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 **MG21 keeps the new edge singular.** C09 §3's `escapes.sgr` is the first runtime import from L1 to L0-terminal — legal under MG1, which forbids upward imports and not downward ones, and required rather than tolerated. What makes it safe is that it is one narrow import and not the beginning of a habit: the rule permits `escapes.js` and type-only capability imports, and fails on anything else `src/presentation/` reaches for in `src/terminal/`. It is an MG rule rather than an SS one because it is a question about the import graph, which the grep-class scans cannot ask: a multi-line `import type` spans lines, and only the graph checker knows a type-only import is not an edge. Recorded as a rule rather than a paragraph because "tidy that import away" and "add one more like it" are both reasonable-looking edits.
 
 **SS38 is the hole SS31 leaves.** SS31 compares `package.json` against `DEPENDENCIES.md`, and both were clean while `src/` imported `highlight.js`, which was in neither: `lowlight` depends on it, npm hoisted it, the import resolved, and every gate passed. That is a **phantom dependency**, and its whole failure mode is that *it resolved, so it must be declared* is exactly the reasoning that does not hold. It breaks on someone else's release — the day the intermediate drops the dependency or a package manager stops hoisting — and in the meantime it is a package nobody reviewed, pinned or wrote a row for, executing in the product. Scoped to `src/`, which ships: a test may import `vitest`, and `src/` may not, because a consumer's install has no devDependencies.
+
+**SS39's blind spot, and its false positive, both measured.** The pattern is the *property*
+form — `glyph: "…"` — so a character reaching a glyph position through a variable, a function
+argument or a computed key is outside it; the rule makes the untokenised **literal** unwritable
+and does not make the position safe. And it matches more than that shape: a ternary whose
+true-branch identifier is named `glyph` reads as `glyph : "` to the pattern, which is how
+`lit >= half ? glyph : " "` was reported in `raster.ts` while taking its mark from a named slot.
+Renaming the local was the cheaper fix and the limit is the finding — a rule that cannot tell a
+property from a ternary will report the next one too.
 
 **SS39 is SS36's shape applied to glyphs.** C04 I6 closes `Glyph` to a vocabulary, and the type holds that inside the tree — but a `Notice` assembled with `as` is one cast away from compiling with a character in it, which is exactly how `colour: "#7faecf"` would have survived without SS36. The rule is what makes the untokenised form unwritable rather than merely discouraged. It matters more than the colour case in one respect: a wrong colour is visible to whoever wrote it, and a glyph that breaks the 1:1 rule is visible only under `LANG=C`, only to users who cannot easily say what they are seeing.
 
@@ -550,6 +570,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP5 | Every `Fnn` citation resolves against a finding that exists | FINDINGS · CLAUDE.md §Ask where a settled claim is written down | A03 §7a |
 | SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
 | SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
+| SP8 | Every `§` reference resolves against the document that owns it — **reported, not gated** | `src/`, `test/`, `tools/`, `docs/` outside `notes/` | A02 §1 · A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
 

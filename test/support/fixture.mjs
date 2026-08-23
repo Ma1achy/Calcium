@@ -388,11 +388,16 @@ switch (mode) {
       void (async () => {
         await runner.killAll();
         const { execFileSync } = await import("node:child_process");
+        const { livePids, psGroupArgv } = await import("./live-pids.mjs");
+        // **The same reader the harness uses** — this was a second copy running
+        // `ps -o pid= -g`, and it kept tier 5 red after the first copy was fixed.
+        // A zombie is a child that took the signal and has not been reaped; PID 1
+        // in a container reaps nothing, where `launchd` reaps at once.
+        const argv = psGroupArgv(pgid);
         let survivors = "";
         try {
-          survivors = execFileSync("ps", ["-o", "pid=", "-g", String(pgid)], {
-            encoding: "utf8",
-          }).trim();
+          const out = execFileSync(argv[0], argv.slice(1), { encoding: "utf8" });
+          survivors = livePids(out).join("\n");
         } catch (err) {
           // `ps` exits 1 when the group holds nothing, which is the answer we
           // want. Any other failure would report an empty group it never saw.

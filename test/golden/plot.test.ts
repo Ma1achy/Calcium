@@ -51,6 +51,29 @@ function requestRate(n: number): readonly number[] {
 const CASES: readonly Readonly<{ label: string; block: Plot; mono?: boolean }>[] = [
   { label: "loss curve", block: plotOf({ id: "loss", points: 40, height: 6 }) },
   {
+    // **The heatmap's second channel** (C10 I31). This golden set keeps SGR —
+    // the states corpus strips it, which is why the frame lives here — so what
+    // the snapshot holds is the *colour per cell*, and the two things worth
+    // reading off it are that the density glyph is unchanged from the
+    // uncoloured heatmap above and that the colour is gone entirely at 4-bit
+    // and below.
+    label: "heatmap, viridis",
+    block: block({
+      kind: "plot",
+      id: "heat-map",
+      form: "heatmap",
+      height: 3,
+      yMin: 0,
+      yMax: 100,
+      colormap: "viridis",
+      xLabels: ["-16 ticks", "", "now"],
+      series: ["api", "worker", "cache"].map((label, r) => ({
+        label,
+        values: Array.from({ length: 16 }, (_, i) => (i * 7 + r * 30) % 100),
+      })),
+    }),
+  },
+  {
     label: "request rate",
     block: block({
       kind: "plot",

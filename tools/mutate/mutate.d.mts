@@ -3,6 +3,9 @@ export declare function killed(output: string): boolean;
 /** Did the run reach a summary at all — pass or fail? A truncated run is not a survivor. */
 export declare function ran(output: string): boolean;
 
+/** The harness's own marker for *the suite did not return* — see mutate.mjs. */
+export declare function timedOut(output: string): boolean;
+
 export declare class AnchorError extends Error {
   constructor(file: string, from: string);
 }

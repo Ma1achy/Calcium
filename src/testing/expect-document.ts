@@ -115,12 +115,40 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
   ["tip", { premise: "no-field", why: "text only" }],
   ["raw", { premise: "no-field", why: "opaque by definition; the app owns what it renders" }],
   [
+    "status",
+    {
+      premise: "by-rendering",
+      why:
+        "`state` selects a tag, the glyph set's `warning` mark and an activity line, all of " +
+        "them text — ` ERROR ` and the mark for the two failing states, `loading` for the " +
+        "third — so the three are told apart at one bit with no colour at all (C09 §3a)",
+    },
+  ],
+  [
     "scroll",
     {
       premise: "no-field",
       why:
         "a box and a residue row whose meaning is in its numbers, and the children are swept " +
         "as blocks in their own right",
+    },
+  ],
+  [
+    "image",
+    {
+      premise: "no-field",
+      why:
+        "pixels and an alt string — the picture carries whatever meaning it has, and there is no " +
+        "field here that could convey one by colour alone",
+    },
+  ],
+  [
+    "mosaic",
+    {
+      premise: "no-field",
+      why:
+        "pure geometry — a grid string, a height and two share arrays, none of which can carry " +
+        "a meaning that colour alone conveys; the children are swept as blocks in their own right",
     },
   ],
 ]);
@@ -173,6 +201,7 @@ const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   colourDepth: 24,
   unicode: "full",
   ambiguousWidth: "narrow",
+  backgroundPolarity: "unknown",
   synchronisedUpdate: true,
   bracketedPaste: true,
   mouse: true,
@@ -313,7 +342,7 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
 
       // Parity of *height* is what the suite above checks. This is the other
       // half and the one a consumer trips: a fallback that is not 1:1 by column
-      // count widens a row without changing its height (C09 commitment 14).
+      // count widens a row without changing its height (C09 commitment 5).
       for (const width of DEFAULT_WIDTHS) {
         const ascii = rows(ASCII, width);
         const over = ascii.findIndex((line) => displayCells(plain(line)) > width);

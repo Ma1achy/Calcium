@@ -40,6 +40,7 @@ import {
 } from "../data/transport/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
+import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
 import { plotDefinition } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
@@ -262,6 +263,13 @@ export type Graph = Readonly<{
    */
   diagnostics: () => readonly string[];
   blocks: ReturnType<typeof createBlockRegistry>;
+  /**
+   * What C09's containments swallowed, and what the frame owes for it (I69,
+   * I70). On the graph rather than private to construction, because the render
+   * loop both writes it — `visibleRows` scopes faults to an entry — and reads
+   * it, after the frame, where the reserve is issued.
+   */
+  blockFaults: BlockFaultLog;
   adapters: ReturnType<typeof createAdapterRegistry>;
   manifest: ReturnType<typeof createManifestStore>;
   completion: ReturnType<typeof createEngine>;
@@ -431,7 +439,21 @@ export async function constructGraph(
   };
 
   const built = await (async () => {
-    const blocks = createBlockRegistry({ defaults: true });
+    // **What C09's containments swallowed** (C09 I29, C22 I6a). The registry
+    // reports every occurrence and the deduplication is here, beside C23's own
+    // `recordFault` and for its reason: a measurer that gives way is called at
+    // frame cadence, so a flood is the default shape and one line is the intent.
+    //
+    // A pull rather than an emit, so this joins `diagnostics()` with C02's and
+    // C20's — the component decides what is wrong, C22 §8 step 3 decides when
+    // the reader is told, and a diagnostic painted onto the alternate screen is
+    // discarded with it.
+    // **Still a pull, and now also a record of what is owed** (C22 I69, I70).
+    // The messages half is unchanged; the second half exists because a fault is
+    // the only thing that knows which block gave way, and the shell has to
+    // address one to reserve rows for it.
+    const blockFaults = new BlockFaultLog();
+    const blocks = createBlockRegistry({ defaults: true, onError: blockFaults.report });
     // **The three the framework itself produces** (C09 §1, I13). `defaults`
     // ships C09's fourteen; `table`, `plot` and `patch` register through the
     // public mechanism, and until this line nobody called it — so a stock
@@ -493,7 +515,7 @@ export async function constructGraph(
     }
     for (const source of config.completionSources) completion.register(source);
 
-    return { blocks, adapters, manifest, completion };
+    return { blocks, adapters, manifest, completion, blockFaults };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("registries", cause);
   });
@@ -645,32 +667,75 @@ export async function constructGraph(
     // start because a preference file has a stray byte in it has made a
     // preference into a dependency.
     //
-    // Anything that is not one of the two variants is treated as absent, and
+    // Anything the set does not hold as a name is treated as absent, and
     // `themeWarning` is what stops "absent" and "corrupt" looking the same to
     // a user who chose light and got dark. The notice is committed at step 8,
     // once there is a transcript to put it in.
+    //
+    // **Absent, empty and unusable are one arm here** (I68, §6h.2 rows 6 and 7).
+    // They were already the same for this rule's purposes — an unreadable file
+    // leaves the base theme standing — and the polarity below is what makes the
+    // collapse load-bearing rather than tidy: *a preference that cannot be
+    // honoured is not a preference*, so all three fall through to the terminal.
     const persisted = await readOrAbsent(config.fs, themePath(config.stateDir));
-    if (persisted !== null) {
-      const trimmed = persisted.trim();
-      // **A membership test against the set, not a comparison to two literals**
-      // (C10 I27). The migration is nothing — `dark` and `light` are names in
-      // the shipped set — and a literal pair here would refuse a legitimate
-      // name the moment a third theme existed.
-      if (themed.value.names.includes(trimmed)) themed.value.setTheme(trimmed);
-      else if (trimmed !== "") {
-        // Appended here rather than carried out to `start()`: the transcript
-        // exists at this point and a warning threaded through the graph is a
-        // second record of the same fact. `origin: "refresh"` because no user
-        // command produced it.
-        transcript.append(
-          noticeDoc(
-            "",
-            `theme preference ignored: \`${trimmed.slice(0, 40)}\` is not dark or light`,
-            "warn",
-            { origin: "refresh" },
-          ),
-        );
-      }
+    const trimmed = persisted?.trim() ?? "";
+    // **A membership test against the set, not a comparison to two literals**
+    // (C10 I27). The migration is nothing — `dark` and `light` are names in
+    // the shipped set — and a literal pair here would refuse a legitimate
+    // name the moment a third theme existed.
+    const stated = themed.value.names.includes(trimmed);
+    if (stated) themed.value.setTheme(trimmed);
+    else if (trimmed !== "") {
+      // Appended here rather than carried out to `start()`: the transcript
+      // exists at this point and a warning threaded through the graph is a
+      // second record of the same fact. `origin: "refresh"` because no user
+      // command produced it.
+      //
+      // **The set's own names, not `dark or light`** (F215). The literal pair
+      // survived C10 I27's fork in this string and in three documents, and on a
+      // set holding `high-contrast` it names two of the three themes available
+      // and calls the third a mistake. Nothing asserted the sentence, which is
+      // why it was free to be wrong.
+      transcript.append(
+        noticeDoc(
+          "",
+          `theme preference ignored: \`${trimmed.slice(0, 40)}\` is not ` +
+            `${themed.value.names.join(", ")}`,
+          "warn",
+          { origin: "refresh" },
+        ),
+      );
+    }
+
+    // **The terminal's own polarity, where the reader has not usably stated a
+    // preference** (I68, §6h). C02 reads `COLORFGBG` and answers `dark`, `light`
+    // or `unknown`; the third value is what makes this branch expressible, since
+    // *nothing stated* and *stated light* would otherwise be one fact.
+    //
+    // **A search of the set by `variant`, and not a switch to a name.** C10 I27
+    // keyed the set by name and made polarity a property a theme declares, so
+    // there is no `setTheme(polarity)` to call — and the search is the first
+    // reader of `variant` outside `store.ts`, which is the use I27 published it
+    // for. The variants come from `config.theme` rather than through a new C10
+    // accessor: the set is the argument `loadTheme` was given, already in hand.
+    //
+    // **Declaration order, on `loadTheme`'s own precedent** — `opening` defaults
+    // to the set's first key rather than to a literal — and **silent when it
+    // matches nothing**: the set is the app author's, and a notice would be the
+    // framework reporting on their choice to their user (§6h.2 rows 4 and 5).
+    //
+    // **Never persisted.** `${stateDir}/theme` has one writer and it is
+    // `/theme`'s handler (I40). A written inference is indistinguishable from a
+    // statement on the next read, and that distinction is what the `stated`
+    // branch above runs on (§6h.3 row 1).
+    if (!stated) {
+      const polarity = detection.capabilities.backgroundPolarity;
+      const match =
+        polarity === "unknown"
+          ? undefined
+          : themed.value.names.find((n) => config.theme[n]?.variant === polarity);
+      // Cannot throw: every name here came from the store's own list (§6h.5).
+      if (match !== undefined) themed.value.setTheme(match);
     }
 
     // **§8's seventh severity, and the only one that had no home.** Six of the
@@ -1500,14 +1565,26 @@ export async function constructGraph(
      * session, and C23 collected nothing at all (F15). C02's ruling —
      * *the component decides what is wrong, never when the user is told* — is
      * only half a ruling until something drains them.
+     *
+     * **Four sources now, and the fourth's absence was structural rather than an
+     * omission** (C09 I29, F223): L1 cannot reach this list, so a contained
+     * renderer had nowhere to report and reported nowhere — for the life of the
+     * registry, and with T3.14's own row saying `logged` the whole time.
+     *
+     * The four are kept contiguous deliberately. `c23-faults` mutates this list
+     * by removing members, and a comment between two of them makes an anchor
+     * that spans the list unmatchable — which is how a mutation quietly becomes
+     * a different mutation (F219).
      */
     diagnostics: () =>
       Object.freeze([
         ...detection.warnings,
         ...stores.history.warnings,
+        ...built.blockFaults.messages,
         ...pipeline.faults,
       ]),
     blocks: built.blocks,
+    blockFaults: built.blockFaults,
     adapters: built.adapters,
     manifest: built.manifest,
     completion: built.completion,

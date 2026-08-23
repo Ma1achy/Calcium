@@ -25,7 +25,8 @@
  */
 
 import { block } from "../data/viewmodel/index.js";
-import type { Block, ErrorLike, Panel } from "../data/viewmodel/index.js";
+import type { Block, ErrorLike, Panel, Status } from "../data/viewmodel/index.js";
+import { elapsed } from "../presentation/blocks/index.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
 
@@ -87,7 +88,27 @@ export type ViewRefresh = Readonly<{
    * held from when the document was made is stale by the first resize.
    */
   render: (data: unknown, ctx: ProducerContext) => Block;
-  renderError: (err: ErrorLike, retryInMs: number | null) => Block;
+  renderError: (err: ErrorLike, retryInMs: number | null, attempt: number) => Block;
+  /**
+   * The declarer's own loading render, or `null` when the framework's is in
+   * place (C23 I52, C24 §5).
+   *
+   * **The driver never calls it** — `b.live` resolves the placeholder at
+   * construction, because the first block exists before this driver runs, which
+   * is why there is no `renderLoading` in the flow above. What it needs is the
+   * one bit that resolution consumed: **whose block is in the panel.** A part
+   * that declared one owns its rendering, and the elapsed counter writing
+   * `elapsedMs` into it would be *behaviour is fixed, rendering is overridable*
+   * reaching past its own boundary.
+   *
+   * **A `status` at `loading` is not a sufficient test**, which is why this is a
+   * field and not an inspection: a consumer's `renderLoading` may return exactly
+   * that shape, and then the two cases are identical from here.
+   *
+   * `null` rather than absent, on the same argument as `source` and `derive`:
+   * this shape is total where the declaration's is optional.
+   */
+  renderLoading: (() => Block) | null;
 }>;
 
 /**
@@ -113,6 +134,41 @@ const keyOf = (host: RefreshHost): string => `${host.kind}:${String(host.id)}`;
 const SEP = "\u0000";
 
 /** C23 I34 — a part is one block, and the block is a `panel`. */
+/**
+ * How often the elapsed counter is considered, in milliseconds (C23 I52).
+ *
+ * **One second, and it is the figure's granularity rather than a chosen rate.**
+ * `elapsed()` is a whole number of seconds, so a faster tick can only produce
+ * writes the guard below discards, and a slower one makes the box lie. The
+ * *cost* of the rate is not what fixes it: measured, a 1 Hz write beside its own
+ * spinner is **0.4 frames a second**, because C03 folds six writes in ten into a
+ * frame it had already scheduled (F234).
+ */
+const ELAPSED_TICK_MS = 1000;
+
+/**
+ * Whether writing this elapsed value would change what the box draws.
+ *
+ * **Extracted, and not because it is complicated.** Both arms are nearly
+ * unreachable from the sweep that calls it — the first needs a block that is not
+ * a loading `status`, which the caller has just checked, and the second needs a
+ * tick landing inside the same second as the last write, which fake timers make
+ * awkward to construct from outside. A guard whose arms cannot be reached from
+ * its call site is a guard nothing can be wrong about (A03 §2), which is the
+ * same argument `reserveNeeded` was extracted on.
+ *
+ * **The comparison is on the rendered figure and never on the clock.** Below one
+ * second `elapsed()` draws nothing, and past ninety-nine it draws minutes — so
+ * *the clock moved* and *the box would change* are different questions, and only
+ * the second one justifies a `rev` bump. A write that changes nothing observable
+ * still invalidates C14's height cache and tells the transcript a document
+ * changed when it did not (C23 I52).
+ */
+export function elapsedNeeded(shown: Block | null, ms: number): boolean {
+  if (shown === null || shown.kind !== "status" || shown.state !== "loading") return false;
+  return elapsed(ms) !== elapsed((shown as Status).elapsedMs ?? 0);
+}
+
 export function livePanel(id: string, title: string, child: Block): Panel {
   // `live` is what makes the panel say so (C04 I39, F18). Two surfaces draw the
   // `▌` rail and the slot existed unreachable: this is the only place in the
@@ -318,6 +374,16 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     readonly spec: ViewRefresh;
     readonly host: RefreshHost;
     readonly source: Source;
+    /**
+     * When this part's box first appeared, for the elapsed counter (C23 I52).
+     *
+     * **The part's and not the source's.** Two parts can join one shared fetch
+     * at different moments — `runSource` renders *every part referring when it
+     * resolves*, including one declared while it was in flight (I44) — and the
+     * reader of the second box has been waiting since the second box appeared,
+     * not since the first did.
+     */
+    readonly startedAt: number;
     lastOk: number | null;
     stale: boolean;
   };
@@ -498,7 +564,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       child = part.spec.render(input, deps.producerContext());
     } catch (err) {
       const shown = { message: err instanceof Error ? err.message : String(err) };
-      put(part.host, part, part.spec.renderError(shown, null));
+      // **`null` because a render throw is deterministic** (§3d, A03 §7 rule 2)
+      // — same data, same throw, so nothing is retrying and the box is `error`
+      // rather than a countdown to a retry that will not happen. The attempt
+      // count is still the source's: the fetch that produced this data may well
+      // have failed twice on the way.
+      put(part.host, part, part.spec.renderError(shown, null, src.failures));
       return true;
     }
     part.lastOk = deps.clock();
@@ -553,7 +624,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // once rather than once per referrer.
           let any = false;
           for (const part of [...src.parts]) {
-            if (put(part.host, part, part.spec.renderError(shown, retryIn))) any = true;
+            if (put(part.host, part, part.spec.renderError(shown, retryIn, src.failures))) any = true;
             else release(part.host);
           }
           if (any) deps.commit("stream");
@@ -615,6 +686,39 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
 
       if (now >= src.dueAt && anyoneLooking(src)) runSource(src);
     }
+
+    // **The elapsed counter, and it needs its own loop over `hosts`** (C23 I52).
+    //
+    // The loop above walks `sources` and skips `src.inFlight` — which is exactly
+    // what a part waiting on its first fetch *is*, so nothing there can ever see
+    // one. A pass folded into it would have been unreachable by construction and
+    // green from the day it was written.
+    let ticked = false;
+    for (const entry of hosts.values()) {
+      for (const part of entry.parts) {
+        // **A part whose declarer supplied `renderLoading` owns its own block**
+        // (C24 §5). *Behaviour is fixed, rendering is overridable* — a framework
+        // timer writing fields into a consumer's block is the guarantee reaching
+        // past its own boundary.
+        if (part.spec.renderLoading !== null) continue;
+        // **`anyoneLooking`'s gate, per part** (I46). C22's spinner ticker
+        // disarms when nothing on screen animates, and this driver cannot see
+        // the viewport — so off screen the spinner stops while the counter would
+        // go on writing, at one whole frame each rather than the 0.4 that made
+        // it free (F234, §8a-bis B7).
+        if (!deps.visible(part.host)) continue;
+        // **The block currently in place, never one remembered at declaration**
+        // — `put`'s own rule for `put`'s own reason. A fetch can fail between
+        // the arm and the fire, so the box this was armed for may now be
+        // `retrying`, and `elapsedNeeded` says no to anything that is not a
+        // loading `status` (§8a-bis B3).
+        const shown = currentChild(part.host, part);
+        const since = now - part.startedAt;
+        if (!elapsedNeeded(shown, since)) continue;
+        if (put(part.host, part, { ...(shown as Status), elapsedMs: since })) ticked = true;
+      }
+    }
+    if (ticked) deps.commit("stream");
 
     // **Through `release`, for the reason `/clear` was** (I32). A host whose parts
     // are all finished is dropped here, and dropping the map entry directly
@@ -713,6 +817,27 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       if (!src.done && !src.inFlight && anyoneLooking(src)) soonest = Math.min(soonest, src.dueAt);
     }
     if (cleanup) soonest = Math.min(soonest, now);
+
+    // **A part waiting on its first fetch wakes the sweep, and nothing else
+    // would** (C23 I52). The loop above arms against `dueAt` and skips a source
+    // that is `inFlight` — which is precisely the state a loading box is in — so
+    // without this the counter would tick only when something *else* happened to
+    // schedule a sweep, and a part with a slow first fetch and no siblings would
+    // sit at `⠋ loading` with no figure for the whole wait.
+    //
+    // **Gated the same way the write is**, so a box nobody is looking at arms no
+    // timer at all — I46's rule, and C22 I60a's for the spinner it sits beside.
+    const waiting = [...hosts.values()].some((e) =>
+      e.parts.some(
+        (p) =>
+          p.spec.renderLoading === null &&
+          p.lastOk === null &&
+          !p.source.done &&
+          deps.visible(p.host),
+      ),
+    );
+    if (waiting) soonest = Math.min(soonest, now + ELAPSED_TICK_MS);
+
     if (!Number.isFinite(soonest)) return;
 
     partTimer = deps.schedule(() => {
@@ -908,6 +1033,11 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
             spec,
             host,
             source: { ...deadSource(key, spec), parts: new Set<Part>() },
+            // Never read — a refused part draws its error box once and its
+            // source is `done` — but the field is `readonly` and a refused part
+            // is still a `Part`. Set from the same clock as the other arm, so
+            // the two are not two answers to one question (I43).
+            startedAt: deps.clock(),
             lastOk: null,
             stale: false,
           };
@@ -939,7 +1069,17 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           };
           sources.set(key, src);
         }
-        const part: Part = { spec, host, source: src, lastOk: null, stale: false };
+        const part: Part = {
+          spec,
+          host,
+          source: src,
+          // **When the box appeared, which is when this part was declared** —
+          // not when its source was created, which a shared fetch makes a
+          // different moment (C23 I52).
+          startedAt: deps.clock(),
+          lastOk: null,
+          stale: false,
+        };
         src.parts.add(part);
         made.push(part);
       }
@@ -951,7 +1091,11 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       if (drawn.length > 0) {
         let any = false;
         for (const { part, message } of drawn) {
-          if (put(part.host, part, part.spec.renderError({ message }, null))) any = true;
+          // A refused declaration never had a source, so there is no attempt to
+          // count and `1` is the honest number: this is the first and only time
+          // it will be drawn (I43 — its source is `done` and referred to by
+          // nobody).
+          if (put(part.host, part, part.spec.renderError({ message }, null, 1))) any = true;
         }
         if (any) deps.commit("stream");
       }

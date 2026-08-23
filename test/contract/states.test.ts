@@ -23,12 +23,26 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
  * is the moment the judgement gets made.
  */
 const EXPECTED_STATES = [
+  // **The judgement, made here as the comment above asks.** A `keyValue` bar
+  // beside `table-value-bar` looks like a duplicate and is not: the table
+  // supplies its column's width and the `keyValue` supplies its own inside a
+  // remainder, which is the whole of what C04 I51 rules on. And it earned its
+  // place the day it landed — the frame it produced is what made anyone look at
+  // the table state's, which had been drawing `█░░░░░░░ …` at `dark-wide` in a
+  // committed snapshot since it was written (F176).
+  // The annotation state, and it is not a duplicate of the plot states above:
+  // those are about a *series* being drawn wrongly, this is about something that
+  // is not a series being drawn as one. Every way of getting it wrong renders.
+  "plot-annotated",
+  "plot-heatmap-overfull",
+  "kv-value-bar",
   "notice-continuation",
   "plot-gapped-line",
   "plot-heatmap",
   "plot-gapped-sparkline",
   "plot-zero-minimum",
   "prompt-paste-chip",
+  "table-value-bar",
 ] as const;
 
 describe("the corpus's second axis", () => {

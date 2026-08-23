@@ -10,6 +10,9 @@
  */
 
 export { DEFAULT_DEFINITIONS } from "./defaults.js";
+export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
+// The floor the shell reserves for a contained failure (C22 I69, C04 I67).
+export { elapsed, statusRowsFor } from "./kinds/status.js";
 export {
   glyphs,
   glyphFor,
@@ -35,6 +38,7 @@ export {
 } from "./kinds/code.js";
 export type {
   BlockDefinition,
+  BlockFault,
   BlockRegistry,
   FocusState,
   NavElement,

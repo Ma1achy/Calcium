@@ -37,8 +37,14 @@
  * out the same id from different modules.
  */
 
-import { cell, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, samplesScale } from "./samples.js";
+import { readFileSync } from "node:fs";
+import { digestOf, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
+import { COLORMAPS } from "../../data/colormaps/index.js";
+import { parseStartDate } from "../../data/dates.js";
 import type {
+  ImageOverlay,
   Action,
   Block,
   Cell,
@@ -55,6 +61,8 @@ import type {
   Logs,
   Notice,
   Panel,
+  Image,
+  Mosaic,
   Scroll,
   Patch,
   Pills,
@@ -84,6 +92,7 @@ import type {
   StepInput,
 } from "./types.js";
 import { rememberLive } from "./live.js";
+import { FigureBuilder } from "./figure.js";
 
 // --- the two shared decisions ---------------------------------------------
 
@@ -214,7 +223,13 @@ function kv(
       rows: pairs.map(({ label, value }) =>
         typeof value === "string"
           ? { label, value }
-          : { label, value: value.text, ...(value.tone === undefined ? {} : { tone: value.tone }) },
+          : {
+              label,
+              value: value.text,
+              ...(value.tone === undefined ? {} : { tone: value.tone }),
+              ...(value.bar === undefined ? {} : { bar: value.bar }),
+              ...(value.barWidth === undefined ? {} : { barWidth: value.barWidth }),
+            },
       ),
     } as KeyValue,
     opts,
@@ -321,9 +336,16 @@ function events(input: readonly EventLine[], opts?: BlockOpts): Events {
 }
 
 /**
- * **`yMin`, `yMax` and `yFormat` are here; `xLabels` and `emptyMessage` are
- * not** — C24 §4 carries the reasoning for each, and this comment carries the
- * one that made the pin urgent.
+ * **`emptyMessage` is the one still withheld** — C24 §4 carries the reasoning,
+ * and this comment carries the one that made the pin urgent.
+ *
+ * **`xLabels` was on that list until a surface wanted it** (F180). Its exemption
+ * read *no surface has wanted one; a caption sentence does not fit it*, and the
+ * history heatmap wants exactly the fixed three-tuple — `-N ticks`, nothing,
+ * `now`. The second clause stands and is why `axisCaption` sits beside the plot
+ * rather than in it. **A reason with two clauses expires one at a time**, and
+ * `BUILDER_OMISSIONS`'s equality arm cannot see that: it catches an entry that
+ * became unnecessary, never one whose argument did.
  *
  * **`yFormat` was withheld and the reason was about the naming** (C04 I41, F31).
  * C24 §4 said exposing it *"wants either a second format or a sentence at the
@@ -352,9 +374,108 @@ function plot(
     yMin?: number;
     yMax?: number;
     yFormat?: Plot["yFormat"];
+    /** The domain the samples span; the sample index where absent (C04 I58). */
+    xMin?: number;
+    xMax?: number;
+    xFormat?: Plot["yFormat"];
+    annotations?: Plot["annotations"];
+    colormap?: Plot["colormap"];
+    /**
+     * The form, defaulting to `line` (C04 §3, FINDINGS F180).
+     *
+     * **It was hardcoded, and that is why the heatmap had no consumer.**
+     * `PlotForm` has three members; `b.plot` wrote `form: "line"` and `b.spark`
+     * writes `"sparkline"`, so `"heatmap"` was buildable by **nothing** in the
+     * public surface — after a walk, a type, a validator arm, a renderer, three
+     * golden frames and a mutation pass. Every fixture that draws one reaches
+     * past `b` to `block()`.
+     *
+     * MG27 passed it throughout: the rule asks whether a builder's constructed
+     * literal *mentions* the field, and `form: "line"` mentions it. A closed
+     * union with one hardcoded arm satisfies a check about names.
+     */
+    form?: Plot["form"];
+    /**
+     * The three x-labels (C24 §4, F180).
+     *
+     * **`BUILDER_OMISSIONS` excused this as *no surface has wanted one*, and the
+     * history heatmap wants exactly it** — `-N ticks`, nothing, `now`. The
+     * omission's other half, *a caption sentence does not fit it*, is still true
+     * and is why `axisCaption` exists beside the plot rather than inside it. A
+     * reason with two clauses expires one at a time.
+     */
+    xLabels?: Plot["xLabels"];
+    xTitle?: Plot["xTitle"];
+    plotStyle?: Plot["plotStyle"];
+    /** The interior of a shape, where the vocabulary can fill (C04 I59). */
+    plotFill?: Plot["plotFill"];
+    /** The radar's ring shape (C12 I45, §3w). */
+    plotGrid?: Plot["plotGrid"];
+    yAxis?: Plot["yAxis"];
+    yCallout?: Plot["yCallout"];
+    vectors?: Plot["vectors"];
+    levels?: Plot["levels"];
+    layers?: Plot["layers"];
+    fieldDim?: Plot["fieldDim"];
+    glyphInk?: Plot["glyphInk"];
+    /** A compact box plot's interquartile run (C12 I46, §3i). */
+    plotBox?: Plot["plotBox"];
+    /**
+     * The candles (C04 I57, C12 I36).
+     *
+     * **Optional beside `series` rather than instead of it.** Plain candles are
+     * `ohlc` with `series: []`; a non-empty `series` is the overlay a moving
+     * average goes in, drawn over them on the shared axis.
+     */
+    ohlc?: Plot["ohlc"];
+    /**
+     * The distribution family's datum, and **four fields that were on `Plot`
+     * and not here** (F263).
+     *
+     * This is the `form` field's own finding one field along, and it survived
+     * the same way. *`"heatmap"` was buildable by nothing in the public
+     * surface — after a walk, a type, a validator arm, a renderer, three golden
+     * frames and a mutation pass*, because **every fixture that draws one
+     * reaches past `b` to `block()`**. So does every fixture that draws a box
+     * plot, a forest plot, a pie and a horizon chart.
+     *
+     * `quartiles` is the datum of **five forms** — boxplot, violin, ridgeline,
+     * forest, bullet — and `categories` names the axis every categorical form
+     * puts them on. Without the pair, none of the five is expressible by a
+     * consumer at all; with `quartiles` alone the categories fall back to
+     * `series 1`, `series 2`, which is a figure with no labels.
+     *
+     * **MG27 passed throughout, for the reason it passed on `form`**: the rule
+     * asks whether a builder's constructed literal *mentions* the field, and a
+     * field nobody can pass is not mentioned rather than mentioned wrongly.
+     * A name-based seam check cannot see an omission.
+     */
+    quartiles?: Plot["quartiles"];
+    categories?: Plot["categories"];
+    segments?: Plot["segments"];
+    bands?: Plot["bands"];
+    plotDetail?: Plot["plotDetail"];
+    plotCorners?: Plot["plotCorners"];
+    orientation?: Plot["orientation"];
+    bandwidth?: Plot["bandwidth"];
+    hierarchy?: Plot["hierarchy"];
+    treeLayout?: Plot["treeLayout"];
+    graph?: Plot["graph"];
+    graphLayout?: Plot["graphLayout"];
+    matrixAnchor?: Plot["matrixAnchor"];
+    legend?: Plot["legend"];
+    plotFrame?: Plot["plotFrame"];
+    width?: Plot["width"];
+    aspect?: Plot["aspect"];
+    align?: Plot["align"];
+    origin?: Plot["origin"];
+    axisCross?: Plot["axisCross"];
+    calendarUnit?: Plot["calendarUnit"];
+    startDate?: Plot["startDate"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax, yFormat } = spec;
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
+    spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
   // author finds out and the validator is where an untrusted document does.
@@ -364,17 +485,331 @@ function plot(
         `(C04 I50a) — a ninth would repeat a colour, which reads as two series being one`,
     );
   }
+  // **The same refusal again** (C04 I56), and the same reason: an author finds
+  // out here, an untrusted document finds out in the validator. Rows only — a
+  // width is not a thing a constructor can see either.
+  if ((form === "boxplot" || form === "violin") && orientation !== "vertical") {
+    // `b.plot` exposes no `categories`, so a band is a series here — which is
+    // what a violin's bands are anyway.
+    const bands = series.length; // cells-ok — a band count
+    const rows = Math.max(1, Math.floor(height ?? 1)); // cells-ok — a row count
+    const need = form === "violin" ? 2 : 1; // cells-ok — a row count
+    if (bands > 0 && Math.floor(rows / bands) < need) {
+      throw new TypeError(
+        `b.plot: ${String(bands)} bands in ${String(rows)} rows is ` +
+          `${String(Math.floor(rows / bands))} per band and a "${form}" needs ${String(need)} ` +
+          `(C04 I56) — below that the density flattens to a bar and the figure states a ` +
+          `property of the height rather than of the data`,
+      );
+    }
+  }
+  // **The same three refusals a second time** (C04 I57), and the geometry one is
+  // not under the style: a wick that does not contain its body is wrong wherever
+  // the bars are, because it is not a candle (C12 §6b B9–B11).
+  for (const [i, bar] of (ohlc ?? []).entries()) {
+    if (bar.low > Math.min(bar.open, bar.close) || bar.high < Math.max(bar.open, bar.close)) {
+      throw new TypeError(
+        `b.plot: ohlc[${String(i)}] has low ${String(bar.low)} and high ${String(bar.high)} ` +
+          `around open ${String(bar.open)} and close ${String(bar.close)} (C04 I57) — a ` +
+          `candle's wick contains its body, so this is not a candle that renders oddly, it ` +
+          `is not a candle`,
+      );
+    }
+  }
+  if (plotStyle === "candlestick") {
+    if (ohlc === undefined) {
+      throw new TypeError(
+        `b.plot: "plotStyle" is "candlestick" and there is no "ohlc" (C04 I57) — the style ` +
+          `has nothing to draw, and "series" is the overlay rather than the candles`,
+      );
+    }
+  }
+  // **One rule over the record, at this gate too** (C04 I59, C12 I43). This
+  // carried its own copy of *candlestick needs line or step* — a second
+  // sentence about one style, in the second place a style is refused, which is
+  // exactly the duplication `STYLE_ARMS` exists to remove. Every style a form
+  // has no arm for is refused here now, and by the same list the validator
+  // reads.
+  //
+  // The **resolved** form, because `b.plot` defaults it to `line` below and a
+  // check on the parameter would refuse the ordinary call that omits it.
+  if (plotStyle !== undefined && plotStyle !== "auto") {
+    const drawn = form ?? "line";
+    const arms = STYLE_ARMS[drawn] as readonly string[];
+    if (!arms.includes(plotStyle)) {
+      throw new TypeError(
+        `b.plot: "plotStyle" is "${plotStyle}" on form "${drawn}" (C04 I59) — that form has ` +
+          `${arms.length === 0 ? "no style arms" : `arms for ${arms.join(", ")}`}, and an ` +
+          `ignored member reads as one not yet implemented`,
+      );
+    }
+  }
+  // **The member had no scope on either gate until now** (F220). `plotDetail`
+  // has one reader in `src/` and reached two forms of forty-four; on the other
+  // forty-two it was accepted here, carried through the document, and ignored —
+  // which is the sentence `plotStyle`'s refusal just above already spells out:
+  // *an ignored member reads as one not yet implemented*.
+  if (plotDetail !== undefined) {
+    const drawn = form ?? "line";
+    if (!HAS_DETAIL_RUNGS[drawn]) {
+      throw new TypeError(
+        `b.plot: "plotDetail" is "${plotDetail}" on form "${drawn}" (C12 I34) — that form ` +
+          `has one figure and no ladder of rungs to pick from`,
+      );
+    }
+  }
+  // **The shape, through the validator's own walk** (C04 I64, F221). The
+  // `plotDetail` refusal above is a copy on purpose — a one-line predicate
+  // written twice can be compared by eye — and a recursive walk is not: two
+  // copies of it are two walks, and the second one drifts.
+  {
+    const drawn = form ?? "line";
+    // **`graph` and `graphLayout` are refused off their own form** — C04 I69 and
+    // C04 I70 — which is `treeLayout`'s guard one form along. The `graph` arm is
+    // the one that matters: a node set accepted on a `line` is data the
+    // renderer never opens, and accepted-and-ignored is the worst of three
+    // answers (F207).
+    if (graph !== undefined && drawn !== "graph") {
+      throw new Error(
+        `b.plot: "graph" is set on form "${drawn}" (C04 I69) — only a graph reads it`,
+      );
+    }
+    if (graphLayout !== undefined && drawn !== "graph") {
+      throw new Error(
+        `b.plot: "graphLayout" is "${graphLayout}" on form "${drawn}" (C04 I70) — only a graph ` +
+          `takes a graph layout`,
+      );
+    }
+    if (treeLayout !== undefined && drawn !== "tree") {
+      throw new TypeError(
+        `b.plot: "treeLayout" is "${treeLayout}" on form "${drawn}" (C04 I65) — only a tree ` +
+          `has more than one layout to choose between, and an ignored member reads as one ` +
+          `not yet implemented`,
+      );
+    }
+    // **A structure form has nothing else to draw** (C04 I65, C12 §3ah.9),
+    // where the three magnitude forms fall back to a series or an empty message.
+    if (hierarchy === undefined && HIERARCHY_ROLE[drawn] === "structure") {
+      throw new TypeError(
+        `b.plot: form "${drawn}" with no "hierarchy" (C04 I65) — that form draws a tree and ` +
+          `nothing else, so there is no figure to fall back to`,
+      );
+    }
+  }
+  if (hierarchy !== undefined) {
+    const drawn = form ?? "line";
+    const role = HIERARCHY_ROLE[drawn];
+    if (role === null) {
+      throw new TypeError(
+        `b.plot: "hierarchy" on form "${drawn}" (C04 I64) — that form draws a series, a ` +
+          `matrix or a field, and an ignored member reads as one not yet implemented`,
+      );
+    }
+    const fault = hierarchyFault(hierarchy, role === "magnitude", "hierarchy");
+    if (fault !== null) throw new TypeError(`b.plot: ${fault} (C04 I64)`);
+  }
+  // **The same rule over the same two records the validator reads** (C04 I60,
+  // C12 I47, C12 I48), on the **resolved** form for `plotStyle`'s reason: the
+  // parameter is optional and defaults to `line` below.
+  {
+    const drawn = form ?? "line";
+    if (yAxis !== undefined && yAxis !== "left" && !HAS_Y_GUTTER[drawn]) {
+      throw new TypeError(
+        `b.plot: "yAxis" is "${String(yAxis)}" on form "${drawn}" (C04 I60) — that form draws ` +
+          `no y gutter, so there is no column for the labels to move to; a facet declares ` +
+          `its own`,
+      );
+    }
+    // The family, not the one form — see `plotAxisErrors`' own note: this is the
+    // third writing of a check that had already been widened once.
+    if (yAxis === false && IS_MATRIX[drawn]) {
+      throw new TypeError(
+        `b.plot: "yAxis" is false on form "${drawn}" (C04 I60) — a row label is the ordinate here, ` +
+          `so a matrix without them is a picture of numbers with no way to tell which row ` +
+          `is which`,
+      );
+    }
+    if (yCallout === "last" && !HAS_CALLOUT[drawn]) {
+      throw new TypeError(
+        `b.plot: "yCallout" is "last" on form "${drawn}" (C04 I60) — a callout names where ` +
+          `one series ends, and that form draws no per-series curve to end`,
+      );
+    }
+    if (yCallout === "last" && (yAxis === undefined || yAxis === "left" || yAxis === false)) {
+      throw new TypeError(
+        `b.plot: "yCallout" is "last" with "yAxis" of ` +
+          `"${yAxis === undefined ? "left" : String(yAxis)}" (C04 I60) — a callout is written ` +
+          `in the right gutter and there is none; widen "yAxis" to "right" or "both"`,
+      );
+    }
+    // **The field family's four, refused off the family** (C04 I61, C12 §3y).
+    for (const [name, value] of [
+      ["layers", layers], ["fieldDim", fieldDim], ["glyphInk", glyphInk],
+    ] as const) {
+      if (value !== undefined && !IS_FIELD_FORM[drawn]) {
+        throw new TypeError(
+          `b.plot: "${name}" on form "${drawn}" (C04 I61) — that form paints its cells and ` +
+            `draws nothing over them, so there is no second thing to order`,
+        );
+      }
+    }
+    // **The three geometry members** (C04 I62, C12 §3ab). A width wider than the
+    // terminal is not checked here either — the builder has no terminal.
+    if (width !== undefined && aspect !== undefined) {
+      throw new TypeError(
+        `b.plot: "width" and "aspect" together (C04 I62) — two ways to say one number, and a ` +
+          `plot that picked one would be reading the caller's other statement`,
+      );
+    }
+    if (align !== undefined && width === undefined && aspect === undefined) {
+      throw new TypeError(
+        `b.plot: "align" with neither "width" nor "aspect" (C04 I62) — a figure that fills ` +
+          `its frame has nothing to align inside it`,
+      );
+    }
+    // **`origin` is refused by the same record that defaults it** (C04 I62,
+    // C12 §3ac) — `null` is the refusal, so there is no second table to keep in
+    // step with this one.
+    const facingForm = form ?? "line";
+    if (origin !== undefined && ORIGIN_DEFAULT[facingForm] === null) {
+      throw new TypeError(
+        `b.plot: "origin" on form "${facingForm}" (C04 I62, C12 §3ac) — this form places its data ` +
+          `itself and has no direction to reverse`,
+      );
+    }
+    // **The same shape one member along, and one clause the record cannot
+    // carry** (C04 I62, C12 §3ad). `HONOURS_AXIS_CROSS` refuses by form; a
+    // *declared* range that excludes zero is refused here too, because the
+    // caller stated it. The realised range is the renderer's to judge — it comes
+    // from `seriesRange`, which is L1 — and its half is dropped, not refused.
+    if (axisCross === "zero" && !HONOURS_AXIS_CROSS[facingForm]) {
+      throw new TypeError(
+        `b.plot: "axisCross" on form "${facingForm}" (C04 I62, C12 §3ad) — a crossing axis needs ` +
+          `a numeric ordinate and a numeric abscissa, and this form has no zero for them to meet at`,
+      );
+    }
+    // **The calendar's four refusals, in the order a caller trips them** (C04
+    // I62, C12 I53, §3ae). `> 1` and never `!== 1`: zero is not more than one,
+    // and an empty calendar is commitment 3's empty plot rather than an error.
+    if (calendarUnit !== undefined && drawn !== "calendar") {
+      throw new TypeError(
+        `b.plot: "calendarUnit" on form "${drawn}" (C04 I62, C12 §3ae) — only a calendar has a ` +
+          `grid for a unit to pick, and a member accepted where nothing honours it reads as one ` +
+          `not yet implemented`,
+      );
+    }
+    if (calendarUnit !== undefined && series.length > 1) { // cells-ok — a series count
+      throw new TypeError(
+        `b.plot: "calendarUnit" with ${String(series.length)} series (C04 I62, C12 I53) — a ` +
+          `calendar's rows are a period, so a second series is a second period claiming the same ` +
+          `rows; the grid is derived from one flat series in time order`,
+      );
+    }
+    if (calendarUnit !== undefined && startDate === undefined) {
+      throw new TypeError(
+        `b.plot: "calendarUnit" without "startDate" (C04 I62, C12 I53) — a calendar's row is a ` +
+          `claim about when, and placing the first reading in the first row is an assumption the ` +
+          `caller never stated`,
+      );
+    }
+    if (startDate !== undefined && parseStartDate(startDate) === null) {
+      throw new TypeError(
+        `b.plot: "startDate" of "${startDate}" is not a date this can place (C04 I62, C12 I53) — ` +
+          `"YYYY-MM-DD", optionally "THH", ":MM", ":SS" and a trailing "Z"; a zone offset is ` +
+          `refused rather than ignored, and a day the month does not have is refused on the leap rule`,
+      );
+    }
+    if (axisCross === "zero" && yMin !== undefined && yMax !== undefined && (yMin > 0 || yMax < 0)) {
+      throw new TypeError(
+        `b.plot: "axisCross": "zero" with a declared range of ${yMin}..${yMax} (C04 I62, C04 I29) — ` +
+          `the range excludes zero, and an axis drawn at the nearest edge would say the origin is ` +
+          `somewhere it is not`,
+      );
+    }
+    if (vectors !== undefined && drawn !== "quiver") {
+      throw new TypeError(
+        `b.plot: "vectors" on form "${drawn}" (C04 I61) — only a quiver draws a vector ` +
+          `field, and two numbers per cell mean nothing to any other form`,
+      );
+    }
+    if (drawn === "quiver" && vectors === undefined) {
+      throw new TypeError(
+        `b.plot: form "quiver" has no "vectors" (C04 I61) — a vector field is what it ` +
+          `draws, and "series" carries one number per cell`,
+      );
+    }
+    if (levels !== undefined && drawn !== "contour") {
+      throw new TypeError(
+        `b.plot: "levels" on form "${drawn}" (C04 I61) — only a contour draws iso-lines, ` +
+          `and a level on anything else names nothing`,
+      );
+    }
+    if (layers !== undefined && new Set(layers).size !== layers.length) { // cells-ok — a layer count
+      throw new TypeError(
+        `b.plot: "layers" names a layer twice (C04 I61) — a layer is drawn once, and the ` +
+          `order of an entry that cannot occlude means nothing`,
+      );
+    }
+  }
+  if (plotFill === "solid" && plotStyle === "line") {
+    throw new TypeError(
+      `b.plot: "plotFill" is "solid" with "plotStyle" of "line" (C04 I59) — a box-drawing ` +
+        `outline has no interior vocabulary, so this would be an outline in one alphabet ` +
+        `around a body in another rather than the same figure filled`,
+    );
+  }
   return finish<Plot>(
     {
       kind: "plot",
       id: idOf(spec, "plot"),
-      form: "line",
+      form: form ?? "line",
       series,
       height,
       ...(axes === undefined ? {} : { axes }),
+      ...(plotFill === undefined ? {} : { plotFill }),
+      ...(plotGrid === undefined ? {} : { plotGrid }),
+      ...(plotBox === undefined ? {} : { plotBox }),
+      ...(yAxis === undefined ? {} : { yAxis }),
+      ...(yCallout === undefined ? {} : { yCallout }),
+      ...(vectors === undefined ? {} : { vectors }),
+      ...(levels === undefined ? {} : { levels }),
+      ...(layers === undefined ? {} : { layers }),
+      ...(fieldDim === undefined ? {} : { fieldDim }),
+      ...(glyphInk === undefined ? {} : { glyphInk }),
+      ...(xMin === undefined ? {} : { xMin }),
+      ...(xMax === undefined ? {} : { xMax }),
+      ...(xFormat === undefined ? {} : { xFormat }),
       ...(yMin === undefined ? {} : { yMin }),
       ...(yMax === undefined ? {} : { yMax }),
       ...(yFormat === undefined ? {} : { yFormat }),
+      ...(annotations === undefined ? {} : { annotations }),
+      ...(colormap === undefined ? {} : { colormap }),
+      ...(xLabels === undefined ? {} : { xLabels }),
+      ...(xTitle === undefined ? {} : { xTitle }),
+      ...(plotStyle === undefined ? {} : { plotStyle }),
+      ...(ohlc === undefined ? {} : { ohlc }),
+      ...(quartiles === undefined ? {} : { quartiles }),
+      ...(categories === undefined ? {} : { categories }),
+      ...(segments === undefined ? {} : { segments }),
+      ...(bands === undefined ? {} : { bands }),
+      ...(plotDetail === undefined ? {} : { plotDetail }),
+      ...(plotCorners === undefined ? {} : { plotCorners }),
+      ...(orientation === undefined ? {} : { orientation }),
+      ...(bandwidth === undefined ? {} : { bandwidth }),
+      ...(hierarchy === undefined ? {} : { hierarchy }),
+      ...(treeLayout === undefined ? {} : { treeLayout }),
+      ...(graph === undefined ? {} : { graph }),
+      ...(graphLayout === undefined ? {} : { graphLayout }),
+      ...(matrixAnchor === undefined ? {} : { matrixAnchor }),
+      ...(legend === undefined ? {} : { legend }),
+      ...(plotFrame === undefined ? {} : { plotFrame }),
+      ...(width === undefined ? {} : { width }),
+      ...(aspect === undefined ? {} : { aspect }),
+      ...(align === undefined ? {} : { align }),
+      ...(origin === undefined ? {} : { origin }),
+      ...(axisCross === undefined ? {} : { axisCross }),
+      ...(calendarUnit === undefined ? {} : { calendarUnit }),
+      ...(startDate === undefined ? {} : { startDate }),
     } as Plot,
     spec,
     true,
@@ -548,6 +983,185 @@ function panel(
  * the constructor is where an author finds out.
  */
 /**
+ * An image: PNG bytes or a path, a declared height, and required alt text
+ * (C04 I73, §3g).
+ *
+ * **`path` is read here and nowhere below.** `node:fs` appears in `shell/` and
+ * `data/process/` and never in `presentation/` — a renderer that opened a file
+ * would be doing I/O at frame cadence in the layer forbidden it, and `measure`
+ * and `render` would disagree the moment the file changed between them.
+ *
+ * **The digest is derived here too**, once, so the identity travels with the
+ * block rather than being recomputed by every consumer that needs it.
+ */
+function image(
+  opts: BlockOpts &
+    Readonly<{ data?: string; path?: string; height: number; alt: string; overlay?: ImageOverlay }>,
+): Image {
+  const { data, path, height, alt, overlay } = opts;
+  if ((data === undefined) === (path === undefined)) {
+    throw new TypeError(
+      `b.image: exactly one of "data" or "path" — got ${data === undefined ? "neither" : "both"} (C04 I73)`,
+    );
+  }
+  if (!Number.isInteger(height) || height < 1) {
+    throw new TypeError(`b.image: height is a positive integer — got ${JSON.stringify(height)} (C04 I73)`);
+  }
+  if (typeof alt !== "string" || alt.trim() === "") {
+    throw new TypeError(
+      "b.image: alt is required and cannot be empty (C04 I73) — at imageProtocol \"none\" with no " +
+        "dither it is the whole of what the reader receives",
+    );
+  }
+  const bytes = data ?? readFileSync(path ?? "").toString("base64");
+  if (!bytes.startsWith("iVBORw0KGgo")) {
+    throw new TypeError(
+      "b.image: the bytes are not a PNG (C04 I73) — phase 1 reads PNG only, and a signature that " +
+        "does not match is a format this cannot draw rather than an image that is broken",
+    );
+  }
+  // **One refusal, thrown here and pushed by the validator** (C04 I74).
+  if (overlay !== undefined) {
+    const fault = overlayFault(overlay, new Set(Object.keys(COLORMAPS)));
+    if (fault !== null) throw new TypeError(`b.image: ${fault}`);
+  }
+  return finish<Image>(
+    {
+      kind: "image",
+      id: idOf(opts, "image"),
+      data: bytes,
+      height,
+      alt,
+      // **The digest stays the data's** and is not widened to cover the overlay
+      // (C04 §3g.2): it keys the decode, and two blocks of one image with
+      // different overlays should decode once. The *picture's* identity is
+      // `imageKey`, derived where it is needed and by one function.
+      digest: digestOf(bytes),
+      ...(overlay === undefined ? {} : { overlay }),
+    } as Image,
+    opts,
+    false,
+  );
+}
+
+/**
+ * A sample grid: N pictures with a label under each (§3f, §3g · `samples.ts`).
+ *
+ * **A composition rather than a kind**, and the premise was re-taken with kitty
+ * placing rather than inherited from the dither. What it adds over writing the
+ * mosaic by hand is the arithmetic nobody should do twice: the spec string, the
+ * row shares, and the **reading order** — `AB/ab` maps as `A B a b`, so a band
+ * contributes its pictures and then its labels, and getting that wrong puts
+ * every caption under the wrong picture with every count agreeing.
+ */
+function samples(opts: BlockOpts & SamplesOptions): Mosaic {
+  const cellRows = opts.cellRows ?? 4;
+  const layout = samplesLayout(opts.items.length, opts.columns, cellRows);
+  if (typeof layout === "string") throw new TypeError(`b.samples: ${layout}`);
+  // **One scale across the set, computed once** (C04 I74, F253) — the shared
+  // normalisation the residual measurement made a ruling rather than a finding.
+  const items = samplesScale(opts.items);
+  const at = (i: number): Sample => items[i] as Sample;
+  // **`opts` is not spread, and the reason is a name collision that type-checks
+  // in the other direction.** `SamplesOptions.columns` is a *count* and
+  // `Mosaic.columns` is a `Share[]`; spreading carries the count into the field
+  // and the compiler caught it, which is the enumeration working on a field
+  // rather than on a kind.
+  return mosaic({
+    ...(opts.id === undefined ? {} : { id: opts.id }),
+    ...(opts.gapBefore === undefined ? {} : { gapBefore: opts.gapBefore }),
+    height: layout.height,
+    areas: layout.areas,
+    rows: layout.rows,
+    children: samplesChildren(
+      opts.items.length,
+      opts.columns,
+      (i) => {
+        const item = at(i);
+        return image({
+          id: `${idOf(opts, "samples")}-i${String(i)}`,
+          height: cellRows,
+          alt: item.alt,
+          ...(item.data === undefined ? {} : { data: item.data }),
+          ...(item.path === undefined ? {} : { path: item.path }),
+          ...(item.overlay === undefined ? {} : { overlay: item.overlay }),
+        });
+      },
+      (i) => raw(at(i).label, { id: `${idOf(opts, "samples")}-l${String(i)}` }),
+    ),
+  });
+}
+
+/**
+ * A mosaic: a declared grid holding a figure nested rows and columns cannot draw
+ * (C04 I71, C04 I72, C04 §3f).
+ *
+ * **Refused at construction on exactly the terms `validateDocument` refuses it**,
+ * from the same parse — `graph`'s lesson read forward rather than repeated: the
+ * gate that landed with the builder and not with the validator produced an
+ * invariant that was true on one side and vacuous on the other.
+ */
+function mosaic(
+  opts: BlockOpts &
+    Readonly<{
+      height: number;
+      areas: string;
+      children: readonly Block[];
+      columns?: readonly Share[];
+      rows?: readonly Share[];
+    }>,
+): Mosaic {
+  const { height, areas, children, columns, rows } = opts;
+  if (!Number.isInteger(height) || height < 1) {
+    throw new Error(
+      `b.mosaic: height is a positive integer — got ${JSON.stringify(height)}; a mosaic with ` +
+        `no declared height draws one blank row (C04 I71)`,
+    );
+  }
+  const parsed = parseAreas(areas);
+  if (!parsed.ok) throw new Error(`b.mosaic: ${parsed.fault}`);
+  const { grid } = parsed;
+  if (children.length !== grid.regions.length) {
+    throw new Error(
+      // **The same fault, said the same way at both gates** — `hierarchy`'s HG4
+      // precedent. Naming the regions is what makes the message actionable: the
+      // author has to know *which* region has no child.
+      `b.mosaic: "areas" names ${String(grid.regions.length)} regions ` +
+        `(${grid.regions.map((r) => JSON.stringify(r.name)).join(", ")}) for ` +
+        `${String(children.length)} children (C04 I71) — the mapping is positional`,
+    );
+  }
+  for (const [member, lines, shares] of [
+    ["columns", grid.columns, columns],
+    ["rows", grid.rows, rows],
+  ] as const) {
+    if (shares !== undefined && shares.length !== lines) {
+      throw new Error(
+        `b.mosaic: ${JSON.stringify(member)} has ${String(shares.length)} entries for a grid ` +
+          `${String(lines)} deep (C04 I72) — one per grid line, not per child`,
+      );
+    }
+  }
+  // **Through `finish`, like every other builder** (I3, I15). Returning the
+  // literal skips the freeze and drops `gapBefore` — both caught by the
+  // enumeration's own rows rather than by anything written for this kind, which
+  // is what the table exists for.
+  return finish<Mosaic>(
+    {
+      kind: "mosaic",
+      id: idOf(opts, "mosaic"),
+      height,
+      areas,
+      children,
+      ...(columns === undefined ? {} : { columns }),
+      ...(rows === undefined ? {} : { rows }),
+    } as Mosaic,
+    opts,
+    false,
+  );
+}
+
+/**
  * A bounded region (C04 §3c, C04 I47).
  *
  * **Throws rather than returning an invalid block**, as `group` does for a bad
@@ -719,11 +1333,34 @@ function live(spec: LiveSpec): Panel {
   // around rather than a way past it.
   const loading =
     spec.renderLoading?.() ??
-    // **The `pending` glyph rather than an ellipsis in the text** (C09 I22,
-    // F122). A builder runs above the renderer, so a character written here
-    // cannot be substituted — and the mark this wanted is one C09 already
-    // carries, with `.` for a terminal that cannot draw `◌`.
-    noticeOf("muted", "loading", "pending", { id: `${spec.id}-loading` });
+    // **A `status` at `loading`, and the kind exists for this fact** (C23 I51,
+    // C09 §3a). A first fetch in flight is the builder's to know — the part is
+    // constructed before the driver has run — and it is one of the three states
+    // a consumer cannot observe, which is the whole argument for the kind.
+    //
+    // **This was a `notice` and drew no spinner.** The `pending` glyph was the
+    // right answer while the box was static: a builder runs above the renderer,
+    // so a character written here cannot be substituted, and `◌` is one C09
+    // already carries with `.` below unicode. A `status` carries its own mark
+    // the same way and animates as well, which the notice could not — and
+    // `elapsedMs` gives the box something to say while it waits (C23 I52).
+    //
+    // **Height 1, and it took two frame reads to get there** (F234, F235). The
+    // panel below already draws the border and holds the title, so 3 spends a
+    // row on a second border inside the first — and 2 drew `loading` over
+    // `⠋ loading`, the same word twice, because at two rows the message gets one
+    // and the activity line gets the other. A waiting box's whole content is the
+    // line that moves; C09 I31's one-row rung now gives `loading` that line.
+    //
+    // `message` is still what a taller one would say — the registry can size
+    // this box from a committed measure, and a consumer can read it.
+    block({
+      kind: "status",
+      id: `${spec.id}-loading`,
+      state: "loading",
+      message: "loading",
+      height: 1,
+    });
   const panel = finish<Panel>(
     { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
     spec,
@@ -763,6 +1400,8 @@ export const b = {
   plot,
   spark,
   progress,
+  figure: (opts?: { title?: string; height?: number; axes?: boolean; yFormat?: Plot["yFormat"]; yMin?: number; yMax?: number }) =>
+    new FigureBuilder(opts),
   code,
   comparison,
   patch,
@@ -771,6 +1410,9 @@ export const b = {
   panel,
   group,
   scroll,
+  mosaic,
+  image,
+  samples,
   raw,
   spinner,
 

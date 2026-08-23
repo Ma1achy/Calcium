@@ -1709,37 +1709,60 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // plausible empty panel rather than a failure. `fetch` is required now.
     fetch: spec.fetch,
     render: spec.render,
+    // **Threaded so the driver knows whose block is in the panel** (C23 I52).
+    // It is never called from there — `b.live` resolves the placeholder at
+    // construction — but resolution consumes the one bit the elapsed counter
+    // needs, and a `status` at `loading` cannot be inspected for it: a
+    // consumer's own `renderLoading` may return exactly that shape.
+    renderLoading: spec.renderLoading ?? null,
+    /**
+     * **A `status`, and its state is read rather than asserted** (C23 I51).
+     *
+     * The kind exists for exactly this fact — a backoff counting down — and the
+     * driver is the only layer that can see it. What decides the arm is
+     * `retryInMs`: **`null` means no retry is coming**, which §3d rule 3 makes
+     * true of every one-shot and of every deterministic `render` throw.
+     *
+     * **Mapping both arms to `retrying` would have shipped a blank row.**
+     * `activityLine` draws nothing for a `retrying` box with no countdown, and
+     * that row is where the spinner goes — so a one-shot's failure would draw a
+     * message and an empty line under it. Found by the classification table
+     * before any of this was written (C23 §8a-bis C1, F234).
+     *
+     * **The heights are a frame read** (F234). Both arms land inside
+     * `livePanel`, which already draws a border and carries the title: at 3 the
+     * box spends a row on a second border inside the first, and `error` has no
+     * activity line, so a second row there is blank by construction.
+     *
+     * The glyph problem the `notice` form had is gone with the form — `status`
+     * carries its own mark from `glyphs(ctx.capabilities)` and cannot be
+     * constructed without one. That defect was A03 §2's vacuity class in a
+     * default, never exercised because no test had failed a fetch on a part that
+     * did not override this, and found by inducing a stall and looking at the
+     * frame (F29).
+     */
     renderError:
       spec.renderError ??
-      ((err, retryInMs) =>
-        block({
-          kind: "notice",
-          id: `${spec.id}-error`,
-          tone: "error",
-          /**
-           * **Without this the framework's own default throws** (C04 I6, D29).
-           *
-           * An `error` notice requires a non-empty glyph — colour alone survives
-           * neither 1-bit nor a colour-blind reader — and `block()` enforces it.
-           * `b.notice` fills the glyph in through `glyphFor`; this path
-           * constructs the block directly and skipped its own convenience, so
-           * the one thing that runs when a live part's fetch fails could not be
-           * constructed at all.
-           *
-           * A `BlockShapeError` out of a `.then` inside the refresh driver:
-           * unhandled, one tick after a fetch failed, on any part whose declarer
-           * did not supply a `renderError`. **A03 §2's vacuity class in a
-           * default** — never exercised, because no test had ever failed a fetch
-           * on a part that did not override this. Found by inducing a stall and
-           * looking at the frame (FINDINGS F29); the frame showed a view frozen
-           * mid-tick with the exception on stderr behind it.
-           */
-          glyph: "error",
-          text:
-            retryInMs === null
-              ? err.message
-              : `${err.message} — retrying in ${String(Math.round(retryInMs / 1000))}s`,
-        })),
+      ((err, retryInMs, attempt) =>
+        block(
+          retryInMs === null
+            ? {
+                kind: "status",
+                id: `${spec.id}-error`,
+                state: "error",
+                message: err.message,
+                height: 1,
+              }
+            : {
+                kind: "status",
+                id: `${spec.id}-error`,
+                state: "retrying",
+                message: err.message,
+                height: 2,
+                retryInMs,
+                attempt,
+              },
+        )),
   });
 
   /**

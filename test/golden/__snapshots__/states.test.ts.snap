@@ -2,24 +2,54 @@
 
 exports[`golden frames — one per state > dark-ascii at 40 1`] = `
 "── plot · plot-gapped-line
-9 |                            .:-=++*#@
-  |                        *#@@
-5 |
-  |          .:-
-1 |.:--=+*#@@
-  +-------------------------------------
-
+   +-----------------------------------+
+10 +                               +---|
+   |                       --------+   |
+ 5 +                                   |
+   |   +--------                       |
+ 0 +---+                               |
+   ++----------+-----------+----------++
+    0          2           4          6
 ── plot · plot-gapped-sparkline
-                                 ?.:?*#@
+?.:?*#@                                 
 ── plot · plot-zero-minimum
-                                .:-=+*#@
+.:-=+*#@                                
 ── plot · plot-heatmap
-   api |                .:-+#@*-:...::=*
-worker |                ================
- cache |                .......
-    db |
+   api +                                
+worker +                                
+ cache +              
+    db +
         -60 ticks                    now
-        .:-=+*#@  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb +                                 
+ fall +                                 
+ late +                                 
+       -60 ticks                     now
+0          100 - 27 older not shown
+── table · table-value-bar
+NAME      CPU               
+api       #............ 4.2%
+worker    ########### 101.2%
+db        -                 
+idle      ............. 0.0%
+── plot · plot-annotated
+     +---------------------------------+
+100% +- - - - - - - - - - - - - - - - -|
+     |- - - - - - +-------+ - - - - - -|
+     |          +-+       +-+          |
+     |- - - -+--+ - - - - - +-+ - - - -|
+ 50% +     +-+                +-+      |
+     |   +-+                    +-+    |
+     |---+                        +----|
+  0% +                                 |
+     ++------+------+-----+------+---+-+
+      0      10     20    30     40  47
+── keyValue · kv-value-bar
+MEM   ####..... 45.2%  1.2GiB / 4GiB
+CPU   ######## 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   \` queued behind /logs
 ── prompt · prompt-paste-chip
@@ -29,24 +59,54 @@ rise it"
 
 exports[`golden frames — one per state > dark-ascii at 80 1`] = `
 "── plot · plot-gapped-line
-9 |                                                          ..::---==+++***##@@
-  |                                                   **##@@@
-5 |
-  |                    ..::--
-1 |..::---===++***##@@@
-  +-----------------------------------------------------------------------------
-
+   +---------------------------------------------------------------------------+
+10 +                                                                    +------|
+   |                                                 -------------------+      |
+ 5 +                                                                           |
+   |      +-------------------                                                 |
+ 0 +------+                                                                    |
+   ++-----------+------------+-----------+-----------+------------+-----------++
+    0           1            2           3           4            5           6
 ── plot · plot-gapped-sparkline
-                                                                         ?.:?*#@
+?.:?*#@                                                                         
 ── plot · plot-zero-minimum
-                                                                        .:-=+*#@
+.:-=+*#@                                                                        
 ── plot · plot-heatmap
-   api |                                                        .:-+#@*-:...::=*
-worker |                                                        ================
- cache |                                                        .......
-    db |
+   api +                                                                        
+worker +                                                                        
+ cache +                                
+    db +
         -60 ticks                                                            now
-        .:-=+*#@  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb +                                                                         
+ fall +                                                                         
+ late +                                                                         
+       -60 ticks                                                             now
+0          100
+── table · table-value-bar
+NAME      CPU               
+api       #............ 4.2%
+worker    ########### 101.2%
+db        -                 
+idle      ............. 0.0%
+── plot · plot-annotated
+     +-------------------------------------------------------------------------+
+100% +- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -|
+     |- - - - - - - - - - - - - -+-----------------+- - - - - - - - - - - - - -|
+     |                      +----+                 +----+                      |
+     |- - - - - - - - -+----+ - - - - - - - - - - - - - +---+ - - - - - - - - -|
+ 50% +             +---+                                    +----+             |
+     |        +----+                                             +---+         |
+     |--------+                                                      +---------|
+  0% +                                                                         |
+     ++-------+------+-------+-------+------+-------+-------+------+-------+---+
+      0       5      10      15      20     25      30      35     40      45
+── keyValue · kv-value-bar
+MEM   ####..... 45.2%  1.2GiB / 4GiB
+CPU   ######## 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   \` queued behind /logs
 ── prompt · prompt-paste-chip
@@ -55,24 +115,54 @@ read [#1 pasted · 184 lines] and summarise it"
 
 exports[`golden frames — one per state > dark-unicode at 40 1`] = `
 "── plot · plot-gapped-line
-9 │                            ⣀⣀⠤⠤⠔⠒⠒⠊⠉
-  │                        ⠐⠒⠉⠉
-5 │
-  │         ⢀⣀⡠⠄
-1 │⣀⣀⠤⠤⠤⠒⠒⠊⠉⠁
-  └─────────────────────────────────────
-
+   ┌───────────────────────────────────┐
+10 ┤                               ╭──╴│
+   │                       ╶───────╯   │
+ 5 ┤                                   │
+   │   ╭───────╴                       │
+ 0 ┤╶──╯                               │
+   └┬──────────┬───────────┬──────────┬┘
+    0          2           4          6
 ── plot · plot-gapped-sparkline
-                                 ?▁▂?▆▇█
+?▁▂?▆▇█                                 
 ── plot · plot-zero-minimum
-                                ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                
 ── plot · plot-heatmap
-   api │                ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache │                ⠄⠄⠄⠄⠄⠄⠄
-    db │
+   api ┤                                
+worker ┤                                
+ cache ┤              
+    db ┤
         -60 ticks                    now
-        ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb ┤                                 
+ fall ┤                                 
+ late ┤                                 
+       -60 ticks                     now
+0          100 · 27 older not shown
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
+db        —                 
+idle      ░░░░░░░░░░░░░ 0.0%
+── plot · plot-annotated
+     ┌─────────────────────────────────┐
+100% ┤⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄│
+     │⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ╭───────╮ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂│
+     │          ╭─╯       ╰─╮          │
+     │⠁ ⠁ ⠁ ⠁╭──╯ ⠁ ⠁ ⠁ ⠁ ⠁ ╰─╮ ⠁ ⠁ ⠁ ⠁│
+ 50% ┤     ╭─╯                ╰─╮      │
+     │   ╭─╯                    ╰─╮    │
+     │╶──╯                        ╰───╴│
+  0% ┤                                 │
+     └┬──────┬──────┬─────┬──────┬───┬─┘
+      0      10     20    30     40  47
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -82,24 +172,54 @@ rise it"
 
 exports[`golden frames — one per state > dark-unicode at 80 1`] = `
 "── plot · plot-gapped-line
-9 │                                                          ⣀⣀⣀⣀⠤⠤⠤⠤⠤⠔⠒⠒⠒⠒⠒⠊⠉⠉⠉
-  │                                                   ⠒⠒⠊⠉⠉⠉⠉
-5 │
-  │                   ⢀⣀⣀⣀⡠⠤⠤
-1 │⣀⣀⣀⡠⠤⠤⠤⠤⠤⠤⠒⠒⠒⠒⠒⠊⠉⠉⠉⠁
-  └─────────────────────────────────────────────────────────────────────────────
-
+   ┌───────────────────────────────────────────────────────────────────────────┐
+10 ┤                                                                    ╭─────╴│
+   │                                                 ╶──────────────────╯      │
+ 5 ┤                                                                           │
+   │      ╭──────────────────╴                                                 │
+ 0 ┤╶─────╯                                                                    │
+   └┬───────────┬────────────┬───────────┬───────────┬────────────┬───────────┬┘
+    0           1            2           3           4            5           6
 ── plot · plot-gapped-sparkline
-                                                                         ?▁▂?▆▇█
+?▁▂?▆▇█                                                                         
 ── plot · plot-zero-minimum
-                                                                        ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                                                        
 ── plot · plot-heatmap
-   api │                                                        ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker │                                                        ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache │                                                        ⠄⠄⠄⠄⠄⠄⠄
-    db │
+   api ┤                                                                        
+worker ┤                                                                        
+ cache ┤                                
+    db ┤
         -60 ticks                                                            now
-        ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb ┤                                                                         
+ fall ┤                                                                         
+ late ┤                                                                         
+       -60 ticks                                                             now
+0          100
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
+db        —                 
+idle      ░░░░░░░░░░░░░ 0.0%
+── plot · plot-annotated
+     ┌─────────────────────────────────────────────────────────────────────────┐
+100% ┤⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄│
+     │⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂╭─────────────────╮⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂│
+     │                      ╭────╯                 ╰────╮                      │
+     │⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁╭────╯ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ╰───╮ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁│
+ 50% ┤             ╭───╯                                    ╰────╮             │
+     │        ╭────╯                                             ╰───╮         │
+     │╶───────╯                                                      ╰────────╴│
+  0% ┤                                                                         │
+     └┬───────┬──────┬───────┬───────┬──────┬───────┬───────┬──────┬───────┬───┘
+      0       5      10      15      20     25      30      35     40      45
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -108,24 +228,54 @@ read [#1 pasted · 184 lines] and summarise it"
 
 exports[`golden frames — one per state > dark-wide at 40 1`] = `
 "── plot · plot-gapped-line
-9 |                            ⣀⣀⠤⠤⠔⠒⠒⠊⠉
-  |                        ⠐⠒⠉⠉
-5 |
-  |         ⢀⣀⡠⠄
-1 |⣀⣀⠤⠤⠤⠒⠒⠊⠉⠁
-  +-------------------------------------
-
+   +-----------------------------------+
+10 +                              ⢀⣀⣀⡠⠤|
+   |                       ⠤⠤⠒⠒⠒⠉⠉⠁    |
+ 5 +                                   |
+   |     ⣀⣀⡠⠤⠤⠔⠒                       |
+ 0 +⠒⠒⠉⠉⠉                              |
+   ++----------+-----------+----------++
+    0          2           4          6
 ── plot · plot-gapped-sparkline
-                                 ?⡀⣀?⣶⣷⣿
+?⡀⣀?⣶⣷⣿                                 
 ── plot · plot-zero-minimum
-                                ⡀⣀⣄⣤⣦⣶⣷⣿
+⡀⣀⣄⣤⣦⣶⣷⣿                                
 ── plot · plot-heatmap
-   api |                ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker |                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache |                ⠄⠄⠄⠄⠄⠄⠄
-    db |
+   api +                                
+worker +                                
+ cache +              
+    db +
         -60 ticks                    now
-        ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb +                                 
+ fall +                                 
+ late +                                 
+       -60 ticks                     now
+0          100 · 27 older not shown
+── table · table-value-bar
+NAME      CPU               
+api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
+worker    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%
+db        -                 
+idle      ⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 0.0%
+── plot · plot-annotated
+     +---------------------------------+
+100% +⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄⣀⣀⣀⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄|
+     |⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⡠⠒⠉ ⠂ ⠉⠑⢄ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂|
+     |          ⡠⠊         ⠑⢄          |
+     |⠁ ⠁ ⠁ ⠁ ⢠⠊⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁⠱⣀ ⠁ ⠁ ⠁ ⠁|
+ 50% +      ⢀⠎⠁                ⠣⡀      |
+     |    ⢀⠔⠁                   ⠈⠢⡀    |
+     |⣀⣀⠤⠔⠁                       ⠈⠢⠤⣀⣀|
+  0% +                                 |
+     ++------+------+-----+------+---+-+
+      0      10     20    30     40  47
+── keyValue · kv-value-bar
+MEM   ⣿⣿⣿⣿⠄⠄⠄⠄⠄ 45.2%  1.2GiB / 4GiB
+CPU   ⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -135,24 +285,54 @@ rise it"
 
 exports[`golden frames — one per state > dark-wide at 80 1`] = `
 "── plot · plot-gapped-line
-9 |                                                          ⣀⣀⣀⣀⠤⠤⠤⠤⠤⠔⠒⠒⠒⠒⠒⠊⠉⠉⠉
-  |                                                   ⠒⠒⠊⠉⠉⠉⠉
-5 |
-  |                   ⢀⣀⣀⣀⡠⠤⠤
-1 |⣀⣀⣀⡠⠤⠤⠤⠤⠤⠤⠒⠒⠒⠒⠒⠊⠉⠉⠉⠁
-  +-----------------------------------------------------------------------------
-
+   +---------------------------------------------------------------------------+
+10 +                                                                 ⢀⣀⣀⣀⣀⣀⡠⠤⠤⠤|
+   |                                                 ⠠⠤⠤⠤⠒⠒⠒⠒⠒⠒⠉⠉⠉⠉⠉⠉⠁         |
+ 5 +                                                                           |
+   |         ⢀⣀⣀⣀⣀⣀⣀⠤⠤⠤⠤⠤⠤⠒⠒⠒⠂                                                 |
+ 0 +⠒⠒⠒⠊⠉⠉⠉⠉⠉⠁                                                                 |
+   ++-----------+------------+-----------+-----------+------------+-----------++
+    0           1            2           3           4            5           6
 ── plot · plot-gapped-sparkline
-                                                                         ?⡀⣀?⣶⣷⣿
+?⡀⣀?⣶⣷⣿                                                                         
 ── plot · plot-zero-minimum
-                                                                        ⡀⣀⣄⣤⣦⣶⣷⣿
+⡀⣀⣄⣤⣦⣶⣷⣿                                                                        
 ── plot · plot-heatmap
-   api |                                                        ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker |                                                        ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache |                                                        ⠄⠄⠄⠄⠄⠄⠄
-    db |
+   api +                                                                        
+worker +                                                                        
+ cache +                                
+    db +
         -60 ticks                                                            now
-        ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb +                                                                         
+ fall +                                                                         
+ late +                                                                         
+       -60 ticks                                                             now
+0          100
+── table · table-value-bar
+NAME      CPU               
+api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
+worker    ⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%
+db        -                 
+idle      ⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 0.0%
+── plot · plot-annotated
+     +-------------------------------------------------------------------------+
+100% +⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄⢀⣀⣀⣀⣀⣀⡀⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄|
+     |⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⣀⡠⠤⠒⠊⠉⠉⠁⠂ ⠂ ⠂⠈⠉⠉⠑⠒⠤⠤⣀ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂|
+     |                      ⣀⠤⠒⠉                     ⠉⠒⠤⣀                      |
+     |⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⣀⠤⠒⠉⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁⠉⠒⠤⣀ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁|
+ 50% +              ⢀⡠⠒⠉                                     ⠉⠒⢄⡀              |
+     |          ⣀⠤⠒⠊⠁                                           ⠈⠑⠒⠤⣀          |
+     |⣀⣀⣀⣀⠤⠤⠤⠒⠒⠉                                                     ⠉⠑⠒⠤⠤⠤⣀⣀⣀⣀|
+  0% +                                                                         |
+     ++-------+------+-------+-------+------+-------+-------+------+-------+---+
+      0       5      10      15      20     25      30      35     40      45
+── keyValue · kv-value-bar
+MEM   ⣿⣿⣿⣿⠄⠄⠄⠄⠄ 45.2%  1.2GiB / 4GiB
+CPU   ⣿⣿⣿⣿⣿⣿⣿⣿ 101.2%  8 cores
+SWAP  -                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -161,24 +341,54 @@ read [#1 pasted · 184 lines] and summarise it"
 
 exports[`golden frames — one per state > light-unicode at 40 1`] = `
 "── plot · plot-gapped-line
-9 │                            ⣀⣀⠤⠤⠔⠒⠒⠊⠉
-  │                        ⠐⠒⠉⠉
-5 │
-  │         ⢀⣀⡠⠄
-1 │⣀⣀⠤⠤⠤⠒⠒⠊⠉⠁
-  └─────────────────────────────────────
-
+   ┌───────────────────────────────────┐
+10 ┤                               ╭──╴│
+   │                       ╶───────╯   │
+ 5 ┤                                   │
+   │   ╭───────╴                       │
+ 0 ┤╶──╯                               │
+   └┬──────────┬───────────┬──────────┬┘
+    0          2           4          6
 ── plot · plot-gapped-sparkline
-                                 ?▁▂?▆▇█
+?▁▂?▆▇█                                 
 ── plot · plot-zero-minimum
-                                ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                
 ── plot · plot-heatmap
-   api │                ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker │                ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache │                ⠄⠄⠄⠄⠄⠄⠄
-    db │
+   api ┤                                
+worker ┤                                
+ cache ┤              
+    db ┤
         -60 ticks                    now
-        ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb ┤                                 
+ fall ┤                                 
+ late ┤                                 
+       -60 ticks                     now
+0          100 · 27 older not shown
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
+db        —                 
+idle      ░░░░░░░░░░░░░ 0.0%
+── plot · plot-annotated
+     ┌─────────────────────────────────┐
+100% ┤⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄│
+     │⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ╭───────╮ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂│
+     │          ╭─╯       ╰─╮          │
+     │⠁ ⠁ ⠁ ⠁╭──╯ ⠁ ⠁ ⠁ ⠁ ⠁ ╰─╮ ⠁ ⠁ ⠁ ⠁│
+ 50% ┤     ╭─╯                ╰─╮      │
+     │   ╭─╯                    ╰─╮    │
+     │╶──╯                        ╰───╴│
+  0% ┤                                 │
+     └┬──────┬──────┬─────┬──────┬───┬─┘
+      0      10     20    30     40  47
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip
@@ -188,24 +398,167 @@ rise it"
 
 exports[`golden frames — one per state > light-unicode at 80 1`] = `
 "── plot · plot-gapped-line
-9 │                                                          ⣀⣀⣀⣀⠤⠤⠤⠤⠤⠔⠒⠒⠒⠒⠒⠊⠉⠉⠉
-  │                                                   ⠒⠒⠊⠉⠉⠉⠉
-5 │
-  │                   ⢀⣀⣀⣀⡠⠤⠤
-1 │⣀⣀⣀⡠⠤⠤⠤⠤⠤⠤⠒⠒⠒⠒⠒⠊⠉⠉⠉⠁
-  └─────────────────────────────────────────────────────────────────────────────
-
+   ┌───────────────────────────────────────────────────────────────────────────┐
+10 ┤                                                                    ╭─────╴│
+   │                                                 ╶──────────────────╯      │
+ 5 ┤                                                                           │
+   │      ╭──────────────────╴                                                 │
+ 0 ┤╶─────╯                                                                    │
+   └┬───────────┬────────────┬───────────┬───────────┬────────────┬───────────┬┘
+    0           1            2           3           4            5           6
 ── plot · plot-gapped-sparkline
-                                                                         ?▁▂?▆▇█
+?▁▂?▆▇█                                                                         
 ── plot · plot-zero-minimum
-                                                                        ▁▂▃▄▅▆▇█
+▁▂▃▄▅▆▇█                                                                        
 ── plot · plot-heatmap
-   api │                                                        ⠄⠔⠖⠷⡿⣿⠿⠖⠔⠄⠄⠄⠔⠔⠶⠿
-worker │                                                        ⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
- cache │                                                        ⠄⠄⠄⠄⠄⠄⠄
-    db │
+   api ┤                                                                        
+worker ┤                                                                        
+ cache ┤                                
+    db ┤
         -60 ticks                                                            now
-        ⠄⠔⠖⠶⠷⠿⡿⣿  0% - 100%
+0%          100%
+── plot · plot-heatmap-overfull
+climb ┤                                                                         
+ fall ┤                                                                         
+ late ┤                                                                         
+       -60 ticks                                                             now
+0          100
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
+db        —                 
+idle      ░░░░░░░░░░░░░ 0.0%
+── plot · plot-annotated
+     ┌─────────────────────────────────────────────────────────────────────────┐
+100% ┤⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄│
+     │⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂╭─────────────────╮⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂│
+     │                      ╭────╯                 ╰────╮                      │
+     │⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁╭────╯ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ╰───╮ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁│
+ 50% ┤             ╭───╯                                    ╰────╮             │
+     │        ╭────╯                                             ╰───╮         │
+     │╶───────╯                                                      ╰────────╴│
+  0% ┤                                                                         │
+     └┬───────┬──────┬───────┬───────┬──────┬───────┬───────┬──────┬───────┬───┘
+      0       5      10      15      20     25      30      35     40      45
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summarise it"
+`;
+
+exports[`golden frames — one per state > mono-unicode at 40 1`] = `
+"── plot · plot-gapped-line
+   ┌───────────────────────────────────┐
+10 ┤                               ╭──╴│
+   │                       ╶───────╯   │
+ 5 ┤                                   │
+   │   ╭───────╴                       │
+ 0 ┤╶──╯                               │
+   └┬──────────┬───────────┬──────────┬┘
+    0          2           4          6
+── plot · plot-gapped-sparkline
+?▁▂?▆▇█
+── plot · plot-zero-minimum
+▁▂▃▄▅▆▇█
+── plot · plot-heatmap
+   api ┤⠄⠄⠔⠔⠖⠖⠷⠷⡿⡿⣿⣿⠿⠿⠖⠖⠔⠔⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠶⠶⠿⠿
+worker ┤⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
+ cache ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
+    db ┤
+        -60 ticks                    now
+0% ⠄⠔⠖⠶⠷⠿⡿⣿ 100%
+── plot · plot-heatmap-overfull
+climb ┤⠄⠄⠄⠔⠔⠔⠔⠔⠖⠖⠖⠖⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠿⠿⠿⠿⡿⡿⡿⡿⡿⣿⣿
+ fall ┤⣿⣿⣿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠖⠖⠖⠖⠔⠔⠔⠔⠔⠄⠄
+ late ┤                      ⠄⠄⠔⠖⠖⠶⠷⠷⠿⡿⡿
+       -60 ticks                     now
+0 ⠄⠔⠖⠶⠷⠿⡿⣿ 100 · 27 older not shown
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
+db        —                 
+idle      ░░░░░░░░░░░░░ 0.0%
+── plot · plot-annotated
+     ┌─────────────────────────────────┐
+100% ┤⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄│
+     │⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ╭───────╮ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂│
+     │          ╭─╯       ╰─╮          │
+     │⠁ ⠁ ⠁ ⠁╭──╯ ⠁ ⠁ ⠁ ⠁ ⠁ ╰─╮ ⠁ ⠁ ⠁ ⠁│
+ 50% ┤     ╭─╯                ╰─╮      │
+     │   ╭─╯                    ╰─╮    │
+     │╶──╯                        ╰───╴│
+  0% ┤                                 │
+     └┬──────┬──────┬─────┬──────┬───┬─┘
+      0      10     20    30     40  47
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
+── notice · notice-continuation
+  ⎿ queued behind /logs
+── prompt · prompt-paste-chip
+read [#1 pasted · 184 lines] and summa
+rise it"
+`;
+
+exports[`golden frames — one per state > mono-unicode at 80 1`] = `
+"── plot · plot-gapped-line
+   ┌───────────────────────────────────────────────────────────────────────────┐
+10 ┤                                                                    ╭─────╴│
+   │                                                 ╶──────────────────╯      │
+ 5 ┤                                                                           │
+   │      ╭──────────────────╴                                                 │
+ 0 ┤╶─────╯                                                                    │
+   └┬───────────┬────────────┬───────────┬───────────┬────────────┬───────────┬┘
+    0           1            2           3           4            5           6
+── plot · plot-gapped-sparkline
+?▁▂?▆▇█
+── plot · plot-zero-minimum
+▁▂▃▄▅▆▇█
+── plot · plot-heatmap
+   api ┤⠄⠄⠄⠄⠄⠔⠔⠔⠔⠖⠖⠖⠖⠖⠷⠷⠷⠷⡿⡿⡿⡿⡿⣿⣿⣿⣿⠿⠿⠿⠿⠿⠖⠖⠖⠖⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠔⠶⠶⠶⠶⠶⠿⠿⠿⠿
+worker ┤⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶
+ cache ┤⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
+    db ┤
+        -60 ticks                                                            now
+0% ⠄⠔⠖⠶⠷⠿⡿⣿ 100%
+── plot · plot-heatmap-overfull
+climb ┤⠄⠄⠄⠄⠄⠄⠄⠔⠔⠔⠔⠔⠔⠔⠔⠔⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⡿⡿⡿⡿⡿⡿⡿⡿⡿⣿⣿⣿⣿⣿⣿
+ fall ┤⣿⣿⣿⣿⣿⣿⣿⡿⡿⡿⡿⡿⡿⡿⡿⡿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠿⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠷⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠶⠖⠖⠖⠖⠖⠖⠖⠖⠖⠖⠔⠔⠔⠔⠔⠔⠔⠔⠔⠄⠄⠄⠄⠄⠄
+ late ┤                                                 ⠄⠄⠄⠔⠔⠔⠖⠖⠖⠖⠶⠶⠷⠷⠷⠷⠿⠿⠿⠿⡿⡿⡿⣿
+       -60 ticks                                                             now
+0 ⠄⠔⠖⠶⠷⠿⡿⣿ 100
+── table · table-value-bar
+NAME      CPU               
+api       █░░░░░░░░░░░░ 4.2%
+worker    ███████████ 101.2%
+db        —                 
+idle      ░░░░░░░░░░░░░ 0.0%
+── plot · plot-annotated
+     ┌─────────────────────────────────────────────────────────────────────────┐
+100% ┤⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄ ⠄│
+     │⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂╭─────────────────╮⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂ ⠂│
+     │                      ╭────╯                 ╰────╮                      │
+     │⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁╭────╯ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ╰───╮ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁ ⠁│
+ 50% ┤             ╭───╯                                    ╰────╮             │
+     │        ╭────╯                                             ╰───╮         │
+     │╶───────╯                                                      ╰────────╴│
+  0% ┤                                                                         │
+     └┬───────┬──────┬───────┬───────┬──────┬───────┬───────┬──────┬───────┬───┘
+      0       5      10      15      20     25      30      35     40      45
+── keyValue · kv-value-bar
+MEM   ████░░░░░ 45.2%  1.2GiB / 4GiB
+CPU   ████████ 101.2%  8 cores
+SWAP  —                unavailable
+PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
 ── prompt · prompt-paste-chip

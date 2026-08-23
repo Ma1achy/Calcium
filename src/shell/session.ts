@@ -28,9 +28,14 @@ import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
+import { transmitImage, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
 import { focusKey } from "./render-cache.js";
+import { reserveNeeded } from "./block-faults.js";
+import { descendants } from "../data/viewmodel/index.js";
+import type { Block } from "../data/viewmodel/index.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
+import { animationIntervalOf } from "../presentation/blocks/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
@@ -156,6 +161,38 @@ class Session implements TuiInstance {
    * it is the only place C03's flag needs an expression here.
    */
   #lastFrame: readonly string[] | null = null;
+
+  /**
+   * Digests this session has transmitted (C09 I36).
+   *
+   * **Session-scoped, because the id space is the terminal's.** An entry evicted
+   * from the transcript does not un-send its image, and a document redrawn does
+   * not need to re-send one.
+   */
+  readonly #sentImages: SentImages = new Set<string>();
+
+  /**
+   * C03's spinner counter, and **the one thing F227 was about**.
+   *
+   * `RenderContext.tick` is documented as *a monotonic counter, incremented by
+   * C03's spinner commit*, and for the life of the project nothing incremented
+   * it: `commit("spinner")` appeared in six test files and nowhere in `src/`.
+   * Measured, `steps` drew one distinct glyph across ten real frames where the
+   * same block through the test harness drew ten.
+   */
+  #tick = 0;
+
+  /**
+   * The cadence the last frame's visible blocks wanted, or `null` for none.
+   *
+   * Written by `visibleRows`, which is the only thing that sees which blocks are
+   * on screen at this width after windowing. **A transcript with nothing
+   * animating in it arms no timer at all** — the ticker is not a heartbeat.
+   */
+  #animationMs: number | null = null;
+
+  /** The armed tick, disposed and re-armed on every frame. */
+  #spinner: Disposable | null = null;
   /**
    * Copy mode: the reader has asked the app to step back (C16 §5b, C03 §4a).
    *
@@ -418,6 +455,13 @@ class Session implements TuiInstance {
     // racing shutdown loses the race (T3.19).
     graph.session.beginStopping();
     this.#identity?.stop();
+    // **Before the release, and disposed rather than left to the frame that
+    // never comes.** The ticker re-arms itself out of `#render`, so a session
+    // that stops between two frames would keep a timer alive holding the process
+    // open — the same shape `refresh.dispose()` sets `stopped` first for.
+    this.#spinner?.[Symbol.dispose]();
+    this.#spinner = null;
+    this.#animationMs = null;
     // **Here, not in `beforeRelease`** (C23 I12). The flag `beginStopping` sets
     // is read at the top of a tick and cannot see a `fetch` already in flight;
     // stopping the timers alongside it is what makes the promise hold. Same
@@ -517,8 +561,112 @@ class Session implements TuiInstance {
     // the rows the partial write got wrong. This way a throw is a full repaint
     // by construction rather than by a handler someone must remember to add.
     this.#lastFrame = null;
-    graph.lifecycle.writer.write(result.write);
+    // **The transmission leads the frame, in the same write** (C09 §4c).
+    // Ink strips APC escapes, so this cannot travel inside a `Text` node and
+    // does not: it is prefixed to the bytes here, where the shell already owns
+    // the write, and only the placeholders go through Ink as ordinary text.
+    //
+    // **Before rather than after**, because placeholders addressing an image
+    // that has not been sent draw nothing — and the frame reaches an absolute
+    // address before any row content, so a cursor the escape might have moved is
+    // corrected by the next byte written. Measured: `session.ts` is the only
+    // path that writes block rows; `drawFallback` writes a fixed message with no
+    // blocks, and C03's sink writes its own control bytes.
+    //
+    // **On entry into the DOCUMENT rather than into the viewport**, and the
+    // `#sentImages` set is what makes that affordable: each digest transmits
+    // once for the session, so an image scrolled into view later costs nothing
+    // at the moment it appears. Keying on the windowed set instead would put a
+    // transmission in a frame where nothing else changed — a scroll that emits
+    // a payload — which is the worse of the two.
+    graph.lifecycle.writer.write(
+      transmitImage(
+        graph.transcript.entries.flatMap((e) => e.doc.blocks),
+        graph.capabilities,
+        this.#sentImages,
+      ) + result.write,
+    );
     this.#lastFrame = result.lines;
+
+    // **After the write, and that is the whole of why the frame stays one pass**
+    // (I69). The fault is discovered inside `visibleRows`, which is a read of the
+    // transcript; patching it there would be a write inside the frame it would
+    // change. Here the frame is on the terminal and the next one honours it.
+    this.#raiseReserves(graph);
+
+    // **Armed from what this frame drew, not from what the document holds.**
+    // `visibleRows` reported the cadence after windowing, so a spinner scrolled
+    // off the screen stops the timer and one scrolled back on starts it — which
+    // is the same rule `anyoneLooking` applies to a refresh source, and for the
+    // same reason (C23 I46).
+    this.#armSpinner();
+  }
+
+  /**
+   * The third link, and the one recorded nowhere (F227).
+   *
+   * C03 declares a `spinner` commit reason, tunes its 100 ms window and
+   * specifies how it coalesces against `stream` — and nothing in the product
+   * ever supplied one. **A missing producer makes every consumer downstream of
+   * it look like a decision deferred rather than a chain broken**, which is why
+   * C22 I60 and its §6c row 10 both read *not reachable* while a shipped kind
+   * could not animate.
+   *
+   * Disposed and re-armed every frame: the interval belongs to the fastest set
+   * on screen, and both the set and the screen can change between frames.
+   */
+  /**
+   * What the frame owed, issued (C22 I69, C04 I67).
+   *
+   * The three guards are `reserveNeeded`'s and are written down there, with the
+   * reason one of them lives in a function rather than in this loop: the drain
+   * is in the same synchronous block as the frame that filled it, so the arm
+   * about a moved `rev` is reachable only through a frame that returned early —
+   * a real path and a narrow one, and not one a session row would enter.
+   */
+  #raiseReserves(graph: Graph): void {
+    let raised = false;
+    for (const req of graph.blockFaults.drain()) {
+      const entry = graph.transcript.entries.find((e) => e.id === req.entryId);
+      const held = entry === undefined ? undefined : blockById(entry.doc.blocks, req.blockId);
+      if (!reserveNeeded(entry, held, req)) continue;
+
+      graph.transcript.patch(
+        req.entryId,
+        { op: "reserve", blockId: req.blockId, rows: req.rows },
+        // **The gate reads who is writing** (C13 §6). The entries whose
+        // renderers gave way are settled ones by construction — a result settles
+        // the moment it lands — so the far side's arm would refuse every case
+        // this exists for.
+        "shell",
+      );
+      raised = true;
+    }
+    // **Guarded, and it is the second half of termination.** An unconditional
+    // commit ends every frame by scheduling another, and the patch guard above
+    // does nothing about it: the session never goes quiet, draws the correct
+    // picture for ever, and looks exactly like one that is idle. Measured — a
+    // fixture with nothing animating in it wrote thirty more frames while the
+    // screen did not change.
+    //
+    // C03's window, so a reserve coalesces with whatever else moved the
+    // document. `stream` rather than `input`: this is content changing, not a
+    // key, and 33 ms is one frame at a rate a reader cannot see.
+    if (raised) graph.scheduler.commit("stream");
+  }
+
+  #armSpinner(): void {
+    this.#spinner?.[Symbol.dispose]();
+    this.#spinner = null;
+    const ms = this.#animationMs;
+    if (ms === null) return;
+    this.#spinner = this.config.schedule(() => {
+      this.#tick += 1;
+      // Through the scheduler rather than straight to `#render`, so the 100 ms
+      // window coalesces a spinner behind a stream commit exactly as C03 §3
+      // says it should — a spinner briefly at 7.5 fps is what that trade buys.
+      this.#graph?.scheduler.commit("spinner");
+    }, ms);
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
@@ -532,7 +680,10 @@ class Session implements TuiInstance {
       // **Both take the frame's width from the frame**, not from a fresh
       // `size()`. A closure that re-read it is exactly the two-width frame the
       // note names, arriving through the one seam that looks harmless.
-      transcriptRows: () => visibleRows(graph, width),
+      transcriptRows: () =>
+        visibleRows(graph, width, this.#tick, (ms) => {
+          this.#animationMs = ms;
+        }),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
       promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
       // **The wash, mapped through the same walk the rows came from** (C17 I18,
@@ -726,8 +877,17 @@ class Session implements TuiInstance {
  * divergence in the place that moves the whole frame — the two would agree on
  * ordinary output and part company at a wrap boundary.
  */
-function visibleRows(graph: Graph, width: number): readonly string[] {
+function visibleRows(
+  graph: Graph,
+  width: number,
+  tick: number,
+  onAnimation: (intervalMs: number | null) => void,
+): readonly string[] {
   const out: string[] = [];
+  // **The cadence anything visible wants, reported once per frame.** The session
+  // arms its ticker from this and disarms when it is `null`, so a transcript
+  // with nothing animating in it schedules nothing at all (F227).
+  let fastest: number | null = null;
   for (const ve of graph.viewport.visible().entries) {
     const entry = graph.transcript.entries.find((e) => e.id === ve.id);
     if (entry === undefined) continue;
@@ -769,11 +929,32 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     // nothing until a row scrolls twice and reads the frame, which is why
     // T4.18e is written that way.
     const offsets = graph.scrollOffsets.key(entry.id);
-    const slot = `${key}\u0000${range}\u0000${offsets}`;
+
+    // **The fifth axis, and it is the one that fails intermittently** (C22 I60,
+    // C09 I32, F227). An animating entry whose key omits `tick` is served its
+    // first frame for the life of the session — but only on a cache *hit*, so
+    // with the counter wired and this line missing the spinner turns whenever
+    // something else invalidated the slot and freezes when nothing did. Frozen
+    // is diagnosable; intermittent is not, which is why this carries its own
+    // mutation rather than riding with the pair that supplies the counter.
+    //
+    // **Per kind, so an entry holding nothing animated keys exactly as before.**
+    // Adding `tick` to every slot would bust the whole cache on every spinner
+    // commit, which is the opposite of what the cache is for.
+    const cadence = animationIntervalOf(windowed.blocks);
+    if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
+    const animated = cadence === null ? "" : `\u0000${String(tick)}`;
+    const slot = `${key}\u0000${range}\u0000${offsets}${animated}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
+    // **Faults from here are this entry's** (I69). A `BlockFault` names a block
+    // and ids are unique within a document and not across entries (C04 I14), so
+    // neither half addresses anything on its own. A scope rather than a field,
+    // because the render that produces the fault is one call and the caller is
+    // what knows which entry it is drawing.
     const lines =
       held ??
-      renderSequenceToLines(graph.blocks, windowed.blocks, width, {
+      graph.blockFaults.within(entry.id, entry.rev, () =>
+        renderSequenceToLines(graph.blocks, windowed.blocks, width, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
         // **The third field, and the context was shipped with two** (C16 §3).
@@ -783,9 +964,32 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
         // still broken — a partially-populated context, which counting
         // references cannot see.
         focus,
-        scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
-      });
+        // **The counter, and it was `?? 0` for the life of every session**
+        // (F227). `RenderContext.tick` is documented as advanced by C03's
+        // spinner commit; nothing raised one and nothing passed one, and the
+        // two are a pair — supplying it here while the commit is missing leaves
+        // the frame exactly as frozen, which is what made the obvious repair
+        // indistinguishable from doing nothing.
+          tick,
+          scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
+        }),
+      );
     if (held === undefined) {
+      // **C09's rows against C09's own number, on the frame that produced them**
+      // (I70, F230). The trim below reconciles this entry's rows against C14's
+      // slot and cannot say whether it is cutting a screen that ran out or a
+      // block that over-drew — the two are the same `slice` and one of them
+      // deletes the block underneath. This is where the difference is knowable,
+      // and it is asked only on a cache miss: a hit's lines came from a miss
+      // that was already asked.
+      const expected = graph.blocks.measureSequence(windowed.blocks, width);
+      if (lines.length !== expected) {
+        graph.blockFaults.note(
+          `entry ${entry.id}: C09 drew ${String(lines.length)} rows where measure ` +
+            `committed ${String(expected)} (C09 I1) — the frame keeps ${String(expected)}, ` +
+            `and anything below the overflow in this entry is dropped`,
+        );
+      }
       graph.rendered.set(entry.id, entry.rev, width, slot, theme, lines);
     }
 
@@ -804,6 +1008,7 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     const rows = [...keptChrome, ...lines.slice(windowed.skipRows)];
     out.push(...rows.slice(0, ve.takeRows));
   }
+  onAnimation(fastest);
   return out;
 }
 
@@ -845,6 +1050,22 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   const found = i === null ? undefined : elements[i];
   if (found === undefined) return null;
   return Object.freeze({ blockId: found.blockId, rowId: found.element.id });
+}
+
+/**
+ * One block by id, children included (C04 I14).
+ *
+ * **The subtree, because a containment descends.** A `steps` inside a `panel` is
+ * exactly what `b.live` builds, so the block that gave way is as likely to be a
+ * child as a top-level entry — and a top-level scan would silently reserve
+ * nothing for the arrangement the framework itself produces.
+ */
+function blockById(blocks: readonly Block[], id: string): Block | undefined {
+  for (const block of blocks) {
+    if (block.id === id) return block;
+    for (const child of descendants(block)) if (child.id === id) return child;
+  }
+  return undefined;
 }
 
 /** What `session` reads before the graph exists — §9's `created` state. */

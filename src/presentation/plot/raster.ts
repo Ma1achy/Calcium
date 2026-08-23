@@ -92,6 +92,45 @@ export function drawColumnSpan(grid: Grid, x: number, yTop: number, yBottom: num
 }
 
 /** The grid, as braille cells. */
+/**
+ * A dot grid folded to **whole cells** — the same geometry, one alphabet
+ * coarser (C12 I43, §3w).
+ *
+ * **The wedges are not recomputed, and that is the point.** A solid pie shares
+ * every part of the braille one — the angular test, the minimum fraction, the
+ * radial edges, the legend — and differs only in what a cell with ink in it
+ * draws. Folding rather than re-rasterising means the two can never disagree
+ * about where a boundary is.
+ *
+ * **Half the dots, because a cell is a claim about area.** At one dot the disc
+ * grows by a cell all the way round and its edge reads as ragged; at all eight
+ * it shrinks and the rim disappears. Four of eight is *this cell is more inside
+ * than out*, which is what a block glyph asserts.
+ */
+export function foldSolid(grid: Grid, mark: string): readonly string[] {
+  const cellsWide = Math.ceil(grid.dotWidth / BRAILLE_DOTS.x); // cells-ok — a cell count
+  const cellsHigh = Math.ceil(grid.dotHeight / BRAILLE_DOTS.y); // cells-ok — a cell count
+  const half = (BRAILLE_DOTS.x * BRAILLE_DOTS.y) / 2; // cells-ok — a dot count
+  const out: string[] = [];
+  for (let cy = 0; cy < cellsHigh; cy += 1) { // cells-ok — a cell row
+    let line = "";
+    for (let cx = 0; cx < cellsWide; cx += 1) { // cells-ok — a cell column
+      let lit = 0;
+      for (let dy = 0; dy < BRAILLE_DOTS.y; dy += 1) {
+        for (let dx = 0; dx < BRAILLE_DOTS.x; dx += 1) {
+          const x = cx * BRAILLE_DOTS.x + dx;
+          const y = cy * BRAILLE_DOTS.y + dy;
+          if (x >= grid.dotWidth || y >= grid.dotHeight) continue;
+          if (grid.dots[y * grid.dotWidth + x] === 1) lit += 1; // cells-ok — a dot count
+        }
+      }
+      line += lit >= half ? mark : " "; // cells-ok — a dot count
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 export function foldBraille(grid: Grid): readonly string[] {
   const cellsWide = Math.ceil(grid.dotWidth / BRAILLE_DOTS.x);
   const cellsHigh = Math.ceil(grid.dotHeight / BRAILLE_DOTS.y);
@@ -126,6 +165,22 @@ export function foldBraille(grid: Grid): readonly string[] {
  * cell and is monotone in the value. Taking the lowest instead would draw the
  * curve's underside, and taking a count would draw its density.
  */
+/**
+ * The ASCII arm: a column of dots folded to one glyph per cell (C12 §6).
+ *
+ * **The ramp stands in for height rather than being it, and that is the whole of
+ * what to know here.** The topmost inked dot-row picks the index — bottom → the
+ * ramp's first step, top → its last — so a reader sees *ink weight* where the
+ * braille form gives them *position*. Monotone and legible, and the cost is that
+ * at ASCII a line and a filled area are hard to tell apart: a value near a
+ * cell's top draws a glyph that fills the whole cell.
+ *
+ * **Deliberate, because ASCII has no vertical sub-cell resolution to offer** —
+ * and written here because the same substitution left unstated is what produced
+ * the heatmap's first draft. A ramp encodes a value along an axis, and height,
+ * density and fill are three different axes; this is the one place in C12 where
+ * the axis drawn is not the axis meant.
+ */
 export function foldRamp(grid: Grid, ramp: string): readonly string[] {
   const glyphs = [...ramp];
   const cellsHigh = Math.ceil(grid.dotHeight / RAMP_DOTS.y);
@@ -144,6 +199,45 @@ export function foldRamp(grid: Grid, ramp: string): readonly string[] {
         }
       }
       line += topmost < 0 ? " " : (glyphs[RAMP_DOTS.y - 1 - topmost] ?? " ");
+    }
+    out.push(line);
+  }
+
+  return out;
+}
+
+/**
+ * A dot grid to cells of **presence** — one mark where anything is lit.
+ *
+ * **The third fold, and it exists because the other two both encode a
+ * magnitude.** `foldBraille` puts the dots' arrangement in the glyph;
+ * `foldRamp` puts the topmost dot's *height* in it. A jittered strip has
+ * neither to say: its dots are raw samples, and their sub-cell position is
+ * spread rather than signal (C12 §3i, I21). Folded through `foldRamp` an ASCII
+ * strip would draw `.` `:` `-` `=` by where a sample happened to land inside its
+ * cell — a magnitude the data does not have, which is the vocabulary mismatch
+ * I21 exists to refuse, arriving on a fourth form.
+ *
+ * Sized on `RAMP_DOTS` because presence is what the ASCII arm needs and ASCII is
+ * one dot column per cell. The unicode arm folds braille and never reaches here.
+ */
+export function foldPresence(grid: Grid, mark: string): readonly string[] {
+  const cellsHigh = Math.ceil(grid.dotHeight / RAMP_DOTS.y);
+  const out: string[] = [];
+
+  for (let cy = 0; cy < cellsHigh; cy += 1) {
+    let line = "";
+    for (let cx = 0; cx < grid.dotWidth; cx += 1) {
+      let lit = false;
+      for (let dy = 0; dy < RAMP_DOTS.y; dy += 1) {
+        const y = cy * RAMP_DOTS.y + dy;
+        if (y >= grid.dotHeight) break;
+        if (grid.dots[y * grid.dotWidth + cx] === 1) {
+          lit = true;
+          break;
+        }
+      }
+      line += lit ? mark : " ";
     }
     out.push(line);
   }

@@ -830,8 +830,15 @@ notice here.
   (§8b.7).
 - **I11** — Element resolution is a pull, recomputed on dispatch. C26 subscribes to no change
   stream.
-- **I12** — A refused or throwing `elements` makes the block atomic for that dispatch and
-  focus falls to the block level. It is not a throw the caller sees.
+- **I12** — A refused or throwing `elements` makes the block atomic for that dispatch **and takes
+  nothing else with it**: its children stay reachable, because ownership is decided by what
+  resolution returned rather than by whether the member is declared (C09 I30). It is not a throw
+  the caller sees. **The clause that used to close this sentence — *focus falls to the block
+  level* — had no mechanism.** `FocusState.rowId` is `string | null` and the type's own comment
+  says `null` means the block itself is focused; `null` is constructed **nowhere in `src/`**, and
+  `focusFor` returns an element id or no focus at all — so an atomic block is skipped rather than
+  focused, and `↓` passes over it. Block-level focus is unbuilt, and naming it here made a gap
+  read as a ruling (F224).
 - **I13** — Leaving a scope and a command running are **different transitions**, and only
   one may keep a focus memory. **`FocusStore` already has both functions** — `toPrompt()` is
   the reader stepping out and `reset()` is C16 I2's append — and the call sites use the wrong
@@ -924,7 +931,14 @@ overlap.
 
 **What does a refusal leave behind?** A throwing `elements` would abandon a focus location
 pointing at something unresolvable, two components from the throw. So it is not a throw:
-the block is atomic for that dispatch and focus falls to the block level → **I12**.
+the block is atomic for that dispatch and its children are still reachable → **I12**.
+
+**The ruling named an outcome the layer below does not have**, which is C12 §3ah's class arriving
+here: *focus falls to the block level* was written as though block-level focus existed, and
+`rowId: null` — the type's own expression of it — is constructed nowhere. The finding survives and
+only the remedy changed: what a refusal must not leave behind is an unreachable **subtree**, which
+is what it was leaving (F224). Whether block-level focus should exist is a separate question and
+this file does not answer it.
 
 ---
 

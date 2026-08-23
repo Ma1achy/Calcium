@@ -17,10 +17,60 @@
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /** The fields a height depends on. Deliberately not `Plot`. */
-export type PlotGeometry = Pick<Plot, "form" | "height" | "axes">;
+// `xTitle` is a **declaration** and not data — it costs a row the caller
+// stated, exactly as `legend` does — so it belongs in this Pick and the
+// guarantee above is untouched: the series is still unreachable from here.
+export type PlotGeometry = Pick<Plot, "form" | "height" | "axes" | "legend" | "xTitle">;
+
+/**
+ * The rows a legend costs — one for a horizontal placement, none otherwise.
+ *
+ * **`series` stays unreachable, which is the whole reason the field is split
+ * this way** (C12 I27). A horizontal legend's cost must be known before the data
+ * is, so it is a fixed row and never auto-enables; a vertical one costs width,
+ * which is already data-dependent through the gutter, and is therefore allowed
+ * to size itself. A legend that grew a second row for a ninth series would make
+ * `plotHeight` a function of the series, which is the one thing C12 I1 forbids.
+ */
+export function legendRows(plot: PlotGeometry): number {
+  return plot.legend === "above" || plot.legend === "below" ? 1 : 0; // cells-ok — a row count
+}
+
+/**
+ * The row an x-axis title costs (C12 I56, §3ag).
+ *
+ * **Added centrally, on `legendRows`' recorded reason**: every form that draws
+ * one pays it the same way, and a table of thirty-six entries each adding the
+ * same term is thirty-six chances to forget one.
+ */
+export function titleRows(plot: PlotGeometry): number {
+  return plot.xTitle === undefined ? 0 : 1; // cells-ok — a row count
+}
 
 /** The rows an axed plot spends below the plot area: the rule, then x-labels. */
 export const AXIS_ROWS = 2;
+
+/**
+ * The row the frame's **top** edge costs, above the plot area (§3f).
+ *
+ * **A constant and not a derivation**, which is I1 in one line: a box has a lid
+ * whatever the data does, so the row is declared here and `plotHeight` adds it
+ * without ever seeing a series. Separate from `AXIS_ROWS` rather than folded
+ * into a 3, because the matrix family spends `AXIS_ROWS` on x-labels and a
+ * legend and has no lid to pay for — §2's *a heatmap's two rows are not the
+ * line's two rows*, one row further along.
+ */
+export const FRAME_ROWS = 1;
+
+/**
+ * The cells the frame's **right** edge costs.
+ *
+ * The left edge is already paid for by `AXIS_GUTTER`; the right one is the new
+ * column, and it comes out of the plot area rather than out of the labels —
+ * T3.3's ladder is *labels, then furniture, then the curve*, and the curve is
+ * the only one of the three that can give up a single cell and still be itself.
+ */
+export const FRAME_RIGHT = 1;
 
 /**
  * The cells an axed plot spends left of the plot area, beside the y-labels: one
@@ -46,13 +96,27 @@ export function plotAreaRows(plot: PlotGeometry): number {
 }
 
 /** Declared rows per form. A `Record` for `FURNITURE_ROWS`' reason, below. */
+const heightOrOne = (plot: PlotGeometry): number => Math.max(1, Math.floor(plot.height ?? 1));
 const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 1,
-  line: (plot) => Math.max(1, Math.floor(plot.height ?? 1)),
-  // **A matrix's row count is data and must not be its height** (C12 I1, §6a
-  // B1). A container starting mid-stream adds a row; the block does not grow,
-  // and the row that does not fit is named in a legend (I8).
-  heatmap: (plot) => Math.max(1, Math.floor(plot.height ?? 1)),
+  waffle: () => 10,
+  contour: heightOrOne, quiver: heightOrOne,
+  line: heightOrOne,
+  heatmap: heightOrOne,
+  scatter: heightOrOne, step: heightOrOne, ecdf: heightOrOne,
+  bar: heightOrOne, histogram: heightOrOne, boxplot: heightOrOne,
+  forest: heightOrOne, dumbbell: heightOrOne,
+  lollipop: heightOrOne, dotplot: heightOrOne,
+  flame: heightOrOne, icicle: heightOrOne, funnel: heightOrOne,
+  gantt: heightOrOne, waterfall: heightOrOne, streamgraph: heightOrOne,
+  stackedarea: heightOrOne, treemap: heightOrOne, tree: heightOrOne, graph: heightOrOne,
+  slope: heightOrOne, bubble: heightOrOne, autocorrelation: heightOrOne, timeline: heightOrOne, bullet: heightOrOne, utilisation: heightOrOne,
+  calendar: heightOrOne, correlation: heightOrOne, confusion: heightOrOne,
+  spectrogram: heightOrOne, latency: heightOrOne, density2d: heightOrOne,
+  density: heightOrOne, violin: heightOrOne, ridgeline: heightOrOne,
+  smallmultiples: heightOrOne, pairplot: heightOrOne,
+  pie: heightOrOne, radar: heightOrOne,
+  horizon: heightOrOne,
 };
 
 /**
@@ -71,16 +135,56 @@ const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
  * bound themselves — so the row pays for the scale legend, which is the only
  * thing that says what a cell means.
  */
+const axedFurniture = (plot: PlotGeometry): number =>
+  plot.axes === true ? AXIS_ROWS + FRAME_ROWS : 0;
 const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 0,
-  line: (plot) => (plot.axes === true ? AXIS_ROWS : 0),
+  waffle: () => 0,
+  line: axedFurniture,
   heatmap: () => AXIS_ROWS,
+  scatter: axedFurniture, step: axedFurniture, ecdf: axedFurniture,
+  bar: axedFurniture, histogram: axedFurniture, boxplot: axedFurniture,
+  forest: axedFurniture, dumbbell: axedFurniture,
+  lollipop: axedFurniture, dotplot: axedFurniture,
+  flame: axedFurniture, icicle: axedFurniture, funnel: axedFurniture,
+  gantt: axedFurniture, waterfall: axedFurniture, streamgraph: axedFurniture,
+  stackedarea: axedFurniture, treemap: () => 0, tree: () => 0, graph: () => 0,
+  slope: axedFurniture, bubble: axedFurniture, autocorrelation: axedFurniture,
+  timeline: axedFurniture, bullet: axedFurniture, utilisation: () => AXIS_ROWS,
+  calendar: () => AXIS_ROWS, correlation: () => AXIS_ROWS, confusion: () => AXIS_ROWS,
+  // No lid, and the row pays for the legend — which here names the levels as
+  // well as the range, because a level cannot be written on its own line (I49).
+  contour: () => AXIS_ROWS, quiver: () => AXIS_ROWS,
+  spectrogram: () => AXIS_ROWS, latency: () => AXIS_ROWS, density2d: () => AXIS_ROWS,
+  density: axedFurniture, violin: axedFurniture, ridgeline: axedFurniture,
+  // **These five compose their own rows and draw no cartesian furniture** (§2's
+  // height table). `pie` always said so; the other four declared a lid, an axis
+  // rule and an x-label row, and drew none of them — 18 combinations across the
+  // catalogue where the measured height and the rendered height disagreed, by up
+  // to six rows. A radar has no cartesian axes to label and a facet grid's
+  // furniture belongs to its facets, so the declaration was the wrong half.
+  smallmultiples: () => 0, pairplot: () => 0,
+  pie: () => 0, radar: () => 0,
+  // **The one row a horizon spends, and it buys the thing the form is for**
+  // (I52, §3z H7). Band depth is an ordinal index into a colour, so the scale
+  // beside it is the reading rather than furniture — the matrix's argument
+  // (I19) on the only other form whose channel has to be learnt. It was `0`
+  // for as long as the colour axis was missing, which is consistent and was
+  // consistent about the wrong thing.
+  // **One row, and `AXIS_ROWS` was the wrong constant.** A matrix spends two —
+  // an x-label row *and* the scale legend — and a horizon has no x labels, so
+  // reaching for the same name padded a blank row and `refdiff`'s RD1 is what
+  // caught it: 18 rows against a declared grid of 16. The number a form spends
+  // is the rows it emits, not the rows the form beside it emits.
+  horizon: () => 1,
 };
 
 /** The block's measured height (I1). A function of the block alone. */
 export function plotHeight(plot: PlotGeometry): number {
-  if (plot.form === "sparkline") return 1;
-  return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot);
+  // **The legend's row is added here rather than per form**, because every form
+  // pays it the same way and a table of thirty-six entries each adding the same
+  // term is thirty-six chances to forget one.
+  return plotAreaRows(plot) + FURNITURE_ROWS[plot.form](plot) + legendRows(plot) + titleRows(plot);
 }
 
 /**
@@ -93,5 +197,37 @@ export function plotHeight(plot: PlotGeometry): number {
  */
 export function plotAreaWidth(width: number, yLabelWidth: number, axes: boolean): number {
   if (!axes) return Math.max(1, Math.floor(width));
-  return Math.max(1, Math.floor(width) - yLabelWidth - AXIS_GUTTER);
+  return Math.max(1, Math.floor(width) - yLabelWidth - AXIS_GUTTER - FRAME_RIGHT);
+}
+
+/**
+ * A declared height from the region a producer was given (roadmap 38).
+ *
+ * **The deferral's blocker expired and nothing noticed.** Roadmap 38 blocked
+ * `height: "fill"` on *the producer cannot see the height — that is F37*, and
+ * `ProducerContext.height` was granted by phase 1: non-null exactly when the
+ * document is bound by a region, which is exactly the case the entry named. The
+ * condition was written where the deferral is and the thing that met it was
+ * written somewhere else, which is that pattern's whole shape.
+ *
+ * **It does not weaken C12 I1, and that is why it lives here rather than in the
+ * type.** The *producer* resolves the number before the block is constructed, so
+ * `measure` still sees a declared height and `series` is still structurally
+ * unreachable from `plotHeight`. I1 forbids the renderer deriving height from
+ * data — not the number being chosen late.
+ *
+ * `region` is `null` for a transcript entry, which is windowed by rows and bound
+ * by nothing; the fallback is the caller's own, because *how tall should this be
+ * when nothing says* is a question about the surface and not about plots.
+ *
+ * `reserve` is what the surface spends around the plot — a title, a metrics row.
+ * Floored at 1, because a plot with no rows is not a smaller plot.
+ */
+export function fillHeight(
+  region: number | null,
+  fallback: number,
+  reserve = 0,
+): number {
+  if (region === null || !Number.isFinite(region)) return Math.max(1, Math.floor(fallback)); // cells-ok — a row count
+  return Math.max(1, Math.floor(region) - Math.max(0, Math.floor(reserve))); // cells-ok — a row count
 }

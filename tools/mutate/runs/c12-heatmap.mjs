@@ -19,6 +19,11 @@ const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/plot.test.ts test/contract/view-model.test.ts test/golden/states.test.ts";
 const DEF = "src/presentation/plot/definition.ts";
+// **The heatmap moved out of `definition.ts`.** Rebuilt as a form like every
+// other in `heatmap.ts`, taking its absence marker, its layout ladder and its
+// legend with it — six anchors below follow it rather than being deleted,
+// because every one of them still names a live invariant.
+const HEAT = "src/presentation/plot/heatmap.ts";
 const RAMP = "src/presentation/plot/ramp.ts";
 const HEIGHT = "src/presentation/plot/height.ts";
 
@@ -38,8 +43,8 @@ const results = runPass({
   run,
   control: {
     file: DEF,
-    from: "  heatmap: (block, width, ctx) => {",
-    to: "  heatmap: (block, width, ctx) => {\n    if (block.series.length >= 0) return [];",
+    from: "  heatmap: (block, width, ctx) => heatmapFormRows(block, width, ctx),",
+    to: "  heatmap: (block, width, ctx) => (block.series.length >= 0 ? [] : heatmapFormRows(block, width, ctx)),",
     why: "a heatmap that renders nothing at all — if this survives, no row below is earned",
   },
   mutations: [
@@ -60,7 +65,7 @@ const results = runPass({
       // sixteen `?` shout over the data for the state that means nothing
       // happened.
       name: "an absent cell draws the sparkline's marker",
-      file: DEF,
+      file: HEAT,
       from: 'const HEATMAP_ABSENT = " ";',
       to: 'const HEATMAP_ABSENT = "?";',
       expect: "T1.21",
@@ -71,20 +76,28 @@ const results = runPass({
       // the full ramp, so an idle container and a saturated one draw the same
       // picture — the comparison a heatmap exists to make, inverted.
       name: "each row normalises over itself",
-      file: DEF,
-      from: "        { text: rampRow(s.values, layout.areaWidth, ctx.capabilities, range, style) },",
-      to: "        { text: rampRow(s.values, layout.areaWidth, ctx.capabilities, rowRange(s), style) },",
+      file: HEAT,
+      // Re-anchored twice now: onto `heatSpans` when the colormap's second
+      // channel landed, and onto the *call site* when `heatSpans` stopped
+      // taking a glyph string and started reading one column map for both
+      // channels. The subject has never moved — the range handed to a row is
+      // the matrix's, or it is the row's own and the comparison is gone.
+      // Re-anchored a third time, onto the `const field =` binding that C12
+      // §3y's pass 5/6 split introduced. The subject is still the range: the
+      // matrix's, or the row's own with the comparison gone.
+      from: "    const field = heatSpans(s, range, layout, map, style, ctx, matrixLayout, dim, painted, facing);",
+      to: "    const field = heatSpans(s, rowRange(s), layout, map, style, ctx, matrixLayout, dim, painted);",
       expect: "T1.18",
       also: [
         {
-          file: DEF,
-          from: "/** A grid cell is blank where nothing was reported (C12 I17, §3a). */",
+          file: HEAT,
+          from: "function heatSpans(",
           to:
             "const rowRange = (s) => {\n"
             + "  const r = s.values.filter((v) => v !== null && Number.isFinite(v));\n"
             + "  return r.length === 0 ? { min: 0, max: 0 } : { min: Math.min(...r), max: Math.max(...r) };\n"
             + "};\n"
-            + "/** A grid cell is blank where nothing was reported (C12 I17, §3a). */",
+            + "function heatSpans(",
         },
       ],
     },
@@ -94,13 +107,13 @@ const results = runPass({
       // height, with the right number of rows and the right width.
       name: "THE SWITCH: form dispatch falls back to the line arm",
       file: DEF,
-      from: "  return rows([...FORM_ROWS[block.form](block, width, ctx)]);",
+      // Re-anchored when `render` grew the narrowing seam (C12 §3ab); the
+      // dispatch is the same line, one variable along.
+      from: "  const body = FORM_ROWS[block.form](block, drawn, ctx);",
       to:
-        "  return rows([\n"
-        + "    ...(block.form === \"sparkline\"\n"
-        + "      ? FORM_ROWS.sparkline(block, width, ctx)\n"
-        + "      : FORM_ROWS.line(block, width, ctx)),\n"
-        + "  ]);",
+        "  const body = block.form === \"sparkline\"\n"
+        + "    ? FORM_ROWS.sparkline(block, drawn, ctx)\n"
+        + "    : FORM_ROWS.line(block, drawn, ctx);",
       expect: "T1.17",
     },
     {
@@ -112,6 +125,43 @@ const results = runPass({
       from: "  heatmap: () => AXIS_ROWS,",
       to: "  heatmap: () => 0,",
       expect: "T1.1",
+    },
+    {
+      // **C12 I18's ladder, put back the way round it was.** Dropping the label
+      // column instead of truncating it gives a matrix with no names beside it —
+      // a picture of numbers, reachable between two ordinary widths, and the
+      // comment above the branch already called it that while the code produced
+      // it.
+      name: "THE LADDER: labels are dropped instead of truncated",
+      file: HEAT,
+      from: "  if (room < 1) return null;\n  return { ...base, gutter: room + AXIS_GUTTER, labelColumn: room, areaWidth: MIN_AREA };",
+      to: "    if (room < 1) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };\n    return { ...base, gutter: AXIS_GUTTER, labelColumn: 0, areaWidth: width - AXIS_GUTTER };",
+      expect: "T1.22",
+    },
+    {
+      // **C12 I19, and the half that was wrong**: the legend aligned to the plot
+      // area rather than the row, so a wide label column cut the range and left
+      // the swatch — a key to a scale nobody named.
+      name: "the legend is aligned to the plot area again",
+      file: HEAT,
+      // Re-anchored: C12 I29 made the legend a run of spans rather than one
+      // truncated string, so aligning it to the plot area is now prepending the
+      // gutter — `clampSpans` cuts the tail, which is the upper bound.
+      from: "  return [labelRow, line(legend, layout, ctx)];",
+      to: "  return [labelRow, line([{ text: \" \".repeat(layout.gutter) }, ...legend], layout, ctx)];",
+      expect: "T1.23",
+    },
+    {
+      // The drop order inverted: the swatch kept and the range dropped, which is
+      // the wrong half by the legend's own argument.
+      name: "the legend drops its range before its swatch",
+      file: HEAT,
+      // Re-anchored to the rung table C12 I29 replaced the string ladder with.
+      // The last rung is what survives at the narrowest width, so putting the
+      // swatch there is the same inversion: a key to a scale nobody named.
+      from: "    [muteds(`${lo} - ${hi}`)],",
+      to: "    [...bar()],",
+      expect: "T1.23",
     },
     {
       // C04 I50b's ragged refusal, removed. What it lets through is the picture the

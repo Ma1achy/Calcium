@@ -31,6 +31,7 @@ import {
   type PlotForm,
   type Tone,
   type ViewDocument,
+  IS_MATRIX,
 } from "./types.js";
 import { childBlocks } from "./tree.js";
 
@@ -92,11 +93,41 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
  */
 const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
   sparkline: false,
+  waffle: false,
+  // A field declares its rows like every other matrix form (C12 I49).
+  contour: true,
+  quiver: true,
   line: true,
-  // A matrix's row count is data, so its height must come from the block or I1
-  // fails through the data path (C12 §6a B1).
   heatmap: true,
+  scatter: true, step: true, ecdf: true,
+  bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
+  lollipop: true, dotplot: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true, graph: true,
+  slope: true, bubble: true, autocorrelation: true, timeline: true, bullet: true, utilisation: true,
+  calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
+  density: true, violin: true, ridgeline: true,
+  smallmultiples: true, pairplot: true,
+  pie: true, radar: true,
+  horizon: true,
 };
+
+/**
+ * I50c — a cell carries at most one of `spark` and `bar`.
+ *
+ * **Both fill the planned width and return before truncation**, so a cell with
+ * both has two renderings and no rule for which wins. Refused rather than
+ * resolved by declaration order, because a reader cannot see which branch a
+ * renderer took and the picture is plausible either way.
+ */
+function checkCellContent(cell: Cell, where: string): void {
+  if (cell.spark !== undefined && cell.bar !== undefined) {
+    throw new BlockShapeError(
+      `${where}: a cell carries a "spark" and a "bar" (C04 I50c) — both fill the ` +
+        `planned width, so there is no rule for which wins and the frame is ` +
+        `plausible either way`,
+    );
+  }
+}
 
 function checkPlotHeight(plot: Plot): void {
   if (DECLARES_HEIGHT[plot.form] && plot.height === undefined) {
@@ -114,12 +145,22 @@ function checkPlotHeight(plot: Plot): void {
  * nothing in one arm is indistinguishable from one not yet implemented, and the
  * reader who finds it cannot tell which.
  */
+/**
+ * The matrix family, keyed so a ninth member declares (C04 I50b).
+ *
+ * **The refusal reached one form of eight.** `checkHeatmap` tested
+ * `form === "heatmap"` while I50b's own reason — *the scale legend is the only
+ * thing that says what a cell means* — is true of all of them, and the family
+ * grew after the check was written. Found by `utilisation` accepting
+ * `axes: false` and rendering eighteen rows into a sixteen-row grid.
+ */
+
 function checkHeatmap(plot: Plot): void {
-  if (plot.form !== "heatmap") return;
+  if (!IS_MATRIX[plot.form]) return;
 
   if (plot.axes === false) {
     throw new BlockShapeError(
-      `plot "${plot.id}": a heatmap cannot set "axes: false" (C04 I50b) — ` +
+      `plot "${plot.id}": form "${plot.form}" cannot set "axes: false" (C04 I50b) — ` +
         `the scale legend is the only thing that says what a cell means, so a ` +
         `heatmap without one is unreadable rather than plain`,
     );
@@ -184,6 +225,58 @@ function checkPlotFormat(plot: Plot): void {
 }
 
 /** Every shape check that applies to a block, by kind. */
+/**
+ * Which forms have a second axis to run along (C12 §3j, C12 I30).
+ *
+ * **Total over `PlotForm`, so a new member declares.** A `Partial` answers
+ * `undefined` for a form it has never heard of, and the natural reading of
+ * `undefined` here is *not orientable* — so a thirty-fifth form would refuse the
+ * field it might well want, silently, and the table would look complete.
+ *
+ * The `false` entries each have a reason and they are not the same reason: the
+ * matrix family has two real axes already, `pie` and `radar` have none, and a
+ * `gantt` bar *is* a time interval so its long axis is not a choice. The five
+ * glyph-row forms are orientable in principle and their vertical arm is a
+ * separate renderer nobody has asked for — recorded as unbuilt rather than
+ * unbuildable.
+ */
+const ORIENTABLE: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
+  bar: true, histogram: true, boxplot: true, violin: true,
+  // The matrix family's reason: two real axes already, and neither is a choice.
+  contour: false, quiver: false,
+  // Not built: each needs its own column renderer and none was asked for.
+  lollipop: false, dotplot: false, funnel: false, dumbbell: false, forest: false,
+  ridgeline: false,
+  // The containment family: `flame` and `icicle` *are* each other's
+  // orientation, and a treemap fills both axes already.
+  flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  // The six newest: each is horizontal or has two axes already, and no
+  // vertical arm was asked for.
+  slope: false, bubble: false, autocorrelation: false, timeline: false, bullet: false, utilisation: false,
+  // Horizontal by construction — the bar is an interval on a time axis.
+  gantt: false, waterfall: false,
+  // Two axes already.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false,
+  // No cartesian axes at all.
+  pie: false, radar: false, waffle: false,
+  // A shared scale along one axis; transposing is `plotStyle`'s question, not this.
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  density: false, streamgraph: false, stackedarea: false, horizon: false,
+  // Composition — each facet answers for itself.
+  smallmultiples: false, pairplot: false,
+});
+
+function checkOrientation(plot: Plot): void {
+  if (plot.orientation === undefined || plot.orientation === "horizontal") return;
+  if (ORIENTABLE[plot.form]) return;
+  throw new BlockShapeError(
+    `plot "${plot.id}": form "${plot.form}" has no vertical arm (C12 I30) — ` +
+      `refused rather than ignored, because a plot that quietly drops a field is ` +
+      `one the caller believes is showing something else`,
+  );
+}
+
 function checkShape(block: Block): void {
   switch (block.kind) {
     case "notice":
@@ -193,11 +286,13 @@ function checkShape(block: Block): void {
       checkHeatmap(block);
       checkPlotHeight(block);
       checkPlotFormat(block);
+      checkOrientation(block);
       break;
     case "table":
       for (const row of block.rows) {
         for (const [key, cell] of Object.entries(row.cells)) {
           requireGlyph(cell.tone, cell.glyph, `table "${block.id}" row "${row.id}" cell "${key}"`);
+          checkCellContent(cell, `table "${block.id}" row "${row.id}" cell "${key}"`);
         }
       }
       break;
@@ -336,5 +431,6 @@ export function document(spec: ViewDocument): ViewDocument {
 /** A cell, checked for I6 in isolation — used by C24's `b` when building rows. */
 export function cell(spec: Cell): Cell {
   requireGlyph(spec.tone, spec.glyph, "cell");
+  checkCellContent(spec, "cell");
   return deepFreeze(spec);
 }

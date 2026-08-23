@@ -12,7 +12,13 @@
 // The only instrument that reaches a glyph nobody can see is a picture.
 import { describe, expect, it } from "vitest";
 
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME } from "../support/render.js";
+import {
+  ASCII_CAPS,
+  DARK_THEME,
+  FULL_CAPS,
+  LIGHT_THEME,
+  MONO_UNICODE_CAPS,
+} from "../support/render.js";
 import { STATES } from "../support/states.js";
 
 const WIDTHS = [40, 80] as const;
@@ -22,6 +28,11 @@ const VARIANTS = [
   { name: "dark-ascii", theme: DARK_THEME, capabilities: ASCII_CAPS },
   { name: "light-unicode", theme: LIGHT_THEME, capabilities: FULL_CAPS },
   { name: "dark-wide", theme: DARK_THEME, capabilities: { ...FULL_CAPS, ambiguousWidth: "wide" as const } },
+  // **1-bit with Unicode, which nothing rendered.** `MONO_CAPS` removes colour
+  // *and* Unicode, so every claim about the 1-bit rung was measured where the
+  // glyphs had changed too. This is the arm where "the glyph is the channel at
+  // every depth" is either true or is a sentence.
+  { name: "mono-unicode", theme: DARK_THEME, capabilities: MONO_UNICODE_CAPS },
 ] as const;
 
 describe("golden frames — one per state", () => {

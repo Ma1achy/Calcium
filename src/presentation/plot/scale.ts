@@ -9,7 +9,53 @@
  * shape is C05 §3a's: a `WeakMap` keyed on the `Series` object, never on the
  * content of its values.
  */
-import type { Plot, Series } from "../../data/viewmodel/index.js";
+import { ORIGIN_DEFAULT, type OHLC, type Origin, type Plot, type Series } from "../../data/viewmodel/index.js";
+import { normalisedOf, pinnedRange } from "../../data/viewmodel/range.js";
+
+/**
+ * Which way each axis runs, derived from `origin` (C12 §3ac).
+ *
+ * **Two independent directions rather than four corners**, because the two
+ * functions below take one each: `rowOf` cannot use the horizontal half and
+ * `columnsOf` cannot use the vertical, and handing each of them a corner would
+ * mean each ignoring half its argument. `origin` is the caller's vocabulary and
+ * this is the renderer's.
+ */
+export type Facing = Readonly<{ x: "right" | "left"; y: "up" | "down" }>;
+
+/** A curve's facing: samples rightward, values upward. */
+export const FACING_DEFAULT: Facing = Object.freeze({ x: "right", y: "up" });
+
+/** A matrix's facing: readings rightward, `series[0]` at the top. */
+export const FACING_MATRIX: Facing = Object.freeze({ x: "right", y: "down" });
+
+/** `origin` as two directions. */
+export function facingFor(origin: Origin): Facing {
+  return Object.freeze({
+    x: origin === "bottom-right" || origin === "top-right" ? "left" : "right",
+    y: origin === "top-left" || origin === "top-right" ? "down" : "up",
+  });
+}
+
+/**
+ * The facing a block draws with (C12 §3ac).
+ *
+ * **`whenRefused` is a parameter and not a constant, and the golden frames are
+ * why.** The first version fell through to `FACING_DEFAULT` on a `null` row,
+ * with a comment saying that is what every refusing form already draws — a claim
+ * written and not checked, and false for two of them. `contour` and `quiver`
+ * refuse `origin` and are drawn by the **matrix** renderer, so the curve's
+ * upward facing turned them upside down: eight golden frames moved under a
+ * commit that was supposed to move none.
+ *
+ * The record answers *what may the caller ask for*; this parameter answers
+ * *what does this renderer draw when the answer is nothing*. They are two
+ * questions and the accident was treating them as one.
+ */
+export function facingOf(block: Pick<Plot, "form" | "origin">, whenRefused: Facing): Facing {
+  const origin = block.origin ?? ORIGIN_DEFAULT[block.form];
+  return origin === null ? whenRefused : facingFor(origin);
+}
 
 /**
  * A finite value and **its position in the original series**.
@@ -83,6 +129,7 @@ export function finiteSamples(values: readonly (number | null)[]): readonly Samp
 export function seriesRange(
   series: readonly Series[],
   pin: Pick<Plot, "yMin" | "yMax">,
+  bars?: readonly OHLC[],
 ): Range | null {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -96,6 +143,19 @@ export function seriesRange(
       if (v > max) max = v;
     }
   }
+  // **The union, in one scan** (C12 §6b B3). A candlestick's extremes are its
+  // wicks and its overlays bound themselves, so both go in before the pin is
+  // applied — folding them here rather than taking a maximum of two ranges is
+  // what keeps `!seen` meaning *nothing was measured anywhere*, which is the
+  // condition the empty message hangs on.
+  for (const b of bars ?? []) {
+    for (const v of [b.open, b.high, b.low, b.close]) {
+      if (!Number.isFinite(v)) continue;
+      seen = true;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
 
   if (!seen && pin.yMin === undefined && pin.yMax === undefined) return null;
   if (!seen) {
@@ -103,28 +163,10 @@ export function seriesRange(
     max = pin.yMax ?? pin.yMin ?? 0;
   }
 
-  const lo = pin.yMin ?? min;
-  const hi = pin.yMax ?? max;
-  if (hi < lo) return { min: lo, max: lo };
-  return isNoise(lo, hi) ? { min: lo, max: lo } : { min: lo, max: hi };
-}
-
-/**
- * Whether a span is float noise rather than signal (T3.7).
- *
- * `[1, 1 + ε, 1 + 2ε]` is not constant — `min !== max`, so I3's guard does not
- * catch it — and a linear scale over a span of 4×10⁻¹⁶ amplifies the last bit of
- * three doubles into a curve that spans the plot area and looks like a trend. It
- * is the most misleading output this component can produce, because nothing about
- * it looks degenerate.
- *
- * A few ULPs of the larger magnitude is the threshold. Genuinely small ranges are
- * unaffected: a denormal span of 5×10⁻³²⁴ against a magnitude of 10⁻³²³ is many
- * orders above its own noise floor and scales normally.
- */
-function isNoise(lo: number, hi: number): boolean {
-  const magnitude = Math.max(Math.abs(lo), Math.abs(hi));
-  return hi - lo <= 8 * Number.EPSILON * magnitude;
+  // **One resolver, two families** (C04 I74). The image overlay's colour scale
+  // is this mechanism on the same kind of datum, and two computations of one
+  // figure is how they would come to disagree about what a value means.
+  return pinnedRange(min, max, pin);
 }
 
 /**
@@ -140,14 +182,27 @@ function isNoise(lo: number, hi: number): boolean {
  * of a series that briefly exceeds its ceiling should show the series pressed
  * against the ceiling, not a hole where it was.
  */
-export function rowOf(v: number, range: Range, rows: number): number {
+export function rowOf(v: number, range: Range, rows: number, facing: Facing): number {
   const last = Math.max(0, rows - 1);
+  // **A flat line has no direction to reverse** (§3ac A6/A7). The early return
+  // is before the facing on purpose: the centre row is the answer under all four
+  // origins, and mirroring it afterwards would move a constant series sideways
+  // at an even height under a member that cannot mean anything for it.
+  //
+  // **And it stays here rather than moving into `normalisedOf`** — which is
+  // §3aj hazard 1 arriving at the one place it bites. Normalised, a flat line is
+  // `0.5`; in cells it is `Math.floor(last / 2)`, and the two disagree at every
+  // even height: at `rows = 4`, `floor(3 / 2) = 1` and `round(0.5 · 3) = 2`. A
+  // rounding stage moved is not a rounding stage preserved, and the difference
+  // is invisible in the code and visible in every frame.
   if (range.max === range.min) return Math.floor(last / 2);
 
-  const t = (v - range.min) / (range.max - range.min);
-  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
-  return Math.round((1 - clamped) * last);
+  // `Facing` stays here: §3ac rules it *the renderer's* vocabulary, so L0
+  // cannot hold it without contradicting that. The shared layer takes the
+  // one fact it needs — which way the axis runs — and nothing else.
+  return Math.round(normalisedOf(v, range, facing.y !== "down") * last);
 }
+
 
 /**
  * Samples to dot columns, preserving per-column extremes and endpoints (I5).
@@ -171,6 +226,7 @@ export function columnsOf(
   samples: readonly Sample[],
   originalLength: number,
   columns: number,
+  facing: Facing,
 ): readonly Column[] {
   const width = Math.max(1, Math.floor(columns));
   if (samples.length === 0) return []; // cells-ok — a sample count
@@ -178,15 +234,34 @@ export function columnsOf(
   const span = Math.max(0, originalLength - 1);
   const buckets = new Map<number, Column>();
 
-  for (const { i, v } of samples) {
+  // **The facing renumbers the samples, and `iFirst`/`iLast` are the new
+  // numbers** (§3ac). Its three consumers all ask one question — *is the next
+  // column the next sample* — and mirroring only `x` leaves the indices running
+  // the other way, so `next.iFirst === column.iLast + 1` is never true and a
+  // reversed curve draws as disconnected dots. Nothing maps these back to a
+  // datum, so the index that means *position along the drawn axis* is the one
+  // they want. **OR9 is what found this**: a constant series came back as a row
+  // of dashes under a left facing and a joined rule under a right one.
+  //
+  // Walked in that order too, because the fold takes `first` from the sample it
+  // meets first and `last` from the sample it meets last.
+  const walk = facing.x === "left" ? [...samples].reverse() : samples;
+
+  for (const { i, v } of walk) {
+    const at = facing.x === "left" ? span - i : i;
+    // **The facing enters the index, never the answer** (§3ac A6). A lone
+    // sample sits at `floor((w − 1) / 2)`, and that column is its own mirror at
+    // an odd width and one cell off at an even one — so mirroring the result
+    // makes a one-sample plot twitch sideways under a member that has nothing to
+    // reverse. Reversing the index leaves the degenerate branch untouched.
     const x =
       span === 0 || width === 1
         ? Math.floor((width - 1) / 2)
-        : Math.round((i / span) * (width - 1));
+        : Math.round((at / span) * (width - 1));
 
     const held = buckets.get(x);
     if (held === undefined) {
-      buckets.set(x, { x, first: v, min: v, max: v, last: v, iFirst: i, iLast: i });
+      buckets.set(x, { x, first: v, min: v, max: v, last: v, iFirst: at, iLast: at });
       continue;
     }
     buckets.set(x, {
@@ -196,7 +271,7 @@ export function columnsOf(
       max: Math.max(held.max, v),
       last: v,
       iFirst: held.iFirst,
-      iLast: i,
+      iLast: at,
     });
   }
 

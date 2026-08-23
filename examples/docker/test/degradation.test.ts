@@ -151,7 +151,19 @@ describe("B04: the same information at every depth", () => {
 
     // And the full alphabet is still the default, or the rows above pass
     // against an app that drew ASCII everywhere.
-    expect(JSON.stringify(containerView(STATS, 100, true))).toContain("░");
+    //
+    // **The S3 view's half was `░` and there is no longer one to find** (C04
+    // I51). Its bar was a run the app interpolated into a `keyValue` value;
+    // the row now carries a `BarSpec` and the framework draws the glyphs, so
+    // the block element the control looked for has moved out of the document
+    // and into the render — which is the whole of the change, and it makes the
+    // *stronger* claim above trivially true for that surface.
+    //
+    // So the control moves to what the view still supplies itself. It must be
+    // a character the unicode arm has and the ASCII arm does not, or it cannot
+    // tell the alphabet being chosen from the alphabet being empty.
+    expect(JSON.stringify(containerView(STATS, 100, true))).toContain("·");
+    expect(JSON.stringify(containerView(STATS, 100, false))).not.toContain("·");
     expect(JSON.stringify(dashboard(SNAP, 100, "29.4.1", true))).toContain("·");
   });
 

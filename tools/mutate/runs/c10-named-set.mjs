@@ -119,8 +119,11 @@ const MUTATIONS = [
     // legitimate name the moment a third theme exists.
     name: "the persisted preference is compared to two literals",
     file: CONSTRUCT,
-    from: "      if (themed.value.names.includes(trimmed)) themed.value.setTheme(trimmed);",
-    to: '      if (trimmed === "dark" || trimmed === "light") themed.value.setTheme(trimmed);',
+    // Re-anchored when C22 I68 split the membership test out of the `if`, so
+    // absent, empty and unusable could share one arm. Same mutation, same
+    // subject; the line it lives on moved.
+    from: "    const stated = themed.value.names.includes(trimmed);",
+    to: '    const stated = trimmed === "dark" || trimmed === "light";',
     expect: "T4.36",
   },
   {

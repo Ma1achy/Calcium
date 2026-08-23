@@ -23,7 +23,7 @@
 // passes, and a mutation whose kill is not in doubt is seen to be killed. The
 // caller supplies that second one and says why it cannot survive — a generic
 // sentinel would be the harness marking its own homework.
-
+import { readFileSync, writeFileSync, renameSync } from "node:fs";
 /** vitest colours its summary; the codes sit between the word and the count. */
 export function strip(output) {
   return output.replace(/\[[0-9;]*m/g, "");
@@ -32,7 +32,7 @@ export function strip(output) {
 /** Did the run kill anything? Read off the stripped summary, not the exit code:
  * a suite that fails to *start* also exits non-zero and kills nothing. */
 export function killed(output) {
-  return /Tests\s+\d+ failed/.test(strip(output));
+  return /Tests\s+\d+ failed/.test(strip(output)) || timedOut(output);
 }
 
 /** Did the run reach a summary at all — pass *or* fail?
@@ -45,7 +45,27 @@ export function killed(output) {
  * 141 and a buffer cut before the summary. Every mutation after it would have
  * reported a survivor. */
 export function ran(output) {
-  return /Tests\s+\d+ (failed|passed)/.test(strip(output));
+  return /Tests\s+\d+ (failed|passed)/.test(strip(output)) || timedOut(output);
+}
+
+/**
+ * The harness's own vocabulary for *the suite did not return*.
+ *
+ * **A timeout is the strongest possible failure and vitest cannot report it**,
+ * because there is no summary to read: the child was killed before it wrote one.
+ * A run whose mutation restores a non-terminating render — C12's `niceAxis`
+ * handing a `NaN` range to Bresenham, which stops on `x === ex` — produced no
+ * summary and was correctly flagged blind, which is right about the harness and
+ * wrong about the mutation.
+ *
+ * So a run that times out **says so in a line of its own**, and this is the only
+ * marker either predicate accepts besides vitest's. It is not a fabricated
+ * summary: `runPass` asks *did the suite fail*, and a suite that never returned
+ * is the most complete yes available. A run emits it only from its own `catch`
+ * on `e.killed`, never from parsing test output.
+ */
+export function timedOut(output) {
+  return /^TIMED OUT after \d+ms/mu.test(strip(output));
 }
 
 /** A named error rather than a boolean, so a miss cannot be read as a survivor. */
@@ -69,15 +89,66 @@ export function apply(src, { file, from, to }) {
 }
 
 /**
+ * Every edit a mutation makes: its own, then any `also` beside it.
+ *
+ * **`also` exists because two wirings can each be sufficient on their own.**
+ * F227 measured it: supplying `RenderContext.tick` while nothing raised C03's
+ * spinner commit left the frame exactly as frozen, so a mutation deleting either
+ * half alone goes red for a reason it does not name — and would go red just as
+ * hard with the other half already broken. A revert row about a *pair* has to
+ * break the pair, on the same argument F226 makes about a row named for a catch
+ * having to reach one.
+ *
+ * @param {{file,from,to,also?:Array<{file,from,to}>}} m
+ * @returns {Array<{file,from,to}>}
+ */
+export function editsOf(m) {
+  return [{ file: m.file, from: m.from, to: m.to }, ...(m.also ?? [])];
+}
+
+/**
  * @param {object} opts
- * @param {Array<{name,file,from,to,expect}>} opts.mutations
+ * @param {Array<{name,file,from,to,expect,also?}>} opts.mutations
  * @param {{file,from,to,why}} opts.control  a mutation whose kill is not in doubt
  * @param {(file:string)=>string} opts.read
  * @param {(file:string,src:string)=>void} opts.write
  * @param {()=>string} opts.run             runs the suite, returns its output
  */
+/**
+ * `read`/`write` for a run, with an **atomic** write (F237).
+ *
+ * **The restore is the dangerous write, and it was not atomic.** `runPass` holds
+ * each file's original text and puts it back with a plain `writeFileSync`; a
+ * `SIGKILL` landing mid-write leaves whatever had been flushed, which is a
+ * *prefix*. Measured: five source files lost their tails — `types.ts` at 1297
+ * lines against 2218 — when two-day-old runs sitting mid-pass were killed. Every
+ * gate had been green ten minutes earlier, because the damage arrives after the
+ * last check and before the next.
+ *
+ * Write-to-temp then `rename`, which is atomic on any POSIX filesystem: a kill
+ * at any instant leaves either the old file or the new one, never half of one.
+ *
+ * **Not yet adopted by every run.** 91 of the 92 still define their own
+ * `writeFileSync` pair inline, and the sweep is a mechanical commit of its own
+ * rather than a rider on this one — the number is here so it is a residue and
+ * not a silence.
+ */
+export function fsIo(root) {
+  return {
+    read: (f) => readFileSync(`${root}/${f}`, "utf8"),
+    write: (f, s) => {
+      const path = `${root}/${f}`;
+      const tmp = `${path}.mutate-tmp`;
+      writeFileSync(tmp, s);
+      renameSync(tmp, path);
+    },
+  };
+}
+
 export function runPass({ mutations, control, read, write, run }) {
-  const files = [...new Set([control.file, ...mutations.map((m) => m.file)])];
+  const files = [
+    ...new Set([control.file, ...mutations.flatMap((m) => editsOf(m).map((e) => e.file))]),
+  ];
   const originals = new Map(files.map((f) => [f, read(f)]));
   const restore = () => {
     for (const [f, s] of originals) write(f, s);
@@ -103,7 +174,13 @@ export function runPass({ mutations, control, read, write, run }) {
   for (const m of mutations) {
     let outcome;
     try {
-      write(m.file, apply(originals.get(m.file), m));
+      // Grouped by file, so two edits to one file compose rather than the
+      // second overwriting the first from the original.
+      const staged = new Map();
+      for (const edit of editsOf(m)) {
+        staged.set(edit.file, apply(staged.get(edit.file) ?? originals.get(edit.file), edit));
+      }
+      for (const [f, src] of staged) write(f, src);
       const output = run();
       outcome = ran(output)
         ? {

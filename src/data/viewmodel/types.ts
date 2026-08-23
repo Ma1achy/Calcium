@@ -213,6 +213,22 @@ export type Glyph =
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
 
+/**
+ * Every tone, as a value — the union is a type and a theme has to be checked
+ * against something at run time (C10 I30, F172).
+ *
+ * **`satisfies Record<Tone, true>` rather than an array**, which is the lesson
+ * `GLYPH_MEMBERS` in `validate.ts` records: a `Set<Tone>` type-checks with a
+ * member missing, because an element type constrains what may go in and says
+ * nothing about what must. A tone added without an entry here stops compiling.
+ */
+const TONE_MEMBERS = {
+  default: true, dim: true, muted: true, ok: true, warn: true,
+  error: true, info: true, accent: true, meta: true, identifier: true,
+} satisfies Record<Tone, true>;
+
+export const TONES: readonly Tone[] = Object.freeze(Object.keys(TONE_MEMBERS) as Tone[]);
+
 export type Action =
   | Readonly<{ kind: "fill"; label: string; command: string }>
   | Readonly<{ kind: "exec"; label: string; command: string }>
@@ -248,6 +264,36 @@ export type Cell = Readonly<{
   glyph?: Glyph;
   /** Inline sparkline. `null` is a gap — a position with no reading (I46a). */
   spark?: readonly (number | null)[];
+  /**
+   * A quantity against a scale, drawn as a run (I50c, C12 I20).
+   *
+   * **Not `progress`, and the difference is what the number means.** A `total`
+   * is reached; a scale's top may be exceeded and may not be knowable — a
+   * per-core CPU percentage, a quota that can be over-committed. `examples/docker`
+   * hand-wrote nine lines of this rather than bend `b.progress`, which is the
+   * gap stated by a workaround (FINDINGS gap 3).
+   *
+   * The cell's own `tone` and `glyph` carry the colour, which is why `BarSpec`
+   * has neither: a framework that shipped thresholds would ship arbitrary
+   * numbers for everyone.
+   */
+  bar?: BarSpec;
+}>;
+
+/** A quantity against a scale (I50c, C12 §3b). */
+export type BarSpec = Readonly<{
+  /** `null` is absent, and it draws a mark — never an empty run, which reads as zero. */
+  value: number | null;
+  /** The scale's top. The fill clamps here and the number does not (C09 I28). */
+  max: number;
+  /** The scale's floor. Zero unless a surface says otherwise. */
+  min?: number;
+  /**
+   * The unit the value arrived in — **`yFormat`'s vocabulary, deliberately**.
+   * A bar's number and a plot's y-label ask the same question, and a second
+   * enum would be a second place for I41's `fraction`/`percent` confusion.
+   */
+  format?: Plot["yFormat"];
 }>;
 
 /**
@@ -329,7 +375,33 @@ export type MergeRow = Omit<TableRow, "expanded">;
  */
 export type Gap = Readonly<{ gapBefore?: boolean }>;
 
-export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap;
+/**
+ * A floor on the rows a block occupies, set by a layer above and read by none
+ * (§3d, I67).
+ *
+ * **It exists because `measure` commits before anything is drawn.** A renderer
+ * that gives way is discovered after the number is fixed — C14 has indexed it
+ * and the viewport has chosen its slice — so the frame that finds the problem
+ * cannot fix it, and a block drawing taller is cut with whatever followed it
+ * (F230). The change is deferred instead: the frame completes, `op: "reserve"`
+ * sets this, and the next frame honours it.
+ *
+ * **Applied by C09's registry, outside every definition**, which is the whole of
+ * why it is safe: `definition.measure` stays a function of `(block, width)` so
+ * C09 I2 holds, `scrollDefinition.measure` cannot consult it even by accident so
+ * §3c's argument about view state is not reopened, and a container counts a
+ * floored child for nothing because `measureChild` **is** the registry's
+ * measurer.
+ *
+ * **View state, and not `gapBefore`'s kind of field.** A gap is content — a
+ * `merge` carries it. A floor is something the shell did, so `merge`, `expand`,
+ * `replace` and `window` all drop it (I68) and the far side may not set it at
+ * all: `validateDocument` refuses it at the adapter boundary, which is the half
+ * F231 found missing from `expanded`.
+ */
+export type Floor = Readonly<{ minHeight?: number }>;
+
+export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap & Floor;
 
 export type Notice = Readonly<{
   kind: "notice";
@@ -337,13 +409,48 @@ export type Notice = Readonly<{
   tone: Tone;
   glyph?: Glyph;
   text: string;
-}> & Gap;
+}> & Gap & Floor;
 
 export type KeyValue = Readonly<{
   kind: "keyValue";
   id: string;
-  rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[];
-}> & Gap;
+  rows: readonly Readonly<{
+    label: string;
+    value: string;
+    tone?: Tone;
+    /**
+     * A quantity beside the value, not instead of it (I51, C12 §3b).
+     *
+     * **Not `Cell.bar`'s seam**, which replaces the cell's text and takes the
+     * planned width (I50c). Both surfaces that draw one here put a text next to
+     * the run — docker's `MEM` reads `████░░░░ 45.2%  1.2GiB / 4GiB` and S13's
+     * cluster panel `71%  ██████░░░` — so `value` stays and the bar joins it.
+     *
+     * **`width` is on the row because a `keyValue` value is a remainder and a
+     * table column is a width.** Given the whole remainder, `valueBar` draws a
+     * 68-cell run at a terminal width of 80: correct in every count and a
+     * picture no surface asked for. Both consumers chose a width by hand, and
+     * S13 §7 shortens its bars at 80–99 columns.
+     *
+     * It is not a member of `BarSpec`, which `Cell` shares and where the column
+     * already supplies the number — two sources for one width is the audit's D6
+     * before there is any code to reconcile them.
+     *
+     * **A sibling rather than an intersection, and the type could not carry the
+     * pairing.** `bar?: BarSpec & { width }` compiles here and breaks
+     * `b.kv({ state: b.warn("degraded") })` at every call site: the tone
+     * shorthands return a `Cell`, whose `bar` is a plain `BarSpec`, so a
+     * narrower member makes the whole shorthand unassignable to `KeyValueInput`.
+     * Measured — two errors, both that path, and it is documented behaviour
+     * (C24 §4). So `bar` without a `barWidth` is expressible and refused by
+     * `validateBlock`, which is exactly how I50c handles a cell carrying both a
+     * `spark` and a `bar`: same block family, same gate, one precedent.
+     */
+    bar?: BarSpec;
+    /** The cells the bar occupies. Required when `bar` is present (I51). */
+    barWidth?: number;
+  }>[];
+}> & Gap & Floor;
 
 export type Table = Readonly<{
   kind: "table";
@@ -353,7 +460,7 @@ export type Table = Readonly<{
   sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;
   showHeader?: boolean;
   emptyMessage?: string;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Steps = Readonly<{
   kind: "steps";
@@ -363,13 +470,13 @@ export type Steps = Readonly<{
     detail?: string;
     state: "pending" | "active" | "done" | "failed";
   }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Logs = Readonly<{
   kind: "logs";
   id: string;
   lines: readonly Readonly<{ ts: string; level: string; message: string }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Events = Readonly<{
   kind: "events";
@@ -389,7 +496,33 @@ export type Events = Readonly<{
    * never carries alone (D29).
    */
   events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
-}> & Gap;
+}> & Gap & Floor;
+
+/**
+ * A row of a **vector** field — `Series`' shape, with two numbers per position
+ * (C04 I61, C12 I50).
+ *
+ * **The one shape on `Plot` that could not be reused.** A contour takes the
+ * matrix family's `series` unchanged; a quiver needs `u` and `v` per cell and
+ * nothing here carried two numbers at a position. Beside `ohlc`, `hierarchy`
+ * and `segments`, which are the other form-specific shapes.
+ *
+ * `null` is a gap and never `NaN`, on I46a's argument unchanged: `JSON.stringify`
+ * writes `NaN` as `null` regardless, so the declared form should be the persisted
+ * one. **A gap is distinct from a still cell** — a still cell has a reading and
+ * it is zero, and C12 I50 draws neither, so the two are told apart by whether
+ * the field beneath them paints.
+ *
+ * `v` is **north-positive**, the data convention rather than the screen's; the
+ * renderer flips it, so no caller has to know which way the rows run.
+ *
+ * No `tone` and no `marker`: a quiver's colour is its magnitude (C12 I50), so a
+ * per-row tone would be a second claim on the one channel the form has.
+ */
+export type VectorSeries = Readonly<{
+  values: readonly (readonly [number, number] | null)[];
+  label?: string;
+}>;
 
 export type Series = Readonly<{
   /**
@@ -409,8 +542,28 @@ export type Series = Readonly<{
    * as they treated a `NaN`.
    */
   values: readonly (number | null)[];
+  /**
+   * A name beside one sample, parallel to `values` (C12 I55, §3ag).
+   *
+   * **Parallel and not a record**, because `values` is a bare array and the
+   * abscissa a sample has *is* its index — a keyed record would be a second way
+   * to say which sample, and the two could disagree. `null` is *no label here*,
+   * so a sparse set needs no length and no sentinel index.
+   *
+   * **Longer than `values` is refused**: an entry past the last reading names a
+   * sample that does not exist, which is a document saying something about
+   * nothing rather than a harmless extra.
+   *
+   * **Refused where `HAS_CALLOUT` is false**, and that record is the right one
+   * rather than a convenient one: it partitions the forms whose sample is drawn
+   * at *its own value*. A `stackedarea` or a `streamgraph` draws sample *j* at a
+   * cumulative height, so `rowOf(value)` names a row the sample is not on — the
+   * same fact the callout was excluded from those forms for.
+   */
+  pointLabels?: readonly (string | null)[];
   label?: string;
   tone?: Tone;
+  marker?: string;
 }>;
 
 /**
@@ -419,14 +572,134 @@ export type Series = Readonly<{
  * defaulted height is how C12's central property fails silently.
  */
 /**
- * The three forms, named so every dispatcher can be exhaustive over them.
+ * The colormaps the framework ships, as a closed vocabulary (C10 I31).
+ *
+ * **The names live here and the tables live in L1**, which is the layer rule
+ * doing exactly what it is for. A colormap's *table* is rendering data — 24-bit
+ * triples, quantised per depth — and belongs where the renderer is. Its *name*
+ * is schema: a document carries it, `validateBlock` checks it, and C04 owns what
+ * a document may say. The first draft imported the table into the validator and
+ * MG1 refused it, correctly: a document type cannot depend on how the thing is
+ * drawn.
+ *
+ * **Closed, because an unknown name paints nothing** — and nothing is also what
+ * a correct block paints at one bit, which is F172's collision arriving on a
+ * third surface. A union makes the wrong name a compile error and
+ * `COLORMAP_NAMES` makes it a document error.
+ */
+import type { ColormapName as ColormapName_ } from "../colormaps/index.js";
+export type ColormapName = ColormapName_;
+export { COLORMAP_MEMBERS, COLORMAP_NAMES } from "../colormaps/index.js";
+
+/**
+ * Every plot form, named so every dispatcher can be exhaustive over them.
  *
  * **A union written inline is a union nothing can be checked against.** Every
  * consumer of `form` was `=== "sparkline" ? … : …`, so a third member fell into
  * the line arm at three sites and compiled — which is a heatmap rendering as a
  * curve, silently and at the right height (C12 §6a).
  */
-export type PlotForm = "line" | "sparkline" | "heatmap";
+export type PlotForm =
+  | "line" | "sparkline" | "heatmap"
+  | "scatter" | "step" | "ecdf"
+  | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
+  | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
+  | "tree"
+  | "graph"
+  | "slope" | "bubble" | "autocorrelation" | "timeline" | "bullet" | "utilisation"
+  | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
+  | "contour" | "quiver"
+  | "density" | "violin" | "ridgeline"
+  | "smallmultiples" | "pairplot"
+  | "pie" | "radar"
+  | "horizon";
+
+/**
+ * A claim about the ordinate, drawn beside the data (C12 §3e, I52).
+ *
+ * **One feature, and six named chart types collapse into it.** A Q-Q plot is a
+ * scatter plus a reference line; an ROC curve is a line plus a diagonal; a
+ * calibration plot, a residual plot and a Bland–Altman are the same shape again.
+ * None is a renderer, so none is a `PlotForm`.
+ *
+ * **A band is one statement with two edges, and the area between them.** The
+ * fill was refused — *a fill would compete for the cells the curve occupies, and
+ * at one bit it would be indistinguishable from the curve* — and the refusal was
+ * half right, which is why it survived being read. The competition has an owner:
+ * `mergedRow` takes the first layer that inked a cell and an annotation is last,
+ * so a curve draws over its own band by construction. The alphabet half stands,
+ * and it is exactly what the obvious fill would be — braille, which is the
+ * curve's own. So the fill is `░`, a block element, on a **narrow** unicode
+ * terminal and nowhere else: `░` doubles at `ambiguousWidth: "wide"`, and the
+ * only narrow substitutes the tree holds are braille and the ASCII ramp, both of
+ * which the curve is already drawn in. Where it cannot draw, the two dashed
+ * edges carry the band (C12 §3e).
+ *
+ * **`tone` is decoration here and never the carrier** (F34). The line is dashed
+ * where a curve is continuous, so the distinction survives one bit and a
+ * colour-blind reader with the tone doing nothing load-bearing.
+ *
+ * **There is no `label`, and it is owed rather than forgotten.** The survey names
+ * one — *a reference line, with a label* — and it has nowhere to go: the gutter
+ * is sized from the y-labels and is a **scale**, so widening it for a string
+ * that is not one changes the plot area for text that is not measured with it;
+ * inside the area a label overwrites the curve it exists to be compared against.
+ * It wants a legend row, which the overlaid form does not have. A member nothing
+ * draws is indistinguishable from one not yet implemented, so the field arrives
+ * with the row that can hold it.
+ *
+ * **The condition is met and the field is one commit behind it** (C12 §3g).
+ * `legendPlacement` honours an explicit `legend:` on every form, so the row the
+ * paragraph above is waiting for exists and can be asked for.
+ *
+ * **What is not met is the arm that would offer it.** The *auto* branch keys off
+ * `SHARES_CELLS[form] && count > 1` and counts **series**, so the case the
+ * deferral was written about — one line, one reference line — still resolves to
+ * no legend, and the field would land in exactly the state it refused. So the
+ * two go together: the arm counts labelled annotations, or the member is drawn
+ * nowhere again.
+ *
+ * **Recorded here because the condition was met somewhere else.** The legend
+ * landed for series identity and knew nothing about this sentence; this sentence
+ * names its blocker and watches nothing. That is the deferral pattern's third
+ * shape and its standing remedy — *grep from the satisfier, not from the
+ * deferral* — which is how it was found.
+ *
+ * **Paid.** `label` is on the two arms that are a claim about *one* place on the
+ * ordinate. `confidence` and `whiskers` do not carry it: both are per-sample
+ * series drawn across the whole abscissa, so a single string names no particular
+ * reading, and a member that would have to mean *the band as a whole* on one arm
+ * and *this sample* on another is one member with two meanings — C04's own test
+ * for whether a field is one field.
+ *
+ * **A label with `legend: false` is refused at both gates** (C12 §3ag A3): the
+ * caller asks for a string and forbids the only place it goes. C04 I57's three
+ * refusals are the idiom, and a construction throw leaves nothing behind because
+ * it fires before any render state exists.
+ */
+export type Annotation =
+  | Readonly<{ kind: "line"; value: number; tone?: Tone; label?: string }>
+  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone; label?: string }>
+  | Readonly<{
+      kind: "confidence";
+      upper: readonly number[];
+      lower: readonly number[];
+      tone?: Tone;
+      /**
+       * Whether the area between the edges is shaded (C12 §3e, I52).
+       *
+       * **Defaults on**, because a band drawn as two unconnected dashed lines is
+       * the reading a caller has to be told to want and `fill_between` is the
+       * one they arrive expecting. `false` keeps the two-edge frame byte for
+       * byte, which is what makes moving the default safe.
+       *
+       * Inert where the capabilities have no alphabet left — see the type's own
+       * note above. That is C12 I25's substitution ladder reaching its bottom
+       * rung, not a member with no arm (F207).
+       */
+      fill?: boolean;
+    }>
+  | Readonly<{ kind: "whiskers"; points: readonly Readonly<{ x: number; y: number; err: number }>[]; tone?: Tone }>;
 
 export type Plot = Readonly<{
   kind: "plot";
@@ -436,6 +709,56 @@ export type Plot = Readonly<{
   height?: number;
   axes?: boolean;
   xLabels?: readonly [string, string, string];
+  /**
+   * What the abscissa is (C12 I56, §3ag).
+   *
+   * **Not a second way to spell `xLabels`**, which is three captions *along* the
+   * axis — a scale, in the caller's own words. This is one name *for* it, drawn
+   * centred under the labels, and the two are read together: `epoch 0 … now`
+   * over `training step`.
+   *
+   * **It costs a declared row**, so it is added by `titleRows` before any data is
+   * seen and I1 is untouched — the same shape a horizontal `legend` has, and the
+   * same reason that one can never turn itself on.
+   *
+   * **Refused with `axes: false` and on a form with no bottom axis**: a title for
+   * an axis that is not drawn names nothing, and the alternative — floating it at
+   * the foot of the block — is a second placement rule for one member.
+   *
+   * **There is no `yTitle`, and that is a ruling.** Rotated it is a column of
+   * single letters, which no terminal reader parses; horizontal above the gutter
+   * it is `xLabels`' shape and a second title member. **A y-axis title is a
+   * heading and C09 already has one** — the document puts a `heading` block above
+   * the plot, which costs the same row and is reusable by every other kind.
+   * `yAxis` makes the same argument about its own gutter: it costs width and
+   * never a row.
+   */
+  xTitle?: string;
+  /**
+   * Pin the horizontal domain the samples span, independently and optionally
+   * (I58, C12 I41, §3d.1).
+   *
+   * **`Series.values` is a bare array, so there is no x coordinate anywhere in
+   * this type** — the abscissa a sample has is its *index*. Absent, that is the
+   * domain: `[0, n − 1]`, which is what `ax.plot(y)` labels and what the data
+   * has when nothing else was said. Present, the samples are read as spanning
+   * `xMin … xMax` evenly, so a series sampled once a second for a minute says
+   * `xMin: 0, xMax: 60` and its axis reads in seconds.
+   *
+   * **Not a second way to spell `xLabels`.** That field is three captions —
+   * the caller's own words at left, centre and right — and this is a scale.
+   * Where both are present the captions win: overriding what a caller wrote
+   * with what we inferred is the wrong direction.
+   */
+  xMin?: number;
+  xMax?: number;
+  /**
+   * The unit the abscissa arrives in — **`yFormat`'s vocabulary, deliberately**.
+   *
+   * One formatter, two axes, for `BarSpec.format`'s reason exactly: a second
+   * enum is a second place for the `fraction`/`percent` confusion to happen.
+   */
+  xFormat?: Plot["yFormat"];
   /**
    * **The unit the value arrives in, not the unit it renders as** (I41, F31).
    *
@@ -466,8 +789,1044 @@ export type Plot = Readonly<{
    */
   yMin?: number;
   yMax?: number;
+  /**
+   * Claims about the ordinate, drawn behind the data (I52, C12 I23).
+   *
+   * **Behind, and the order is the ruling**: an annotation that overwrote a
+   * sample would hide the thing it exists to be compared against. Layers resolve
+   * first-non-blank, so these are appended last.
+   *
+   * **An out-of-range edge is dropped rather than clamped**, which is the one
+   * place this differs from a sample. I29 clamps a sample because pressing data
+   * against the ceiling is honest; an annotation is a claim about *where* a
+   * value sits, and one clamped onto a scale it is outside says the limit is
+   * somewhere it is not.
+   */
+  annotations?: readonly Annotation[];
+  /**
+   * A continuous colormap by name, for a form that encodes magnitude (C10 I31).
+   *
+   * **The second channel, and density stays the carrier.** A heatmap's glyph is
+   * chosen the same way at every depth and colour joins it above 8-bit, so the
+   * 1-bit behaviour is unchanged *by construction* rather than by a fallback —
+   * F34 satisfied throughout instead of at the bottom rung.
+   *
+   * **A name, not a family of slots.** A colormap is a function from a
+   * normalised value to a colour and viridis is viridis on every theme, so it is
+   * framework data rather than theme tokens: a theme chooses which, never what
+   * it contains. An unknown name is refused at construction, because a name that
+   * resolves to nothing renders uncoloured and green — F172's shape, and the one
+   * this type will not reproduce.
+   */
+  colormap?: ColormapName;
   emptyMessage?: string;
-}> & Gap;
+  categories?: readonly string[];
+  layout?: "overlap" | "grouped" | "stacked" | "normalised";
+  binning?: "sturges" | "freedman-diaconis" | "scott";
+  quartiles?: readonly QuartileSummary[];
+  /**
+   * The bars a `plotStyle: "candlestick"` draws (C04 I57, C12 I36).
+   *
+   * **Overlay `series` are optional and `series: []` is the ordinary case.** A
+   * non-empty `series` draws over the candles on the shared axis — a moving
+   * average is what that is for — so the range unions both and the legend
+   * names the candles as well as each series.
+   */
+  ohlc?: readonly OHLC[];
+  offsets?: readonly number[];
+  totals?: readonly boolean[];
+  /**
+   * The cell a `calendar` is built from, which picks the grid (C12 I53, §3ae).
+   *
+   * **Rows are the sub-unit and columns the super-unit** — one statement over
+   * four layouts rather than four layouts that happen to agree: `hour` is 24
+   * rows and a column is a day, `day` is 7 rows (`Mon … Sun`) and a column is a
+   * week, `week` is 5 rows and a column is a month, `month` is 12 rows and a
+   * column is a year.
+   *
+   * **The span needs no member, and that is what the unit buys.** `startDate` +
+   * this + `series[0].values.length` states it exactly, and a `span` field
+   * beside those three would be a fourth statement of a fact they already fix.
+   *
+   * One flat series in time order, and more than one is refused: a calendar's
+   * rows *are* a period, so a second series is a second period claiming the same
+   * rows. Without this member a `calendar` stays the raw matrix it has always
+   * been, so no shipped frame moves.
+   */
+  calendarUnit?: "hour" | "day" | "week" | "month";
+  /**
+   * When the first reading was taken, for a `calendar` (C12 I53, §3ae).
+   *
+   * `YYYY-MM-DD`, optionally `THH`, `:MM`, `:SS` and a trailing `Z` —
+   * everything below the hour is *inside* the cell rather than discarded, which
+   * is what makes ignoring it honest. A zone offset is refused rather than
+   * ignored, and a date that does not exist is refused on the leap rule.
+   * Required with `calendarUnit`: index 0 → row 0 is an assumption the caller
+   * never stated.
+   */
+  startDate?: string;
+  bands?: number;
+  facets?: readonly Plot[];
+  segments?: readonly Segment[];
+  xScale?: ScaleType;
+  yScale?: ScaleType;
+  /**
+   * How much of a band a distribution form spends on itself (C12 §3i, I28).
+   *
+   * Selects a renderer *inside* the declared height and never contributes to
+   * it — rows-per-band times category count would be a height derived from the
+   * data, which I1 forbids. So "auto" is the richest renderer the declared
+   * height affords, and an explicit "full" that does not fit degrades.
+   */
+  plotDetail?: "auto" | "compact" | "full";
+  /**
+   * What one column draws (C12 I36, §3r).
+   *
+   * **`candlestick` is a style and not a thirty-third form**, because everything
+   * a line plot has is unchanged — axis, grid, annotations, legend, crosshair
+   * — and only the column's mark differs. So `form` stays `line` or `step`,
+   * and the data it draws is `ohlc` rather than `series`.
+   */
+  /**
+   * The iso-lines a `contour` draws, or derived when absent (C04 I61, C12 I49).
+   *
+   * Derived through `niceAxis` — the y gutter's own function — so a contour's
+   * levels and the axis ticks are the same numbers rather than two nice-number
+   * runs that agree at most ranges and not all. The interior ticks only: a level
+   * at the field's minimum crosses nothing, so drawing it says *no contour*
+   * where the caller asked for one.
+   *
+   * A declared level outside the field's range is kept in the legend and drawn
+   * nowhere. Dropping it makes an empty plot area indistinguishable from a
+   * constant field, which is the one thing a contour has to be able to say.
+   */
+  levels?: readonly number[];
+  /**
+   * What is drawn over a field, in **draw order — last on top** (C04 I61, C12 I51).
+   *
+   * The painter's reading, which is what a caller expects; `mergedRow` resolves
+   * a contested cell **first-wins**, so the array is reversed at that seam and
+   * nowhere else. The two answer different questions: this says *what is drawn*,
+   * `Layer.kind` says *how two inked cells resolve*.
+   *
+   * **`field`'s membership is load-bearing and its position is not.** A
+   * background has no glyph and cannot occlude one, so `["field", "contour"]`
+   * and `["contour", "field"]` render byte-identical — membership says whether
+   * the field paints at all, which is how `["contour"]` asks for lines on an
+   * unpainted area. Stated because a reader given an ordered array will assume
+   * every position in it means something.
+   */
+  layers?: readonly ("field" | "contour" | "quiver")[];
+  /**
+   * Whether the field dims to make room for a glyph over it (C12 I51, §3y).
+   *
+   * **A glyph over a colormap competes on legibility, not on cells**, which is
+   * the thing *the background has no competition* gets backwards. Measured
+   * against the 4.5 : 1 floor, a white glyph clears it on 45% of viridis and 16%
+   * of coolwarm; every theme slot clears viridis on 3–19%.
+   *
+   * `"floor"` dims until every sample clears, **computed per map rather than
+   * tabulated** — the shipped factors come out at 50% for viridis and coolwarm
+   * and 40% for inferno, and a constant that clears three maps fails the fourth.
+   * Its price is stated because it is real: viridis keeps 0.165 of its 0.742
+   * luminance spread, 22%, and luminance is the ordering channel a perceptual
+   * map exists for. So the remedy costs the thing the map was chosen for, which
+   * is why it is not the default.
+   *
+   * Inert below `colourDepth: 8`, where there is no background to dim.
+   */
+  fieldDim?: "none" | "floor";
+  /**
+   * Where a glyph over a field takes its colour from (C12 I51, §3y).
+   *
+   * **Two fields rather than one union**, on `plotFrame`'s test above: a single
+   * enum would make `fieldDim: "floor"` with `glyphInk: "contrast"`
+   * inexpressible, and neither makes the other meaningless — one changes the
+   * background, the other the foreground.
+   *
+   * `"contrast"` picks black or white per cell from that cell's own background,
+   * which is seaborn's annotated heatmap. It does not break *a block names a
+   * palette slot*: the block still names a `colormap`, and `continuousColour`
+   * already resolves data-dependent colour inside the renderer. Its price is
+   * that the glyph's colour stops meaning magnitude — so on a `quiver` it spends
+   * the second channel to save the first.
+   */
+  glyphInk?: "own" | "contrast";
+  plotStyle?: "auto" | "braille" | "line" | "candlestick" | "solid";
+  /**
+   * Whether a shape's interior is drawn (C04 I59, C12 I43, §3w).
+   *
+   * **Refused where the vocabulary cannot fill.** A box-drawing outline has no
+   * interior alphabet: `█` inside `╭──╮` is an outline in one alphabet around a
+   * body in another, a third figure rather than the same one filled. So
+   * `"solid"` with `plotStyle: "line"` is a construction error and not an
+   * ignored member, which reads as one not yet implemented.
+   */
+  plotFill?: "none" | "solid";
+  /**
+   * The shape of a radar's value rings and outer bound (C12 I45, §3w).
+   *
+   * **A default rather than an inference.** The two arms had already chosen
+   * differently — braille drew circles through `arcDots`, the quadrant arm drew
+   * *n*-gons through the data's own vertices — and neither said so. `"polygon"`
+   * is the default because the grid is a ruler for the shape measured against
+   * it: at three categories a circular ring behind a triangular polygon is two
+   * figures in one frame. At ten the two are within a dot.
+   *
+   * **Not chosen from the category count**, which is the tempting rule — a
+   * figure that changes shape at a threshold is two figures with one name.
+   */
+  plotGrid?: "polygon" | "circle";
+  /**
+   * A compact box plot's interquartile run (C12 I46, §3i).
+   *
+   * At one row a box has no top and bottom edge, so its interior carries the
+   * range: a blank one leaves `┤    ├` and says nothing about where the box
+   * begins. **Filled is not the only run a whisker is not** — `"line"` draws it
+   * a stroke heavier than the whisker instead, which keeps the summary a line
+   * drawing where `"solid"` gives it mass against a density behind it.
+   */
+  plotBox?: "solid" | "line";
+  plotCorners?: "rounded" | "sharp";
+  /**
+   * Which axis a categorical or distribution form runs along (C12 §3j, C12 I30).
+   *
+   * **`"horizontal"` is the default and it is a terminal's answer, not a
+   * chart's.** A cell is about twice as tall as it is wide and a category's name
+   * is text, so a horizontal bar gets its name written beside it in full while a
+   * vertical one gets a column two or three cells wide to write it under. That
+   * is why every terminal plotting library defaults this way and matplotlib does
+   * not.
+   *
+   * Vertical is what a caller wants when the categories are **ordered** — a
+   * histogram's bins, a month of readings — because a horizontal bar chart runs
+   * its category axis top-to-bottom and time does not go that way.
+   *
+   * A form with no second axis refuses it at construction rather than ignoring
+   * it: a plot that quietly drops a field is one the caller believes is showing
+   * something else.
+   */
+  orientation?: "horizontal" | "vertical";
+  /**
+   * The kernel bandwidth, as a **multiplier** on the rule of thumb (C12 §3m).
+   *
+   * seaborn's `bw_adjust`, and a multiplier rather than an absolute width for
+   * the reason seaborn chose one: a bandwidth in the data's own units means
+   * nothing until you know the data, so every caller would be computing
+   * Silverman themselves to scale it.
+   *
+   * **The default oversmooths multimodal data and that is a property of the
+   * rule, not a defect.** Silverman assumes something roughly normal; two
+   * separated peaks are exactly the case it flattens, and no automatic choice
+   * fixes it — which is why the escape is a field rather than a better default.
+   * Below 1 sharpens, above 1 smooths.
+   */
+  bandwidth?: number;
+  /** The tree `flame`, `icicle`, `treemap` and `tree` are drawn from (C04 I54, C12 §3n, C12 §3ah). */
+  hierarchy?: HierarchyNode;
+  /**
+   * Which of three layouts a `tree` is drawn in (C04 I65, C12 I57, C12 §3ah).
+   *
+   * **A member rather than a rung on `plotDetail`, and it was measured.** Over
+   * four trees the top-down figure is the cheapest of the three in rows on a
+   * broad tree and the dearest on a deep one, while its columns invert with it —
+   * so no ordering by budget exists, not even one depending only on the budget,
+   * because which layout is cheapest depends on the tree. All three draw the
+   * same names and the same edges, which is C12 I34's test for a rung failed
+   * three times in the same way.
+   *
+   * **`"auto"` is a fit**: the first of `topDown`, `leftRight`, `outline` whose
+   * natural size fits both axes, else the one that keeps the most nodes. Naming
+   * one is honoured whatever the budget, and the drawing is truncated with a
+   * `+N` row rather than overflowing — an explicit `plotDetail: "full"` degrades
+   * the same way (C12 I28).
+   *
+   * Refused on every other form: a member that does nothing reads as one not
+   * yet implemented.
+   */
+  treeLayout?: "auto" | "topDown" | "leftRight" | "outline";
+
+  /**
+   * A graph's nodes and edges — **required** on `form: "graph"` and refused on
+   * every other form, with `hierarchy` refused on it (C04 I69, §3e).
+   */
+  graph?: Graph;
+
+  /**
+   * A graph's layout (C04 I70, §3e.2).
+   *
+   * **One value, so the choice arm forbids nothing** — A03 §2's vacuity class in
+   * a field, said here rather than left to be noticed. The refusal arm is
+   * testable on every other form, and `graphLayout: "force"` is a compile error
+   * rather than a value nothing honours. `force` is refused on the labels alone
+   * and its expiry is `shiftInward` (C12 I58, §3ai.2).
+   */
+  graphLayout?: "layered";
+  /**
+   * The vector field a `quiver` draws (C04 I61, C12 I50).
+   *
+   * Required on that form and refused on every other. Where `series` is empty
+   * the field beneath the arrows is the vectors' own **magnitude**, which is the
+   * only scalar a vector field has unless the caller names another.
+   */
+  vectors?: readonly VectorSeries[];
+  /**
+   * Where a matrix puts a row shorter than its width (C12 §3o).
+   *
+   * `"stretch"` spreads the readings across the area, `"window"` keeps the
+   * newest at the right and blanks the left, `"left"` grows from the left and
+   * scrolls once full. The default is per form: a live feed anchors so a
+   * column does not move every tick, and a grid of categories has no time axis
+   * to anchor to.
+   *
+   * **`"uniform"` is `"left"` with the cells widened to fill** (C12 §3ae.5),
+   * added because a `calendar`'s columns are the family's first with an
+   * *intrinsic width* — a week is a week. `"stretch"` gives widths differing by
+   * one cell, which is imperceptible at a pitch of six and a **doubling** at a
+   * pitch of one, and a two-cell week beside a one-cell week reads as two weeks
+   * holding one value (C12 §6b B15). Every column takes `⌊w ÷ n⌋` cells, the oldest
+   * drop first as `"left"`'s do, and the remainder is a fringe the caller
+   * removes with `width` rather than by stretching a period. The two arms are
+   * identical wherever the pitch is one.
+   */
+  matrixAnchor?: "stretch" | "window" | "left" | "uniform";
+  /**
+   * Where the legend goes, or `false` for none (C12 §3g, C12 I27).
+   *
+   * **The two axes behave differently, and it is a constraint rather than
+   * taste.** `"left"` and `"right"` cost **width**, which is already
+   * data-dependent — the gutter sizes itself from the y-range — so they may size
+   * themselves to the longest label and turn themselves on where a form needs
+   * one. `"above"` and `"below"` cost a **declared row**, and C12 I1 requires the
+   * row count to be known before the data is, so they are a fixed one row and
+   * never auto-enable.
+   *
+   * That asymmetry is why `"right"` is the default: it is the only placement
+   * that can turn itself on.
+   */
+  legend?: "above" | "below" | "left" | "right" | false;
+  /**
+   * The shape of the furniture, where `axes` says whether there is any
+   * (C12 §3f, C12 I26).
+   *
+   * **Two fields because they answer two questions.** A single enum spelling
+   * `"none"` would make `axes: false, plotFrame: "box"` expressible and
+   * meaningless.
+   *
+   * The references disagree with each other — UnicodePlots ships `:solid` and
+   * `:corners`, plotext draws a closed box, kitty.r draws gridlines — so this is
+   * a style field rather than a choice the framework makes for the caller.
+   */
+  plotFrame?: "box" | "corners" | "grid" | "rule";
+  /**
+   * Which side of the plot area the y labels sit on (C12 I47, §3x).
+   *
+   * At eighty columns a reader cannot track a row back to a label seventy cells
+   * away, which is why every financial and monitoring TUI mirrors its axis.
+   * `"both"` draws the **same** ticks on both sides — a second *scale* on the
+   * right is a different feature and is refused, because two ranges on one
+   * figure assert a correlation the data does not have.
+   *
+   * It costs **width and never a row**, so C12 I1 is untouched: this is the
+   * vertical legend's data-dependent kind (C12 I27) and not its declared kind.
+   * `false` removes the labels and keeps the frame and the x axis, which is
+   * what `axes: false` cannot say on its own.
+   */
+  yAxis?: "left" | "right" | "both" | false;
+  /**
+   * A reading at the right edge, on the row each series ends at (C12 I48, §3x).
+   *
+   * **Named for the case it serves.** On a static chart the last value is at the
+   * end of the line and the callout is clutter; on a live one it is the number
+   * that matters most and the hardest to read off a line still moving. So it is
+   * opt-in, and it needs a right gutter to write in — `yCallout` with
+   * `yAxis: "left"` is refused rather than quietly widening the axis.
+   */
+  /**
+   * **`"name"` and `"both"` are the same mechanism, not a second one**
+   * (C12 I55, §3ag). A value at the line's end and a *name* at the line's end
+   * take the same anchor — the series' own last inked row, read from ink — the
+   * same collision rule, the same right gutter and the same 1-bit carrier, so a
+   * second field would be a second copy of C12 I48 to keep in step.
+   *
+   * **`"name"` and `"both"` suppress the automatic legend and `"last"` does
+   * not**, because only they answer the question a legend answers. C12 I48 ruled
+   * that a callout *does not* replace the legend — *it names a value where a
+   * legend names an identity* — and a name at the line's end names the identity,
+   * so the sentence selects rather than excludes. An explicit `legend:` still
+   * draws, exactly as it does for the positional family's 1-bit strips.
+   *
+   * **Where the pair does not fit, the number survives**: a live chart is read
+   * for the value, which is C12 I48's own argument for the field existing.
+   */
+  yCallout?: "none" | "last" | "name" | "both";
+  /**
+   * The cells the figure is drawn in, narrower than the frame it sits in
+   * (C04 I62, C12 §3ab).
+   *
+   * **Clamped at render and not refused at construction**, because C04 has no
+   * terminal width: a validator refusing a width it cannot measure asserts a
+   * fact it does not hold. What the gates check is what a document can be wrong
+   * about on its own — finite, positive, integral.
+   *
+   * A width too narrow for the gutter and the area together reaches
+   * `layoutFor`'s existing `null` and draws *Too narrow.*, which is a rung that
+   * already existed reached by a new road.
+   */
+  width?: number;
+  /**
+   * Drawn width to drawn height, **visually** (C04 I62, C12 §3ab).
+   *
+   * **The member that knows a cell is not square**, which is the whole of why it
+   * is not arithmetic in the caller: `aspect.ts`'s argument is that exactly one
+   * file knows the ratio, and a caller deriving a width from a height has to.
+   * With a cell 1 × 2, `a = w / (h · CELL_ASPECT)`, so `a: 1` is a visually
+   * square figure and `a: 2` is twice as wide as it is tall.
+   *
+   * **The height is declared and the width derived**, never the other way:
+   * C12 I1 forbids a plot's height coming from anything but the caller. Mutually
+   * exclusive with `width` — two ways to say one number, and picking one quietly
+   * would be reading the caller's other statement.
+   */
+  aspect?: number;
+  /**
+   * Where a narrowed figure sits in its frame (C04 I62, C12 §3ab).
+   *
+   * **Refused without `width` or `aspect`**, and the refusal is what gives the
+   * member its necessity: aligning a figure that already fills its frame does
+   * nothing, and a member that does nothing reads as one not yet implemented
+   * (F207).
+   *
+   * **Not `matrixAnchor`.** That places a row shorter than the area inside a
+   * fixed area; this places an area narrower than the frame inside the frame.
+   * Two containers, two contents, and a caller setting both gets both.
+   */
+  align?: "left" | "centre" | "right";
+  /**
+   * Which corner of the plot area the data grows from (C04 I62, C12 §3ac).
+   *
+   * **Refused where `ORIGIN_DEFAULT` says `null`** — 27 of the 44 forms — and
+   * the set was measured rather than reasoned. The question this type first
+   * asked was *does the form have two reversible directions*, and it is the
+   * wrong question: what decides it is **which machinery places the data**.
+   * Seven positional forms carry their direction in two functions and ten matrix
+   * forms in two places; eleven categorical forms carry each bar's direction in
+   * its own row builder, and fourteen forms are their own renderer.
+   *
+   * **The default is not one corner**, which is why `ORIGIN_DEFAULT` is a record
+   * rather than a constant: a curve's first sample is at the left with its value
+   * growing upward, and a matrix's `series[0]`, `values[0]` is at the *top*
+   * left, because a row index grows downward and a value does not.
+   */
+  origin?: Origin;
+  /**
+   * Where the axes are drawn: at the plot area's edges, or crossing at zero
+   * (C04 I62, C12 §3ad). `"edge"` when absent, which is what every frame drew
+   * before this existed.
+   *
+   * **A separate field from `origin`, on `plotFrame`'s test.** One enum spelling
+   * `"centre"` beside the four corners would make `origin: "top-right"` with a
+   * crossing axis inexpressible, and the two answer different questions — which
+   * corner the data grows from, and where the axes meet.
+   *
+   * **This is gnuplot's `set zeroaxis` and not matplotlib's moved spine**: the
+   * gutter keeps the scale and the captions keep their row, and the crossing
+   * axes are two rules inside the plot area. `plotFrame: "corners"` composes to
+   * give the other picture.
+   *
+   * **Honoured on seven forms and dropped rather than refused where the data
+   * cannot place it.** The acceptance set is `HONOURS_AXIS_CROSS`; the two
+   * conditions on each half — a range that strictly straddles zero, and a
+   * position strictly inside the area — are the renderer's, because no gate can
+   * see a realised range from L0 (A02 §1).
+   */
+  axisCross?: AxisCross;
+}> & Gap & Floor;
+
+/** Which corner of a plot area the data grows from (C04 I62, C12 §3ac). */
+export type Origin = "bottom-left" | "bottom-right" | "top-left" | "top-right";
+
+/** Where a plot's axes are drawn (C04 I62, C12 §3ad). */
+export type AxisCross = "edge" | "zero";
+
+/**
+ * Which forms honour `origin`, and what each one defaults to (C04 I62, C12 §3ac).
+ *
+ * **`null` is the refusal, so one total record carries the acceptance set and
+ * the default together** — `FURNITURE_ROWS`' argument, which is that two records
+ * obliged to agree should be one record whose agreement is the thing that ships.
+ * It lives here rather than beside the renderer for `STYLE_ARMS`' reason: the
+ * validator needs it and L0 cannot import L1 to ask (A02 §1).
+ *
+ * **Measured, not reasoned** (C12 §3ac). The rows are the placement machinery:
+ * `"bottom-left"` for the seven positional forms, `"top-left"` for the ten
+ * matrix forms whose row index grows downward, and `null` for the eleven
+ * categorical forms, the fourteen own renderers and the two facet containers.
+ *
+ * **`bar` is the refusal worth naming**, because it is the most ordinary chart
+ * in the catalogue and was not among the three this record was guessed to
+ * contain. Its rows come from `categoricalForm` in one place and each bar's
+ * direction from its own row builder in eleven. **The condition is a symbol so a
+ * grep finds it**: `origin` reaches the categorical family the day
+ * `categoricalForm` takes a shared span builder for the row body instead of a
+ * `rowBuilder` per form.
+ *
+ * **A facet container refuses because its `origin` would name a different
+ * thing** — which corner the first *facet* sits in, not which corner the data
+ * grows from. `facets` is `readonly Plot[]`, so each facet declares its own.
+ */
+export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.freeze({
+  // Positional — the direction is `rowOf` and `columnsOf`.
+  line: "bottom-left", scatter: "bottom-left", step: "bottom-left",
+  ecdf: "bottom-left", slope: "bottom-left", bubble: "bottom-left",
+  density: "bottom-left",
+
+  // Matrix — the direction is `columnMap` and `matrixRows`' loop, and a row
+  // index grows downward, so the first datum is already in the top-left corner.
+  heatmap: "top-left", calendar: "top-left", correlation: "top-left",
+  confusion: "top-left", spectrogram: "top-left", latency: "top-left",
+  density2d: "top-left", utilisation: "top-left",
+
+  // **The two field forms refuse, and the code is what said so** (C12 §3ac).
+  // A `contour`'s isolines and a `quiver`'s arrows are rasterised into *area*
+  // coordinates by `fieldLayers`, a second placement inside the matrix — so a
+  // flip reaching the wash and not the field draws isolines over the wrong
+  // cells, and mirroring the rasterised row instead is the braille dot
+  // permutation probe 3 ruled out. **The condition is a symbol**: they join the
+  // day a `FieldLayer` is sampled in `columnMap`'s space rather than the area's.
+  contour: null, quiver: null,
+
+  // Categorical (11) — `categoricalForm` orders the rows in one place and each
+  // form's own `rowBuilder` draws the bar's direction.
+  autocorrelation: null, bar: null, bullet: null, dotplot: null, dumbbell: null,
+  forest: null, funnel: null, gantt: null, lollipop: null, timeline: null,
+  waterfall: null,
+
+  // Their own renderer (14).
+  boxplot: null, flame: null, histogram: null, horizon: null, icicle: null,
+  pie: null, radar: null, ridgeline: null, sparkline: null, stackedarea: null,
+  streamgraph: null, treemap: null, tree: null, graph: null, violin: null, waffle: null,
+
+  // Facet containers — each facet is a `Plot` and declares its own.
+  smallmultiples: null, pairplot: null,
+});
+
+/**
+ * Which forms honour `axisCross` (C04 I62, C12 §3ad).
+ *
+ * **A strict subset of `ORIGIN_DEFAULT`'s fifteen, and the difference is the
+ * matrix family.** A matrix has a corner and no zero: `origin` asks which way
+ * the axes run, and this asks where they meet, so it needs a numeric ordinate
+ * *and* a numeric abscissa. Seven of forty-four.
+ *
+ * **A plain boolean where `origin` carries a default, because there is nothing
+ * to default to.** `"edge"` means *draw no rule inside the area*, which is
+ * exactly what a refusing form does — so a per-form default would be the same
+ * value in all forty-four rows and would say nothing.
+ *
+ * **Not `HAS_POSITION_AXIS`, for the third time** (C12 I43's finding; C12 §3ac
+ * records the second). That record holds `stackedarea` and `streamgraph`, which
+ * have their own composers, and `contour` and `quiver`, which the matrix
+ * renderer draws — eleven forms answering *does the abscissa carry positions*,
+ * where this one asks *who composes the area*.
+ *
+ * Measured by instrumenting `overlaidRows` and rendering the whole corpus, not
+ * reasoned from the shape of the forms (C12 §3ad.2).
+ */
+export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // The positional family — `overlaidRows` composes the area, and a crossing
+  // axis is a reference row merged behind the data there.
+  line: true, scatter: true, step: true, ecdf: true, slope: true,
+  bubble: true, density: true,
+
+  // Matrix — a corner, and no zero to cross at.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  contour: false, quiver: false,
+
+  // Categorical — one row or column per category; the abscissa is a set of
+  // names and has no origin.
+  bar: false, forest: false, dumbbell: false, lollipop: false, dotplot: false,
+  funnel: false, gantt: false, waterfall: false, timeline: false, bullet: false,
+  autocorrelation: false,
+
+  // Own renderer — a disc, a mosaic, a tree, a band, a single row.
+  boxplot: false, flame: false, histogram: false, horizon: false, icicle: false,
+  pie: false, radar: false, ridgeline: false, sparkline: false, stackedarea: false,
+  streamgraph: false, treemap: false, tree: false, graph: false, violin: false, waffle: false,
+
+  // Facet containers — each facet is a `Plot` and declares its own.
+  smallmultiples: false, pairplot: false,
+});
+
+/**
+ * Which `plotStyle` arms a form actually has (C12 I43, §3w).
+ *
+ * **The refusal was a clause naming `candlestick` and the form it needs** —
+ * right, and a special case: every style is one some forms draw and others do
+ * not, so a second style would have wanted a second clause. This is that shape
+ * as data, and the refusal is one rule over it.
+ *
+ * `"auto"` is every form's, and is left out of the lists rather than repeated
+ * into all thirty-five: it means *the renderer decides*, which every renderer
+ * can always do.
+ *
+ * Total over `PlotForm`, so the thirty-fifth form declares its arms or does not
+ * compile.
+ *
+ * **Here and not in `presentation/plot/`, because the validator needs it.**
+ * `SHARES_CELLS` and its siblings are rendering facts and live beside the
+ * renderer; which styles a form *has* is a fact about the contract, and L0
+ * cannot import L1 to ask (A02 §1). C12 reads it downward, which is the
+ * direction that is allowed.
+ */
+/**
+ * Which forms draw a y gutter at all — the set `yAxis` can move (C12 I47, C12 §3x).
+ *
+ * **Measured, not reasoned.** Every catalogue fixture was rendered at
+ * `axes: true` and asked whether any row carries an edge glyph at a column
+ * past the first: thirty-two do and ten do not. The measurement corrected one
+ * guess in each direction — `smallmultiples` and `pairplot` *look* gutter-ed
+ * because a facet's own gutter shows in the frame, and the outer block draws
+ * none. A facet is a `Plot` and declares its own `yAxis`, which is the same
+ * answer `HAS_POSITION_AXIS` gives for the same reason.
+ *
+ * A non-`"left"` `yAxis` on a form with no gutter is **refused** rather than
+ * ignored. F207 is what ignoring costs: a field accepted on a form that has no
+ * arm for it tells the caller nothing and the reader nothing.
+ *
+ * **Here and not in `presentation/plot/`, for `STYLE_ARMS`' reason**: the
+ * validator needs it and L0 cannot import L1 to ask (A02 §1). `SHARES_CELLS`
+ * and its siblings stay beside the renderer because they are facts about
+ * drawing; which sides a form *has* is a fact about the contract.
+ */
+export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // A scale in the gutter, one label per labelled row.
+  line: true, scatter: true, step: true, ecdf: true, density: true,
+  slope: true, bubble: true, stackedarea: true, streamgraph: true,
+  // A name in the gutter, one per row or band.
+  bar: true, histogram: true, boxplot: true, violin: true, ridgeline: true,
+  forest: true, dumbbell: true, lollipop: true, dotplot: true, funnel: true,
+  gantt: true, waterfall: true, timeline: true, bullet: true, autocorrelation: true,
+  // A matrix's row labels *are* its ordinate (C12 I18), which is why
+  // `yAxis: false` is refused here and only here.
+  heatmap: true, calendar: true, correlation: true, confusion: true,
+  spectrogram: true, latency: true, density2d: true, utilisation: true,
+  // **A contour is a matrix by the same argument** (I49): its rows are the
+  // field's rows, and a field with no names beside it is a picture of numbers.
+  contour: true, quiver: true,
+  // One row, or a figure that bounds itself: no gutter to put a label beside.
+  sparkline: false, horizon: false, waffle: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  // Composition: the facets carry the gutters and each declares its own.
+  smallmultiples: false, pairplot: false,
+});
+
+/**
+ * Which forms rasterise a **per-series curve** into the plot area — the set a
+ * callout can name (C12 I48, C12 §3x).
+ *
+ * A callout needs ink belonging to *one* series, which is what `positionalForm`
+ * produces and what a band, a mosaic and a matrix do not: a stacked area's rows
+ * are one figure cut into parts, so *where does this series end* has no answer
+ * a row can carry.
+ *
+ * **Not `HAS_POSITION_AXIS`, which was the obvious reuse.** That record says
+ * whether the *abscissa* is a position — a question about the other axis — and
+ * it answers `true` for `stackedarea` and `streamgraph`, which have no per-series
+ * ink at all. A total record over forms reads as a complete answer to a question
+ * it cannot ask, which is C12 I43's finding one field along.
+ */
+/**
+ * Whether this form draws a row beneath its plot area that a title can sit under
+ * (C12 I56, §3ag).
+ *
+ * **Every value here was measured, not reasoned.** Each form was rendered with
+ * an `xTitle` set and the frame searched for it: twenty-six draw one, eighteen
+ * do not, and **sixteen of those eighteen also broke `measure === rendered`**,
+ * because `titleRows` had already added the row to the declared height and
+ * nothing composed it. So this record is not a taste — it is what keeps C12 I1,
+ * and a form answering `true` without routing through `axed`, `axedWithCursor`
+ * or `categoricalColumnForm` produces a block whose declaration and drawing
+ * disagree.
+ *
+ * **The matrix family is a named gap and not an omission.** A heatmap does draw
+ * a column-label row and a title under it would read; it composes its own
+ * furniture and was not wired, and widening it is a change to that family's
+ * compositor rather than to this member. `pie`, `radar`, `waffle`, `treemap` and
+ * `horizon` have no abscissa to name at all, which is a different `false`.
+ *
+ * Total over `PlotForm`, so the thirty-fifth form declares which it is — and the
+ * sweep in C12 T2.9 re-measures it rather than trusting these values.
+ */
+/**
+ * Whether this form has a `plotDetail` rung ladder to select from (C12 I28, I34,
+ * §3i · F220).
+ *
+ * **The member had no scope at all until this record.** `plotDetail` has one
+ * reader in `src/` — `rungFor` — reached only from the `boxplot` and `violin`
+ * renderers, and nothing refused it anywhere: it was accepted on **42 of 44
+ * forms** that do nothing with it. That is F207's class arriving in a member
+ * rather than in a record, and the silence runs the other way — `STYLE_ARMS`
+ * said *yes* where the renderer said nothing, and here nothing said anything, so
+ * §3i's description of two ladders read as general because no artefact narrowed
+ * it.
+ *
+ * **It survived because the member is optional and defaults to `"auto"`**, so
+ * every form renders correctly whether or not it is set. There is no wrong frame
+ * to find; the only observable is the absence of an error, which is what no
+ * frame-read, golden or mutation reaches.
+ *
+ * **This record and `RUNGS` cannot be derived from one another** — `RUNGS` is in
+ * `definition.ts` (L1) and validation is here (L0), and L0 does not import
+ * upward. So they must agree, and C12 T2.10 asserts it rather than trusting it:
+ * a `true` with no ladder is a refusal that never fires, and a `false` with one
+ * is a ladder no caller can reach.
+ *
+ * Total over `PlotForm`, so the thirty-fifth form declares which it is.
+ */
+export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // The two distribution ladders §3i is written about.
+  boxplot: true, violin: true,
+  // Everything else. A form joining this list needs a `RUNGS` entry with it, or
+  // the refusal stops firing and nothing starts drawing.
+  line: false, sparkline: false, heatmap: false, scatter: false, step: false,
+  ecdf: false, bar: false, histogram: false, forest: false, dumbbell: false,
+  lollipop: false, dotplot: false, waffle: false, flame: false, icicle: false,
+  funnel: false, gantt: false, waterfall: false, streamgraph: false,
+  stackedarea: false, treemap: false, slope: false, bubble: false,
+  // **Measured rather than reasoned** (C12 §3ah.1): the three tree layouts are
+  // one drawing at three aspect ratios, no ordering by budget exists over them,
+  // and I34's own test for a rung — every rung adds information rather than
+  // resolution — is failed by all three in the same way. The choice is
+  // `treeLayout`, and this record's first new question is answered `false`.
+  tree: false,
+  graph: false,
+  autocorrelation: false, timeline: false, bullet: false, utilisation: false,
+  calendar: false, correlation: false, confusion: false, spectrogram: false,
+  latency: false, density2d: false, contour: false, quiver: false,
+  density: false, ridgeline: false, smallmultiples: false, pairplot: false,
+  pie: false, radar: false, horizon: false,
+});
+
+/**
+ * The deepest a `hierarchy` may nest (I64, F221).
+ *
+ * **The bound is not what the check is for**, and the figures say why: a chain
+ * 3200 deep satisfies every rule the type states and is refused by the *stack*,
+ * the treemap failing between 1600 and 3200 and the flame between 3200 and 6400
+ * — which is the size of the two walks' frames rather than anything about the
+ * data. Nobody has a call stack that deep. 256 is an eighth of the lower figure
+ * and deeper than any profile prints, and it exists because **a gate that walks
+ * a recursion has to terminate it** — including on an object graph with a cycle,
+ * which a builder call can hand over and a document cannot.
+ *
+ * **Breadth is deliberately not bounded**, and the asymmetry is the reason: ten
+ * thousand children degrade to ten thousand zero-width strips, which is a figure
+ * saying *too many to draw*, where depth degrades to a throw.
+ */
+export const HIERARCHY_MAX_DEPTH = 256;
+
+/**
+ * What a form reads a `hierarchy` **for**, or `null` where it reads none (I64).
+ *
+ * Three forms divide space in proportion to `value` — `flame`, `icicle`,
+ * `treemap` — so on those a node without a finite non-negative magnitude is not
+ * a node drawn oddly, it is not a node. **The arm for a form whose subject is
+ * structure arrives with `tree`** (C12 §3ah, C12 I57), and it arrives as a third
+ * value of this union rather than as a second record: `value` becomes optional
+ * on the node exactly then, because until there is a form that ignores it, an
+ * optional `value` is a weaker type refused identically at both gates.
+ *
+ * Total over `PlotForm`, so the forty-fifth form declares which it is — and the
+ * `null` arm is a refusal rather than silence, because `hierarchy` on a form
+ * that draws a series is F220's class in a second member.
+ */
+export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | "structure" | null>> = Object.freeze({
+  // The three forms whose subject is containment (I54, C12 §3n).
+  flame: "magnitude", icicle: "magnitude", treemap: "magnitude",
+  // **And the one whose subject is structure** (C12 §3ah, C12 I57) — which is why
+  // `value` is optional on the node: a tree is placed by shape alone, and a
+  // number every caller of that form has to invent is worse than a member that
+  // does nothing — a member that does nothing can at least be left out.
+  tree: "structure",
+  // **`null`, where `tree` is `"structure"`.** A graph does not read
+  // `hierarchy` at all — it has its own shape, and this record answers a
+  // question about the field a form consumes rather than about the family it
+  // belongs to (C04 I69).
+  graph: null,
+  // Everything else draws a series, a matrix or a field.
+  line: null, sparkline: null, heatmap: null, scatter: null, step: null,
+  ecdf: null, bar: null, histogram: null, forest: null, dumbbell: null,
+  lollipop: null, dotplot: null, waffle: null, boxplot: null, violin: null,
+  funnel: null, gantt: null, waterfall: null, streamgraph: null,
+  stackedarea: null, slope: null, bubble: null,
+  autocorrelation: null, timeline: null, bullet: null, utilisation: null,
+  calendar: null, correlation: null, confusion: null, spectrogram: null,
+  latency: null, density2d: null, contour: null, quiver: null,
+  density: null, ridgeline: null, smallmultiples: null, pairplot: null,
+  pie: null, radar: null, horizon: null,
+});
+
+export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // Composed by `axed`, `axedWithCursor` or `categoricalColumnForm` — the
+  // positional family and the categorical one.
+  line: true, scatter: true, step: true, ecdf: true,
+  density: true, slope: true, bubble: true, stackedarea: true,
+  streamgraph: true,
+  bar: true, histogram: true, boxplot: true, violin: true,
+  ridgeline: true, forest: true, dumbbell: true, lollipop: true,
+  dotplot: true, funnel: true,
+  gantt: true, waterfall: true, timeline: true, bullet: true,
+  autocorrelation: true, flame: true, icicle: true,
+  // **A matrix composes its own furniture and was not wired** — a named gap:
+  // its column-label row could carry a title and does not.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  contour: false, quiver: false,
+  // No abscissa to name: a disc, a polygon, a mosaic, one row, a composition.
+  pie: false, radar: false, waffle: false, treemap: false, tree: false, graph: false,
+  horizon: false, sparkline: false, smallmultiples: false, pairplot: false,
+});
+
+export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // Everything `positionalForm` renders, including the two that derive a block
+  // first — an ECDF's last value is its own last reading, and a density's is the
+  // estimate at the right edge, which is what the figure draws in both cases.
+  line: true, scatter: true, step: true, ecdf: true, density: true,
+  slope: true, bubble: true,
+  // Bands, not curves: one figure cut into parts.
+  stackedarea: false, streamgraph: false, ridgeline: false,
+  // A row or a column per category; the gutter already names each one.
+  bar: false, histogram: false, boxplot: false, violin: false,
+  forest: false, dumbbell: false, lollipop: false, dotplot: false, funnel: false,
+  gantt: false, waterfall: false, timeline: false, bullet: false, autocorrelation: false,
+  // A matrix has no per-series row, and no scale in its gutter to write beside.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  contour: false, quiver: false,
+  // No cartesian area, or one row, or a composition.
+  sparkline: false, horizon: false, waffle: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  smallmultiples: false, pairplot: false,
+});
+
+
+/**
+ * The forms that draw a field — a grid where a cell is a position rather than a
+ * category (C04 I61, C12 §3y).
+ *
+ * **A new record and not a reuse of `MATRIX_LAYOUT`**, which answers whether a
+ * form's columns are a time window or a fixed category set. That is a question
+ * about the abscissa, and every matrix form has an answer to it while only two
+ * of them can take a glyph layer. C12 I43's finding is a total record over forms
+ * read as a complete answer to a question it cannot ask, and reusing that one
+ * here would be the same mistake with the same shape.
+ *
+ * Here rather than in `presentation/plot/`, for `HAS_Y_GUTTER`'s reason: the
+ * validator needs it and L0 cannot import L1 to ask (A02 §1).
+ */
+/**
+ * The matrix family (C04 I50b), **here rather than in `construct.ts`** because
+ * the validator needs it and had been asking a narrower question instead.
+ *
+ * `checkHeatmap` was widened to this record when `utilisation` fell through
+ * `form === "heatmap"`; `plotAxisErrors` was written afterwards and asked
+ * `form === "heatmap"` again, so `yAxis: false` was refused on one form of eight.
+ * `contour` is the ninth and it fell through in the same way — **the same narrow
+ * check, found by the same kind of member, two files apart.** A record both
+ * gates read is what closes the class rather than the instance.
+ */
+export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  heatmap: true, calendar: true, correlation: true, confusion: true,
+  spectrogram: true, latency: true, density2d: true, utilisation: true,
+  quiver: true,
+  // **A contour is a matrix and I50b binds**: its rows are the field's rows, so
+  // `axes: false` would take the row labels *and* the level legend, and the
+  // legend is the only thing that says which line is which level (C12 I49).
+  contour: true,
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  density: false, bar: false, histogram: false, boxplot: false, violin: false,
+  ridgeline: false, forest: false, dumbbell: false, lollipop: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  funnel: false, gantt: false, waterfall: false, streamgraph: false,
+  stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
+  radar: false, horizon: false, slope: false, bubble: false,
+  autocorrelation: false, timeline: false, bullet: false,
+});
+
+export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  contour: true, quiver: true,
+  // Every other matrix form paints its cells and draws nothing over them. They
+  // are *fields* in the survey's sense and not in this one: `layers` on a
+  // `spectrogram` has no second thing to order.
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  density: false, bar: false, histogram: false, boxplot: false, violin: false,
+  ridgeline: false, forest: false, dumbbell: false, lollipop: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  funnel: false, gantt: false, waterfall: false, streamgraph: false,
+  stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
+  radar: false, horizon: false, slope: false, bubble: false,
+  autocorrelation: false, timeline: false, bullet: false,
+});
+
+export type PlotStyleArm = NonNullable<Plot["plotStyle"]>;
+
+export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = Object.freeze({
+  // The positional family: braille dots or box-drawing strokes, and the two
+  // curve forms that can carry candles.
+  line: ["braille", "line", "candlestick"], step: ["braille", "line", "candlestick"],
+  scatter: ["braille", "line"], ecdf: ["braille", "line"], density: ["braille", "line"],
+  slope: ["braille", "line"], bubble: ["braille", "line"],
+  stackedarea: ["braille", "line"], streamgraph: ["braille", "line"],
+  // **The three forks C12 §3w adds.** A violin's outline can be strokes in the dot
+  // grid; a pie's wedges can be block glyphs; a radar's polygons can be
+  // box-drawing.
+  violin: ["braille", "line"],
+  pie: ["braille", "solid"],
+  // **`radar` has a line arm again, in the alphabet that connects** (C12 I43,
+  // §3w). Box drawing was tried three times and refused: its two diagonals do
+  // not reach their cell corners, so a run of them renders as dashes. The
+  // quadrant blocks are *filled* sub-cells, so consecutive cells touch — and
+  // `plotStyle` names what to draw, never the vocabulary that draws it (§3c).
+  radar: ["braille", "line"],
+  // Runs, bands and mosaics: the vocabulary is the form's and there is nothing
+  // to choose. Stated rather than omitted — an empty list is an answer.
+  bar: [], histogram: [], boxplot: [], ridgeline: [], forest: [], dumbbell: [],
+  lollipop: [], dotplot: [], funnel: [], gantt: [], waterfall: [], timeline: [],
+  bullet: [], autocorrelation: [], waffle: [], utilisation: [],
+  heatmap: [], calendar: [], correlation: [], confusion: [],
+  spectrogram: [], latency: [], density2d: [],
+  // **The one matrix form with a style fork, and the saddle is why** (I49,
+  // §3y). Both saddle resolutions give mask 15, so `"line"` renders `┼` either
+  // way and the centre-value ruling has nothing to be wrong about there. At 2×4
+  // the two segments part, so `"auto"` picks braille — the arm on which the
+  // ruling has a subject.
+  contour: ["braille", "line"],
+  // **An arrow is a whole-cell glyph and there is nothing to choose.** Stated
+  // rather than omitted — an empty list is an answer, and the vocabulary here
+  // is the form's own.
+  quiver: [],
+  flame: [], icicle: [], treemap: [], tree: [], graph: [],
+  sparkline: [], horizon: [],
+  smallmultiples: [], pairplot: [],
+});
+
+export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };
+
+export type QuartileSummary = Readonly<{
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+  outliers?: readonly number[];
+  /**
+   * The arithmetic mean (I53), drawn with its own mark and never the median's.
+   *
+   * The five-number summary has no place for it, and *where is the centre* has
+   * two answers the moment a distribution is skewed — showing only the median
+   * hides exactly the case a reader is looking for. Optional, because a summary
+   * computed from quantiles alone genuinely does not have one.
+   */
+  mean?: number;
+  centre?: number;
+  lower?: number;
+  upper?: number;
+  /**
+   * The study's weight in a meta-analysis, as a fraction of the total (C12 §3k).
+   *
+   * **A forest plot's point estimate is sized by it**, and that is not
+   * decoration: the whole reading of the chart is that a wide interval drawn
+   * small contributed little and a narrow one drawn large carried the result.
+   * Absent, every estimate is one cell and the plot is a list of intervals.
+   */
+  weight?: number;
+  /**
+   * The pooled estimate — the summary row, drawn as a diamond (C12 §3k).
+   *
+   * Its own field rather than a convention about the last entry, because *the
+   * last row is the summary* is a rule the data cannot state and a renderer
+   * cannot check. A meta-analysis with no pooled estimate is ordinary, and one
+   * with the summary first is a formatting choice.
+   */
+  pooled?: boolean;
+}>;
+
+/**
+ * One bar of a candlestick chart (C04 I57, C12 §3r).
+ *
+ * **A shape rather than four series in an agreed order**, on the precedent
+ * `QuartileSummary` and `HierarchyNode` set: an order is a convention nothing
+ * checks, so the first caller to pass `high` where `low` belongs gets a chart
+ * that renders and is wrong.
+ *
+ * **The wick contains the body**, and construction refuses a bar where it does
+ * not — `low` above `min(open, close)`, or `high` below `max(open, close)`,
+ * is not a candle drawn oddly, it is not a candle.
+ */
+export type OHLC = Readonly<{ open: number; high: number; low: number; close: number }>;
+
+export type Segment = Readonly<{ label: string; value: number }>;
+
+/**
+ * A node in a `Plot`'s `hierarchy` (C04 I54, C12 §3n).
+ *
+ * **One field for three forms rather than three shapes.** `flame`, `icicle` and
+ * `treemap` cannot be built from `series` plus `categories` — a call stack is
+ * depth and offset, a treemap is area and nesting — and what they disagree about
+ * is layout while what they share is the tree.
+ *
+ * `value` is the node's **own** magnitude where it has no children and its
+ * subtree's where it does; a renderer takes the larger of the two, so a parent
+ * whose stated value is less than its children's sum does not draw its children
+ * outside itself.
+ *
+ * **A magnitude you want a *structural* reading to show goes in the name.**
+ * `HIERARCHY_ROLE` says which forms read `value` at all, and a form whose
+ * subject is structure rather than area places by shape alone — so
+ * `label: "gc (2.1s)"` is what to write, which costs nothing and works today.
+ * The ruling on its own would leave *a field that does nothing* reading as one
+ * not yet implemented (C12 §3ah).
+ *
+ * **The shape is checked at both gates rather than by the type** (I64, F221).
+ * `validate.ts` did not contain the word `hierarchy`: a node that was the number
+ * `42`, a `children` that was the string `"nope"`, a node with no `label`
+ * writing those nine letters into a frame as a tile's name — all accepted. A
+ * document does not typecheck, and a gate written member by member has nothing
+ * to hang a clause on when the field is a recursive shape.
+ */
+export type HierarchyNode = Readonly<{
+  label: string;
+  value?: number;
+  children?: readonly HierarchyNode[];
+}>;
+
+/**
+ * A node in a `graph` (C04 I69, §3e).
+ *
+ * **`id` is separate from `label` and in `HierarchyNode` it is not.** A tree
+ * node's identity is its position, so its label may repeat freely; an edge names
+ * its endpoints, so a graph needs a name that does not. Two nodes labelled
+ * `retry` is ordinary data, and `from: "retry"` would be a document that means
+ * two things.
+ */
+export type GraphNode = Readonly<{ id: string; label?: string }>;
+
+/** A directed edge. Both endpoints must name a declared node (C04 I69). */
+export type GraphEdge = Readonly<{ from: string; to: string }>;
+
+/**
+ * The shape a `hierarchy` cannot express (C04 I69, §3e).
+ *
+ * `HierarchyNode` is label-and-children, so a node reachable from two places has
+ * to be written twice — and two writings are two nodes, with two sets of
+ * children and nothing telling a reader or a renderer they are one thing. A call
+ * graph, a dependency graph and a state machine are all that shape.
+ */
+export type Graph = Readonly<{ nodes: readonly GraphNode[]; edges: readonly GraphEdge[] }>;
 
 export type Progress = Readonly<{
   kind: "progress";
@@ -488,7 +1847,7 @@ export type Progress = Readonly<{
    * because a bar is decoration over a number that is already correct.
    */
   style?: string;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Code = Readonly<{
   kind: "code";
@@ -496,7 +1855,7 @@ export type Code = Readonly<{
   language: string;
   text: string;
   wrap?: boolean;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Comparison = Readonly<{
   kind: "comparison";
@@ -533,7 +1892,7 @@ export type Comparison = Readonly<{
     /** The judgement axis, and the only half that takes a colour. */
     verdict?: "better" | "worse";
   }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Hunk = Readonly<{
   header: string;
@@ -591,7 +1950,7 @@ export type Patch = Readonly<{
    * it exists so a *window* can say what its parent measured.
    */
   numberWidth?: number;
-}> & Gap;
+}> & Gap & Floor;
 
 export type Pills = Readonly<{
   kind: "pills";
@@ -602,14 +1961,14 @@ export type Pills = Readonly<{
     action?: Action;
     active?: boolean;
   }>[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
   text: string;
   actions?: readonly Action[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Panel = Readonly<{
   kind: "panel";
@@ -643,7 +2002,7 @@ export type Panel = Readonly<{
    */
   live?: boolean;
   children: readonly Block[];
-}> & Gap;
+}> & Gap & Floor;
 
 export type Group = Readonly<{
   kind: "group";
@@ -681,7 +2040,7 @@ export type Group = Readonly<{
    * Ignored on a `column` group, on `flex`'s precedent and for its reason.
    */
   align?: readonly Valign[];
-}> & Gap;
+}> & Gap & Floor;
 
 /**
  * One child's share of a `row` group's width (I44).
@@ -734,7 +2093,7 @@ export type Share = number | Readonly<{ cells: number }>;
 export type Valign = "top" | "middle" | "bottom";
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
-export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
+export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap & Floor;
 
 /**
  * A bounded region: a box of declared height holding children (C04 §3c, I47).
@@ -768,7 +2127,231 @@ export type Scroll = Readonly<{
    * live here rather than in the renderer (§3c cell 5).
    */
   children: readonly Block[];
-}> & Gap;
+}> & Gap & Floor;
+
+/**
+ * A block that declares a height in cells and draws pixels into them (C04 §3g, I73).
+ *
+ * **Not a floating overlay and not a separate surface**: a block, in the
+ * transcript, that measures, scrolls, degrades and caches like every other kind.
+ * The precondition was measured before this was designed (F247, F248) —
+ * `cells(placeholder)` is 1, the row and column diacritics add nothing, Ink lays
+ * out exactly what `cells()` measures, and Ink re-emits the whole frame when one
+ * row changes.
+ */
+export type Image = Readonly<{
+  kind: "image";
+  id: string;
+  /**
+   * PNG bytes, base64.
+   *
+   * **`b.image({ path })` reads into this at construction.** `node:fs` appears
+   * nowhere in `src/presentation/`, and a renderer that opened a file would make
+   * `measure` and `render` disagree the moment it changed between them.
+   */
+  data: string;
+  /** Rows, declared. A positive integer — `Scroll.height`'s precedent (I47). */
+  height: number;
+  /**
+   * Required, and it is what a reader without pixels gets.
+   *
+   * Not a courtesy: at `imageProtocol: "none"` with no dither this is the whole
+   * of what arrives.
+   */
+  alt: string;
+  /**
+   * The identity, derived once at construction — **never the data** (§3g.2).
+   *
+   * A megabyte of base64 in a cache key costs more than it saves, and it asks the
+   * wrong question: two blocks holding the same pixels should hit, and the same
+   * block re-encoded should not miss.
+   */
+  digest: string;
+  /**
+   * A scalar field over the image's own cell rectangle — an attention map, a
+   * saliency mask, a class-activation map (C04 §3h.2, I74).
+   *
+   * **Its rendering differs by arm, which is what makes it a mechanism rather
+   * than an arrangement** — the only thing in this phase that does. At the
+   * dither this framework owns the glyph and the colour, so the braille cell
+   * carries the picture and the foreground carries the overlay, with C10's
+   * colormap and its floor applying unchanged. At `kitty` the cell's rendering
+   * is the terminal's — the two diacritics are spent on position and the 24-bit
+   * foreground on the image id — so the overlay is **composited into the pixels
+   * before transmission** and nothing this framework draws there is visible.
+   *
+   * **The composited arm gives up the palette and the degradation, at `kitty`
+   * specifically.** That is not a loss, because there is nothing below `kitty`
+   * for it to degrade *to*: the dither is a different rendering rather than a
+   * lower rung of the same one.
+   */
+  overlay?: ImageOverlay;
+}> & Gap & Floor;
+
+/**
+ * The overlay's data: a matrix at **its own** resolution, resampled to whatever
+ * rectangle the image occupies (C04 I74).
+ *
+ * **Its own resolution and never the cell grid's**, because the cell rectangle
+ * is `imageCells(block, width)` — a function of the render width, which a block
+ * cannot know at construction. A 7x7 attention map is a 7x7 attention map at
+ * every width, and the resample is the renderer's.
+ */
+export type ImageOverlay = Readonly<{
+  /**
+   * Row-major, rectangular, at least 1x1. Finite numbers.
+   *
+   * **Row-major and in the image's orientation** — `values[0][0]` is the
+   * top-left of the picture, which is the only reading that makes a mask line
+   * up with what it masks.
+   */
+  values: readonly (readonly number[])[];
+  /** A `ColormapName`. Absent takes the default, which is stated in one place. */
+  colormap?: string;
+  /**
+   * Pin the value range, independently and optionally — **the plot family's
+   * members, because it is the plot family's mechanism** (C04 I29, I74).
+   *
+   * Absent, the field normalises over its own extent, which is matplotlib's
+   * `imshow` default and the right one for a single overlay. **It is the wrong
+   * one for a set**: three panels each normalised to their own range draw three
+   * different scales that look like one, and a residual is exactly the case
+   * where the third range is not the other two's (§3h.3, F253).
+   *
+   * **Named `yMin`/`yMax` rather than `min`/`max` because C12 already ruled the
+   * equivalence.** `heatmap.ts` says it outright — *on a field those two pin the
+   * **value** range, the levels and the colour scale* — so a field form spends
+   * them on the reading rather than on the ordinate, and an overlay is a field
+   * form that happens to sit over a picture. `seriesRange` carries the argument
+   * this section rediscovered by measuring: *a pinned axis exists so two plots
+   * can be compared, and a range that grew to fit an outlier would defeat the
+   * only reason to pin one.*
+   *
+   * **Independently optional, and that was the family's ruling rather than
+   * this one's.** A first draft made them both-or-neither on the grounds that
+   * half a scale still moves between panels — true, and it forbids `yMin: 0`
+   * alone, which is a real single-panel use: *zero means zero* rather than *the
+   * least value observed means zero*, exactly as a loss curve pins its floor.
+   */
+  yMin?: number;
+  yMax?: number;
+  /**
+   * How much of the composite is the overlay, at `kitty` only. `0..1`.
+   *
+   * **A field one arm reads and the other cannot**, which is stated rather than
+   * hidden: at the dither the picture survives in the glyph and the overlay in
+   * the colour, so there is nothing to blend and no number that would mean
+   * anything. matplotlib's two-`imshow` idiom is the reference and 0.5 its
+   * conventional value.
+   */
+  alpha?: number;
+}>;
+
+/**
+ * A declared grid of cells, holding a figure nested rows and columns cannot draw
+ * (C04 §3f, I71, I72).
+ *
+ * **The case for a second container is a measurement.** Every nesting of `Group`
+ * produces a *slicing* floorplan — one decomposable by guillotine cuts — and the
+ * pinwheel, four cells rotating around a centre, admits no cut at all, while a
+ * five-rectangle floorplan that *is* slicing cuts at its first interior edge.
+ * Same count, same tiling, opposite answer, so the difference is the figure and
+ * not the size (FINDINGS F244).
+ *
+ * **Reach for one where the arrangement is the point** — a dashboard, a status
+ * wall, a figure with a centre. Where nested rows and columns can say it, they
+ * are cheaper and they compose with `Valign`, which this does not have.
+ */
+export type Mosaic = Readonly<{
+  kind: "mosaic";
+  id: string;
+  /**
+   * Interior rows. A positive integer, and **required** (I71).
+   *
+   * **Measured rather than argued.** A container whose children are all
+   * absolutely positioned computes a content height of zero, because such a
+   * child contributes nothing to its parent's content size — so a mosaic with no
+   * declared height draws **one blank row** and reports it. `Scroll.height`'s
+   * precedent with a sharper reason: a scroll without one is unbounded, and a
+   * mosaic without one is empty.
+   */
+  height: number;
+  /**
+   * The grid, as a string: rows separated by `/`, one character per column.
+   *
+   * `"AAB/DEB/DCC"` is the pinwheel. `.` is a hole — drawn as blanks, named by
+   * no child, and exempt from the rectangle rule, because a blank corner is
+   * ordinary and requiring it to be a rectangle would forbid it.
+   *
+   * Four refusals at both gates, each naming the part at fault: an empty grid,
+   * ragged rows, a region that is not a solid rectangle, and a region count
+   * differing from `children.length` (§3f.1).
+   */
+  areas: string;
+  /**
+   * One per named region, in **reading order** — left to right, then top to
+   * bottom, by where each region first appears.
+   *
+   * **`children` and not `cells`, and that is a mechanism rather than a
+   * convention.** `childBlocksOf` in `validate.ts` walks a block's children by
+   * reading `b["children"]` structurally, so a kind naming them anything else is
+   * skipped in silence and takes id-uniqueness (I14) and every nested refusal
+   * with it.
+   */
+  children: readonly Block[];
+  /**
+   * How the grid's columns divide the width, and its rows the height (I72).
+   *
+   * One entry per grid **line** rather than per child: a region spanning two
+   * columns takes the sum of both their shares, because a spanning region has no
+   * single column to be weighted by. Absent is an equal split; a length that
+   * does not match the grid is refused, on `flex`'s precedent.
+   *
+   * **`rows` is the half `Group` does not have.** A column group's height is
+   * whatever its children measure, so there is no budget to divide; a mosaic
+   * declares one, and the same arithmetic runs against a different total.
+   */
+  columns?: readonly Share[];
+  rows?: readonly Share[];
+}> & Gap & Floor;
+
+/**
+ * The block a layer above knows about and the definition does not (C04 I66, C09 I31).
+ *
+ * **Three states, one kind, because only one of them is knowable where the box
+ * is drawn.** L1 catches a throw and knows `error`; *never fetched* and *backing
+ * off* are the builder's and the refresh driver's facts, two layers up, and a
+ * registry that could see them would be reading upward. So the state travels in
+ * the block and one definition draws all three.
+ */
+export type Status = Readonly<{
+  kind: "status";
+  id: string;
+  state: "error" | "loading" | "retrying";
+  message: string;
+  /**
+   * The rows the box occupies — required, on `plot`'s argument (C09 I31).
+   *
+   * A box the framework sized by guess is silently wrong and nobody notices it
+   * is wrong. On the error path the registry supplies the number `measure` has
+   * already committed, which is what makes the pair self-consistent by
+   * construction rather than by agreement.
+   */
+  height: number;
+  /**
+   * Supplied by whoever holds the clock, never derived from `ctx.tick` (C04 I66).
+   *
+   * C03 coalesces and drops commits under load, so tick is not in a fixed ratio
+   * with wall-clock and cannot carry a duration; this layer may not read a clock
+   * at all. `retryInMs` already arrives this way through `LiveSpec.renderError`
+   * and the other two follow it rather than opening a second route.
+   */
+  retryInMs?: number;
+  attempt?: number;
+  elapsedMs?: number;
+  /** A `SPINNER_SETS` name. Unknown resolves to the default rather than throwing. */
+  spinner?: string;
+}> & Gap & Floor;
 
 export type Block =
   | Rule
@@ -788,6 +2371,9 @@ export type Block =
   | Panel
   | Group
   | Scroll
+  | Mosaic
+  | Image
+  | Status
   | Raw;
 
 export type BlockKind = Block["kind"];
@@ -816,7 +2402,24 @@ export type ViewPatch =
    * — "trust me" in two components, with the far side's adapter on one boundary.
    * A named op cannot be forged. The same argument as glyphs becoming tokens.
    */
-  | Readonly<{ op: "expand"; blockId: string; rowId: string; expanded: boolean }>;
+  | Readonly<{ op: "expand"; blockId: string; rowId: string; expanded: boolean }>
+  /**
+   * The second view-state arm, and the reason it is an op (§3d, §4, I67).
+   *
+   * **A floor on the block's rows, because a height can be discovered too late
+   * to use.** `measure` commits before anything is drawn; a renderer that gives
+   * way is found after the number is fixed. This is how the layer that found out
+   * says so, and the *next* frame is where it lands — nothing re-enters the
+   * layout, so every frame stays one pass.
+   *
+   * On `expand`'s side of C13's gate for `expand`'s reason: the entries worth
+   * reserving on are the settled ones. And a named op rather than a field the far
+   * side could set, because nothing out there knows a renderer threw.
+   *
+   * `rows` is a floor and never a height — a block already taller keeps its own
+   * measurement.
+   */
+  | Readonly<{ op: "reserve"; blockId: string; rows: number }>;
 
 /**
  * Fallible in the type (I15). `applyPatch` runs on every stream tick in the

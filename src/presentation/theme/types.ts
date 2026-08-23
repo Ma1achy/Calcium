@@ -68,6 +68,38 @@ export type Surfaces = Readonly<{
    * `SELECTION_SLOTS`, and the same argument for its narrowness.
    */
   selection: string;
+  /**
+   * **The error tag's ground and its matched ink — one pair, checked together**
+   * (C10 §4d, I21, I32 · C09 §3a).
+   *
+   * The only painted run in a `status` box: the word `ERROR` and its two spaces,
+   * sitting in a gap in the rule. Everything else in that figure — the rule, the
+   * mark, the message, the border, the blanks — is unpainted and carries the
+   * error tone.
+   *
+   * **Two members rather than a ground beside the existing foreground**, and
+   * I21's own sentence is why: *a tone painted as a background is a tone nothing
+   * measured a floor for.* The inverse holds too — a ground with no ink of its
+   * own borrows one nobody measured against it, which is how a contrast floor
+   * gets missed. So they arrive together and `errorTagPairs` checks them
+   * together, at the meaning floor, because a tag that says *this failed*
+   * carries meaning rather than decoration.
+   *
+   * **The ground *is* `tone.error`**, asserted by equality per theme (T2.14e), so
+   * the tag and the message under it are one red by construction rather than by
+   * two literals being kept in step by hand. That is what made the slot a pair
+   * and what lowered its floor to 2.5; the trade, the cube sweep behind it and
+   * the alternative it declined are C10 §4d's, not repeated here.
+   *
+   * **The ink is not always white, and high contrast is the case that shows
+   * why.** Dark takes `#ffffff` on `#c62828` at **5.62 : 1** and light
+   * `#ffffff` on `#a81f12` at **7.32**; high contrast inverts — `#3d0000` on
+   * `#ff7171` at **6.55** — because its error tone is a *light* red and white on
+   * it would be 2.67. A pair per theme is what lets that be a choice rather than
+   * a failure.
+   */
+  errorGround: string;
+  errorInk: string;
 }>;
 
 export type ThemeTokens = Readonly<{
@@ -84,7 +116,9 @@ export type ThemeTokens = Readonly<{
    * Kept rather than derived because a token cannot express **intent** for a
    * mid-luminance theme, and a user asking for the dark one is asking about
    * intent. Published through `ResolvedTheme` so an app can choose an asset by
-   * it — *no reader here* is not *no reader*.
+   * it — *no reader here* is not *no reader*, and C22 I68 is the reader that
+   * arrived: the opening theme is chosen by matching this field against the
+   * terminal's own background.
    */
   variant: "dark" | "light";
   /**
@@ -115,9 +149,13 @@ export type ThemeTokens = Readonly<{
  * put it — and I25 took that job when a theme began declaring the background it
  * assumes.
  *
- * **Nothing reads `variant` as polarity**: its readers are all in `store.ts`,
- * each a key into this record or part of the memo identity. That measurement is
- * what the name-keying rests on, rather than the argument for it (§5a.1).
+ * **`variant` was read only inside `store.ts`** when the keys were freed —
+ * each read a key into this record or part of the memo identity — and that
+ * measurement is what the name-keying rests on rather than the argument for it
+ * (§5a.1). **It has since expired as the doc comment below predicted it would**:
+ * `shell/construct.ts` searches this record by `variant` to open the theme that
+ * matches the terminal's detected polarity (C22 I68), which is one consumer and
+ * is the use the field is published for.
  *
  * A `{ dark, light }` literal still satisfies this, which is what makes the
  * widening free for every app that already supplies one.

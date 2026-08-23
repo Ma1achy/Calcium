@@ -211,9 +211,18 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // rule `glyphs()` follows: a block names a style and the terminal decides
     // which arm of it is drawn, so one document is correct on both terminals.
     const bar = barStyle(ctx.capabilities, block.style);
-    const total = block.total > 0 ? block.total : 1;
-    const ratio = Math.min(1, Math.max(0, block.current / total));
-    const percent = `${Math.round(ratio * 100)}%`;
+    // **The bar clamps and the number does not** (I28). `100/100` and `150/100`
+    // drawing identically is the same defect `examples/docker`'s CPU bar was
+    // built around — a bar that stops at its ceiling draws a busy thing exactly
+    // like a saturated one — and a progress bar reporting `100%` on an overshoot
+    // says *complete* about something that is not.
+    //
+    // A `total` of zero has no proportion at all: an empty bar and `0%`, which
+    // is a floor rather than a measurement.
+    const total = block.total > 0 ? block.total : 0;
+    const fraction = total === 0 ? 0 : Math.max(0, block.current / total);
+    const fill = Math.min(1, fraction);
+    const percent = `${Math.round(fraction * 100)}%`;
 
     const labelRoom = Math.max(0, Math.floor(width / 3));
     const labelColumn = pad(
@@ -225,7 +234,7 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // width rather than one row at most widths. It can reach zero, and a bar of
     // no cells is still a row: the label and the percentage carry the meaning.
     const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - 2);
-    const filled = Math.round(ratio * barWidth);
+    const filled = Math.round(fill * barWidth);
 
     return rows([
       paint(

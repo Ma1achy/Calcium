@@ -18,6 +18,7 @@ const FIELDS: readonly (keyof TerminalCapabilities)[] = [
   "colourDepth",
   "unicode",
   "ambiguousWidth",
+  "backgroundPolarity",
   "synchronisedUpdate",
   "bracketedPaste",
   "mouse",
@@ -39,10 +40,12 @@ const FIXTURES: readonly NodeJS.ProcessEnv[] = [
   { TERM: "xterm", TMUX: "/tmp/x" },
   { LANG: "en_GB.UTF-8", TERM: "xterm" },
   { LC_ALL: "C", LANG: "en_GB.UTF-8", TERM: "xterm" },
+  { TERM: "xterm", COLORFGBG: "15;0" },
+  { TERM: "xterm", COLORFGBG: "0;default;15" },
 ];
 
 describe("C02 contract", () => {
-  it("T2.1 (I1): exactly the eight documented keys, all present, for every fixture", () => {
+  it("T2.1 (I1): exactly the nine documented keys, all present, for every fixture", () => {
     for (const env of FIXTURES) {
       const { capabilities } = detectCapabilities(env);
       expect(Object.keys(capabilities).sort(), JSON.stringify(env)).toEqual([...FIELDS].sort());
@@ -153,6 +156,36 @@ describe("C02 contract", () => {
       expect(DEGRADATION[field].owner, `${field} owner`).toMatch(/^(C\d\d|L4)( (C\d\d|L4))*$/);
       expect(DEGRADATION[field].behaviour.length, `${field} behaviour`).toBeGreaterThan(0);
     }
+  });
+
+  it("T2.8 (I1, I6): §2's interface block and the record are a bijection too", () => {
+    // **F214.** T2.6 parses §4 and has been green throughout; §2 — the interface
+    // block, the first thing anyone reads — declared seven fields against a
+    // record of eight. `ambiguousWidth` shipped with a §3 subsection, a §4 row,
+    // an invariant, a commitment and ten test rows and never reached it.
+    //
+    // Kept separate from T2.6 rather than folded in: the two tables fail
+    // separately, T6.4 already cites T2.6 for §4's half, and the message should
+    // name which document is behind.
+    const spec = readFileSync("docs/components/C02_capability_detection.md", "utf8");
+    const section = spec.split("## 2. Public interface")[1]?.split("\n## ")[0];
+    expect(section, "§2 not found in the spec").toBeDefined();
+
+    const block = /type TerminalCapabilities = Readonly<\{\n([\s\S]*?)\n\}>;/u.exec(section!);
+    expect(block, "§2's TerminalCapabilities block not found").not.toBeNull();
+
+    const declared = [...block![1]!.matchAll(/^\s*([A-Za-z]\w*)\s*:/gmu)].map((m) => m[1]!);
+    // Parsed something, and each name once: a regex that matched nothing would
+    // make the comparison below vacuous in the direction that matters.
+    expect(declared.length, "§2 fields parsed").toBeGreaterThan(0);
+    expect(new Set(declared).size).toBe(declared.length);
+
+    const { capabilities } = detectCapabilities({ TERM: "xterm" });
+    expect([...declared].sort()).toEqual(Object.keys(capabilities).sort());
+    // And in document order, because §2 is read rather than looked up — a field
+    // appended to the block while the record grew in the middle is a diff that
+    // reads as agreement.
+    expect(declared).toEqual(Object.keys(capabilities));
   });
 
   it("T2.7 (I8): no warning is emitted — every warning is returned", () => {

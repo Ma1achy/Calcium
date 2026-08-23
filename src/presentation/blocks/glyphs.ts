@@ -35,12 +35,127 @@ export type GlyphSet = Readonly<{
   // Box drawing — panel borders, rules.
   horizontal: string;
   vertical: string;
+  /**
+   * A **broken** vertical rule — a reference line drawn beside data (C12 §3k).
+   *
+   * Its own slot rather than `vertical`, because a solid rule through a figure
+   * reads as part of it: a forest plot's null line crossing five intervals looks
+   * like a sixth interval unless it is visibly not one. ASCII takes `:`, which
+   * is the same statement with the alphabet it has.
+   */
+  dashedVertical: string;
+  /** Its transpose — a broken horizontal rule, for a gridline at a labelled row. */
+  dashedHorizontal: string;
   topLeft: string;
   topRight: string;
   bottomLeft: string;
   bottomRight: string;
+  /**
+   * The box plot band, and the four marks it needs that nothing else did.
+   *
+   * `teeDown`/`teeUp` carry a median where it meets the box's top and bottom
+   * edges; `stubDown`/`stubUp` are a whisker's end cap on a row with no
+   * horizontal run to join. ASCII collapses all four, which is what makes the
+   * figure survive C09 I22 rather than depending on it.
+   *
+   * **`stubLeft`/`stubRight` are the same pair rotated**, and they arrived with
+   * the vertical box plot (C12 I30): a whisker running *up* ends in a cap that is
+   * a horizontal stub, and the vertical pair cannot spell it. Two slots rather
+   * than reusing `horizontal`, because a bare `─` at a whisker's end is
+   * indistinguishable from a run that continues.
+   */
+  teeDown: string;
+  teeUp: string;
+  stubDown: string;
+  stubUp: string;
+  stubLeft: string;
+  stubRight: string;
+  /** A second centre that must never share the median's glyph (C04 I53). */
+  /**
+   * A candlestick's body and its crossing (C12 §3r, C12 I36).
+   *
+   * **Three slots and not five**: the wick is `vertical` and the doji is
+   * `horizontal`, which are the same statements those slots already make.
+   *
+   * **Hollow is rising and filled is falling at every depth**, rather than a
+   * pair reserved for the monochrome rung. I25's sweep is indexed by
+   * `PlotForm` and a candlestick is a *style* on `line`, so the one rule that
+   * would catch a tone-only distinction renders a document without any
+   * candles in it — and the catalogue's `.plain` frames, which are what the
+   * scheduled frame-read looks at, strip colour. Colour reinforces the mark
+   * here; it never carries it alone.
+   *
+   * `candleCross` is the cell where a body shorter than one cell meets the
+   * wick running past it on both sides. Without it the body wins the overlap
+   * and the wick disappears at exactly the bar the reader is looking at
+   * (§6b B13).
+   */
+  /**
+   * Where a cursor points, on the rule below the plot area (C12 §3s, C12 I37).
+   *
+   * **Its own slot beside `dashedVertical` because the two do different jobs.**
+   * The dashed line runs behind the data and disappears under it, which is
+   * right for a reference line and wrong for the one mark that has to survive a
+   * dense column. This one sits on the rule, where nothing else is drawn.
+   *
+   * It shares a code point with `warning` and never shares a figure: one is a
+   * notice's tone mark and one is a plot's axis. Named separately so a theme or
+   * a substitution can move either without moving the other.
+   */
+  cursorMark: string;
+  candleHollow: string;
+  candleFilled: string;
+  candleCross: string;
+  /**
+   * Where a crossing axis's two halves meet (C12 §3ad).
+   *
+   * **Its own slot rather than `candleCross`**, which is `┿` — a heavy stem
+   * through a light rule, drawn for a body shorter than one cell (C12 I36).
+   * This is two light rules meeting, and borrowing the candle's mark would put
+   * a body's weight on an axis.
+   *
+   * **The arms are `dashedVertical` and `dashedHorizontal`, and only the
+   * junction is solid.** A crossing axis shares rows with the data, and drawn
+   * solid its horizontal half and the curve are the same glyph — so the zero
+   * row reads as one continuous line and where the series crosses zero, the one
+   * thing the axis is drawn to show, is unreadable. §3k's sentence about a
+   * solid rule through a figure turns out to cover this too (C12 §3ad.4).
+   */
+  crossing: string;
+  /**
+   * A run drawn **heavier than the line beside it** (C12 I46, §3i).
+   *
+   * A compact box plot is one row: its interquartile range is a filled run
+   * because a blank interior between two tees says nothing about where the box
+   * is. Filled is not the only thing a run can be that a whisker is not — a
+   * heavier stroke says *box* against `─` while staying a line, which is what a
+   * reader after the summary's shape rather than its weight wants.
+   *
+   * ASCII has one width of rule, so both collapse to a glyph that is at least
+   * *different* from `-` and `|`.
+   */
+  heavyHorizontal: string;
+  heavyVertical: string;
+  diamond: string;
+  /** Mean and median in one cell, so *they coincide* never reads as *it is missing* (C12 I33). */
+  diamondTee: string;
   teeLeft: string;
   teeRight: string;
+  /**
+   * The tick a **callout** hangs on, against `teeLeft`'s ordinary one (C12 I48).
+   *
+   * **A mark and not a weight, because weight is spoken for.** A callout is
+   * drawn in its series' colour and bold above the colour floor; at
+   * `colourDepth: 1` a series slot resolves through `MONO`, where `emphasised`
+   * *is* `{ bold: true }` — so a bold callout in an already-bold slot is
+   * typographically identical to the series it names. C12 I25's rule is that
+   * two things a reader must tell apart differ by mark, and this is the mark.
+   *
+   * ASCII has no heavy tee, so it takes a glyph that is at least *different*
+   * from the `+` every box-drawing junction collapses to.
+   */
+  calloutTee: string;
+
 
   // Status — steps, notices, cells.
   tick: string;
@@ -74,12 +189,30 @@ const UNICODE: GlyphSet = Object.freeze({
   residue: "\u22ef",
   horizontal: "─",
   vertical: "│",
+  dashedVertical: "┊",
+  dashedHorizontal: "┄",
   topLeft: "┌",
   topRight: "┐",
   bottomLeft: "└",
   bottomRight: "┘",
+  teeDown: "┬",
+  teeUp: "┴",
+  stubDown: "╷",
+  stubUp: "╵",
+  stubLeft: "╴",
+  stubRight: "╶",
+  cursorMark: "▲",
+  candleHollow: "▯",
+  candleFilled: "┃",
+  candleCross: "┿",
+  crossing: "┼",
+  heavyHorizontal: "━",
+  heavyVertical: "┃",
+  diamond: "◆",
+  diamondTee: "◈",
   teeLeft: "├",
   teeRight: "┤",
+  calloutTee: "┣",
 
   tick: "✓",
   cross: "✗",
@@ -99,12 +232,30 @@ const ASCII: GlyphSet = Object.freeze({
   residue: "~",
   horizontal: "-",
   vertical: "|",
+  dashedVertical: ":",
+  dashedHorizontal: "-",
   topLeft: "+",
   topRight: "+",
   bottomLeft: "+",
   bottomRight: "+",
+  teeDown: "+",
+  teeUp: "+",
+  stubDown: "|",
+  stubUp: "|",
+  stubLeft: "-",
+  stubRight: "-",
+  cursorMark: "^",
+  candleHollow: "=",
+  candleFilled: "#",
+  heavyHorizontal: "=",
+  heavyVertical: "H",
+  candleCross: "+",
+  crossing: "+",
+  diamond: "x",
+  diamondTee: "X",
   teeLeft: "+",
   teeRight: "+",
+  calloutTee: "#",
 
   tick: "+",
   cross: "x",

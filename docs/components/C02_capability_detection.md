@@ -28,6 +28,8 @@ C02 answers one question once, at startup: what can this terminal actually do? E
 type TerminalCapabilities = Readonly<{
   colourDepth:        1 | 4 | 8 | 24;
   unicode:            "full" | "bmp" | "ascii";
+  ambiguousWidth:     "narrow" | "wide";
+  backgroundPolarity: "dark" | "light" | "unknown";
   synchronisedUpdate: boolean;
   bracketedPaste:     boolean;
   mouse:              boolean;
@@ -64,11 +66,12 @@ Environment-based. **C02 never queries the terminal and never awaits a reply.** 
 | `bracketedPaste` | `TERM` present and ≠ `dumb` |
 | `mouse` | `TERM` present and ≠ `dumb`, **and** `TMUX` unset. Disabled inside tmux by default — sequence passthrough is unreliable and keyboard parity means nothing is lost (D34) |
 | `imageProtocol` | `TERM_PROGRAM` = iTerm.app → `iterm2`; `TERM` = `xterm-kitty` → `kitty`; otherwise `none`. Detected in v1, unused until Phase 1B |
+| `backgroundPolarity` | `COLORFGBG`'s **last** `;`-separated field: 0–6 or 8 → `dark`; 7 or 9–15 → `light`; absent, non-numeric or outside 0–15 → `unknown`. Not gated by `dumb` — the rule is derived from `COLORFGBG` and not from `TERM` |
 | `altScreen` | `TERM` present and ≠ `dumb` |
 
-**Which rules the `dumb` gate applies to.** `TERM = dumb` gates every rule derived from `TERM` — `colourDepth`, `bracketedPaste`, `mouse`, `altScreen`. It does **not** gate rules derived from `TERM_PROGRAM` — `synchronisedUpdate` and `imageProtocol` — because those describe the emulator, and `TERM=dumb` is a statement about terminfo. The case that makes this matter is an override of `altScreen: true` under `TERM=dumb` (T1.9): the user has said detection is wrong about their terminal, and iTerm2 supports synchronised update whatever `TERM` claims. Gating it would give them an alt screen that tears.
+**Which rules the `dumb` gate applies to.** `TERM = dumb` gates every rule derived from `TERM` — `colourDepth`, `bracketedPaste`, `mouse`, `altScreen`. It does **not** gate rules derived from `TERM_PROGRAM` — `synchronisedUpdate` and `imageProtocol` — or from `COLORFGBG` — `backgroundPolarity` — because those describe the emulator, and `TERM=dumb` is a statement about terminfo. The case that makes this matter is an override of `altScreen: true` under `TERM=dumb` (T1.9): the user has said detection is wrong about their terminal, and iTerm2 supports synchronised update whatever `TERM` claims. Gating it would give them an alt screen that tears.
 
-`unicode` is derived from the locale and is gated by neither.
+`unicode` and `ambiguousWidth` are derived from the locale and are gated by neither.
 
 **Absent `TERM` is treated as `dumb` throughout**, which is why three rows test presence rather than inequality alone. A record that has already concluded the shell cannot open has no business claiming bracketed paste. Absent `TERM` means nothing is known about the terminal, and the safe reading of nothing-known is nothing-supported. It is also what makes T3.1's "a complete record at minimum values" true as written rather than aspirational.
 
@@ -106,6 +109,40 @@ not an omission**, and it is asserted rather than described.
 
 ---
 
+### The background's polarity is read from `COLORFGBG`, and it stops at index 15
+
+**One variable, and it is the only one that carries the fact.** `COLORFGBG` is `fg;bg` — written
+by rxvt and urxvt, Konsole and mintty — and the background is **the field after the last `;`**,
+because rxvt writes a three-field `fg;default;bg` when one colour is left at the terminal's own.
+Taking the last field is right for both shapes; taking the second is right for one of them.
+
+**0–6 and 8 are dark, 7 and 9–15 are light.** The ANSI sixteen split there: 0–6 are the dark half
+of the base eight, 7 is light grey, 8 is bright black, and 9–15 are the bright half.
+
+**Anything else is `unknown`, and the boundary is a layer rule rather than a judgement.** A
+terminal may write a 256-colour index — `COLORFGBG=15;235` is a real value — and 16–255 *is*
+knowable: the cube and the greyscale ramp have defined luminances, and C10 holds them and
+validates its floors against them. C10 is L1 and this is L0-terminal, so reaching for them is an
+import upward, and writing a second cube here is a second source of truth for that table. Neither
+is worth a polarity, so the range where the answer is certain is the range that is answered.
+
+**`unknown` is a third value and not a default.** *No `COLORFGBG`* and *a `COLORFGBG` that says
+white* are different facts, and a two-valued field has to pick one of them to mean both. C22 is the
+consumer and it acts on a detected polarity and must not act on an absent one (→ C22 I68), so the
+distinction is the field's job rather than the reader's.
+
+**Nothing is warned about when it says nothing.** C02 returns warnings for rejected *overrides*
+(I8) and for nothing else — an absent `TERM_PROGRAM` does not warn either. A detection rule that
+finds nothing has found nothing, and a notice about it would be the framework reporting on the
+reader's terminal configuration.
+
+**Inert at `TERM=dumb` rather than gated.** The gate boundary above is the reason it is not gated;
+that it changes nothing there is a separate fact and worth stating so the untested combination is
+not mistaken for an untaken one — at depth 1 nothing is coloured, and the two themes a polarity
+chooses between resolve to the same typographic styles (C10 I26).
+
+---
+
 ## 4. Degradation
 
 Every capability has a defined fallback, and each is exercised by a test rather than merely written down.
@@ -125,6 +162,7 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Mouse | `mouse` | Every mouse affordance has a keyboard equivalent, so nothing is lost — only convenience | C11 C15 |
 | Image protocol | `imageProtocol` | Nothing renders an image in v1, so its absence costs nothing; blocks that would carry one render their text form. Detected now so Phase 1B does not need a second detection pass | C09 |
 | Ambiguous width | `ambiguousWidth` | Every `East_Asian_Width=Ambiguous` glyph is measured and drawn as **narrow**, which is the Western convention and today's behaviour; where a locale says otherwise the wide arm is used and the ramps and fills that would double in width are replaced by narrow ones | C09 C12 |
+| Background polarity | `backgroundPolarity` | `unknown` keeps the app's own opening theme — the set's first key, or whatever the reader persisted. Nothing is painted differently and no notice is drawn: a terminal that does not say is a terminal the framework does not guess about | C22 |
 | Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 | L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
@@ -139,11 +177,13 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 - **I2** — Detection is synchronous and never performs I/O. No terminal query, no file read, no await.
 - **I3** — `detectCapabilities` is pure: same `env` and `overrides` produce a deeply equal record, always.
 - **I4** — A *valid* override wins over detection, unconditionally, including for `altScreen`. A value outside a field's domain is not an override — it is rejected, the detected value stands, and a warning is returned (T3.5).
-- **I5** — No component outside C02 reads `TERM`, `COLORTERM`, `TERM_PROGRAM`, `LANG`, `LC_ALL`, `LC_CTYPE` or `TMUX`. Lint-enforced.
+- **I5** — No component outside C02 reads `TERM`, `COLORTERM`, `TERM_PROGRAM`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TMUX` or `COLORFGBG`. Lint-enforced — and **the rule is key-agnostic where this list is not**: A03 SS10 matches `process.env` and allows one file, so a variable added here joins the scan by being read rather than by being listed. The list is what a reader checks the code against, which is the only thing that makes its length worth keeping right (F214's class, one document along).
 - **I6** — Every capability has a fallback owned by a named component (§4). A capability with no fallback cannot be added.
 - **I7** — `isUsable` depends on `altScreen` alone. No other capability can prevent the shell opening. **The predicate had no caller and the rule had two expressions** — C01 asks `!capabilities.altScreen` inline, which is the refusal that reaches the user, so A03 §9's MG25 allow-listed `isUsable` as *a rule expressed twice, the second unreachable*. C22's gate 3b is now that caller (→ C22 I61), which disposes of the duplicate by consuming it rather than by exempting it: C01's inline test stays, because C01 is a component with its own consumers and must refuse whoever hands it an unusable record.
 - **I8** — Warnings are returned, never emitted. C02 decides what is wrong, never when the user is told.
 - **I9** — **`ambiguousWidth` is detected from the locale, overridable, and constant for the session.** `ja`, `zh` or `ko` as the language subtag of the first *set* variable of `LC_ALL` · `LC_CTYPE` · `LANG` gives `wide`; everything else, including an unset environment, gives `narrow`. **A declared-only field would ship without fixing anything** for the users it exists for, which is why detection is part of the invariant rather than a convenience. **Nothing may change it after construction** — every measured height, every rendered block and C14's index are computed against it, so a mid-session change is a frame that disagrees with the store it was built from (→ C22 I63, T4.18d's argument).
+
+- **I10** — **`backgroundPolarity` is read from `COLORFGBG` alone, answers `unknown` wherever it is not certain, and chooses nothing.** The background is the field after the **last** `;`, which is right for `fg;bg` and for rxvt's `fg;default;bg` alike; 0–6 and 8 are `dark`, 7 and 9–15 are `light`, and everything else — absent, empty, non-numeric, or an index above 15 — is `unknown`. **The third value is the invariant's load-bearing half**: *nothing stated* and *stated light* are different facts, and a two-valued field makes them one, which is exactly the distinction its only consumer branches on. **C02 does not choose a theme**, on commitment 9's shape — a depth is reported and never interpreted, and a polarity is the same kind of fact: what it *means* for which theme opens is C22's, decided against a set C02 cannot see (→ C22 I68).
 
 ---
 
@@ -161,6 +201,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 10. `bmp` unicode and non-`none` image protocols are detected but unused in v1 (I1).
 11. Warnings about rejected overrides are returned to the caller, never printed (I8).
 12. **`ambiguousWidth` is detected from the locale, overridden by declaration, and constant for the session** — and `cells()` takes it as a parameter rather than reading it, because only L1 measures and L0's data half must not learn about terminals (I9). `cells()` is C09's and takes it as an argument.
+13. **`backgroundPolarity` is detected from `COLORFGBG`, is three-valued, and is never acted on here** — the certain range is 0–15 because the range beyond it is C10's table and C10 is a layer up, and *not stated* keeps its own value because the consumer branches on it (I10). What a polarity *means* for which theme opens is decided against a set C02 cannot see (→ C22 I68).
 
 ---
 
@@ -182,15 +223,17 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.
+- **T1.11** (I10): background polarity — `COLORFGBG=15;0` → `dark`; `0;15` → `light`; `0;default;15` → `light`, which is rxvt's three-field form and the row that decides *last field* against *second field*; `15;default` → `unknown`, because the background is the thing that is not a number; **`0;15x` and `0;15.5` → `unknown`**, which is the digit test rather than a parse and was **added by the mutation pass** — `parseInt` declines `default` and answers `15` for `15x`, so the two rules agree on every value a fixture happened to hold and the sentence naming the difference was in a comment with nothing asserting it; `COLORFGBG` absent → `unknown`; `15;235` → `unknown`, the 256-index case the rule declines rather than guesses at.
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I1): the record has exactly the seven documented keys, all present, for every fixture in T1.
+- **T2.1** (I1): the record has exactly the nine documented keys, all present, for every fixture in T1.
 - **T2.2** (I1): the record is frozen — mutation attempts do not change it.
 - **T2.3** (I3): called twice with the same input, results are deeply equal and not the same reference (no shared mutable state).
 - **T2.4** (I2): no async boundary — the function's return value is not a promise, and a fake timer advanced zero ticks still yields a complete record.
-- **T2.5** (I5): a source scan over `src/` finds no read of the seven environment variables outside `terminal/capabilities.ts`. This is A03 SS10, executed from the test suite against the same scan definition `make enforce` uses.
+- **T2.5** (I5): a source scan over `src/` finds no read of the environment outside `terminal/capabilities.ts` — of any variable, since SS10's subject is `process.env` and not a name list. This is A03 SS10, executed from the test suite against the same scan definition `make enforce` uses.
 - **T2.6** (I6): every capability field appears in the §4 degradation table with a named owner, and the table names no field the record does not have — a bijection over §4's `Field` column, parsed at test time, so both adding a field without a fallback and leaving a stale row behind fail the build. Each row's owner must match the implementation's table for the field it names.
+- **T2.8** (I1, I6): **§2's interface block and the record are a bijection too**, parsed at test time from the fenced TypeScript exactly as T2.6 parses §4's table. Separate from T2.6 because the two tables fail separately and one of them already had: `ambiguousWidth` shipped with a §3 subsection, a §4 row, an invariant and a commitment, and §2 declaring seven fields — T2.6 was green throughout, because the bijection it checks is the *other* table (F214). A field added to the record without being declared in §2 fails here.
 - **T2.7** (I8): no warning is emitted. Across every T1 fixture and the T3.5 bad-override case, neither `stdout` nor `stderr` is written to; the rejected override appears in the returned `warnings` instead.
 
 ### Tier 3 — edge cases
@@ -204,6 +247,9 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T3.7**: `TERM_PROGRAM` with unexpected casing (`iterm.app`) → matched case-insensitively.
 - **T3.8**: `LANG` present but `LC_ALL=C` → `ascii`. Precedence, not presence.
 - **T3.9**: `env` containing prototype-polluting keys (`__proto__`) → ignored safely.
+- **T3.11** (I10): `COLORFGBG` set to each of the sixteen indices as the background → exactly {0…6, 8} are `dark` and {7, 9…15} are `light`. The whole domain, because the split has two discontinuities and a sampled pair cannot tell a wrong boundary from a right one.
+- **T3.12** (I10): `TERM=dumb` with `COLORFGBG=0;15` → `light`, `altScreen` false. T3.10's assertion for the other ungated rule, and the same argument: the gate is about terminfo and this variable is not.
+- **T3.13** (I10): `COLORFGBG=""` → `unknown`, through `read`'s empty-string rule rather than through a second check — the same path T3.6 asserts for `TMUX`.
 - **T3.10**: `TERM=dumb` with `TERM_PROGRAM=iTerm.app` → `synchronisedUpdate` true, `imageProtocol` `iterm2`, `altScreen` false. Asserts the §3 gate boundary as intent rather than oversight: `TERM_PROGRAM` describes the emulator and survives a dumb terminfo, which is what makes an `altScreen: true` override usable.
 
 ### Tier 4 — integration
@@ -235,6 +281,9 @@ PTY harness with a controlled environment.
 - **T6.5** (I1): making any field optional → T2.1 fails.
 - **T6.6** (D29): rendering a status using colour with no glyph → T4.3's `colourDepth: 1` case loses the distinction and fails.
 - **T6.7** (I3): caching detection in module scope so a second call returns a shared reference → T2.3 fails.
+- **T6.8** (I10): taking `COLORFGBG`'s **second** field rather than its last → T1.11 fails on the rxvt row alone. Every other row in the suite has two fields, where the two rules agree — so this is the row that exists to disagree with them.
+- **T6.9** (I10): collapsing `unknown` into `dark` → T1.11 fails on the absent row, and **C22's T1.20c passes unchanged**. That asymmetry is the row's whole content: the two-valued field is wrong only where nothing is stated, and it is the reader's behaviour there that the third value exists to protect.
+- **T6.10** (I1): adding a field to the record without declaring it in §2 → **T2.8 fails and T2.6 does not**, which is the state `ambiguousWidth` shipped in.
 
 ---
 

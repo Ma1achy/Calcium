@@ -15,11 +15,13 @@ import {
   normaliseWidth,
   sequenceHeight,
 } from "../../data/viewmodel/index.js";
-import type { Block } from "../../data/viewmodel/index.js";
+import type { Block, Status } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { paint, rows, tone } from "./paint.js";
+import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
   BlockDefinition,
+  BlockFault,
   BlockRegistry,
   NavElement,
   RenderContext,
@@ -34,6 +36,24 @@ import type {
  * every keystroke for a value that is always the same nothing.
  */
 const EMPTY_ELEMENTS: readonly NavElement[] = Object.freeze([]);
+
+/**
+ * *No elements, and this definition does not own them* — the one answer both
+ * halves of I30 are read from.
+ *
+ * **`owned: false` on the throwing path is the fix.** The two questions used to
+ * be two calls, and the ownership one asked whether `elements` was *declared*
+ * rather than what resolving it returned — so a container whose `elements` threw
+ * answered *no elements* and *do not descend* at once, and took its whole subtree
+ * out of the walk. Measured at 0 elements against a control's 4 (F224).
+ */
+const NO_ELEMENTS: Resolved = Object.freeze({ elements: EMPTY_ELEMENTS, owned: false });
+
+/** A block's elements and whether its definition answered them. */
+type Resolved = Readonly<{ elements: readonly NavElement[]; owned: boolean }>;
+
+/** The contained height, and whether the measurer gave way producing it (I11). */
+type Measured = Readonly<{ ok: boolean; rows: number }>;
 
 /**
  * The definition of last resort: a registry with no `raw` at all, which is
@@ -63,10 +83,129 @@ const MISSING: BlockDefinition = {
  */
 class Registry implements BlockRegistry {
   readonly #definitions = new Map<string, BlockDefinition>();
+  readonly #onError: (fault: BlockFault) => void;
   #sealed = false;
 
-  constructor(definitions: readonly BlockDefinition[]) {
+  constructor(definitions: readonly BlockDefinition[], onError: (fault: BlockFault) => void) {
     for (const definition of definitions) this.#definitions.set(definition.kind, definition);
+    this.#onError = onError;
+  }
+
+  /**
+   * What a containment swallowed, handed to whoever asked for it (I29).
+   *
+   * **Three call sites, not four**, and the fourth is gone rather than missing:
+   * the ownership question used to carry a catch of its own and now reads the
+   * one `#elements` already took (I30). The invariant was written expecting four
+   * and the implementation is what disproved it.
+   *
+   * **A throwing sink is not caught.** That is what makes a caught error a red
+   * suite rather than a quiet frame — the harness supplies one that throws, and
+   * containment that survives its own alarm would be the defect this exists to
+   * end. Deduplication is the sink's business: `measure` is called at frame
+   * cadence, so a flood is the default shape and L4's recorder already collapses
+   * one by message.
+   */
+  #report(block: Block, member: BlockFault["member"], error: unknown, rows = 0): void {
+    this.#onError(Object.freeze({ kind: block.kind, id: block.id, member, error, rows }));
+  }
+
+  /**
+   * What the error box will say — **one text, and the fault and the block both
+   * take it from here.**
+   *
+   * The rows a fault asks for are a function of this string, and the string the
+   * box draws has to be the same one or the height fits a message nobody sees.
+   * They were two literals a hundred lines apart before there was a number
+   * riding on them; `cells()`'s argument, applied to a sentence.
+   */
+  static #errorText(block: Block, member: "measure" | "render", error: unknown): string {
+    if (member === "measure") return `${block.kind} failed to measure`;
+    return `${block.kind} failed to render: ${error instanceof Error ? error.message : String(error)}`;
+  }
+
+  /**
+   * `measure`, contained — and whether it gave way, which the error path needs
+   * and the public member throws away.
+   */
+  #measured(block: Block, width: number, caps?: RenderContext["capabilities"]): Measured {
+    // **The floor is C04's and applying it is this function's** (I33, C04 I67).
+    // In both arms rather than only the successful one: a floor is about the
+    // block, not about which half of its definition gave way, and a measurer
+    // that threw is exactly the case where the rows are most needed.
+    const floor = floorOf(block);
+    try {
+      const resolved = this.#resolve(block);
+      const rows = resolved.definition.measure(resolved.block, width, this.measure);
+      return { ok: true, rows: Math.max(rows, floor) };
+    } catch (error) {
+      // I11 — a throwing measurer is contained and the block treated as one
+      // row. This protects virtualisation: C14 sums measured heights without
+      // rendering, so a measurer that throws would take the viewport with it
+      // (T3.14). Compute, so no retry (A02 §7 rule 2).
+      // **`caps` is absent on the public `measure` path and that is not a
+      // default standing in for a value** (I2). A fault seen there is a
+      // diagnostic and never a request: the shell only records one inside the
+      // scope a *render* opens, so a measure fault with no request is exactly
+      // the case that cannot produce one. Asking for rows would be answering a
+      // question nobody put.
+      const rows =
+        caps === undefined
+          ? 0
+          : statusRowsFor(
+              errorStatus(Registry.#errorText(block, "measure", error), 1),
+              width,
+              caps,
+            );
+      this.#report(block, "measure", error, rows);
+      return { ok: false, rows: Math.max(1, floor) };
+    }
+  }
+
+  /**
+   * The error block, at **exactly** the height already committed (I11).
+   *
+   * The message is fitted to the width and the remaining rows are blank; the
+   * height is never fitted to the message. A committed height of zero — an empty
+   * `group`, the one legitimate zero (`rows`' own comment) — draws **nothing**,
+   * and the fault still reaches the sink: the visible channel is bounded by the
+   * contract and the reporting channel is not.
+   */
+  /**
+   * **No brackets around the message.** They shipped because the design figure
+   * drew `[⚠ plot failed to render: …]` as *annotation* — square brackets marking
+   * which cells the figure intended to paint — and the implementation read them
+   * as characters. The tag ` ERROR ` keeps its own, because those are real.
+   */
+  #errorBlock(text: string, height: number, ctx: RenderContext): ReactElement {
+    if (height <= 0) return createElement(Box, { flexDirection: "column" });
+    // **Through the `status` definition, not a private figure** (C09 I31). The
+    // boundary's box and the box a live part draws while it is retrying are the
+    // same picture, so they are one implementation — and the height handed in is
+    // the one `measure` already committed, which is what makes the pair
+    // self-consistent by construction rather than by agreement.
+    //
+    // Called directly rather than through `this.render`: the definition is a
+    // different kind from the one being contained, so there is no re-entrancy,
+    // and going back through the registry would put a second catch between the
+    // boundary and the block it is drawing.
+    return statusDefinition.render(errorStatus(text, height), ctx);
+  }
+
+  /**
+   * A block's elements **and** whether its definition owns them — one call,
+   * because they are one answer (I30, C26 I12).
+   */
+  #elements(block: Block, width: number): Resolved {
+    try {
+      const resolved = this.#resolve(block);
+      const declared = resolved.definition.elements;
+      if (declared === undefined) return NO_ELEMENTS;
+      return { elements: declared(resolved.block, width, this.measure), owned: true };
+    } catch (error) {
+      this.#report(block, "elements", error);
+      return NO_ELEMENTS;
+    }
   }
 
   get sealed(): boolean {
@@ -127,19 +266,7 @@ class Registry implements BlockRegistry {
     };
   }
 
-  measure = (block: Block, width: number): number => {
-    const w = normaliseWidth(width);
-    try {
-      const resolved = this.#resolve(block);
-      return resolved.definition.measure(resolved.block, w, this.measure);
-    } catch {
-      // I11 — a throwing measurer is contained and the block treated as one
-      // row. This protects virtualisation: C14 sums measured heights without
-      // rendering, so a measurer that throws would take the viewport with it
-      // (T3.14). Compute, so no retry (A02 §7 rule 2).
-      return 1;
-    }
-  };
+  measure = (block: Block, width: number): number => this.#measured(block, normaliseWidth(width)).rows;
 
   /**
    * A sequence's rows: the blocks' heights plus one per `gapBefore` (C04 §3a).
@@ -164,27 +291,16 @@ class Registry implements BlockRegistry {
    * its block atomic for this call rather than taking the caller with it. C26
    * I12 rules that explicitly — the alternative leaves focus pointing at
    * something unresolvable two components from the throw.
+   *
+   * **And atomic means the block, never the subtree** (I30). The ownership
+   * question used to be a second call that read whether `elements` was
+   * *declared*, so a container whose `elements` threw answered *no elements* and
+   * *do not descend* at once — 0 elements against a control's 4, with `↓`
+   * skipping the lot (F224). Both answers come out of `#elements` now, which is
+   * why they cannot disagree rather than why they happen not to.
    */
-  elementsOf = (block: Block, width: number): readonly NavElement[] => {
-    const w = normaliseWidth(width);
-    try {
-      const resolved = this.#resolve(block);
-      const declared = resolved.definition.elements;
-      if (declared === undefined) return EMPTY_ELEMENTS;
-      return declared(resolved.block, w, this.measure);
-    } catch {
-      return EMPTY_ELEMENTS;
-    }
-  };
-
-  /** Does this block's definition answer `elements` itself? (C26 §4b cell 3.) */
-  #ownsElements(block: Block): boolean {
-    try {
-      return this.#resolve(block).definition.elements !== undefined;
-    } catch {
-      return false;
-    }
-  }
+  elementsOf = (block: Block, width: number): readonly NavElement[] =>
+    this.#elements(block, normaliseWidth(width)).elements;
 
   /**
    * Every element in a **sequence**, block-local rows lifted into
@@ -213,7 +329,10 @@ class Registry implements BlockRegistry {
       for (const block of seq) {
         if (block.gapBefore === true) row += 1;
         const top = row;
-        for (const element of this.elementsOf(block, atWidth)) {
+        // **One call for both questions** (I30). Asking twice is what let the
+        // two answers disagree.
+        const own = this.#elements(block, atWidth);
+        for (const element of own.elements) {
           out.push({
             blockId: block.id,
             element: Object.freeze({
@@ -231,7 +350,7 @@ class Registry implements BlockRegistry {
         // So the question is asked of the **definition** rather than of a list
         // of kinds, which is the one form that stays right when a fourth
         // container arrives: whichever answer it gives, this walk follows it.
-        if (hasChildren(block) && !this.#ownsElements(block)) {
+        if (hasChildren(block) && !own.owned) {
           const widths = childWidths(block, atWidth);
           const before = row;
           block.children.forEach((child, i) => {
@@ -286,7 +405,20 @@ class Registry implements BlockRegistry {
       if (bottom <= lo || top - gap >= hi) continue;
 
       const resolved = this.#resolve(block);
-      const windowable = resolved.definition.window;
+      // **A block carrying a floor is kept whole** (C09 I33, C04 I68).
+      //
+      // The window's contract is an identity about rows the *definition* can
+      // produce — `measure(w.block, w) − skipRows === to − from` (I26) — and a
+      // floor's rows are the registry's padding, which no definition knows
+      // about. Handing a `to` derived from the floored height to a `window` that
+      // can only reach the definition's own rows breaks that identity from
+      // outside the definition, where nothing would find it.
+      //
+      // Keeping it whole costs slack, which this function already pays for
+      // every kind declaring no `window` at all — and a floored block is small
+      // by construction, because the reason it has a floor is that it failed to
+      // draw.
+      const windowable = floorOf(block) > 0 ? undefined : resolved.definition.window;
 
       // The gap row, when the window opens on or above it, is kept by keeping
       // the block's own `gapBefore`; when the window opens *below* it the gap is
@@ -333,6 +465,27 @@ class Registry implements BlockRegistry {
     return createElement(Box, { flexDirection: "column", width }, children);
   };
 
+  /**
+   * The other half of C04's floor: the element, padded to it (I33).
+   *
+   * **`minHeight` and never `height`, and the difference was measured.** A box
+   * with a fixed height holding more rows than it declares drops its **first**
+   * row rather than its last — `["1","2","3","4"]` in a `height: 3` box renders
+   * `["2","3","4"]` — and `overflowY: "hidden"` does not change it. So a bound
+   * would silently behead a block that grew, which is F223's defect wearing the
+   * mechanism built to prevent it. `minHeight` pads a short child and leaves a
+   * tall one exactly as it was.
+   *
+   * With this and the `max` in `#measured`, I1 holds by construction: both
+   * sides take the same number from the same field, so neither is trusted to
+   * agree with the other.
+   */
+  #floored(block: Block, element: ReactElement): ReactElement {
+    const floor = floorOf(block);
+    if (floor === 0) return element;
+    return createElement(Box, { flexDirection: "column", minHeight: floor }, element);
+  }
+
   render = (block: Block, ctx: RenderContextInput): ReactElement => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
@@ -343,23 +496,45 @@ class Registry implements BlockRegistry {
         this.render(child, { ...ctx, width: childWidth }),
     };
 
+    // **The height is committed before anything is drawn** (I11). One extra
+    // `measure` per render, and the two reasons it is affordable are that L4
+    // caches rendered lines per entry (C22 I58) so this is not a per-frame cost,
+    // and that `windowSequence` has already measured the same blocks on the way
+    // here. The alternative — measuring only inside the catch — cannot see a
+    // *measurer* that gave way while the renderer succeeded, which is the case
+    // that drew a fifth of a figure and said nothing.
+    const committed = this.#measured(block, width, childContext.capabilities);
+
+    if (!committed.ok) {
+      // A definition that threw in either half renders the error block (I11).
+      // Truncating a good render to the fallback height is the same failure one
+      // level down: 4 of 5 rows dropped, in silence (F223).
+      return this.#floored(
+        block,
+        this.#errorBlock(Registry.#errorText(block, "measure", undefined), committed.rows, childContext),
+      );
+    }
+
     try {
       const resolved = this.#resolve(block);
-      return resolved.definition.render(resolved.block, childContext);
+      return this.#floored(block, resolved.definition.render(resolved.block, childContext));
     } catch (error) {
-      // I11 — a throwing renderer is contained to its block. The rest of the
-      // frame is unaffected, and the block says what happened rather than
-      // vanishing, which is the difference between a visible fault and a
-      // document that quietly renders short.
-      const message = error instanceof Error ? error.message : String(error);
-      return rows([
-        paint([
-          {
-            text: `[${block.kind} failed to render: ${message}]`.slice(0, width), // cells-ok
-            style: tone("error", childContext.theme, childContext.capabilities),
-          },
-        ]),
-      ]);
+      // I11 — a throwing renderer is contained to its block, **and the
+      // containment includes the row count**. The rest of the frame is
+      // unaffected in position as well as in content, and the block says what
+      // happened rather than vanishing.
+      // **The text first, because the number rides on it** (I34). The rows this
+      // fault asks for are a function of exactly this string at exactly this
+      // width, and the box below is drawn from the same one — so they are
+      // computed together rather than written twice.
+      const text = Registry.#errorText(block, "render", error);
+      this.#report(
+        block,
+        "render",
+        error,
+        statusRowsFor(errorStatus(text, 1), width, childContext.capabilities),
+      );
+      return this.#floored(block, this.#errorBlock(text, committed.rows, childContext));
     }
   };
 }
@@ -373,8 +548,46 @@ class Registry implements BlockRegistry {
  * it (§3). Three components rather than one matters: a single privileged
  * exception is indistinguishable from a special case.
  */
-export function createBlockRegistry(opts: { defaults?: boolean } = {}): BlockRegistry {
-  return new Registry(opts.defaults === false ? [] : DEFAULT_DEFINITIONS);
+export function createBlockRegistry(
+  opts: Readonly<{ defaults?: boolean; onError?: (fault: BlockFault) => void }> = {},
+): BlockRegistry {
+  return new Registry(
+    opts.defaults === false ? [] : DEFAULT_DEFINITIONS,
+    // **Silence is the default and the harness opts in** (I29). Loud by default
+    // would make every existing containment test a failure, which is a fact
+    // about those tests and not about a consumer's registry; the shell passes
+    // one, and `test/support/render.ts` passes one that throws.
+    opts.onError ?? ((): void => undefined),
+  );
+}
+
+/**
+ * C04's floor, as a non-negative integer (C04 I67, C09 I33).
+ *
+ * **Read here and by no definition**, which is the whole of why the field is
+ * safe: `definition.measure` stays a function of `(block, width)` so I2 holds,
+ * and `scrollDefinition.measure` cannot consult it even by accident, so C04
+ * §3c's argument that a bounded box never depends on view state is not
+ * reopened by the mechanism added two components away.
+ *
+ * Total, because `measure` is: a malformed floor on a document that reached
+ * here anyway is treated as none rather than throwing at frame cadence.
+ */
+/**
+ * The `status` block a containment draws, and **the one the fitter measures.**
+ *
+ * One constructor for both, because the height a fault asks for is computed from
+ * this block and the box that arrives is drawn from it: two literals would let
+ * the request fit a message the frame does not show, and every count would agree
+ * (C09 I34).
+ */
+function errorStatus(text: string, height: number): Status {
+  return { kind: "status", id: "status", state: "error", message: text, height } as Status;
+}
+
+function floorOf(block: Block): number {
+  const held = (block as { minHeight?: unknown }).minHeight;
+  return typeof held === "number" && Number.isInteger(held) && held > 0 ? held : 0;
 }
 
 /** A block without its `gapBefore`, so a dropped gap row is genuinely dropped. */

@@ -235,7 +235,7 @@ describe("C21 streams", () => {
     // C-string thinking is the failure here: a decoder or a queue that treats
     // NUL as a terminator drops everything after it, and the output looks like a
     // short read rather than a bug.
-    expect(await collect(child.stdout)).toBe("a bc");
+    expect(await collect(child.stdout)).toBe("a\u0000bc");
   });
 
   it("T3.3 (I5): the bound is exact, and the dropped tail leaves no replacement mark", async () => {

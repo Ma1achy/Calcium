@@ -107,6 +107,16 @@ const SLOTS: Readonly<Record<string, string>> = Object.freeze({
 });
 
 /**
+ * The distinct slots `SLOTS` maps to — C10's manifest is checked against this.
+ *
+ * **Derived, not restated.** Fourteen `hljs-*` classes map onto nine slots, and
+ * a fifteenth mapped to a tenth is a slot every theme would render uncoloured
+ * with nothing saying so (C10 I30). The set is what a theme owes; the map is how
+ * a grammar reaches it.
+ */
+export const SYNTAX_SLOTS: readonly string[] = Object.freeze([...new Set(Object.values(SLOTS))]);
+
+/**
  * Classes the default set emits that deliberately have no slot (I24).
  *
  * Read by T3.32, so an omission that starts being mapped is a stale entry rather

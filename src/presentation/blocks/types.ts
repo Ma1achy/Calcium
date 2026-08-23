@@ -11,6 +11,55 @@ import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /** Which block, and which row within it, currently holds focus. */
+/**
+ * What one of the registry's containments swallowed (I29).
+ *
+ * **The kind is the document's, not the fallback's.** An unregistered kind
+ * resolves through `raw` (I10), so reporting the resolved kind would name `raw`
+ * for a fault in someone else's block and send the reader to the wrong file.
+ *
+ * `error` is `unknown` rather than `Error` because `throw` takes anything, and a
+ * sink that assumed otherwise would itself throw on the one input it exists to
+ * describe.
+ */
+export type BlockFault = Readonly<{
+  kind: string;
+  /**
+   * **Which block, and it was missing** (C22 I69).
+   *
+   * A fault carrying only the kind is enough to write a diagnostic and not
+   * enough to *act* — the shell that wants to reserve rows for a block whose
+   * renderer gave way has to address it, and `ViewPatch` addresses by id. The
+   * kind cannot stand in: a document can hold three `plot`s.
+   *
+   * Ids are unique within a document (C04 I14) and **not across entries**, so
+   * this half of the address is the caller's: whoever is rendering an entry
+   * knows which one, and the fault does not.
+   */
+  id: string;
+  /** Which half gave way. Three, and the fourth was folded into `elements` (I30). */
+  member: "measure" | "render" | "elements";
+  /**
+   * The rows the error box needs for the text it is about to draw (I34, C22 I69).
+   *
+   * **Computed here because this is the only place that can.** The number is a
+   * function of the message *and* the width, and the containment holds both: it
+   * is one line above the `#errorBlock` call that draws them. The shell drains
+   * the request after the frame has returned — deliberately, so the frame stays
+   * single-pass — and by then the width is gone.
+   *
+   * It replaced a constant the shell imported from this component. A floor that
+   * is the same three rows whatever the box has to say is a floor that cuts, and
+   * cut in silence at every height rather than only at a cap (F230's class, one
+   * level down).
+   *
+   * Zero for `elements`, which costs no rows: it makes a block atomic for
+   * keyboard and pointer (I30) and changes nothing about the frame.
+   */
+  rows: number;
+  error: unknown;
+}>;
+
 export type FocusState = Readonly<{
   blockId: string;
   /** null — the block itself is focused, rather than a row inside it. */
@@ -42,6 +91,7 @@ export type RenderContext = Readonly<{
    * (C23 I47).
    */
   scrollOffsets?: Readonly<Record<string, number>>;
+  cursorPositions?: Readonly<Record<string, number>>;
   focus: FocusState | null;
   /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer

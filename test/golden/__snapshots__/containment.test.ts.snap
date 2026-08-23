@@ -1,0 +1,346 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii capped at 30 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: Type~[39m
+
+frame 2 — asked 7
++----------------------------+
+| [38;2;198;40;40m---------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m----------[39m |
+| [38;2;198;40;40m! plot failed to render:  [39m |
+| [38;2;198;40;40mTypeError: series.map is  [39m |
+| [38;2;198;40;40mnot a function            [39m |
+| [38;2;198;40;40m    at plotDefinition.ren~[39m |
++----------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii capped at 40 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: TypeError: ser~[39m
+
+frame 2 — asked 7
++--------------------------------------+
+| [38;2;198;40;40m--------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m---------------[39m |
+| [38;2;198;40;40m! plot failed to render: TypeError: [39m |
+| [38;2;198;40;40mseries.map is not a function        [39m |
+| [38;2;198;40;40m    at plotDefinition.render        [39m |
+| [38;2;198;40;40m(plot/definition.ts:1204:18)     at~[39m |
++--------------------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii capped at 80 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: TypeError: series.map is not a function     at plotDef~[39m
+
+frame 2 — asked 7
++------------------------------------------------------------------------------+
+| [38;2;198;40;40m----------------------------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m-----------------------------------[39m |
+| [38;2;198;40;40m! plot failed to render: TypeError: series.map is not a function            [39m |
+| [38;2;198;40;40m    at plotDefinition.render (plot/definition.ts:1204:18)                   [39m |
+| [38;2;198;40;40m    at BlockRegistry.render (blocks/registry.ts:495:47)                     [39m |
+| [38;2;198;40;40m    at renderSequence (render-lines.ts:88:20)     at visibleRows (shell/ses~[39m |
++------------------------------------------------------------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii short at 30 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: ENOE~[39m
+
+frame 2 — asked 5
++----------------------------+
+|[38;2;198;40;40m----------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m-----------[39m|
+|[38;2;198;40;40m! plot failed to render:    [39m|
+|[38;2;198;40;40mENOENT                      [39m|
++----------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii short at 40 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: ENOENT[39m
+
+frame 2 — asked 4
++--------------------------------------+
+|[38;2;198;40;40m---------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m----------------[39m|
+|[38;2;198;40;40m! plot failed to render: ENOENT       [39m|
++--------------------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii short at 80 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: ENOENT[39m
+
+frame 2 — asked 4
++------------------------------------------------------------------------------+
+|[38;2;198;40;40m-----------------------------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m------------------------------------[39m|
+|[38;2;198;40;40m! plot failed to render: ENOENT                                               [39m|
++------------------------------------------------------------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii wrapping at 30 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: Cann~[39m
+
+frame 2 — asked 7
++----------------------------+
+| [38;2;198;40;40m---------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m----------[39m |
+| [38;2;198;40;40m! plot failed to render:  [39m |
+| [38;2;198;40;40mCannot read properties of [39m |
+| [38;2;198;40;40mundefined (reading        [39m |
+| [38;2;198;40;40m'series')                 [39m |
++----------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii wrapping at 40 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: Cannot read pr~[39m
+
+frame 2 — asked 6
++--------------------------------------+
+| [38;2;198;40;40m--------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m---------------[39m |
+| [38;2;198;40;40m! plot failed to render: Cannot     [39m |
+| [38;2;198;40;40mread properties of undefined        [39m |
+| [38;2;198;40;40m(reading 'series')                  [39m |
++--------------------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-ascii wrapping at 80 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m! plot failed to render: Cannot read properties of undefined (reading 'series')[39m
+
+frame 2 — asked 5
++------------------------------------------------------------------------------+
+|[38;2;198;40;40m-----------------------------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m------------------------------------[39m|
+|[38;2;198;40;40m! plot failed to render: Cannot read properties of undefined (reading         [39m|
+|[38;2;198;40;40m'series')                                                                     [39m|
++------------------------------------------------------------------------------+"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode capped at 30 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: Type…[39m
+
+frame 2 — asked 7
+┌────────────────────────────┐
+│ [38;2;198;40;40m─────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m──────────[39m │
+│ [38;2;198;40;40m▲ plot failed to render:  [39m │
+│ [38;2;198;40;40mTypeError: series.map is  [39m │
+│ [38;2;198;40;40mnot a function            [39m │
+│ [38;2;198;40;40m    at plotDefinition.ren…[39m │
+└────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode capped at 40 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: TypeError: ser…[39m
+
+frame 2 — asked 7
+┌──────────────────────────────────────┐
+│ [38;2;198;40;40m──────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m───────────────[39m │
+│ [38;2;198;40;40m▲ plot failed to render: TypeError: [39m │
+│ [38;2;198;40;40mseries.map is not a function        [39m │
+│ [38;2;198;40;40m    at plotDefinition.render        [39m │
+│ [38;2;198;40;40m(plot/definition.ts:1204:18)     at…[39m │
+└──────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode capped at 80 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: TypeError: series.map is not a function     at plotDef…[39m
+
+frame 2 — asked 7
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [38;2;198;40;40m──────────────────────────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m───────────────────────────────────[39m │
+│ [38;2;198;40;40m▲ plot failed to render: TypeError: series.map is not a function            [39m │
+│ [38;2;198;40;40m    at plotDefinition.render (plot/definition.ts:1204:18)                   [39m │
+│ [38;2;198;40;40m    at BlockRegistry.render (blocks/registry.ts:495:47)                     [39m │
+│ [38;2;198;40;40m    at renderSequence (render-lines.ts:88:20)     at visibleRows (shell/ses…[39m │
+└──────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode short at 30 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: ENOE…[39m
+
+frame 2 — asked 5
+┌────────────────────────────┐
+│[38;2;198;40;40m──────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m───────────[39m│
+│[38;2;198;40;40m▲ plot failed to render:    [39m│
+│[38;2;198;40;40mENOENT                      [39m│
+└────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode short at 40 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: ENOENT[39m
+
+frame 2 — asked 4
+┌──────────────────────────────────────┐
+│[38;2;198;40;40m───────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m────────────────[39m│
+│[38;2;198;40;40m▲ plot failed to render: ENOENT       [39m│
+└──────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode short at 80 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: ENOENT[39m
+
+frame 2 — asked 4
+┌──────────────────────────────────────────────────────────────────────────────┐
+│[38;2;198;40;40m───────────────────────────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m────────────────────────────────────[39m│
+│[38;2;198;40;40m▲ plot failed to render: ENOENT                                               [39m│
+└──────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode wrapping at 30 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: Cann…[39m
+
+frame 2 — asked 7
+┌────────────────────────────┐
+│ [38;2;198;40;40m─────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m──────────[39m │
+│ [38;2;198;40;40m▲ plot failed to render:  [39m │
+│ [38;2;198;40;40mCannot read properties of [39m │
+│ [38;2;198;40;40mundefined (reading        [39m │
+│ [38;2;198;40;40m'series')                 [39m │
+└────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode wrapping at 40 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: Cannot read pr…[39m
+
+frame 2 — asked 6
+┌──────────────────────────────────────┐
+│ [38;2;198;40;40m──────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m───────────────[39m │
+│ [38;2;198;40;40m▲ plot failed to render: Cannot     [39m │
+│ [38;2;198;40;40mread properties of undefined        [39m │
+│ [38;2;198;40;40m(reading 'series')                  [39m │
+└──────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > dark-unicode wrapping at 80 1`] = `
+"frame 1 — committed
+[38;2;198;40;40m▲ plot failed to render: Cannot read properties of undefined (reading 'series')[39m
+
+frame 2 — asked 5
+┌──────────────────────────────────────────────────────────────────────────────┐
+│[38;2;198;40;40m───────────────────────────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m────────────────────────────────────[39m│
+│[38;2;198;40;40m▲ plot failed to render: Cannot read properties of undefined (reading         [39m│
+│[38;2;198;40;40m'series')                                                                     [39m│
+└──────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode capped at 30 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: Type…[39m
+
+frame 2 — asked 7
+┌────────────────────────────┐
+│ [38;2;168;31;18m─────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m──────────[39m │
+│ [38;2;168;31;18m▲ plot failed to render:  [39m │
+│ [38;2;168;31;18mTypeError: series.map is  [39m │
+│ [38;2;168;31;18mnot a function            [39m │
+│ [38;2;168;31;18m    at plotDefinition.ren…[39m │
+└────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode capped at 40 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: TypeError: ser…[39m
+
+frame 2 — asked 7
+┌──────────────────────────────────────┐
+│ [38;2;168;31;18m──────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m───────────────[39m │
+│ [38;2;168;31;18m▲ plot failed to render: TypeError: [39m │
+│ [38;2;168;31;18mseries.map is not a function        [39m │
+│ [38;2;168;31;18m    at plotDefinition.render        [39m │
+│ [38;2;168;31;18m(plot/definition.ts:1204:18)     at…[39m │
+└──────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode capped at 80 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: TypeError: series.map is not a function     at plotDef…[39m
+
+frame 2 — asked 7
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [38;2;168;31;18m──────────────────────────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m───────────────────────────────────[39m │
+│ [38;2;168;31;18m▲ plot failed to render: TypeError: series.map is not a function            [39m │
+│ [38;2;168;31;18m    at plotDefinition.render (plot/definition.ts:1204:18)                   [39m │
+│ [38;2;168;31;18m    at BlockRegistry.render (blocks/registry.ts:495:47)                     [39m │
+│ [38;2;168;31;18m    at renderSequence (render-lines.ts:88:20)     at visibleRows (shell/ses…[39m │
+└──────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode short at 30 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: ENOE…[39m
+
+frame 2 — asked 5
+┌────────────────────────────┐
+│[38;2;168;31;18m──────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m───────────[39m│
+│[38;2;168;31;18m▲ plot failed to render:    [39m│
+│[38;2;168;31;18mENOENT                      [39m│
+└────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode short at 40 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: ENOENT[39m
+
+frame 2 — asked 4
+┌──────────────────────────────────────┐
+│[38;2;168;31;18m───────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m────────────────[39m│
+│[38;2;168;31;18m▲ plot failed to render: ENOENT       [39m│
+└──────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode short at 80 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: ENOENT[39m
+
+frame 2 — asked 4
+┌──────────────────────────────────────────────────────────────────────────────┐
+│[38;2;168;31;18m───────────────────────────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m────────────────────────────────────[39m│
+│[38;2;168;31;18m▲ plot failed to render: ENOENT                                               [39m│
+└──────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode wrapping at 30 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: Cann…[39m
+
+frame 2 — asked 7
+┌────────────────────────────┐
+│ [38;2;168;31;18m─────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m──────────[39m │
+│ [38;2;168;31;18m▲ plot failed to render:  [39m │
+│ [38;2;168;31;18mCannot read properties of [39m │
+│ [38;2;168;31;18mundefined (reading        [39m │
+│ [38;2;168;31;18m'series')                 [39m │
+└────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode wrapping at 40 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: Cannot read pr…[39m
+
+frame 2 — asked 6
+┌──────────────────────────────────────┐
+│ [38;2;168;31;18m──────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m───────────────[39m │
+│ [38;2;168;31;18m▲ plot failed to render: Cannot     [39m │
+│ [38;2;168;31;18mread properties of undefined        [39m │
+│ [38;2;168;31;18m(reading 'series')                  [39m │
+└──────────────────────────────────────┘"
+`;
+
+exports[`C09 I34 — the contained failure, in a frame > light-unicode wrapping at 80 1`] = `
+"frame 1 — committed
+[38;2;168;31;18m▲ plot failed to render: Cannot read properties of undefined (reading 'series')[39m
+
+frame 2 — asked 5
+┌──────────────────────────────────────────────────────────────────────────────┐
+│[38;2;168;31;18m───────────────────────────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m────────────────────────────────────[39m│
+│[38;2;168;31;18m▲ plot failed to render: Cannot read properties of undefined (reading         [39m│
+│[38;2;168;31;18m'series')                                                                     [39m│
+└──────────────────────────────────────────────────────────────────────────────┘"
+`;

@@ -8556,3 +8556,4612 @@ the corpus had none.
 an existing kind is invisible to it by construction. That is why three consecutive behaviour
 changes — the continuation mark, the gapped series, the chip — each left golden green and each
 needed a frame added by hand. Three coincidences with one cause.
+
+---
+
+## F172 — an unknown `ColourRef` resolves to no style, and nothing says so ★★★
+
+| | |
+|---|---|
+| **Surface** | `resolve()` — every painted span in the framework |
+| **Reached for** | entry 3's planning pass, measuring whether a `continuous` palette could be declared |
+| **Verdict** | **a real Calcium defect**, silent, and the empty-block class arriving in the resolver |
+| **Absorbed by** | nothing; filed rather than folded into the plan, because it is a defect today |
+
+```
+resolve("continuous.s3", theme, caps)   →  {}      the family does not exist
+resolve("categorical.c1", theme, MONO)  →  {}      a decoration palette at 1-bit
+```
+
+**One value, two meanings** — `resolve.ts:354` returns `NO_STYLE` when the palette is missing
+*or* the slot is, and `:360` returns the same for a decoration palette at 1-bit, where it is
+correct. So *this reference does not exist* and *this reference resolves to nothing here* are
+indistinguishable to every caller, and the frame that results is a span painted in the default
+foreground: **legible, plausible, and not what the block asked for.**
+
+**It is the empty-block class one layer down.** A `resolve(key)` with no choices was ruled a
+construction error for exactly this reason — a lookup that silently answers *nothing* reads as a
+lookup that answered.
+
+### Why it is filed now rather than found later
+
+Entry 3's colour ruling adds a fourth palette family. **The first thing anyone writes against
+it is `continuous.s3`, and if the family has not landed the cell renders uncoloured and the
+suite stays green** — the defect and the not-yet-built look identical. That is the same trap the
+plan refuses elsewhere: a member that means nothing is indistinguishable from one not yet
+implemented.
+
+**Reachable today, narrowly**: `ColourRef` is `` `${string}.${string}` `` and is published, so an
+app or a framework typo — `tone.okay`, `syntax.keyworrd` — takes this path. Nothing in `src/`
+currently produces one, which is why it has never been seen rather than why it cannot be.
+
+### What it wants, and the shape is already ruled twice
+
+**A missing family or slot should fail where the theme is resolved, not where a span is
+painted.** `ThemeError` exists and `resolveTheme` already reports contrast failures per slot, so
+the seam is built: a reference to a family that does not exist is a theme error, and a
+decoration palette collapsing at 1-bit stays `NO_STYLE` because it is the answer rather than the
+absence of one.
+
+**The cheap half is separable**: `NO_STYLE` for *collapsed* and a distinct sentinel for *missing*
+costs nothing and makes the two cases tellable apart by anything that looks.
+
+---
+
+## F173 — the anchor checker could not see 23% of its anchors ★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/mutate/anchors.mjs`, run by `make instruments` |
+| **Reached for** | a comment edit in `text.ts` broke one anchor, and the reported count was checked against the tree rather than trusted |
+| **Verdict** | **a gate that ran, printed a number, and read 357 of 465 anchors** |
+| **Absorbed by** | fixed in place — a branch per quote style, and six newly-visible stale anchors triaged |
+
+```
+before   54 runs · 357 anchors · 19 missing across 8 run(s)
+after    54 runs · 465 anchors · 25 missing across 12 run(s)
+```
+
+`anchorsOf` matched `from:\s*"…"` and nothing else. **108 anchors — 30 of the 54 runs carry at least one — are
+single-quoted** — the style an author reaches for when the anchored source itself contains a
+double quote, which is most of the interesting ones: `caps.unicode === "ascii"`,
+`origin: "defect"`, every capability test in the tree.
+
+**It is not that the rule was wrong. It had nothing to be wrong about over a quarter of its
+subject**, which is A03 §2's vacuity class arriving in the instrument that guards against
+staleness. The exit status was the same bit for *clean* and for *did not look*.
+
+### How it surfaced, and it is the sixth blind spot's method
+
+A one-word comment edit in `text.ts` broke a double-quoted anchor in `c02-ambiguous.mjs`, which
+the checker reported. Repairing it was two minutes. **Reading the run afterwards showed a second
+anchor in the same file — `rampFor`'s old body — that had been stale since the previous commit
+and had never been reported.** The checker had said the tree was clean about a file it was
+half-reading.
+
+**Two directions, and the second is the one nothing else reaches.** The reported miss was real;
+the reported *count* was the falsification. `54 runs · 357 anchors` is what a working gate looks
+like from outside, and F161 is the same shape: a count is an argument only if you know what it
+counted.
+
+### The six it revealed
+
+| run | disposition |
+|---|---|
+| `c12-ramp.mjs` | **repaired** — re-anchored onto `LADDERS.height`, pass re-run, six mutations caught |
+| `c12-value-bar.mjs` | **repaired** — re-anchored onto `pairFor`, pass re-run, six mutations caught |
+| `c10-categorical.mjs` · `c26-elements.mjs` · `c26-focus-target.mjs` | on `KNOWN_STALE` |
+| `c22-construct.mjs` · `docker-dashboard.mjs` | each gained one, counts raised |
+
+**Two repaired and four listed, and the split is the list's own doctrine**: repairing an anchor
+without running the pass produces a mutation that applies and asserts nothing, which reads as
+coverage from the summary line. The two repaired are this session's own and were re-run; the
+four are whoever runs them next.
+
+### The limit that remains
+
+The pattern now reads both quote styles and skips comment lines between `file:` and `from:`.
+**A template literal anchor would still be invisible**, and there are none today — measured, not
+assumed. The MA4 equality arm is what would catch the population moving again, and it is only as
+good as what `anchorsOf` can parse, which is why the figure is recorded in that function's header
+rather than here alone.
+
+---
+
+## F174 — three tests outlived the function they asserted ★★★
+
+| | |
+|---|---|
+| **Surface** | `examples/docker`'s `bar()`, and three rows of `dashboard.test.ts` |
+| **Reached for** | moving `ioBlock`'s `MEM` onto `keyValue`'s new bar (C04 I51) |
+| **Verdict** | **a function no frame drew, passing six assertions**, and hiding a regression |
+| **Absorbed by** | `bar()` deleted; the three rows rewritten against the frame in `test/repo/cpu-cell.test.ts` |
+
+`bar()` drew a run into a string. `Cell.bar` took the dashboard's CPU column off it one commit
+ago and `ioBlock` was the last caller; when that moved, `bar()` had none. **It kept passing
+because the tests called it directly** — the mechanism, never the wiring.
+
+The file's own header says *assertions read the rendered output, never the arithmetic the code
+used*. Three rows in it did not, in the file that documents why.
+
+### What the orphaned rows were hiding
+
+Rewriting them against the frame failed immediately, and the failure was real:
+
+```
+expected '████████████ 780%'  to contain '780.0%'
+expected '███████████ 1000%'  to contain '999.9%'
+```
+
+**The CPU column has been rounding since `Cell.bar` landed.** `docker stats` sends `45.2%` and
+the cell drew `45%`. That is F175, and it was invisible for exactly as long as the rows testing
+it were pointed at a function the cell does not call.
+
+### Why the replacement is a repo test
+
+`@fmx/calcium` publishes `createTui` and the builders and **no block-to-lines renderer**, so the
+package cannot render a block — which is why the rows were written against a function in the
+first place. `test/repo/` is the established answer (see `banner.test.ts`) and it labels the
+reach rather than hiding it.
+
+---
+
+## F175 — a bar's number was formatted as a tick label ★★★
+
+| | |
+|---|---|
+| **Surface** | `valueBar` — every bar in the framework |
+| **Reached for** | F174's rewritten rows, which failed on the first run |
+| **Verdict** | **a real Calcium defect**, and this component's recurring class a third time |
+| **Absorbed by** | `formatReadout`, beside `formatValue` |
+
+`formatValue(v, "percent")` is `${Math.round(v)}%`, which is right for a **tick**: an axis is a
+scale and its marks are round. A bar's number is a **readout** — the answer — and rounding it
+throws away the digit the reader opened the surface for.
+
+**The enum is shared on purpose and the sharing argument never covered precision.** C04 I50c
+puts `BarSpec.format` on `Plot["yFormat"]` because *a bar's number and a plot's y-label ask the
+same question* — about the unit coming in. Precision is not a property of the unit.
+
+**Third instance of one shape in one component**: the heatmap took the sparkline's height ramp,
+`sparkline` took `line`'s *filtered before scaling*, and now the bar took the axis's rounding.
+Each was correct next door, arithmetically sound, and rendered.
+
+### The fix that read as minimal and was wrong
+
+`formatValue` already takes a `places`, so honouring it in the percent arms looks like the
+smallest possible change. **`yLabels` already passes `places`.** Every percent axis in the golden
+corpus gained a decimal, the gutter widened by two cells, and every plot lost them — 224 lines of
+snapshot diff that nothing in the function's own diff predicted.
+
+So the entry point is **named** rather than switched on an optional argument: `formatReadout` for
+a value, `formatValue` for a tick. **An intent inferred from whether an argument is present is an
+intent two callers can disagree about**, and here they already did.
+
+---
+
+## F176 — the `fill` pair had no ambiguous-width arm, and the corpus had recorded it ★★★★
+
+| | |
+|---|---|
+| **Surface** | `pairFor` — every bar, at `ambiguousWidth: "wide"` |
+| **Reached for** | reading the golden diff after adding a `keyValue` bar state |
+| **Verdict** | **a shipped defect, already in a committed snapshot**, unread |
+| **Absorbed by** | a braille arm in `pairFor` |
+
+`█` (U+2588), `░` (U+2591) and `—` (U+2014) are all `East_Asian_Width=Ambiguous`. On a terminal
+that draws ambiguous glyphs wide, a bar occupies **twice its declared cells**, so `truncate` eats
+the end of it — and the end is the number, the one thing a bar exists to say.
+
+```
+dark-wide, before   api       █░░░░░░░ …
+dark-wide, after    api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%
+```
+
+**This is precisely what `RAMP_UNICODE` did**, and `ladderFor` swaps braille in for it — every
+code point in U+2800–U+28FF is `Neutral`, narrow under both conventions. `pairFor` was written
+after that fix and did not inherit it: the fourth encoding axis, added last, with the third
+axis's solved problem.
+
+### The part that is about the habit rather than the code
+
+**The golden corpus had it.** `table-value-bar` at `dark-wide` has read `█░░░░░░░ …` since the
+state landed, in a snapshot that was generated, reviewed and committed. **The instrument
+captured the evidence and the reading step was skipped.**
+
+That is a sharper failure than a missing test. Adding the state was the right move and it
+worked; what did not happen is anyone looking at what it produced. `-u` makes a diff, and a diff
+nobody reads is a record, not a check.
+
+**And it is why the `keyValue` state was worth adding even though the table state existed.** The
+new frame is what made the old one get looked at.
+
+### The absent mark, which is the same bug in the arm nobody would check
+
+`—` is ambiguous too, so the *absent* mark was two cells at that rung. It drops to ASCII `-`
+there: braille has no glyph that reads as *nothing was reported*, and a mark that is right in one
+convention only is what this whole finding is about.
+
+---
+
+## F177 — a shared precision that the string threw away ★★★
+
+| | |
+|---|---|
+| **Surface** | `yLabels` → `formatNumber` — every numeric y-axis |
+| **Reached for** | step 4's nice numbers, which made the precision rule matter more |
+| **Verdict** | **a correct rule with an arithmetic that obeyed it and a string that did not** |
+| **Absorbed by** | `formatNumber` keeps a named precision and trims an unnamed one |
+
+`yLabels` computes one precision for the whole axis and passes it down. `formatNumber` then did
+`Number(v.toFixed(places))` and `String(...)`, which **strips the trailing zero** — so three
+labels formatted to two places came out at three precisions:
+
+```
+computed   0.20  0.15  0.10        one precision, correctly shared
+rendered   0.2   0.15  0.1         three, and the eye compares digit counts first
+```
+
+That is the survey's own counter-example — *`0.10 0.15 0.20`, never `0.1 0.15 0.2`* — shipped.
+
+**The prose was true and described the half that worked.** *The three share one precision, taken
+from the span* is an accurate statement about `places`, and `places` was shared. Nothing said
+what happened to it afterwards, and a reader checking the sentence against the code would have
+agreed with both.
+
+### The discriminator
+
+Whether the caller **named** a precision. `yLabels` does, from the tick step; a lone value does
+not and wants `1284` rather than `1284.00`. Same shape as `formatReadout` beside `formatValue`,
+one finding earlier: an intent the caller states rather than one inferred downstream.
+
+---
+
+## F178 — a nice step of zero, and a hang three modules away ★★★★
+
+| | |
+|---|---|
+| **Surface** | `niceAxis` → `drawLine` |
+| **Reached for** | running the suite after step 4's first draft |
+| **Verdict** | **a non-terminating render**, from a function where every number was finite |
+| **Absorbed by** | `niceNumber` returns `0` for a step it cannot pick; `niceAxis` guards on it |
+
+A denormal span underflows twice over. `span / (wanted - 1)` is half of `Number.MIN_VALUE`,
+which **is zero**, and `10 ** -324` is zero as well — either way `niceNumber` produced `0`, so
+`Math.floor(min / 0) * 0` is `NaN` and the axis handed a `NaN` range to the rasteriser.
+
+**There `drawLine` stops on `x === ex`, and `NaN` is equal to nothing.** The loop does not
+terminate. Not slowly — never.
+
+### Three things about this, and each is a different lesson
+
+**The invariant it breaks lives two modules away.** C12 I2 says no series input throws or hangs.
+Nothing in a rule-interaction table for `niceAxis` reaches it: the function returns, every value
+it returns is a `number`, and the state it leaves behind is refused somewhere else. That is the
+walk's own recorded blind spot — *a decision leaves state, and the rule forbidding that state is
+in a different component* — arriving in the first function written after it was written down.
+
+**The first guard made it worse by being plausible.** `if (rough <= 0) return 1` reads as
+defensive and it is not: a step of `1` against a range of `5e-324 … 1e-323` snaps the axis to
+`0 … 1` and swamps the data by three hundred orders of magnitude. It terminates, every number is
+finite, and the frame is a flat line at the bottom of an empty plot. **A plausible constant is
+worse than no answer**, because no answer is checkable.
+
+**And a float loop counter does not count.** The first bound was `for (let k = first; k <= last;
+k += 1)` over the tick values; at a magnitude of 10³⁰⁰, `k += 1` leaves `k` exactly where it was.
+Bounding it by an integer index is not a tidier way to write the same loop — it is the only one
+that terminates.
+
+### Found by running the suite, which is worth naming
+
+Not by a test written for it, and not by reading. `test/contract/plot.test.ts` stopped reporting
+and the run had to be bisected to find which file, then which corpus entry. **The fuzz corpus is
+the instrument** — `[Number.MIN_VALUE, Number.MIN_VALUE * 2]` is in it for exactly this, and it
+is the same entry that found `decimalsFor`'s `toFixed` RangeError.
+
+---
+
+## F179 — the accessibility theme drew every series in one colour ★★★★
+
+| | |
+|---|---|
+| **Surface** | `tokens-high-contrast.ts`, and every multi-series plot or `pills` block under it |
+| **Reached for** | F172's gate, on its first run |
+| **Verdict** | **shipped, silent, and on the theme where it costs most** |
+| **Absorbed by** | the theme gains `categorical`; C10 I30 is what found it |
+
+The high-contrast theme declares `tone`, `syntax` and `spectrum` and **no `categorical`
+palette**. The framework resolves `categorical.c1`–`c8` for a plot's series and a chip's fill, so
+under that theme `resolve` returned `NO_STYLE` for all eight and every series drew in the default
+foreground.
+
+**One colour, on the theme a reader chooses when they most need to tell things apart.**
+
+### Why nothing saw it
+
+`NO_STYLE` is what a *decoration palette at one bit* also returns, correctly. So the frame under
+high-contrast is byte-identical to a correct frame under a 1-bit terminal, and every assertion
+about widths, heights, glyphs and row counts passes — C12 I50a caps series at eight *because* the
+palette distinguishes eight, and the cap was enforced against a palette that was not there.
+
+**The contrast suite could not reach it either**, and for a reason worth stating: `resolve.ts`
+skips the contrast gate for `carries !== "meaning"`, so a decoration palette is checked by
+nothing. A missing one is checked by nothing twice over.
+
+### The omission was not a ruling
+
+The theme's header is unusually explicit about what it cannot promise — *at 4-bit it is not
+provable at all* — and says nothing about `categorical`. It carries `spectrum`, which is also
+`carries: "decoration"`, so there was no principle refusing decoration here. It was left out.
+
+**The remedy is the dark variant's eight**, and that is a ruling rather than a copy: they are
+Okabe–Ito, chosen for distinguishability under the three common colour-vision deficiencies, which
+is exactly the property this theme exists to maximise. A set solved for luminance alone would be
+worse at the thing being solved for. The ground moves from `#1a1a1a` to `#000000`, which raises
+every ratio rather than lowering it.
+
+### What it says about the instrument
+
+F172 was filed as *a defect that becomes reachable when `continuous` lands*. The gate written for
+that future case found a present one on its first run, in a file nobody was editing. **A rule
+that can fire is worth more than the case it was written for** — and the case it was written for
+has not happened yet.
+
+---
+
+## F180 — the heatmap was unreachable from the builder, and the rule said it was covered ★★★★
+
+| | |
+|---|---|
+| **Surface** | `b.plot`, and every consumer that would have drawn a matrix |
+| **Reached for** | writing the heatmap's first real consumer |
+| **Verdict** | **a form with a walk, a type, a validator, a renderer, three golden frames and a mutation pass — and no door** |
+| **Absorbed by** | `b.plot` takes `form` and `xLabels`; `plot.xLabels` leaves `BUILDER_OMISSIONS` |
+
+`PlotForm` has three members. `b.plot` wrote `form: "line"`; `b.spark` writes `"sparkline"`.
+**`"heatmap"` was buildable by nothing in the public surface.** Every fixture that draws one
+reaches past `b` into `block()`, which is what a test may do and an application may not.
+
+That is the whole explanation of a fact this session kept restating as a mystery: *the heatmap
+has data and no drawing*. It was not waiting for a consumer. **A consumer could not have been
+written.**
+
+### Why MG27 passed it, which is the part to keep
+
+MG27 asks whether a builder's constructed literal **mentions** each field of the block type.
+`form: "line"` mentions `form`. So a **closed union with one hardcoded arm satisfies a check
+about names** — the rule is about a field being writable, and what was missing is a *value* being
+reachable.
+
+**This is F84's shape one rule along**: a correct check whose subject is narrower than the thing
+it reads as covering. MG27 is right that `form` is wired; it has no opinion about `PlotForm`
+having three members and the door offering one.
+
+### And a second instance in the same edit
+
+`plot.xLabels` sat in `BUILDER_OMISSIONS` reading *a fixed three-tuple, and no surface has wanted
+one; a caption sentence does not fit it*. The history heatmap wants exactly that three-tuple —
+`-N ticks`, nothing, `now`.
+
+**A reason with two clauses expires one at a time**, and the equality arm cannot see it: that arm
+catches an entry that has become *unnecessary*, never one whose *argument* has. Both clauses were
+true when written; one stopped being true when a surface arrived, and nothing was watching the
+difference.
+
+### What it cost
+
+The heatmap shipped complete and unusable. The walk found seven defects before any code; the
+build took a spec section, an invariant, a renderer, a validator arm, three golden variants, nine
+mutations and an audit — and an application could not construct one. **Every instrument was
+pointed at whether it was correct, and none at whether it was reachable.**
+
+---
+
+## F181 — the coverage rule reads one of the two builder files ★★★
+
+| | |
+|---|---|
+| **Surface** | `b.figure`, `BUILDER_OMISSIONS`, and MG27's subject |
+| **Reached for** | asking whether a `setOhlc` on `FigureBuilder` would have anything to draw |
+| **Verdict** | **ten exemptions whose reason is not the reason, and six parameters no caller can pass** |
+| **Absorbed by** | MG27's blind-spot paragraph gains the file scope; `setOhlc` withheld until `b.figure` forwards `plotStyle` |
+
+F180's shape one door along. MG27 asks *a block field no builder can set* and its violation reads
+*buildable by nothing public* — and `checkBuilderCoverage` opens `src/data/viewmodel/types.ts` and
+`src/shell/builders/index.ts`. **`figure.ts` is a second builder file and the rule never reads it.**
+
+Measured, not inferred — `b.figure({height: 5}).setQuartiles([…]).setCategories(["a"]).setBands(7).build()`
+returns a `Plot` carrying all three:
+
+```
+BUILDER_OMISSIONS               14 entries
+set by FigureBuilder.build()    12 — categories layout binning quartiles offsets totals
+                                     startDate bands facets segments xScale yScale
+of those, publicly reachable    10 — every one with a setter
+```
+
+The entries read *step 0 scaffolding — builder shorthand lands in step 11*, and that sentence is
+**true**: `b.plot` has no `categories` parameter. It is also not the claim the rule enforces. So the
+list reads as *nothing can set this* while meaning *`b.plot` has no shorthand for this*, and the two
+diverge silently for ten fields. **This is the correct-sentence-justifying-the-wrong-decision class**
+(F84) inside an exemption list rather than a scope.
+
+### The two that are genuinely unreachable are unreachable for a different reason
+
+`xScale` and `yScale` **are** written by `FigureBuilder.build()` — from `this.opts`, and `b.figure`
+does not forward them. Six of `FigureOpts`' twelve fields are in that state:
+
+```
+FigureOpts declares      title height axes yFormat yMin yMax
+                         colormap xScale yScale plotStyle plotDetail plotCorners
+b.figure forwards        the first six
+```
+
+So the chain declares six parameters no caller can pass, and its own `build()` faithfully spreads
+three of them from a field that is always `undefined`. Nothing is wrong in either file on its own.
+
+### What it cost here, which is a method not written
+
+`plotStyle` is one of the six. A `setOhlc` on the chain would have set candles that no chain could
+ever ask to be drawn as candles — **an operation with no seam to call it from**, and the reason it is
+absent from `figure.ts` with a comment rather than present and inert. The remedy is `b.figure`
+forwarding `FigureOpts`, at which point the method lands and ten exemptions get re-argued or removed.
+
+### The instrument
+
+Not a test and not a gate. It is *does this new member have a caller that could reach it* — asked
+because `plotStyle: "candlestick"` was the field being added, and the chain's copy of that union was
+the thing that had to be touched. **The union copy was the visible defect and the file scope was the
+one underneath it.**
+
+---
+
+## F182 — the fix landed on the two arms it was found on, not on the class ★★★★
+
+| | |
+|---|---|
+| **Surface** | `formatReadout`, and every plot number a reader reads rather than looks at |
+| **Reached for** | adopting `formatReadout` in `cursorReadout`, which is what F175's own remedy asked for |
+| **Verdict** | **a bar with no `yFormat` draws `45` for `45.2` — F175's defect, in the arm its fix did not touch** |
+| **Absorbed by** | the numeric arm keeps what the producer sent; `readoutSet` formats a set at one precision |
+
+F175 is *a tick is a mark on a scale and a readout is the answer* — `docker stats` sends
+`45.2%` and the cell drew `45%`. Its remedy was `formatReadout`, a named entry point beside
+`formatValue`:
+
+```ts
+if (format === "percent")  return `${v.toFixed(READOUT_PLACES)}%`;
+if (format === "fraction") return `${(v * 100).toFixed(READOUT_PLACES)}%`;
+return formatValue(v, format);          // ← the arm nothing fixed
+```
+
+**The two arms the finding was found on got a precision and the default arm kept
+`decimalsFor`**, which answers *how many digits does an axis label at this scale want* — two
+significant figures. Measured:
+
+```
+formatReadout(45.2,  undefined) = "45"        formatReadout(45.2,  "percent") = "45.2%"
+formatReadout(12.4,  undefined) = "12"        formatReadout(12.75, undefined) = "13"
+```
+
+Rendered, a `bar` block with `series: [{ values: [45.2, 8.7, 91.35] }]` and no `yFormat` draws
+`45`, `9`, `91`; the identical block with `yFormat: "percent"` draws `45.2%`, `8.7%`, `91.3%`.
+**Same function, same values, one loses the digit it exists to keep.**
+
+### Why nothing caught it
+
+`categorical.ts` carries a comment reading *`axes.ts` records this exact class as having
+happened three times before; this was the fourth*. Accurate, and about the call site rather
+than about the function — the fourth instance was fixed by **calling** `formatReadout`, and
+whether `formatReadout` was right on every arm is a different question that the comment's
+confidence closes off.
+
+The golden corpus is silent: 260 frames pass unchanged across this fix, so no committed frame
+exercises a plot number with a fractional value and no `yFormat`.
+
+### And a second one underneath, on a set rather than an arm
+
+With the arm fixed, the four values of a candlestick's readout came out
+`O 12.4  H 13.1  L 12  C 12.9` — **four precisions for four readings of one quantity**, which
+is F177 exactly: *the eye compares the digit count before it compares the value*. F177 fixed it
+for an axis's labels, where the caller names a shared precision; nothing named one here because
+nothing had formatted a *set* before. `readoutSet` is that name, and the claim it encodes —
+*these values are one quantity* — is one only a caller can make: a plot's several series are
+not.
+
+### The rule that replaced the floor
+
+A floor of one decimal was tried first and rounds `12.75` to `12.8` — the same digit loss one
+order down. What holds is **what the producer sent, short of noise**: the decimals of the
+shortest round-tripping representation, capped at six. `1284` stays `1284`, `0.023` stays
+`0.023`, `1/3` stops at `0.333333`.
+
+### The instrument
+
+Reading the frame of my own change. The readout was correct against its spec's example on the
+`percent` arm and wrong on the default one, and only the two side by side say so.
+
+---
+
+## F183 — the reference comparison read one variant per form, and said so nowhere ★★★
+
+| | |
+|---|---|
+| **Surface** | `make refdiff`, and every catalogue variant that is not a form's first |
+| **Reached for** | adding a candlestick fixture, which can only ever be a variant |
+| **Verdict** | **42 of 100 variants compared, in an instrument whose header records two other limits carefully** |
+| **Absorbed by** | `EXTRA_VARIANTS`, keys of `form` or `form.variant`, and the count printed in the generated README |
+
+Both halves independently took the first variant of each form — `Object.values(variants)[0]` in
+`export-fixtures.ts`, `next(iter(variants.items()))` in `reference.py`. Measured:
+
+```
+forms                 42
+catalogue variants   100
+compared              42        line.legend-right, violin.bimodal-sharp, …
+never compared        58
+```
+
+The Makefile calls it *every form beside its braille-rendered matplotlib twin*, and **at the form
+level that is true**, which is exactly why it stayed unwritten. `reference.py`'s header records
+two limits with care — the braille grid, and that a form absent from `RENDERERS` is reported
+rather than dropped — and it is silent about this one, so the instrument reads as covering the
+catalogue.
+
+### What it was hiding, and what made it load-bearing
+
+The raincloud ladder is four variants of `violin`; `violin` compares `bimodal-sharp`. So the
+whole of `plotDetail`'s ladder — the rungs, the strip, both vertical arms — has never been
+compared against anything, and a green refdiff run said nothing about it either way.
+
+It became load-bearing when a **style** arrived. A candlestick is `form: "line"`, so it cannot be
+a form's first variant without displacing `line`'s. **Adding the fixture without fixing this
+would have been a fixture nothing rendered** — the same shape as an anchor that does not match,
+which the mutation harness already distinguishes from a survivor and this one did not.
+
+### The fix, and the half of it worth keeping
+
+Keys are now `form` or `form.variant`, and **our side declares which** — `ours.json`'s grid keys
+are the authority the reference iterates. That is not a new rule: the header already states it
+for the *row count*, having learned it from `sparkline` rendering one row against sixteen. The
+same sentence covers which fixtures, and did not.
+
+The generated README now prints *N of 100*, so the residue is a number a reader sees rather than
+an absence they would have to go looking for.
+
+### The instrument
+
+Asking what a new fixture would actually be compared against, before adding it. The comparison
+would have run green with the candlestick in the tree and never rendered it.
+
+
+---
+
+## F184 — the palette indexed the row, and the rule saying it should was a code comment ★★★★
+
+| | |
+|---|---|
+| **Surface** | a histogram's bins and a correlogram's lags — rows the renderer cut from a continuous axis |
+| **Reached for** | a user asking *I don't think each bar of a histogram should be a different colour?* |
+| **Verdict** | **the claim it followed exists in one comment and no file, and the first correction over-reached** |
+| **Absorbed by** | C12 §3t, I38 and `ROW_IS_AN_IDENTITY` — colour names an identity, and a slice of an axis has none |
+
+Eight bins of one distribution drew eight colours. Nine lags of one statistic drew seven. The
+channel was naming an identity per row, and those rows have none — `[15.4, 24.1)` is a cut this
+renderer made, not a thing the caller chose.
+
+**The rule it was following:**
+
+```
+src/presentation/plot/definition.ts:998
+  The default stays: a plain bar is one series across N categories and the
+  category *is* what a colour can name.
+```
+
+That sentence is the whole record. `grep` across `docs/`, `src/`, `test/` and `tools/` returns
+that line and nothing else — the spec never states it, no invariant covers it, and the four
+enforcement scans that read colour have nothing to say about which slot a row takes. It was
+written while fixing the grouped bar, where it was **true**: one row per *(category, series)* pair
+means slot 3 named the row rather than `before`, group A drew the legend's two colours and group B
+drew two others. A correct sentence about one instance, sitting in the parameter doc of the
+function that then applied it to thirty forms.
+
+**Measured**, in `make refdiff`'s own container — matplotlib 3.9.2, seaborn 0.13.2:
+
+```
+ax.bar 5 categories · ax.barh 4 · ax.hist 8 bins             1 colour
+ax.broken_barh 4 rows · ax.eventplot 3 tracks                1
+ax.acorr 9 lags · ax.boxplot 3 · ax.violinplot 3             1
+sns.barplot · histplot · countplot · stripplot               1
+sns.boxplot 3 bands · sns.violinplot 3 bands                 1
+two ax.scatter calls                                         2
+sns.boxplot(hue=x), 3 levels                                 3
+```
+
+### The first correction read the measurement as the ruling, and that is the finding under the finding
+
+*The palette indexes the series* fits all eleven rows and is **not** the rule behind them. It is
+the references' taste, and taking it whole took the colour off every named band as well as off the
+bins — box plots, violins, bar categories, funnel stages, all of it. Reported by the user within
+the same turn, twice, and correctly.
+
+**A measurement settles what is true; it does not settle what to draw.** The partition is the row
+axis, and it splits exactly where the two cases part:
+
+| the row axis | the rows | colour | forms |
+|---|---|---|---|
+| continuous, sliced by the renderer | `[15.4, 24.1)` · lag 3 | nothing to name — **one colour** | `histogram`, `autocorrelation` |
+| a set of names the caller supplied | `control` · `Opex` · `Deploy` | an identity — **a slot each** | every other categorical form |
+
+Nothing but measurement reaches the first row: there is no reading under which eight bins are
+eight identities. Nothing but taste reaches the second, and this component's differs from the
+references' with a reason — they have fill against edge, alpha, marker size and a wide canvas; a
+terminal band is one row of glyphs in a narrow gutter, and a reader tracking `dose-b` across three
+bands is using the colour. Their answer stays reachable: a series with an explicit `tone` takes it.
+
+**`ROW_IS_AN_IDENTITY` is the axis the rule was missing**, `Record<PlotForm, boolean>` and total,
+so the thirty-fifth form declares which it is or does not compile. Deliberately not `SHARES_CELLS`,
+which reads as though it answers this and does not: that record is indexed by *form* and its
+`bar: true` is about *layers inside one bar*, so a plain bar and a stacked one share an entry and
+want opposite answers from it. Two records, two questions.
+
+### What the walk found and what only the pass found
+
+**Three renderers held their own copy of the decision** — `categoricalForm`, its transposed twin
+`categoricalColumnForm` (C12 §3j: *a different renderer, not a flag*), and `bandedForm`. Fixing one
+would have left the vertical arm cycling.
+
+**A row past the last label was taking a slot.** `categoricalForm` loops to `areaRows`, so a
+timeline of three tracks in four rows asked for slot 3 and painted a blank row in it — invisible,
+and still a fourth colour in a frame with three tracks. `bullet` had it too. Found by counting the
+regenerated catalogue against what a test asserts, which is a disagreement a reader would hit and a
+suite would not.
+
+**And the mutation pass found the row that could not tell two arms apart.** Removing the timeline's
+`refFor` declaration survived sixteen green assertions, twice. The first reading — *it is redundant
+now* — was wrong; the second — *no test builds a per-track tone* — was also wrong, because the row
+built to test that asserted *each track has its own colour and no other row has it*, which the
+default satisfies too. What separates them is **which** colour: the declaration reads *this
+track's* tone, the default reads the first track's. The fixture had to become a pair — the same
+timeline with and without a tone on the middle track — before the mutation died. Twice past a
+plausible diagnosis, and the frame is what settled it.
+
+Eleven mutations, all caught. Golden frames moved twice and **every glyph is identical to HEAD once
+colour is stripped**, which is the check that says the change did what it claimed and nothing more.
+
+**Under it, a gap named rather than closed:** a dumbbell's row holds two series and draws in one
+span, so `before` and `after` are separated by `●` against `○` alone where the reference gives them
+two colours. That is a `BandRow` with two owners and it is not built.
+
+---
+
+## F185 — a mirror with no centre, and the corpus that could not have caught it ★★★
+
+| | |
+|---|---|
+| **Surface** | both violin arms, at every even extent — three rows of ink above the rule against two below |
+| **Reached for** | a user calling it *kinda ugly*, having already been told it was there |
+| **Verdict** | **two correct statements meeting, with the right comment standing over one of them** |
+| **Absorbed by** | C12 I39 and §3i — the mirrored rung draws on an odd extent, the spare cell precedes it |
+
+Both arms split their slot as `⌊(k−1) ÷ 2⌋` above and `⌈(k−1) ÷ 2⌉` below. That is symmetric and
+carries a comment saying exactly why:
+
+```
+kde.ts — the offset is rounded once and applied both ways. Rounding each edge
+independently is not symmetric, because Math.round breaks ties toward +∞ …
+A violin that is asymmetric by a row is a violin that is wrong, and it is
+invisible in anything but a mirror assertion.
+```
+
+Then both take the spine at `round((k−1) ÷ 2)` — and for an even `k` that is the **lower** of the
+two baselines, not the axis they mirror about. The outline reflected about `k/2 − 0.5`; the rule,
+the box, the median and the closing points sat half a cell below it. Measured at 4, 6 and 8, both
+arms, every time.
+
+**Neither statement is wrong and the pair is**, which is why that comment is right about the class
+and did not reach the instance. It also names its own remedy and nothing built it: **there was no
+mirror assertion.**
+
+### The corpus could not have supplied one, and the first reason given was wrong
+
+Landing the fix moved **four vertical frames and not one horizontal frame**, out of 284. The
+first reading — *the horizontal fixture's band height is odd* — went into the spec, and measuring
+it gives **four**. Even. The reason is the **rung**: `ONE_PER_FORM`'s violin is `height: 12` over
+three categories, and §3i spends four rows a band on the **raincloud**, which is one-sided by
+construction and has no reflection to be wrong about. The mirrored outline starts at five, so the
+ladder's top rung had no horizontal golden frame at all.
+
+The observation was right and the reason under it was not — F58's shape, one turn wide instead of
+four documents, and caught because a spec sentence naming a number is a sentence someone can go
+and count. **A green run cannot tell *a case the corpus covers and passes* from *a case the corpus
+does not reach*.**
+
+### The spare cell's side is a derivation, not a preference
+
+`bandedForm` places a band's name at `⌊rows ÷ 2⌋` of the figure it is handed. `columnLabels` places
+a band's tick at `x + ⌊w ÷ 2⌋`. Padding **before** the figure lands the spine on both, at every even
+extent; padding after lands it one cell short of both. Two placements neither of which the fix
+touches, agreeing.
+
+### What each instrument contributed
+
+- **The frame-read** found it — the user's, from a picture, after the same figure had been through
+  two fixes for its tails.
+- **The sweep** is what it needed: one assertion per extent, both parities, both arms, both
+  alphabets. A suite that picks a height tests whichever side of the parity it picked.
+- **The mutation pass** killed the padding-side mutations immediately and left one alive — *the
+  vertical arm's fill row forgets the spare column*, which the sweep could not reach because it
+  starts at three and the fill is drawn below two. Sixty-two green rows and a path with no
+  coverage. **Only the vertical arm has to pad**: `categoricalColumnForm` composes each band into
+  one row, so a short string moves every band to its right, while `bandedForm` stacks and centres.
+- **`MIRRORED`** is the golden corpus this needed, at six rows a band and seven — the case that was
+  broken and its control, so parity is something a reader compares rather than something the spec
+  asserts.
+
+---
+
+## F186 — one merge rule, three symptoms, and a test that failed for two different reasons ★★★★
+
+| | |
+|---|---|
+| **Surface** | every figure that composites layers — a pie's wedges, a radar's polygons over its frame, `slope`'s overlaid series |
+| **Reached for** | two user reports read as separate: *gaps appear between the pie's slices* and *the radar's lines seem dashed / have gaps* |
+| **Verdict** | **`mergedRow` gave a whole cell to the first layer that inked it, and every compositing form folds to braille before it gets there** |
+| **Absorbed by** | C12 I40 and §3u — the merge is per dot where the vocabulary allows it |
+
+```ts
+for (const layer of layers) {
+  if (isBlank(candidate)) continue;
+  cell = candidate; cellRef = layer.ref; break;      // ← the cell, to one layer
+}
+```
+
+**The two reports are one defect.** A pie's disc is covered by construction — the fractions sum
+to one, so every dot inside the radius belongs to some wedge — and `pie-default-40` had **seven
+cells flanked by a full cell on each side that were not themselves full**. The radar has it
+twice: its layers are `[labels, …polygons, frame]`, so a polygon crossing another loses cells to
+it, and the frame is drawn **only where nothing else drew**. Fragmented rings and strokes that
+read as dashed and are not — `dashFor` returns solid at any depth above one bit.
+
+A braille cell is `U+2800 + bits`, so the union is an OR. Where any candidate is not braille the
+first-wins rule stands: a letter and a polygon cannot share a cell.
+
+**The colour stays one layer's and the spec says so** rather than implying otherwise. A `Span`
+carries one `ColourRef`, so two wedges meeting in a cell draw both sets of dots in the first
+wedge's colour — the union removes the gap, not the boundary's inexactness. And the priority
+order stays the ref's rather than becoming the densest layer's, because that order is a ruling
+(labels over polygons over frame) that a dot count would overturn wherever the frame was denser.
+
+### The assertion failed twice, and only the second failure was the code's
+
+LM1 read *every cell between two full cells is itself full* and failed against the shipped
+code — correctly. It then failed **after the fix**, and the second failure was its own: it
+dropped the non-braille cells from a row and read neighbours out of the filtered array, so it
+compared the last cell of the disc with the first cell of the legend's swatch, forty columns
+away. A probe over the raw row found no partials at all.
+
+**A red test agreeing with you is not evidence.** Both failures said *partial cells exist*; one
+was true and one was an index. What separated them was measuring the row directly rather than
+re-reading the assertion.
+
+### The mutation pass found the clause nothing had a subject for
+
+Four mutations, three killed at once. **The letter guard survived** — the clause that stops a
+polygon overwriting a category name — because `labelRows` places the names outside the disc and
+at every width the catalogue uses no polygon cell ever lands on a letter. Measured with every
+value at the ceiling:
+
+```
+80×17 · 60×13 · 40×11     0 label/polygon clashes
+34×9                      2
+28×9                      6
+```
+
+The disc grows into its labels as the room shrinks, so the guard has a subject at 34 columns and
+below and none above. The row is anchored there now, and asserted as containment — *no letter
+becomes a glyph* — rather than as *the names are still readable*, which is the weaker claim and
+the one that passed against the mutation.
+
+### What the whole corpus says about the change
+
+Every golden frame that moved was compared cell by cell against its predecessor:
+
+```
+cells that gained dots   95
+cells that lost dots      0
+changed some other way    0
+```
+
+**Provably additive**, which is the check that says a merge rule did what it claimed and nothing
+else — and it reaches `slope`, a form neither report mentioned and neither of us predicted.
+
+---
+
+## F187 — three fixes for one nit, and two of them were no-ops the renderer never told me about ★★★
+
+| | |
+|---|---|
+| **Surface** | every catalogue PNG — the frame's corners sit three pixels right of the border between them |
+| **Reached for** | a user's *really small nit*, with an image |
+| **Verdict** | **librsvg implements neither `textLength` nor a per-glyph `x` list, and ignoring an attribute looks exactly like honouring it** |
+| **Absorbed by** | one `<text>` per glyph in `catalogue-png.mjs` — what the braille path already did |
+
+**The frames were never wrong.** `PC12` asserts every catalogue frame's border sits in one column
+and passes, and the SVG confirms it: every frame run and every data row's border ends at
+**x=670.4**, to the tenth of a unit. The defect is entirely in the image.
+
+### Four diagnoses, three of them wrong, and each was checked before being dropped
+
+| what I thought | what measuring said |
+|---|---|
+| the font's advance drifts over a long run | true, and **not fixable by `textLength`** — the PNG was byte-identical with and without it |
+| an `x` list fixes it | **no** — librsvg uses only the first coordinate |
+| the corner glyph's stem sits right of `│`'s | **no** — `│ ┐ ┘ ┌ └ ┤` all rasterise their stem to the same two columns at this density |
+| it is hinting at 14px | **no** — rendering at 4× and resampling down does not move it |
+
+The measurement that settled it renders a 76-glyph rule ending in `┐` three ways and the same
+`│` alone at the same column:
+
+```
+one <text> with an x list     x = 1285
+one <text> per glyph          x = 1282
+the border alone              x = 1282
+```
+
+**An attribute a renderer ignores reads exactly like one it honours.** That is why every step
+here was a pixel measurement and none of it an assertion about the SVG — the two rejected fixes
+would both have shipped green, with a test asserting the attribute was present and an image
+unchanged.
+
+### The instrument that found the wrong ones was the same one that found the right one
+
+Reading the frame, at increasing magnification. The 3px first appeared as a split in a
+rightmost-ink histogram — **and that histogram lied twice**: once because I mapped rows at a
+pitch of 32 when the image is 2× of a 16px cell over nine rows, and once because a threshold on
+a low-contrast grey put the same `│` at three columns on one row and six on another. Cropping the
+border strip and enlarging it is what showed the step for certain, and it is the only step of the
+four that never gave a wrong answer.
+
+### What it cost and what it bought
+
+One `<text>` per glyph is about 1600 elements a frame against a few dozen. The full catalogue —
+**560 PNGs and a contact sheet — renders in 7 seconds**, so the cost is not a cost. What it buys
+is that no glyph's position depends on any other glyph's advance, which is the property the
+braille path has had since it was written and the box-drawing path never had.
+
+`PC14` asserts the shape of the output — one element per glyph, each at its own column — rather
+than the presence of an attribute, for the reason above. `PC10` and the `xOf` helper had to be
+rewritten with it: they searched for a `<text>` holding a whole word, and there are no longer any.
+
+---
+
+## F188 — a larger value drawing a shorter bar, from a rule that is correct per row ★★★★
+
+| | |
+|---|---|
+| **Surface** | every horizontal bar and histogram — any chart whose values cross a digit boundary |
+| **Reached for** | building the vertical arm's value labels, and reading §3b's rule before extending it |
+| **Verdict** | **the number's allowance was the row's, and the run is scaled against what is left of the row** |
+| **Absorbed by** | C12 I20 and §3b — one allowance for the chart, and the standing number goes above the run |
+
+§3b says *the number takes the width it needs and the run takes the residual: the run **is** the
+axis, so it is the part that may shrink.* Correct, and applied per row it inverts. Measured at
+`max: 100` in 40 cells:
+
+```
+ 99   ████████████████████████████████████▋ 99      37 cells
+100   ████████████████████████████████████ 100      36 cells
+```
+
+**Every count in both rows is right.** `100` is one column wider than `99`, so its run was scaled
+against 36 cells where its neighbour had 37 — and the picture says the smaller value is bigger, in
+the one place a reader is comparing lengths rather than reading numbers.
+
+The allowance is the widest label in the chart now. The rule is unchanged — the run is still what
+shrinks — and it shrinks once for all rows instead of per row against a different residual.
+
+### The transpose does not hold, which is the half that was asked for
+
+Horizontally the run **is** the axis: the row's own width is the scale, so the label may take part
+of it and the picture stays true. Vertically it is not — a column's height is read against the
+value scale in the **gutter**, so shortening a bar to make room for its number would draw a value
+its own axis contradicts.
+
+So the standing number goes in the row **above** the bar's top, centred on its column, and is
+**dropped** rather than made to fit: when the top is row 0, and when the number is wider than its
+column, because a truncated number is a different number and one that spills labels the
+neighbouring bar. **Dropping is per bar, so the tallest bar is the one that loses its number** —
+which is right rather than unfortunate, its height being what the axis already says most clearly.
+
+### The corpus could not see either half, and the second time it is the fixture
+
+`ONE_PER_FORM.bar` was `[10, 25, 15, 30]` — **four two-digit numbers**, so every bar reserved the
+same width whatever the rule was, and *one allowance for the chart* and *each row against its own*
+render identically. Landing the fix moved **eight vertical frames and not one horizontal frame**,
+out of 292. `[8, 25, 15, 100]` is what makes it visible, and twelve frames move.
+
+This is F185's shape a step along: there the corpus could not reach the rung, here it could not
+reach the *shape of the data*. **A fixture whose values are all one width tests a width rule
+against itself and agrees.**
+
+### And the mutation pass found the same gap inside the new tests
+
+Six mutations, five killed at once. **The partial top cell survived** — the clause that puts the
+number above a bar whose top cell is a half-step rather than on it — because BV3's fixture was 50
+of 100 in ten rows, which is *exactly five whole cells*. With `part` zero, counting the partial
+cell and not counting it give the same answer. 53 of 100 is five cells and two eighths, and the
+row is anchored there now, with the partial cell shown to be partial before anything is asserted
+about the row above it.
+
+---
+
+## F189 — `yScale: "log"` chooses the ticks and moves nothing ★★★★
+
+| | |
+|---|---|
+| **Surface** | every plot with a non-linear `yScale` — the labels are logarithmic, the data is not |
+| **Reached for** | building the x axis, and checking whether a log domain needed a transform |
+| **Verdict** | **the scale reaches the labels and never the rasteriser, so the two halves of one axis disagree** |
+| **Absorbed by** | nothing yet — **open**, and named at C12 §3d.1's log row |
+
+`scatter` of `[1, 10, 100, 1000]` at height 9, with and without `yScale: "log"`:
+
+```
+linear                          log
+1000 ┤                     ⠈│   1000 ┤                     ⠈│
+     │                      │        │                      │
+ 750 ┤                      │        │                      │
+ 500 ┤                      │        │                      │
+ 250 ┤                      │    200 ┤                      │
+   0 ┤⡀     ⡀     ⠈         │      1 ┤⡀     ⡀     ⠈         │
+```
+
+**The labels changed and not one point moved.** 1, 10 and 100 all sit on the bottom row in both;
+on a log axis they belong at 0, ⅓ and ⅔. `axisFor` dispatches on the scale and returns log-valued
+ticks; `rowOf` places by `(v − min) / (max − min)`, unconditionally.
+
+**This is the class `yLabels` records of itself, one layer down.** Its own body carries the note
+*"`yLabels` was called without `yScale`, so a log axis was labelled linearly"* — a defect between
+the *tick chooser* and the *label writer*, found and fixed. The same seam exists between the tick
+chooser and the **rasteriser**, and nothing had asked.
+
+**The x axis does not share it, and the asymmetry is real rather than an inconsistency.** A y value
+*is* the datum, so a log y needs the rasteriser to plot `log(v)`. An x sample is placed by its
+**index**, evenly, and the domain declares which value that index carries: under `xMin: 1,
+xMax: 1000, xScale: "log"`, sample *i* of *n* holds `1000 ^ (i / (n − 1))` and already sits at
+`i / (n − 1)` of the width, so placing its tick at `log(v) / log(max/min)` is what makes the label
+agree with the sample beneath it. That is built; the y transform is not.
+
+**Found because `xScale` had no consumer at all.** Before this work it was declared on `Plot`,
+forwarded by `figure.ts`, and read by nothing in `src/` — so asking *what does the existing scale
+machinery actually move* was the first question the field had ever been put to.
+
+---
+
+## F190 — three tests that asserted a claim by a proxy, and the proxy broke the day the frame gained a row ★★★
+
+| | |
+|---|---|
+| **Surface** | `T2.12b`, and two rows of the x axis's own new suite |
+| **Reached for** | landing the x axis, which writes numbers where no numbers were |
+| **Verdict** | **each asserted something true *about* the claim rather than the claim, and each held only while the rest of the frame stayed quiet** |
+
+**`T2.12b` asked whether the y axis reaches zero by grepping the whole rendered frame for `0`.**
+Its data is flat at 100.2, so unpinned the y axis has no zero and the control passed — until the
+x axis wrote `0` as its first sample index, and a correct y axis failed. The claim was always
+about the *gutter*; that is what it reads now. **And narrowing it once was not enough**: splitting
+every row on its axis edge and keeping the head returns the whole x-label row, which carries no
+box-drawing character at all, so the first narrowing still read the indices it was written to stop
+reading. Only rows that *have* an edge have a gutter.
+
+**The other two are the mutation pass finding the same shape in rows written the same hour.**
+§3d.1's load-bearing row is that a candlestick's ticks come from its own pitch, and both of its
+tests survived their mutations:
+
+- one called `xTickRow` with a **hand-written** column mapping — the mechanism, never the wiring —
+  so removing the wiring changed nothing it could see;
+- the other filtered the empty rows out of the frame before taking the last one, and asserted *the
+  last row is not blank* of the frame's bottom rule, which is never blank.
+
+Both now read the composed frame and assert what the ruling says: **every tick has a candle in its
+column.** Ten mutations, all caught after.
+
+**The pattern under all three is one sentence**: an assertion that is *implied by* the claim is not
+the claim, and it stops being implied the moment anything else in the picture changes. `T2.12b`
+had been correct for as long as the frame had nothing else to say.
+
+---
+
+## F192 — a categorical chart with more rows than height draws what fits and says nothing ★★★
+
+| | |
+|---|---|
+| **Surface** | every form through `categoricalForm` — bar, histogram, lollipop, dotplot, funnel, forest, gantt, waterfall, bullet |
+| **Reached for** | sizing a two-series histogram fixture, where nine bins grouped over two series is eighteen rows |
+| **Verdict** | **`labels.slice(0, areaRows)` — the excess is dropped with no notice, no count and no mark** |
+| **Absorbed by** | nothing — **open** |
+
+```
+8 categories at height 4:
+    ┌────────────────────────────────────┐
+  a ┤████▎                              1│
+  b ┤████████▌                          2│
+  c ┤████████████▊                      3│
+  d ┤█████████████████                  4│
+    └────────────────────────────────────┘
+```
+
+`e` through `h` are not there and nothing on the frame says so. **A reader has no way to know
+they are looking at half a chart** — the frame closes, the axis is correct, every count is right.
+
+**I8 is the neighbouring rule and does not cover this.** It says *series that cannot be given a
+row are named in a legend, never dropped silently*, and it is about **series**; these are
+**categories**, and the mechanism it asks for — a legend naming what did not fit — has no
+counterpart on the category axis. §3g's *horizontal placements truncate with a count* is the
+shape the remedy would take.
+
+**Found by making it twice as likely rather than by looking for it.** A grouped histogram is one
+row per *(bin, series)* pair, so two series double the row count and a chart that fit stops
+fitting. The fixture is sized to eighteen rather than sixteen so the catalogue does not ship a
+frame missing a bin — which is the workaround, not the fix.
+
+---
+
+## F193 — the delegation that fixed one invariant reintroduced another, and only the frames said so ★★★★
+
+| | |
+|---|---|
+| **Surface** | every histogram, at the moment it learned to draw more than one series |
+| **Reached for** | C12 I42 — *binned, a histogram is a bar chart of counts, so the drawing is the bar's* |
+| **Verdict** | **the delegation rewrote `form` to `"bar"`, and three records are keyed on the form's name** |
+| **Absorbed by** | the block keeps `form: "histogram"`; the delegation is a call, not a cast |
+
+Handing the binned block to `FORM_ROWS.bar` is right — all four layouts arrive without being
+invented. Setting `form: "bar"` on the way is not, and nothing in the type system says so:
+
+```
+- [1.80, 2.60) ┤ 38;2;230;159;0 █████████████████▎      3│
++ [1.80, 2.60) ┤ 38;2;86;180;233 █████████████████▎      3│
+- [2.60, 3.40) ┤ 38;2;230;159;0 ███████████▌            2│
++ [2.60, 3.40) ┤ 38;2;60;191;154 ███████████▌            2│
+```
+
+**Every bin in a different colour — I38's defect, in the commit that fixed I42.** That is the
+user's original report, reintroduced four steps later by a delegation whose purpose was
+unrelated. `ROW_IS_AN_IDENTITY` is keyed on `PlotForm`: `bar`'s rows are names a caller chose and
+a histogram's are cuts the renderer made, and rewriting the field made the block answer the wrong
+one. `HAS_POSITION_AXIS` and `SHARES_CELLS` are keyed the same way.
+
+**The delegation is fine and the cast was not.** Nothing in the bar arm branches on the form's
+name; it reads those three records and they should all give the histogram's answers. With `form`
+left alone, **all 292 golden frames pass unchanged** — which is simultaneously the proof that the
+regression is gone and the proof that a single-series histogram is byte-identical to what it was.
+
+### Nothing but the frames could have caught it
+
+- The type checker cannot: `form: "bar"` is a valid `PlotForm`.
+- The unit rows cannot: they were written for the multi-series case, which has no
+  single-colour claim to make.
+- **The mutation pass cannot**, and this is the part worth keeping: every mutation of the new
+  code was caught, because the defect is not in the new code — it is in one word of the block
+  handed to old code.
+- The colour rows from I38's own commit **did not fire**, because they render `histogram` blocks
+  and the substitution happens inside the renderer, after the assertion's reach.
+
+What caught it was four golden frames moving in a commit that had no business changing them, and
+reading the diff instead of updating it. **A snapshot records; the reading is the check** — and
+this is the second time in this arc that a `-u` would have laundered a defect into the corpus.
+
+**And the corpus could not see the new case either.** `ONE_PER_FORM.histogram` has one series, so
+every layout renders the same picture and the shared-edge work moved no frame at all. *Green
+because it is right* and *green because it never ran* are the same colour. `two histograms, one
+edge set` is that corpus — grouped, stacked and vertical, at both capability sets and both widths.
+
+---
+
+## F194 — a mutation that hangs is evidence about the code ★★★★
+
+| | |
+|---|---|
+| **Surface** | the braille violin's outline, and any density it cannot sample |
+| **Reached for** | a mutation pass that stopped producing output and was killed at 420 s |
+| **Verdict** | **one non-finite offset is an infinite loop, because `drawLine` stops on `x === ex`** |
+| **Absorbed by** | the offset is guarded before it reaches the raster |
+
+The mutation was *the braille violin does not resample* — reuse the cell-resolution densities
+instead of the dot-resolution ones. Half the array is then `undefined`, `undefined / max` is `NaN`,
+and `drawLine` walks until `x === ex`, which `NaN` never satisfies.
+
+**`niceAxis` records this exact class about itself** — *`drawLine` compares `x === ex` to stop,
+`NaN` is equal to nothing, and the loop does not terminate* — and clamps its own span for it. The
+braille arm reached the same raster with no such clamp.
+
+**A pass that goes quiet is not a slow pass.** One run of that file takes **1.6 seconds**, so
+eleven of them is under twenty; a 420-second timeout is not a scheduling problem, it is a
+mechanism that does not return. Timing a single run is what separated the two, and it is cheaper
+than any amount of staring at the harness.
+
+### And it left a mutation in the tree
+
+The run was killed mid-mutation, so `kde.ts` still held `const fineD = densities` when control
+came back. **`make check` and the tests would have passed a commit with a mutation in it** — the
+guarded version renders, it just renders half a violin. Auditing every `to` string in the run
+against the working tree is what found it, and it is a step that belongs after any killed pass.
+
+---
+
+## F195 — three assertions that passed against the defect, and each was wrong about a different thing ★★★
+
+| | |
+|---|---|
+| **Surface** | the styling forks' own suite, at the moment the mutation pass first ran |
+| **Verdict** | **each was true of the mutated output, and measuring the mutation is what said how** |
+
+| the row | what it asserted | what the mutation did | why it passed |
+|---|---|---|---|
+| the braille violin resamples | *the outline is dots and has no `╭`* | collapsed the right half onto the spine | dots are still dots |
+| …second form | *both halves have more than ten inked cells* | left **99** cells against 241 | 99 > 10 |
+| a solid pie folds at half | *the same number of inked rows*, then *the same widest row* | grew the disc by its **rim** | the flanks are dense; only the rim holds part-covered cells, and neither the row count nor the widest row is a rim measurement |
+| the radar's polygons are line-drawn | *the figure contains box glyphs* | left the polygons in braille | **the frame is line-drawn too**, so the figure has box glyphs either way |
+
+**Guessing the sharper assertion failed twice.** What worked was applying each surviving mutation
+by hand and printing the numbers: 519 solid cells against 540 at height 18, 99 inked cells against
+241. The assertions are those relations now — *the solid disc is strictly smaller than the braille
+one, and within a tenth of it*; *the two halves are within a sixth of each other* — rather than
+thresholds chosen to be safely true.
+
+**The radar row is the one worth keeping.** Its assertion became false because of a change made in
+the same session for an unrelated reason: the frame started following the style, so *the figure
+contains box glyphs* stopped distinguishing anything. **An assertion can be sharpened out from
+under itself by a neighbouring fix**, and nothing but the pass would have said so.
+
+---
+
+## F196 — SP8 was implemented, reported, and invisible to the suite that checks rules ★★★
+
+| | |
+|---|---|
+| **Surface** | `SPEC_RULES`, A03's rule table, and `enforce-commitments.test.ts` |
+| **Reached for** | finishing the section-citation rule, three commits after it landed |
+| **Verdict** | **the rule ran on every build and no gate knew it existed** |
+| **Absorbed by** | registration in all three, with the ungated state written as a test that expires |
+
+SP8 resolves `§` the way SP3 resolves `Inn`. It shipped reporting **120 dangling citations across
+58 targets**, deliberately not gated — and it was in neither `SPEC_RULES`, nor A03's table, nor
+the fabrication suite.
+
+**That is F146 exactly, and the suite was green for the opposite reason.** F146 records SP6
+implemented and inventoried while `SPEC_RULES` never learned it existed, so `make test` was red for
+two commits while `npm run enforce` stayed green and correct. Here nothing was red: A03 commitment
+14's equality is `implemented` against `covered`, and both sides are built from `SPEC_RULES` — so a
+rule missing from that list is missing from *both* and the equality holds over a set that does not
+contain it. **A check comparing two derived sets cannot see a member absent from the source of
+both.**
+
+### The ungated state is now a test that expires
+
+SP3 shipped with its two findings already fixed; this arrived with 120, and a gate that fails on a
+hundred pre-existing citations is switched off rather than fixed. So the residue is asserted to be
+**non-empty**:
+
+```
+expect(v.violations.length,
+  "when this reaches zero, move SP8 into the gated list in enforce/index.mjs")
+  .toBeGreaterThan(0);
+```
+
+Which reads backwards and is the point. **A deferral that names a condition and is watched by
+nothing** is the class CLAUDE.md records three instances of — a code comment, a roadmap row, a
+chain of citations — and each was found by someone reading the *satisfier*, never by anything
+watching the condition. This is the condition, watched: the day the last citation is closed, the
+row goes red and says what to do about it.
+
+### What the residue is, measured rather than estimated
+
+```
+4655 section citations resolved
+  95 resolve to no section, across 58 targets
+ 139 name no document at all
+```
+
+Four were this session's own and are closed: two `§3w` written bare in C04-owned files when the
+section is C12's, one `A03 §262` where `A03 §2` was meant, and one in SP8's own source — prose
+*about* a broken citation, which scans as a broken citation, so it is written without the mark now.
+
+**The rest are other authors' and need judgement rather than a sweep.** The largest are `C22 §3b`
+(7), `C09 §4b` (5) and `C23 §13a` (5) — sections that were cited into existence and never written,
+which is `C12 §3q`'s shape and what the rule exists for. And a stray-digit class — `C22 §141`,
+`C09 §485`, `C15 §183`, `C07 §85` — where a line number or a rule id was written with a section
+mark; each needs its author's intent, and guessing would resolve a citation against the wrong
+thing, which is the one failure `docs/COMMITMENT_INVARIANT_AUDIT.md` argues no mechanism should
+automate.
+
+---
+
+## F197 — a fork built three times and removed, because the limit is the alphabet ★★★★
+
+| | |
+|---|---|
+| **Surface** | `radar` with `plotStyle: "line"` — shipped in the previous commit and visibly broken |
+| **Reached for** | a user: *the entire shape of the plot is broken* |
+| **Verdict** | **the algorithm was right at every step and a polygon cannot be drawn in box glyphs** |
+| **Absorbed by** | `STYLE_ARMS.radar` is `["braille"]`; the style is refused at construction |
+
+**It shipped wrong, and the previous commit's own words are the reason it did.** That message said
+the arm *staircases where the braille arm draws diagonals* and called it a trade — *blocky and
+legible*. It is not legible; the shape is unrecoverable, and describing a broken picture as a
+trade-off is how it got past a frame-read that had already seen it.
+
+### Three attempts, each fixing a real defect, none of them the last one
+
+| attempt | what it fixed | what it left |
+|---|---|---|
+| `strokePolyline` | — | steps orthogonally, and every edge of a pentagon is oblique: a staircase |
+| `diagUp` / `diagDown` slots and a per-cell stroke | the shape — **a pentagon in isolation is clean** | composed, it is rubble |
+| one grid with an owner per cell | the composition — no merge at all | still dashes |
+
+**The second attempt's failure is I40's stated limit arriving.** `mergedRow` unions braille and
+resolves everything else first-wins, so at cell resolution the labels, the two polygons and the
+frame each took cells from the others. Rendering one polygon on its own showed a clean pentagon
+while the composed figure showed fragments — **the same input, two answers, and only running both
+separated the stroke from the merge.**
+
+**The third failure is not this component's.** `╱` U+2571 and `╲` U+2572 do not reach their cell
+corners, so a run of them renders as a row of dashes whatever is upstream. No amount of correct
+geometry survives an alphabet that cannot draw a connected diagonal.
+
+### What braille has that cell glyphs do not, stated once
+
+Eight sub-cell dots, which **connect**; and a bit-per-dot encoding, which **unions** when two
+layers meet a cell (I40). A radar is a figure of oblique edges that cross each other, so it needs
+both. That is why it is the radar's vocabulary and why the pie keeps *both* arms — a solid pie has
+no seams and a braille pie has no gaps, and neither loses the shape.
+
+### The prompt was a real defect and pursuing it is what produced the measurement
+
+The user's first question was *why are some of the lines braille and others not* — the polygons had
+been line-drawn while the rings stayed stippled braille. That was right to flag: half a figure in
+each alphabet reads as unfinished, and §3g's *a scale drawn as heavily as the data competes with it*
+is an argument about **weight**, not about kind. Fixing it is what forced the whole figure into cell
+glyphs, and that is what made the alphabet's limit visible. **The fork that survives a frame-read is
+not always the one that was asked for.**
+
+---
+
+## F198 — four alphabets for one line, and the stipple that answered the wrong question ★★★★
+
+| | |
+|---|---|
+| **Surface** | the radar — its frame in braille, and its line arm in three vocabularies that could not draw a polygon |
+| **Reached for** | a user: *the braille lines have gaps* and *try it again with other chars* |
+| **Verdict** | **`plotStyle` names what to draw and the alphabet is the renderer's — §3c proving itself** |
+| **Absorbed by** | quadrant blocks for the line arm; a continuous frame for both |
+
+### The line arm, four times
+
+| attempt | fixed | left |
+|---|---|---|
+| `strokePolyline` | — | steps orthogonally; every edge of a pentagon is oblique, so it staircases |
+| `╱` / `╲` slots, per-cell stroke | **the shape** — a pentagon in isolation is clean | composed, rubble |
+| one grid, an owner per cell | **the composition** — no merge at all | **still dashes** |
+| **quadrant blocks** U+2596–U+259F | **the alphabet** | — |
+
+**The second failure is I40's stated limit arriving.** `mergedRow` unions braille and resolves
+everything else first-wins, so the labels, the polygons and the frame each took cells from the
+others. *A clean pentagon rendered alone beside fragments rendered together* — the same input, two
+answers — is what separated the stroke from the merge, and neither reading was available from the
+composed frame on its own.
+
+**The third settles it.** `╱` U+2571 and `╲` U+2572 are *strokes inside a box*: they do not reach
+their cell corners, so a run of them renders as dashes whatever the geometry upstream does. The
+quadrant blocks are **filled sub-cells** — consecutive cells touch because each is a solid
+rectangle. Half braille's vertical resolution and the same horizontal, traded for coverage, which
+is the right trade for a **shape** where braille's is right for a **curve**.
+
+**And §3c is what the answer turned out to be.** *A renderer names an axis, never a vocabulary* —
+`plotStyle: "line"` says *draw this as a connected line*, and which glyphs do it is the renderer's.
+The previous commit removed the arm and justified it with *box drawing has no connecting diagonal*,
+which is true and is a fact about **one** alphabet rather than about the fork.
+
+### The frame's gaps were deliberate and were the wrong answer
+
+The value rings stepped every fourth dot and the spokes dashed two-on-two-off, on §3g's *a scale
+drawn as heavily as the data competes with it*. **That is an argument about weight and it was
+answered by leaving holes.** A stippled ring does not read as a lighter ring; it reads as a broken
+one — which is what the user saw. The frame is `tone.muted` and the polygons carry their series'
+slots, so the separation was already there.
+
+### Two measurements that changed the tests
+
+**The total ink is not the signal.** Stippling takes the figure from 289 inked cells to 266 — 7%,
+which no honest threshold separates. What a reader sees is a *ring crossing a row*, so the
+assertion is the **longest unbroken run**: 25 continuous against 15 stippled on the bare fixture,
+20 against less on the labelled one.
+
+**And `Math.max` gave the frame's tone to the data.** `furniture` is `series.length`, greater than
+every series index, so the largest owner in a cell was the frame wherever the frame touched it — a
+polygon crossing a ring lost its colour cell by cell. **The glyph keeps every quadrant either way**,
+so only a colour row can see it, and there was none until the mutation pass asked.
+
+### And a `git checkout` destroyed the work mid-measurement
+
+Restoring `circle.ts` to compare a stippled render against a continuous one took the **uncommitted
+quadrant arm** with it — `git checkout <path>` is a restore from the index, not an undo, which this
+repository's own notes record. Rebuilt from the edit scripts, then committed as a checkpoint
+*before* the next measurement rather than after. **A measurement that mutates the tree needs the
+tree committed first**, and copying the file aside is the cheaper habit.
+## F199 — a union measured on a pie, applied to every layer ★★★★★
+
+Three reports, and the reader who filed them saw three defects: *the grey radar lines are
+getting coloured blue and orange*, *the orange bleeds onto the blue and green lines* on the
+slope chart, and the quadrant radar's polygons reading as thick jogged masses. One mechanism.
+
+**I40's union is right, and its scope was inferred rather than measured.** It was written to
+close the pie's seams — two wedges meeting in a cell showed one wedge's dots and dropped the
+other's — and the paragraph that records it says the cost is *a seam a cell wide where the
+colour changes one cell early or late*. Every word of that is true **about layers that meet
+along a boundary**. Two wedges share a one-dimensional locus, so a cell is the whole of it.
+
+**Two curves have no such locus.** They run alongside each other, and the union then draws one
+series' ink in another series' colour for the whole length of the overlap:
+
+| figure | measured |
+|---|---|
+| `slope-default` | 11 cells carry two series; **25 of the dots drawn in them belong to a series other than the one whose colour they wear**, against 20 that belong to it |
+| `radar-default`, braille | **70 of 279 frame cells wear a series slot** |
+| `radar-line`, quadrants | **80 of the 98 cells wearing a series colour are frame**, and 53 carry a fuller glyph than the frame's own |
+
+**The radar is the worst of the three for a structural reason nobody had stated**: a value ring
+and a data polygon are *the same shape at different radii*. They do not cross at points, they run
+parallel — so there is no locus small enough for *a seam a cell wide* to describe, and 82% of what
+reads as "the polygon" is the pentagon recoloured.
+
+The fix is a partition by **what a layer is**, not by which form drew it. `Layer.kind` is
+required: a `"surface"` is part of one filled figure and unions; a `"curve"` has its own identity
+and occludes, the topmost owning the cell outright. **A gap and a lie are not the same cost** — a
+one-cell break where a line passes in front reads as depth and every plotting library draws it
+that way, while ink in the wrong colour is a false statement about which series it is that a
+reader has no way to detect.
+
+**The class**: *a true observation promoted to a general claim*, and the fifth instance. What
+makes this one worth its own number is that the promotion happened **in the same paragraph that
+carefully stated the limit** — "the colour is still one layer's, and that is a limit rather than
+an oversight" reads as exactly the sober caveat a reviewer wants, and it is the sentence that
+carried the defect. *Stating a limit is not the same as measuring it.*
+
+**Fixed.** Two probes, both premise-free from the public surface — render each series alone
+against a pinned range and compare cell by cell — and a fabricated violation on each arm of the
+partition. Six mutations caught on the merge, four on the quadrant figure.
+
+## F200 — a golden frame is evidence about geometry and silent about identity ★★★
+
+`slope · full · 80` has sat in the corpus containing `⠭⠭⠝⠛⠛⠛⠛⠛⠛⠓` — a run of six- and
+seven-dot cells through the middle of a chart whose three curves are one and two dots thick
+everywhere else. `radar · full · 80` has `⣯`, `⠿`, `⣤`, `⡷` in a figure of thin strokes.
+
+**Half of that is retracted, by the instrument that filed it.** F203's amendment restores the
+dense run — the peers union again — and `⠭⠭⠝⠛⠛⠛⠛⠛⠛⠓` is now the **correct** frame. So the
+slope's glyphs were never evidence of the defect: they say *these cells hold more than one
+layer*, which is true before and after, and whether that is a lie is a fact about **colour**
+that a plain snapshot does not record. What was legible was a proxy for the defect and not the
+defect.
+
+The radar half stands — its frame's dots genuinely moved, and a glyph diff can see that.
+
+**This is the third instance of `-u` writing a record rather than checking one.** It read at
+first as the one where the defect was legible in the snapshot itself; it is not, and the
+correction is the more useful half — *assert the artefact, not a proxy*, arriving in the
+corpus. A golden frame records glyphs, so it is evidence about geometry and silent about
+identity, and a defect whose whole content is **which colour** is outside what it can hold. The corpus is not weak evidence — it caught F193's regression when the mutation pass
+structurally could not. It is that **a diff is read and a file is not**: the rows were correct on
+the day they were written, and nothing re-reads a green snapshot.
+
+No remedy proposed. A rule that flags *unusually dense braille next to sparse braille* is a
+heuristic about drawings, and the honest note is that reading the corpus is a thing a person does
+deliberately or not at all.
+
+## F201 — a guard that two correct guards now share, found by a mutation that stopped firing ★★★
+
+`mergedRow`'s `if (dots === null) break` says *a letter never shares a cell*, and its mutation had
+been caught since I40 landed. After F199 it survived: the kind guard refuses the union one clause
+earlier, because the radar's labels are a `"curve"` and a curve unions with nothing.
+
+**The arrangement that would still need the break is a `"surface"` drawing text beside a
+`"surface"` drawing braille**, and no layer stack in the tree is that — the solid pie's wedges are
+all non-braille, so they meet on the guard's *first* clause instead. So the break protects nothing
+today.
+
+Kept, on the asymmetry rule rather than the odds: it costs one comparison, the defect it prevents
+is silent, and the invariant it states should not depend on a partition invented for another
+reason. What changed is the **mutation**, which now turns over the priority order §3u calls a
+ruling — labels over polygons over frame — and which nothing else had ever tested.
+
+*A mutation that stops firing is not always a stale anchor.* The anchor resolved; the subject had
+acquired a second guard.
+
+## F202 — the documented way to run two tools does not resolve ★★
+
+`tools/plot-catalogue.mjs` and `tools/catalogue-png.mjs` both carry `node tools/<file>.mjs` in
+their headers. Neither runs: they import `../src/**/index.js` and the sources are `.ts`, so plain
+node exits with `ERR_MODULE_NOT_FOUND` before the first frame. They only resolve under a runner
+that maps `.js` specifiers onto `.ts` sources, which is how `tools/instruments.mjs` covers them —
+by pairing each with a vitest fixture.
+
+Small, and it cost something anyway: reaching for the tool meant writing the loop again in a
+probe, which is the *second renderer* hazard the catalogue file already carries a comment about.
+Both main blocks are now exported functions — `renderCatalogue()` and `renderCatalogueImages()` —
+so a caller has something to call.
+
+**And the extraction ate `clearGenerated` whole.** The script asserted its anchor matched and the
+tail brace balanced; both held, and the slice it cut discarded a function and its fourteen-line
+comment. *Reading the diff of a mechanical rewrite* is what caught it, one instrument along from
+the one that was supposed to.
+
+## F203 — the fix for a bleed was a deletion, and the third answer was available all along ★★★★★
+
+F199 replaced the union with occlusion and the reader's next words were *now the lines don't
+render where the bleeding was happening* — and, plainly: *you didn't fix it, you just deleted the
+parts that were broken.* Correct on both counts.
+
+**The measurement that let it through was too lenient by one word.** The probe asked whether a
+series' dots appear in the composed frame, and counted a dot as *shown* when it was drawn in
+**another series' colour** — so it reported south losing 5 columns of 67 and east 8, and the
+picture showed blue and green absent through the whole crossing. *An instrument that conflates
+presence-of-ink with presence-of-this-series cannot measure either failure.*
+
+**Four candidate rules, rendered and looked at rather than argued about:**
+
+| | ink | tone | what it looks like |
+|---|---|---|---|
+| union, first wins | complete | series 0 | the reported bleed — blue and green *become* orange |
+| union, tone by dot majority | complete | the denser | the same picture; orange is denser where it rises through a flat line |
+| occlude | **deleted** | correct | blue and green vanish through the crossing |
+| **union, neutral tone** | complete | **neither** | three lines converge into a grey braid and separate |
+
+**And the neutral tone was a third compromise, not the answer** — *why are you using neutral,
+can't you just fix it properly.* Right again. **A cell holds one colour, and that never meant a
+*region* holds one colour**: the constraint was being read at the wrong scale three times
+running. Occlusion gave all eleven contested cells to one series; the neutral gave them to none;
+**turning the owner with the column gives each a share**, so every cell holds one series' dots
+in that series' own slot and each line runs the overlap as a dash.
+
+| rule | ink | tone | `slope-default` |
+|---|---|---|---|
+| union, first wins | complete | series 0 | 25 dots wearing another series' colour |
+| occlude by layer order | **deleted** | true | south and east absent through the crossing |
+| union, neutral tone | complete | **names neither** | 11 grey cells; no line identifiable |
+| **rotate by column** | a dash each | **true** | **125 / 119 / 122 of 134 dots in their own colour · 0 mistinted · longest absence 3 columns** |
+
+*Three lines genuinely occupy those cells — at 10 rows over a range of 26 they sit inside two
+dot rows of each other — so something has to give, and what gives is a third of the cells each
+rather than a line.*
+
+**And the neutral is wrong for a surface, which only the picture said.** Applied to a pie it does
+not draw a border — at ten segments the small wedges contest cells with *both* neighbours and a
+whole sector of `pie-many-segments` comes out grey. So the partition is three-way, not two:
+`"surface"` unions and keeps a wedge's tone, `"curve"` unions and goes neutral, `"context"` is
+occluded by whatever is in front. *The partition of a disc is arbitrary; the partition between
+two series is the reading.*
+
+**The suite licensed the deletion.** `LM6` asserted *no cell draws another series' ink*, which
+deleting the other series satisfies perfectly — one of two opposite failures asserted, and the
+other one free. The rows are now the two failures by name: **nothing is deleted** and **nothing
+is mistinted**, and a fabrication of each of the three wrong rules fails a different one.
+
+*And `LM3`'s escape was written too wide in the same sitting*: allowing a cell whose dots are the
+union of **any** layers waves through the frame joining a polygon, which is F199 again. Scoped to
+the peers, and shown to fail by fabricating it — with every layer unioning, all fifteen rows had
+been green.
+
+## F204 — the previewer drew every braille dot at a third of its pitch ★★★★★
+
+*This looks like ass, why is the pie all messed up* — and the pie's glyphs were `⣿`, a **fully
+solid cell**, all the way across the disc. Nothing was wrong with the plot.
+
+`catalogue-png.mjs` renders a braille cell as circles, and it sized them
+`min(cellW, cellH) * 0.1` — **1.7px across against a dot pitch of 4.5** — so under a third of
+the space between two dots was inked. It also spread the two dot columns to the cell's edges,
+`cellW - 2 · 0.15 · cellW = 5.9px` apart in an 8.4px cell, against a true pitch of `cellW / 2 =
+4.2`. So a solid disc previewed as scattered specks with vertical stripes through it, and a
+terminal draws it as a disc.
+
+**Every judgement made through this previewer in this arc was made through a distortion**, and
+they were the judgements that drove three rulings. The pie reading as broken, the radar reading
+as sparse, whether a line survives a crossing — all of it was read off frames that under-drew
+braille by a factor of three in area. *An instrument that renders the artefact is part of the
+artefact.*
+
+**And it had a fixture.** `PC5` asserted the dot map — *braille dots land where the codepoint
+says* — and passed throughout, because it checks the **model** and never the rendering. A
+fixture over a model cannot see the model being wrong; it is the same class as F190's
+assertion-by-proxy, one directory along. It now asserts that no such model exists: no `<circle`
+in the output, and a braille glyph emitted as `<text>` at its own column like any other.
+
+**The first fix overshot, and the reader caught that too** — *still think the older version of
+the pie looked better.* Correct. Measured against the font instead of against my eye: rendering
+`⣿` in DejaVu Sans Mono at this size gives **20.2% ink**; the old circles gave 13.2% and the new
+ones **47.8%**. The font's geometry is pitch **4.11 × 3.88** with a dot **2.04px** across — my
+corrected radius was 3.2px, **57% too wide and 2.4× the area**, where the original was 18% too
+narrow. *I was wrong about the direction of the error and then wrong about its size.*
+
+**So the font draws it, and the model is deleted.** `BRAILLE_DOT_MAP`, `brailleDots`,
+`renderBrailleCell` and the duty constant are gone; a braille cell emits a `<text>` at its own
+column exactly as a box-drawing glyph does. Nothing hand-drawn here could be checked without
+measuring the font, and once you are measuring the font you may as well use it.
+
+**The argument for the circles was independence from the rendering machine's fonts, and the
+frame never had it**: every box-drawing glyph, block glyph and letter already comes from the same
+stack, so a machine without it renders tofu either way. **Braille was the one glyph class
+modelled rather than rendered, and that inconsistency is where the error hid.**
+
+**The third shape of *an instrument can manufacture evidence*, and the one that was missing**:
+not truncated, not fabricated from nothing, but **real bytes reassembled by a wrong model**. The
+glyphs were right, the colours were right, the geometry was a guess nobody had measured.
+
+## F205 — a rotation key that is constant down a vertical run ★★★★
+
+F203's turn — *which peer owns a contested cell turns with the column* — was measured on
+`slope-default`, whose three lines run roughly horizontally. **`x % peers.length` does not change
+down a column**, so wherever two curves overlap on a *vertical* stretch the same peer takes every
+cell of it and the other is deleted, which is precisely the failure the turn was introduced to
+fix.
+
+Found by asking whether the radar works at 3, 4, 5, 6 axes. It does — the split is even at every
+count from 3 to 10. **At two axes both polygons lie on one vertical line and one series took 9 of
+9 contested cells.** Two axes is a degenerate radar and nobody would draw one; the defect it
+exposes is not degenerate, and it fires wherever two polygons meet on a spoke.
+
+**No positional key fixes it.** Alternating on all of (1,0), (0,1) and (1,1) modulo two is the
+checkerboard and has no solution, so `x + y` fails on diagonals and `x + y + ink` was measured
+worse still — it un-starved two axes and starved three, four and seven.
+
+**A counter is not positional.** The turn now counts contested cells in scan order and resets
+each row: a horizontal run advances on the counter, a vertical run on the row index, and a
+diagonal on the row index with the counter back at zero. Every run advances by one per cell.
+*Measured at 2 through 10 axes: closest split 7/7, furthest 5/7, and nothing starved.*
+
+**And the probe that found it was wrong twice first.** Collapsing a radar series to nulls leaves
+the **frame** in the alone-render, so every cell inside the disc counted as contested and the
+first run reported one series holding *zero* at every count — a fabricated catastrophe. Reading
+against `radarRender`'s own polygon layers is what gave the real numbers. *Second time in this
+arc that an isolation-by-collapse probe answered about the wrong layer.*
+
+## F206 — one form drew two figures, and the difference was which routine each arm reached for ★★★
+
+The radar's braille arm drew its value rings with `arcDots` — circles. The quadrant arm drew them
+as *n*-gons through the data's own vertices. **Same form, same spec, two figures**, and nothing
+chose: each arm reached for the routine nearest to hand and the spec was silent, so there was no
+statement for a test to disagree with.
+
+Invisible to every instrument in the repo. Both arms render; both are internally consistent; no
+invariant mentions the ring's shape; the golden corpus records each arm's own output, so both are
+"correct" against themselves. **A difference between two implementations of one rule is only
+findable by putting them side by side**, and nothing schedules that.
+
+Surfaced by a reader asking for the thing the *other* arm already did — *at 3 can you make it so
+there's an option to render it as a triangle instead of a circle.*
+
+`plotGrid?: "polygon" | "circle"` (I45), polygon by default: the grid is a ruler for the shape
+measured against it, and at three axes a circular ring behind a triangle is two figures in one
+frame. **The default moved a mutation's subject with it** — `arcDots`'s stipple is now the circle
+grid's mechanism alone, so the row that kills it renders `plotGrid: "circle"` on purpose. *A
+mutation whose target is only reachable through a non-default option is a mutation that quietly
+stops testing when the default changes.*
+
+## F207 — a total record that answers at the wrong granularity ★★★★★
+
+*There is no braille version of the vertical violin plot or of the compact ones, I don't think
+anyway.* There is not, and `STYLE_ARMS` says there is.
+
+`STYLE_ARMS` is `Record<PlotForm, readonly PlotStyle[]>` — total, so the thirty-fifth form must
+declare, and it says `violin` has a braille arm. **A violin has five drawing routines and one of
+them had it.** Measured by rendering each with and without the style and asking whether the frame
+changed at all:
+
+| the routine | before | after |
+|---|---|---|
+| horizontal, full density | honoured | honoured |
+| **vertical, full density** | **ignored** | honoured |
+| **horizontal raincloud** (`compact`) | **ignored** | honoured |
+| **vertical raincloud** | **ignored** | honoured |
+| **raindrop** | **ignored** | honoured |
+
+**Accepted at construction and ignored at render is the worst of the three answers** — worse
+than refusing, which tells the caller, and worse than degrading, which tells the reader. And the
+record could not have caught it: the arm belongs to a **routine** and the key is a **form**, so a
+record that is total over its key reads as a complete answer to a question it cannot ask.
+
+*The totality is what makes it convincing.* `SP1`-style pairing, a `Record` the compiler checks,
+a test asserting every form declares — all green, all true, and three-fifths of one form's
+surface unreachable.
+
+**The vertical arm is now the transpose.** `violinRows` samples at `2w` dot columns and offsets
+in dot rows; stood up, the value axis is sampled at `4n` dot rows and the width offset at 2 a
+cell. **§3w had said only "smoothness"** and the two arms gain different things — lying down the
+finer axis is the *offset*, so the outline's shape sharpens; standing up it is the *sampling*.
+
+**The raincloud rungs were ruled out on an argument that compared one axis, and that was
+wrong.** Their cloud is one cell row drawn with `ladderFor("height")` — `▁▂▃▄▅▆▇█`, **eight
+levels** — against braille's **four dot rows**, which reads as half the resolution and is not. A
+cell holds eight braille dots as **2 × 4**: the ladder spends all eight on magnitude at one
+sample a cell, braille spends them as five magnitude levels at **twice the sampling** along the
+value axis. **Equal budgets, different split.**
+
+*Reading one axis and calling the result a downgrade is the same error as reading a limit off
+the case that produced it* — and the ruling it produced said `degrade` where the repo's own rule
+for a styling fork says **ship every variant**. All five routines honour both fields now.
+
+The horizontal cloud is a bottom-anchored stroke over `2w` dot columns, filled to the floor
+rather than out from a spine, because the ladder it replaces is bottom-anchored and two rungs of
+one figure must anchor the same way. The vertical cloud is that stood up — anchored on the right
+edge and growing left, which is `extentFor(caps, "leftward")`'s direction expressed in dots.
+
+## F208 — a new call site moved in above a mutation's anchor ★★★
+
+`the braille violin does not resample` had been caught since the fork landed. Adding the vertical
+arm put a second `const fineD = kde(finite, fine, bw)` in the file **above** the one it named,
+and `apply` replaces the first — so the mutation silently changed subject to a routine `SA3` does
+not render, and survived.
+
+**F201 said a survivor is not always a stale anchor. This is the third disposition**: the anchor
+resolved, the subject was replaced. `tools/mutate/anchors.mjs` cannot see it — the string is
+present, so the anchor is not missing; it is *no longer unique*, which nothing checks.
+
+And when it was re-anchored to the arm it names, **it still survived**. `SA10` asserted *the
+style changes the figure* and *the figure is braille*, both of which are true of a violin drawn
+to a quarter of its length — F195's class, third instance. Even the bounding box passes, because
+the **spine** runs the figure's whole length whatever the body does. What catches it is the ink's
+**centroid**: §3w's claim is that the fork changes the vocabulary and not the geometry, and where
+the mass sits is the geometry.
+
+*An anchor that is present but not unique is a mutation testing something else, and it reads
+exactly like one that is passing.*
+
+## F209 — four attempts at one assertion, each defeated by the fixture rather than the code ★★★★
+
+The vertical raincloud's cloud grows **leftward**, out from the box. Flipping that anchor is a
+one-line mutation and it survived **four** forms of the row meant to catch it. Each failure is a
+different way a fixture answers for the code:
+
+| the assertion | why it could not see the flip |
+|---|---|
+| whole-figure **column centroid** | the clouds run near the full four cells for most of their length, and **mirroring a saturated run changes nothing** |
+| per-row **leftmost ink** | a chart has three bands side by side, so a row's leftmost ink belongs to the **first** band and never moves |
+| per-row **rightmost ink** | the same, from the other end — the last band's **box** is the rightmost thing in every row |
+| **inked-cell disagreement** | 3.6% correct against 9.9% flipped — a real separation, and picking a number between them is a threshold chosen to be safely true |
+
+**What worked was dropping to the unit.** `rainColumns` for one band, leftmost inked column per
+row, tolerance one cell — because the two vocabularies quantise a run differently (one of eight
+ladder steps against one of five over twice the samples) while a flipped anchor moves the left
+end by the cloud's whole width.
+
+**Three of the four failures are the same shape: a neighbour answered.** The composed frame has
+three bands and a box and a strip, and every whole-row statistic is dominated by whichever of
+them is furthest out. *A figure with more than one band in it cannot answer a question about one
+band's geometry*, and the fix is not a sharper statistic but a smaller subject.
+
+And the first of the four is the fixture rule again, one turn after it was applied to the
+mutation itself: **a fixture must be shown to respond to the thing under test.** These clouds
+saturate. The row now asserts that its own fixture narrows — `the fixture's cloud narrows`,
+checked before the claim it enables — because a cloud that never narrows makes every direction
+assertion vacuous.
+
+
+## F210 — the axis was niced twice, and the spec's own table held the right answer ★★★★★
+
+`positionalForm` nices the data to get the range the curve is rasterised against. `yLabels` then
+niced **that** to get the range the gutter is labelled from. Two computations of one axis, and
+`niceAxis` is **not idempotent**: the second pass sees the widened span, reaches for a coarser
+step, and widens again.
+
+| series | data | the curve's axis | the gutter's axis |
+|---|---|---|---|
+| `bubble`, the form corpus | 1 … 30 | **0 … 30** | 0 … 40 |
+| `line`, the form corpus | 1 … 5 | **0 … 6** | 0 … 7.5 |
+| request rate, the golden frame | 392 … 960 | **250 … 1000** | 0 … 1000 |
+| −3.7 … 12.4 at 16 rows | −3.7 … 12.4 | **−5 … 12.5** | −5 … 15 |
+
+**The bubble row is the one with no quantisation in it.** The largest bubble is 30, it is drawn on
+the top area row because 30 is the axis maximum, and the gutter called that row **40**. Nothing was
+rounded and nothing was ambiguous: the number beside the mark was a third larger than the mark.
+
+**The spec already held the right answer.** §3d's cost table — written to measure what loose
+labelling spends in rows — lists *request rate · 392 … 960 · snapped 250 … 1000 · +24%*, and the
+shipped frame labelled that axis's floor `0`. The document and the frame disagreed for as long as
+both existed, and no instrument compares a table in prose to a number on screen.
+
+**Measured before it was believed**: 12 of 23 heights diverge for one ordinary series, and every
+divergent case is a range that spans zero or sits off the step grid. It moved **46 golden frames**,
+every one of them in the same direction — a narrower, truer axis.
+
+### The previous remedy is what built it
+
+The comment standing in `yLabels` recorded this class found once before, in the other axis: *a
+`yScale: "log"` plot picked log ticks in `positionalForm`, where only `.range` was read, and was
+then labelled linearly. The ticks were computed twice and the set nobody drew was the correct one.*
+
+The fix threaded the **scale** through so both nicings would agree. Two computations that agree
+about scale are still two computations, and nothing made them agree about **range**. So the remedy
+closed the instance and left the class, and the class came back on the axis the remedy had just
+been applied to.
+
+**`xTickRow` has the other half of the evidence.** It pins both ends — `axisFor(range, xTicksFor(w),
+{ yMin: range.min, yMax: range.max }, scale)` — so its second nicing cannot widen. One function,
+two consumers, one pinned and one not, and the pinned one was written later. The pin is a
+work-around for the second computation; it does not remove it, and it does not fix the **step**,
+which is what put `13` where `12.5` belongs when pinning alone was tried.
+
+### The shape to take from it
+
+**A remedy that makes two computations agree is weaker than one that removes the second.** Agreeing
+about one input leaves every other input free to disagree, and the next divergence looks nothing
+like the one that was fixed — it was a *scale* mismatch and came back as a *range* mismatch, in a
+function whose comment described the first.
+
+`yLabels` now takes an `Axis` and nices nothing. `positionalForm` computes it once, where the data
+is measured, and hands the same object to the rasteriser and to the gutter. Two parameters —
+`pin` and `scale` — went away with the second computation, which is the sign it was the right cut:
+they existed only to keep the copy in step.
+
+**And the instrument that found it was the frame, at a height nothing renders.** Both heights the
+catalogue and the goldens happen to use are in the agreeing set. The divergence was found by
+rendering the same series at every height from 2 to 24 and reading the two ranges side by side —
+which is the *walk the component by hand* rule applied to a function rather than a component, and
+`n = 8` and `n = 11` would both have said the code was right.
+
+## F211 — the grid drew from the captions arm, so a numeric abscissa got no vertical lines ★★★★
+
+C12 I26: *a gridline exists to carry the eye from a mark to a value, so it belongs exactly where
+there is a value written — the rows the gutter labels and the columns the bottom rule ticks.*
+
+The horizontal half honours it. The vertical half was blank on every plot with a numeric x axis,
+because `overlaidRows` took its tick columns from `xAxis(block.xLabels, …)` — the **captions** arm
+alone — while the rule three rows below took its own from `xRowFor`, which dispatches to
+`xTickRow` when there are no captions. With no `xLabels`, `xAxis(undefined, …)` returns an empty
+tick set, and the grid drew nothing.
+
+    grid, xLabels: ["a","b","c"]        grid, numeric x axis
+    7.5 ┤┊┄┄┄┄┄┄┄┊┄┄┄┄┄┄┄┊│             7.5 ┤┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄│
+        └┬───────┬───────┬┘                 └┬──────┬──────┬───┘
+         a       b       c                   0      1      2
+
+Same style, same rule below, and one of them has the lines the style is named for.
+
+**The one fixture the corpus renders at `grid` declares `xLabels`.** So every committed frame,
+every golden and the catalogue all exercise the arm that works. A style member with two arms and a
+corpus that only walks one is the shape to watch for — it is F210's *both heights the corpus
+renders are in the agreeing set*, one member along and found the same way.
+
+**Fixed as a consequence rather than as a repair**, which is worth recording. `axisCross` needs
+the column the value 0 lands in, which is `xRowFor`'s to know and is needed while the *area* is
+composed — so the axis had to be computed once in `positionalForm` and handed to both halves. Once
+it is a parameter, the grid using anything else is obviously wrong. **The defect was invisible
+while the value was re-derived and became unmissable the moment it was passed.**
+
+## F212 — the ASCII contract is correct and its fixture has no plot in it ★★★★★
+
+`styleRasteriser` chooses line-drawing on **`ambiguousWidth`**:
+
+    const useLineDraw = ps === "line" || (auto && caps.ambiguousWidth !== "wide");
+
+`ambiguousWidth` answers *how many cells does an ambiguous character occupy*. Whether the terminal
+can draw `╭` at all is `unicode`. So at `unicode: "ascii"` with `ambiguousWidth: "narrow"` a line
+plot renders `╭────╯` and `│` into a terminal that has told the framework it cannot show them —
+inside a frame whose own borders correctly degraded to `+`, `-` and `|`.
+
+**Two fixtures conceal it and they conceal it in different ways.**
+
+`test/contract/expect-document.test.ts` has the row that would catch it — every codepoint under
+128 at `unicode: "ascii"`, with the *fixture responds* control beside it — and its document is a
+rule, a notice and a table. **The contract is right, the control is right, and no plot has ever
+been through it.**
+
+The catalogue's ASCII arm is `ascii-wide`: `unicode: "ascii"` **and** `ambiguousWidth: "wide"`
+together. Every ASCII frame in the corpus is also a wide frame, so the wide arm answers for the
+ASCII one and the case that separates them — ascii · narrow — is rendered by nothing.
+
+**Two capabilities varied together in every fixture cannot be told apart by any number of frames.**
+That is the reusable shape, and it is why the count of frames is not the measure of coverage: 312
+goldens, 1208 catalogue files and a contract row asserting exactly this, and the combination is
+absent from all three.
+
+Not fixed here — it is a defect in `styleRasteriser`'s condition and unrelated to the change that
+found it, and folding it into a large diff is how a repair stops being readable.
+
+## F213 — five unions named as protected, and not one of them is checked ★★★★☆
+
+C04's `colormap` clause states the rule and names its siblings:
+
+> **A name that resolves to nothing renders uncoloured**, which is F172's shape and the one this
+> type will not reproduce twice. `plotFrame`, `legend`, `plotDetail`, `orientation` and
+> `matrixAnchor` are unions for the same reason.
+
+`colormap` **is** checked at the document gate — four occurrences in `validate.ts`. Of the five
+named beside it, **none is**. `plotFrame`, `plotDetail` and `matrixAnchor` appear in that file zero
+times; `legend` and `orientation` appear twice and once, and both hits are unrelated rules — a form
+that requires `vertical`, and a horizon refusing `legend: false`.
+
+**Being a union is a compile-time fact and the gate's subject is a document**, which is the whole of
+the confusion: a `Plot` built in TypeScript cannot hold a bad value, and a `Plot` arriving as JSON
+from the far side is exactly what `validateBlock` exists for. The sentence is true about the type
+and was read as true about the check.
+
+**What each unchecked value actually does**, measured from the consumer rather than reasoned:
+
+| member | a value outside the union | what the reader gets |
+|---|---|---|
+| `matrixAnchor` | `columnMap`'s final arm is a fall-through | silently **`window`** — right-anchored with a blank fringe |
+| `legend` | `legendPlacement` returns it; `legendRows` reserves 0 | silently **no legend**, on a plot that asked for one |
+| `plotFrame` | `{ ...layout, style: block.plotFrame }` | silently the frame renderer's default arm |
+| `plotDetail` | `block.plotDetail ?? "auto"`, then compared | silently `auto`'s arm |
+| `orientation` | `checkOrientation` returns early only for `undefined` and `"horizontal"` | **refused on a non-orientable form** with a message about a *vertical arm* the caller never asked for, and silently horizontal everywhere else |
+
+`orientation` is the one to read twice: it is the only member of the five that produces an error,
+and the error names a value the document does not contain. A caller who typed `"vertial"` on a
+`pie` is told the form has no vertical arm.
+
+**Found by the calendar's walk** (C12 §3ae A1, A12), which had to establish what a `matrixAnchor`
+does before it could rule on the calendar's columns — and establishing it meant reading `columnMap`
+to the bottom, where the fall-through is.
+
+**Partly fixed here.** `matrixAnchor` gains its check with the calendar, because the same commit
+widens that member's domain and shipping a new value into an unchecked member widens the hole. The
+other four are one commit of about twenty lines and they are **open**: folding them in would put
+five unrelated refusals in a diff about dates, and F212's own note is the reason not to.
+
+**The class, rather than the five instances**: a public union whose values are checked nowhere. The
+mechanism that closes it is a rule rather than five clauses — every union-typed optional member of
+`Plot` has a value check — and it is worth noting that the argument against automating it is the
+same one `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass makes: a citation resolving against the
+wrong subject cannot be caught by matching names.
+
+
+---
+
+## F214 — the bijection guards §4 and §2 drifted behind it ★★★★☆
+
+C02 T2.6 parses the spec's §4 degradation table at test time and asserts a bijection with the
+record's own keys, in both directions, with the owners compared per field. It is a good gate and it
+has been green throughout.
+
+**§2 — the public interface block, which is the first thing anyone reads — declared seven fields
+while the record had eight.** `ambiguousWidth` shipped with a §3 subsection arguing for it, a §4
+row, invariant I9, commitment 12 and a full set of test rows, and was never added to the interface
+block. T2.1's prose still said *the seven documented keys* while T2.1's own `FIELDS` array listed
+eight and the assertion passed.
+
+**Nothing was wrong except the reach.** Every statement in that commit was true; the gate covered
+the table it was written for and the other table has no gate, so the drift is invisible from a
+green run and from a careful read of either document alone — §2 is internally consistent, and so
+is §4.
+
+**The class is the one this repository keeps finding**: a rule is exhaustive over the artefact it
+names, and reads as exhaustive over the subject. `docs/COMMITMENT_INVARIANT_AUDIT.md` makes the
+same point about citations, and F84's MG24 scope is the same shape one layer out — a correct
+sentence bounding a rule to a quarter of its subject.
+
+**Fixed** — §2 gains both `ambiguousWidth` and `backgroundPolarity`, and **T2.8 parses the fenced
+block** the way T2.6 parses the table. Kept as a separate row rather than folded into T2.6: the two
+tables fail separately, T6.4 already cites T2.6 for §4's half, and the failure message should name
+which document is behind.
+
+---
+
+## F215 — a name and a variant, conflated in four documents and one user-facing string ★★★☆☆
+
+C10 I27 keyed the theme set by **name** and made polarity a property a theme declares. The guard in
+`construct.ts` moved with it — `themed.value.names.includes(trimmed)` — and the word *variant*
+stayed where it was:
+
+| where | what it says |
+|---|---|
+| C22 I40 | *anything that is not one of the two variants is treated as absent* |
+| C22 commitment 17 | *a file that is not a known variant* |
+| C22 §12a | *one file, holding the variant* |
+| `construct.ts:668` | **`theme preference ignored: \`X\` is not dark or light`** |
+
+The last one is the one that matters, because it is text a reader sees. On a set holding
+`high-contrast` it names two of the three themes available and calls the third a mistake — and no
+test asserts that half of the string, so it was free to be wrong.
+
+**Found by needing the distinction rather than by reading for it.** C22 §6h had to rule on whether a
+detected polarity outranks a persisted preference, and the plan's own words were *pick the theme
+variant* — an operation that does not exist, since `setTheme` takes a name and the set has no map
+from a polarity to a theme. Establishing what the persisted file actually holds is what turned the
+other three up.
+
+**Repetition across four documents is not corroboration** — the same shape as F58, and the same
+count. Each restatement cites the situation rather than the guard.
+
+**Fixed**: the three prose sites and the message, which becomes `is not one of ${names}`.
+
+---
+
+## F216 — a rule stated three times, contradicted at four sites, and the corpus could not see it ★★★★★
+
+**The rule was never in doubt.** C12 §3c ends *`plotStyle` names __what__, never the alphabet*.
+I43 says *`plotStyle: "line"` says draw this as a connected line; which glyphs do it is the
+renderer's*. C02 §4 gives the substitution with a named owner — *box drawing → `+ - \|`; braille
+plots → coarse block plot, owner C09 C12*.
+
+**Four sites decide the alphabet from `plotStyle` or from the wrong capability:**
+
+| site | the decision |
+|---|---|
+| `linedraw.ts` `lineDrawRows` | `const table = corners === "sharp" ? SHARP : ROUNDED` — no capability in the signature |
+| `definition.ts` `styleRasteriser` | branches on `ambiguousWidth`, which answers *how wide is a glyph*, where *can this terminal draw one* is `unicode` — and discards `_caps` on the way to the site above |
+| `heatmap.ts`, the contour | `const braille = (block.plotStyle ?? "auto") !== "line"` |
+| `definition.ts`, the violin ×4 | `block.plotStyle === "braille"`, passed as a boolean to four routines that each hold `ctx.capabilities` |
+
+**The first is the one to read twice.** `glyphForMask` sits **twelve lines below** it in the same
+file, already takes `caps`, and already has an `ASCII` table whose doc comment reads: *every caller
+was emitting box-drawing regardless of capability … the violin's outline made it visible — an ASCII
+frame came back full of `╭─╯`.* The fix was made, for the exported helper, and never reached the
+function above it — where the frame full of `╭─╯` still comes back.
+
+**Measured across the corpus**, every form × variant at `unicode: "ascii"`:
+
+| | `ascii · narrow` | `ascii · wide` |
+|---|---|---|
+| variants carrying a non-ASCII codepoint | **49 of 159** | **24 of 159** |
+
+**And the framework fails its own published contract.** `expectDocument(doc).degradesToAscii()` —
+C24 §7, exported for a consumer's suite — refuses a document containing a `line` plot (`U+256D`)
+and one containing a `contour` (`U+28C0`). A consumer running the assertion the framework hands
+them is told their document is wrong.
+
+**F212 named half of it.** Its diagnosis was the missing arm — *the catalogue's ASCII arm is
+`ascii-wide`, so every ASCII frame is also a wide frame and the wide arm answers for the ASCII
+one* — and that is exactly right about sites 1 and 2. It could not reach sites 3 and 4, which are
+wrong in the arm that **is** rendered: **32 files of the rendered corpus carry braille inside a
+frame labelled `ascii`** — 16 variants in two formats — and nobody had read them. *A finding about a
+missing fixture is not a finding about the fixtures you have.*
+
+**Generated, not committed**, and the distinction is worth keeping: `.gitignore` line 18 is
+`docs/catalogue/`, so no diff ever carried one and only a reader who runs the generator could have
+seen them. Weaker than *shipped*, and stronger about the instrument — **a corpus is a thing you
+look at, so a defect in it survives exactly as long as nobody looks.** That is the argument for
+AA1 over another frame: an assertion does not have to be looked at.
+
+**The separator is the same class in prose.** `·` (U+00B7) is written into five plot strings and
+passes `checkMarks` correctly — `·` is in `PROSE_MARKS`, and that rule's comment records the blind
+spot with its number: *106 literals carry prose punctuation and this passes every one … a real and
+much larger question, and not this rule's.* It does **not** pass `degradesToAscii`, which is a
+contract on a rendered document and has no opinion about punctuation. Two instruments, two
+subjects, and the weaker one was the one being run.
+
+**Fixed** — C12 I54, §3af. One predicate at every decision, C02 §4's own substitutions, degraded
+and never refused. `lineDrawRows` degrades **in place** rather than yielding to `curveRows`:
+falling back to the ramp keeps the frame ASCII and loses the connectivity that is the whole content
+of `plotStyle: "line"`. The corpus stops varying `unicode` and `ambiguousWidth` together, which
+also gives `full · wide` its first frame — the combination F171's braille ramp lives in. AA1
+asserts the whole corpus in one row, because the four sites were four mechanisms and what they
+share is the output.
+
+
+## F217 — three sentences a component's spec asserts about itself, and the code disagrees in both directions ★★★★☆
+
+**Found by reading C12's spec against the tree while writing a plan that cited it**, which is the
+only reason all three came out together: each is invisible from the side that holds it.
+
+### 1 · A correct ruling, filed under the form that breaks it
+
+C12 §3n's containment section ended: *A frame's label is written inside it where it fits and
+dropped where it does not.* The sentence sat inside the **treemap** subsection.
+
+`hierarchyStripRows` implements it — `st.label.length + 2 <= cells`, the name laid into the strip.
+`treemapRows` receives `label` on every `Tile` from the same layout module and fills the rectangle
+with `markOf(idx)`. **The same fixture, the same file, the same paragraph:**
+
+```
+flame · tree · 24bit          treemap · default · 24bit
+ raster ████████████          ████████████████████████████████
+ curve ██████ paint █████     ████████████████████████████████
+ render ████ layout ████      ████████████████████████████████
+ root ███████████████████     ████████████████████████████████   <- twelve rows, no word
+```
+
+At `ascii` the figure is a fill pattern and at one bit another one. **A form whose declared subject
+is containment, saying nothing about what is contained, at every capability.**
+
+**Why it survived**: the sentence says *a frame's* label — flame vocabulary — so a reader checking
+the family finds it satisfied in the renderer that uses that word and stops. **A correct ruling
+filed under the form that breaks it.** MG24's class one step along: there a true sentence justified
+the wrong scope, here a true sentence sits in the wrong section, and review checks whether a
+sentence is true.
+
+### 2 · A sentence saying a condition is closed, which closed one of two
+
+§3g opened: *C04 I52 defers `Annotation.label` to the same place — it arrives with the legend row
+that can hold it — **so one row closes two conditions that were written down and then watched by
+nothing.*** The legend landed. `Annotation` has three arms at HEAD and **none carries a label.**
+
+The sentence is in the paragraph complaining that such conditions are watched by nothing, and it
+is itself the thing not watched. **A claim that a deferral is paid reads exactly like the payment.**
+
+And the residue is worse than the missing field: `legendPlacement`'s auto arm keys off
+`SHARES_CELLS[form] && count > 1` over **series**, so the case I52 was written about — one line,
+one reference line — resolves to no legend. Adding the field alone would have landed it in the
+state the deferral refused.
+
+### 3 · The same section, behind the code instead of ahead of it
+
+§3g also said *__Skipped entirely at `colourDepth: 1`__*. `legendPlacement` skips only where
+`POSITIONAL_STACKS[form]`, and `legendEntries` carries the correction in its own comment:
+*skipping the legend at one bit is the same error one layer up — it means little where colour
+leads and it is the **only** thing that means anything where colour does not.*
+
+**The code was fixed and the spec was not**, and CLAUDE.md's contract makes the spec
+authoritative — so a reader implementing to it would have re-broken the thing the comment records
+fixing.
+
+### What is new against F128
+
+F128 keyed *three specs disagreed with the code they specify, **all in one direction***. These
+three are **two directions in one section**: 1 and 2 are the spec ahead of the code, 3 is the spec
+behind it. **A rule assuming spec divergence is aspirational would pass 3, and one assuming it is
+stale would pass 1 and 2.** That is the increment, and it is the reason not to build the obvious
+gate.
+
+**One narrow mechanical check would have caught 2**: a spec sentence naming a `Type.member` that
+the type does not declare. Its blind spot is large and worth stating — it cannot reach 1, where
+every symbol named exists and only the *section* is wrong, nor 3, where the prose names no symbol
+at all. Recorded as a candidate rather than built, on `docs/COMMITMENT_INVARIANT_AUDIT.md`
+§Fourth pass's argument.
+
+**Fixed** — §3n carries the ruling with the tile's own answer (a parent's label goes in the
+padding ring, which is the only part of it a child does not paint over), §3g carries both
+corrections with the direction each moved, and `types.ts` records that the condition is met and
+the arm is not.
+
+
+## F218 — a local variable cleared a published member's exemption, and MG24 is gated ★★★☆☆
+
+**Adding a file with `let blocker: Owner | null` — first written `blocked` — failed `make
+enforce`**, on a rule about a glyph:
+
+```
+MG24  UNCONSUMED_MEMBERS names GlyphSet.blocked, which is no longer an unconsumed
+      published member — it is either wired now or gone. Remove the entry.
+```
+
+`GlyphSet.blocked` is `⊘`, declared in `glyphs.ts`, drawn by nothing. It is still drawn by
+nothing. What changed is that an unrelated file in a different directory declared a **local
+variable** of the same name, and MG24 resolves consumption by name.
+
+**The instrument reports this limitation itself, on every run**: *name exactness · MG24 is exact
+for 488/1416 members; the rest share a name with another owner — id (32), kind (25), text (20),
+label (16), width (13)*. That line has been read as a precision figure about a **reported** number.
+It is not only that: `UNCONSUMED_MEMBERS` is a **gated** exemption list, and a name collision
+anywhere in `src/` clears an entry and fails the build.
+
+**Both directions are wrong and only one of them fails loudly.**
+
+| | what happens |
+|---|---|
+| a local variable takes an exempt member's name | the exemption reads as stale, `make enforce` fails, and the fix is to rename something unrelated |
+| a local variable takes an **unexempt** member's name | the member reads as consumed, and MG24 stops asking about it — **silently** |
+
+The second is the one to worry about: MG24's whole subject is *a published member nothing
+consumes*, and any of the 928 inexact members can be answered by a `let` in a test helper.
+`id`, `kind`, `text`, `label` and `width` are the top five collisions and all five are ordinary
+local-variable names.
+
+**Not fixed here.** The rename to `blocker` is an improvement on its own terms — the variable
+holds the *blocker*, not a boolean — so the immediate failure is gone without contorting the
+source. Resolving MG24 by symbol rather than by name is a change to the instrument and wants its
+own commit, with F105/F160 in front of it: **this is the first instance where the imprecision has
+teeth rather than only noise.**
+
+**And it belongs to the group about instruments** rather than to the group about unconsumed
+members, which is the distinction the ranking rests on: the finding is not that `⊘` is undrawn —
+it is that the thing asking has an answer that depends on a variable in another file.
+
+
+## F219 — an ambiguous mutation anchor reports as a survivor, which a missing one does not ★★★★☆
+
+**Writing a mutation against `HAS_X_TITLE` produced a survivor that was not one.** The anchor
+was one row of a per-form record:
+
+```
+heatmap: false, calendar: false, correlation: false, confusion: false,
+```
+
+That line appears **four times** in `types.ts` — `HAS_X_TITLE`, `HAS_CALLOUT`, `IS_MATRIX` and one
+more all carry it verbatim, because the matrix family answers `false` to every one of those
+questions. `String.replace` takes the first, so the mutation flipped **a different record**, the
+suite passed, and the harness printed `SURVIVED`.
+
+**That is the wrong end of the report.** A *missing* anchor is reported as itself —
+`ANCHOR MISSED … those rows ran nothing and are not survivors` — and the distinction exists
+precisely so a row cannot read as verified when it ran nothing. An **ambiguous** anchor runs
+something, mutates the wrong thing, and lands in the one bucket that means *the tests have a
+gap*. So the reader's next move is to go and write a test for a defect that was never injected.
+
+**Neither `mutate.mjs` nor `anchors.mjs` checks uniqueness.** `anchors.mjs` answers *does this
+anchor still exist*, which is staleness, and the MA rows are about drift from a recorded list.
+Existence and uniqueness are different questions and only the first is asked.
+
+**Measured, as a floor rather than a total**: a parser over `tools/mutate/runs/*.mjs` resolved
+**471** anchors and found **5 ambiguous, across 5 runs** — `c04-round-trip`, `c10-colormap`,
+`c10-named-set`, `c12-absence`, `c12-origin`. `anchors.mjs` counts **744**, so the probe reaches
+63% of them and the real figure is higher. Each of the five is a row that may be mutating
+something other than what its name says.
+
+**Not fixed here.** The check belongs in `anchors.mjs` beside the staleness one — *this anchor
+matches N times* is the same walk over the same files — and it should be gated only once the five
+are re-anchored, or it fails the build on day one for reasons nobody asked for. That is a change
+to the instrument and wants its own commit, which is the same disposition F218 took one commit
+ago and for the same reason.
+
+**The pair is worth reading together.** F218 is an instrument answering a question about a
+*name*; this one is an instrument answering a question about a *string*. Both are exact enough
+to be trusted and neither says how exact it is at the point of use — F218 prints its precision
+on every run and this one prints nothing at all.
+
+
+## F220 — `plotDetail` is accepted on forty-four forms and read by two ★★★★☆
+
+**Found by checking a premise before building on it.** Phase B's `tree` puts its three rungs on
+`plotDetail`, so the first question was what that member does today. `grep` over `src/` answers
+structurally rather than by sampling:
+
+```
+definition.ts:302   const mode = block.plotDetail ?? "auto";        <- the only read
+definition.ts:2297  rungFor(block, "boxplot", ...)                  <- call site 1
+definition.ts:2636  rungFor(block, "violin",  ...)                  <- call site 2
+definition.ts:2660  rungFor(block, "violin",  ...)                  <- call site 3
+validate.ts         nothing
+```
+
+**One reader. Three call sites, all inside the `boxplot` and `violin` renderers. No validator
+anywhere.** So `plotDetail: "compact"` on a `line`, a `bar`, a `heatmap` or a `pie` is accepted at
+construction, carried through the document, and does nothing — on **42 of 44 forms**.
+
+**This is F207's class in a member rather than in a record.** That finding's own words: *accepted
+at construction and ignored at render is the worst of the three answers — worse than refusing,
+which tells the caller, and worse than degrading, which tells the reader.* F207 was about
+`STYLE_ARMS` claiming a braille arm that four of a violin's five routines did not have; there the
+record was total and compiler-checked and **still** answered a question it could not ask. Here
+there is no record at all.
+
+**The difference from F207 is which way the silence runs.** `STYLE_ARMS` said *yes* where the
+renderer said nothing; `plotDetail` says nothing anywhere — the type permits it on every form and
+no artefact in the tree states which forms have a ladder. §3i describes the boxplot's and the
+violin's rungs and never says the scope is those two, so a reader takes the member as general
+because nothing narrows it.
+
+**Why it survived**: the member is *optional* and its default is `"auto"`, so every form renders
+correctly whether or not it is set. There is no wrong frame to find. The only observable is the
+absence of an error, and an absence is what no frame-read, golden or mutation reaches — the
+suite's own blind spot rather than a gap in it.
+
+**And it was about to get worse.** `tree` joining the ladder takes the ratio from 2/44 to 3/44 and
+leaves 41 forms accepting a member that governs three. A member's scope narrowing as the component
+grows is the direction that reads as *more implemented* and is less.
+
+**Fixed** — `HAS_DETAIL_RUNGS`, total over `PlotForm`, on `HAS_CALLOUT`'s and `HAS_X_TITLE`'s shape
+in the same file; refused at both gates where it is `false`, with the message naming the form. The
+record and `RUNGS` must agree, and PD3 asserts that rather than trusting it: a record in `types.ts`
+and a ladder in `definition.ts` cannot be derived from one another, because L0 does not import L1.
+
+---
+
+## F221 — the `hierarchy` field reaches the renderer unopened by either gate ★★★☆☆
+
+**Found by asking the same question of the second field.** B1 asked what `plotDetail` is checked
+for and found one reader; the same question about `hierarchy` has a shorter answer — `validate.ts`
+does not contain the word.
+
+Measured, `form: "treemap"`, `height: 6`, 40 cells, through `validateBlock` and then through the
+renderer:
+
+```
+a node with no `value`        accepted    6 rows, blank
+`children: "nope"`            accepted    1 row   [plot failed to render: ...]
+a child that is the number 42 accepted    6 rows, blank
+a node with no `label`        accepted    6 rows, a tile named `undefined`
+`value: NaN`                  accepted    6 rows, blank
+a well-formed chain, 3200     accepted    1 row   [plot failed to render: ...]
+```
+
+**The frame is not corrupted, and that is C09 I11 rather than luck** — a throwing renderer is
+contained to its block and the block says what happened. So two of the six are *visible* faults,
+which is the containment doing its job.
+
+**The silent one is `undefined`.** A node with no `label` writes those nine letters into the frame
+as a tile's name, through the coercion every JavaScript program has. The type says `label: string`
+and nothing between a document and the grid asks whether it is one.
+
+**The last row is well-formed input**, which is the one worth keeping. A chain 3200 deep satisfies
+every rule `HierarchyNode` states and is refused by the **stack** rather than by a gate. The
+figures, so nobody re-derives them: the treemap fails between 1600 and 3200 and the flame between
+3200 and 6400, and the difference between the two is the size of the two walks' frames rather than
+anything about the data. **Nobody has a call stack 3200 deep** — the depth is not what this finding
+is about, and saying so is what stops the fix being a cap and nothing else.
+
+**Why it survived being read.** C04's gate is written member by member, and `hierarchy` is not a
+member — it is a **shape**, which is I54's own argument: *one field for three forms rather than
+three shapes*. Every other typed field on `Plot` is a flat list or a small record, so a clause
+against it is one line and gets written; a recursive shape needs a walk, and the walk is the thing
+that did not get written. **The type carries the whole claim, and the type is not a gate** — which
+is C04's own division of labour stated backwards: the constructor is where an author finds out and
+the validator is where an untrusted document does, and a document does not typecheck.
+
+**And it was about to acquire a fourth reader.** `tree` is the first form whose *whole* subject is
+the shape — a treemap with a broken hierarchy still draws a rectangle, and a tree with one draws
+nothing at all.
+
+**Fixed** — `hierarchyFault`, one walk exported from `validate.ts` and called by both gates:
+every node an object with a string `label`, `children` an array where present, `value` finite and
+non-negative **where the form's subject is magnitude**, and a 256 bound because a gate that walks
+a recursion must terminate it — including on a cyclic object graph, which a builder call can hand
+over and a document cannot. **One walk rather than two**, where `plotDetail`'s refusal is
+deliberately a copy: a one-line predicate written twice can be compared by eye, and a recursive
+walk written twice is two walks.
+
+**And `HIERARCHY_ROLE` closes the other half**, which the probe found on the way past: `hierarchy`
+was accepted on all forty-four forms and read by three, which is F220's class in a second member.
+The record is total over `PlotForm` with a `null` arm that refuses, and **HG5 asserts it against
+the frames rather than against a restatement** — every form rendered twice, with and without a
+hierarchy, and the set that moves must be exactly the three. C04 I64, T2.29, T2.30.
+
+---
+
+## F222 — a blank legend row, and the diagnosis was wrong ★★☆☆☆ · **disproved**
+
+`legendRows(plot)` returns 1 for `"above"` and `"below"` and 0 otherwise. Its parameter is
+
+```ts
+type PlotGeometry = Pick<Plot, "form" | "height" | "axes" | "legend" | "xTitle">;
+```
+
+which excludes `series`, `segments`, `ohlc` and `annotations` — **every source `legendEntries`
+reads**. So the row is declared from the member alone, and a plot with nothing to name declares it
+anyway.
+
+Measured: `form: "treemap"`, `height: 4`, `series: []`, a `hierarchy`, `legend: "below"` → **five
+rows, the fifth blank**. `legend: "right"` on the same block is correct at four, because a
+width-costing placement sizes itself from the entries and finds none.
+
+**The measurement stands and the diagnosis was wrong.** This finding first read the `Pick` as the
+MG24 class — *a correct sentence justifying the wrong scope* — on the grounds that an entry count
+is a count of block members, knowable before a label is placed. The fix it proposed was to widen
+the `Pick` by those four members and read them.
+
+**Checked before building on it, and the check refuses it.** `ViewPatch` carries
+`op: "replace"`, so a streaming plot is a new block on every tick; `series: []` gaining its first
+entry is the ordinary way a plot starts. A legend row that appeared at that moment would change
+the block's height mid-stream and shift everything below it — **which is §2's empty-series rule,
+one row down**: *an empty series occupies its declared height rather than collapsing, because a
+plot that changes height when data arrives would shift everything below it*. The blank legend row
+is that rule applied to the legend, not an oversight. `legendRows`' own comment says so, and it is
+both true **and** the constraint on the decision it is attached to — which is exactly what
+distinguishes it from MG24's sentence, and is a distinction only running the case can make.
+
+**What survives is the residue.** A form that can *never* gain a series keeps a blank row for a
+legend it can never fill — `treemap` today, whose renderer reads `hierarchy` and nothing else, and
+`tree` after it. `flame` and `icicle` are not in that set: absent a `hierarchy` they fall back to
+`barRow` and draw their series. So closing it means a total record over forty-four forms for two
+entries, and the residue is named here rather than built — **stated, because an unrecorded limit
+reads as strength**. C12 I27 carries the ruling and the residue together.
+
+**The instrument that caught it is the one that checks the record**: asking where a claim is
+written down and finding `legendRows`' comment says the opposite. Its running total is now four
+claims disproved and four produced, and this is the first of the four that was **mine**, filed one
+commit earlier in this same arc.
+
+---
+
+## F223 — a containment that restored the content and not the contract ★★★★☆
+
+**The boundary exists and predates the question.** `registry.ts` wraps four things — `measure`,
+`render`, `elements`, and the resolution behind the ownership question — and C09 I11, T3.13,
+T3.14, T6.7 and T6.8 were all written for it. Three of the four properties a per-block boundary
+needs hold: it is **per block** and genuinely so, because `renderChild` recurses through the same
+`render` and a throwing child inside a `panel` is contained at the child; the failure is
+**visible** — `[<kind> failed to render: <message>]`, carrying the thrown text; and the tone is
+`error`.
+
+**The fourth does not hold. Measured:**
+
+```
+measure=1   -> measure() says  1, render drew 1
+measure=2   -> measure() says  2, render drew 1
+measure=5   -> measure() says  5, render drew 1
+measure=20  -> measure() says 20, render drew 1
+
+a real plot, height: 20                     measure() = 20,  error block = 1
+measureSequence      [raw, throws(20), raw]           = 22
+renderSequenceToLines, the same sequence              =  3
+```
+
+The error path is `rows([paint([…])])` — one string, floored at one by `rows()` — and it never
+consults `measure`.
+
+**C09 I1 and C09 I11 sit adjacent in one list and neither mentions the other.** I1 is *"for every
+registered kind, `measure(b, w)` equals the row count of `render(b, ctx)`"*, and calls itself the
+system's most load-bearing invariant. I11 is *"a renderer throwing is contained: that block renders
+as an error block, **the rest of the frame is unaffected**."* That sentence is true about content
+and false about geometry — **MG24's shape**, a correct justification that does not constrain the
+decision attached to it. The cell where both invariants apply is a registered kind whose renderer
+throws, and it satisfies one of them.
+
+**The other direction was measured too and fails differently.** A throwing *measurer* is contained
+to 1 — ruled, in T3.14 — and nothing binds `render` to that number: the definition draws 5 rows and
+`visibleRows` clamps the entry with `rows.slice(0, ve.takeRows)`, so **four rows are dropped in
+silence**. A block showing a fifth of its drawing with nothing saying so.
+
+**What it does *not* do, which is where the obvious diagnosis is wrong.** `shell/paint.ts`'s
+`transcript()` throws `FrameError` when the viewport hands it more rows than the region has, and
+the first reading of this was that one broken plot takes the whole frame to the fallback — *"one
+row too few leaves the previous frame showing through while one too many scrolls the alternate
+screen"*, in that file's own words. **It does not.** The entry-level slice in `visibleRows` catches
+both directions before the frame check sees them. What actually happens is quieter and harder to
+attribute: the under-draw leaves the transcript short, `transcript()` pads it bottom-aligned, and
+C14 goes on scrolling the block as twenty rows — so a reader holding `↓` moves through nineteen
+rows of nothing and blank rows appear at the top of a viewport that is not short. **A frame
+arithmetically consistent and describing a different document than it holds**, which is the failure
+C09 I1 exists to prevent, arriving through the path that exists to survive failures.
+
+**The test that covers it asserts the defect.** T3.13's fixture is `broken("render")` with
+`measure: () => 2`, and its assertion is `lines[2]` contains `"after"` — the position the sibling
+takes *because* the error block is one row instead of two. The row is not weak; it is precise about
+the wrong frame. **The fixture constructs the divergent state and the expectation was written from
+the output**, which is the one direction a green run cannot distinguish.
+
+**And `logged` has never had a mechanism.** T3.14 reads *"contained, block treated as height 1,
+logged"*. Both catches are bare: `measure`'s discards the error entirely, `render`'s discards it
+the moment it has read the message off it, `RenderContext` carries no diagnostic seam, and L1
+cannot reach L4's. A step naming an effect with no mechanism, in a **test row** rather than a plan
+— satisfied by the half of the sentence that was true, which is why nothing ever went red.
+
+**Fixed in spec** — C09 I11 gains the geometry half rather than acquiring a sibling invariant, on
+the ground that a gap between two adjacent sentences is exactly what produced this one: the error
+block is `measure(b, w)` rows, the message is fitted to the committed height and never the height
+to the message, and a definition throwing in *either* half renders it. C09 I29 gives the four
+catches a sink — `createBlockRegistry({ onError })`, wired at L4 to C23's existing record of what
+the pipeline's bare catches swallowed (C23 I48), and supplied in the harness by one that fails the
+run. T3.13 is corrected to `lines[3]` **with the reason in the row**, because an expected value
+that changes without one reads as a test bent to fit the code. T6.21 restores the shipped
+behaviour — one row regardless of measure — and both new rows must die on it.
+
+**Found by measuring a boundary rather than by anything failing.** Nothing was red, no golden held
+a caught error, and the component had gone from 4 plot forms to 34 in one session — which is the
+argument for asking: bad *data* is handled by C12 I2 and a bad *shape* by both gates, and neither
+of those catches a bug.
+
+---
+
+## F224 — two catches, one block, two answers — and the container takes its subtree ★★★☆☆
+
+F223's class in a different member, found by checking the other two catches while in the file.
+
+`elementsOf` contains a throwing `elements` and answers `EMPTY_ELEMENTS`. The ownership question —
+*does this definition answer `elements` itself?* — is a **separate call** that asks whether
+`definition.elements !== undefined`, and its own catch covers only resolution. So for one block the
+two answer differently: *no elements*, and *it owns them, do not descend*.
+
+**Measured, and the control is the finding:**
+
+```
+E1  a leaf whose `elements` throws        elementsOf = [],  elementsIn found 4 from ["g","g2"]
+E2  a container declaring `elements`
+    that throws, two focusable children   elementsIn found 0
+E3  the same container, no `elements`     elementsIn found 4 from ["kid-1","kid-2"]
+```
+
+**0 against 4.** A container whose `elements` throws does not become atomic — it takes its whole
+subtree out of the focus walk, silently, and `↓` skips the lot. `scroll` is a shipped kind that
+declares `elements`, so a bug in it costs everything inside it. E1 is the contained case working:
+the block loses its own elements and its siblings keep theirs.
+
+**And the ruling it was supposed to satisfy names an outcome that does not exist.** C26 I12 read *"a
+refused or throwing `elements` makes the block atomic for that dispatch **and focus falls to the
+block level**."* `FocusState.rowId` is `string | null` and the type's own comment says `null` means
+the block itself is focused — and **`null` is constructed nowhere in `src/`**. `focusFor` returns
+`rowId: found.element.id` or no focus at all, so an atomic block is skipped rather than focused.
+Block-level focus is unbuilt.
+
+**That is C12 §3ah's class arriving in another spec**: a walk correct about the interaction it
+found and wrong about a mechanism it assumed existed. The finding survives and only the remedy
+changes — what a refusal must not leave behind is an unreachable **subtree**, which is what it was
+leaving, and that is expressible today.
+
+**Fixed in spec** — C09 I30 rules the mechanism (ownership is read from what resolution *returned*,
+never from whether the member is declared) and C26 I12 gains the reachability clause and loses the
+one with no mechanism. T3.37 asserts both arms, because a row that only exercises the throwing
+container passes at 0 and 4 alike; the control **is** the test.
+
+---
+
+## F225 — four commitments numbered twice, and the one citation into the collision resolves against neither ★★☆☆☆
+
+Found while appending to C09's commitment list, which could not be done cleanly without resolving
+it.
+
+**C09's `## 8. Commitments` is two lists.** The first runs 1–21; the second restarts at **11** and
+runs to 14 — so `C09 commitment 11`, `12`, `13` and `14` each name two different commitments.
+Measured across the tree: **C09 is the only spec with duplicate commitment numbers** — 25
+commitments, 4 collisions, against 0 in every other spec that has a numbered list.
+
+**Three citations exist and one of them is wrong in a way the collision hides.**
+`src/testing/expect-document.ts` cites `C09 commitment 14` for *"a fallback that is not 1:1 by
+column count widens a row without changing its height"* — which is **commitment 5**, *every
+capability substitution is 1:1 by cell count*. Neither candidate in the collided range is about
+substitution at all. The other two, in `C25` and `collapse.ts`, cite `commitment 11` and mean the
+first list's, and are correct by intent rather than by the number resolving.
+
+**Nothing checks it, and the rule that would is already argued for.** SP1 checks that a commitment
+cites an invariant; SP2 checks invariant numbering; **SP7 checks that a test row's number is unique
+within its spec**, on the reasoning that *"C13 I17 is the cap"* locates something only if the
+numbers do. A commitment is cited by fewer readers than a test row and by more than none, and
+`commitmentsOf` already parses `{n, text}` per row — the uniqueness check is a comparison it does
+not make.
+
+**Fixed** — the second list renumbered to 22–25 and the new commitments appended at 26–28;
+`expect-document.ts` re-pointed at commitment 5. **The enforcement row is not here**: A03
+commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, so the
+row lands with its implementation and this entry is the prose that goes ahead of it.
+
+**Worth its own number rather than a line in F223** because the test is *would landing this close
+it* — F223's fix touches none of this, and a renumber folded into another finding is a change
+nobody can find later.
+
+---
+
+## F226 — two fail-on-revert rows about a containment, on a kind that never reached it ★★★★☆
+
+C09 T6.7 and T6.8 are the tier-6 rows for I11 — *letting a renderer's throw propagate → T3.13
+fails and the frame dies*, and the same for a measurer. Both build their document around a block of
+kind `explodes`.
+
+**Nothing registers `explodes`.** `test/revert/blocks.test.ts` never passes `definitions`, so the
+kind is unknown, and an unknown kind resolves through `raw` (C09 I10) and renders as its own JSON.
+Measured:
+
+```
+kinds registered: explodes is NOT registered
+measure(explodes) = 1
+frame:
+  [0] "first"
+  [1] "{\"kind\":\"explodes\",\"id\":\"bad\"}"
+  [2] "third"
+```
+
+**Both rows pass with the render catch deleted entirely**, because no throw ever happens: they
+exercise C09 I10's fallback and are named for C09 I11's containment. **A03 §2's vacuity class, in
+the tier that exists to prevent it** — a revert row about a catch has to reach the catch.
+
+**Two things made it invisible, and the second is the one to keep.** `not.toThrow()` is an
+assertion that cannot tell *contained* from *never thrown*; that much is ordinary. The other is
+arithmetic: `measure` answers **1** for the contained case *and* **1** for a 29-character JSON
+string at width 80 — the fallback height and the containment height are the same number, so
+T6.8's second assertion agrees with both readings. A fixture whose two candidate behaviours
+produce one observation.
+
+**Found by a new instrument on its first run, and it fired by staying silent.** C09 I29's sink is
+`LOUD` by default in the harness, so any test reaching a containment now throws. Turning it on
+turned exactly one row red — T3.13, whose subject it is. T6.7 and T6.8 stayed green, and *that*
+is the measurement: a row named for a catch, in a suite where reaching a catch is now fatal,
+which does not go red is a row that does not reach one. **A negative result from an instrument
+built for the positive one.**
+
+**Fixed** — both rows register a definition that genuinely throws, pass `QUIET` (the named
+exemption, because the containment is their subject), and assert the containment *fired*:
+`failed to render` in the frame, not merely the absence of a throw. C09's T6.7 and T6.8 carry the
+requirement in their text, since the rows were right and the fixtures were not.
+
+**And it generalises past these two.** `measurable()`'s `definitions` is opt-in, so any test
+naming a kind it did not register is testing `raw`. The loud sink is now the standing check for
+the containment half of that, which is the half nothing could see.
+
+---
+
+## F227 — three links, two of them recorded as a hypothetical and the third recorded nowhere ★★★★☆
+
+`RenderContext.tick`'s own doc: *a monotonic counter, incremented by C03's spinner commit. A
+renderer computes `frames[tick % frames.length]`.* `steps` does exactly that
+(`blocks/kinds/structured.ts:461`), `b.spinner()` is public API built on it, and C09 T6.13
+covers it.
+
+**In a running session the counter is `0` and stays `0`.** Measured over ten real frames of a
+real session — a `steps` block with one `active` step, a keystroke between each frame:
+
+```
+SESSION  ⠋⠋⠋⠋⠋⠋⠋⠋⠋⠋      1 distinct
+DIRECT   ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏      10 distinct
+SET      ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏
+```
+
+Same block, same kind, same registry. `DIRECT` is `measurable({ tick })` — the harness every
+test uses — walking ticks 0…9. **The renderer is correct and the wiring is dead.**
+
+**Three links, and any one is sufficient:**
+
+```
+1  commit("spinner") appears in six test files and NOWHERE in src/. The reason
+   is in `CommitReason`, its 100 ms budget is at line 74, and three paragraphs
+   specify how it interacts with `stream`. Nothing raises it.
+2  visibleRows builds the render options as {theme, capabilities, focus,
+   scrollOffsets}. No tick, so every transcript render is at `?? 0`.
+3  the line cache is keyed on rev · width · focus · range+offsets · theme.
+   No tick axis, so a supplied one is served the held lines.
+```
+
+**Links 2 and 3 are already written down, correctly, and as a pair** — C22 I60 and §6c trace
+row 10. I60 states the coupling and the ruling it owes: *the axis is absent **and** the value is
+constant, so the day one is threaded the other is owed — either the key gains it or live entries
+stop being cached.* That is right, and it is the thing this finding would otherwise have
+claimed to discover.
+
+**What is wrong is the mood.** Row 10 is headed **"Not reachable, and recorded because it is one
+line from being reachable"**, and I60 says an animating block *would* serve its first frame.
+Both are conditional, and the condition is already met: `steps` ships, `b.spinner()` is public
+API, and a session drew one glyph across ten frames while both notes read as forward-looking.
+
+**The conflation is between two subjects sharing one phrase.** *A `steps` block animating through
+`ctx.tick`* names the **cache defect** and the **animation defect**, and nothing in the sentence
+forces a choice. Of the cache defect, *not reachable* is exactly true — no assertion there can
+fail while tick is constant. Of the animation, it is false and shipped. The note was written
+from the cache's point of view, which is the honest place to write it from and the one place the
+distinction does not show. F58's shape — two readings of one phrase, both about "an exit code",
+nothing in the prose choosing.
+
+**Link 1 is what makes the other two look dormant, and it is recorded nowhere.** With no producer
+raising `commit("spinner")`, tick never moves, so the cache never has to be right, so row 10's
+*not reachable* is locally true and globally false. C03's spec declares the reason, tunes its
+window and specifies its coalescing against `stream` — and never says that nothing supplies one.
+
+**And the correct half of the fix changes nothing.** Link 2 was patched alone and the frame did
+not move — still `⠋⠋⠋⠋⠋⠋⠋⠋⠋⠋`, one distinct. Adding the cache axis as well produced
+`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`, ten distinct and identical to the direct path, which is also what says there is
+**no fourth break in the render path**. *Two blockers read as one, and a correct fix that
+changes nothing observable is the signal* — anyone repairing this from the grep alone would have
+written the right patch, watched a static spinner and looked elsewhere.
+
+**Why a full suite is green over it.** Every test drives the renderer through
+`measurable({ tick })`, which passes tick directly — the mechanism is called and the wiring is
+not. C09 T6.13 is the row that looks like coverage: *a renderer calling a clock for its spinner
+frame → T2.7's environment scan fails*. **True, and it does not constrain whether tick moves** —
+it forbids a clock and says nothing about the counter advancing, so it reads as coverage of the
+animation while covering only where the number is computed. A03 §2's vacuity class, in prose.
+
+**Two smaller things found in the same pass, recorded here rather than filed:**
+
+- **`tools/spinner.js` carries its own `SEQ` and `UNSAFE` tables**, written before
+  `SPINNER_SETS` shipped. Two sources of truth for one subject, and the playground is the one
+  that drifts silently, because nothing runs it and no rule reaches it.
+- **`spinners.test.ts`'s `COUNTERS` exemption is `{decimal, hex, binary4}` and `binary4` does
+  not ship** — nor does `braille2`, named in the same comment. A dead member of an exemption
+  list, which is the class where a subset check lets an entry outlive its reason unread.
+- **Group 2's two counts disagreed by one before this finding, and adding it made them agree.**
+  The ranking table read *6 open* and the group heading *5 open*; the group's own rows give five,
+  so the table was stale — F165 is dispositioned **fixed** in its own cell and was still being
+  counted. F227 is the sixth, so both now read 6 and the disagreement is gone **without anyone
+  having corrected it**. That is worse than a count that stays wrong, because a stale number that
+  becomes true by arrival is one nothing will ever look at again. SP6 cannot see it: it compares
+  the *ids keyed* column against the keyed set and does not check per-group open counts, for the
+  reason its own limits section gives — keys and mentions are indistinguishable in prose.
+
+**The reusable part is not the defect.** It is that a note can be accurate, well-argued, and
+filed in the wrong tense — and that the tense is invisible from inside the component that wrote
+it. **Ask what a "not reachable" is not reachable *by*.** Row 10 answers *by an assertion in this
+file*, and the reader was never in scope.
+
+**Fixed** — three places, because it is three links. C22's session arms a ticker from what the
+frame drew, commits `spinner` through the scheduler, supplies the counter to `visibleRows`, and
+keys the line cache on it **per kind** so an entry holding nothing animated keys as it did.
+
+**Measured again, the same way:**
+
+```
+before   SESSION  ⠋⠋⠋⠋⠋⠋⠋⠋⠋⠋      1 distinct
+after    SESSION  ⠋⠙⠹⠼⠴⠦⠇⠏⠋⠙      8 distinct over ten samples, and it wraps
+         DIRECT   ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏      10, unchanged throughout
+```
+
+The two repeats in the *after* row are the wrap, not a stall: ten samples at 250 ms against a
+cadence near 100 ms traverses the set and starts again. **T4.35 asserts all ten** by sampling
+thirty times rather than by tuning the interval.
+
+**And as images**, because a spinner is the one subject a string of glyphs argues about badly —
+`tools/status-proof.mjs` writes both to `docs/catalogue/status/`:
+
+```
+steps-before.gif    every frame at tick 0 — what a session drew, measured
+steps-after.gif     the counter moving
+```
+
+**The *before* is not a reconstruction**, which is the trap this file has fallen into once
+already: it is the real renderer at the real value a real session supplied, so the honest image
+and the defect are the same render. That is the only reason a before-image was available at all
+— had the defect been in the renderer rather than in its input, there would be no way to draw
+one without a checkout, and no image is the honest answer then (F156's shape).
+
+**And a number that was not stated anywhere before this.** The braille set declares **80 ms** and
+C03's `spinner` window is **100 ms**, so the observable cadence is `max(set, window)` — the
+default runs at 10 fps rather than 12.5. C03 §3 makes that trade explicitly for a spinner
+arriving under a stream commit and it is unconditional; C22 I60a is where it is now written down,
+because *the interval belongs to the set* and *the window floors it* are both true and neither
+mentioned the other.
+
+**The container walk came from the mutation pass, not from a test.** Removing the descent into
+containers survived every row until the fixture was changed to put the spinner inside a `panel` —
+which is not a contrived arrangement but exactly what `b.live` builds, because `Panel` is the only
+kind with a title and the title is where a live part says what state it is in. The fixture was
+testing the shape the framework does not produce.
+
+**The pair is removed together and the reason is fidelity, not redness.** `runPass` gained an
+`also` so one mutation can make two edits, and the run says plainly that removing either half
+alone *also* kills — measured — so nobody later simplifies it believing the pairing is what makes
+it red. What a single-half row would restore is a state the tree never shipped in.
+
+---
+
+## F228 — a shipped kind absent from the table that enumerates the kinds, and from the row that walks it ★★★☆☆
+
+C09 §3 is *The seventeen kinds* — the enumeration of what the registry renders, one row per kind,
+each row the obligation its implementation is written against. **`scroll` is a C09 default and has
+no row in it.**
+
+```
+DEFAULT_DEFINITIONS           15 entries — scrollDefinition is the fifteenth
+C04's Block union             18 members
+C09 §1                        "ships fourteen default kinds … union to seventeen"
+C09 §3 table                  16 rows — no `scroll`, no `patch`
+C09 T1.4                      "each of the fourteen kinds" — 14 cases, no `scroll`
+grep scroll C09 spec          9 hits, every one the verb
+```
+
+**The kind is not unspecified** — C04 I47 and I49 govern it, and its `window` refusal is argued at
+length in `containers.ts` against C04 §3c cell 1. What is missing is C09's own enumeration of its
+own registry, and everything downstream that counts it.
+
+**T1.4 is the sharp end, and it had already been bitten from the other side.** Its job is one case
+per kind, read back from §3's table. Its own comment records the earlier failure: a `comparison`
+rename left `ONE_PER_KIND["diff"]` undefined, `measure` answered `1` rather than raising, and
+**seven entries would each have passed against no fixture at all**. The repair was
+`expect(fixture).toBeDefined()` — *every listed kind has a fixture*.
+
+**That guard runs in one direction only.** Nothing asks whether every *registered* kind is listed,
+so a kind can join the registry and never join the row that claims to cover the registry. The
+coverage set is the test's own table, which is the shape where a suite tests each rule against
+itself and agrees: `scroll` has no documented height, so nothing asserts one, so nothing failed.
+
+**The remedy is equality, not another entry.** The set of keys in T1.4's `documented` record is
+compared to the kinds in `DEFAULT_DEFINITIONS` — both directions, on `BUILDER_OMISSIONS`'
+precedent — so a kind added without a documented height fails the day it is registered rather than
+whenever someone recounts. Adding `scroll` alone closes the instance and leaves the class.
+
+**Third instance of one class today, which is why it is being closed rather than filed.** F227
+carried two: `spinners.test.ts`'s `COUNTERS` exemption names `binary4` and `braille2`, neither of
+which ships; and group 2's two open-counts disagreed by one until a new finding made them agree by
+arrival. **All three are a hand-maintained list beside a generated one**, and in all three the
+hand-maintained list is the one that reads as authoritative.
+
+**Fixed** — the counts corrected to fifteen and eighteen, `scroll` given its row, and T1.4's
+obligation rewritten from a number to a comparison. The comparison itself lands with the code.
+
+---
+
+## F229 — the overturn was recorded in two places and not in the one that made the claim ★★★☆☆
+
+C04 §3c opens: *C26 §4b's cell 3 gets its first inhabitant: **the one kind declaring both
+`elements` and `window`.*** `scroll` declares `elements` and **no `window`**.
+
+The build falsified the walk — a bounded region's height is declared, so it cannot measure less
+without becoming a different box — and that is recorded twice:
+
+```
+C26 §4b        "The kind that would have inhabited cell 3 declares only `elements`."
+               "So cell 3 is still empty, and the ruling that filled it is unaffected."
+containers.ts  "No `window`, and the sweep is what said so (C04 §3c cell 1)."
+C04 §3c        unchanged — still the first, most confident statement of the old ruling
+```
+
+**The code comment cites the cell it contradicts.** Whoever wrote it went to §3c, read cell 1,
+disagreed with it correctly, wrote down the disagreement where the code is, and did not carry it
+back. C26 was updated because the claim was *about* C26's table; C04 was not, because the claim
+was C04's own.
+
+**This is the sixth blind spot pointed at a stale copy rather than a missing one.** The usual
+shape is *a claim carried with no record anywhere*; here there are three records, two current and
+one not, and the stale one is the one a reader meets first — §3c is where the kind is specified,
+so a reader arrives there before either correction. Repetition across documents is not
+corroboration, and it is not currency either.
+
+**And §3c is the section that already does this well**, which is what makes the omission legible:
+cell 8 carries *"The walk missed this and `tsc` did not"* and its trace row 1 carries *"RULING
+NAMES AN OPERATION THAT DOES NOT EXIST"*, both added in place after the build overturned them.
+The habit exists in this exact section and was not applied to the sentence that opens it —
+an opening paragraph reads as framing rather than as a claim, and framing is not what gets
+re-read when a ruling moves.
+
+**Fixed** — §3c states the falsification where the claim is, keeps cell 1's reasoning about the
+two windows composing, and gives up only the part the build disproved: that this kind is the one
+performing it.
+
+---
+
+## F230 — the entry trim reconciles a height disagreement by deleting blocks ★★★★☆
+
+C09 I1 is the contract that `measure(b, w)` equals the rows `render` draws, and **nothing
+enforces it.** A kind registered to measure 1 and render 3 returns three lines from
+`renderToLines` — no throw, no clamp, nothing to the sink.
+
+What binds is one line in the shell:
+
+```
+session.ts   out.push(...rows.slice(0, ve.takeRows));
+viewport.ts  const takeRows = Math.min(available, height - taken);   // height is the index's
+```
+
+`takeRows` can never exceed what C14 measured for the entry, so a block drawing taller is cut —
+**and the cut is taken out of whatever follows it.** Measured in a real session:
+
+| the entry | on screen |
+|---|---|
+| the over-drawing block alone | **1 row** — its first. Rows 2 and 3 gone |
+| the block, then a `notice` | **2 rows** of the block, and **the notice is not on the frame** |
+
+No fault, no diagnostic. `BlockFault` has three arms — `measure`, `render`, `elements` — and a
+frame-level disagreement is none of them, so the sink that exists for exactly this kind of
+silence is never called.
+
+**The repair already exists one level up and was not applied one level down.** `paint.ts`'s
+`transcript()` refuses a frame whose rows exceed the region, and its comment is about this
+exact shape: *"the trim was `rows[0 … height)` — the **top** of the selection — … `heightsSum`
+compares the frame with itself and C14 I10 compares the viewport with itself, so the only place
+the two quantities meet is here, where the trim was quietly reconciling them."* That trim became
+a `FrameError`. The per-entry trim, one loop inside the same function's caller, still reconciles
+quietly.
+
+**Second instance of F40's class.** There, `document-view.ts` packed nearly twice what the region
+holds and C15 cut the excess in silence; here C09 draws more than C14 indexed and C22 cuts it in
+silence. Both are a component below reconciling a disagreement it did not cause, and in both the
+component that chose the rows goes on believing it was obeyed.
+
+**Nothing in the tree triggers it**, which is why it has survived: every default kind plus
+`table`, `plot` and `patch` honours I1 across **15 kinds × 4 widths, zero divergences**. It is a
+contract holding on good behaviour with a frame-corrupting failure mode and no alarm — and the
+deferred height change is the first thing that will make a disagreement ordinary.
+
+**Not a throw.** A frame that dies because one block over-drew is worse than a frame that
+truncates and complains, and `paint.ts`'s refusal is affordable only because it is unreachable
+with I34 held. This one is reachable.
+
+---
+
+## F231 — the named op is unforgeable and the field it lands as is not ★★★☆☆
+
+C04 §4 rules `op: "expand"` a named op rather than a `viewState: true` flag on `replace`, and
+states the argument in full:
+
+> A named op rather than a `viewState: true` flag on `replace`, and the reason is unforgeability
+> rather than tidiness: `replace` is the arm C25's patch expansion uses, so the flag would be set
+> by C25's renderer **and** by adapters — "trust me" in two components, with the far side's
+> adapter on one boundary. A named op cannot be forged.
+
+The op cannot. **The field it writes can**, because `validate.ts` does not contain the word
+`expanded`. Measured — an inbound document carrying `expanded: true` on a table row:
+
+```
+validateDocument            ok: true
+measure, expanded: true     3
+measure, expanded: false    2
+```
+
+The far side set view state, the detail was drawn, and the row it cost was real. **The guarantee
+holds at the op and leaks at the field**, which is the precedent being half-true: everything the
+argument says about `replace` is correct, and the conclusion it licenses — *so this is
+unforgeable* — is about the op alone. Nobody copying it would notice, because the sentence they
+are copying is true.
+
+**Third instance of the `validateBlock` gap class**, after F220 (`plotDetail`, one reader,
+governing two forms of forty-four) and F221 (`hierarchy`, a whole typed field, the word absent
+from the file). Three of one kind argues for a check over the kind rather than a third line —
+*close the class, not the instance* — and the shape is available: a field that only a named op
+may set is a small, enumerable set, and the validator can be made to refuse all of them at once.
+
+**Filed rather than fixed**, because the deferred height change adds the second member of that
+set and the two should be closed together.
+
+---
+
+## F232 — the anchor checker read a concatenated anchor as its first fragment ★★★☆☆
+
+F173 widened `anchorsOf`'s pattern from one quote style to two and turned *108 of 465 anchors
+invisible* into a gate that could see its subject. **It stopped at the form in front of it.** A
+`from:` whose value is written as a `+`-joined run of literals on its own lines —
+
+```js
+      from:
+        "        ...detection.warnings,\n" +
+        "        ...stores.history.warnings,\n" +
+        "        ...built.blockFaults,\n" +
+        "        ...pipeline.faults,",
+```
+
+— was matched by `from:\s*("…")` with `\s*` crossing the newline, so **the anchor the checker
+held was the first fragment alone**. Six of 838 across five runs: `c02-polarity`,
+`c12-absence`, `c23-faults`, `enforce-public-surface`, `states-axis`.
+
+**And a fragment resolves where the whole does not, which is the direction that matters.**
+`...detection.warnings,` is in `construct.ts` and always will be; the four lines together stopped
+matching the moment `built.blockFaults` became `built.blockFaults.messages`. The gate said *no
+run drifted* about an anchor that had moved — measured on the commit that moved it.
+
+**This is not F173's class arriving again. It is one shape worse.** F173's anchors were
+*unread*: 465 counted, 108 unseen, and the summary said so by omission. These were **read
+wrongly** — counted, resolved, and reported clean — which is the truncated form of *an
+instrument can manufacture evidence*, the shape whose whole hazard is that the count looks
+right. Before and after the fix the total is **801 either way**; only which string was checked
+changed.
+
+**Fixed** — the pattern matches a sequence of literals and joins them, so the anchor the checker
+holds is the anchor the harness will apply. The one stale anchor was repaired and
+`c23-faults.mjs` re-run whole, twelve mutations, all caught.
+
+**The reusable part is where to point a widening.** F173's remedy was correct and its scope was
+the case in hand; nothing asked *what else does this pattern not read*, and the answer was one
+grep — `from:\s*\n` — against the same directory. A widening that fixes an instrument should
+count what it still cannot reach, and the figure belongs beside the fix.
+
+---
+
+## F233 — the fix rewrote the spec of the component that held the repair, and not the two that held the subject ★★★★☆
+
+F227 named three links in three components. **Its fix touched one spec.**
+
+```
+cc84ca4  docs/components/C22_composition_root.md   +8
+         docs/components/C03_frame_scheduler.md     0
+         docs/components/C09_block_library.md       0
+```
+
+C22's four statements of the defect were rewritten at length — §6c row 10, I60, the new I60a,
+T4.35. C03 §3 and C09 §2, §3a and I32 went on saying it in the present tense:
+
+| where | what it still said |
+|---|---|
+| C03 §3 | *no producer raises it … `RenderContext.tick` is `0` for the life of a session and `steps` cannot animate* |
+| C09 §2 | *nothing increments it … a chain with three links and none of them is joined* |
+| C09 §3a | *`RenderContext.tick` does not currently advance … until C03 raises the commit, C22 supplies the counter and the line cache admits the axis* |
+| C09 I32 | *The counter does not currently advance at all* |
+
+**Four present-tense statements of a defect that had been repaired**, in the two components a
+reader actually opens for the subject. Nobody looking up how `status` animates opens C22 — the
+wiring is C22's, the *kind* is C09's, and the counter is declared in C03.
+
+**And then the sweep found two more, in C22 — the component that *was* rewritten.** This is the
+part that changes the finding, because the first version of it was *the untouched components are
+where the stale text is*, and that is not what the tree says:
+
+| where | its lead sentence | where the repair was written |
+|---|---|---|
+| C22 I60 | *`ctx.tick` is **not** in the key and no transcript render receives one* | eleven lines below, under *Resolved by the first arm of its own ruling* |
+| C22 §6c row 10 | *`visibleRows` passes no `tick`, so every transcript render is at 0* | the row's last clause — *it is now owed rather than anticipated* |
+
+**The correction was appended and the claim was left standing at the top.** An invariant is read
+by its lead sentence — the lead sentence *is* the invariant — so eleven lines of correct history
+underneath do not change what I60 says. And row 10's own resolution stops at **owed**, which was
+true when it was written and was already false in the same commit.
+
+**So the axis is finer than *which component*: it is *the headline versus the body*.** Appending
+is the natural motion when a finding is being closed — the history is what you have just learned
+and it feels like the valuable part — and it leaves the one sentence a reader will actually take
+away pointing the wrong way. Six statements, three components, and **the two worst are in the
+file the fix was careful about.**
+
+**Found because the four sentences sourced a false premise into a plan.** A step was scoped as
+*S4 · MAKE `tick` LIVE — sixteen spinner sets ship, fully tested, and nothing in a session can
+animate one*, with all three links listed as owed. Every clause of that is what C03 and C09 say
+today. Nothing was misread.
+
+**And a third thing, which is the same mechanism with the tense removed.** The fix added
+`src/presentation/blocks/animation.ts` — 78 lines, three exports, **C09's directory** — and:
+
+```
+ANIMATES · animationIntervalOf · tickIntervalOf   in docs/components/C09_*.md   0 hits
+                                                  in docs/components/C22_*.md   1 (a test row)
+```
+
+A new C09 module whose only documentation is an obligation in **C22's** test list. The rule the
+module implements — which kinds animate and how fast — is C09 I32's subject, and I32 does not
+know the module exists.
+
+**So the axis is not *summary versus body*. It is *where the repair landed versus where the
+subject lives*.** F86, F89 and F92 are a claim weakened by being summarised; this is a claim
+**corrected** in one place and left standing in three, and the direction is opposite. The common
+cause is that a commit's blast radius is measured in code — and the code was almost all C22's,
+which is exactly why C22's prose got the attention.
+
+**Second instance of the retraction direction** (F89 is the first: a retraction that never
+reached the Order list citing it). **Two instances is the minimum for noticing a rule, not
+evidence for one** — so this is a habit and not a gate: *when a finding names N components, ask
+which of the N the fix is about to leave untouched, and open those.*
+
+**The cheap mechanical half, named and not built.** *A spec cites F-N* ∧ *F-N is dispositioned
+`fixed` in TRIAGE* is a grep, and it yields a short review list. What it cannot do is read tense
+— that half is prose, and matching *does not currently advance* against *it advances* is the
+citation-resolves-against-the-wrong-thing class the audit argues against automating. The list
+would have been four lines long here and every one a true positive, which is the number that
+would make it worth building on a third instance.
+
+**Fixed** — the six statements rewritten against HEAD **lead sentence first**, `animation.ts`
+given its C09 text, and F227's two proof GIFs cited from the finding that measured them rather
+than sitting unreferenced in `docs/catalogue/status/`.
+
+**The habit this leaves is one line: when closing a finding, rewrite the claim, then append the
+history.** Doing it in the other order is what produced I60, and the other order is the one that
+comes naturally.
+
+---
+
+## F234 — the 1 Hz counter was the weak joint on paper, and it is 0.4 frames a second ★★★☆☆
+
+The elapsed counter S5 needs writes a document once a second, bumps `rev`, misses the cache and
+rewrites the block. **Named as the joint to watch, and measured before anything rested on it.**
+
+**Ten seconds of fake time, 90 × 24, frames counted as writes reaching the terminal:**
+
+```
+                       frames   polls
+still,    no patch        0       0     ← the instrument responds
+still,    1 Hz           10      10     ← a patch costs exactly one frame, alone
+spinner,  no patch       55       0
+spinner,  1 Hz           59      10     ← the 1 Hz write costs FOUR, not ten
+spinner,  10 Hz          99     100
+```
+
+**Six of the ten writes cost nothing**: C03 coalesces the `stream` commit into a spinner frame
+that was already going to happen. The marginal cost of the counter beside its own spinner is
+**0.4 frames a second against 5.5 — seven per cent.**
+
+**And the two control arms are why the number can be believed.** *Nothing animating, no patch* is
+**0 frames** — C22 I60a's claim measured end to end rather than reasoned from the arming code —
+and *patch alone* is exactly 10. A fixture that could not tell those apart could not tell the
+other three apart either.
+
+**The inversion is the point: the counter is cheapest exactly when it is visible.** A loading
+status animates, so the ticker is armed, so the write lands inside a frame that was already
+scheduled. There is no case where the counter is expensive and also on screen.
+
+**So coarsening is not a cost argument, and the guard survives on a different one.** `elapsed()`
+never gets coarser than the second — `99s`, then `1m 40s`, then `60m 0s` — so a 1 Hz write is
+needed for as long as the box is up, and a ladder would buy 0.3 frames a second. What the guard
+is for is that **a write which changes nothing observable is still a `rev` bump**: it invalidates
+C14's height cache and tells the transcript the document changed when it did not. A hygiene
+argument, not a throughput one, and it is the honest one to write down — *a justification the
+next person checks and cannot reproduce is a justification they delete.*
+
+**The frame read settled the height, and the arithmetic could not have.** Both defaults land
+inside `livePanel`, which already draws a border and a title:
+
+```
+H=1   │fetching containers                    │   message only — NO SPINNER
+H=2   │fetching containers                    │   ✓
+      │⠸ loading (4s)                         │
+H=3   │┌─────────────────────────────────────┐│   a second border inside the panel's,
+      ││fetching containers                  ││   one row spent, nothing gained
+H=4   ││─────────── ERROR ───────────────────││   the tag, at two nested borders
+```
+
+**H=2**, and at 1-bit it degrades to `!`, `/` and `+ - |` with the word carrying it.
+
+**The `error` arm is H=1, and that came out of the same read.** A state with no activity line
+draws a blank second row at H=2 — and **the first reading of that was wrong.** It looked like the
+ladder failing to fill a row it had allocated; measuring a long message showed it wraps into
+exactly that row, so the blank is a declared-height box with one row of content, which is I31
+working. **It is only a defect where L4 picks the height itself** — and `renderError` with
+`retryInMs === null` is precisely that case, so its arm is `error` at 1 rather than `retrying`
+at 2. Nothing about the ladder needs to change.
+
+**And I31's three-numbers rule turns out to be implemented rather than only ruled.** The
+classification table's watch row — *`retrying` with `elapsedMs` set* — was open on whether *ruled
+against* meant *unreachable*. It is neither: the block constructs fine and `activityLine` silently
+prefers the countdown.
+
+```
+retrying + elapsedMs  ->  |▲ msg|  |⠸ retrying in 8s (attempt 2)|   elapsed dropped
+loading  + retryInMs  ->  |msg|    |⠸ loading (4s)|                 countdown dropped
+```
+
+**The ladder has an answer and it is the right one**, which is what the table was for — *ruled
+against* and *unreachable* are different states, and only running it says which.
+
+**The last one is a defect S5 would have introduced.** `retrying` **without** `retryInMs` draws
+no activity line **and therefore no spinner** — `|▲ msg|  ||` — and `refresh.ts` passes
+`retryIn = null` for every one-shot (`intervalMs === 0`). Mapping `renderError`'s default to
+`retrying` unconditionally would have given a one-shot's failure a blank row where the spinner
+goes. The state union already carries the distinction; `retryInMs === null` **means** no retry is
+coming, and the arm is `error`.
+
+---
+
+## F235 — the one-row rung was a correct sentence about the two states it was reasoned from ★★★★☆
+
+C09 I31's height ladder ends: *at one row the message wins and the retry line is dropped, because
+a countdown without its cause is a number nobody can act on.*
+
+**True, well argued, and about `error` and `retrying`.** The rung applies to all three states, and
+`loading` has no cause — its message is a label, not an error. Wired up, `b.live` drew:
+
+```
+┌ containers ───────────────┐
+│loading                    │
+│⠋ loading                  │
+└───────────────────────────┘
+```
+
+**The word twice, with every count agreeing.** `measure` said 2 and `render` drew 2; the message
+row took one and the activity line took the other, exactly as the ladder specifies. No assertion
+about heights, rows, wrapping or precedence could have failed.
+
+**MG24's shape, and that is why it is worth filing rather than fixing quietly.** *A correct
+sentence justifying a decision whose scope is wider than the sentence's subject* — review checks
+whether a justification is true, and this one is. The question that reaches it is **does this
+sentence constrain the case it is being applied to**, and for `loading` it does not: there is no
+countdown and no cause, so the clause is silent about which of the two rows to keep and reads as
+though it has ruled.
+
+**All the information in a waiting box is that it is still waiting, and that lives entirely in
+the line that moves.** The panel above already carries the title. So at one row `loading` keeps
+the activity line and the other two keep the message, and the rung's argument is unchanged for
+the states it was written about.
+
+```
+┌ containers ───────────────┐     ┌ ▌ containers ─────────────┐
+│⠋ loading                  │     │▲ connection refused       │
+└───────────────────────────┘     │⠋ retrying in 2s (attempt 1)│
+                                  └───────────────────────────┘
+```
+
+**Found by reading a frame, and it is the fourth thing in this sequence that only a frame
+found** — after the width ladder that would have shipped broken, the box that drew four rows
+against a measured six, and F234's height choice. **The count is now the argument**: every one of
+the four is a cell where the arithmetic is self-consistent and the figure is wrong, and a suite
+indexed by row counts agrees with itself in all four.
+
+**And it changes a shipped rung rather than only the new caller**, which is the right blast
+radius: a `loading` status at one row is wrong for the registry and for a consumer too, and
+fixing it at `b.live` by picking height 2 would have left the rung wrong and hidden the evidence.
+
+**One thing the fix had to be careful about**, and the file's own comment is what flagged it: the
+message used to be floored at one row by `Math.max(1, …)`, and with the activity line taking the
+only row that floor would put the message back and let the final `slice(0, height)` cut it —
+**the message winning by truncation rather than by rule**, which is the exact defect the rung's
+comment records having been fixed once already. The floor is `Math.max(0, …)` and the body is
+empty when there is no room, so the precedence stays a statement rather than an accident.
+
+---
+
+## F236 — three NUL bytes made a 14 KB test file invisible, and the search that missed it read as coverage ★★★★★
+
+Looking for where C09's status ladder is tested:
+
+```
+grep -rn 'kind: "status"' test/            ->  3 files, none of them tier 3
+grep -n  'it("' test/edge/status.test.ts   ->  nothing
+```
+
+**The conclusion drawn was that C09's eleven ledger rows T3.38-T3.48 have no tests.** All eleven
+exist, in `test/edge/status.test.ts`, 14 KB of them — and the file was open in front of me, since
+`head -40` printed it perfectly.
+
+```
+file test/edge/status.test.ts   ->  data
+```
+
+**Three literal NUL bytes**, at offsets 9565, 9892 and 10339. `grep` classifies such a file as
+binary and skips it **in silence**: no warning, no count, no diagnostic. A search for its contents
+returns nothing, and **nothing reads exactly like no coverage.**
+
+**They were written as `?? " "` fallbacks** — `r.includes(frames[0] ?? " ")` where the string that
+looks like a space is a NUL. That is SS43's own stated failure mode, word for word: *a separator
+that reads as a space turns out to be a NUL*.
+
+**And SS43's scope is `src/`, which is where the byte does the least harm.** In source a stray NUL
+is a wrong character inside a string — bad, and visible to every other tool. In a *test* file it
+deletes the file from every search anyone will ever run. **The rule was scoped to the directory
+where its subject was first found rather than to the one where its consequence is worst.**
+
+**Five files, measured across the whole tree:**
+
+```
+test/contract/parser.test.ts    1     among a list of separator strings
+test/edge/history.test.ts       1     inside an appended command line
+test/edge/process.test.ts       1     inside an expected output
+test/edge/status.test.ts        3     the `?? " "` fallbacks above
+tools/enforce/todo-expiry.mjs   1     a Map key separator, `${id} ${path}`
+```
+
+The last is an **enforcement tool** that was itself invisible to `grep`.
+
+All five replaced by the escape "\u0000" — byte-identical behaviour, and the remedy SS43 already
+prescribes. 125 tests unchanged, `make enforce` unchanged.
+
+**SS52 is the rule, and three things about its shape were decided by measurement.**
+
+- **It is not SS43 widened.** `checkSourceScans` only ever receives `walk("src")`, so changing
+  SS43's scope *string* would have read as a tightening and done nothing at all. It needs its own
+  pass over its own list — and its row asserts the list actually reaches `test/`, because a
+  control-byte check that silently scanned `src/` alone would pass identically.
+- **NUL alone.** The first draft took SS43's whole C0 class and reported **90** violations, every
+  one a literal ESC in a test about escape sequences — and those files grep perfectly well; `file`
+  calls them *UTF-8 text, with escape sequences*. A rule whose subject is *the file became
+  unreadable*, firing on ninety readable files, is a rule someone turns off — and the four real
+  instances would then have been buried in the allow-list that silenced them.
+- **Bytes, and no comment exemption.** SS43 skips comment lines because a rule's own prose is not a
+  violation of it. Correct there and wrong here: a NUL inside a comment makes the file just as
+  invisible.
+
+**Its blind spot, stated**: a non-NUL control character in `test/` or `tools/` is invisible to a
+*reader* and is now caught by nothing. Left open deliberately — the two rules answer different
+questions, and merging them is what produced the ninety.
+
+**The fabricated violation could not go in the shared table, and the reason is the finding in
+miniature.** `FABRICATED` is a list of `source` strings inside `enforce-rules.test.ts`, and SS52's
+subject is the one byte that would make *that file* binary to `grep` if written literally — **the
+defect installing itself in the fixture that tests for it.** Its rows build the byte at runtime.
+
+**Two instruments caught this class while it was being fixed, and neither was the suite.** The
+first draft of the scan was written through a shell heredoc and **the tool refused the command**,
+because it contained control characters that would be hidden in an approval dialog — SS43's own
+argument, enforced by something with no knowledge of this repository. It then refused this finding
+for quoting them. The second was `file` reporting `data`, which is the whole diagnosis in one word
+and was one command away for however long those bytes had been there.
+
+**The reusable part is not the byte.** It is that **a search returning nothing is evidence only if
+the search could have returned something**, and an empty result carries no signal about whether the
+corpus was read. Every other instrument here checks a thing that exists — the frame-read checks
+output, the mutation pass checks tests, the audit checks code, *where is this written down* checks
+the record. **This is the first about whether the reading happened at all**, and the near-miss it
+produced was a finding about eleven missing tests that were never missing.
+
+---
+
+## F237 — a SIGKILL during a mutation pass truncated five source files, and `git status` was the only thing that noticed ★★★★☆
+
+Two concurrent `npm run e2e` runs were racing in the devcontainer, alongside sixteen vitest
+processes two days old. `pkill -9 -f vitest` cleared them. Some minutes later the build failed on
+types that have shipped for months:
+
+```
+src/data/viewmodel/construct.ts: Module './types.js' has no exported member 'IS_MATRIX'
+src/shell/builders/index.ts:     'PlotForm' and '"tree"' have no overlap
+```
+
+**Five files had lost their tails, and none of them was in the change being made:**
+
+```
+                                    HEAD    disk
+src/data/viewmodel/types.ts         2218    1297
+src/data/viewmodel/validate.ts      1805     961
+src/presentation/plot/definition.ts 2980    2343
+src/presentation/plot/kde.ts        1136     956
+src/presentation/plot/circle.ts      979     861
+```
+
+**The mechanism is the mutation harness's restore.** `runPass` holds each file's original text in
+a `Map` and puts it back with a plain `writeFileSync` (`mutate.mjs:123`) — not a write-to-temp and
+rename. A `SIGKILL` landing mid-write leaves whatever had been flushed, which is a **prefix**. Two
+days of stale `plot-style-arms` runs were sitting mid-pass, and killing them stopped the restore
+halfway through.
+
+**Every gate was green ten minutes before and none of them could have seen it coming**, because
+the damage arrives *after* the last check and *before* the next. What caught it was `npm run e2e`
+building first — and the diagnosis came from `git diff HEAD --stat` reading **3042 deletions** in
+files nobody had touched.
+
+**The instrument that found it is the cheapest one there is, and it was nearly skipped.** *Read
+the diff, including files nothing intended to touch* is already a standing rule here, and it is
+the fourth time it has been the only thing to notice something. It was very nearly missed again:
+the build errors read as a resolution problem, and two rounds went into `--traceResolution` before
+`git status` was consulted at all. **A compiler error naming a symbol that obviously exists is a
+statement about the file, not about the resolver.**
+
+**Three things follow, and the first is the fix.**
+
+- **The restore should be atomic** — write to a sibling temp file and `rename`, which is atomic on
+  every POSIX filesystem. The harness's own header already argues that *a run whose child was
+  killed before it wrote a summary* is the strongest failure mode it has; this is the same
+  observation about the file rather than about the report.
+- **The devcontainer's PID 1 is `sleep infinity`, so nothing reaps.** Measured at the same moment:
+  **9087 zombie processes.** That is what let two-day-old runs persist, and it is why `TaskStop`
+  on the host looked like it had worked — it kills the `docker exec`, not the process inside.
+- **`pkill -9` in a tree that tools write to is not a neutral act.** `pkill` first, `-9` only if it
+  does not answer, and check `git status` afterwards either way.
+
+**And the near-miss underneath it**: the first e2e failure of the session — *1 failed*, no row
+named — was read as *plausibly the known contention class* and it was **piped through `tail -6`**,
+which discarded the diagnosis along with the exit code. That is this repository's own recorded
+lesson about pipes arriving again, and the honest version of the timeline is that the failing row
+was never identified: the tree was damaged before it could be re-run, and it stayed unidentified.
+
+---
+
+## F238 — the cap was a guess, and the width it is worst at is the one nobody tests ★★★☆☆
+
+The error box is about to ask for the height its message needs, capped so a stack trace does not
+make a forty-row block. **Four lines was the proposed number and it was named as a guess.**
+Measured, wrapping `plot failed to render: ${message}` at the top rung's content width:
+
+```
+message                              w=40   w=80   w=120
+short — ENOENT                          1      1       1
+typical — Cannot read properties …      3      2       1
+a path — ENOENT: no such file …         4      2       2
+a three-frame stack trace               6      3       3
+```
+
+**Four is right, and the measurement is what makes that a ruling rather than a preference.** At 80
+columns four lines holds a whole three-frame stack trace; at 120 it holds it with a line to spare.
+**At 40 it holds a path and nothing else** — a *typical* message is already three lines there, so
+the cap binds at exactly the width where the message matters most and the room is least.
+
+**It is still four, and not width-scaled.** The cap is about how much a reader will take in before
+going to the sink, which is a property of the reader; a rule with a second axis is one more thing
+to get wrong, and the honest cost is stated instead: **at 40 columns a capped stack trace shows the
+error and one frame, at 80 the error and two.** The frames it keeps are the outermost, which are
+the ones that name the failing call.
+
+**And the newlines survive the wrap**, which was not obvious and is why a stack trace is three
+lines at 80 rather than one long fold: `wrapCells` breaks on `\n`, so a multi-line message keeps
+its shape and the cap counts real lines rather than fold artefacts.
+
+**A second argument for the cap turned up while confirming something else, and it is the stronger
+one.** See F239: a bounded container draws an over-tall child **whole**, and C25 I1 is knowingly
+false for that case. The floor is 3 today, so the divergence is small; fitted and uncapped it would
+be unbounded. **Capped at four lines the error box is at most seven rows, so the worst over-draw
+inside a `scroll` is bounded by a number rather than by the length of an exception.** The cap was
+proposed for readability and it is load-bearing for containment.
+
+---
+
+## F239 — the plan cited the wrong mechanism for a bounded container, and the right one is already written down ★★★★☆
+
+Asked what happens to a floored error box inside a bounded container, the plan answered **C09
+I33** — *a floored block is kept whole and paid for out of `skipRows`*. That is the **transcript
+viewport's** rule, in `windowSequence`. A `scroll` is a different mechanism and gives a different
+answer.
+
+**Measured, through the real containment path** — a definition that throws, floored, inside
+`scroll { height: 3 }`:
+
+```
+bare, floor 7            measure=7  rendered=7
+scroll h=3, child f=7    measure=4  rendered=8      <-- diverges by four
+scroll h=3, child f=3    measure=3  rendered=3
+```
+
+**Neither clipped nor kept whole: over-drawn.** And it is not a defect anyone missed — C04 §3c
+trace 1 rules it and names why:
+
+> **RULING NAMES AN OPERATION THAT DOES NOT EXIST** — taking a child's top `n` rows needs a
+> windowing seam, and `RenderContext` offers `measureChild` and `renderChild` and nothing that
+> slices. So the child is drawn whole and C25 I1 is false for that one case, held open by T2.28b,
+> which expires by asserting the disagreement.
+
+**Three things follow.**
+
+- **The classification table's row was wrong and would have shipped as a ruling.** *Where a
+  finding's answer is already written down in another component* is the sixth blind spot arriving
+  in a walk artefact: the row cited a real invariant that governs a real mechanism, and not the
+  mechanism in the cell.
+- **The fitted height makes an existing, named divergence bigger** — four rows over instead of one
+  — which is the whole argument for the cap being a bound rather than a preference (F238).
+- **It is exactly the case the mosaic work will hit**, because a mosaic cell is a bounded region
+  and a cell holding a failed renderer is not exotic. Better found here than there.
+
+**What it does not do is change the ruling.** The remedy for the divergence is the windowing seam
+C04 §3c already names, and the error box has no business inventing one. T2.28b expires when the
+seam lands, which is the mechanism that already exists for this.
+
+
+## F240 — a degradation is ruled for two rungs with a reason that is forced at one ★★★★☆
+
+**Filed with the wrong headline and corrected before anything was built on it.** The frame read
+found the tag unpainted at 4-bit and 1-bit and this said *nobody gave it an arm*. C09 §3a had
+already ruled it:
+
+> **And the pair degrades together.** At 4-bit and 1-bit there is no ground *and no ink*: the tag
+> carries no styling and is distinguishable by being the one run that does not — non-bold between
+> two bold rules at one bit.
+
+I31 cites it and **T3.46 asserts both halves' absence at depth 4 and 1**, two-armed and on
+purpose. So the behaviour is specified, invariant-backed and tested. **The code, the tokens, the
+maps and four frames were all measured and the one instrument not run was the one that asks where
+the behaviour is written down** — the sixth blind spot, on the claim I was most confident about.
+
+**The finding survives and is a better one.** The ruling's reason is right about the *pair* and
+silent about the *rung*:
+
+- **At 1-bit it is forced.** C10 I8 vanishes every surface, so there is nothing to degrade to and
+  distinction-by-absence is the only answer. Correct, and unchanged.
+- **At 4-bit nothing forces it.** The ladder has a rung for surfaces — `bg`, `bgElev`, `bgDeep`,
+  `border`, `borderStrong`, `diffAdd`, `diffRemove` all carry curated indices — and `diffAdd` and
+  `diffRemove` are text-bearing grounds chosen at exactly this depth, in the same file, under a
+  comment that argues how to pick one. The pair is not degraded there; **it is unfilled.**
+
+One sentence covers two depths with a reason that holds at one of them, which is *a correct
+sentence justifying the wrong decision*: **an ink left behind on a vanished ground is an
+unmeasured foreground** is true, load-bearing, and an argument for the pair moving *together* —
+not for the ground vanishing where the rung exists. The pair can degrade together **into a 4-bit
+pair** and honour it exactly.
+
+**What the frame shows, which is what makes it worth changing.** At 4-bit the rule, the mark and
+the message are all bright red and the word `ERROR` is plain default — the one unmarked run in a
+red box, inverting §3a's own *the tag is painted and nothing else is*. A failure notice whose tag
+is the quietest thing in it is backwards, and it is visible in `status-error-ascii.png` without
+measuring anything. At 1-bit the same mechanism reads correctly, because there everything else is
+bold and absence is the only channel left.
+
+**And the mechanism underneath is a class.** `Surfaces` declares ten slots; every `*_FOUR_BIT` map
+answers seven, identically:
+
+```
+missing in all three:   selection · errorGround · errorInk
+```
+
+Nothing could have asked. `FourBitMap = Readonly<Record<string, number>>` is partial over an open
+key, so **an unanswered slot and a deliberately unpainted one resolve identically** — which is why
+this took a frame read to notice and why the spec sentence above was so easy to write. And C10 §3's
+*"Surfaces degrade too"* **enumerates** — `bg`, `bgElev`, `bgDeep`, `border` and `borderStrong`,
+the five that existed when it was written — where it means to quantify. Five slots landed after it;
+two were given arms by whoever added them and three were not.
+
+**Three missing arms are probably three cases, and lumping them is how the wrong fix ships for
+two of them.** `selection` is a **wash behind arbitrary text** — its 4-bit answer has to leave
+legible whatever it washes and it has no ink of its own to compensate with. The error pair is a
+**tag that brings its own ink and washes nothing**. One is constrained by text it does not own;
+the other owns both halves. `selection` is roadmap 23's subject and is named here rather than
+folded in.
+
+**Ruled: the 4-bit arm lands, 1-bit is untouched.** Four reasons, in order of weight — the stated
+reason argues for the pair and not for the rung; the rung exists and this file already uses it for
+the only other text-bearing surfaces; I26 makes the floor *best-effort at 4-bit*, so nothing is
+promised that cannot be kept; and §3a's own claim about the tag is false at that depth today.
+**The withdrawn half is a fallback in `withBackground`** — making a pair that resolves to nothing
+fall back to the tone would have "fixed" 1-bit as well, and 1-bit is right.
+
+**What is not owed is a measurement, and the 24-bit construction settles the ground without a
+choice.** §4d makes the ground `tone.error` *by equality*, asserted by T2.14e — so the 4-bit
+ground is `tone.error`'s own index per theme and only the ink is chosen. That flips dark's ink
+from white to black, and the flip is the construction working rather than a divergence: at 24-bit
+`tone.error` is a dark red needing white on it, and at 4-bit it is bright red needing black.
+
+**T3.46's second arm changes and that is the point of finding this first.** It asserts no ground
+*and* no ink at depths 4 and 1; it becomes a 1-bit assertion plus a 4-bit assertion that the pair
+arrives whole. Landing the arm without touching it would have turned a deliberate two-armed row
+into a failing one, and read as the arm being wrong.
+
+---
+
+## F241 — the instrument reassembled real bytes with a model missing the whole 4-bit vocabulary, and the watcher for that never opens the directory ★★★★☆
+
+F240's 4-bit row was nearly read off `status-error-ascii.png`, which draws the rule in **grey**
+where the frame's bytes say `91m` — bright red. The image is not the frame.
+
+**`ansiToSvg` has no arm for 4-bit colour at all.**
+
+```
+KNOWN_SGR = { 0, 1, 2, 22, 38, 39, 48, 49 }
+
+absent:  30-37  40-47  90-97  100-107      the entire sixteen-colour vocabulary
+```
+
+**The watcher exists, is correct about the thing it was built for, and cannot see this.** PC11
+sweeps for exactly this failure, carries counters against the *did-not-run* green, and names `7m`
+as the deferral it is watching. It sweeps `readdirSync(join(..., "docs", "catalogue"))` —
+**non-recursively**. `docs/catalogue/status/` holds the only 4-bit frames in the tree and PC11
+never opens it.
+
+**And made recursive yesterday it would still have passed.** Measured over the 880 top-level
+frames, the distinct SGR first-parameters are
+
+```
+[1, 2, 22, 38, 39, 48, 49]        — exactly KNOWN_SGR, less 0
+```
+
+so the gate is green because **nothing in its corpus is rendered at `colourDepth: 4`**, not
+because the parser is complete. Coverage was a property of the fixtures the whole time.
+
+**Two recorded classes meeting, which is why neither caught it.** *A gate that exists and is not
+run* — coverage is where a target sits relative to the gate's default path, and a subdirectory is
+outside `readdirSync`. And *an instrument can manufacture evidence*, third shape: real bytes
+reassembled by a wrong model. The first made the second invisible.
+
+**The header is not what is wrong this time, and that is worth saying** — it lists what is parsed
+and the list is accurate. What is missing is any sentence claiming the list is **complete for what
+the framework emits**, which is the claim a reader takes from it. The same file already records
+one instance of an abstract read instead of its body; this is the mirror, where the abstract is
+true and the reader's inference is not.
+
+**Read before anything else is read through it**, which is why this lands ahead of F240's fix
+rather than beside it.
+
+
+## F242 — the layout that cannot collide, and the sweep count that is a number rather than a recipe ★★★★☆
+
+Three measurements taken before `graph`'s design rested on them, over 360 graphs — three densities
+(near-path, dense ~1/3, complete) × three sizes (12, 20, 50) × 40 seeded trials, deterministic.
+
+### 1 · Label collisions are not expressible under `layered`, and that is the whole case for it
+
+**Zero, in all 360.** A layered layout lays a layer's labels side by side with a gap, so two labels
+cannot overlap; the failure mode is the layer being **wider than the terminal**, which is overflow
+and has an answer. `force` places nodes continuously and was refused **on the labels alone** — one
+pair in six overlapping at a third of the edges present, n = 20 — so this is the same question
+asked of the layout being kept, and it comes back clean for a structural reason rather than a
+lucky one.
+
+**So the refusal and the choice are one measurement read twice**, which is worth saying because
+the refusal has already been moved once, off the edges and onto the labels, and a reason that
+survives being re-asked of the alternative is a stronger reason than one that was never tested.
+
+### 2 · What fits, so the drop threshold is chosen
+
+```
+kind          n   reversed  layers  width(med)  fits 80x24  fits 120x30
+near-path    12        0.5     5.6          38        100%         100%
+near-path    20        0.3     6.7          58        100%         100%
+near-path    50        0.5     9.1         136          0%          28%
+dense        12        3.0     7.5          29        100%         100%
+dense        20       20.9    15.6          42          0%          53%
+dense        50      190.6    45.5         203          0%           0%
+complete     12       28.9    12.0          38        100%         100%
+complete     20       90.5    20.0          98          0%           0%
+complete     50      608.3    50.0         608          0%           0%
+```
+
+**`+N more` is the ordinary case past about a dozen nodes, not an edge case.** At 80 columns a
+near-path graph fits to 20 and a dense one stops at 12. That makes I8's notice row load-bearing
+for this form rather than a courtesy, and it is why the row is spent before the drawing is chosen
+rather than clamped in afterwards.
+
+**The `reversed` column is a property of this corpus and not of real data**, and is recorded that
+way: the generator assigns each edge a random direction, so cycles are manufactured. What it
+establishes is that the pass must **exist** and be correct — nothing in a node-and-edge shape
+forbids a cycle — not how often it fires on a dependency graph.
+
+### 3 · Two sweeps ends worse than one, in a whole family
+
+```
+kind          n     none      one      two      one vs none      two vs one
+near-path    12      7.2      1.3      1.0      0/40 worse       3/40 worse
+near-path    20     25.8      4.3      3.1      0/40 worse       3/40 worse
+near-path    50    194.4     36.5     38.1      0/40 worse      17/40 worse
+dense        20    780.8    187.1    147.7      0/40 worse       1/40 worse
+complete     20  12588.6   2583.8   2397.1      0/40 worse       1/40 worse
+```
+
+**One sweep never hurts — 0 of 40 in every cell — and cuts crossings four- to fivefold.** The
+second is where a fixed count stops being safe: at near-path n = 50 the mean **rises**, 36.5 to
+38.1, and 17 trials of 40 come out worse than they went in. *Two sweeps* was a recipe, and the
+recipe is non-monotone.
+
+Extended to six, plain against **best-kept** — keep the ordering with the fewest crossings seen
+rather than the last one produced:
+
+```
+kind          n  |  plain   0      1      2      3      4      6  | best-kept  2      3      4      6
+near-path    50  |       194     37     38     32     35     33  |           34     31     30     29
+dense        20  |       781    187    148    139    134    133  |          148    135    129    127
+complete     12  |      1240    270    233    210    196    187  |          233    210    193    187
+```
+
+**Ruled: two sweeps, best-kept.** Three reasons, measured:
+
+- **Best-kept makes it monotone by construction**, for one crossing count and one array copy per
+  sweep — so the family where two was worse than one cannot occur at all.
+- **Past two the marginal gain is small**: 3–6% a sweep against a linear cost, where the first
+  sweep buys 80%.
+- **And at the sizes that fit a terminal it is already at the floor.** Probe 2 says a readable
+  graph is n ≲ 20; near-path 12 reaches 1 crossing at sweep 1 and stays, near-path 20 reaches 3 at
+  sweep 2 and stays. The extra sweeps only improve graphs that cannot be drawn — `complete` 12
+  goes 233 → 187, which is 20% of a number no reader can use.
+
+**The number is chosen and the argument is attached**, so a later change that makes sweeps cheaper
+has something to overturn rather than a convention to inherit.
+
+### 4 · The instrument's own invariants, and the third gap in the recipe
+
+Checked over the same 360 graphs rather than assumed:
+
+```
+cyclic     0     every edge runs strictly forward after removal — the pass yields a real DAG
+span       0     after dummies, every segment spans exactly one layer
+lostNode   0     every real node appears exactly once
+dupEdge   24     <-- a two-node cycle reversed onto an edge that already existed
+```
+
+**Corrected by F243 before anything rested on it: *drawn twice* is false.** An edge sets mask
+bits with `|=`, so laying the same one down twice is idempotent and invisible. The cost is entirely
+in the **counting** — a duplicate inflates the crossing figure, which steers the ordering — and the
+pass earns its place on that alone. The wrong half is the one that made this sound visual, and a
+reader chasing the drawing would have found nothing and called the pass dead.
+
+**The stated recipe — *layer assignment by longest path, ordering by median heuristic, two
+sweeps* — is short by three passes, and the third came from checking the instrument rather than
+from reading the recipe.** Cycle removal and dummy nodes are structural and were named before the
+probe ran; **deduplication after reversal was not.** Reversing `b→a` where `a→b` already exists
+yields the same edge twice, which is drawn twice, counted twice in every crossing figure above,
+and looks exactly like a correct edge. 24 in 360 is small and the point is that nothing in the
+recipe asks.
+
+
+## F243 — three survivors, three dispositions, and one of them corrects the finding above ★★★★☆
+
+`c12-graph`, six mutations against the four passes the recipe does not name. Three caught, three
+survived — and **the three survivors are three different things**, which is the whole reason the
+disposition is asked per row rather than per pass.
+
+### 1 · Drawing an edge twice is a no-op, so F242's stated cost is half wrong
+
+Removing deduplication changed **nothing in the frame**. The reason is the mask: an edge sets bits
+with `|=`, so laying the same edge down twice is idempotent, and the second one is invisible by
+construction.
+
+**F242 said a duplicate is "drawn twice and counted twice".** *Counted* twice is true and is where
+the cost is — a duplicated edge inflates the crossing count, which steers the ordering. *Drawn*
+twice is false, and it was the half that made the finding sound visual. **The pass still earns its
+place** on the counting alone, and the correction matters because a reader chasing the drawing
+would find nothing and conclude the pass is dead.
+
+**It is the mutation pass indicting the sentence rather than the test**, one level down from where
+that usually happens: not a rule with nothing to be wrong about, but a *consequence* asserted
+without being run.
+
+### 2 · The corpus cannot reach the defect the sweep trace predicted
+
+`best = rows` instead of `best = rows.map((r) => [...r])` — §3ai.5 S5, the reference-not-a-copy that
+reports the right number and returns the wrong order — **survived, and correctly**. With two sweeps
+on a five-node and a fourteen-node fixture the last ordering *is* the best one, so reference and
+copy agree and no frame can tell them apart.
+
+**The defect is only expressible where sweep 2 is worse than sweep 1**, which F242 measured and
+located: near-path at *n* = 50, 17 trials in 40. **Both fixtures are far below it.** *A fixture must
+be shown to respond to the thing under test* — and this is the sharper form of that rule, because
+the fixture responds to everything else in the pipeline and only this one row needs a bigger graph.
+
+**Owed: a fixture in the near-path family at a size where the second sweep can lose**, and the row
+that reads its frame. Recorded rather than fixed, because adding it means re-measuring which *n*
+still fits a golden frame.
+
+### 3 · The drop's guard is doubled, and the mutation indicts the subject
+
+Removing `if (!keep.has(a) || !keep.has(b)) continue;` from `lay` changed nothing either — because
+the drawing loop already refuses a segment whose endpoints have no entry in `centre`, and a dropped
+node has none. **Two guards for one rule**, and the second is load-bearing while the first reads as
+the one that matters.
+
+**That is a mutation's third disposition** — not a weak test and not a stale anchor, but a second
+defence masking the first. The honest resolutions are opposite and both are defensible: delete the
+redundant guard and let the drawing loop own the rule, or keep it and say in the comment that it is
+the cheap arm of a rule enforced twice. **What is not defensible is leaving it looking like the only
+guard**, which is what it looks like now.
+
+### The three that were caught
+
+Cycle removal never reversing, the medians read against a half-applied order, and the ordering pass
+never running — all three moved the golden frame. So the corpus *is* sensitive to the pipeline; what
+it cannot reach is one row's worth of it, at one size.
+
+
+## F244 — the mosaic composites, and the precedent that warned against it was measured on a different mechanism ★★★★☆
+
+D1 is a spike: measurements taken before a mosaic's spec rests on them, and nothing built. Three
+were asked for. A fourth is what the frame produced, and a fifth corrected a sentence that was
+already written.
+
+### 0 · The mosaic has a subject, and this is the measurement that could have cancelled the phase
+
+**"The pinwheel" is in no file and no commit in this repository** — not case-insensitively, not in
+the archive, not under `git log -S`, not in `node_modules`. The name arrived carried, which is F161's
+shape, so the figure is *defined* here rather than assumed and probe 0 is what makes the definition
+load-bearing instead of decorative.
+
+A `group` divides its region into full-width columns or full-height rows and recurses, so every
+figure any nesting of them can draw is a **slicing** floorplan. The pinwheel — four cells rotating
+around a centre, five rectangles — admits **no guillotine cut at all**:
+
+```
+  AAAAAABBB      top-level guillotine cut : NONE
+  DDDEEEBBB      slicing (nested groups)  : false
+  DDDCCCCCC
+```
+
+**The control is what makes that a proof rather than an observation.** A search that merely gave up
+at five rectangles would read identically, so the same search runs over a five-rectangle floorplan
+that *is* slicing:
+
+```
+  PPPQQQQQQ      top-level guillotine cut : x=1
+  PPPRRRSSS      slicing (nested groups)  : true
+  PPPRRRTTT
+```
+
+Same count, same tiling, opposite answer. **The difference is the figure and not the count**, so no
+nesting of `group`s expresses the pinwheel and the mosaic is not a `group` change.
+
+### 1 · It composites whole, and the overlap rule is order rather than mechanism
+
+Five `Box`es at `position: 'absolute'` in one container at 60 x 12, through `renderToString`: five
+cells drawn, borders intact, every label present. Declared `A B C D E` and declared `E D C B A` give
+**byte-identical frames**, so the figure is a function of the geometry and not of the declaration
+order.
+
+**Overlap is the arm that separates the two questions**, because *absolute positioning does not
+work* and *they were drawn in the wrong order* look the same in a frame. Two 20-cell boxes
+overlapping by ten:
+
+```
+X at 0, Y at 10, declared X then Y   XXXXXXXXXXYYYYYYYYYYYYYYYYYYYY
+the same two, declared Y then X      XXXXXXXXXXXXXXXXXXXXYYYYYYYYYY
+```
+
+**Painter's algorithm — the last declaration wins.** Overlap is an ordering rule, it is well
+defined, and a mosaic that tiles has no overlap for it to bite on. A relative-positioned control
+drew, so *nothing appeared* stayed distinguishable from *the harness drew nothing*.
+
+### 2 · The declared height is honoured exactly, and it is not optional
+
+`top`/`left` — the API Ink's types declare — gives a **byte-identical** frame to `marginLeft`/
+`marginTop`, so the declared edges work and the margin workaround is unnecessary.
+
+| container | content | frame |
+|---|---|---|
+| no `height` | 12 rows | **one blank row** |
+| `height: 6` | 12 rows | rows 0-5, contiguous |
+| `height: 20` | 12 rows | 12 rows then 8 blanks |
+
+**A mosaic must declare a height or it draws nothing.** An absolutely positioned child contributes
+nothing to its parent's content size, so Yoga computes 0 and `renderer.js` builds its `Output` from
+`getComputedHeight()`. That is not a limitation — `Scroll.height` is the same field for the same
+reason — but omitting it is a construction error rather than a default.
+
+Through the real path, `measure` against `renderToLines(...).length` at four heights x four widths:
+**equal at all sixteen.** C09 I1 holds.
+
+### 3 · It composes with the cache, and the key is not the triple it was said to be
+
+**The gate first, because a purity count taken on a harness that collapses renders is clean about
+nothing** — F227's ten-frames-one-glyph is that failure exactly. A definition whose `render` reads a
+counter reports **10 distinct over 10 renders**, so the harness does not collapse them.
+
+Against that gate the mosaic gives **1 distinct over 10 renders**, and a fresh registry gives the
+same frame as a reused one. The render is a function of `(block, width, ctx)`.
+
+**And the key it composes with is five-way rather than three.** `(entry, rev, width)` is
+`HeightCache`'s triple; `render-cache.ts` is `(id, rev, width, focus, theme)`, and `session.ts`
+passes a composite in the focus slot — `key\0range\0offsets[\0tick]` — so the window range, the
+per-container scroll offsets and a per-kind tick are folded in already. The mosaic reads `block` and
+`ctx.width`, and through `renderChild` exactly what every container reads. **Nothing new**, so
+nothing is owed where the slot is built.
+
+That is what the shape of D2 was waiting on: **the mosaic is not a `raw`-block path.**
+
+### 4 · What the frame found and the numbers could not: the axis I1 does not constrain
+
+Every row of section 2 agreed, and the frame at width 40 is **60 cells wide** — measured with
+`cells()` rather than `.length`, because the figure is being cited.
+
+```
+ 0|╭──────────────────────────────────────╮╭──────────────────╮
+ 1|│A                                     ││B│
+```
+
+**An absolutely positioned child is not clipped to its parent's width.** Isolated: one child at
+`left: 20, width: 40` in a container of 40 draws 60 columns; the same figure with
+`overflowX: "hidden"` draws exactly 40 and costs no rows. **The relative control never over-draws at
+all** — flex shrinks it to fit — so the clip is doing real work rather than the figure happening to
+fit inside it.
+
+C09 I1 is about rows, so it is satisfied and silent here. C09 I34 names this as *I1's over-draw in
+the other axis*, and the group renderer already carries `overflowX: "hidden"` for the relative
+version of the same hazard. So the remedy exists and is a row in D2's table: **a mosaic computes its
+geometry from the width it is handed and clips as a backstop, because nothing below it will.**
+
+### 5 · The precedent that warned against a declared height, re-measured
+
+The scroll renderer rejected `height` on a Box and says why: *"`height` on the Box does pad, and it
+also clips **bottom-anchored**: a child of five rows in a box of two drew rows three and four."*
+Probe 2 found top-anchored, so the two disagree — and **the sentence about to be written here, that
+the anchor is a property of the position type, is wrong.** Measured with `flexShrink` as the only
+variable:
+
+| one child of five rows, in a box of two | drew |
+|---|---|
+| relative, `flexShrink: 0` | `r0, r1` |
+| relative, **default shrink** | **`r2, r4`** |
+| absolute, `flexShrink: 0` | `a0, a1` |
+| absolute, default shrink | `a0, a1` |
+
+**The position type does not change the anchor. Shrink does** — and an absolute child is out of flex
+flow, so shrink never reaches it.
+
+**The precedent's decision stands and its characterisation understates the fault.**
+*Bottom-anchored* would at least be contiguous; a shrinkable relative child drops rows out of the
+**middle** — `r2, r4`, with `r0`, `r1` and `r3` gone. Padding with blank rows is the right remedy,
+and the comment argues for it against a milder fault than the one it actually has.
+
+**None of it transfers to the mosaic**, whose children cannot shrink. The warning was real and it
+was about a mechanism the mosaic does not use.
+
+**The wrong fixture is worth recording too**, because it is the reason this was caught: the first
+control was five one-row siblings rather than one child of five rows, and it answered `r2, r4` —
+neither anchor. A fixture that reproduces neither reading is the signal that it is not the shape
+under test.
+
+### Carried into D2's table rather than discovered during D3
+
+- **A block inside a mosaic is sized by the mosaic** — `facetAt`'s precedent at `facet.ts:76`, which
+  hands down the parent's budget *minus the child's own furniture*, because a parent declaring 5
+  whose children each declare 5 gets children of 8. `scroll`'s residue row is the shape for a child
+  that measures from content.
+- **A mosaic cell holding an error block is F239, measured** — `measure=4 rendered=8`, C25 I1
+  knowingly false there, C04 §3c trace 1's windowing seam the remedy, T2.28b holding it open.
+- **The width clamp of section 4**, which is new here.
+
+### What this did not do
+
+No spec, no `src/` change, no block kind, no D2 table. Five probes and a finding — and D2 is written
+against these numbers rather than against the plan that asked for them.
+
+
+## F245 — a nested clip widens rather than intersects, and the spec sentence naming it as a backstop was an hour old ★★★★☆
+
+**F244 §4 measured the defect and proposed the remedy, and only the first half survived the build.**
+An absolutely positioned child is not constrained by its parent's width — 60 cells at width 40, every
+count agreeing, because C09 I1 is about rows. The remedy looked settled: `overflowX: "hidden"` on the
+container, which is what the group renderer already carries and which probe 4 measured working.
+
+**It does not compose.** Ink keeps a stack of clipping regions and applies `clips.at(-1)` — the
+**innermost** — so a descendant clip *replaces* its ancestor's rather than intersecting with it:
+
+```
+three 1-wide cells in a container of 1, container clips only   ->  "A"
+the same, once each cell clips its own child too               ->  "ABC"
+```
+
+And every cell **must** clip, because that is the other half of C09 I35: a cell bounds its child with
+`flexShrink: 0` and `overflow: "hidden"`. So the container's clip is shadowed in exactly the
+configuration the block always has, and the backstop protects nothing.
+
+**Three things follow.**
+
+- **The geometry is the guarantee.** `mosaicRects` clamps, and a cell with no room is zero-wide and
+  not drawn — the only one of three answers keeping both axes of I1, since drawing it over-runs the
+  region and widening the region is not this block's to do.
+- **The reachable case is the floor of 1 per grid line**, which asks a three-column grid for three
+  cells at any width including one. Not a width nobody uses: it is the width every narrow-terminal
+  row of the conformance sweep passes through, and `T2.1b` found it within a minute of the kind
+  being registered.
+- **It is C23 §8a A4's class arriving from the implementation rather than from the walk** — a ruling
+  naming an operation the layer below does not have, except that here the operation *exists* and does
+  something other than what its name suggests. The walk cannot reach that: no row of a classification
+  table asks whether two correct mechanisms compose, and the sentence was written the same hour the
+  code falsified it.
+
+**The mutation pass then indicted a row rather than the code.** `the cell does not clip` survived,
+because MG6 used `areas: "A"` — one region filling the frame, so the container's own height already
+bounds the spill and the cell's clip has nothing to do. The row asserted the right thing and could
+not construct the state it claimed; `AB/CB` gives the tall child the top half so an unclipped cell
+writes into the row below, and the mutation dies. **The convenient fixture is the one where both
+readings agree**, and a single-cell mosaic is as convenient as it gets.
+
+
+## F246 — three of four queue items were already done, and each was stale in a different way ★★★★☆
+
+A four-item queue, picked up in order. **Three needed no code**, and the three staleness mechanisms
+are different enough to be worth separating.
+
+### S5 — a sentence carried without its second half
+
+The claim: *`elapsedMs` and `attempt` have no writer, so two of `activityLine`'s three arms are
+unreachable from any session.* It is written down — C23 §3d-bis — as:
+
+> Two of the three had no producer **until now**: `elapsedMs` and `attempt` were fields nothing in
+> `src/` wrote, so two of `activityLine`'s three arms could not be reached from any session.
+
+**The clause that retires it is two words long.** Both are built, both frame-read (F234, F235), and
+both driven end to end rather than at the seam: `T3.56` writes `elapsedMs` *through `declare` and the
+sweep, never by calling the writer* — its own comment says so, and gives F227 as the reason — and
+`T1.40a` gets `attempt: 1` out of a source that actually fails. This is F86/F89/F92's compression
+class a fourth time, and the cheapest instance yet: the body was correct, the summary kept the
+claim and dropped the tense.
+
+### F240's residue — the arm is missing and the answer is not
+
+`selection` has no entry in any of the three 4-bit maps, which is true and was the whole of the
+item. Measured at every rung:
+
+```
+depth 24 -> {"kind":"rgb","hex":"#264057"}       depth  4 -> undefined -> {inverse: true}
+depth  8 -> {"kind":"ansi256","index":237}       depth  1 -> undefined -> {inverse: true}
+```
+
+**`selectionStyle` carries its own fallback** — *the wash, or reverse video where there is no colour
+to wash with* (§4b) — so the wash is painted at every depth. A missing map entry and an unpainted
+surface are not the same fact, and the error pair was the case where they coincided.
+
+**And it is the better answer, which is what makes this more than a correction.** F240 argued the two
+cases differ because a wash *has to leave legible whatever it washes and has no ink of its own to
+compensate with*. Reverse video is exactly the answer to that constraint and a curated index cannot
+be: inversion guarantees contrast against arbitrary text by construction. **F240 withdrew a fallback
+for the error pair** — in `withBackground`, because a resolver-level fallback would have "fixed"
+1-bit too — and `selection`'s lives at its *call site*, so it reaches 4-bit and 1-bit alike, which
+for a wash is right at both. **One case already has the mechanism the other was deliberately
+denied**, and that is a stronger form of *these are not one case* than the finding had.
+
+So the residue is closed by ruling rather than by code: **the map entry is not added**, because it
+would replace a guaranteed answer with a chosen one, and the choice could not be read off a frame.
+
+### The label pass — real, and not small
+
+`shiftInward` resolves to one line in `src/`: the deferral comment that names it. The pass is *shift,
+drop and count* over a label taxonomy — a C12 subsystem, not a rewire. **Reported at its size rather
+than attempted at the queue's**, which is the only useful thing to say about it here.
+
+### The fourth was real, and the golden was hiding it
+
+`graph`'s zigzag: built, and the assertion written for it found a defect in its own first
+implementation inside a minute (§3ai.6). **The three that needed nothing and the one that needed a
+pass were indistinguishable from the queue.**
+
+
+## F247 — the measurement that gates images, and the two implementations that had to agree before the terminal was asked ★★★★☆
+
+`CALCIUM_ROADMAP.md` prices images on three *free* rows, and the first is the one everything else
+rests on:
+
+> **Measurement is free** — the placeholder grid *is* `rows` x `cols` of ordinary characters, so
+> `measure` returns `rows` because that is literally how many rows were emitted.
+
+**True of the terminal, and a claim about three width implementations rather than one.** `cells()`
+is what every `measure` in this tree uses (SS23); Ink's own string width lays out the `Box` the
+placeholder sits in; the terminal's is what draws. **Two of the three are checkable here, and they
+are the two where a plane-16 private-use character is most likely to be wrong** — a width table with
+no entry for `U+10EEEE` is the ordinary case, not the exotic one.
+
+```
+one placeholder                    cells()=1  .length=2  codepoints=1
+placeholder + row/col diacritics   cells()=1  .length=4  codepoints=3
+four placeholders                  cells()=4  .length=8  codepoints=4
+a plain 4-cell run                 cells()=4  .length=4  codepoints=4
+
+Ink's layout, against cells():     n=1 -> 1    n=2 -> 2    n=4 -> 4    n=8 -> 8
+```
+
+**The gate is open.** `cells()` gives one cell per placeholder and nothing for the diacritics that
+carry row and column, Ink lays out exactly what `cells()` measures at every size, and the text path
+survives the surrogate pair — `stripControl` leaves it alone and `truncate` does not split it. So an
+image declares a height in cells and participates in the grid, and the roadmap's three free rows are
+free for the reason it gives. **Nothing floats, and the phasing behind that measurement stands.**
+
+**The blind spot, stated rather than left out**: the third implementation is the terminal's, and it
+is the protocol's guarantee rather than something this repo can measure. What was reachable is what
+would have broken silently.
+
+**And `.length` is exactly 2x wrong on an image.** SS23 already forbids it for display width, and
+every previous instance has been incidental — a CJK run, an emoji. A placeholder grid is the first
+content where the error is *systematic and proportional*: every image, at every size, off by a
+factor of two. The rule was right and this is the first subject that makes it unmissable.
+
+**A literal BEL reached the probe by being typed**, and the width table disagreeing with `.length` is
+what surfaced it — `a`, `U+0007`, `b` where `"ab"` was intended. F236's class in miniature, on the
+smallest possible scale, found by an instrument pointed somewhere else. It is kept as the contrast
+row and written as an escape, because a zero-width control is the *other* way `cells()` and `.length`
+come apart and it is the one that has nothing to do with images.
+
+
+## F248 — the three measurements images rest on, and the first one nearly reported the harness ★★★★☆
+
+Taken before phase 1's design rested on them, ranked so the two that could change the shape went
+first.
+
+### 1 · A partial row rewrite — the one that could have changed the shape
+
+**It is Ink's diff and not this framework's**: `terminal/` has no row-level rewriting, `Output`
+and `log-update` own it. A twelve-row placeholder grid, one row changed:
+
+```
+CONTROL — first render:  4 writes, 418 chars, 96 placeholders
+one row of twelve:       516 chars, 96 placeholders, 12 cursor-ups, 13 erase-lines
+```
+
+**Full frame.** Every row is re-emitted, so an image is cheap and the placeholder grid never has
+to survive being written a row at a time — the branch where the diacritic encoding would have had
+to carry the whole burden does not arise.
+
+**The first run of this reported `NOTHING re-emitted` and that was the harness.** A fake stdout
+without `isTTY` makes Ink take a different path and write nothing at all, so a zero was
+indistinguishable from a full frame of nothing. **The control is not a courtesy** — it is the row
+that turns "0 placeholders" into a fact about Ink rather than a fact about the probe, and it is
+the third instrument this session to have needed one.
+
+### 2 · Truncation and the window — the failure mode no other kind has
+
+Every other block degrades by losing content. **A placeholder grid degrades by lying**, because its
+cells carry their own coordinates: a split cluster does not shorten the row, it addresses a
+different part of the image.
+
+```
+truncate at widths 1..12   no cluster split, at either unicode arm
+unicode=full   5 cells + …      unicode=ascii   5 cells + ~
+a windowed row             still names its own row — row 2 carries row 2's diacritic
+```
+
+**Both are safe, and for different reasons.** Truncation is safe because `truncate` is grapheme-
+aware and the marker replaces a whole cell rather than half of one. The window is safe because
+**each cell names its row *and* its column**, so a surviving row addresses correctly with no
+knowledge of the rows that were dropped. A truncated row shows five image cells and one text
+glyph, which is honest degradation rather than a wrong picture.
+
+### 3 · The decoder against a real file
+
+`sharp` already drives `tools/catalogue-png.mjs`, so the reference costs nothing new. An 8x4 PNG
+reads back with the signature intact and chunks `IHDR pHYs IDAT IEND` — **`pHYs` is the useful
+part of that answer**: a decoder walks chunks and must skip ancillary ones rather than assuming
+`IHDR` is followed by `IDAT`.
+
+### What the three together settle
+
+The shape in the plan holds unchanged: the dither arm is buildable without a decoder dependency,
+the grid survives every path the framework already puts a row through, and nothing about the
+protocol arm needs the diff to be smarter than it is.
+
+
+## F249 — Ink strips APC, so the kitty arm has no call site — and three other things a fixture could not see ★★★★★
+
+### 1 · The ruling the implementation falsified, third time this phase
+
+The protocol arm shipped on a chain of true statements: `a=T` at a stable id **replaces**, Ink
+writes nothing when nothing changes (F248), therefore transmission can ride with placement and no
+session state is needed. **Every step holds and the conclusion is false.**
+
+```
+APC alone         in=27  out=0   ""
+APC then text     in=29  out=2   "xy"
+SGR then text     in=20  out=20  survives unchanged
+```
+
+**Ink's tokeniser understands SGR and discards `ESC _G … ESC \`.** A transmission in a `Text` node
+never reaches the terminal, and the placeholders after it address an image that was never sent.
+
+**So the arm is built and cannot be called from where it would be called** — C23 §8a A4's class,
+arriving from the implementation rather than the walk for the **third time this phase**, after the
+mosaic's clip and `graph`'s clamp. The shape is identical each time: a conclusion about a mechanism
+nobody had run. **The failure this shape produces is *nothing drawn***, which is at least the loud
+one; the alternative — shipping the branch — would have read as a broken terminal.
+
+`imageDefinition` takes the dither at every protocol including `kitty`, because **nothing is worse
+than a dither on a terminal that could have shown one**, and the expiry is `transmitImage`.
+
+### 2 · The exemption that removed itself inside one phase
+
+`Decoded.pixels` was exempted in `UNCONSUMED_MEMBERS` with `imageDefinition` named as its expiry —
+a symbol rather than a sentence, so the deferral could be grepped. **The bidirectional arm deleted
+it the moment `imageDefinition` landed**, three commits later, reporting *no longer an unconsumed
+published member — it is either wired now or gone*. The mechanism working rather than being
+trusted, and the shortest a deferral has ever lived here.
+
+### 3 · A fixture typed from memory, and the two faults it hid
+
+The corpus's first image was a base64 PNG written by hand rather than generated. It did not decode,
+so **every row of the suite took the `alt` fallback** — and that path had two faults of its own,
+both invisible while the main path was never entered:
+
+- **Ink's `wrap: "truncate"` emits `…` at every capability**, where C09 I22 substitutes `~` under
+  `ascii`. F6's class, in a prop rather than a literal.
+- **An empty `Text` occupies no row.** A three-row block drew one, so C09 I1 came apart on the whole
+  corpus at every width.
+
+**A fixture that cannot reach the code under test hides the code under test's bugs**, and here it
+hid two in the very path it was accidentally exercising.
+
+### 4 · Three mutation survivors, three different reasons, and one of them twice
+
+| survivor | why |
+|---|---|
+| the width clamp | **the harness.** `T2.1b` is the row that catches it and its file was not under the pass |
+| Paeth's predictor | **the fixture.** `sharp` wrote filter **0 on every scanline** — measured, `filters sharp used: 0` — so ID2 asserted against a decoder path it never entered |
+| point-sampling | **the fixture, then the assertion** |
+
+**The Paeth case is the one with the reusable shape.** *A fixture must be shown to respond to the
+thing under test* — so the row now reads the filter byte off each scanline and asserts all five
+arms appear. The encoder would not produce them, so the PNG is **hand-encoded**: choosing the
+filters makes each arm reachable by construction rather than by hoping an encoder picks one.
+
+**And point-sampling survived twice, which is the sharper lesson.** A hard-edged disc has no detail
+to alias, so the first fixture could not see it. The replacement — one-pixel stripes at a fraction
+of the output resolution — could, and the *assertion* still could not: counting distinct glyphs
+accepts both readings, because point-sampling lands on the even pixel of every cell and returns one
+glyph while averaging returns one or two. **A "few distinct glyphs" check passes either way.** What
+separates them is *which* glyph, and the row asserts mid-ramp.
+
+**Two of the three were the test and one was the harness. None was the code.** That is the pass
+doing what it is for, and it took two rounds because the first repair fixed the fixture and left
+the assertion that could not tell the difference.
+
+
+## F250 — a geometry measurement answered a rendering question, and the ruling was right at one arm of two ★★★★★
+
+**The fork was ruled PLACED on a measurement that could not see it.** `imageCells` is a pure
+function of `(block, width)` — no capability reaches it — so an image occupies the same cell
+rectangle at `kitty` and at the dither alike: `w=40 h=4 → 8x4` both ways. That is true, it is
+measured, and it settles **where an image lands**.
+
+**The overlay asks what a cell *shows*.** Different question, different answer.
+
+**At `kitty` a placeholder cell cannot be painted over**, and the reason was already written down —
+in `placeholderCell`'s own comment, composed the same session for a different purpose:
+
+> **The id travels as a colour because the cell has nowhere else to put it.** The two diacritics
+> are spent on position, so the terminal reads the image from the 24-bit foreground — which is why
+> this arm needs no palette from C10 and **why C10 owns no part of it**.
+
+That last clause is the overlay's answer. The cell's rendering is the terminal's; anything this
+framework draws there is replaced by the image tile. A Calcium heatmap over a kitty placement is
+not inexact — **it is not visible**.
+
+**So the ruling holds at the dither and inverts at kitty**: placed where this framework owns the
+glyph and the colour, composited where it does not. The overlay becomes a field on the block whose
+rendering differs by arm — **a mechanism rather than an arrangement**, which is what §3h's closing
+claim about compositions was already hedging toward without knowing it.
+
+**The reusable shape.** *A measurement about geometry reads as settling a question about
+rendering*, because both are about where things are — and the sentence that would have caught it
+was already in the repository, written for the id, one file away from the ruling it contradicts.
+**Nothing indexed by rule interaction reaches that**: the two statements are in different
+components, agree completely about their own subjects, and only meet when a third thing — an
+overlay — needs both at once.
+
+**Third correction of a same-session ruling in this phase** — after the mosaic's clip, `graph`'s
+clamp and the APC transmission — and the first where the falsifier was a comment I had written
+myself rather than a measurement I had not taken.
+
+## F251 — the picture's identity is not the image's, and the digest that was right became wrong ★★★★★
+
+**§3g.2 rules the identity a digest of the *data*, and gives three reasons that are all correct.**
+A megabyte of base64 in a cache key costs more than it saves; two blocks holding the same pixels
+should hit; the same block re-encoded should not miss. The kitty arm keys transmission on it, so
+one image in two blocks transmits once — and that is exactly what §3g.2 exists to buy.
+
+**The overlay makes the transmitted picture a function of two things, and nothing said so.** At
+`kitty` the overlay is composited into the pixels before transmission (§3h.2), so two blocks
+holding *one image* with *different overlays* share a digest. The second is found in the sent set,
+nothing is transmitted, and **both placements draw the first block's overlay**.
+
+**The wrong picture rather than no picture**, which is the failure this whole arm is built to
+avoid and the one a reader cannot diagnose: nothing drawn sends them to the image, and the wrong
+one sends them nowhere. Both frames are internally consistent; every count agrees.
+
+**The fix is one exported function and two callers** — `imageKey`, read by the renderer's id and by
+the shell's sent set — because two computations of one figure is how the two would come to disagree
+about which picture they were talking about. `digest` stays the data's, since it also keys the
+*decode*, and two blocks of one image should still decode once.
+
+**The shape.** *An identity is correct with respect to the things that existed when it was
+specified.* Adding a field that participates in what the identity identifies does not make the old
+reasoning wrong — every sentence in §3g.2 is still true — it makes the **scope** wrong, and a
+scope is what review does not check. The question that reaches it is not *is this digest right*
+but **what is this digest the identity of, and is that still the thing being sent**.
+
+## F252 — an escape with a length limit, emitted whole; correct for the fixture and wrong for every real image ★★★★☆
+
+**kitty's direct transmission caps an escape at 4096 bytes**, and the payload continues in further
+escapes carrying `m=1` until a final `m=0`. Phase 1's `transmit` emitted one escape with the entire
+base64 payload.
+
+**It passed everything, because the corpus fixture is an 8×8 PNG.** Seventy bytes of base64 fits
+comfortably, so IK2's structural assertions about `a=T`, `f=100`, `U=1` and the payload's position
+were all satisfied by a string that is legal at that size and illegal at any useful one. **No
+in-repo test can see this**, because no in-repo test has a terminal — it is the plane-16 class
+(C09 §4c), and the first real-terminal test is where it is checked.
+
+**Found by building the composited arm**, which sends raw RGBA rather than PNG and is therefore
+*larger*: 7595 bytes for a 64×32 picture against 1741 for the same image as PNG. Thinking about the
+payload size is what raised the question; the question is what found the shipped defect.
+
+**Taken now rather than deferred, on the asymmetry rather than on certainty.** The chunked form is
+correct under both readings of the limit — right if it is real, merely verbose if it is not — and
+the failure without it is *nothing drawn*, blamed on the image.
+
+**And the reserve was off by one in the first draft.** `CHUNK - opts.length - 8` against a frame
+that is `ESC_G` (2) + `,m=1` (4) + `;` (1) + `ESC\` (2) = **9**, so every first chunk came out at
+4097 — one byte over a limit named four lines above it. The row that found it is the one that
+asserted the limit rather than the chunking: *no escape exceeds 4096*. **An assertion about the
+mechanism agrees with an off-by-one; only an assertion about the bound disagrees.**
+
+## F253 — a shared scale is not a property any panel has, and two of three predictions were wrong ★★★★★
+
+**§3h closed with a claim** — *none of the three compositions needs a mechanism this section does
+not already have* — and the three were built to test it, each the way a consumer would, from `b`
+and nothing else. **Two predictions were wrong and the surviving one is the finding.**
+
+| | predicted | measured |
+|---|---|---|
+| image + histogram | breaks the claim outright | **composes**, nothing added |
+| before / after / residual | needs a mechanism | **breaks the claim** |
+| confusion matrix | composes | **composes** |
+
+**The histogram's premise was wrong, not its reasoning.** *The pixels live behind `pixelsOf` in
+`presentation/` and a plot's data lives in the document, with no seam between them* — all true, and
+irrelevant, because **the consumer already holds the pixels**. An ML reader has an array; they
+encode a PNG to *show* it, and the histogram is of the array they had before there was a PNG. The
+seam the prediction went looking for is one nobody needs to cross. **A layering argument can be
+exactly right about the layers and wrong about who is standing in them.**
+
+**The residual is the one that breaks it, and the frame is the argument.** Two panels spanning
+`0.7..157.7` and their difference spanning `0.7..14.1`. Read on its own extent — matplotlib's
+`imshow` default, and the obvious implementation — the residual's hottest cell renders at luminance
+**202** against the before panel's **224**. A fourteen-unit difference drawn as loud as a
+hundred-and-fifty-eight-unit signal, beside the two pictures it is the difference of. Declared on
+one scale: **13**.
+
+**Both frames are internally consistent and only one is true.** Each panel is correct alone, each
+normalisation is correct alone, and **the composition is where the falsehood appears** — which is
+why no walk of the image block reaches it, and why the measurement had to be the composition and
+not the part. The mechanism is `min`/`max` on the overlay, declared as a pair because one bound
+alone is half a scale.
+
+**The residue image + histogram leaves is a surface rather than a rendering.** `b.image({ path })`
+reads a file, so *that* consumer never sees a pixel and `decodePng` is not on C24's surface: they
+can show the picture and plot nothing about it. Recorded with a row that fails the day the export
+lands, because a negative claim passes hardest the day it becomes false.
+
+## F254 — an assertion that sees one encoding of a thing reports its absence ★★★☆☆
+
+**IO3 asks the sharpest question the overlay has**: below 8-bit is the field *absent*, or is it
+drawn in a vocabulary that says something it should not? The row read the frame for foreground
+colours with `\[38;2;` — the 24-bit SGR form — and reported **nothing drawn at 8-bit**, which is
+where `continuousColour` quantises to the 256-cube and emits `38;5;N`.
+
+**The reading was of the matcher, not of the frame.** A control is what separated them: the same
+row asserts the picture's glyphs are unchanged, and they were — so the cells existed and something
+about them was invisible to the instrument rather than missing from the output.
+
+**The shape is the fixture rule pointed at an assertion.** *A fixture must be shown to respond to
+the thing under test before it is asserted against* — and a matcher is a fixture. A regex that can
+see one encoding of the value it measures cannot distinguish **the rung is absent** from **the rung
+is a different escape**, and absence is exactly what the row was written to establish. The
+degradation ladder is the worst place for it, because every rung below the top is a different
+encoding by construction.
+
+## F255 — four local answers where the family already had them, and three were worse ★★★★★
+
+**The overlay's shared scale was ruled from first principles and the principles were already in
+the tree.** C12's `seriesRange` carries the sentence F253 was found by measuring — *a pinned axis
+exists so two plots can be compared, and a range that grew to fit an outlier would defeat the only
+reason to pin one* — and `heatmap.ts` carries the one that decides the naming:
+
+> There is no `yMin`/`yMax` arm: on a field those two pin the **value** range — the levels and the
+> colour scale — and spending them on the ordinate as well would give one pair of members two
+> meanings on one form.
+
+**A field form spends `yMin`/`yMax` on the reading.** An overlay is a field form — a scalar field
+over a grid read through a colormap — that happens to sit over a picture. Same mechanism, same
+datum, and the local pair was `min`/`max`.
+
+| the local answer | the family's | why the family's is right |
+|---|---|---|
+| `min` / `max` | `yMin` / `yMax` | one pair of members, one meaning, already ruled for fields |
+| both or neither | independently optional | `yMin: 0` alone is a real single-panel use — *zero means zero* rather than *the least observed value means zero* |
+| a constant field is `{v, v+1}` | `{v, v}`, drawn **mid-ramp** | `{v, v+1}` puts a field that never varied at the *bottom* of the scale |
+| a reversed pin is refused | collapses to a constant | C12 I2 — no series input throws, and a pin is series input by another route |
+
+**The fourth local decision was right** — a pinned bound replaces rather than widens — **and it is
+why the other three were reachable at all**: getting the load-bearing one right makes a cluster of
+wrong ones read as a considered design.
+
+**Each was defensible on its own terms and that is the whole difficulty.** *Both or neither*
+protects against a half-shared scale, which is a real hazard; it also forbids a loss curve's floor
+pin, which the family had already weighed and answered the other way. **A local answer and a family
+answer read identically when only the local one is in front of you**, and review compares a
+decision against its justification rather than against the tree.
+
+**The shape: the sixth blind spot, pointed at a member rather than at a claim.** *Where is this
+written down* asks whether a belief has a source. This asks **who else already solved this, and did
+they call it something** — and it is cheaper, because the answer is a grep for the mechanism rather
+than an audit of a claim. Two greps found all four here.
+
+**One resolver, not two that rhyme.** `pinnedRange` moved to `data/viewmodel/range.ts` and
+`seriesRange` calls it. **Zero golden frames changed**, which is the only evidence that a refactor
+of a resolver 47 plot forms depend on was a refactor — and it is the rehearsal for C12 §3aj's gate,
+which demands exactly that and has never been run.
+
+## F256 — the gate was written, found, run — and passed against the violation it names ★★★★★
+
+**C12 §3aj is the best-placed gate in this repository.** It was written two phases before anything
+could invoke it, put beside the geometry it governs rather than in the plan that produced it,
+carries four named hazards and five rows, and names its own preconditions. *A gate nobody can find
+is a gate that will not be run.* It was found, and it was run.
+
+**Both preconditions held.** The catalogue is reproducible — 1780 files, two runs, zero diff.
+`niceAxis` is unit-free, so most of the geometry was already shared and the refactor was small,
+exactly as the section predicted. `layoutFor` is cell-bound throughout, which hazard 3 says it
+should stay.
+
+**The refactor passed: 0 of 377 golden rows and 0 of 1780 catalogue frames moved.**
+
+**Then the same gate was run against hazard 1's own violation, and it passed that too.** Moving
+the flat-line answer into the normalised layer gives `round(0.5 · last)` where cells want
+`floor(last / 2)` — wrong at **every even row count**, not at a rare boundary. Zero frames moved.
+
+**Counting the branch says why: 0 hits across 1780 catalogue frames and 0 across the golden
+suite.** Neither corpus contains a constant series. The case the hazard names is never
+constructed, so the gate's subject does not exist in its evidence.
+
+**This is A03 §2's vacuity class arriving in a gate rather than in a rule or a sentence.** A rule
+with nothing to be wrong about passes exactly like a satisfied one; so does a gate whose corpus
+never reaches its hazard. And it is the *good* gate this happened to — the one written early,
+placed well, and hedged with its own preconditions. **None of that is evidence about coverage**,
+because a gate phrased over a corpus inherits the corpus's blind spots without inheriting a way to
+see them.
+
+**What separated the readings was a fabricated violation**, which is the instrument that was
+missing and the one A03 already asks for everywhere else: *state a rule's blind spot, with a
+fabricated violation.* The gate had hazards, rows and preconditions and no fabricated violation —
+so a zero meant *clean* and *did not run* with the same bit.
+
+**The remedy is a companion, not a rewording.** *Zero golden frames change* is still the right
+demand; it is now paired with rows that construct what the corpus does not, and a mutation run
+that says those rows can fail. **And one row was removed rather than declared an expected
+survivor** — *`rowOf` normalises for itself again* is byte-identical and uncatchable, and a
+permanently surviving mutation turns a pass's signal off for good. A survivor has three
+dispositions and *expected* is not one of them.
+
+## F257 — three commit messages cited a gitignored directory as evidence ★★★★★
+
+**`docs/catalogue/` is in `.gitignore`.** It is generated output and is not committed, so
+`git status --porcelain docs/catalogue | wc -l` returns **0 whether a frame moved or not**.
+
+That command appears in three commit messages from this session as half of the §3aj gate's
+evidence — *zero of 1780 catalogue frames moved* — and it could not have said anything else.
+**It is the same bit for *clean* and for *cannot see***, which is exactly the class F256 was
+filed about, committed three times by the person who filed it.
+
+**What survives and what does not.**
+
+| claim | evidence | holds? |
+|---|---|---|
+| zero golden rows moved | `test/golden/` is **tracked**, 20 snapshot files, 377 rows | **yes** — this is the refactor's real evidence |
+| zero of 1780 catalogue frames moved | a gitignored path | **no** — the command was blind |
+| the flat-line branch is never taken | counted **during rendering**, 0 hits | **yes** — never went through git |
+
+**So the refactor's conclusion stands on the goldens**, and the catalogue sentence was
+decoration that read as corroboration. *Repetition is not corroboration* — F58's lesson, and
+here the repetition was of one blind command across three commits.
+
+**Why it survived writing it three times**: `git status <path>` *looks* like it is checking that
+path. The failure has no output to inspect — a blind check and a passing check are both an empty
+string — and the surrounding claim was true, so nothing about the result contradicted anything.
+
+**The remedy is a digest, not a discipline.** `tools/catalogue-hash.mjs` prints one sha256 over
+every frame: 956 frames, `e25a2defe7da643d`, reproducible across runs. A number that differs is a
+frame that moved, and a tool that cannot see the directory cannot print a number at all.
+
+**And the ordering hazard beside it**, found the same hour: `plot-catalogue.mjs` clears every
+generated file before it writes, so running it *after* `phase-catalogue.mjs` deletes all 66 phase
+frames. Measured by watching 66 become 1. Two tools writing into one directory and only one of
+them sweeps it — now recorded in the header of the one that must run second.
+
+## F258 — a mutation run named a test file that is not there, and vitest said nothing ★★★★☆
+
+**`tools/mutate/runs/c12-shared-geometry.mjs` listed `test/golden/plots.test.ts`.** The files are
+`plot.test.ts` and `plot-forms.test.ts`. **vitest drops a filter that resolves to nothing whenever
+another one does** — no warning, no non-zero exit, three files run where four were named — so the
+pass had been running without the goldens for two commits.
+
+**And the run's header argued *from* their presence:**
+
+> The goldens are in the file list on purpose. They cannot catch the flat line — that is the
+> finding — and their presence is what makes each row's `expect` a claim about *which* instrument
+> caught it.
+
+Every `caught` in that report was a claim about an instrument set the run did not have.
+
+**A second instance, in a different run.** `c04-weights.mjs` named
+`examples/docker/test/banner.test.ts`; the file is at `examples/docker/test/repo/banner.test.ts`
+and had moved. Two of 97, found by one scan.
+
+**Why an anchor is louder than a suite.** `tools/mutate/anchors.mjs` already sweeps these files —
+an anchor that will not apply throws and stops the run, and the sweeper catches the ones that
+rotted between runs. **A missing test path does none of that.** It changes nothing anyone can see,
+and the pass reports `caught` in exactly the font it uses when it is right.
+
+| what rots | what happens | who says |
+|---|---|---|
+| the anchor | `runPass` throws before the first mutation | the harness, loudly |
+| the **test path** | the corpus is quietly short | **nothing, until now** |
+
+**The remedy is in the sweeper that already reads these files.** `anchors.mjs` gains the second
+question: 97 runs, 882 anchors, **184 test paths**, every one resolved against the same two roots
+the anchors use. Its fixture gains `MA5` — the fabricated violation, one letter changed in a real
+path — and `MA5b`, which asserts the *count*, because a scan that reads nothing exits 0 exactly as
+a clean one does.
+
+**Found sideways**, which is worth recording: not by anything watching these lists, but by writing
+a throwaway scan for a *different* question and reading its output. The first version of that scan
+reported eight instances and six were its own regex matching the tail of a longer path — so the
+count that mattered came from tightening the instrument, not from the first number it printed.
+
+## F259 — the two arms disagree about a candlestick, and one variant per form is why ★★★★★
+
+**A `line` carrying candles draws three candles in the terminal and an empty axis in SVG.**
+`plotToSvg` never reads `ohlc`. The block takes the curve family — the form *is* claimed — finds
+`series: []`, which is legal precisely because plain candles are the ordinary case (C04 I57), and
+draws **a fully furnished plot with an axis running 0 to 1** while the data spans 8 to 16.
+
+**The moving-average case is worse and it is the one to look at.** A non-empty `series` beside
+`ohlc` is an average *over* the candles (C04 I57), so the range came from the average alone:
+
+| | terminal | SVG |
+|---|---|---|
+| candles only | three candles, 8 to 16 | axis 0 · 0.25 · 0.5 · 0.75 · 1, no ink |
+| candles + a moving average | three candles and a line | **a line, on an axis of 11 to 12** |
+
+Not a blank frame a reader questions — **a confident chart of the wrong thing**, on an axis wrong
+by a factor of eight in span. That is the plausible wrong figure the `null` arm exists to refuse,
+produced by the arm that refuses it.
+
+### The more useful half: `plotStyle` is an axis the per-form corpus does not cross
+
+**G7 asks whether the *form* is claimed. That is one of two questions.** The corpus behind it —
+`ONE_PER_FORM`, one representative block per `PlotForm` — cannot ask the second, because a `line`
+and a `line carrying candles` are different blocks that the same claim covers. **`candlestick` is
+a `plotStyle`, not a thirty-third form** (C04 I57), and the corpus is indexed by form.
+
+**So the question was asked of the other block-level fields, and two more came back:**
+
+| axis | measured | what it leaves |
+|---|---|---|
+| `plotStyle` | `ohlc` never read | a chart of the wrong thing, or of nothing |
+| `origin` | **all four values byte-identical** — `svgPoints` passes `invert: true` unconditionally | the same data upside down between the arms |
+| `annotations` | a reference line at 5 labelled `target` draws nothing | a correct curve with a claim missing beside it |
+
+**Three of three, once the question was asked.** Nothing indexed by form could reach any of them.
+
+### The ruling: refuse a false figure, record an incomplete one
+
+**`ohlc` and a non-default `origin` are refused** — each leaves a picture that is wrong rather than
+partial, and a wrong-way-up chart is a plausible wrong figure exactly as a treemap drawn by the
+curve family is. **A dropped annotation is not refused**, because what it leaves is a true curve
+with a claim absent from beside it, and `G8f` is the record: the row asserts the absence, so the
+day annotations land it fails and names what changed.
+
+**A second clause, because it is a second failure.** `series: []` on a plain form and a series that
+is all `null` both reach the renderer with a range nobody declared — `seriesRange` returns `null`
+and the fallback furnishes an axis out of nothing. Counting marks catches those and cannot reach
+the moving-average case; refusing `ohlc` catches that and cannot reach these.
+
+### And it cost a mutation, which is the third finding inside the second
+
+**G7's mutation stopped being catchable.** Disabling the form partition changes nothing now:
+`marks()` switches on the family and returns `[]` for an unclaimed one, so the empty-marks clause
+refuses the same block a few lines later. **Two guards, one ruling**, and no fixture can tell them
+apart.
+
+Removed rather than declared an expected survivor — this run made the same call for `rowOf` — and
+replaced by **G7b: a claimed form must put ink on the page.** That is the arm that will stop
+agreeing, because a family claimed in `SVG_FAMILY` before its branch exists in `marks()` refuses
+*as though the form were unclaimed*, and **every family in the completion plan does exactly that on
+its first commit.**
+
+**Widening G7 to all 27 refused forms turned up why it had sampled six**: `b.plot({ form: "tree",
+series })` throws, because a tree with no `hierarchy` has no figure to fall back to (C04 I65).
+`ONE_PER_FORM` is a `Record<PlotForm, Plot>` and already had them all.
+
+## F260 — the shared coordinate returns NaN at a zero span, and the spec had ruled it ★★★★★
+
+**C04's own table rules a constant field `{v, v}` drawn mid-ramp.** `pinnedRange` implements it —
+collapsing rather than widening to `{v, v+1}`, because *that puts a field that never varied at the
+bottom of the scale, which says all minimum about data that says nothing*. **`normalisedOf`, the
+next function in the same file, computes `0 / 0`.**
+
+**The clamp cannot repair it, and that is the mechanism worth keeping.**
+
+```ts
+const clamped = t < 0 ? 0 : t > 1 ? 1 : t;   // NaN < 0 is false. NaN > 1 is false.
+```
+
+**A guard written as a range check does not catch a value that fails every comparison.** It passes
+through both arms unchanged and arrives at the renderer as a coordinate.
+
+### What it drew
+
+```
+plotToSvg, series [5, 5, 5]  ->  <path d="M89.6 NaN L352 NaN L614.4 NaN"/>
+```
+
+**A well-formed `<path>` that paints no pixels.** It survives the element count, every containment
+assertion, and the empty-marks refusal that landed one commit earlier — `d` is a non-empty string,
+so the mark is *there*. It rasterises to a blank plot area with correct furniture around it: axis,
+gridlines, labels, and no curve.
+
+**The terminal never saw it** because `rowOf` guards before it calls, returning
+`Math.floor(last / 2)`. So the defect lived exactly in the arm with no local guard, which is the
+arm that was extracted onto the shared function.
+
+### Nine open-coded normalisations, five answers
+
+| answer | where |
+|---|---|
+| **mid** | `scale.ts`'s `rowOf`, `glyph-row.ts`'s `scaleX` |
+| **0.5** | `strip.ts`, `image/overlay.ts` (twice, each with its reason written down) |
+| **0** | `axes.ts`, `bar.ts`, `glyph-row.ts`'s two `at` closures |
+| **the last row** | `stack.ts` |
+| **`NaN`** | `normalisedOf`, the shared one |
+
+`0` and *the last row* are one decision seen through an inversion, and it is the decision C04's
+table calls wrong. **So the spec ruled it, two files implement it, five contradict it, and the
+function every renderer is being extracted onto returns the answer that is not a number.**
+
+**One disagreement is a bug; nine is a missing ruling.** The count is what turned this from *fix
+`normalisedOf`* into a section in C04 — and the count only exists because the distribution family's
+extraction made someone grep for the arithmetic rather than for the name.
+
+### Found by the extraction it was blocking
+
+**Not by a test and not by a frame.** Family 1's extraction is *pull the five positions out of
+`glyph-row.ts`*, and reading the file to do it turned up `scaleX` and two `at` closures computing
+the same figure three ways. Asking which was right sent the question to the shared function, which
+answered `NaN`.
+
+**Routing three more renderers onto it would have spread the NaN to the distribution family**,
+where `boxplotColumn`'s local `t = span <= 0 ? 0` is currently masking it — so the extraction would
+have been *correct* and the result would have been blank box plots.
+
+### The ruling, and what it deliberately does not touch
+
+**`normalisedOf` answers `0.5`.** The only renderer-independent answer: `0` means *the floor* to a
+position and *the coldest colour* to a field, and neither reads as *every value is the same*.
+
+**A renderer's degenerate *rounding* stays its own** (C12 §3aj hazard 1). `rowOf` keeps
+`Math.floor(last / 2)`, because `Math.floor(0.5 · last)` and `Math.round(0.5 · last)` differ **at
+every even height** — which is exactly what the gate's `G0` row exists to catch. So this is a
+change to one function and not to nine, and the evidence is **377 golden rows with zero snapshots
+written**.
+
+## F261 — a tool that runs on import, and a fixture that passed on a directory's state ★★★☆☆
+
+**`contact-defaults.mjs` had its whole sheet build at module top level, with a top-level `await`.**
+So `import { tileAt } from "./contact-defaults.mjs"` — three pure helpers — **rendered two
+megabytes of PNG as a side effect.**
+
+Its own fixture did exactly that, **and passed**, because `docs/catalogue` held 956 tiles at the
+moment it was written. `plot-catalogue.mjs` clears every `.txt`, `.plain` and `.png` in that
+directory before writing, so the next full suite found none: `Math.max(...[])` returned `-Infinity`
+and sharp refused the width.
+
+**A test that passes because of the state of a generated directory, and the tool that generates it
+sweeps.** The failure is not in the assertions — it is in the import.
+
+**The shape is the one worth keeping.** `catalogue-hash.mjs` was given an `isMain` guard **in the
+same commit**, for the same reason, and this one was not: the fix was applied where the flaw was
+noticed rather than to the pair. Both tools were touched in that commit, both read the same
+directory, and only one question was asked of one of them.
+
+**Caught by the suite one commit later**, which is the argument for running every target rather
+than the three that seem relevant — `make instruments` and `npm test` both went red, and the
+targets that had been run in isolation stayed green.
+
+**Fixed** — the build moves behind `buildSheet()` and an `isMain` guard, an empty tile set is
+**named** rather than thrown at by sharp (*Expected valid width, height and channels* says nothing
+about the ordinary state between two generators), and `CG1` asserts the rule over all five
+catalogue tools. `CG2` is its control: the loop filters on *does this file export anything*, so a
+filter that matched nothing would pass over an empty set in the same green — it asserts the subject
+count, and names `phase-catalogue.mjs` as the one that exports nothing and therefore cannot be
+imported for a helper.
+
+## F262 — six rows whose verdict is a function of machine load ★★★★☆
+
+**`vitest.config.ts` sets no `testTimeout`, so the default 5000ms governs — and six rows do
+whole-tree work.** The module graph over every source file, the commitment scan, the anchor sweep
+across 98 runs, the catalogue's SGR parser. Each is **1.5 to 2 seconds in isolation and past five
+under a full parallel run.**
+
+| row | alone | in the suite |
+|---|---|---|
+| `MA4` | **1539ms** | 5033 · 7345ms |
+| `T6.5 / T6.6` | **1723ms** | 5114 · 5373 · 5489ms |
+
+**Three consecutive runs gave three different failing sets** — five rows, then three, then two —
+and every one passed on its own. *A changed set is the signature of contention; an identical one
+would have been evidence.*
+
+**The config already reasons about flakiness and this class walked past it.** Its comment says
+*real timers here would make the suite flaky in exactly the components that inject one*, which is
+true and is about a clock a test asks for. **The clock these rows race is one nobody chose.**
+
+### What it cost, which is the argument
+
+**Three red runs against a change that moved zero frames.** A sweep routing three normalisations
+onto the shared coordinate came back red three times out of three while `HEAD` came back green two
+of three — and at n=3 on a noisy process that difference is not measurement, but it is exactly what
+a real regression looks like from outside. **Twenty minutes went into separating them**, ending at
+*every failing row passes alone and the set is different every time*.
+
+**A gate whose verdict is a function of machine load is not evidence about the code**, and
+`make all` is where this repository's evidence comes from.
+
+### The remedy is a ceiling, not six arguments
+
+`testTimeout: 30_000`, in the config, with both figures beside it.
+
+**Why not `{ timeout: … }` on the six**: the rule is *a row that reads the whole tree needs room*,
+and a per-row list stops seeing the seventh — the same reason a scan covers a directory and names
+its exceptions rather than globbing narrowly.
+
+**The number is the asymmetry, not the odds.** A green run costs nothing extra; a load-dependent
+verdict costs a session. **And a hang still fails, six seconds later** — what this removes is a
+default nobody chose deciding whether the suite means anything. Three consecutive runs after the
+change: **226 files, green, green, green.**
+
+## F263 — a builder gap I got wrong, and the rule I said had passed is what disproved it ★★★☆☆
+
+**The claim as first written**: `quartiles`, `categories`, `segments` and `bands` are on `Plot` and
+absent from `b.plot`, so the distribution family's five forms are *buildable by nothing in the
+public surface* — the `form` field's own finding one field along — and **MG27 passed throughout**
+because a name-based check cannot see an omission.
+
+**Two of those three are false**, and `make enforce` said so on the first run after the fix.
+
+| the claim | what measuring says |
+|---|---|
+| absent from `b.plot` | **true**, field by field |
+| buildable by nothing public | **false** — `b.figure(…).setQuartiles([…])`, `.setCategories`, `.setSegments`, `.setBands` have all been there |
+| MG27 passed throughout | **false** — all four were on `BUILDER_OMISSIONS` with a stated reason, and the list's bidirectional arm **refused the commit** the moment the builder set them |
+
+**So this is not a defect arriving; it is scheduled work arriving early.** The exemptions read
+*step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one*, which was accurate.
+What lands here is the shorthand.
+
+### The part worth keeping is how the wrong claim was reached
+
+**One builder file was read and there are two.** The rule's own doc comment records exactly this
+about itself — *it reads one of the two builder files … which is why ten of the entries below say
+shorthand lands in step 11 and are true about `b.plot` while `b.figure(…).setQuartiles([…])` has
+been setting the field all along*. **The limitation was written down, in the file I was citing as
+evidence, and I cited the rule's silence instead of reading its list.**
+
+**A grep for a field name in one file answers *is it in this file*, and it was read as *is it
+reachable*.** The measurement was correct and narrow; the conclusion was wide.
+
+**The instrument that caught it is the one that costs nothing**: an exemption compared by
+**equality in both directions**, so a list entry whose reason has expired is a violation. Nobody
+had to remember. That is the third entry disposed of this way — `plot.yFormat` and MG25's
+`isUsable` were the first two — and it is the argument for equality over a subset check, which
+would have let all four sit unread.
+
+**What actually lands**: the four fields on `b.plot`, so the shorthand exists beside the chain; the
+four expired entries removed; and family 1's SVG arm draws something both builders can express.
+
+## F264 — the digest that could not tell an addition from a change ★★★☆☆
+
+**F257's remedy hashes two populations as one.** `docs/catalogue/` holds 890 frames from
+`plot-catalogue.mjs` — the **terminal** arm — and 66 `phase*` frames from `phase-catalogue.mjs`,
+which are the **SVG** arm's own output. `catalogue-hash.mjs` hashed every `.txt` together.
+
+**So a frame the SVG arm was meant to add is indistinguishable from a terminal frame that moved**,
+and *the terminal arm is untouched* is the gate this tool exists for.
+
+**It happened on the first commit that added one.** Claiming three forms for the distribution
+family took the digest from `e25a2defe7da643d` to `9be0fef40a38305e` — read as the gate failing.
+Measured by stashing the change, regenerating, and hashing the 890 alone: **`64b8845e6408c819`
+on both sides, every frame byte-identical.**
+
+**The tool built to be precise about *did a frame move* was imprecise about exactly that**, and its
+own fixture could not see it because the fixture wrote two files into one temp directory and asked
+for one number.
+
+**Fixed** — `digestOf(dir, group)` and a report that always prints both, because a flag would make
+the split something a caller has to remember at the moment it matters. `CH4` asserts that adding to
+one population leaves the other's digest alone; `CH5` asserts the empty case, because `sha256("")`
+is `e3b0c44298fc1c14…` and **prints exactly like an answer** — the frame count is the only thing
+that distinguishes a clean population from one the tool could not see, which is F257's one bit
+inside the tool built to fix it.

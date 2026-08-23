@@ -24,7 +24,18 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
 import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
-import { bar, percent } from "./dashboard.ts";
+import { BUSY, HOT, percent } from "./dashboard.ts";
+
+/**
+ * The cells `MEM`'s bar occupies (C04 I51).
+ *
+ * **Declared here rather than taken from `CPU_WIDTH`**, which is the table's
+ * column and a different geometry — reaching for it is how this component's two
+ * ramp defects both happened. Fifteen is the run plus a space plus `100.0%`,
+ * which walk A4 permits to exceed its ceiling, and it leaves the value column's
+ * remainder to `MemUsage`.
+ */
+const MEM_BAR_WIDTH = 15;
 import { axisCaption, capFor, createRing, TICK_MS } from "./history.ts";
 import type { Ring } from "./history.ts";
 import { parseNdjson, str } from "./ndjson.ts";
@@ -112,6 +123,23 @@ export function cpuBlock(ring: Ring, trouble?: Block, unicode = true): Block {
          * one, which is the finding walk A4 already ruled against for the bar.
          */
         yMin: 0,
+        /**
+         * **The thresholds the table already classifies by, on the axis** (C04
+         * I52). `loadTone` turns 60 and 85 into a cell's tone and glyph, so the
+         * *numbers* were already the app's judgement and the plot was the one
+         * surface that could not show them: a reader watching the curve had no
+         * way to see where busy begins.
+         *
+         * A band rather than two lines because it is one statement, and dashed
+         * rather than toned because at one bit the tone is all that would be
+         * left — F34, and the reason annotations are cheap in a terminal.
+         *
+         * **The ceiling is still unpinned**, so on an eight-core host running at
+         * 780% the band sits low and correctly says so. An annotation outside
+         * the range is dropped rather than clamped, which is why this is safe to
+         * declare unconditionally.
+         */
+        annotations: [{ kind: "band", from: BUSY, to: HOT, tone: "warn" }],
       }),
       b.notice("muted", axisCaption(ring, unicode), undefined, { id: "cpu-axis" }),
       ...(trouble === undefined ? [] : [trouble]),
@@ -169,7 +197,20 @@ export function ioBlock(row: Row | null, unicode = true): Block {
   const absent = unicode ? "—" : "-";
   return b.kv(
     {
-      MEM: `${bar(memPerc, unicode).text}  ${str(row, "MemUsage")}`,
+      // **The interpolated bar, gone** — C04 I51. It was the same workaround
+      // `Cell.bar` closed one level along: a run drawn by the app into a string,
+      // sized by the *table's* CPU column constants, with the alphabet chosen
+      // from a flag the app computes because `AdapterContext` carries none.
+      //
+      // The framework now draws it and reads the capability itself, so the
+      // `unicode` argument no longer reaches this row. `barWidth` is the row's
+      // because a `keyValue` value is a remainder — 74 cells at a terminal width
+      // of 80, where an undeclared bar would run for 68 of them.
+      MEM: {
+        text: str(row, "MemUsage"),
+        bar: { value: memPerc, max: 100, format: "percent" as const },
+        barWidth: MEM_BAR_WIDTH,
+      },
       NET: str(row, "NetIO") || absent,
       BLK: str(row, "BlockIO") || absent,
       PIDS: str(row, "PIDs") || absent,
