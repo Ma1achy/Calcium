@@ -249,6 +249,48 @@ const results = runPass({
       expect: "G8e",
     },
     {
+      // **A node sized to its own layer's share.** The first version did this
+      // and a node alone in its layer spanned the whole figure — a leaf drawn
+      // as wide as the root, inside the area, with every box in the right
+      // layer. The frame is what showed it and no row could.
+      name: "a node is sized by its own layer rather than by the busiest",
+      file: SVG,
+      from: "    const across = (transposed ? h : w) / busiest; // cells-ok — a node count",
+      to: "    const across = (transposed ? h : w) / Math.max(1, row.length); // cells-ok — a node count",
+      expect: "G6e1",
+    },
+    {
+      // **A sparse layer stretched instead of centred**, the other half of the
+      // same defect: a single-node layer left-aligned while its children sit
+      // under the middle.
+      name: "a sparse layer is not centred in its axis",
+      file: SVG,
+      from: "    const offset = ((transposed ? h : w) - across * row.length) / 2; // cells-ok — a node count",
+      to: "    const offset = 0; // cells-ok — a node count",
+      expect: "G6e2",
+    },
+    {
+      // **The default layout chosen rather than read.** `chooseLayout` returns
+      // the first of `["topDown", "leftRight", "outline"]` that fits and an SVG
+      // has no budget, so `topDown` is the terminal's answer. Family 1's
+      // orientation came out transposed by picking what read naturally.
+      name: "the tree's default layout is not the terminal's",
+      file: SVG,
+      from: '      const wanted = block.treeLayout ?? "topDown";',
+      to: '      const wanted = block.treeLayout ?? "leftRight";',
+      expect: "G6e3",
+    },
+    {
+      // **A dummy node given a box.** The pipeline inserts them to carry an
+      // edge across a layer, so a box there is a node the graph does not have —
+      // and it draws in the right place with the right colour.
+      name: "a routing waypoint is drawn as a node",
+      file: SVG,
+      from: "      if (label === \"\") continue;",
+      to: "      if (false) continue;",
+      expect: "G6e6",
+    },
+    {
       // **The flame and the icicle transposed**, which is family 1's own
       // mistake one family along: `hierarchyStripRows` takes an `inverted`
       // flag and the terminal passes `false` for a flame and `true` for an
@@ -288,8 +330,8 @@ const results = runPass({
       // beside tiles — which is what the frame caught and no row did.
       name: "the tiles family gets a value axis",
       file: SVG,
-      from: '  if (family !== "matrix" && family !== "tiles" && rule !== undefined && label !== undefined) {',
-      to: '  if (family !== "matrix" && rule !== undefined && label !== undefined) {',
+      from: '  const noValueAxis = family === "matrix" || family === "tiles" || family === "nodes";',
+      to: '  const noValueAxis = family === "matrix";',
       expect: "G6d6",
     },
     {

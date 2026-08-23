@@ -52,7 +52,18 @@ const OUTLINE_INDENT = 4;
 
 // --------------------------------------------------------------- the tree
 
-function flatten(root: HierarchyNode): readonly Flat[] {
+/**
+ * A node flattened out of the recursion — **the topology, and it is shared**
+ * (§3aj.6).
+ *
+ * Exported because the SVG arm needs the structure and **not** the placement:
+ * `tdWidth` measures a subtree by the widest label under it, so where a node
+ * goes is a function of text measurement and the two arms measure text
+ * differently by construction. This is the half that is neither.
+ */
+export type FlatNode = Flat;
+
+export function flatten(root: HierarchyNode): readonly Flat[] {
   const out: { label: string; depth: number; parent: number; kids: number[] }[] = [];
   const walk = (node: HierarchyNode, depth: number, parent: number): void => { // cells-ok — a depth index
     const here = out.length; // cells-ok — a node index

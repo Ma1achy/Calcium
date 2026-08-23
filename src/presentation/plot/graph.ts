@@ -272,6 +272,34 @@ function widthOf(rows: readonly (readonly number[])[], g: Graph, caps: Caps): nu
   return widest;
 }
 
+/**
+ * The layered pass over the **whole** graph — no pruning (§3aj.6).
+ *
+ * `graphArea` drops least-connected nodes until the figure fits a cell budget,
+ * and that budget is a terminal fact: an SVG has none. So the second arm takes
+ * the pipeline and not the loop around it — which is possible because
+ * `acyclic`, `layerOf`, `expand`, `positions`, `crossings`, `order` and `lay`
+ * are **0 `cells()` and 0 `caps`**, measured.
+ *
+ * `labelOf` returns `''` for a dummy node, which is how a caller tells a
+ * routing waypoint from a node the graph declared.
+ */
+export function graphLayers(g: Graph): {
+  rows: readonly (readonly number[])[];
+  reversed: number;
+  edges: readonly (readonly [number, number])[];
+  labelOf: (id: number) => string;
+} {
+  const keep = new Set(g.nodes.map((_n, i) => i));
+  const laid = lay(g, keep);
+  return {
+    rows: laid.rows,
+    reversed: laid.reversed,
+    edges: laid.seg.map((e) => [e[0], e[1]] as const),
+    labelOf: (id) => (id < g.nodes.length ? labelOf(g, id) : ""), // cells-ok — a node count
+  };
+}
+
 function lay(g: Graph, keep: ReadonlySet<number>): { rows: number[][]; seg: readonly Edge[]; reversed: number } {
   const index = new Map(g.nodes.map((node, i) => [node.id, i]));
   const edges: Edge[] = [];

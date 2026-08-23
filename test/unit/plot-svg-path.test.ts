@@ -260,6 +260,21 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
   // corpus takes one datum per form, and a form with two gets one of them
   // arbitrarily.**
   if (svgFamilyOf(form) === "tiles") return { series: [], hierarchy: HIERARCHY };
+  // **A third datum shape in one table**, and the builder refuses without it:
+  // `b.plot({ form: "tree" })` with no `hierarchy` throws, because a tree with
+  // no tree has no figure to fall back to (C04 I65). `graph` carries its own
+  // shape again — a node list and an edge list, which is what `hierarchy`
+  // cannot express (C04 I69).
+  if (form === "tree") return { series: [], hierarchy: HIERARCHY };
+  if (form === "graph") {
+    return {
+      series: [],
+      graph: {
+        nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }],
+        edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "c", to: "d" }],
+      },
+    };
+  }
   if (svgFamilyOf(form) !== "distribution") return { series: [{ label: "s", values: SAMPLES }], ...PIN };
   if (form === "dumbbell") {
     return { series: [{ label: "a", values: [2, 5, 8] }, { label: "b", values: [8, 3, 4] }], ...PIN };
@@ -774,6 +789,139 @@ describe("G6d — the tiles family, and every default checked against the termin
     for (const form of ["treemap", "flame", "icicle"] as const) {
       const bare = b.plot({ id: form, form, height: 6, series: [{ label: "s", values: [3, 2, 1] }] });
       expect(plotToSvg(bare, THEME, tl), `${form} without a hierarchy`).toBeNull();
+    }
+  });
+});
+
+describe("G6e — the nodes family, where the placement is per-arm", () => {
+  const HIER = {
+    label: "root", value: 100,
+    children: [
+      { label: "a", value: 60, children: [{ label: "a1", value: 35 }, { label: "a2", value: 25 }] },
+      { label: "b", value: 40 },
+    ],
+  };
+  const GRAPH = {
+    nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }],
+    edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "c", to: "d" }],
+  };
+  const nl = svgLayout(600, 300);
+  const nArea = {
+    left: nl.width * (nl.gutter + nl.pad),
+    right: nl.width * (1 - nl.pad),
+    top: nl.height * nl.pad,
+    bottom: nl.height * (1 - nl.gutter),
+  };
+  const treeAt = (extra: Record<string, unknown> = {}): Parameters<typeof plotToSvg>[0] =>
+    b.plot({ id: "tr", form: "tree", height: 8, series: [], hierarchy: HIER, ...extra } as Parameters<typeof b.plot>[0]);
+  const nodeRects = (svg: string): Array<Record<string, number>> =>
+    [...svg.matchAll(/<rect ([^>]*?rx="2"[^>]*?)\/>/gu)].map((m) => {
+      const o: Record<string, number> = {};
+      for (const at of m[1]?.matchAll(/([a-zA-Z][\w-]*)="([-\d.]+)"/gu) ?? []) o[at[1] as string] = Number(at[2]);
+      return o;
+    });
+
+  it("G6e1: every node is the same size, taken from the busiest layer", () => {
+    // **The frame caught the first version.** A node sized to its own layer's
+    // share made a node alone in its layer span the whole figure — a leaf drawn
+    // as wide as the root. The terminal sizes a node to *its label*, which this
+    // arm cannot do (§3aj hazard 4), so the font-independent equivalent is one
+    // size for all of them.
+    const rs = nodeRects(plotToSvg(treeAt(), THEME, nl) ?? "");
+    expect(rs.length, "one box per named node").toBe(5);
+    const widths = new Set(rs.map((r) => r["width"]));
+    expect(widths.size, "one width, not one per layer").toBe(1);
+    const heights = new Set(rs.map((r) => r["height"]));
+    expect(heights.size, "and one height").toBe(1);
+  });
+
+  it("G6e2: a sparse layer is centred, not stretched", () => {
+    // The other half of the same defect: a single-node layer offset to the
+    // left while its children sit under the middle. Asserted as a position —
+    // the root's centre against the area's — because *inside the area* is true
+    // of every wrong answer here.
+    const rs = nodeRects(plotToSvg(treeAt(), THEME, nl) ?? "");
+    const top = rs.reduce((m, r) => ((r["y"] ?? 0) < (m["y"] ?? 0) ? r : m), rs[0]!);
+    const centre = (top["x"] ?? 0) + (top["width"] ?? 0) / 2;
+    expect(centre, "the root sits on the area's centre").toBeCloseTo((nArea.left + nArea.right) / 2, 1);
+  });
+
+  it("G6e3: the default layout is topDown, which is what the terminal picks", () => {
+    // `chooseLayout` returns the **first** of `["topDown", "leftRight",
+    // "outline"]` whose size fits, and an SVG has no budget, so everything
+    // fits and the terminal would pick `topDown`. Read out of the source
+    // rather than chosen — family 1's orientation default came out transposed
+    // by being read the other way round.
+    const plain = nodeRects(plotToSvg(treeAt(), THEME, nl) ?? "");
+    const down = nodeRects(plotToSvg(treeAt({ treeLayout: "topDown" }), THEME, nl) ?? "");
+    expect(plain, "no layout named is topDown").toEqual(down);
+
+    // And `leftRight` is the transpose, so depth runs along x instead of y.
+    const right = nodeRects(plotToSvg(treeAt({ treeLayout: "leftRight" }), THEME, nl) ?? "");
+    expect(new Set(down.map((r) => r["y"])).size, "topDown puts each depth on its own y").toBe(3);
+    expect(new Set(right.map((r) => r["x"])).size, "leftRight puts each depth on its own x").toBe(3);
+  });
+
+  it("G6e4: `outline` is refused, because it is a listing and not a placement", () => {
+    // An indented text listing drawn as boxes would be a different figure from
+    // the terminal's — the plausible wrong figure the `null` arm refuses.
+    expect(plotToSvg(treeAt({ treeLayout: "outline" }), THEME, nl), "outline has no node placement").toBeNull();
+  });
+
+  it("G6e5: a graph's edges are diagonals, which the terminal cannot draw", () => {
+    // `strokePolyline` steps orthogonally because a diagonal step would claim
+    // two cells at once. An SVG path draws any angle, so an edge goes where it
+    // goes — a per-arm difference in what is **possible** rather than chosen.
+    const svg = plotToSvg(b.plot({ id: "g", form: "graph", height: 8, series: [], graph: GRAPH } as Parameters<typeof b.plot>[0]), THEME, nl) ?? "";
+    const paths = [...svg.matchAll(/<path d="M([-\d.]+) ([-\d.]+) L([-\d.]+) ([-\d.]+)"/gu)];
+    expect(paths.length, "an edge per segment").toBeGreaterThan(0);
+    const slanted = paths.filter((m) => Math.abs(Number(m[1]) - Number(m[3])) > 1 && Math.abs(Number(m[2]) - Number(m[4])) > 1);
+    expect(slanted.length, "at least one runs at an angle").toBeGreaterThan(0);
+  });
+
+  it("G6e6: a dummy node routes an edge and draws no box", () => {
+    // The Sugiyama pipeline inserts them to carry an edge across a layer, and
+    // a box there would be a node the graph does not have. `labelOf` answers
+    // `""` for one, which is how the caller tells them apart.
+    // **The fixture has to span a layer, and `GRAPH` does not.** Its four
+    // edges all join adjacent layers, so the pipeline inserts no dummy and the
+    // row read four segments against four — passing for both readings, which
+    // is the fixture lesson in its third family.
+    //
+    // `a → b → c` with `a → c` puts `c` two layers below `a`, so that edge is
+    // carried by one waypoint and becomes **two** segments.
+    const spanning = {
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }, { from: "a", to: "c" }],
+    };
+    const svg = plotToSvg(b.plot({ id: "gs", form: "graph", height: 8, series: [], graph: spanning } as Parameters<typeof b.plot>[0]), THEME, nl) ?? "";
+    expect(nodeRects(svg).length, "three declared nodes, three boxes").toBe(3);
+    expect([...svg.matchAll(/<path /gu)].length, "four segments for three edges — one is carried").toBe(4);
+  });
+
+  it("G6e7: a reversed edge is reported, as the terminal reports it", () => {
+    // C12 I58. An edge reversed to make the graph acyclic is drawn pointing the
+    // way it is not, and a reader who is not told reads the dependency
+    // backwards. **The frame is what said it was missing.**
+    const cyclic = {
+      nodes: [{ id: "a" }, { id: "b" }],
+      edges: [{ from: "a", to: "b" }, { from: "b", to: "a" }],
+    };
+    const svg = plotToSvg(b.plot({ id: "gc", form: "graph", height: 8, series: [], graph: cyclic } as Parameters<typeof b.plot>[0]), THEME, nl) ?? "";
+    expect(svg, "the count and the word").toContain("1 reversed");
+    // And an acyclic graph says nothing, so the notice is a claim rather than
+    // furniture that is always there.
+    const clean = plotToSvg(b.plot({ id: "g", form: "graph", height: 8, series: [], graph: GRAPH } as Parameters<typeof b.plot>[0]), THEME, nl) ?? "";
+    expect(clean.includes("reversed"), "nothing to report").toBe(false);
+  });
+
+  it("G6e8: neither form draws a value axis", () => {
+    // A tree's readings are its structure and a graph's are its edges. Second
+    // family running where the ticks came from `seriesRange([]) ?? {0,1}` and
+    // the frame is what caught them.
+    for (const blk of [treeAt(), b.plot({ id: "g", form: "graph", height: 8, series: [], graph: GRAPH } as Parameters<typeof b.plot>[0])]) {
+      const svg = plotToSvg(blk, THEME, nl) ?? "";
+      expect([...svg.matchAll(/text-anchor="end"/gu)].length, "no value ticks").toBe(0);
     }
   });
 });

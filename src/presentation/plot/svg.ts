@@ -31,6 +31,8 @@
  */
 import { normalisedSummary, quartileRange, type NormalisedSummary } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
+import { flatten } from "./tree.js";
+import { graphLayers } from "./graph.js";
 import { normalisedOf, type PinnedRange } from "../../data/viewmodel/range.js";
 import { seriesRange } from "./scale.js";
 import { niceAxis } from "./axes.js";
@@ -111,7 +113,7 @@ function escape(text: string): string {
  * own: a curve spends it on a y, a matrix spends it on a colour. That is the
  * overlay's ruling from phase 2 arriving one component along (C04 §3h.2).
  */
-export type SvgFamily = "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles";
+export type SvgFamily = "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -157,12 +159,12 @@ export const SVG_FAMILY = {
   // `caps` in that file**, which is what makes this family nearly free where
   // `tree` is not (§3aj.6).
   flame: "tiles", icicle: "tiles", treemap: "tiles",
-  // **`tree` and `graph` are the other geometry and they are not this one.**
-  // A tree's node positions are a function of its labels' widths — `tdWidth`
-  // is a subtree measured as the widest label under it — so the placement
-  // cannot be shared, only the topology. Hazard 4, arriving as a constraint
-  // rather than a rule.
-  tree: null, graph: null,
+  // **Nodes** — `tree` and `graph`, the family's other geometry. A tree's
+  // node positions are a function of its labels' widths in the terminal —
+  // `tdWidth` measures a subtree by the widest label under it — so **the
+  // topology is shared and the placement is not** (§3aj.6). This arm places by
+  // slots and clips its labels, which is font-independent by construction.
+  tree: "nodes", graph: "nodes",
   // *Its own domain*: a date grid, a time span, a category ring, an angle.
   calendar: null, gantt: null, timeline: null, pie: null, radar: null,
   waffle: null, funnel: null,
@@ -415,6 +417,103 @@ function summaryMarks(
 }
 
 /**
+ * Layered nodes and their edges, placed without measuring a single label.
+ *
+ * **The placement is per-arm and this is the SVG's** (§3aj.6). The terminal's
+ * is a function of label widths — `tdWidth` measures a subtree by the widest
+ * label under it — and the two arms measure text differently by construction,
+ * so each computes its own placement from the same topology.
+ *
+ * **A slot per node and a `clipPath` per label**, which is the treemap's answer
+ * one family along: the label places itself *and* stops itself, and nothing
+ * here asks how wide the string is. That is what makes the placement
+ * font-independent rather than font-dependent in a second way.
+ */
+function nodeMarks(
+  layers: readonly (readonly number[])[],
+  labelAt: (id: number) => string,
+  edges: readonly (readonly [number, number])[],
+  box: Readonly<{ left: number; right: number; top: number; bottom: number }>,
+  w: number,
+  h: number,
+  transposed: boolean,
+  ink: string,
+  ground: string | undefined,
+  theme: ResolvedTheme,
+  id: string,
+  out: string[],
+): readonly string[] {
+  const depth = layers.length; // cells-ok — a layer count
+  if (depth === 0) return out;
+  const at = new Map<number, Readonly<{ x: number; y: number; w: number; h: number }>>();
+
+  // **One box size for every node, taken from the widest layer.**
+  //
+  // The first version sized a node to its own layer's share, so a node alone in
+  // its layer spanned the whole figure: a leaf drawn as wide as the root, and
+  // the frame is what showed it. The terminal sizes a node to **its label**,
+  // which this arm cannot do (§3aj hazard 4) — so the font-independent
+  // equivalent is one size for all of them, from the busiest layer.
+  const busiest = layers.reduce((m, row) => Math.max(m, row.length), 1); // cells-ok — a node count
+  for (const [d, row] of layers.entries()) {
+    const band = (transposed ? w : h) / depth;
+    const across = (transposed ? h : w) / busiest; // cells-ok — a node count
+    // Centred in the axis rather than spread across it, so a sparse layer sits
+    // under its parents instead of stretching to the edges.
+    const offset = ((transposed ? h : w) - across * row.length) / 2; // cells-ok — a node count
+    for (const [i, node] of row.entries()) {
+      const alongCentre = (transposed ? box.left : box.top) + band * (d + 0.5);
+      const acrossCentre = (transposed ? box.top : box.left) + offset + across * (i + 0.5);
+      const bw = Math.max(4, (transposed ? band : across) * 0.7);
+      const bh = Math.max(4, (transposed ? across : band) * 0.5);
+      const cx = transposed ? alongCentre : acrossCentre;
+      const cy = transposed ? acrossCentre : alongCentre;
+      at.set(node, { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh });
+    }
+  }
+
+  // **The edges first, so a node is drawn over its own connections.** The same
+  // order the treemap paints in, for the same reason: what is on top says what
+  // is in front, and a line ending under a box reads as ending at it.
+  const rule = inkOf(RULE, theme) ?? ink;
+  for (const [from, to] of edges) {
+    const a = at.get(from);
+    const b = at.get(to);
+    if (a === undefined || b === undefined) continue;
+    // **A diagonal, which is the gain this arm has and the terminal does not.**
+    // `strokePolyline` steps orthogonally because a diagonal step would claim
+    // two cells at once; an SVG path draws any angle, so an edge goes where it
+    // goes. A per-arm difference in what is *possible*, not in what is chosen.
+    out.push(
+      `<path d="M${n(a.x + a.w / 2)} ${n(a.y + a.h / 2)} L${n(b.x + b.w / 2)} ${n(b.y + b.h / 2)}" ` +
+        `stroke="${rule}" stroke-width="1" fill="none"/>`,
+    );
+  }
+
+  for (const [d, row] of layers.entries()) {
+    for (const node of row) {
+      const r = at.get(node);
+      if (r === undefined) continue;
+      const label = labelAt(node);
+      // **A dummy node is a waypoint and draws nothing.** The Sugiyama pipeline
+      // inserts them to route an edge across a layer, and a box there would be
+      // a node the graph does not have.
+      if (label === "") continue;
+      const slot = inkOf(refOf(d), theme);
+      if (slot === undefined) continue;
+      out.push(
+        `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" ` +
+          `rx="2" fill="${slot}" stroke="${ground ?? slot}" stroke-width="1"/>`,
+        `<clipPath id="n${id}-${String(node)}"><rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}"/></clipPath>`,
+        `<text x="${n(r.x + 3)}" y="${n(r.y + r.h / 2 + SVG_FONT_SIZE / 3)}" clip-path="url(#n${id}-${String(node)})" ` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ground ?? ink}">${escape(label)}</text>`,
+      );
+    }
+  }
+  return out;
+}
+
+/**
  * One forest row: a confidence interval, tees at each end, and an estimate.
  *
  * **The estimate is sized by weight** (C12 I31): a wide interval drawn small
@@ -494,6 +593,78 @@ function marks(block: Plot, range: PinnedRange, layout: SvgLayout, theme: Resolv
       }
     }
     return out;
+  }
+
+  if (family === "nodes") {
+    const ink0 = inkOf(LABEL, theme);
+    const ground = inkOf(GROUND, theme);
+    if (ink0 === undefined) return out;
+    const w = box.right - box.left;
+    const h = box.bottom - box.top;
+
+    // **Layers of node indices, and where each came from.** A tree's layer is
+    // its depth; a graph's is the Sugiyama pipeline's, dummy nodes and all.
+    // Both are pure topology — measured at 0 `cells()` and 0 `caps` for
+    // `graph.ts`'s pipeline and for `tree.ts`'s `flatten` (§3aj.6).
+    let layers: readonly (readonly number[])[] = [];
+    let labelAt: (id: number) => string = () => "";
+    let edges: readonly (readonly [number, number])[] = [];
+
+    if (block.form === "tree") {
+      const root = block.hierarchy;
+      if (root === undefined) return out;
+      // **`topDown` where nothing is asked**, which is what the terminal picks
+      // when everything fits: `chooseLayout` returns the first of
+      // `["topDown", "leftRight", "outline"]` whose size fits the budget, and
+      // an SVG has no budget. Read out of the source rather than chosen.
+      const wanted = block.treeLayout ?? "topDown";
+      // **`outline` is an indented text listing and not a node placement.**
+      // Drawing it as boxes would be a different figure from the terminal's,
+      // which is the plausible wrong figure the `null` arm refuses.
+      if (wanted === "outline") return out;
+      const flat = flatten(root);
+      const byDepth: number[][] = [];
+      for (const [i, f] of flat.entries()) (byDepth[f.depth] ??= []).push(i);
+      layers = byDepth;
+      labelAt = (id) => flat[id]?.label ?? "";
+      edges = flat.flatMap((f, i) => (f.parent >= 0 ? [[f.parent, i] as const] : []));
+      // `leftRight` is the same placement transposed, which is what it is in
+      // the terminal too — one label column per depth instead of one row.
+      if (wanted === "leftRight") {
+        return nodeMarks(layers, labelAt, edges, box, w, h, true, ink0, ground, theme, block.id, out);
+      }
+      return nodeMarks(layers, labelAt, edges, box, w, h, false, ink0, ground, theme, block.id, out);
+    }
+
+    const g = block.graph;
+    if (g === undefined) return out;
+    // **No pruning**, which is §3aj.6's other half: `graphArea` drops
+    // least-connected nodes until the figure fits a cell budget, and an SVG
+    // has none. A shared pruner would put a terminal's constraint into a
+    // renderer that does not have it.
+    const laid = graphLayers(g);
+    layers = laid.rows;
+    labelAt = (id) => laid.labelOf(id);
+    // **The notice the terminal carries and this arm dropped** (C12 I58).
+    // An edge reversed to make the graph acyclic is drawn pointing the way it
+    // is not, and a reader who is not told reads the dependency backwards. The
+    // frame is what said it was missing: the terminal's `1 reversed` sat under
+    // its figure and the SVG had nothing.
+    //
+    // F259's ruling says *refuse a false figure, record an incomplete one* —
+    // and this one is cheap enough to draw rather than record.
+    if (laid.reversed > 0) {
+      const warn = inkOf("tone.warn", theme);
+      if (warn !== undefined) {
+        out.push(
+          `<text x="${n(box.left)}" y="${n(box.bottom + SVG_FONT_SIZE)}" ` +
+            `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${warn}">` +
+            `${escape(String(laid.reversed))} reversed</text>`,
+        );
+      }
+    }
+    edges = laid.edges;
+    return nodeMarks(layers, labelAt, edges, box, w, h, false, ink0, ground, theme, block.id, out);
   }
 
   if (family === "tiles") {
@@ -807,7 +978,11 @@ export function plotToSvg(
   // (*its ordinate is the series and its readings are the colours*) arriving at
   // the family whose readings are sizes.
   const family = svgFamilyOf(block.form);
-  if (family !== "matrix" && family !== "tiles" && rule !== undefined && label !== undefined) {
+  // **`nodes` has no value axis either.** A tree's readings are its structure
+  // and a graph's are its edges; the ticks came from `seriesRange([]) ?? {0,1}`
+  // again, and the frame is what said so — for the second family running.
+  const noValueAxis = family === "matrix" || family === "tiles" || family === "nodes";
+  if (!noValueAxis && rule !== undefined && label !== undefined) {
     for (const tick of axis.ticks) {
       if (valueOnX) {
         const x = box.left + (box.right - box.left) * normalisedOf(tick, range, false);
