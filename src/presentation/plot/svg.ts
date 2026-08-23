@@ -30,6 +30,7 @@
  * second renderer.
  */
 import { normalisedSummary, quartileRange, type NormalisedSummary } from "../../data/viewmodel/distribution.js";
+import { strips, tiles } from "./hierarchy.js";
 import { normalisedOf, type PinnedRange } from "../../data/viewmodel/range.js";
 import { seriesRange } from "./scale.js";
 import { niceAxis } from "./axes.js";
@@ -110,7 +111,7 @@ function escape(text: string): string {
  * own: a curve spends it on a y, a matrix spends it on a colour. That is the
  * overlay's ruling from phase 2 arriving one component along (C04 §3h.2).
  */
-export type SvgFamily = "curve" | "scatter" | "bar" | "matrix" | "distribution";
+export type SvgFamily = "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -150,8 +151,18 @@ export const SVG_FAMILY = {
   // terminal's, which is the plausible-wrong-figure the `null` arm refuses.
   // The outline is the family's residue, not its omission.
   violin: null, ridgeline: null,
-  // *Hierarchy and topology*: position comes from structure, not from a value.
-  flame: null, icicle: null, treemap: null, tree: null, graph: null,
+  // **Tiles** — position comes from *values* through the structure, and
+  // `hierarchy.ts` already returns it on the unit interval: `tiles` in the unit
+  // square, `strips` on the line with a depth. Measured: **0 `cells()` and 0
+  // `caps` in that file**, which is what makes this family nearly free where
+  // `tree` is not (§3aj.6).
+  flame: "tiles", icicle: "tiles", treemap: "tiles",
+  // **`tree` and `graph` are the other geometry and they are not this one.**
+  // A tree's node positions are a function of its labels' widths — `tdWidth`
+  // is a subtree measured as the widest label under it — so the placement
+  // cannot be shared, only the topology. Hazard 4, arriving as a constraint
+  // rather than a rule.
+  tree: null, graph: null,
   // *Its own domain*: a date grid, a time span, a category ring, an angle.
   calendar: null, gantt: null, timeline: null, pie: null, radar: null,
   waffle: null, funnel: null,
@@ -485,6 +496,98 @@ function marks(block: Plot, range: PinnedRange, layout: SvgLayout, theme: Resolv
     return out;
   }
 
+  if (family === "tiles") {
+    const root = block.hierarchy;
+    // **Refused where the terminal takes its other arm.** `flame` and `icicle`
+    // fall back to `legacyDepthBars` when there is no `hierarchy` — a bar chart
+    // of depths, which is the bar family's geometry and not this one. Drawing
+    // tiles for it would be a different figure from the terminal's.
+    if (root === undefined) return out;
+
+        const w = box.right - box.left;
+    const h = box.bottom - box.top;
+    const ground = inkOf(GROUND, theme);
+    const ink0 = inkOf(LABEL, theme);
+
+    /**
+     * A node's name inside its own rectangle, **clipped by SVG rather than
+     * measured** (§3aj hazard 4).
+     *
+     * The terminal truncates a label to the cells its tile has, which it can do
+     * because it measures text. This cannot and must not: a `<clipPath>` is the
+     * renderer's own mechanism, so the label places itself *and* stops itself,
+     * and nothing here asks how wide the string is.
+     *
+     * **The frame is what said the labels were missing.** Every row asserted
+     * rectangles and every one passed; a treemap with no names is a colour
+     * chart.
+     */
+    const named = (id: string, x: number, y: number, tw: number, th: number, text: string): void => {
+      if (text === "" || ink0 === undefined || th < SVG_FONT_SIZE) return;
+      out.push(
+        `<clipPath id="${id}"><rect x="${n(x)}" y="${n(y)}" width="${n(tw)}" height="${n(th)}"/></clipPath>`,
+        `<text x="${n(x + 3)}" y="${n(y + SVG_FONT_SIZE)}" clip-path="url(#${id})" ` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ground ?? ink0}">` +
+          `${escape(text)}</text>`,
+      );
+    };
+
+    if (block.form === "treemap") {
+      // **A pixel's worth of padding, expressed on the unit square** — which is
+      // the terminal's own rule at its own resolution: it passes
+      // `1 / max(width, areaRows)`, one cell. Resolution-independent by
+      // construction, so the two arms inset by the same *proportion* of the
+      // figure and differ only in what a unit is.
+      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);
+      for (const t of placed) {
+        const ink = inkOf(refOf(t.index), theme);
+        if (ink === undefined) continue;
+        // **Depth order, painted over** — a parent is drawn and then its
+        // children are drawn on top, which is how nesting reads without a
+        // border per node. The sort above is what makes that true.
+        out.push(
+          `<rect x="${n(box.left + t.x0 * w)}" y="${n(box.top + t.y0 * h)}" ` +
+            `width="${n(Math.max((t.x1 - t.x0) * w, 0.5))}" height="${n(Math.max((t.y1 - t.y0) * h, 0.5))}" ` +
+            `fill="${ink}" stroke="${ground ?? ink}" stroke-width="1"/>`,
+        );
+        named(
+          `t${block.id}-${String(t.index)}`,
+          box.left + t.x0 * w, box.top + t.y0 * h,
+          (t.x1 - t.x0) * w, (t.y1 - t.y0) * h,
+          t.label,
+        );
+      }
+      return out;
+    }
+
+    // **`flame` grows up from depth 0 and `icicle` grows down from it**, which
+    // is the terminal's `inverted` flag read from its own source rather than
+    // from what reads naturally: `rowFor` is `areaRows - 1 - depth` for a flame
+    // and `depth` for an icicle. Getting this from the convention rather than
+    // from the code is how family 1's orientation default came out transposed.
+    const inverted = block.form === "icicle";
+    const placed = strips(root);
+    const depth = placed.reduce((m, st) => Math.max(m, st.depth), 0); // cells-ok — a depth count
+    const band = h / (depth + 1);
+    for (const st of placed) {
+      const ink = inkOf(refOf(st.index), theme);
+      if (ink === undefined) continue;
+      const y = inverted ? box.top + st.depth * band : box.bottom - (st.depth + 1) * band;
+      out.push(
+        `<rect x="${n(box.left + st.from * w)}" y="${n(y)}" ` +
+          `width="${n(Math.max((st.to - st.from) * w, 0.5))}" height="${n(Math.max(band - 1, 0.5))}" ` +
+          `fill="${ink}"/>`,
+      );
+      named(
+        `s${block.id}-${String(st.index)}`,
+        box.left + st.from * w, y,
+        (st.to - st.from) * w, band - 1,
+        st.label,
+      );
+    }
+    return out;
+  }
+
   if (family === "distribution") {
     // **Horizontal unless asked, which is the terminal's default and therefore
     // this arm's.** The first draft read `!== "horizontal"`, so an unset
@@ -697,7 +800,14 @@ export function plotToSvg(
   // Nothing in the rows caught it. Every one asserts a position against the
   // *area*, and the furniture is inside the area either way.
   const valueOnX = svgFamilyOf(block.form) === "distribution" && block.orientation !== "vertical";
-  if (svgFamilyOf(block.form) !== "matrix" && rule !== undefined && label !== undefined) {
+  // **`tiles` has no value axis either**, and the frame is what said so: a
+  // treemap drew ticks at 0, 0.25, 0.5, 0.75, 1 — furnished by
+  // `seriesRange([]) ?? {0,1}` out of a block with no series — beside a figure
+  // whose readings are **areas**. That is C12's own ruling for a field form
+  // (*its ordinate is the series and its readings are the colours*) arriving at
+  // the family whose readings are sizes.
+  const family = svgFamilyOf(block.form);
+  if (family !== "matrix" && family !== "tiles" && rule !== undefined && label !== undefined) {
     for (const tick of axis.ticks) {
       if (valueOnX) {
         const x = box.left + (box.right - box.left) * normalisedOf(tick, range, false);

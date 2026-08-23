@@ -26,10 +26,20 @@ import { normalisedOf } from "../../src/data/viewmodel/range.js";
 import { decodePng } from "../../src/presentation/image/index.js";
 import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/colormap.js";
 import { rgbOf } from "../support/theme.js";
+import { tiles } from "../../src/presentation/plot/hierarchy.js";
+import { refOf } from "../../src/presentation/plot/marks.js";
+import { resolve } from "../../src/presentation/theme/index.js";
 import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
+
+/** A slot's hex at this arm's one depth — the same call the renderer makes. */
+const hexOf = (ref: string): string => {
+  const { colour } = resolve(ref as `${string}.${string}`, THEME, { colourDepth: 24 });
+  if (colour === undefined || colour.kind !== "rgb") throw new Error(`no rgb for ${ref}`);
+  return colour.hex;
+};
 
 const VALUES = [1, 4, 2, 8, 5, 9, 3, 7];
 const RANGE = { min: 1, max: 9 };
@@ -233,7 +243,23 @@ const supported = (Object.entries(SVG_FAMILY) as [PlotForm, string | null][])
  * thing that plays the clamp's part is an **outlier past the whiskers** — the
  * one member that widens the extent. Every summary below has one.
  */
+const HIERARCHY = {
+  label: "root", value: 100,
+  children: [
+    { label: "a", value: 60, children: [{ label: "a1", value: 35 }, { label: "a2", value: 25 }] },
+    { label: "b", value: 40, children: [{ label: "b1", value: 40 }] },
+  ],
+};
+
 const datumFor = (form: PlotForm): Record<string, unknown> => {
+  // **`flame` and `icicle` have two datum shapes and the corpus picks one.**
+  // `ONE_PER_FORM` gives both of them `categories` + `series` — the terminal's
+  // `legacyDepthBars` arm — and no `hierarchy` at all. The SVG arm draws the
+  // *tiles*, so its representative has to carry the datum the tiles come from.
+  // Same lesson as `plotStyle` and `quartiles`, a third time: **a per-form
+  // corpus takes one datum per form, and a form with two gets one of them
+  // arbitrarily.**
+  if (svgFamilyOf(form) === "tiles") return { series: [], hierarchy: HIERARCHY };
   if (svgFamilyOf(form) !== "distribution") return { series: [{ label: "s", values: SAMPLES }], ...PIN };
   if (form === "dumbbell") {
     return { series: [{ label: "a", values: [2, 5, 8] }, { label: "b", values: [8, 3, 4] }], ...PIN };
@@ -622,6 +648,136 @@ describe("G6c — the distribution family, where containment says nothing", () =
   });
 });
 
+describe("G6d — the tiles family, and every default checked against the terminal", () => {
+  const HIER = {
+    label: "root", value: 100,
+    children: [
+      { label: "a", value: 60, children: [{ label: "a1", value: 35 }, { label: "a2", value: 25 }] },
+      { label: "b", value: 40, children: [{ label: "b1", value: 40 }] },
+    ],
+  };
+  const tileBlock = (form: "treemap" | "flame" | "icicle"): Parameters<typeof plotToSvg>[0] =>
+    b.plot({ id: form, form, height: 8, series: [], hierarchy: HIER } as Parameters<typeof b.plot>[0]);
+  const tl = svgLayout(600, 300);
+  const area = {
+    left: tl.width * (tl.gutter + tl.pad),
+    right: tl.width * (1 - tl.pad),
+    top: tl.height * tl.pad,
+    bottom: tl.height * (1 - tl.gutter),
+  };
+  // **The clip rectangles are rects too**, and counting them read 10 nodes for
+  // 5 — the same shape as reading the background rect as a mark. A tile carries
+  // a `fill`; a clip's rectangle carries nothing but geometry, which is what
+  // separates them without a marker attribute.
+  const boxes = (svg: string): Array<Record<string, number>> =>
+    [...svg.matchAll(/<rect ([^>]*?fill="[^"]*"[^>]*?)\/>/gu)].map((m) => {
+      const o: Record<string, number> = {};
+      for (const at of m[1]?.matchAll(/([a-zA-Z][\w-]*)="([-\d.]+)"/gu) ?? []) o[at[1] as string] = Number(at[2]);
+      return o;
+    }).filter((r) => (r["width"] ?? 0) > 1);
+
+  it("G6d1: a tile sits where tiles() puts it, on the unit square", () => {
+    // **A position, not a containment.** Every tile is inside the area under any
+    // wrong layout that keeps the unit square; what is asserted is that the
+    // shared function's coordinates are the ones drawn.
+    // Sorted by depth, because the renderer paints parents before children —
+    // that ordering *is* how nesting reads without a border per node.
+    const expected = [...tiles(HIER, 1 / Math.max(area.right - area.left, area.bottom - area.top))]
+      .sort((p, q) => p.depth - q.depth);
+    const drawn = boxes(plotToSvg(tileBlock("treemap"), THEME, tl) ?? "");
+    expect(drawn.length, "one rect per node").toBe(expected.length);
+    for (const [i, t] of expected.entries()) {
+      expect(drawn[i]?.["x"], `tile ${i} x`).toBeCloseTo(area.left + t.x0 * (area.right - area.left), 3);
+      expect(drawn[i]?.["y"], `tile ${i} y`).toBeCloseTo(area.top + t.y0 * (area.bottom - area.top), 3);
+    }
+  });
+
+  it("G6d2: a tile's fill is the slot its index names — a separate claim", () => {
+    // **The fill is a different row from the position**, which is the lesson of
+    // three families in a row: a rect has coordinates the rows checked and a
+    // datum they did not.
+    const svg = plotToSvg(tileBlock("treemap"), THEME, tl) ?? "";
+    // The ground is the first rect; the tiles follow, in depth order.
+    const fills = [...svg.matchAll(/<rect [^>]*fill="(#[0-9a-f]{6})"/gu)].map((m) => m[1]).slice(1);
+    const expected = [...tiles(HIER, 0)].sort((p, q) => p.depth - q.depth).map((t) => hexOf(refOf(t.index)));
+    expect(fills.length).toBe(expected.length);
+    for (const [i, f] of fills.entries()) expect(f, `tile ${i} takes ${refOf(i)}`).toBe(expected[i]);
+  });
+
+  it("G6d3: flame grows up from depth 0 and icicle grows down — the terminal's flag", () => {
+    // **Checked against hierarchyStripRows, not against the convention.** Its
+    // rowFor is `areaRows - 1 - depth` for a flame and `depth` for an icicle,
+    // and family 1's orientation default came out transposed by being read the
+    // other way round.
+    const rootY = (form: "flame" | "icicle"): number => {
+      const drawn = boxes(plotToSvg(tileBlock(form), THEME, tl) ?? "");
+      const widest = Math.max(...drawn.map((r) => r["width"] ?? 0));
+      return drawn.find((r) => Math.abs((r["width"] ?? 0) - widest) < 0.01)?.["y"] ?? 0;
+    };
+    const mid = (area.top + area.bottom) / 2;
+    expect(rootY("flame"), "a flame's root is at the foot").toBeGreaterThan(mid);
+    expect(rootY("icicle"), "an icicle's root is at the head").toBeLessThan(mid);
+  });
+
+  it("G6d4: the treemap's inset is a proportion, which is the terminal's rule", () => {
+    // The terminal passes `1 / max(width, areaRows)` — a cell's worth on the
+    // unit square, resolution-independent. This passes a pixel's worth by the
+    // same expression, so the two arms inset by the same fraction and differ
+    // only in what a unit is.
+    const share = (px: number): number => {
+      const l = svgLayout(px, px / 2);
+      const w = l.width * (1 - l.pad) - l.width * (l.gutter + l.pad);
+      return Math.max(...boxes(plotToSvg(tileBlock("treemap"), THEME, l) ?? "").map((r) => r["width"] ?? 0)) / w;
+    };
+    expect(share(300), "the same share of the area at either size").toBeCloseTo(share(1200), 1);
+  });
+
+  it("G6d5: a label clips itself and nothing measures it", () => {
+    // §3aj hazard 4. The terminal truncates a name to the cells its tile has,
+    // which it can do because it measures text. A clipPath is the renderer's
+    // own mechanism: the label places itself and stops itself.
+    const svg = plotToSvg(tileBlock("treemap"), THEME, tl) ?? "";
+    // A leaf's name rather than the root's: `tiles()` places the root as the
+    // whole square and its children over it, so whether the root gets a text
+    // element is a property of the layout and not of the labelling.
+    expect(svg, "the names are drawn").toContain(">a1<");
+    expect(svg, "every leaf, not one").toContain(">b1<");
+    expect([...svg.matchAll(/<clipPath /gu)].length, "one clip per named tile").toBeGreaterThan(0);
+    expect(svg, "and every label uses one").toMatch(/<text [^>]*clip-path="url\(#/u);
+    const risky = b.plot({
+      id: "r", form: "treemap", height: 6, series: [],
+      hierarchy: { label: "a<b&c", value: 1, children: [{ label: "x", value: 1 }] },
+    } as Parameters<typeof b.plot>[0]);
+    expect((plotToSvg(risky, THEME) ?? "").includes("a<b&c"), "raw markup never reaches the output").toBe(false);
+  });
+
+  it("G6d6: a treemap has no value axis, because its readings are areas", () => {
+    // The matrix family's ruling one family along, and the **frame** is what
+    // said it: a treemap drew ticks at 0, 0.25, 0.5, 0.75, 1 — furnished out of
+    // seriesRange([]) — beside a figure whose readings are sizes.
+    for (const form of ["treemap", "flame", "icicle"] as const) {
+      const svg = plotToSvg(tileBlock(form), THEME, tl) ?? "";
+      expect([...svg.matchAll(/text-anchor="end"/gu)].length, `${form} draws no value ticks`).toBe(0);
+    }
+    // The control: a form that does have one still draws it, so a zero above is
+    // a decision rather than a renderer that stopped ticking.
+    const curve = b.plot({ id: "cv", form: "line", height: 6, series: [{ label: "s", values: [1, 4, 2] }] });
+    expect([...(plotToSvg(curve, THEME, tl) ?? "").matchAll(/text-anchor="end"/gu)].length)
+      .toBeGreaterThan(0);
+  });
+
+  it("G6d7: no hierarchy is a refusal, because the terminal draws its other arm", () => {
+    // flame and icicle fall back to legacyDepthBars without one — a bar chart of
+    // depths, which is the bar family's geometry. **Both corpora pick that
+    // arm**: ONE_PER_FORM and the catalogue's default variant each give these
+    // two categories + series and no hierarchy.
+    for (const form of ["treemap", "flame", "icicle"] as const) {
+      const bare = b.plot({ id: form, form, height: 6, series: [{ label: "s", values: [3, 2, 1] }] });
+      expect(plotToSvg(bare, THEME, tl), `${form} without a hierarchy`).toBeNull();
+    }
+  });
+});
+
 describe("G7 — the partition itself", () => {
   it("is exhaustive over PlotForm, and every refusal has a reason in the table", () => {
     // **The compiler already proved exhaustiveness** — `satisfies Record<
@@ -667,8 +823,14 @@ describe("G7 — the partition itself", () => {
     //
     // So the guard is here rather than in the mutation pass: a claimed form
     // must put ink on the page.
+    // **`ONE_PER_FORM` is the corpus for the *refused* side and not for this
+    // one**, and family 2 is why: two of the three tile forms have a
+    // representative built on the datum shape the SVG arm does not draw. A
+    // guard that a claimed form puts ink on the page has to hand it the form's
+    // own data, or it measures the corpus rather than the renderer.
     for (const form of supported) {
-      const svg = plotToSvg(ONE_PER_FORM[form], THEME);
+      const made = b.plot({ id: `c-${form}`, form, height: 6, ...datumFor(form) } as Parameters<typeof b.plot>[0]);
+      const svg = plotToSvg(made, THEME);
       expect(svg, `${form} is claimed, so it renders`).not.toBeNull();
       const ink = (svg ?? "").split("\n").filter((l) => /^<(path|rect x|circle)/u.test(l));
       expect(ink.length, `${form} puts ink on the page rather than furniture alone`).toBeGreaterThan(0);

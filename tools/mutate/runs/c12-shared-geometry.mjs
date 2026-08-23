@@ -249,6 +249,50 @@ const results = runPass({
       expect: "G8e",
     },
     {
+      // **The flame and the icicle transposed**, which is family 1's own
+      // mistake one family along: `hierarchyStripRows` takes an `inverted`
+      // flag and the terminal passes `false` for a flame and `true` for an
+      // icicle. Both figures still draw, inside the area, with every band the
+      // right width — the only difference is which end the root is at.
+      name: "a flame and an icicle grow the same way",
+      file: SVG,
+      from: '    const inverted = block.form === "icicle";',
+      to: '    const inverted = block.form !== "icicle";',
+      expect: "G6d3",
+    },
+    {
+      // **The tiles unsorted.** Nesting is drawn by depth ordering — a parent
+      // painted, then its children over it — so an unsorted walk puts a parent
+      // over its own children and the figure loses its structure while every
+      // rectangle stays in the right place.
+      name: "a treemap paints its nodes in walk order rather than by depth",
+      file: SVG,
+      from: "      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);",
+      to: "      const placed = tiles(root, 1 / Math.max(w, h));",
+      expect: "G6d1",
+    },
+    {
+      // **The inset as a constant.** One pixel at every output size rather
+      // than one pixel's *worth* of the unit square: correct at the size it was
+      // tuned for and a different figure at every other, which is exactly what
+      // `svgLayout`'s fractions exist to prevent (§3aj hazard 3).
+      name: "the treemap's inset stops being a proportion",
+      file: SVG,
+      from: "      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);",
+      to: "      const placed = [...tiles(root, 0.004)].sort((a, b) => a.depth - b.depth);",
+      expect: "G6d4",
+    },
+    {
+      // **A value axis over a figure whose readings are areas.** Furnished out
+      // of `seriesRange([]) ?? {0, 1}`, so it draws 0 · 0.25 · 0.5 · 0.75 · 1
+      // beside tiles — which is what the frame caught and no row did.
+      name: "the tiles family gets a value axis",
+      file: SVG,
+      from: '  if (family !== "matrix" && family !== "tiles" && rule !== undefined && label !== undefined) {',
+      to: '  if (family !== "matrix" && rule !== undefined && label !== undefined) {',
+      expect: "G6d6",
+    },
+    {
       // **This row replaces one that survived, and the survivor was right.**
       //
       // *A form with its own geometry falls back to a family instead of

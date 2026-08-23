@@ -211,12 +211,40 @@ const fixture = (form) => {
   return { ...variants[key], id: form };
 };
 
+/**
+ * The first variant this arm can actually draw, or the default.
+ *
+ * **`flame` and `icicle` have two datum shapes and every fixture in both
+ * corpora picks the other one.** Their default variant carries `categories` +
+ * `series` — the terminal's `legacyDepthBars` — and the SVG arm draws the
+ * *tiles*, which come from `hierarchy`. So a claimed form produced no
+ * side-by-side at all, and the sheet showed the arm working for one of the
+ * three forms it had claimed.
+ *
+ * Choosing by *can this be drawn* rather than by name is the fix, and it says
+ * what it skipped rather than quietly picking: a form with no drawable variant
+ * still falls through to `default` and lands in the refused list, which is the
+ * honest answer.
+ */
+const drawableFixture = (form, variants) => {
+  for (const [name, spec] of Object.entries(variants)) {
+    const { id: _drop, cursor: _c, ...rest } = spec;
+    try {
+      if (plotToSvg(block({ kind: "plot", id: form, ...rest }), theme, layout) !== null) {
+        return { ...spec, id: form, variant: name };
+      }
+    } catch { /* a variant the builder refuses is not a candidate */ }
+  }
+  return { ...fixture(form), variant: "default" };
+};
+
 const supported = Object.entries(SVG_FAMILY).filter(([, f]) => f !== null);
 const refused = Object.entries(SVG_FAMILY).filter(([, f]) => f === null).map(([f]) => f);
 
 const layout = svgLayout(560, 260);
 for (const [form] of supported) {
-  const spec = fixture(form);
+  const variants = CATALOGUE_FORMS[form] ?? {};
+  const spec = drawableFixture(form, variants);
   const { id: _drop, ...rest } = spec;
   const blk = block({ kind: "plot", id: form, ...rest });
   const cells = draw(blk, capsBy["24bit"], 68);
