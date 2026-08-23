@@ -1,0 +1,7 @@
+── tree · overflow-outline · 1bit · 80w
+root
+├── render
+│   ├── curve
+│   │   ╰── raster
+│   ╰── paint
+[1m+4 more · layout · measure · wrap · parse[22m

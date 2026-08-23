@@ -1,0 +1,8 @@
+── graph · crowded · wide · 60w
+                         service-02
+                             │
+                         service-03
+                             │
+                         service-04
+
+[38;2;212;179;90m+11 more · service-14 · service-01 · service-13 · service-1…[39m

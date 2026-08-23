@@ -13165,3 +13165,36 @@ one population leaves the other's digest alone; `CH5` asserts the empty case, be
 is `e3b0c44298fc1c14…` and **prints exactly like an answer** — the frame count is the only thing
 that distinguishes a clean population from one the tool could not see, which is F257's one bit
 inside the tool built to fix it.
+
+---
+
+## F265 — a clamp that cannot fire, found by the gate built to prove nothing moved ★★☆☆☆
+
+**Measured while certifying T1, the terminal baseline fixture.** A fixture is not verified by
+being written; it is verified by breaking the thing it covers and watching it fail. So
+`reservedFor`'s width clamp was mutated — `Math.min(width - 1, legendWidth(…))` reduced to
+`legendWidth(…)` — as a case the *catalogue* cannot construct, because the catalogue takes one
+width per capability set and this branch is about narrow rows.
+
+**It survived everything.** 4480 unit, contract, edge and integration rows; 382 golden rows;
+**1780 baseline frames across five capability sets and two widths.** Nothing moved.
+
+**And the reason is not coverage.** `legendWidth` already ends `Math.min(longest + gaps,
+Math.floor(width / 3))`, and `floor(w / 3) ≤ w - 1` for every `w ≥ 1`. So the outer clamp is
+**dead arithmetic**: it can only be reached at `width: 0`, which no caller produces.
+
+**This is the same class the SVG arm produced two commits earlier** — `normalisedOf(range.min, …)`
+is `1` by construction, so the expression was `box.bottom` written the long way round, and there
+too a mutation that changed nothing is what said so. **A guard that cannot fire reads exactly like
+a guard that does**, and the next reader trusts it: the comment in `reservedFor` explains what is
+reserved and the clamp beneath it implies a case where the legend outgrows the row.
+
+**Not fixed here, deliberately.** §6b of the arm unification pass says the terminal arm does not
+change during the pass, and a no-op removal is still a change to its source inside a commit whose
+whole claim is *nothing moved*. Removing it moves no frame — which is the point, and also why it
+can wait. **Recorded now because the mutation that found it will not be run again.**
+
+**And it is not an argument against the baseline.** The fixture was built to reach cases the
+golden suite does not construct, and this branch is reachable by neither because it is reachable
+by nothing. What the run measured is the fixture's floor, not its ceiling: 1780 frames compared,
+0 moved, and a *stated* reason the mutation was invisible rather than an unexamined green.

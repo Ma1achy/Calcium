@@ -1,0 +1,4 @@
+── tree · overflow-left-right · wide · 40w
+root──render┬─curve──raster
+            ╰─paint
+[38;2;212;179;90m+4 more · layout · measure · wrap · par…[39m

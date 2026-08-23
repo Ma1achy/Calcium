@@ -112,6 +112,46 @@ export function clearGenerated(dir) {
 }
 
 /**
+ * The catalogue's width policy — **one width per capability set.**
+ *
+ * The wide arm draws every ambiguous glyph two cells, so a figure needs the
+ * narrower frame to stay inside a comparable footprint. `ascii` is narrow and
+ * takes the ordinary width, which it never could before.
+ */
+export const CATALOGUE_WIDTHS = (capsName) => [capsName === "wide" ? 60 : 80];
+
+/**
+ * Every form × variant × capability set × width, as frames — **the loop, once.**
+ *
+ * `frameFor` already exists so that nobody renders a second way; this exists so
+ * that nobody *enumerates* a second way. The catalogue and the terminal baseline
+ * want the same corpus at different widths, and the difference between them is
+ * `widthsFor` and nothing else. A second copy of this loop is how the two corpora
+ * come to disagree about which forms they cover, which is the drift
+ * `CATALOGUE_FORMS` was made a `Record<PlotForm, …>` to stop one level up.
+ *
+ * **The header is part of the frame**, so a frame that moved between widths is
+ * not silently comparable with one that did not.
+ */
+export function* everyFrame(widthsFor = CATALOGUE_WIDTHS) {
+  for (const [formName, variants] of Object.entries(FORMS)) {
+    for (const [variantName, spec] of Object.entries(variants)) {
+      for (const { name: capsName, caps } of CAPS) {
+        for (const width of widthsFor(capsName)) {
+          const id = `cat-${formName}-${variantName}`;
+          const lines = frameFor(spec, caps, width, id);
+          const header = `── ${formName} · ${variantName} · ${capsName} · ${width}w`;
+          yield {
+            formName, variantName, capsName, width,
+            frame: [header, ...lines].join("\n"),
+          };
+        }
+      }
+    }
+  }
+}
+
+/**
  * Every form x variant x capability set, written to `docs/catalogue/`.
  *
  * **Exported rather than left inside the `isMain` guard**, for the same reason
@@ -128,24 +168,11 @@ const stale = clearGenerated(outDir);
 
 let totalFiles = 0;
 
-for (const [formName, variants] of Object.entries(FORMS)) {
-  for (const [variantName, spec] of Object.entries(variants)) {
-    for (const { name: capsName, caps } of CAPS) {
-      const id = `cat-${formName}-${variantName}`;
-      // The wide arm draws every ambiguous glyph two cells, so a figure needs
-      // the narrower frame to stay inside a comparable footprint. `ascii` is
-      // narrow and takes the ordinary width, which it never could before.
-      const width = capsName === "wide" ? 60 : 80;
-      const lines = frameFor(spec, caps, width, id);
-      const header = `── ${formName} · ${variantName} · ${capsName} · ${width}w`;
-      const frame = [header, ...lines].join("\n");
-
-      const basename = `${formName}-${variantName}-${capsName}`;
-      writeFileSync(join(outDir, `${basename}.txt`), frame + "\n");
-      writeFileSync(join(outDir, `${basename}.plain`), stripSgr(frame) + "\n");
-      totalFiles += 2;
-    }
-  }
+for (const { formName, variantName, capsName, frame } of everyFrame(CATALOGUE_WIDTHS)) {
+  const basename = `${formName}-${variantName}-${capsName}`;
+  writeFileSync(join(outDir, `${basename}.txt`), frame + "\n");
+  writeFileSync(join(outDir, `${basename}.plain`), stripSgr(frame) + "\n");
+  totalFiles += 2;
 }
 
 console.log(`catalogue: ${totalFiles} files written to docs/catalogue/ (${stale} stale cleared first)`);

@@ -1,0 +1,7 @@
+── contour · flat · ascii · 40w
+[2mrow0 +[22m
+[2mrow1 +[22m
+[2mrow2 +[22m
+[2mrow3 +[22m
+      [2m0               7               15[22m
+[2m50 .:-=+*#@ 50 - [22m

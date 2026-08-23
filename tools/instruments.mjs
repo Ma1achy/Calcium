@@ -79,6 +79,13 @@ const COVERED = [
   // and splitting the answer across two files is what the header argues against.
   ["tools/plot-catalogue.mjs", ["npx", "vitest", "run", "test/unit/plot-catalogue.test.ts"]],
   ["tools/catalogue-png.mjs", null], // same fixture — the catalogue pipeline
+  // **Its fixture is a golden row rather than a unit one**, because what this
+  // instrument owes is not arithmetic — it is *the comparison responds to a
+  // frame that moved*, and that can only be asked of the corpus it writes.
+  // `TB5` corrupts a frame in a temporary directory and requires the diff to
+  // name it; `TB1`–`TB4` assert the count, the set equality and that the rungs
+  // are constructed at all.
+  ["tools/terminal-baseline.mjs", ["npx", "vitest", "run", "test/golden/terminal-baseline.test.ts"]],
   // Covered by that same fixture all along — `plot-catalogue.test.ts` imports
   // `CATALOGUE_FORMS` and compares it against `ALL_FORMS` by equality. It was
   // simply not *seen*, being a `.ts`. See the note on `SUFFIX`.
