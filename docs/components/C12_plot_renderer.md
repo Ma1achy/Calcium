@@ -4334,6 +4334,171 @@ for flame or icicle exercises a hierarchy with no nesting, so *it draws somethin
 while the figure is a single strip. **A guard that a claimed form puts ink on the page is satisfied
 by one rectangle.**
 
+## 3ak. One figure, two renderers — the seam moves up a level
+
+**§3aj built two rasterisers over one geometry. Measured against what shipped, what is shared is
+*coordinates*** — `normalisedOf`, `normalisedSummary`, `flatten`, `graphLayers` — **and everything
+above them is decided twice.**
+
+**The measurement is the specification, and it is `test/unit/plot-arm-disagreement.test.ts`.** Every
+form, every variant, both widths, at 24-bit: **73 of 135 cells over the 27 forms the SVG arm claims
+disagree, 59 of them everywhere.** Not three defects found by building — five decisions found by
+looking, disagreeing almost universally:
+
+```
+numericLabels   which ticks, how many, and how they are formatted   ALL on every ticked form
+identityLabels  the categories, rows, series and nodes named        ALL on matrix · tiles · bar · distribution
+border          the terminal frames the area; the SVG draws none    ALL on every ticked form
+interiorRules   the SVG rules every tick; the terminal rules none   ALL on every ticked form
+legend          the terminal has one; the SVG has none at all       partial, where the terminal draws it
+```
+
+**And the sharpest one is not in that table**, because no single decision holds it: the terminal
+rasterises against the **niced** range and the SVG against the **raw** one. A `line` of `1 3 2 5 4`
+spans 0–6 in the terminal and 1–5 in SVG, so the first sample sits on the bottom edge in one arm
+and floats in the other. The same data at two different scales, which is not a rasterisation
+difference.
+
+**Three families reached the same wrong answer separately**, which is the seam being in the wrong
+place stated as plainly as it can be: `matrix`, `tiles` and `nodes` each furnished a value axis out
+of `seriesRange([]) ?? {0, 1}` over a figure whose readings are colours, areas and positions. Three
+renderers, three commits, one defect.
+
+### 3ak.1 — What the sketch got right, and the six things measuring changed
+
+`CALCIUM_ARM_UNIFICATION.md` §3 sketches `Mark`, `Drawn` and `GlyphRole` *to be measured against
+what the two renderers actually need rather than adopted as written*. Measured, four of its rulings
+hold and six things change.
+
+**Holds**: positions normalised and uninverted, with the inversion applied twice from one decision;
+`GlyphRole` rather than a glyph, as an exhaustive `Record` so a missing rung is a compile error;
+`ref` unresolved, so each arm calls `resolve()` at its own depth; and one emitter per family rather
+than per form.
+
+**1 · `arc` has no consumer, so it is not in the type.** `pie` and `radar` are refused by
+`SVG_FAMILY` and nothing else draws one. A member nothing draws is the class MG25 refuses and the
+class §3e's deferral was avoiding — it arrives with the proportion family or not at all.
+
+**2 · `circle` is not a mark the terminal has.** A terminal point is *one cell*; there is no radius
+to give it. So `circle` collapses into `point`, carrying a `GlyphRole` and an optional **normalised
+`size`** — because a bubble's radius is *data* and must cross the seam, while a scatter dot's radius
+is the SVG's own rasterisation and must not.
+
+**3 · `role` is two different things wearing one name.** The sketch puts
+`role: "series" | "furniture" | "annotation" | "label"` on `Drawn` **and** `GlyphRole` on the glyph
+mark. One is *which layer this belongs to*; the other is *which shape this is*. That is MG24's own
+collision class, in the type built to end a class of collision. The first becomes `layer`.
+
+**4 · Two operations the ruling names do not exist in the form it needs.** `Axis` is
+`{ range, ticks, step }` and carries **no formatted strings** — the strings come from `yLabels`,
+which also takes the row count, so *the numbers* and *how they print* are computed in different
+places from different inputs. And `LegendEntry` is `{ mark: string; label; ref }`, where `mark` is
+an **already-resolved terminal glyph**: precisely what must not cross the seam. Both are named here
+before the ruling is written down, which is C23 §8a A4's own finding: *an artefact can be
+correct about the interaction it found and wrong about a mechanism it assumed existed.*
+
+**5 · The types the figure needs live in the terminal's own module, and taking them would make a
+cycle.** `FrameStyle` and `LegendEntry` are exported by `furniture.ts`, and `furniture.ts` is what
+reads the figure back. `figure.ts` importing them while `furniture.ts` imports `figure.ts` is a
+cycle **inside L1**, which is what A02 §1 forbids and MG1 and MG22 implement. So the shared shapes
+move down into `figure.ts` and `furniture.ts` imports them, rather than the reverse.
+
+**6 · §2's *the same labels dropped* and §3aj hazard 4 cannot both hold, and hazard 4 wins.** The
+terminal drops a label by measuring it with `cells()`; the SVG cannot measure text at all, which is
+the whole reason its layout is fractions. So the two arms cannot agree about *which* labels fit.
+What they can agree about is **how much room a label has**, stated in normalised units — the
+threshold is shared and the outcome is each arm's. Measured: a `treemap` where the terminal names
+five tiles and the SVG names eight. **§2 overstates, and the type expresses the threshold rather
+than the outcome.**
+
+### 3ak.2 — The type
+
+```ts
+type GlyphRole = "point" | "median" | "mean" | "outlier" | "cap" | "target" | "absent";
+
+type Mark =
+  | { kind: "polyline"; points: readonly Pt[]; closed?: boolean }
+  | { kind: "rect"; x: number; y: number; w: number; h: number; fill?: boolean }
+  | { kind: "point"; x: number; y: number; role: GlyphRole; size?: number }
+  | { kind: "text"; x: number; y: number; text: string; anchor: Anchor; room: number };
+
+type Drawn = Readonly<{
+  mark: Mark;
+  layer: "series" | "furniture" | "annotation" | "label";
+  seriesIndex?: number;   // the CATEGORICAL slot, unresolved
+  ref?: ColourRef;        // or an explicit slot, unresolved
+}>;
+
+type Figure = Readonly<{
+  value: ValueAxis | null;              // niced range, ticks, AND the formatted strings
+  identity: readonly string[];          // categories, rows, series or nodes, in order
+  orientation: "horizontal" | "vertical";
+  facing: Facing;                       // decided once, applied twice
+  frame: FrameStyle;
+  legend: readonly LegendSlot[];        // { role | seriesIndex, label, ref } — never a glyph
+  marks: readonly Drawn[];              // normalised, uninverted, refs unresolved
+}>;
+```
+
+**`value: null` is the three-families fix and it is the member doing the most work.** A `matrix`
+reads its values as colours, a `tiles` figure reads them as areas and a `nodes` figure reads them as
+structure. None has readings on an axis, so none gets one — and saying that once is what stops a
+fourth renderer furnishing a fifth false axis out of `{0, 1}`.
+
+**`room` on a text mark is normalised, and it is finding 6 in one field.** The shared layer says
+*this label has this fraction of the figure*; the terminal turns that into cells and truncates, the
+SVG turns it into a `clipPath`. Neither arm decides the allowance and neither shares the outcome.
+
+### 3ak.3 — The rungs are decided after the figure, and that is where a diamond becomes a comma
+
+**`Figure` is capability-independent by design and the terminal's rendering is not.** Every rung
+below is a decision the terminal makes *on* a figure, in its projection, and every one is a place
+where *the shared layer now says a diamond* can quietly become a different character:
+
+| rung | what it changes | where it lives after the pass |
+|---|---|---|
+| the glyph per `GlyphRole` per unicode rung | `◈` · `+` · `*` | the terminal walker's `Record` |
+| `CATEGORY_MARKS` below the colour floor | identity carried by shape | `markOf` at projection |
+| stacked strips at 1-bit | the whole answer for a multi-series plot | `stackedRows`, untouched |
+| the truncation ladder | which labels fit `room` | `labelAllowance` at projection |
+| the `+N` notices | the count and the wording | `calloutInto` at projection |
+| the `ambiguousWidth` arms | narrow-only sets falling to their ASCII pair | `glyphs()` at projection |
+
+**The SVG arm has none of them**, which is §3aj hazard 5 restated: it is always 24-bit and always
+`unicode: "full"`. So a form whose terminal answer *is* a rung — a 1-bit stacked strip — draws the
+24-bit answer in SVG and never the fallback, and the two arms are **not byte-comparable below
+24-bit**. Every cross-arm assertion compares at 24-bit or compares the figure.
+
+### 3ak.4 — Both walk artefacts, and they cover different halves
+
+CLAUDE.md's rule is that a **table** finds structural interactions — two rules holding at rest — and
+a **trace** finds event-mediated ones. This component has both kinds and therefore owes both.
+
+- **Artefact A is the disagreement matrix**, and it is a table: every cell is *this form is a bar
+  chart* meeting *this decision is which way the value axis runs*, true standing still, with no
+  event between them. Committed as `test/unit/plot-arm-disagreement.test.ts`, 135 cells.
+- **Artefact B is the rung ladder**, and it is a trace: the capability set supplies the events, and
+  the question is which decisions survive a rung and which change. It is U6, and it doubles as the
+  degradation audit this component has never had.
+
+**Taking the table alone because the type is the obvious thing is how the rung half goes
+unexamined**, which is the mistake C19 §8a records: a trace indexed by events cannot reach a
+structural interaction however many rows it has, and C18's table was already in the repository.
+
+### 3ak.5 — What a refusal leaves behind
+
+**`figureOf` is total and never throws.** I2 says no series input throws, and a figure is one level
+above the rasteriser it feeds — a throw here would abandon a half-built figure in a component whose
+whole claim is that both arms read the same one.
+
+**A refusal is a figure with no marks**, which is F259's ruling arriving as a type: *refuse a false
+figure, record an incomplete one*. `plotToSvg` already returns `null` on an empty body and keeps
+doing so; the terminal already draws its empty rows and keeps doing that. **The two arms refuse
+differently and that is legitimate** — what must be identical is *whether there was anything to
+draw*, and after this pass there is one answer to that question instead of two.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -5572,6 +5737,12 @@ orientation — and belongs in the classification table as its own rows.
 - **I56** — **The abscissa is named in one declared row beneath its labels, and the forms that can carry one were measured rather than reasoned about.** `xTitle?: string`, drawn centred over the **plot area** — `layout.gutter` is the whole left offset, which is what `xLabelRowFor` one row above uses — truncated and never wrapped, because a second row would change a declared height (I1). **Below the labels and never above them**: the labels are the scale, and a name between a scale and the thing it measures separates the two. **The row is added by `titleRows` centrally**, on `legendRows`' recorded reason — every form that draws one pays it the same way, and thirty-six entries each adding the same term is thirty-six chances to forget one. **`HAS_X_TITLE` is total over `PlotForm` and every value in it was measured**: each form was rendered with a title and the frame searched for it, giving **26 true and 18 false** — and **16 of those 18 also broke `measure === rendered`**, because the row was declared and nothing composed it. So the record is not a taste, it is what keeps I1, and the **refusal is the mechanism**: a `true` in the wrong place is a block whose declaration and drawing disagree. *The matrix family is a named gap and not an omission* — a heatmap draws a column-label row a title could sit under, and wiring it is a change to that family's compositor. **`axes: false` is refused**, because a title for an axis that is not drawn names nothing and the alternative is a second placement rule for one member. **There is no `yTitle`**: rotated it is a column of single letters no terminal reader parses, horizontal above the gutter it is `xLabels`' shape and a second title member — and **a y-axis title is a heading, which C09 already has**, costing the same row and reusable by every kind. *The first draft offset the row by `labelColumn + AXIS_GUTTER` on top of the gutter and pushed it four cells right, off the area's centre and past its right edge into `clampSpans`' ellipsis; a row-width assertion cannot see that, because the row is exactly `width` either way* (§3ag).
 - **I57** — **A tree is one drawing in three layouts, chosen to fit and never as a rung.** `tree` is the fourth reading of `hierarchy` and the first whose subject is structure rather than magnitude: it takes `label` and `children`, and **`value` is ignored** — optional on the node for it (C04 I64), with the answer beside the ruling in the member's own doc, because *put it in the name* costs nothing and a bare refusal leaves *a field that does nothing* reading as one not yet implemented. **Top-down Reingold–Tilford, left-to-right, and `tree(1)`'s indented outline**, with natural sizes `2·depth + 1` × `W(root)`, `leaves` × `Σ_d max label + 2·depth`, and `nodes` × `max(4·depth + label)` — where **`W(node) = max(cells(label), Σ W(children) + gaps)`**, because a parent's own name can be wider than everything beneath it and then the parent sets the width: measured at 20 columns against a plan formula's 5, with the leaf positions, the depth and the node total agreeing either way. **They are not a ladder, and `HAS_DETAIL_RUNGS.tree` is `false`.** Measured over four trees, the top-down figure is the cheapest of the three in rows on a broad tree (3) and the dearest on a deep one (13) while its columns invert with it, so no ordering by budget exists — **not even one that depends only on the budget**, since which layout is cheapest depends on the tree; and all three draw the same names and the same edges, which is I34's own test for a rung failed three times in the same way. **The choice is `treeLayout` and `"auto"` is a fit**: the first of top-down, left-to-right, outline whose natural size fits both axes, else the one that keeps the most nodes at the budget. **What does not fit is a `warn`-toned row inside the area** (I8), and **the row is spent before the choice rather than after it**, so the notice cannot remove itself by making the drawing fit — §3ag.4's cycle in a second place, ruled the same way. **Truncation runs before placement**, or a surviving parent is centred over a span that includes the subtree that is gone, with every count agreeing; and an edge is derived from the kept set rather than from `children`, which is that defect one pass along and a separate ruling because the first fix does not make the second. A fan is three orthogonal moves through `strokePolyline` and `glyphForMask`, **a fan of one is `│` and never a zero-length bar**, the outline's indent is four cells because `├── ` and `|-- ` both are, and edges are `tone.muted` with no categorical palette — **so I25 has nothing to carry here**, the name being the identity at every depth and drawn at every capability. `hierarchy` absent is refused at both gates and drawn as `emptyRows` on the third path, where a fixture reaches the renderer without passing either (I2).
 - **I58** — **A graph is one drawing in one layout, and the layered pipeline is seven passes rather than the three it is usually named with.** Cycle removal, deduplication, longest-path layering, dummy nodes, ordering, x-coordinate assignment and painting — and *deduplication* is there because reversing `b→a` where `a→b` exists yields the same edge twice, drawn twice and counted twice, which was found by checking the instrument rather than by reading the recipe (F242, §3ai.1). **Two sweeps is a number chosen and best-kept is what makes it safe**: one sweep never hurts and cuts crossings four- to fivefold, two taken plainly is worse than one in a whole family — near-path *n* = 50, mean 36.5 to 38.1, worse in 17 trials of 40 — and keeping the ordering with the fewest crossings seen makes it monotone for one crossing count a sweep. Past two the gain is 3–6% where the first buys 80%, and at the sizes that fit a terminal it is already at the floor. **`force` is refused on the labels alone and the refusal has been moved once**: it rested on `strokePolyline` stepping orthogonally, which is a fact about the tool — `drawLine` strokes arbitrary angles at 2 × 4 — and what stands is 17.4% of label pairs overlapping at a third of the edges present, *n* = 20. **The same question asked of `layered` comes back clean structurally**: a layer's labels sit side by side with a gap, so an overlap is not expressible — zero in 360 graphs — and the failure mode is overflow, which I8's row answers. Its expiry is `shiftInward` and the label taxonomy, written as a symbol because a deferral names a condition and nothing watches it. **The figure does not claim direction**, because an arrowhead needs a glyph the set does not have and `▲`, `↑` and `↓` are ambiguous-width throughout; the layering carries it, and edges the cycle pass reversed are counted in the notice row rather than marked (§3ai.3). **The seventh pass was missing and the figure is what found it** (§3ai.6): every layer was centred on its own width, so a chain whose layers hold different numbers of nodes stepped sideways at each rung — 37, 35, 34 for one four-node chain — and the edges between them drew as staircases between nodes that belong in a column. Arithmetically self-consistent at every count, which is why nothing but reading it could have said so. The remedy is the phase Sugiyama names and the first build skipped: pull each node to the **median** of its neighbours, restore separation without reordering — the ordering pass owns that, and a placement that reordered would throw away the crossings it bought — alternate the sweep direction so neither end is privileged, and centre **once, on the whole figure** rather than per layer.
+- **I59** — **Every decision above the shared coordinate is made once, and both arms read the same one.** Which mark, which orientation, which tick, which label, which furniture, which colour slot and what is dropped are members of a `Figure`; a renderer that computes one of them is a renderer that can disagree. *Measured before the rule: 73 of 135 cells over the 27 forms the SVG arm claims disagreed, 59 of them everywhere — and three of the five decisions disagreed on every ticked form in the corpus.*
+- **I60** — **A form whose readings are not on an axis has no value axis, and the figure says so.** `value` is `null` for the matrix, tiles and nodes families, whose readings are colours, areas and structure. *This is not a tidiness rule: `matrix`, `tiles` and `nodes` each furnished an axis out of `seriesRange([]) ?? {0, 1}` in three separate commits, so a fourth renderer would have furnished a fourth. An absent axis is a decision with a reason, never an omission.*
+- **I61** — **Positions are normalised and uninverted, and the facing is carried rather than assumed.** One decision about which end is zero and which way each axis grows, applied twice. *`svgPoints` passed `invert: true` unconditionally, so all four `origin` values were byte-identical and a block asking for a top-left origin drew flipped in one arm and unflipped in the other.*
+- **I62** — **A mark names a role and a slot, never a glyph and never a colour.** `GlyphRole` is an exhaustive `Record`, so a rung with no entry is a compile error rather than a silently different character; `ref` stays unresolved so each arm calls `resolve()` at its own depth — one resolution rule, two depths.
+- **I63** — **The shared layer states how much room a label has and never measures the label.** `room` is a fraction of the figure; the terminal turns it into cells and truncates, the SVG turns it into a `clipPath`. *§3aj hazard 4 says a shared layout that calls `cells()` cannot serve the image path, so the two arms cannot agree about which labels fit — measured, a `treemap` names five tiles in one arm and eight in the other. The threshold is shared and the outcome is each arm's.*
+- **I64** — **`figureOf` is total, and a refusal is a figure with no marks.** No block throws, because a throw one level above the rasteriser abandons a half-built figure in the component whose claim is that both arms read the same one (I2, one level up). *How each arm refuses stays its own — `null` in SVG, empty rows in the terminal — because what must be identical is whether there was anything to draw.*
 
 ## 8. Commitments
 
@@ -5627,6 +5798,12 @@ orientation — and belongs in the classification table as its own rows.
 50. **The abscissa gets a name, in a row declared before the data and drawn only by the forms that were measured to draw it** — 26 of 44, with the other 18 refused because 16 of them would otherwise declare a row nothing composes; and there is no `yTitle`, because a y-axis title is a heading and C09 has one (I56, §3ag).
 51. **A tree is one drawing in three layouts, chosen to fit** — measured over four trees rather than ordered into a ladder, because the cheapest layout depends on the tree and not on the budget; the choice is a member, the overflow row is spent before the choice so it cannot remove itself, and truncation runs before placement so no parent is centred over a subtree that is gone (I57, §3ah).
 52. **A graph is one form with a layered layout, its pipeline is six passes, and its sweep count is a measured number rather than a recipe** (I58). `force` stays refused on the labels alone, with the label pass named as its expiry; the figure does not claim direction, and the reversed edges are counted rather than marked.
+53. **One figure and two renderers — every decision above the shared coordinate is made once** (I59, §3ak). The seam moves from *value → [0,1]* to *value → a drawing*, and what was three defects found by building is 73 disagreeing cells found by looking.
+54. **A form whose readings are not on an axis is given none, in the type rather than per renderer** (I60, §3ak). Three families furnished a false axis out of an empty range in three separate commits; `value: null` is what stops the fourth.
+55. **The inversion is decided once and applied twice, and the figure carries the facing** (I61, §3ak).
+56. **A mark carries a role and an unresolved slot, so neither arm holds a glyph or a colour** (I62, §3ak). The role table is exhaustive, so a missing rung fails to compile in both arms rather than drawing a different character in one.
+57. **The label allowance crosses the seam and the label does not** (I63, §3ak). §2 asked for the same labels dropped and hazard 4 forbids the measurement that would achieve it; the threshold is shared and the truncation is each arm's.
+58. **A figure is total and a refusal is an empty one** (I64, §3ak). F259's *refuse a false figure, record an incomplete one*, expressed as a type rather than as a clause in two renderers.
 
 ---
 
@@ -5781,6 +5958,17 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.90** (I28): a compact box plot at three categories in twelve rows, and a three-row box in five — the set of rows carrying a box spine and the set carrying a category name are **the same set**. Equality rather than containment, because *every named row has a spine* passes on a frame with spines elsewhere too and *every spine is named* passes on one where a band lost its name. **The glyph took two goes and both misses were furniture**: the median is `│`, which is the plot's right border on every row, and the box's minimum cap is `┤`, which is the gutter's axis tick on every named row by construction. `├` is drawn by the spine and by nothing else in the frame. Not asserted at a row index, which an off-by-one in the offset satisfies when the index is written from the same expression.
 - **T1.88** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
+
+#### The arm unification rows (§3ak, I59–I64)
+
+- **AD1–AD5** (I59, §3ak): **the disagreement matrix, and it is walk artefact A** — every form, every variant, both widths, at 24-bit, with each cell's disposition stated as *the relation the row asserts*: `agree` fails if the arms drift apart, `n/m` fails if it closes silently **or becomes a different disagreement**, `legitimate` fails if they ever start agreeing. Shipped ahead of the type, because the list of disagreements is what the type is designed against. `AD5` corrupts one side and requires the comparison to see it, since a sweep certified only by its own record agrees with itself whatever it does.
+- **U1a** (I59, §3ak): **a decision mutated inside `figureOf` moves BOTH arms.** *The row U1 was written as — `the same block yields an identical Drawn[] for both arms` — is `f(x) === f(x)` the moment one emitter serves both, which is A03 §2's vacuity class arriving in the assertion the pass exists for.* One arm moving alone is the finding: the other still decides it itself.
+- **U1b** (I62, §3ak): **each arm's output is a faithful projection of the figure** — every `Drawn` appears as an element in the SVG and as a glyph at the mapped cell in the terminal. This is what catches *the shared layer says a diamond and the terminal draws a comma*.
+- **U2–U3** (I59, §3ak): identical across every form in `ONE_PER_FORM` and every variant the catalogue holds, including both data shapes where a form has two.
+- **U4** (I62, §3ak): identical across themes, because the refs are unresolved — a theme change moves nothing in the figure.
+- **U5** (I59, §3ak): the SVG arm's figure is identical at every capability set, because it has no ladder.
+- **U6** (I59, §3ak): **the terminal's figure is identical at every capability set, and where its *projection* differs the difference is a stated rung** — which is walk artefact B, the trace, and the degradation audit this component has never had. The capability sets supply the events a table cannot.
+- **T1–T5** (§3ak, §6b): the terminal arm is byte-identical throughout — `TB1`–`TB5` over 1780 baseline frames crossed on width as well as capability set, plus the glyph-per-role, 1-bit strip, truncation-ladder and `ambiguousWidth` rows named in the rung table.
 
 ### Tier 2 — contract / interface
 
