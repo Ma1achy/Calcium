@@ -13345,4 +13345,88 @@ braille, dot grid, glyph ladder and strips to reach five lines of arithmetic. **
 undercuts it, reported because an unreported one becomes a threshold**: `figure.ts`'s closure is
 already 92 modules and 28,268 lines, so that is +11% and +14%, not a clean layer spoiled. The force
 is direction, not size.
+---
+
+## F269 — a claimed form that draws the same picture for every dataset, and the tie-break would have shipped it to both arms ★★★★★
+
+**Found while moving `ecdfSeries` down into the shared layer** — reading the function rather than
+calling it. It sorts its samples into a variable, and reads that variable only for `.length`:
+
+```ts
+const sorted = [...finite].sort((a, b) => a.v - b.v);
+const n = sorted.length;
+for (let i = 0; i < n; i++) values.push((i + 1) / n);
+```
+
+**`ecdfSeries` is a function of `values.length` and of nothing else.** The sort is dead. And `x`
+comes from the sample *index* — `columnsOf` places a column per position — so the frame is a fixed
+staircase from bottom-left to top-right at every dataset of a given size. Read at 44 × 8, full
+capabilities:
+
+```
+[5, 1, 4, 2, 3]  and  [1, 1, 1, 1, 100]   →   byte-identical frames
+```
+
+**A chart of nothing, framed, gridded, gutter-labelled `0.0 0.5 1.0` and axis-labelled `0 1 2 3 4`.**
+
+### The class, swept
+
+178 catalogue form·variant pairs rendered twice with every finite number under a data key moved by a
+position-varying factor. **16 frames did not move — and 15 of those had *no number to perturb*.**
+Eight `empty` variants, whose subject is having no data, and the `tree` and `graph` fixtures, whose
+data is structure (`value` is ignored on a tree by design, C12 I57). Those rows were never asked a
+question, and without the count they read exactly like passes.
+
+**One form was asked and did not answer**: `ecdf/default`, 11 numbers changed, not one cell moved.
+
+That split is the instrument's own control and it is `test/support/README.md`'s rule arriving where
+it matters most — *a fixture must be shown to respond to the thing under test.* A sweep reporting
+*sixteen insensitive forms* would have been 15/16 wrong.
+
+### Why nothing had caught it
+
+**`G7b` passes.** *A claimed form must put ink on the page* — `ecdf` puts plenty. The next rung is
+whether the ink moves when the data does, and no instrument here could reach it: a golden frame
+records whatever is drawn, walk artefact A compares labels and furniture, and a mutation on dead
+code fails nothing **by construction**. The one signal that existed — a `sort` whose result is
+unused — is the kind a reader skims.
+
+### The mutation pass found a second defect masking the first
+
+Mutating `ecdfSeries` to push `sorted[i].v` — making it plainly data-dependent — **changed no frame
+and failed no row.** The reason is the dispatch entry two files away:
+
+```ts
+ecdf: (block, …) => positionalForm({ …block, yMin: block.yMin ?? 0, yMax: block.yMax ?? 1 }, …)
+```
+
+The axis is **pinned to 0…1**, so any real value clamps to the ceiling and every sample lands on the
+top row. **Two independent defects, each sufficient on its own to make the frame constant** — so
+anyone repairing the derivation, re-rendering and seeing nothing move concludes the derivation was
+not the problem. *Two blockers read as one, and a correct fix changing nothing observable is the
+signal.*
+
+The complete repair — the empirical CDF evaluated on a **uniform grid over the data range**, which
+keeps `y` a fraction and makes the pin correct — moves the frame and fails `DS1` and `DS4` as it
+should. That is `densitySeries`' own mechanism one form along, and it is why this is a *figure* to be
+decided rather than a line to be patched.
+
+### What it says about this pass
+
+**The tie-break is *if the arms disagree, the terminal is right by default*, and here it is not.**
+F268 records `ecdf` as one of two forms where the arms draw different charts, and the terminal's is
+the constant one. Unifying on the default would have propagated a chart of nothing into the second
+arm — **agreement is not correctness**, with a number behind it for the first time.
+
+**And it does not change the ruling**, which is worth stating because the temptation is to refuse the
+form. After unification the two arms draw the *same* wrong figure, and one repair fixes both; today
+they draw two different wrong figures, and the repair would have to be made twice and would still
+leave them disagreeing. Closing the class beats closing the instance even when the class is wrong.
+
+**Not fixed here.** The unification pass freezes the terminal arm for its duration, and the repair is a decision about
+what `ecdf` draws — including the x axis, where `density` has the milder half of the same defect: it
+resamples to 100 points and labels the axis `0 … 99` instead of the data's `10 … 90`. **A derived
+series changes what `x` means and nothing tells the axis** — one mechanism, two severities. Owed as a
+C12 ruling after the pass.
+
 

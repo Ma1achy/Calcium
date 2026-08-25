@@ -4642,6 +4642,50 @@ is also why the emitters land per family rather than per decision** — a family
 in which the cells are jointly satisfiable, and the plan's step 3 was already shaped that way for a
 reason this walk has now measured.
 
+### 3ak.8 — Agreement is not correctness, and the tie-break has one measured counterexample
+
+**The pass's tie-break is *if the arms disagree, the terminal is right by default*.** It is the right
+default — the terminal arm is fourteen thousand lines with a golden corpus, a capability ladder and
+five years of frames read — and §3ak.7 found the case where it is wrong.
+
+`ecdfSeries` returns `(i + 1) / n` for every index and reads its own `sort` only for `.length`. It is
+a **function of the sample count and of nothing else**, and `x` comes from the sample index, so the
+terminal draws one fixed staircase for every dataset of a given size. Measured at 44 × 8, full
+capabilities: `[5, 1, 4, 2, 3]` and `[1, 1, 1, 1, 100]` are byte-identical frames (F269).
+
+**Unifying on the default would have propagated a chart of nothing into the second arm.** That is
+what makes this the tie-break's counterexample rather than another defect: the rule is about which
+arm to copy, and here neither is right.
+
+> **And the ruling does not change.** After unification both arms draw the *same* wrong figure and
+> one repair fixes both; today they draw two different wrong figures, so a repair must be made twice
+> and still leaves them disagreeing. **Closing the class beats closing the instance even when the
+> class is currently wrong** — what unification buys is that there is one figure to correct, which is
+> the whole claim of the pass stated against its least flattering case.
+
+**Two defects, each sufficient, and the mutation pass is what separated them.** Making `ecdfSeries`
+plainly data-dependent moved no frame and failed no row, because the dispatch entry pins
+`yMin: 0, yMax: 1` and any real value clamps to the ceiling. *Two blockers read as one, and a correct
+fix changing nothing observable is the signal.* The complete repair — the empirical CDF on a uniform
+grid over the data range, which keeps `y` a fraction and makes the pin right — is `densitySeries`'
+own mechanism one form along, and it is a decision about what `ecdf` **draws** rather than a line to
+be patched.
+
+**`density` has the milder half of the same mechanism.** It resamples to 100 points and the x axis
+reads `0 … 99` where the data spans `10 … 90`: **a derived series changes what `x` means and nothing
+tells the axis.** One mechanism, two severities, and both owed as a C12 ruling after the pass — the unification pass
+freezes the terminal arm for its duration.
+
+**The instrument is `DS1`–`DS4`, and its exemption split is 15 of 16.** Swept over 178 catalogue
+form·variant pairs: 16 frames did not move when their numbers did, and **fifteen had no number to
+perturb** — the `empty` variants, and `tree` and `graph`, whose data is structure. Those rows were
+never asked a question and read exactly like passes; without the count the sweep would have reported
+sixteen offenders and been wrong about fifteen. `G7b` asks whether a claimed form puts ink on the
+page and `ecdf` passes it; **this is the next rung, and it is the rung no other instrument here can
+reach** — a golden frame records whatever is drawn, artefact A compares labels and furniture, and a
+mutation on dead code fails nothing by construction.
+
+
 ---
 
 ## 3q. One value axis across the bands, and the record it never had
@@ -5889,6 +5933,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I63** — **The shared layer states how much room a label has and never measures the label.** `room` is a fraction of the figure; the terminal turns it into cells and truncates, the SVG turns it into a `clipPath`. *§3aj hazard 4 says a shared layout that calls `cells()` cannot serve the image path, so the two arms cannot agree about which labels fit — measured, a `treemap` names five tiles in one arm and eight in the other. The threshold is shared and the outcome is each arm's.*
 - **I64** — **`figureOf` is total, and a refusal is a figure with no marks.** No block throws, because a throw one level above the rasteriser abandons a half-built figure in the component whose claim is that both arms read the same one (I2, one level up). *How each arm refuses stays its own — `null` in SVG, empty rows in the terminal — because what must be identical is whether there was anything to draw.*
 - **I65** — **A form whose datum is derived derives it once, above both arms.** `ecdf` replaces its samples with a sorted cumulative fraction and `density` replaces five of them with a hundred kernel estimates; both answer *what is drawn* and never *how*, so a derivation one renderer can reach and the other cannot is a second figure rather than a second rasterisation. *Measured before the rule: for one block the terminal drew `[0.2 … 1.0]` over 0–1 and the SVG drew `5 1 4 2 3` over 1–5 — an ECDF that descends, and a density plot with no density in it. Both functions were pure, written and living in rasteriser modules, which is the one place the second arm could not reach them (F268).*
+- **I66** — **A claimed form's frame is a function of its data.** A form the renderer accepts draws something that changes when its readings change; ink on the page is `G7b`'s rung and this is the one above it. *Measured before the rule: `ecdf` draws one fixed staircase for every dataset of a given length — `ecdfSeries` reads its own `sort` only for `.length` — and the sweep that found it reports 16 unmoving frames of 178, of which **15 had no number to perturb** and were never asked (F269). A fixture that cannot answer reads exactly like one that answered well.*
 
 ## 8. Commitments
 
@@ -5951,6 +5996,7 @@ orientation — and belongs in the classification table as its own rows.
 57. **The label allowance crosses the seam and the label does not** (I63, §3ak). §2 asked for the same labels dropped and hazard 4 forbids the measurement that would achieve it; the threshold is shared and the truncation is each arm's.
 58. **A figure is total and a refusal is an empty one** (I64, §3ak). F259's *refuse a false figure, record an incomplete one*, expressed as a type rather than as a clause in two renderers.
 59. **The datum a form draws is derived once, above both renderers** (I65, §3ak.7). A derivation inside one arm's dispatch table is a figure the other arm cannot reach: `ecdf` and `density` drew their raw samples in SVG while the terminal drew a cumulative fraction and a kernel estimate — D14's shape found a second time, by walking a family rather than a form.
+60. **A form that is drawn is drawn from its data, and a sweep says so rather than a reader** (I66, §3ak.8). `G7b` asks whether a claimed form puts ink on the page; `ecdf` passes it and draws the same picture for every dataset. The rung above is the one a golden frame, a disagreement matrix and a mutation on dead code all structurally cannot reach.
 
 ---
 
@@ -6106,9 +6152,10 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.88** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
 
-#### The arm unification rows (§3ak, I59–I65)
+#### The arm unification rows (§3ak, I59–I66)
 
 - **FV1–FV3** (I60, §3ak): **`HAS_VALUE_AXIS`' true direction over the corpus** — a form marked `false` never draws a numeric gutter label, at both widths and every capability set, with the count of forms checked reported rather than assumed. **`FV1` failed on the commit that introduced it**, four offenders, against a record its own author had just written (F267). `FV2` refuses the converse — a form marked `true` need draw no numeric label, because whether the gutter holds values is orientation and rung — and `FV3` pins the strings the axis carries, so the arm that stopped computing them cannot start again.
+- **DS1–DS4** (I66, §3ak.8): **every catalogue fixture rendered twice, with its numbers moved by a position-varying factor** — a uniform scale leaves a normalised figure identical and a reversal leaves a histogram identical, and neither is a defect. `DS2` is the row that makes `DS1`'s number mean anything: the exempt set is the fixtures with **nothing to perturb**, compared by equality, and it is 15 of the 16 unmoving frames. `DS3` is the fabricated violation — a comparison that never reports equality reports every form as moving, on any corpus. `DS4` names `ecdf`'s mechanism, so a repair that moves the frame for the wrong reason still has to face it.
 
 - **AD1–AD5** (I59, §3ak): **the disagreement matrix, and it is walk artefact A** — every form, every variant, both widths, at 24-bit, with each cell's disposition stated as *the relation the row asserts*: `agree` fails if the arms drift apart, `n/m` fails if it closes silently **or becomes a different disagreement**, `legitimate` fails if they ever start agreeing. Shipped ahead of the type, because the list of disagreements is what the type is designed against. `AD5` corrupts one side and requires the comparison to see it, since a sweep certified only by its own record agrees with itself whatever it does.
 - **U1a** (I59, §3ak): **a decision mutated inside `figureOf` moves BOTH arms.** *The row U1 was written as — `the same block yields an identical Drawn[] for both arms` — is `f(x) === f(x)` the moment one emitter serves both, which is A03 §2's vacuity class arriving in the assertion the pass exists for.* One arm moving alone is the finding: the other still decides it itself.
