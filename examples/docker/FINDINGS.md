@@ -13642,6 +13642,57 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F279 — the sweep checks the half of a mutation that did not move ★★★★☆
+
+**A mutation row is a pair and the instrument reads one side of it.** `anchors.mjs` extracts
+`{file, from}` from every run, confirms `from` appears in `file` exactly once, and reports
+`942 anchors · no drift`. Nothing looks at `to`.
+
+**Re-anchoring is exactly the operation that breaks the half nobody checks.** Step 4 moved the tiles
+family's growth direction out of `svg.ts` and into the figure's facing, so the row *a flame and an
+icicle grow the same way* changed `file:` and `from:`. Its `to:` kept the old arm's replacement:
+
+```js
+file: FIGURE,
+from: '    facing: facingOf(block, block.form === "flame" ? FACING_DEFAULT : FACING_MATRIX),',
+to:   '    const inverted = block.form !== "icicle";',      // ← the SVG arm's line
+```
+
+which splices a statement into an object literal. Every suite failed to *transform*, so the run
+produced no summary at all — and `anchors.mjs` had swept clean minutes before, because `from` was
+perfect.
+
+**The harness caught it and the sweep could not.** `ran()` exists for a different reason — a suite
+piped into `grep -q` taking SIGPIPE mid-pass — and it is what stood between a syntax error and a
+report reading `SURVIVED`. That is the right outcome and the wrong instrument: the sweep runs in
+seconds inside `make test`, the pass runs in minutes and is not in the default gate.
+
+**And the probe agreed with me.** Reproducing the row in isolation, I rebuilt it from what the
+mutation was *for* — and wrote the `to:` correctly, so it was caught, twice. **A probe reconstructed
+from intent cannot find a transcription defect**, because it is written from the same understanding
+that produced it. What found it was capturing the real invocation's own output and reading the
+esbuild error.
+
+**Two candidate gates, both measured.**
+
+*The cheap one is refused.* A replacement usually sits in the same syntactic slot as what it
+replaces, so *the last non-space character of `to` matches that of `from`* would have caught this
+`,` against `;` exactly. Measured across every run: **31 of 942 pairs mismatch and they are
+legitimate** — multi-line replacements, `? 2.5` to `? 2`, `if (…) {` to `if (true) {`. A gate with
+31 false positives is one that gets an exemption list and stops being read.
+
+*The honest one is apply-and-parse*, and it wants a parser this repo does not currently offer a tool.
+**TypeScript is 7.0.2 and its JS entry point no longer exports `createSourceFile`** — measured:
+`Object.keys(await import("typescript"))` is `["default", "version", "versionMajorMinor"]` and
+`require("typescript").createSourceFile` is `undefined`. `esbuild` would do it in one `transformSync`
+per anchor and is present only as vite's transitive dependency, which is a dependency decision and not
+a tooling detail.
+
+**So it is owed with a blocker that is a symbol rather than a condition**: a parser `tools/` may
+depend on. Grepping for one is what picking this up begins with.
+
+---
+
 ## F278 — separation and nesting look the same in a diff of rectangles ★★★★★
 
 **A treemap's pad is not a margin.** `hierarchy.ts` says so in its own comment, and it is the reason
