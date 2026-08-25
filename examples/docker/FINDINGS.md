@@ -13502,6 +13502,63 @@ failing rather than by memory.
 else to live — the same shape `segments` already has. Until then every form with a second channel
 inherits all three symptoms, and `bubble` is the only one that has one.
 
+---
+
+## F272 — a bar chart of signed data draws no negative bars, in either orientation ★★★★☆
+
+**Both terminal arms fill from the range floor.** `barRow` and `barColumn` each compute
+`(value - min) / span`, so a bar's length is its distance from the *bottom of the axis* rather than
+from zero. Read at height 7 over `[-8, 4, -2, 10]`:
+
+```
+horizontal                              vertical
+a ┤                            -8│       10 ┤                    ██████████│
+b ┤██████████████████████       4│          │        ▇▇▇▇▇▇      ██████████│
+c ┤█████████████               -2│        0 ┤        ██████  -2  ██████████│
+d ┤████████████████████████    10│          │        ██████▆▆▆▆▆▆██████████│
+                                         -10┤▆▆▆▆▆▆▆▆██████████████████████│
+```
+
+**Horizontally, `-8` gets an empty run and `10` a full one** — the chart reads as a ranking of
+positive magnitudes and the sign survives only in the printed number. **Vertically it is worse**: the
+gutter labels `0`, and every bar is drawn straight through that label from `-10`. A reader taking the
+axis at its word reads `-8` as a value of 2.
+
+**The SVG arm is the one that gets this right.** `plotToSvg` computes *the baseline is zero where the
+range contains it, and the floor otherwise*, and grows the rect both ways from it. So this is a
+disagreement the tie-break resolves the wrong way — **the third such counterexample**, after F269's
+constant `ecdf` and F271's channel-as-a-series.
+
+**The figure reproduces it, and the reasoning is the same each time.** Emitting a zero-anchored rect
+would correct the terminal *inside a refactor*: no frame moves, the arms disagree at step 4, and
+nothing announces the change. Landing the terminal's answer means both arms draw one wrong figure and
+**one repair fixes both**, which is what unification buys and is worth more than the instance. `FB4`
+asserts the defect, so the day a bar hangs below zero the row fails and closes this by failing.
+
+**And `baselineOf` is not dead in the meantime.** `extent.min = min(0, dataMin)` puts the *floor* at
+zero for non-negative data — the common case, and the reason `[10, 25, 15]` stopped drawing nothing
+at 10. What is missing is only the signed case, where the floor and the baseline stop coinciding.
+
+**Found by writing the family's marks and having a test disagree.** `FB4` asserted a negative bar
+hanging below the rule, which is what a bar chart does; it failed, and reading the frame is what said
+which of the two was wrong. *The implementation falsifies the walk* — the walk ruled the shape and
+the code was the first thing that could disprove it.
+
+---
+
+## F272b — three ranges for one family, and only one of them has a labelled axis ★★★☆☆
+
+Measured while writing the same emitter. `plotToSvg` rasterises against the **raw** range,
+`barRow` against **raw-zeroed** `{ base, data.max }`, and `categoricalColumnForm` against the
+**niced** one. So a bar of 25 in a set topping out at 25 fills its whole run horizontally and 83% of
+its column vertically — **in the same arm, from the same data.**
+
+The figure takes the niced range, which is F210's rule (*the range the figure is drawn against is the
+range the gutter is labelled from*) and the only one of the three with a labelled axis behind it.
+**The horizontal arm's is invisible rather than absent**: its gutter holds categories, so no label
+disagrees with the fraction, which is exactly how a third range survived inside one family.
+
+
 
 
 

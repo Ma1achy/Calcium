@@ -2445,6 +2445,14 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // draws scatter and bubble through `positionalDecisions` like everything else
   // positional, so what waits here is the marks alone. Same expiry symbol:
   // `plotToSvg` walking a figure.
+  // **The bar family's, and it is the third with the same shape.** Its decisions
+  // ARE consumed — `categoricalColumnForm` reads `categoricalDecisions` back for
+  // all four of its callers — and the rects wait for the same reader.
+  barFigure:
+    "C12 I59, I62, §3ak.7 — the bar family's shared emitter. Its decisions are " +
+    "`categoricalDecisions`, consumed by `categoricalColumnForm`; the rects wait " +
+    "for `plotToSvg` to walk a figure at step 4. The terminal's bars are eighths " +
+    "of a cell filled from a ladder, not rectangles in a normalised space",
   scatterFigure:
     "C12 I59, I62, §3ak.7 — the scatter family's shared emitter. Its decisions " +
     "are `positionalDecisions`, consumed by `positionalForm` today; what has no " +

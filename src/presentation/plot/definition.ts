@@ -27,7 +27,7 @@ import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
-import { positionalDecisions, valueAxisOf } from "./figure.js";
+import { baselineOf, categoricalDecisions, positionalDecisions, valueAxisOf } from "./figure.js";
 import { treeArea } from "./tree.js";
 import { graphArea } from "./graph.js";
 import { curveRows, isBlank } from "./curve.js";
@@ -396,10 +396,6 @@ function labelAllowance(
     widest = Math.max(widest, cells(` ${formatReadout(v, format)}`, caps.ambiguousWidth)); // cells-ok — a label width
   }
   return widest;
-}
-
-function baselineFor(dataMin: number): number {
-  return Math.min(0, dataMin);
 }
 
 function refOf(series: Series, index: number): ColourRef {
@@ -1559,12 +1555,13 @@ function categoricalColumnForm(
   const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
   if (n === 0) return emptyRows(block, fallback, ctx);
 
-  const data = seriesRange(block.series, block);
-  if (data === null) return emptyRows(block, fallback, ctx);
-  // A bar's baseline is zero unless the data goes below it — the same rule
-  // `barRow` takes, and the reason `[10, 25, 15]` used to draw nothing at 10.
-  const zeroed = { min: baselineFor(data.min), max: data.max };
-  const axis = valueAxisOf(zeroed, ticksFor(areaRows), block, block.yScale);
+  // **Read back rather than computed here** (C12 I59, §3ak.7). The zeroing, the
+  // nicing, the tick count and the scale are one call the second arm makes too —
+  // and the baseline rule it carries is the reason `[10, 25, 15]` used to draw
+  // nothing at 10, which both orientations reached for separately.
+  const figure = categoricalDecisions(block);
+  if (figure.value === null) return emptyRows(block, fallback, ctx);
+  const axis = figure.value;
   const range = axis.range;
   const layout = reserving(layoutFor(block, axis, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
 
@@ -1747,7 +1744,7 @@ function legacyDepthBars(
   let ri = 0;
   return categoricalForm(src, width, ctx, (_label, aw) => {
     const v = src.series[0]?.values[ri++] ?? null;
-    return barRow(v, baselineFor(data.min), data.max, aw, ctx.capabilities, false);
+    return barRow(v, baselineOf(data.min), data.max, aw, ctx.capabilities, false);
   });
 }
 
@@ -2274,7 +2271,7 @@ const FORM_ROWS: Readonly<
       // One row per (category, series), in category-major order, so a group's
       // bars sit together and the gutter names which series each one is.
       const cats = block.categories ?? [];
-      const base = baselineFor(data.min);
+      const base = baselineOf(data.min);
       const ordered = cats.flatMap((_c, i) => block.series.map((sr) => sr.values[i] ?? null));
       const grouped = {
         ...block,
@@ -2304,7 +2301,7 @@ const FORM_ROWS: Readonly<
       );
     }
     let ri = 0;
-    const base = baselineFor(data.min);
+    const base = baselineOf(data.min);
     const allow = labelAllowance(block.series[0]?.values ?? [], block.yFormat, ctx.capabilities);
     return categoricalForm(block, width, ctx, (_label, aw) => {
       const v = block.series[0]?.values[ri++] ?? null;

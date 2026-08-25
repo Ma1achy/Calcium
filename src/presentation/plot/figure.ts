@@ -317,6 +317,26 @@ function runsOf(values: readonly (number | null)[], range: Range): readonly (rea
 }
 
 /**
+ * The value axis over an extent — **one derivation, read by every family**.
+ *
+ * Written twice first, once per family, and the **anchor sweep is what said so**:
+ * two mutations aimed at the tick count and the scale matched two places each,
+ * and an ambiguous anchor reports as SURVIVED, which routes to *write a test*
+ * rather than *fix the duplicate* (F219). That is `placesFor`'s lesson arriving
+ * a second time in the same module, from the same instrument.
+ *
+ * The arguments are the ones `positionalForm` and `categoricalColumnForm` each
+ * already passed — the row count for the ticks, and the block's scale — so this
+ * is still the terminal's computation moved and there is one place left to get
+ * it wrong.
+ */
+function axisOver(extent: Range | null, block: Plot): ValueAxis | null {
+  return extent === null
+    ? null
+    : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block, block.yScale);
+}
+
+/**
  * A reference line's mark — **the annotation mechanism, not a form's machinery**
  * (C04 I52, §3e).
  *
@@ -357,9 +377,7 @@ function annotationMarks(block: Pick<Plot, "annotations">, range: Range): readon
 export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
   const extent = seriesRange(block.series, block, candlesOf(block));
   return {
-    value: extent === null
-      ? null
-      : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block, block.yScale),
+    value: axisOver(extent, block),
     extent,
     identity: identityOf(block),
     // **These families run their values up the ordinate at every form.** Stated
@@ -371,6 +389,136 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     frame: block.plotFrame ?? "box",
     legend: legendSlots(block),
   };
+}
+
+/**
+ * A bar's baseline — **`min(0, dataMin)`, and it is a family decision** (§3ak.7).
+ *
+ * A bar's *length* is its value, so signed data grows both ways from zero and
+ * unsigned data starts there; a bar chart of `[10, 25, 15]` anchored at 10 draws
+ * nothing for its first category, which is what this rule was written for.
+ * `definition.ts` held it and both orientations reached for it separately.
+ */
+export function baselineOf(dataMin: number): number {
+  return Math.min(0, dataMin);
+}
+
+/**
+ * **Every decision the categorical families share** — `bar`, `histogram`,
+ * `lollipop`, `dotplot`, and the distribution family's column arm (§3ak.7).
+ *
+ * `categoricalColumnForm` draws all of them, so like `positionalDecisions` this
+ * is one computation the families read and the marks are each family's own.
+ *
+ * **`identity` is the categories here and the series labels for a curve, and
+ * both are right.** The member is *what the figure's slots are named*: a curve's
+ * slots are its series, a bar's are its categories. So the legend and the
+ * identity are the same list for the positional families and **different lists**
+ * here — the gutter names categories, the legend names series — and conflating
+ * them would give a bar chart a legend naming its own rows.
+ *
+ * **`extent` is zero-anchored, and it is what the horizontal arm rasterises
+ * against.** The two orientations do not use the same range: `barRow` takes
+ * `{ base, data.max }` raw, and `categoricalColumnForm` nices it. Both are in
+ * the figure — the raw as `extent`, the niced as `value.range` — because a
+ * horizontal bar's gutter holds *categories*, so there is no label for the raw
+ * range to disagree with, and the asymmetry is invisible rather than absent.
+ *
+ * **The orientation is the block's, and that is D11.** The terminal defaults to
+ * horizontal and the SVG arm defaulted to vertical — the same block drawn on its
+ * side in one arm — which no rasterisation difference can account for. It is
+ * decided here now, once.
+ */
+export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
+  const data = seriesRange(block.series, block);
+  const extent = data === null ? null : { min: baselineOf(data.min), max: data.max };
+  return {
+    value: axisOver(extent, block),
+    extent,
+    identity: block.categories ?? [],
+    orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
+    facing: facingOf(block, FACING_DEFAULT),
+    frame: block.plotFrame ?? "box",
+    legend: legendSlots(block),
+  };
+}
+
+/**
+ * The bar family's figure — **`bar`, `histogram`, `lollipop`, `dotplot`**
+ * (§3ak.7).
+ *
+ * **The marks are in the figure's own space, not the screen's**: `x` runs along
+ * the identity axis and `y` along the value axis, whatever `orientation` says.
+ * That is `facing`'s arrangement one member along — decided once, applied twice —
+ * and it is what stops the two arms transposing differently. A vertical renderer
+ * takes them as written; a horizontal one swaps the axes on the way out.
+ *
+ * **A bar fills its whole slot here and each arm insets it.** The terminal fills
+ * the cell column `categoricalColumnForm` allotted; the SVG takes three fifths.
+ * Both are rasterisation (§3aj hazard 1), so the shared layer states the slot and
+ * neither arm's inset crosses.
+ *
+ * **The rect runs from the range floor, and that is F272 reproduced on purpose.**
+ * Both terminal arms fill from `range.min`: `barRow` and `barColumn` each compute
+ * `(value - min) / span`. Read at height 7 over `[-8, 4, -2, 10]`, the horizontal
+ * arm gives `-8` an empty run and `10` a full one, and the vertical arm rises
+ * every bar from `-10` **through its own `0` gutter label**. A bar chart of
+ * signed data draws no negative bars in either orientation.
+ *
+ * The SVG arm is the one that gets this right — *the baseline is zero where the
+ * range contains it* — so unifying on the terminal propagates the defect, and
+ * that is the tie-break's third counterexample after F269 and F271. It is still
+ * what lands: the arms then draw one wrong figure and one repair fixes both,
+ * where correcting it here would be a divergence no commit announced.
+ *
+ * `baselineOf` is not dead in the meantime — it is what puts the *floor* at zero
+ * for non-negative data, which is the common case and the reason `[10, 25, 15]`
+ * no longer draws nothing at 10.
+ *
+ * **Three ranges existed for this family and the mark takes one of them.**
+ * Measured: `plotToSvg` rasterises against the **raw** range, `barRow` against
+ * **raw-zeroed** `{ base, data.max }`, and `categoricalColumnForm` against the
+ * **niced** one. So a bar of 25 in a set topping out at 25 fills its whole run
+ * horizontally and 83% of its column vertically, in the same arm.
+ *
+ * The mark takes the **niced** range, which is F210's rule — *the range the
+ * figure is drawn against is the range the gutter is labelled from* — and the
+ * only one of the three with a labelled axis behind it. The horizontal arm's is
+ * invisible rather than absent: its gutter holds categories, so there is no
+ * label for the fraction to disagree with, which is exactly how a third range
+ * survived in one family.
+ */
+export function barFigure(block: Plot): Figure {
+  const decisions = categoricalDecisions(block);
+  const { value } = decisions;
+  const marks: Drawn[] = [];
+  if (value !== null) {
+    const cats = decisions.identity.length; // cells-ok — a category count
+    const n = Math.max(1, cats === 0 ? block.series[0]?.values.length ?? 0 : cats); // cells-ok — a category count
+    const per = Math.max(1, block.series.length); // cells-ok — a series count
+    block.series.forEach((series, seriesIndex) => {
+      series.values.forEach((v, i) => {
+        if (v === null || !Number.isFinite(v) || i >= n) return;
+        // From the floor, because that is where both terminal arms fill from
+        // (F272) — `(value - min) / span` in `barRow` and in `barColumn`.
+        const top = normalisedOf(v, value.range, false);
+        marks.push({
+          mark: {
+            kind: "rect",
+            x: (i + seriesIndex / per) / n,
+            y: 0,
+            w: 1 / (n * per),
+            h: top,
+            fill: true,
+          },
+          layer: "series",
+          seriesIndex,
+        });
+      });
+    });
+    marks.push(...annotationMarks(block, value.range));
+  }
+  return { ...decisions, marks };
 }
 
 /**

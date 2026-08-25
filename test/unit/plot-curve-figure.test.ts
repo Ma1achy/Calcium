@@ -14,6 +14,9 @@ import {
   curveFigure,
   identityOf,
   legendSlots,
+  barFigure,
+  baselineOf,
+  categoricalDecisions,
   positionalDecisions,
   scatterFigure,
 } from "../../src/presentation/plot/figure.js";
@@ -259,5 +262,95 @@ describe("FS — the scatter family's figure (C12 §3ak.7)", () => {
     expect(f.marks.filter((d) => d.seriesIndex === 1).length,
       "the channel is drawn as a series — F271, owed").toBe(2);
     expect(f.identity, "and named as one in the legend").toEqual(["series 1", "series 2"]);
+  });
+});
+
+describe("FB — the bar family's figure (C12 §3ak.7)", () => {
+  const bars = (over: Partial<Plot> = {}): Plot => plot({
+    form: "bar", height: 8, categories: ["a", "b", "c"],
+    series: [{ values: [10, 25, 15] }], ...over,
+  });
+
+  it("FB1 (C12 I59): identity is the categories here and the series for a curve, and both are right", () => {
+    // The member is *what the figure's slots are named*. A curve's slots are its
+    // series; a bar's are its categories — so the legend and the identity are one
+    // list there and two here, and conflating them gives a bar chart a legend
+    // naming its own rows.
+    const f = barFigure(bars());
+    expect(f.identity, "the gutter's names").toEqual(["a", "b", "c"]);
+    expect(f.legend.map((sl) => sl.label), "and the legend names the series").toEqual(["series 1"]);
+    expect(f.identity).not.toEqual(f.legend.map((sl) => sl.label));
+    // The curve family's own answer, asserted beside it so the difference is on
+    // purpose rather than by omission.
+    const c = curveFigure(plot({ series: [{ values: [1, 2], label: "x" }] }));
+    expect(c.identity, "a curve's slots are its series").toEqual(["x"]);
+    expect(c.legend.map((sl) => sl.label)).toEqual(c.identity);
+  });
+
+  it("FB2 (C12 I59, §3ak.7): the extent is zero-anchored, and it is what the horizontal arm draws against", () => {
+    // `[10, 25, 15]` anchored at 10 draws nothing for its first category —
+    // `barRow` takes `{ base, data.max }` and the column arm nices the same
+    // range, so both are in the figure and neither is re-derived.
+    const f = barFigure(bars());
+    expect(baselineOf(10), "a bar's length is its value, so it starts at zero").toBe(0);
+    expect(f.extent, "raw and zero-anchored — what `barRow` takes").toEqual({ min: 0, max: 25 });
+    expect(f.value!.range.min, "and the niced axis keeps the anchor").toBe(0);
+    // Signed data grows both ways from zero rather than from its own floor.
+    expect(barFigure(bars({ series: [{ values: [-5, 10] }] })).extent).toEqual({ min: -5, max: 10 });
+  });
+
+  it("FB3 (C12 I59, D11): the orientation is the block's, decided once", () => {
+    // The terminal defaults horizontal and the SVG arm defaulted vertical — the
+    // same block drawn on its side in one arm, which no rasterisation difference
+    // accounts for.
+    expect(barFigure(bars()).orientation, "the terminal's default").toBe("horizontal");
+    expect(barFigure(bars({ orientation: "vertical" })).orientation).toBe("vertical");
+    expect(categoricalDecisions(bars()).orientation, "and the decision is the family's, not the mark's")
+      .toBe("horizontal");
+  });
+
+  it("FB4 (C12 I62): a rect runs from the baseline, in the figure's space and not the screen's", () => {
+    const f = barFigure(bars());
+    const rects = f.marks.filter((d) => d.layer === "series");
+    expect(rects.length).toBe(3);
+    const first = rects[0]!.mark;
+    expect(first.kind).toBe("rect");
+    if (first.kind !== "rect") throw new Error("not a rect");
+    // `x` runs along the identity axis whatever the orientation says — decided
+    // once, applied twice, so the two arms cannot transpose differently.
+    // **Every slot, not the first one.** Checking `rects[0]` alone passed a
+    // mutation that collapsed the rest onto it — the first rect's `x` is `0`
+    // either way, so the assertion agreed with the defect. The mutation pass is
+    // what said so.
+    expect(rects.map((d) => (d.mark.kind === "rect" ? d.mark.x : -1)),
+      "one slot per category, in order").toEqual([0, 1 / 3, 2 / 3]);
+    expect([first.x, first.w], "category 0 of 3 takes the first third").toEqual([0, 1 / 3]);
+    expect(first.y, "and the bar starts at the baseline").toBe(0);
+    // **Against the NICED range, which is a ruling and not an accident.** This
+    // family has three ranges across two arms: the SVG takes the raw unzeroed
+    // one, `barRow` takes raw-zeroed `{ base, data.max }`, and the column arm
+    // nices it. The mark takes the niced one — the axis a reader would read off,
+    // and F210's rule that the range the figure is drawn against is the range the
+    // gutter is labelled from. So `10` of a range niced to `0…30`, not of `25`.
+    expect(f.value!.range, "niced past the data's own maximum").toEqual({ min: 0, max: 30 });
+    expect(first.h).toBeCloseTo(10 / 30, 6);
+    // **F272, asserted rather than described.** Both terminal arms fill from the
+    // range floor, so a bar chart of signed data draws no negative bars — read at
+    // height 7 the vertical arm rises every bar from `-10` through its own `0`
+    // gutter label. The figure says what the terminal draws; the day a bar hangs
+    // below zero, this row fails and closes the finding by failing.
+    const neg = barFigure(bars({ categories: ["a", "b"], series: [{ values: [-4, 4] }] }));
+    const [lo, hi] = neg.marks.filter((d) => d.layer === "series").map((d) => d.mark);
+    if (lo?.kind !== "rect" || hi?.kind !== "rect") throw new Error("not rects");
+    expect([lo.y, hi.y], "both start at the floor — F272, owed").toEqual([0, 0]);
+    expect(lo.h, "and the negative one is the SHORTER bar, not a downward one")
+      .toBeLessThan(hi.h);
+  });
+
+  it("FB5 (C12 I64): a categorical refusal is empty, and the identity survives it", () => {
+    const f = barFigure(bars({ series: [{ values: [] }] }));
+    expect(f.value, "nothing was measured").toBeNull();
+    expect(f.marks).toEqual([]);
+    expect(f.identity, "and the categories are still what the figure would name").toEqual(["a", "b", "c"]);
   });
 });

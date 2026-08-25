@@ -25,9 +25,20 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
+// **The baseline is in the command, and a survivor is what put it there.**
+// Severing the column arm's read-back survived four suites — and the reason was
+// not coverage of the *rule* but of the *fixture*: `categoricalColumnForm` is
+// reached only by `orientation: "vertical"`, which the catalogue constructs
+// eleven times and those four suites construct **zero** times. The corpus had
+// the subject and the run did not ask it.
+//
+// So the run is gated by the pass's own gate. It costs about seven seconds a
+// mutation; a seam mutation that survives for want of a fixture is a green run
+// that means nothing, which is what F256 says about every zero-moved.
 const CMD =
   "npx vitest run test/unit/plot-curve-figure.test.ts test/unit/plot.test.ts " +
-  "test/unit/plot-y-axis.test.ts test/golden/plot.test.ts";
+  "test/unit/plot-y-axis.test.ts test/unit/plot-bar-values.test.ts " +
+  "test/golden/plot.test.ts test/golden/terminal-baseline.test.ts";
 const FIGURE = "src/presentation/plot/figure.ts";
 const DEFINITION = "src/presentation/plot/definition.ts";
 const FURNITURE = "src/presentation/plot/furniture.ts";
@@ -54,6 +65,69 @@ const results = runPass({
     why: "the terminal stops reading the shared axis and furnishes two raw bounds instead. If this survives, nothing downstream reads the figure and every row below is a claim about a value nobody takes",
   },
   mutations: [
+    {
+      // **THE RULE INTERACTION** (§3ak.7). `identity` is *what the figure's slots
+      // are named* — a curve's series, a bar's categories — and taking the series
+      // here gives a bar chart a gutter naming its own legend, with every count
+      // still agreeing.
+      name: "THE INTERACTION: the bar family's identity is the series, as a curve's is",
+      file: FIGURE,
+      from: "    identity: block.categories ?? [],",
+      to: "    identity: identityOf(block),",
+      expect: "FB1",
+    },
+    {
+      // **D11**: the terminal defaults horizontal, the SVG arm defaulted
+      // vertical, and the same block drew on its side in one of them. No
+      // rasterisation difference accounts for it.
+      name: "THE DEFECT: the bar family's default orientation flips",
+      file: FIGURE,
+      from: "    orientation: block.orientation === \"vertical\" ? \"vertical\" : \"horizontal\",",
+      to: "    orientation: block.orientation === \"horizontal\" ? \"horizontal\" : \"vertical\",",
+      expect: "FB3",
+    },
+    {
+      // The baseline from the data's own floor rather than zero — which is what
+      // made `[10, 25, 15]` draw nothing for its first category, the frame this
+      // rule exists for.
+      name: "the baseline is the data's floor, so the smallest bar is empty",
+      file: FIGURE,
+      from: "  return Math.min(0, dataMin);",
+      to: "  return dataMin;",
+      expect: "FB2",
+    },
+    {
+      // Bars stacked in one slot instead of spread across the categories: every
+      // rect at x = 0, which is a plausible figure — one column, N bars — and a
+      // chart of a different thing.
+      name: "every category's rect lands in the first slot",
+      file: FIGURE,
+      from: "            x: (i + seriesIndex / per) / n,",
+      to: "            x: seriesIndex / per / n,",
+      expect: "FB4",
+    },
+    {
+      // **The height as the value rather than as the fraction.** Unnormalised,
+      // every rect is out of the unit square — and nothing in the type says so,
+      // which is why the row is here rather than in a comment.
+      name: "the rect's height is the raw value, not the normalised one",
+      file: FIGURE,
+      from: "            h: top,",
+      to: "            h: v,",
+      expect: "FB4",
+    },
+    {
+      // **The read-back severed by re-nicing** — F210's defect restored at the
+      // family next door: the columns drawn against a range the gutter does not
+      // describe. *The first form of this row passed a block with `yMin`/`yMax`
+      // stripped, which is a no-op for every fixture that declares neither; it
+      // survived, and the survivor was the mutation rather than the test.*
+      name: "the column arm nices the figure's range a second time",
+      file: DEFINITION,
+      from: "  const axis = figure.value;",
+      to: "  const axis = valueAxisOf(figure.value.range, ticksFor(areaRows), block, block.yScale);",
+      expect: "golden",
+    },
     {
       // **A bubble's size channel scaled against the wrong maximum.** `sizes` is
       // the second series read positionally, and `bubbleRows` divides by
@@ -97,8 +171,10 @@ const results = runPass({
       // so this row is the disagreement restored from the other side.
       name: "the tick count is a constant again, as the second arm had it",
       file: FIGURE,
-      from: "      : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block, block.yScale),",
-      to: "      : valueAxisOf(extent, 5, block, block.yScale),",
+      // Re-anchored when the duplicate derivation the sweeper found was
+      // extracted to `axisOver` — one place, one anchor.
+      from: "    : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      to: "    : valueAxisOf(extent, 5, block, block.yScale);",
       expect: "T1.12",
     },
     {
@@ -107,8 +183,8 @@ const results = runPass({
       // number at a real row.
       name: "the scale is not passed, so a log axis gets linear ticks",
       file: FIGURE,
-      from: "      : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block, block.yScale),",
-      to: "      : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block),",
+      from: "    : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      to: "    : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block);",
       expect: "FC9",
     },
     {
