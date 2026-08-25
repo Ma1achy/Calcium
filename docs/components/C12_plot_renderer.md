@@ -4418,7 +4418,7 @@ type GlyphRole = "point" | "median" | "mean" | "outlier" | "cap" | "target" | "a
 
 type Mark =
   | { kind: "polyline"; points: readonly Pt[]; closed?: boolean }
-  | { kind: "rect"; x: number; y: number; w: number; h: number; fill?: boolean }
+  | { kind: "rect"; x: number; y: number; w: number; h: number; fill?: boolean; depth?: number }
   | { kind: "point"; x: number; y: number; role: GlyphRole; size?: number }
   | { kind: "text"; x: number; y: number; text: string; anchor: Anchor; room: number };
 
@@ -4448,6 +4448,33 @@ fourth renderer furnishing a fifth false axis out of `{0, 1}`.
 **`room` on a text mark is normalised, and it is finding 6 in one field.** The shared layer says
 *this label has this fraction of the figure*; the terminal turns that into cells and truncates, the
 SVG turns it into a `clipPath`. Neither arm decides the allowance and neither shares the outcome.
+
+**`depth` on a rect is the same shape one mark along, and F278 is why it exists.** A treemap's
+nesting is drawn by insetting a child inside its parent so the parent shows as a ring — that ring is
+*the only thing that says which tiles belong together*, and `tiles`' own comment says so: *filling the
+parent exactly is arithmetically right and draws a mosaic; the leaves are correct, the siblings are
+adjacent, and nothing says which ones belong together.*
+
+**The ring's width is one unit of the output and the two arms have different units** — one cell,
+`1 / max(width, areaRows)`, against one pixel, `1 / max(w, h)` — and the terminal's is a *runtime*
+width, so no constant the figure could hold is either arm's. So the pad cannot cross the seam, and a
+partition emitted already-padded would be one arm's picture.
+
+**What crosses is the depth; the inset is each arm's.** The figure carries the true partition — areas
+proportional to the data before anything is taken off for legibility — and a renderer insets a rect by
+`depth + 1` of whatever its own smallest unit is. That reproduces the compounding a layout-time pad
+produces, and it keeps the areas true rather than approximately true.
+
+> **A uniform inset is not a substitute, and measuring it is what found this.** Insetting every rect
+> by one unit separates *siblings* and leaves a child's shared edge exactly on its parent's, so the
+> ring vanishes at every depth: the frame showed tiles cleanly outlined and nesting gone. The terminal
+> draws the ring, so shipping that would have been **a new disagreement introduced by a refactor** —
+> the one thing this pass forbids — and it would have been announced by nothing, because separation
+> and nesting look alike in a diff of rectangles.
+
+**Absent means *not nested*, not depth zero.** A flame's strips are stacked bands rather than
+enclosing boxes, so they take a uniform inset and carry no `depth`; the member says *this rect sits
+inside that many others*, which is false of a band.
 
 ### 3ak.3 — The rungs are decided after the figure, and that is where a diamond becomes a comma
 

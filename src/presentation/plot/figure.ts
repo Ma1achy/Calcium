@@ -165,6 +165,23 @@ export type Mark =
       h: number;
       fill?: boolean;
       /**
+       * **How many rects this one sits inside** — absent where it sits inside
+       * none, which is not the same as `0` (§3ak.2, F278).
+       *
+       * A treemap's nesting is drawn by insetting a child so its parent shows as
+       * a ring, and that ring is the only thing saying which tiles belong
+       * together. **The ring's width is one unit of the output and the two arms
+       * have different units** — one cell against one pixel, and the terminal's
+       * is a runtime width — so the pad cannot cross and a partition emitted
+       * already-padded would be one arm's picture. The depth crosses; each arm
+       * insets by `depth + 1` of its own smallest unit.
+       *
+       * Absent on a flame's strips, which are stacked bands rather than
+       * enclosing boxes: a uniform inset separates them and the member would be
+       * false of them.
+       */
+      depth?: number;
+      /**
        * **The reading, where the mark's *appearance* is the datum** —
        * normalised, and `point.size`'s argument one mark along (§3ak.1
        * finding 2).

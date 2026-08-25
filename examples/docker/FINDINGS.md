@@ -13642,6 +13642,62 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F278 — separation and nesting look the same in a diff of rectangles ★★★★★
+
+**A treemap's pad is not a margin.** `hierarchy.ts` says so in its own comment, and it is the reason
+the parameter exists:
+
+> *Filling the parent exactly is arithmetically right and draws a mosaic: the leaves are correct, the
+> siblings are adjacent, and **nothing says which ones belong together**.*
+
+`tiles(root, pad)` insets a parent's box **before laying its children out**, so a child sits inside a
+smaller frame and the parent shows as a ring on every side the child would otherwise touch. That ring
+is the whole of the nesting signal, and it compounds with depth because every level insets again.
+
+**The pad cannot cross the seam.** Both arms take *one unit of the output*:
+
+| arm | pad |
+|---|---|
+| terminal | `1 / max(width, areaRows)` — one cell |
+| SVG | `1 / max(w, h)` — one pixel |
+
+They differ by 6.5× at the sizes both actually draw, and the terminal's is a **runtime** width, so no
+constant the figure could hold is either arm's. A `Figure` that emitted padded tiles would be emitting
+one arm's picture, which is §3aj hazard 1 exactly.
+
+**So the walk insets at projection time — and the first version was wrong in a way that reads as
+right.** One unit off every side of every rect. Siblings separate cleanly, every tile is outlined, and
+**a child's shared edge lands exactly on its parent's**, because both were inset by the same amount
+from coincident edges. Measured against the previous frame:
+
+```
+before   parent  x=89.6 w=404.096      child  x=90.6      ← 1px of parent visible
+after    parent  x=90.6 w=402.096      child  x=90.6      ← nothing visible
+```
+
+**The ring is gone at every depth.** The frame reads as a flat mosaic of outlined boxes — the exact
+picture `hierarchy.ts`' comment was written against — and the terminal still draws the ring, so this
+would have been **a new disagreement introduced by a refactor**, which is the one thing the pass
+forbids. It would have been announced by nothing: `3 of 178 frames moved` is what a correct tiles
+migration reports too.
+
+**Nothing in either walk artefact reaches this.** §3ak.10's table indexes *rule interactions* and this
+is one rule — *inset for legibility* — meeting the **absence** of a rule nobody had written, because
+the pad had never been a decision anyone made twice. It was found by reading two rect lists side by
+side and noticing that two numbers that used to differ now agreed.
+
+**Ruled: the depth crosses and the inset does not.** `Mark.rect` gains an optional `depth`, the figure
+carries the true partition — areas proportional to the data before anything is taken off for
+legibility — and each arm insets by `depth + 1` of its own smallest unit. Better than the pad it
+replaces on the arithmetic too: a layout-time pad shrinks the box the children are packed into, so
+their areas are proportional to the data *minus the padding*, and this way they are proportional to
+the data.
+
+**Absent means *not nested*.** A flame's strips are stacked bands, not enclosing boxes; they take the
+uniform inset and carry no `depth`, because the member would be false of them rather than zero.
+
+---
+
 ## F277 — a mutation whose subject moved out from under it, and the sweep cannot see that ★★★★☆
 
 **The migration is the mechanism.** Step 4 moves one family at a time out of `marks()`' per-family
