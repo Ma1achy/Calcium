@@ -386,9 +386,20 @@ function clusterCells(cluster: string, ambiguous: AmbiguousWidth = "narrow"): nu
  * rather than absent, because the row still has to be the width it was measured
  * at.
  *
- * The marker is 1 cell in both unicode modes (C09 I5). `…` is one column and
- * `...` is three, so the ASCII form is `~`; anything else shifts every log
- * line's cut point, for users with a non-UTF-8 locale and nobody else.
+ * The ASCII form is `~` because `…` is one column and `...` is three; anything
+ * else shifts every log line's cut point, for users with a non-UTF-8 locale and
+ * nobody else.
+ *
+ * **The marker is measured rather than assumed, and it used to be assumed**
+ * (F292). This read *the marker is 1 cell in both unicode modes* — true of the
+ * two **unicode** modes, and this function takes a third capability. `…` is
+ * U+2026, East-Asian Ambiguous, so it is **two** cells at
+ * `ambiguousWidth: "wide"` and `limit - 1` reserved one. The result was
+ * `limit + 1`: the third route to the failure the paragraph above names, past a
+ * sentence that was accurate about the question it answered and silent about
+ * the one that mattered. Measured before the fix, 29 rows of the plot catalogue's
+ * 1841 were 61 cells wide in a 60-cell frame, and a wrapped line scrolls the
+ * alternate screen.
  */
 export function truncate(
   text: string,
@@ -405,7 +416,16 @@ export function truncate(
   // `bmp` keeps the Unicode marker: U+2026 is in the basic plane, and the
   // ASCII form is for terminals that cannot draw beyond it at all.
   const marker = caps.unicode === "ascii" ? "~" : "…";
-  const budget = limit - 1; // the marker's own cell
+  const markerCells = clusterCells(marker, caps.ambiguousWidth);
+  // **A marker too wide for the slot is not a marker** (F292). At
+  // `ambiguousWidth: "wide"` the ellipsis is two cells, so a one-cell limit
+  // cannot say *truncated* at all — and returning it anyway put a two-cell
+  // glyph in a one-cell slot, which is the same overflow one character smaller.
+  // Blank rather than absent, on this module's own rule for a double-width
+  // glyph refused at the boundary: the row still has to be the width it was
+  // measured at.
+  if (markerCells > limit) return " ".repeat(limit);
+  const budget = limit - markerCells;
   if (budget <= 0) return marker;
 
   // `from` names the end characters are removed from (C04 I30), so `"start"` walks

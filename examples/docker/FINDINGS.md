@@ -13642,6 +13642,35 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F293 — the furniture falls back at `wide` and the rasterisers do not ★★★★☆
+
+**One row, two alphabets.** At `ambiguousWidth: "wide"` a `ridgeline` frame draws its border as
+`+------+` — `glyphs()` correctly falling the furniture back to ASCII, because box-drawing is
+East-Asian Ambiguous and would take two cells — and then fills the same row with `╭────╮` from the
+curve rasteriser, which never asked.
+
+**The rung exists and is honoured in one place.** §3ak.3's table names *the `ambiguousWidth` arms —
+narrow-only sets falling to their ASCII pair — at `glyphs()` on projection*. That is exactly what
+the frame, the ticks and the tees do. The field, curve, quadrant and braille rasterisers do not, so
+`contour`, `graph`, `tree`, `violin`, `radar`, `heatmap`, `histogram` and `ridgeline` emit two-cell
+glyphs into one-cell slots at that rung.
+
+**What it costs after F292.** The wrap is gone — the rows are the width they were measured at — and
+the figure is not: a `radar` truncates mid-shape, a `contour` gives a cell to a blank where a glyph
+was refused. **F292 made the frames width-correct and this is what makes them figure-correct**, and
+the difference matters: a wrapped row is a correctness failure the application cannot see afterwards,
+and a truncated figure is a legibility failure it can.
+
+**Why it is recorded and not fixed here.** It is the degradation pass — `CALCIUM_ARM_UNIFICATION.md`
+scopes it out in as many words (*not the terminal's degradation audit — U6 measures it, fixing it is
+a separate pass*), and it is a change to eight rasterisers rather than a line. `U6e` holds the floor
+underneath it: no row may exceed the terminal's width at any rung, exemption compared by equality.
+
+**The reusable half.** A capability honoured at one layer and ignored at the layer below reads as
+honoured, because the layer that honours it is the one a reader checks first — the frame is the
+visible furniture. The question that reaches it is *which layers emit glyphs*, asked of the
+capability rather than of the component.
+
 ## F292 — the truncation budgets one cell for a marker that takes two ★★★★★
 
 **`truncate` is careful about ambiguous width everywhere except the one character it adds itself.**
@@ -13686,10 +13715,23 @@ form is read from the frame*. Reading them: `pie` and `radar` **substitute** a d
 ASCII rather than degrading, which is legitimate and worth naming; and the `wide` frames mix ASCII
 furniture with box-drawing content, which is what led to measuring the width.
 
-**`U6e` asserts the defect as it stands**, with the exemption recorded **by equality** so a new
-overflow cannot hide behind an old one, and `U6e2` proves the mechanism by direct call. Both fail
-the day the budget takes the marker's measured width — which is the fix, and it moves terminal
-frames, so it lands alone.
+**Fixed, in its own commit.** `const budget = limit - clusterCells(marker, caps.ambiguousWidth)`,
+plus the boundary the residue exposed: measuring the marker closed 27 of 29, and the two that
+remained were `contour/style-line`, where instrumenting the render showed the caller asking to fit
+`╭` — two cells — into a limit of **1**. `budget <= 0` then returned the marker whether or not it
+fitted, which is the same overflow one character smaller and predates the fix. A marker too wide for
+its slot is not a marker: `" ".repeat(limit)`, on this module's own rule for a double-width glyph
+refused at a boundary. **Fuzzed over 32,000 truncations at eight limits: zero over.**
+
+**What moved: 28 baseline frames, every one `-wide-`**, 231 lines for 231, no row gained or lost —
+`…` becoming a blank, or one content cell handed back to a marker that now measures two. Nothing at
+the other four rungs, which is the control. The catalogue's terminal digest moves
+`64b8845e6408c819 → d06687b479814a56`, the campaign's first terminal move.
+
+**`U6e` holds the floor** — no row exceeds the terminal's width at any rung, exemption by equality
+so a new overflow cannot hide behind an old one — and `U6e2` proves the mechanism by direct call, so
+the finding never rested on inferring a cause from a frame. **The frames are width-correct and not
+figure-correct**: that is F293.
 
 ## F291 — a decision covered only by whole-frame gates, and the disposition that said so all along ★★★★☆
 

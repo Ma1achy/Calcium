@@ -482,10 +482,11 @@ describe("U — the seam, asserted from both arms", () => {
     // **Recorded by equality rather than excluded** — a subset check lets a row
     // that starts overflowing hide behind one that already does, and the day the
     // budget is fixed this map must go empty rather than merely shrink.
-    const OVERFLOWING = {
-      "contour/style-line": 2, "graph/crowded": 1, "tree/default": 1,
-      "violin/vertical": 13, "radar/line": 12,
-    };
+    // **Empty, and it is compared by equality so it has to stay empty.** It held
+    // `contour/style-line: 2, graph/crowded: 1, tree/default: 1,
+    // violin/vertical: 13, radar/line: 12` — 29 rows — until the marker's width
+    // was measured rather than assumed (F292).
+    const OVERFLOWING: Record<string, number> = {};
     const measured: Record<string, number> = {};
     const byRung: Record<string, number> = {};
     for (const { name, caps: set } of caps) {
@@ -505,7 +506,7 @@ describe("U — the seam, asserted from both arms", () => {
     // Four of five rungs are clean, and that is the control: a measurement that
     // reported overflow everywhere would be measuring itself.
     expect(byRung, "rows wider than the terminal, per capability set")
-      .toEqual({ "24bit": 0, "8bit": 0, ascii: 0, wide: 29, "1bit": 0 }); // cells-ok — row counts
+      .toEqual({ "24bit": 0, "8bit": 0, ascii: 0, wide: 0, "1bit": 0 }); // cells-ok — row counts
     expect(measured, "the wide rung's overflow, by variant").toEqual(OVERFLOWING);
   });
 
@@ -518,11 +519,11 @@ describe("U — the seam, asserted from both arms", () => {
       cells(truncate("abcdefghij", 6, { unicode, ambiguousWidth }), ambiguousWidth);
     expect(at("full", "narrow"), "narrow: the budget of one is right").toBe(6); // cells-ok — a cell count
     expect(at("ascii", "wide"), "`~` is not ambiguous, so the ascii rung is right").toBe(6); // cells-ok — a cell count
-    // **The defect, asserted as it stands** (F292). This row fails the day the
-    // budget takes the marker's own measured width — which is the fix, and it
-    // moves the terminal, so it lands in its own commit with the frames read.
-    expect(at("full", "wide"), "F292: one cell over, and `bmp` is the same marker").toBe(7); // cells-ok — a cell count
-    expect(at("bmp", "wide"), "F292: `bmp` keeps the ellipsis and so keeps the defect").toBe(7); // cells-ok — a cell count
+    // **F292, closed**: the budget takes the marker's own measured width, so the
+    // ambiguous rung reserves two cells and the result is the width asked for.
+    // The row that read `7` here is what made the fix's subject explicit.
+    expect(at("full", "wide"), "F292: the ellipsis is measured, not assumed").toBe(6); // cells-ok — a cell count
+    expect(at("bmp", "wide"), "F292: `bmp` keeps the ellipsis, and now keeps the width").toBe(6); // cells-ok — a cell count
   });
 
   it("U6d (§3ak.15): the trace responds to a rung moving, and to the edges being wrong", () => {

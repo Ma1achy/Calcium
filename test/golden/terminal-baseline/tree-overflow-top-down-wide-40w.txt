@@ -1,5 +1,5 @@
 ── tree · overflow-top-down · wide · 40w
                   root
-            ╭──────┼───── …
+            ╭──────┼─────…
           render layout parse
-[38;2;212;179;90m+5 more · curve · raster · paint · meas…[39m
+[38;2;212;179;90m+5 more · curve · raster · paint · mea…[39m

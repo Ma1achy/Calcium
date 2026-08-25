@@ -5233,8 +5233,31 @@ what it renders finds what an instrument comparing output to itself cannot.
 
 `U6e` asserts the exemption **by equality**, so a new overflow cannot hide behind an old one, and
 `U6e2` proves the mechanism by direct call so the finding does not rest on inferring a cause from a
-frame. Both fail when the budget takes the marker's measured width, which moves terminal frames and
-therefore lands alone.
+frame.
+
+**The fix landed alone, and the residue was the same defect at its boundary.** Measuring the marker
+closed 27 of 29; the two that remained were `contour/style-line`, and instrumenting `truncate`
+during that render showed the caller asking it to fit `╭` — two cells at this rung — into a limit of
+**1**. `budget <= 0` then returned the marker regardless of whether the marker fitted, which is the
+same overflow one character smaller and predates the fix. A marker too wide for its slot is not a
+marker: the answer is `" ".repeat(limit)`, on this module's own rule for a double-width glyph refused
+at a boundary — blank rather than absent, because the row still has to be the width it was measured
+at. Fuzzed over 32,000 truncations of ambiguous-width content at eight limits: **zero over.**
+
+**What moved, read.** 28 baseline frames, **every one of them `-wide-`**, 231 lines changed for 231
+— no row gained or lost, and the change in each is `…` becoming a blank or one content cell handed
+back to a marker that now measures two. Nothing at the other four rungs moved, which is the control
+the mechanism predicts. **The catalogue's terminal digest moves with it: `64b8845e6408c819` →
+`d06687b479814a56`**, the first terminal move of this campaign and the reason it is a commit of its
+own. The statements elsewhere in this document that report the frozen digest are reports about *those*
+commits and stay as written.
+
+**And the fix makes the frames width-correct, not figure-correct** — F293. A radar still truncates
+mid-shape at `wide` and a contour still loses a cell to a blank, because the **rasterisers** keep
+emitting ambiguous-width glyphs where `glyphs()` falls the frame's own furniture back to ASCII. One
+row at `wide` therefore mixes two alphabets. That is the `ambiguousWidth` rung in §3ak.3's table and
+it is the degradation pass's, not this one's: what this fix removes is the wrap, which is a
+correctness failure the application cannot see, and what it leaves is a legibility failure it can.
 
 ---
 ## 3q. One value axis across the bands, and the record it never had

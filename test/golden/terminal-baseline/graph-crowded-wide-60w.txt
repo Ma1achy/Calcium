@@ -5,4 +5,4 @@
                              │
                          service-04
 
-[38;2;212;179;90m+11 more · service-14 · service-01 · service-13 · service-1…[39m
+[38;2;212;179;90m+11 more · service-14 · service-01 · service-13 · service-…[39m
