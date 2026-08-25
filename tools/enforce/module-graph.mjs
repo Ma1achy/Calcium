@@ -1343,20 +1343,6 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
-  // **F84's class, stated where the rule can see it** (C12 §3ak.7). `Figure` is
-  // read by `positionalForm` today and every member but this one is taken; the
-  // marks are what the second arm draws, and the second arm has not been
-  // rewritten yet.
-  //
-  // **The expiry is the same symbol as `curveFigure`'s**: `plotToSvg` walking a
-  // figure. Until then a mutation inside the mark emitter fails `FC1`, `FC2` and
-  // `FC8` and **moves no frame**, which is recorded on those rows rather than
-  // left for someone to rediscover as a survivor.
-  "Figure.marks":
-    "C12 I62, I64, §3ak.7 — normalised marks with unresolved slots, for the arm " +
-    "that does not exist yet. The terminal reads the figure's decisions and " +
-    "rasterises its own geometry; `plotToSvg` is the reader, at step 4 of the " +
-    "unification pass",
   // --- published ahead of the value that makes it readable ------------------
   //
   // **A single-value union has nothing for a consumer to branch on**, which is

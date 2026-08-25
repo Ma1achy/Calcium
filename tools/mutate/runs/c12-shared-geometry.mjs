@@ -27,6 +27,11 @@ const SCALE = "src/presentation/plot/scale.ts";
 // is §3aj hazard 4's seam, structural rather than asserted.
 const SHARED = "src/data/viewmodel/range.ts";
 const SVG = "src/presentation/plot/svg.ts";
+// **Where two of these defects now live.** Step 4 moved the marks across the
+// seam, so a mutation aimed at *how a family computes its own coordinate* has to
+// follow — the coordinate is the shared layer's and only the rasterisation is
+// still this arm's (C12 §3ak.10).
+const FIGURE = "src/presentation/plot/figure.ts";
 
 // **The goldens are in the file list on purpose.** They cannot catch the flat
 // line — that is the finding — and their presence is what makes each row's
@@ -148,10 +153,16 @@ const results = runPass({
       // the difference is the **span**: `Math.max(1, span)` squashes a density
       // field over `0..0.3` into the bottom third of the map. The first fixture
       // had a span of 6 and could not see it.
+      //
+      // **Re-anchored when the marks crossed the seam** (§3ak.10). The open-coded
+      // span was `marks()`' own loop; the cell's reading is now a member of the
+      // mark — `value`, normalised, spent on a ramp at each arm's own depth — so
+      // the defect is one file down and identical in shape. Both arms would take
+      // it now, which is the point of moving it.
       name: "the matrix family normalises its colour for itself",
-      file: SVG,
-      from: "        const t = normalisedOf(v, range, false);",
-      to: "        const t = (v - range.min) / Math.max(1, range.max - range.min);",
+      file: FIGURE,
+      from: "            value: normalisedOf(v, extent, false),",
+      to: "            value: (v - extent.min) / Math.max(1, extent.max - extent.min),",
       expect: "G6",
     },
     {
@@ -185,10 +196,22 @@ const results = runPass({
       // **The wrap point, and it is the whole of F-this-commit.** `% 5` is
       // indistinguishable from `% 8` on every fixture with five series or
       // fewer, which is every fixture the per-form corpus has.
+      //
+      // **Re-anchored, and the survivor is what asked for it** (§3ak.10). TC2's
+      // fixture is eight *curve* series, and the curve family left this loop for
+      // the marks walk — so the mutation stayed in real, reachable code and
+      // stopped being on the path the test exercises.
+      //
+      // **The anchor sweep cannot see that.** `anchors.mjs` asks whether the text
+      // still matches, and it does: the bar family still runs this loop. Only
+      // running the pass says the row went quiet, and the reading it routes to is
+      // *write a test* when the answer is *the subject moved* — F219's
+      // misrouting arriving from the opposite direction, from an anchor that is
+      // unique and present rather than duplicated.
       name: "the slot index wraps at five rather than at the palette's size",
       file: SVG,
-      from: "    const ink = inkOf(refOf(si), theme);",
-      to: "    const ink = inkOf(refOf(si % 5), theme);",
+      from: "        ? inkOf(refOf(d.seriesIndex), theme)",
+      to: "        ? inkOf(refOf(d.seriesIndex % 5), theme)",
       expect: "TC2",
     },
     {
@@ -357,10 +380,17 @@ const results = runPass({
       // `SVG_FAMILY` before its branch exists in `marks()` refuses *as though
       // the form were unclaimed*, and every family in the completion plan does
       // exactly that on its first commit.
+      //
+      // **Re-anchored to the routing, which is what the row was always about**
+      // (§3ak.10). It used to blank the curve family's path because that was the
+      // only way to say *this family has no branch*; the walk makes the sentence
+      // literal — a family absent from the disjunction falls through to a loop
+      // that does not claim it and emits nothing. The mutation is now the exact
+      // shape the row predicted every family's first commit would have.
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
-      from: '      const d = curvePath(points, block.form === "step" || block.form === "ecdf");',
-      to: "      const d = \"\";",
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

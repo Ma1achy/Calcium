@@ -4780,6 +4780,61 @@ could not report that the axis a reader looks at had changed on seventy variants
 **The terminal half of the gate is unchanged and holds**: 890 frames at `64b8845e6408c819`, 1780
 baseline frames unmoved, on every commit of this step.
 
+---
+
+### 3ak.11 — The projector: the whole of what the second arm does with a figure's two directions
+
+**The walk reads `orientation` and `facing` in one function and nothing else reads either.** That is
+what makes S2 close by construction rather than by repair: `valueOnX` was a *third* answer to which
+way the value axis runs, beside `positionalDecisions`' fixed `"vertical"` and `orientationOf`'s read
+of the block, and a scoping clause can only be wrong where there is a clause.
+
+| the figure says | the page does |
+|---|---|
+| `orientation: "vertical"` | the identity axis is the abscissa, the value axis the ordinate |
+| `orientation: "horizontal"` | the two swap |
+| `facing.x: "left"` | the identity axis is mirrored, on whichever axis it occupies |
+| `facing.y: "up"` | the value axis **inverts on the ordinate and does not on the abscissa** |
+
+**The asymmetry in the last row is the page's, not the figure's.** SVG's `y` grows downward and its
+`x` does not, so the same `up` that makes a vertical figure's values run bottom to top makes a
+horizontal figure's run left to right — one member, two applications, which is what `facing` was
+separated into two independent directions for (§3ac).
+
+**A rect projects by its two corners and never by a corner and a size.** Mapping the size separately
+would need the walk to know which way each axis runs — the second copy of `facing` the function
+exists to remove — so it maps both corners and takes the bounding box, and every flip falls out.
+
+**Three reads of the form survive in this arm and all three are rasterisation** (§3aj hazard 1):
+
+| read | why it is not the figure's |
+|---|---|
+| `step`/`ecdf` take a square polyline joint | the terminal picks `stepRows` off the same member; the *points* are shared and the joint is which rasteriser draws them |
+| a matrix cell reads `block.colormap` | the ramp is a palette, and `rect.value` — the reading itself — is what crosses |
+| a bubble's radius is `2 + 5·size` | the terminal spends the same normalised number on 0 to 2 dots; the floor is what its radius-0 single dot is, *a sample with no size still draws* |
+
+**`absent` draws nothing, and that is the role's entire content here** (I62). The terminal has a
+character for *no estimate was reported*; this arm's equivalent of that character is not a circle at
+the fallback position, which is the plausible wrong figure the role exists to refuse.
+
+**The extraction is byte-identical where it should be, and that is the measurement.** Migrating
+`curve`, `scatter` and `matrix` into the walk moved **4 of 178 SVG frames**, and all four moved for
+reasons that are additions rather than differences:
+
+| frame | what appeared | why |
+|---|---|---|
+| `line-annotated`, `line-annotation-label`, `autocorrelation-default` | one dashed rule each | the arm drew **no annotations at all**; `annotationMarks` is in the figure and the walk reads it |
+| `bubble-default` | radii from `2.714` to `7` where every circle was `r="3"` | the size channel crosses the seam now (§3ak.1 finding 2) |
+
+Every other curve, scatter and matrix frame is **unchanged to the byte**, which is the claim
+*`svgPoints` + `curvePath` and the matrix loop are the projector at three call sites* asserted rather
+than hoped: the projector reproduces three hand-written loops exactly, including the one whose
+coordinate is spent on colour instead of position.
+
+**And the bubble frame is F271 visible in the second arm.** Both series carry the same radii, because
+`positionalForm` hands `block.series[1]` to `bubbleRows` as the sizes *for every series* — so the size
+channel is drawn as a series sized by itself, in its own colour, in both arms now. One wrong figure
+rather than two different ones, which is the tie-break's whole argument.
 
 ---
 

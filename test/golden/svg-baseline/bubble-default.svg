@@ -8,18 +8,18 @@
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">40</text>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
-<circle cx="89.6" cy="196.267" r="3" fill="#e69f00"/>
-<circle cx="177.067" cy="81.6" r="3" fill="#e69f00"/>
-<circle cx="264.533" cy="150.4" r="3" fill="#e69f00"/>
-<circle cx="352" cy="12.8" r="3" fill="#e69f00"/>
-<circle cx="439.467" cy="113.707" r="3" fill="#e69f00"/>
-<circle cx="526.933" cy="49.493" r="3" fill="#e69f00"/>
-<circle cx="614.4" cy="173.333" r="3" fill="#e69f00"/>
-<circle cx="89.6" cy="278.827" r="3" fill="#56b4e9"/>
-<circle cx="177.067" cy="246.72" r="3" fill="#56b4e9"/>
-<circle cx="264.533" cy="269.653" r="3" fill="#56b4e9"/>
-<circle cx="352" cy="223.787" r="3" fill="#56b4e9"/>
-<circle cx="439.467" cy="260.48" r="3" fill="#56b4e9"/>
-<circle cx="526.933" cy="237.547" r="3" fill="#56b4e9"/>
-<circle cx="614.4" cy="274.24" r="3" fill="#56b4e9"/>
+<circle cx="89.6" cy="196.267" r="2.714" fill="#e69f00"/>
+<circle cx="177.067" cy="81.6" r="5.214" fill="#e69f00"/>
+<circle cx="264.533" cy="150.4" r="3.429" fill="#e69f00"/>
+<circle cx="352" cy="12.8" r="7" fill="#e69f00"/>
+<circle cx="439.467" cy="113.707" r="4.143" fill="#e69f00"/>
+<circle cx="526.933" cy="49.493" r="5.929" fill="#e69f00"/>
+<circle cx="614.4" cy="173.333" r="3.071" fill="#e69f00"/>
+<circle cx="89.6" cy="278.827" r="2.714" fill="#56b4e9"/>
+<circle cx="177.067" cy="246.72" r="5.214" fill="#56b4e9"/>
+<circle cx="264.533" cy="269.653" r="3.429" fill="#56b4e9"/>
+<circle cx="352" cy="223.787" r="7" fill="#56b4e9"/>
+<circle cx="439.467" cy="260.48" r="4.143" fill="#56b4e9"/>
+<circle cx="526.933" cy="237.547" r="5.929" fill="#56b4e9"/>
+<circle cx="614.4" cy="274.24" r="3.071" fill="#56b4e9"/>
 </svg>

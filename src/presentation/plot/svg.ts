@@ -47,6 +47,7 @@ import {
   nodesDecisions,
   scatterFigure,
   tilesFigure,
+  type Drawn,
   type Figure,
 } from "./figure.js";
 import { ORIGIN_DEFAULT } from "../../data/viewmodel/index.js";
@@ -215,7 +216,7 @@ export function svgFamilyOf(form: PlotForm): SvgFamily | null {
  * `marks: []` would make I64 read it as *nothing to draw* and refuse two forms
  * this arm draws today.
  */
-function figureFor(block: Plot): Omit<Figure, "marks"> | null {
+function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
   switch (svgFamilyOf(block.form)) {
     case "curve": return curveFigure(block);
     case "scatter": return scatterFigure(block);
@@ -262,8 +263,11 @@ export function svgPoints(
   });
 }
 
+/** The plot area in px. Never a cell count. */
+type Area = Readonly<{ left: number; right: number; top: number; bottom: number }>;
+
 /** The plot area in px, from the layout's fractions. Never a cell count. */
-function area(layout: SvgLayout): Readonly<{ left: number; right: number; top: number; bottom: number }> {
+function area(layout: SvgLayout): Area {
   return {
     left: layout.width * (layout.gutter + layout.pad),
     right: layout.width * (1 - layout.pad),
@@ -337,6 +341,141 @@ function curvePath(points: readonly (readonly [number, number] | null)[], square
     void i;
   }
   return out.join(" ");
+}
+
+/**
+ * Figure space to page space — **the whole of what this arm does with
+ * `orientation` and `facing`** (I61, §3ak.10).
+ *
+ * A mark is normalised and uninverted: `x` runs along the identity axis and `y`
+ * along the value axis, whichever way round those two end up on the page.
+ * **Which page axis each occupies is `orientation`, and which way each runs is
+ * `facing`** — so this is the only place in this arm that reads either, and that
+ * is what stops it drawing on its side a chart the terminal draws flat (D11).
+ *
+ * **`facing.y` inverts on the ordinate and does not on the abscissa**, because
+ * the page's `y` grows downward and its `x` does not. One member, two
+ * applications: the same `up` that makes a vertical figure's values run bottom
+ * to top makes a horizontal figure's run left to right.
+ */
+function projected(figure: Omit<Figure, "marks">, box: Area): (x: number, y: number) => readonly [number, number] {
+  const wide = box.right - box.left;
+  const tall = box.bottom - box.top;
+  const sideways = figure.orientation === "horizontal";
+  const up = figure.facing.y === "up";
+  const mirrored = figure.facing.x === "left";
+  return (x, y) => {
+    const along = mirrored ? 1 - x : x;
+    return sideways
+      ? ([box.left + wide * (up ? y : 1 - y), box.top + tall * along] as const)
+      : ([box.left + wide * along, box.top + tall * (up ? 1 - y : y)] as const);
+  };
+}
+
+/**
+ * A figure's marks as SVG elements — **the walk that replaces a loop per
+ * family** (§3ak.10).
+ *
+ * **Nothing here reads the form to decide *what* is drawn**, which is the whole
+ * of the change: a rect is a rect whether it came from a bar, a heatmap cell or
+ * a treemap tile, and the two members that vary its appearance — a `value` to
+ * spend on the ramp, a `size` to spend on a radius — are on the mark rather than
+ * in a table keyed by form. The form is read twice below and both are
+ * rasterisation (§3aj hazard 1): which polyline joint a step takes, and which
+ * ramp a matrix reads.
+ *
+ * **A colour is resolved here and never crosses the seam** (I62). `ref` is an
+ * explicit slot and `seriesIndex` is the categorical ladder's; a mark with
+ * neither is furniture, which is `xTitleRow`'s own reason — *furniture is not a
+ * series*.
+ */
+function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out: string[]): readonly string[] {
+  const at = projected(figure, box);
+  const map = COLORMAPS[block.colormap ?? "viridis"];
+  const furniture = inkOf(LABEL, theme);
+  // **A step holds its value until the next sample, and that is *which
+  // rasteriser* rather than *where the samples are*.** The terminal picks
+  // `stepRows` off the same member — `styleRasteriser(block, caps, stepRows,
+  // "step")` — and the points it rasterises are the figure's either way, so the
+  // joint is this arm's and the polyline is shared (§3aj hazard 1).
+  const square = block.form === "step" || block.form === "ecdf";
+
+  const inkFor = (d: Drawn): string | undefined =>
+    d.ref !== undefined
+      ? inkOf(d.ref, theme)
+      : d.seriesIndex !== undefined
+        ? inkOf(refOf(d.seriesIndex), theme)
+        : furniture;
+
+  for (const d of figure.marks) {
+    const ink = inkFor(d);
+    if (ink === undefined) continue;
+    const m = d.mark;
+
+    if (m.kind === "polyline") {
+      const annotation = d.layer === "annotation";
+      const path = curvePath(m.points.map((pt) => at(pt[0], pt[1])), square && !annotation);
+      if (path === "") continue;
+      // **Dashed, for `annotate.ts`' own reason**: a reference line is a claim
+      // *about* the ordinate drawn beside the data, and a solid rule crossing
+      // five series reads as a sixth. The terminal draws `┄` and the legend
+      // swatch it already shares says the same thing (C04 I52).
+      out.push(
+        `<path d="${path}${m.closed === true ? " Z" : ""}" fill="none" stroke="${ink}" ` +
+          `stroke-width="${annotation ? "1" : "2"}"${annotation ? ' stroke-dasharray="4 3"' : ""}/>`,
+      );
+      continue;
+    }
+
+    if (m.kind === "point") {
+      // **`absent` draws nothing, and that is the role's entire content here**
+      // (I62). A forest row with no estimate is a real state the terminal has a
+      // character for; this arm's equivalent of that character is not a circle
+      // at the fallback position, which is the plausible wrong figure the role
+      // exists to refuse.
+      if (m.role === "absent") continue;
+      const [cx, cy] = at(m.x, m.y);
+      // **A bubble's radius is data and this scale is not** (§3aj hazard 1,
+      // §3ak.1 finding 2). The size arrives normalised against its own series'
+      // maximum — `bubbleRows`' own figure — and the terminal spends it on 0 to
+      // 2 dots. The floor of 2 px is what its radius-0 single dot is: a sample
+      // with no size still draws.
+      const r = m.size === undefined ? 3 : 2 + 5 * m.size;
+      out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="${ink}"/>`);
+      continue;
+    }
+
+    if (m.kind === "rect") {
+      const a = at(m.x, m.y);
+      const b = at(m.x + m.w, m.y + m.h);
+      // **Two corners and a bounding box, so every flip is the projector's.**
+      // Mapping a corner and a size separately would need the walk to know which
+      // way each axis runs — the second copy of `facing` this function exists to
+      // remove.
+      const x = Math.min(a[0], b[0]);
+      const y = Math.min(a[1], b[1]);
+      const w = Math.abs(b[0] - a[0]);
+      const h = Math.abs(b[1] - a[1]);
+      let fill = ink;
+      // **A rect carrying a `value` is coloured by the ramp rather than by its
+      // slot**, and the rule is the mark's rather than the family's. A matrix
+      // cell has no length and no position left to carry its reading — the
+      // coordinate is spent on the grid — so the reading crosses the seam
+      // normalised and each arm turns it into a colour at its own depth.
+      if (m.value !== undefined) {
+        if (map === undefined) continue;
+        const colour = continuousColour(map, m.value, SVG_CAPS);
+        if (colour === undefined || colour.kind !== "rgb") continue;
+        fill = colour.hex;
+      }
+      out.push(
+        `<rect x="${n(x)}" y="${n(y)}" width="${n(Math.max(w, 0.5))}" height="${n(Math.max(h, 0.5))}" ` +
+          `fill="${fill}"/>`,
+      );
+      continue;
+    }
+  }
+  return out;
 }
 
 // **`rangeFor` is gone, and its removal is what this step is for** (C12 §3ak.10).
@@ -589,33 +728,28 @@ function forestMarks(
  * family differ only in what they put at a position the shared coordinate
  * already gave them — a joined path, a mark, a rectangle, a painted cell.
  */
-function marks(block: Plot, range: PinnedRange, layout: SvgLayout, theme: ResolvedTheme): readonly string[] {
+function marks(
+  block: Plot,
+  figure: Figure | Omit<Figure, "marks">,
+  range: PinnedRange,
+  layout: SvgLayout,
+  theme: ResolvedTheme,
+): readonly string[] {
   const family = svgFamilyOf(block.form);
   const box = area(layout);
   const out: string[] = [];
 
-  if (family === "matrix") {
-    const map = COLORMAPS[block.colormap ?? "viridis"];
-    const rows = block.series.length; // cells-ok — a series count
-    const cols = block.series.reduce((m, r) => Math.max(m, r.values.length), 0); // cells-ok — a column count
-    if (map === undefined || rows === 0 || cols === 0) return out;
-    const w = (box.right - box.left) / cols;
-    const h = (box.bottom - box.top) / rows;
-    for (const [r, series] of block.series.entries()) {
-      for (const [c, v] of series.values.entries()) {
-        if (v === null || !Number.isFinite(v)) continue;
-        // **The shared coordinate, spent on colour.** `invert` is false: a
-        // matrix reads low-to-high up the map rather than up the page.
-        const t = normalisedOf(v, range, false);
-        const colour = continuousColour(map, t, SVG_CAPS);
-        if (colour === undefined || colour.kind !== "rgb") continue;
-        out.push(
-          `<rect x="${n(box.left + c * w)}" y="${n(box.top + r * h)}" width="${n(w)}" height="${n(h)}" ` +
-            `fill="${colour.hex}"/>`,
-        );
-      }
-    }
-    return out;
+  // **The families that have crossed**, and the list is the diff (§3ak.10).
+  // Each commit of step 4 moves one or more into the walk and deletes the loop
+  // it had, so what is left below is what is still decided twice — readable
+  // without holding the plan beside it.
+  //
+  // **`"marks" in figure` is the nodes family and nothing else** (§3ak.10 S3).
+  // `nodesDecisions` returns `Omit<Figure, "marks">` because a tree's placement
+  // is a function of its labels' widths in the terminal and of slots here, so
+  // the topology crosses and the placement does not.
+  if ((family === "curve" || family === "scatter" || family === "matrix") && "marks" in figure) {
+    return walk(figure, block, box, theme, out);
   }
 
   if (family === "nodes") {
@@ -868,17 +1002,6 @@ function marks(block: Plot, range: PinnedRange, layout: SvgLayout, theme: Resolv
     // so the two arms cannot give series three different colours.
     const ink = inkOf(refOf(si), theme);
     if (ink === undefined) continue;
-    if (family === "curve") {
-      const d = curvePath(points, block.form === "step" || block.form === "ecdf");
-      if (d !== "") out.push(`<path d="${d}" fill="none" stroke="${ink}" stroke-width="2"/>`);
-      continue;
-    }
-    if (family === "scatter") {
-      for (const p of points) {
-        if (p !== null) out.push(`<circle cx="${n(p[0])}" cy="${n(p[1])}" r="3" fill="${ink}"/>`);
-      }
-      continue;
-    }
     if (family === "bar") {
       // **The baseline is zero where the range contains it, and the floor
       // otherwise** — because a bar's length *is* its value, so signed data
@@ -960,9 +1083,15 @@ export function plotToSvg(
   // sat on the bottom edge in one arm and floated in the other: not a
   // rasterisation difference but a different scale, and no single decision held
   // it because both arms drew something plausible.
+  // **Non-null by construction**, since a family of `null` returned above and
+  // `figureFor` answers `null` for nothing else. Stated as a guard rather than
+  // threaded as `?.`, because the marks walk needs the object and an optional
+  // chain would say the refusal is decided in two places when it is decided in
+  // one.
   const figure = figureFor(block);
-  const range = figure?.value?.range ?? figure?.extent ?? { min: 0, max: 1 };
-  const axis = figure?.value ?? null;
+  if (figure === null) return null;
+  const range = figure.value?.range ?? figure.extent ?? { min: 0, max: 1 };
+  const axis = figure.value;
   const box = area(layout);
 
   // **Furniture is not a picture**, and this is the second clause because it is
@@ -971,7 +1100,7 @@ export function plotToSvg(
   // returns `null` and the `?? { min: 0, max: 1 }` above furnishes an axis out
   // of nothing. Drawn, that is five gridlines labelled 0 to 1 over an empty
   // box: a plot of a range the block never had.
-  const body = marks(block, range, layout, theme);
+  const body = marks(block, figure, range, layout, theme);
   if (body.length === 0) return null; // cells-ok — a count of SVG elements
 
   const parts: string[] = [

@@ -13642,6 +13642,79 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F277 — a mutation whose subject moved out from under it, and the sweep cannot see that ★★★★☆
+
+**The migration is the mechanism.** Step 4 moves one family at a time out of `marks()`' per-family
+loops and into the walk over `figure.marks`. `TC2`'s mutation — *the slot index wraps at five rather
+than at the palette's size* — was anchored on
+
+```ts
+    const ink = inkOf(refOf(si), theme);
+```
+
+and `TC2`'s fixture is **eight curve series**. The curve family left that loop on the commit that
+built the walk. The line is still there, still real, still reachable: **the bar family runs it.**
+
+**So the anchor is valid and the row is dead.** `anchors.mjs` asks whether the text still matches and
+it does — 941 anchors, no drift, exit 0. Only running the pass says anything, and what it says is
+`SURVIVED`, which routes to the first of the three dispositions: *write a test*. There is nothing
+wrong with the test. The subject moved.
+
+**F219's misrouting arriving from the opposite direction.** F219 is an *ambiguous* anchor reporting
+as SURVIVED — one mutation matching two sites. This is a **unique, present, textually correct** anchor
+reporting the same way, and the two want opposite repairs: F219 wants the duplicate extracted, this
+wants the anchor followed. The report cannot tell them apart, and neither can the sweep.
+
+**What reaches it is asking why the mutation cannot get to the test** — which is the third disposition
+the mutation pass already has (*the test is right and something else masks it*) with the mask being a
+refactor rather than a second defect. Cheap here because the migration is scheduled and the survivor
+arrived on the commit that caused it; expensive whenever a refactor and a pass are separated by more
+than one commit, which is the ordinary case.
+
+**Two of the three stale rows on this commit were caught by the sweep and this one was not**, and the
+difference is the whole finding: those two named text that had been *deleted*. Text that survives its
+own meaning is invisible to a matcher.
+
+---
+
+## F276 — a facing that decides nothing, and a sentence that says it decides twice ★★★★☆
+
+`tilesFigure`'s doc reads:
+
+> **The facing is live for this family**, unlike the matrix's (F273): `flame`, `icicle` and `treemap`
+> all declare `ORIGIN_DEFAULT: null`, so `facingOf` reaches its fallback and the argument decides. A
+> flame grows up from its root and an icicle hangs down from it, **which is one decision applied
+> twice.**
+
+Every clause of the first sentence is true and measured. `ORIGIN_DEFAULT` is `null` for all three, so
+`facingOf` does reach its fallback, and the argument does decide — **and the argument is the constant
+`FACING_DEFAULT`, passed for all three forms.** So the member is `{x: "right", y: "up"}` for a flame
+and for an icicle alike, and it distinguishes nothing.
+
+**The decision it claims to hold is written in two renderers instead**:
+
+| arm | where | what |
+|---|---|---|
+| terminal | `definition.ts` | `rowFor = inverted ? depth : areaRows - 1 - depth` |
+| SVG | `svg.ts` | `const inverted = block.form === "icicle"` |
+
+which is exactly the *two copies of one decision* that I61 — *decided once, applied twice* — exists to
+end, sitting under a comment asserting it had been ended.
+
+**This is the class MG24's scoping sentence is in**: a correct justification attached to a decision it
+does not constrain. Review checks whether the sentence is true, and it is. What review does not ask is
+whether the code the sentence is about could be *changed* to violate it — and nothing here can, because
+`facing` has no consumer for this family yet. **An invariant is vacuous until its subject exists**, and
+the subject arrives the moment a renderer reads `figure.facing` instead of `block.form`.
+
+**Found by trying to use it.** The marks walk projects with `orientation` and `facing` and nothing
+else, so writing it meant asking what a tiles figure's facing *is* — and the answer disagreed with the
+paragraph above it. Measured in both arms first: the terminal maps `t.y0 * areaRows` to a row index, so
+a **treemap**'s `y0 = 0` is the top and its facing is downward too. Two of the three face down and the
+comment names the one that does not.
+
+---
+
 ## F275 — the gate this pass's next step rests on does not watch the arm it names ★★★★★
 
 **Step 4's rule is that the terminal digest stays frozen and the phase digest moves on every commit,
