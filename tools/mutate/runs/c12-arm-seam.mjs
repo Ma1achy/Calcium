@@ -1,4 +1,9 @@
-// The curve family's seam, mutated — C12 I59, I61, I64, I65, §3ak.7.
+// The arm seam, mutated — C12 I59, I61, I64, I65, §3ak.7.
+//
+// **One run for the seam rather than one per family**, because the families
+// share the decisions and differ only in the marks: `positionalDecisions` is
+// mutated once and every family that reads it is under the same row. Named for
+// the seam and not the curve for that reason — it grows as the seven land.
 //
 // **The pass's own claim is what is under test here.** Step 3 says `figureOf`
 // is the terminal's computation *moved*, so a decision changed inside it must
@@ -49,6 +54,43 @@ const results = runPass({
     why: "the terminal stops reading the shared axis and furnishes two raw bounds instead. If this survives, nothing downstream reads the figure and every row below is a claim about a value nobody takes",
   },
   mutations: [
+    {
+      // **A bubble's size channel scaled against the wrong maximum.** `sizes` is
+      // the second series read positionally, and `bubbleRows` divides by
+      // `max(1, …finite)`. Dividing by the *value* series' maximum keeps every
+      // bubble a plausible size and makes none of them the size it is.
+      name: "the size channel is normalised against the value series",
+      file: FIGURE,
+      from: "    const maxSize = Math.max(1, ...finite);",
+      to: "    const maxSize = Math.max(1, value.range.max);",
+      expect: "FS3",
+    },
+    {
+      // **F271 silently corrected**, which is the mutation this family most
+      // needs: dropping the channel from the figure is the *right* chart and the
+      // wrong commit — no frame moves, the two arms disagree at step 4, and
+      // nothing announces it. The row exists so the divergence cannot be made by
+      // accident.
+      name: "THE DIVERGENCE: the figure quietly stops drawing the size channel",
+      file: FIGURE,
+      // **Two lines, because one is ambiguous** — both families iterate the
+      // series identically and the sweeper said so. An ambiguous anchor reports
+      // as SURVIVED, which routes to *write a test* rather than *fix the anchor*
+      // (F219).
+      from: "    block.series.forEach((series, seriesIndex) => {\n      const span = Math.max(1, series.values.length - 1); // cells-ok — a sample count",
+      to: "    block.series.slice(0, 1).forEach((series, seriesIndex) => {\n      const span = Math.max(1, series.values.length - 1); // cells-ok — a sample count",
+      expect: "FS3",
+    },
+    {
+      // **An absent size becomes a zero radius**, which the terminal draws as a
+      // single dot — so *no size given* and *size zero* stop being different
+      // statements at the seam that exists to keep them apart.
+      name: "a missing size is a zero radius rather than an absence",
+      file: FIGURE,
+      from: "          ? undefined\n          : Math.abs(size) / maxSize;",
+      to: "          ? 0\n          : Math.abs(size) / maxSize;",
+      expect: "FS3",
+    },
     {
       // **The SVG arm's old constant, moved into the shared layer.** Five ticks
       // regardless of height is what `plotToSvg` passed, and it is half of D2 —

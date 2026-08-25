@@ -317,6 +317,25 @@ function runsOf(values: readonly (number | null)[], range: Range): readonly (rea
 }
 
 /**
+ * A reference line's mark — **the annotation mechanism, not a form's machinery**
+ * (C04 I52, §3e).
+ *
+ * A reference line is a claim *about* the ordinate drawn beside the data, and it
+ * is the same mechanism an autocorrelation plot's significance bounds use, which
+ * is what §3ak.6 measured rather than assumed before refusing that form. Shared
+ * across the families for that reason: a second copy would be a second answer to
+ * *where does a reference line sit*, and the arms already had two.
+ */
+function annotationMarks(block: Pick<Plot, "annotations">, range: Range): readonly Drawn[] {
+  return (block.annotations ?? []).flatMap((a) => {
+    if (a.kind !== "line") return [];
+    const y = normalisedOf(a.value, range, false);
+    const ref: ColourRef = a.tone === undefined ? "tone.muted" : `tone.${a.tone}`;
+    return [{ mark: { kind: "polyline" as const, points: [[0, y], [1, y]] as readonly Pt[] }, layer: "annotation" as const, ref }];
+  });
+}
+
+/**
  * **Every decision the positional families share — which is all of them but the
  * marks** (§3ak.7).
  *
@@ -355,6 +374,77 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
 }
 
 /**
+ * The scatter family's figure — **`scatter` and `bubble`** (§3ak.7).
+ *
+ * **The same decisions as the curve, and that is measured rather than assumed**:
+ * both families reach `positionalForm`, which computes the extent, the nicing,
+ * the tick count and the facing once for all of them. So this family's emitter
+ * is `positionalDecisions` and a different mark — which is what *one emitter per
+ * family* is for, and why the families are the unit rather than the forms.
+ *
+ * **A bubble's size crosses the seam and a scatter dot's does not** (§3ak.1
+ * finding 2). The radius of a bubble *is data* — `sizes` is the second series,
+ * read positionally against the first — so it arrives normalised against that
+ * series' own maximum, exactly as `bubbleRows` does it. A scatter dot's radius
+ * is the SVG's rasterisation and the terminal's is one cell, so neither is here.
+ *
+ * **`maxSize` is `bubbleRows`' own**: at least 1, over the finite sizes. A
+ * sample with no size gets no `size` member rather than a zero, because zero is
+ * a radius the terminal draws as a single dot and *absent* is not.
+ *
+ * **This reproduces F271 deliberately, and the alternative was worse.** A
+ * bubble's size channel is `block.series[1]` — a *member of `series`*, with
+ * nothing to say it is not a series — so `overlaidRows` rasterises it like any
+ * other, `seriesRange` stretches the value axis over it, and `identityOf` names
+ * it in the legend. The shipped catalogue frame shows all three: a gutter
+ * running `0 · 20 · 40 · 60` for data spanning 20–60, a second set of bubbles in
+ * the size series' own colour, and a legend reading *value · size*.
+ *
+ * Emitting one series here would be **correcting the terminal inside a
+ * refactor**, which is the one thing this pass forbids: no frame would move, the
+ * two arms would disagree at step 4, and the correction would be announced by
+ * nothing. So the figure says what the terminal draws and F271 is owed — the
+ * fix is a channel that is not a member of `series`, which is a C04 ruling.
+ */
+export function scatterFigure(block: Plot): Figure {
+  const decisions = positionalDecisions(block);
+  const { value } = decisions;
+  const marks: Drawn[] = [];
+  if (value !== null) {
+    // The second series is the size channel, and it is never a series of its own
+    // — `bubbleRows` reads `block.series[1]` positionally against the first.
+    const sizes = block.form === "bubble" ? block.series[1]?.values : undefined;
+    const finite = (sizes ?? []).filter((v): v is number => v !== null && Number.isFinite(v));
+    const maxSize = Math.max(1, ...finite);
+    // Every member of `series` is drawn, because `overlaidRows` draws every
+    // member of `series` — including the one that is a channel (F271).
+    block.series.forEach((series, seriesIndex) => {
+      const span = Math.max(1, series.values.length - 1); // cells-ok — a sample count
+      series.values.forEach((v, i) => {
+        if (v === null || !Number.isFinite(v)) return;
+        const size = sizes?.[i];
+        const scaled = size === null || size === undefined || !Number.isFinite(size)
+          ? undefined
+          : Math.abs(size) / maxSize;
+        marks.push({
+          mark: {
+            kind: "point",
+            x: i / span,
+            y: normalisedOf(v, value.range, false),
+            role: "point",
+            ...(scaled === undefined ? {} : { size: scaled }),
+          },
+          layer: "series",
+          seriesIndex,
+        });
+      });
+    });
+    marks.push(...annotationMarks(block, value.range));
+  }
+  return { ...decisions, marks };
+}
+
+/**
  * The curve family's figure — **`line`, `sparkline`, `step`, `ecdf`, `density`**
  * (§3ak.7).
  *
@@ -384,21 +474,7 @@ export function curveFigure(block: Plot): Figure {
         marks.push({ mark: { kind: "polyline", points }, layer: "series", seriesIndex });
       }
     });
-    // **The bands are the annotation mechanism, not a form's machinery**
-    // (C04 I52, §3e). A reference line is a claim about the ordinate drawn
-    // beside the data, and it is the same mechanism an autocorrelation plot's
-    // significance bounds use — which is what §3ak.6 measured rather than
-    // assumed before refusing that form.
-    for (const a of block.annotations ?? []) {
-      if (a.kind !== "line") continue;
-      const y = normalisedOf(a.value, value.range, false);
-      const ref: ColourRef = a.tone === undefined ? "tone.muted" : `tone.${a.tone}`;
-      marks.push({
-        mark: { kind: "polyline", points: [[0, y], [1, y]] },
-        layer: "annotation",
-        ref,
-      });
-    }
+    marks.push(...annotationMarks(block, value.range));
   }
   return { ...decisions, marks };
 }

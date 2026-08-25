@@ -2441,6 +2441,16 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // rasterisers — a curve is Bresenham at dot resolution and folded, which is
   // not a polyline walk — so wiring the marks into *this* arm would be a rewrite
   // of the thing the pass promises not to touch.
+  // **The scatter family's, and its decisions ARE consumed** — `positionalForm`
+  // draws scatter and bubble through `positionalDecisions` like everything else
+  // positional, so what waits here is the marks alone. Same expiry symbol:
+  // `plotToSvg` walking a figure.
+  scatterFigure:
+    "C12 I59, I62, §3ak.7 — the scatter family's shared emitter. Its decisions " +
+    "are `positionalDecisions`, consumed by `positionalForm` today; what has no " +
+    "reader is the point marks and the size channel, which `plotToSvg` takes at " +
+    "step 4. The terminal's bubbles are dots in a braille grid, not points in a " +
+    "normalised space",
   curveFigure:
     "C12 I59, §3ak.7 — the curve family's shared emitter. Its decisions half is " +
     "consumed by `positionalForm` through `positionalDecisions`; the marks half " +

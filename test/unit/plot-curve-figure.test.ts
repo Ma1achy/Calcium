@@ -15,6 +15,7 @@ import {
   identityOf,
   legendSlots,
   positionalDecisions,
+  scatterFigure,
 } from "../../src/presentation/plot/figure.js";
 import { legendEntries } from "../../src/presentation/plot/furniture.js";
 import { ecdfSeries } from "../../src/presentation/plot/derive.js";
@@ -204,5 +205,59 @@ describe("FC — the curve family's figure (C12 §3ak.7)", () => {
     // The raw bounds the 1-bit arm rasterises against are still a figure fact —
     // it is the *axis object* built from them that is the projection's.
     expect(f.extent).toEqual({ min: 1, max: 4 });
+  });
+});
+
+describe("FS — the scatter family's figure (C12 §3ak.7)", () => {
+  it("FS1 (C12 I59): the decisions are the curve family's, because `positionalForm` makes them once", () => {
+    // **The families are the unit, and this is why.** Both reach the same
+    // composer, so the extent, the nicing, the tick count and the facing are one
+    // computation — and asserting that keeps a later commit from giving the
+    // scatter family a second axis by accident.
+    const block = plot({ form: "scatter", height: 8, series: [{ values: [1, 5, 3] }] });
+    const c = curveFigure(block), sc = scatterFigure(block);
+    for (const k of ["value", "extent", "identity", "orientation", "facing", "frame", "legend"] as const) {
+      expect(sc[k], k).toEqual(c[k]);
+    }
+    expect(sc.marks, "and only the marks differ").not.toEqual(c.marks);
+  });
+
+  it("FS2 (C12 I62): a point per finite sample, and a hole is an absence rather than a zero", () => {
+    const f = scatterFigure(plot({ form: "scatter", series: [{ values: [1, null, 3] }] }));
+    const pts = f.marks.filter((d) => d.layer === "series");
+    expect(pts.length, "two samples, two points — the hole is not drawn at zero").toBe(2);
+    expect(pts.every((d) => d.mark.kind === "point" && d.mark.role === "point")).toBe(true);
+    expect(pts.every((d) => d.mark.kind === "point" && d.mark.size === undefined),
+      "a scatter dot's radius is the renderer's, so it does not cross").toBe(true);
+  });
+
+  it("FS3 (C12 I62, §3ak.1): a bubble's size IS data, so it crosses normalised", () => {
+    // `bubbleRows` reads `block.series[1]` positionally against the first and
+    // divides by `max(1, …finite sizes)`. Same normalisation here, or the two
+    // arms scale the size channel differently and every bubble is a different
+    // size in each.
+    // **The value series is the larger one on purpose.** With sizes above the
+    // values, `seriesRange` — which spans every member of `series`, F271 — makes
+    // the niced maximum *equal* the size maximum, and the mutation that divides
+    // by the wrong one survives. The convenient fixture is the one where both
+    // readings agree, and the mutation pass is what said so.
+    const f = scatterFigure(plot({
+      form: "bubble", height: 8,
+      series: [{ values: [1, 100, 50] }, { values: [4, 2, null] }],
+    }));
+    const own = f.marks.filter((d) => d.seriesIndex === 0);
+    const sizes = own.map((d) => (d.mark.kind === "point" ? d.mark.size : "not a point"));
+    expect(sizes, "normalised against the size series' own maximum").toEqual([1, 0.5, undefined]);
+    // **`undefined` rather than `0`**, because a zero radius is a dot the
+    // terminal draws and *absent* is not the same statement.
+    expect(sizes[2]).toBeUndefined();
+    // **F271, asserted rather than described.** The size channel is a member of
+    // `series`, so the terminal rasterises it as a second bubble series and the
+    // figure says so — correcting it here would be a silent divergence inside a
+    // refactor. The day the channel stops being a series, this row fails and the
+    // finding is closed by the failure rather than by memory.
+    expect(f.marks.filter((d) => d.seriesIndex === 1).length,
+      "the channel is drawn as a series — F271, owed").toBe(2);
+    expect(f.identity, "and named as one in the legend").toEqual(["series 1", "series 2"]);
   });
 });

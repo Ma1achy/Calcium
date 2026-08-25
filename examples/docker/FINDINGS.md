@@ -13459,5 +13459,49 @@ values and **draws them at linear rows** — documented in `axes.ts`, deliberate
 `x`, which does transform. So the untested mode is one already known to be half-implemented, and a
 fixture would have put that in a frame where a reader would meet it.
 
+---
+
+## F271 — a bubble chart draws its size channel as a second series, and the shipped frame says so ★★★★☆
+
+**`block.series[1]` is a bubble's size channel and it is a member of `series`, with nothing to say
+it is not a series.** Three consequences, one cause, all three visible in
+`test/golden/terminal-baseline/bubble-default-24bit-80w.txt` — a frame that has been through every
+visual review this component has had:
+
+```
+60 ┤   ●            ●                    ● value
+   │                ●                    ● size
+40 ┤          ●
+20 ┤●
+   │   ○      ○     ○      ○      ○
+ 0 ┤○         ○            ○            ○
+```
+
+1. **The value axis spans the size magnitudes.** `seriesRange` iterates every member of `series`, so
+   data spanning 20–60 is drawn against a gutter running `0 · 20 · 40 · 60`. Every reading a reader
+   takes off it is compressed into the top two-thirds for no reason in the data.
+2. **The channel is rasterised.** `overlaidRows` does `block.series.map((s, i) => rasterise(s, …))`,
+   so `bubbleRows` is called on the sizes too — **sized by themselves** — and the frame carries a
+   second set of bubbles in the size series' own colour.
+3. **The legend names it.** `identityOf` is `series.map(…)`, so the reader is told there are two data
+   series where there is one and a channel.
+
+**Found by a mutation that survived, and the survivor's cause was the fixture.** The row divided the
+size channel by the *value* series' maximum instead of the sizes' own; it survived because the sizes
+were the larger series, so `seriesRange` made the two maxima equal. **The convenient fixture is the
+one where both readings agree** — and going to look at why is what put the frame on screen.
+
+**Not fixed, and the figure reproduces it deliberately.** `scatterFigure` emits a point set per
+member of `series`, because that is what the terminal draws. Emitting one would be *correcting the
+terminal inside a refactor*: **no frame would move**, the two arms would disagree at step 4, and
+nothing would announce the change — which is the one thing this pass forbids. So `FS3` asserts the
+defect, and the day the channel stops being a series that row fails and closes the finding by
+failing rather than by memory.
+
+**The fix is a C04 ruling, not a C12 patch.** A size channel is not a series and needs somewhere
+else to live — the same shape `segments` already has. Until then every form with a second channel
+inherits all three symptoms, and `bubble` is the only one that has one.
+
+
 
 
