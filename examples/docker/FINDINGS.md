@@ -13642,6 +13642,38 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F291 — a decision covered only by whole-frame gates, and the disposition that said so all along ★★★★☆
+
+**D2 was *the SVG hardcodes five ticks where the terminal derives them from height*.** The seam
+closed it by moving `ticksFor(plotAreaRows(block))` into `figureOf`, and `c12-arm-seam.mjs` carries
+the row that restores the constant.
+
+**It has read `CAUGHT ELSEWHERE` since the day it was written.** The mutation is caught — by twenty
+golden frames, by both baselines, and by `FC5`, which is about something else. **No assertion whose
+subject is the tick count fired**, because there was none. `T1.12` names real rows in
+`plot.test.ts`; they construct their own axes and none of them sees this.
+
+**A whole-frame gate reports that a picture moved, not which decision moved it.** That is the whole
+of the difference, and it is why the pass's summary line — *every mutation was caught* — is not the
+thing to read. The per-row disposition is, and `CAUGHT ELSEWHERE` is the word for *this row proves
+less than it says*. One bit for the gate, one bit for the pass, and the information in neither.
+
+**The coincidence is the reusable part, and it is why the disagreement survived being looked at.**
+The derived count at height 12 — the catalogue's commonest — is **exactly five**:
+
+| height | 4 | 8 | 12 | 20 | 30 |
+|---|---|---|---|---|---|
+| ticks | 2 | 3 | **5** | 6 | 10 |
+
+So the second arm's constant is the right answer at the one height most fixtures use. A reader
+comparing a single frame sees no disagreement; a fixture at that height cannot catch the constant
+coming back. **A probe at one point on a curve cannot tell a constant from a function**, and the
+point most likely to be chosen is the one where they agree.
+
+**Fixed** — `U1a3` asserts the five counts and pins the coincidence, so the coincidence stays
+visible instead of being the reason nobody looked. The mutation now expects it and is caught by it
+alone.
+
 ## F290 — a catalogue bucket that lies about its form, and the instrument that believed it ★★★☆☆
 
 **`CATALOGUE_FORMS` is keyed by form and one of its variants is filed under the wrong one.**

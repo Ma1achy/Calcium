@@ -15,10 +15,23 @@
 // its own rasteriser, which is the only place a shared layer can be wrong in a
 // way both arms agree about.
 //
-// **Stated survivor, so an unrecorded limit does not read as strength.**
-// `Figure.frame` is not mutated: `definition.ts` still applies `block.plotFrame`
-// to the layout directly, so nothing reads the member and a mutation on it would
-// fail nothing by construction. It closes when the SVG walks the figure.
+// **The stated survivor's condition expired and the thing it promised did not
+// happen** (F286). It read: *`Figure.frame` is not mutated, because nothing reads
+// the member; it closes when the SVG walks the figure.* The SVG walks the figure.
+// The member is still unread — walking a figure and reading every member of one
+// are different events, and the deferral named the one that was easy to check.
+//
+// Measured, it is three members and not one: `identity`, `frame` and `legend` are
+// written by every emitter and read by neither arm, and they are exactly D10, D9
+// and D13 — the terminal features the second arm has never been given. So they
+// are **owed** rather than dead, and `U1a` is where that is asserted, because a
+// mutation on them would fail nothing by construction and read as coverage.
+//
+// **And the command below used to be six terminal suites** (F287). A run named
+// for the seam could tell *caught* from *survived* and could not tell *both arms
+// moved* from *the terminal moved*, which is the whole of U1a's claim. Worse than
+// that: `plot-curve-figure.test.ts` asserts the **figure**, so a row it catches
+// has proved the figure changed and not that either renderer noticed.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -35,14 +48,23 @@ const ROOT = process.cwd();
 // So the run is gated by the pass's own gate. It costs about seven seconds a
 // mutation; a seam mutation that survives for want of a fixture is a green run
 // that means nothing, which is what F256 says about every zero-moved.
+//
+// **Both arms are in it now, and the two rendering gates with them.** A seam
+// mutation has three places it can be caught and the report says which: a figure
+// suite (the decision moved), a terminal gate (that arm consumed it), an SVG
+// gate (so did the other). A row expecting `G…` or `SB…` is a row that has
+// proved a renderer read the member, which no figure assertion can.
 const CMD =
   "npx vitest run test/unit/plot-curve-figure.test.ts test/unit/plot.test.ts " +
   "test/unit/plot-y-axis.test.ts test/unit/plot-bar-values.test.ts " +
-  "test/golden/plot.test.ts test/golden/terminal-baseline.test.ts";
+  "test/unit/plot-arm-unification.test.ts test/unit/plot-svg-path.test.ts " +
+  "test/golden/plot.test.ts test/golden/terminal-baseline.test.ts " +
+  "test/golden/svg-baseline.test.ts";
 const FIGURE = "src/presentation/plot/figure.ts";
 const DEFINITION = "src/presentation/plot/definition.ts";
 const FURNITURE = "src/presentation/plot/furniture.ts";
 const HEATMAP = "src/presentation/plot/heatmap.ts";
+const SVG = "src/presentation/plot/svg.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -66,6 +88,51 @@ const results = runPass({
     why: "the terminal stops reading the shared axis and furnishes two raw bounds instead. If this survives, nothing downstream reads the figure and every row below is a claim about a value nobody takes",
   },
   mutations: [
+    {
+      // **The row that proves the SVG gate is in the command at all** (F287).
+      // Nothing in `figure.ts` moves, so no figure assertion can see this: the
+      // text marks are emitted exactly as before and the arm stops turning them
+      // into elements. Under the old six-suite command it was uncatchable.
+      name: "THE ARM: every text mark is clipped out of existence",
+      file: SVG,
+      from: "      if (clip.bottom - clip.top < SVG_FONT_SIZE) continue;",
+      to: "      if (clip.bottom - clip.top < SVG_FONT_SIZE * 100) continue;",
+      expect: "U3",
+    },
+    {
+      // **`absent` is a role and not a gap**, so the arm that draws a circle at
+      // the fallback position draws the plausible wrong figure the role exists
+      // to refuse. Swapped rather than deleted, so the branch still exists and
+      // the mutation is a wrong *answer* rather than a missing one.
+      name: "THE ARM: the absent datum draws, and the outlier does not",
+      file: SVG,
+      from: "      if (m.role === \"absent\") continue;",
+      to: "      if (m.role === \"outlier\") continue;",
+      expect: "SB",
+    },
+    {
+      // **`Figure.orientation` has exactly one consumer and this is it.** The
+      // terminal reads `block.orientation` for itself, so a member of the shared
+      // type is carried for one arm — which is why the row expects an SVG gate:
+      // a terminal suite cannot tell this mutation from a no-op.
+      name: "THE ARM: the projector stops reading the figure's orientation",
+      file: SVG,
+      from: "  const sideways = figure.orientation === \"horizontal\";",
+      to: "  const sideways = false;",
+      expect: "SB",
+    },
+    {
+      // **The rung `U6b`'s tally is mostly about**: moving the stacking floor up
+      // one rung turns the 24-to-8 colour edge from 45 pure `colour` cells into
+      // an edge that moves geometry. The trace is a record and this is what a
+      // record is for — the frames still render, every suite that asserts a
+      // 24-bit frame still passes, and the ladder is a different shape.
+      name: "THE RUNG: the plot stacks at 8-bit, not at the colour floor",
+      file: DEFINITION,
+      from: "  return caps.colourDepth === 1 && block.series.length > 1; // cells-ok — a series count",
+      to: "  return caps.colourDepth <= 8 && block.series.length > 1; // cells-ok — a series count",
+      expect: "U6b",
+    },
     {
       // **`quartileRange`'s two arms collapsed into one.** A forest plot's
       // interval can reach past its observed range, so taking the boxplot arm
@@ -293,13 +360,22 @@ const results = runPass({
       // **The SVG arm's old constant, moved into the shared layer.** Five ticks
       // regardless of height is what `plotToSvg` passed, and it is half of D2 —
       // so this row is the disagreement restored from the other side.
+      //
+      // **It read `CAUGHT ELSEWHERE` from the day it was written, and that was
+      // the finding.** `T1.12` names real rows in `plot.test.ts` and none of
+      // them fired: the tick count was caught by twenty golden frames and both
+      // baselines and by no assertion whose subject it is. A whole-frame gate
+      // reports that a picture moved, not which decision moved it. `U1a3` is
+      // that assertion, and the coincidence it pins is why the disagreement
+      // survived measurement — at height 12, the catalogue's commonest, the
+      // derived count *is* five.
       name: "the tick count is a constant again, as the second arm had it",
       file: FIGURE,
       // Re-anchored when the duplicate derivation the sweeper found was
       // extracted to `axisOver` — one place, one anchor.
       from: "    : valueAxisOf(extent, ticksFor(plotAreaRows(block)), block, block.yScale);",
       to: "    : valueAxisOf(extent, 5, block, block.yScale);",
-      expect: "T1.12",
+      expect: "U1a3",
     },
     {
       // **D4**: the scale dropped, which is what the second arm did by never
