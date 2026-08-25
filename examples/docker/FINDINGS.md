@@ -13642,6 +13642,55 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F292 — the truncation budgets one cell for a marker that takes two ★★★★★
+
+**`truncate` is careful about ambiguous width everywhere except the one character it adds itself.**
+`cells(clean, caps.ambiguousWidth)` decides whether to truncate; `clusterCells(segment,
+caps.ambiguousWidth)` decides what fits. Then:
+
+```ts
+const budget = limit - 1; // the marker's own cell
+```
+
+`…` is U+2026, **East-Asian Ambiguous**: one cell at `narrow`, **two** at `wide`. So the reserved
+cell is right at four capability sets and one short at the fifth, and the result is `limit + 1`.
+
+**Proved without a frame.** `truncate("abcdefghij", 6, { unicode: "full", ambiguousWidth: "wide" })`
+returns `abcde…`, which is **seven cells**. `unicode: "ascii"` uses `~`, which is not ambiguous, and
+is correct — which is why only one rung is wrong. `bmp` keeps the ellipsis and keeps the defect.
+
+**This is the failure CLAUDE.md singles out.** *Width is the axis that wraps, and a wrapped line
+scrolls the alternate screen — the one failure that corrupts state the application can no longer
+see.* Measured over the plot catalogue at width 60: **29 rows of 1841 are 61 cells wide**, across
+`contour/style-line` (2), `graph/crowded` (1), `tree/default` (1), `violin/vertical` (13) and
+`radar/line` (12). Zero at the other four sets.
+
+**Every overflow is exactly one cell and every overflowing row ends in the marker**, which is what
+turns a plausible story into a mechanism: the widths are `61 × 29`, not a spread.
+
+**Why no gate saw it, and the reason generalises.** The golden frames, both baselines and the
+catalogue digest compare **bytes**, and the bytes are stable — a frame that is 61 cells wide is 61
+cells wide every run. `cells()` is the measurer and **nothing runs it over rendered output**. So the
+corpus contained the defect at every capability sweep since `wide` was added, and the only
+instrument that could see it is one that measures what it renders rather than comparing it to
+itself.
+
+**It is not C12's.** `src/presentation/text.ts` is C09's, and `truncate` has **50 call sites across
+14 files** — C11's table cells, C09's status, structured, image, simple and container blocks, C12's
+furniture, axes, bar, circle and heatmap. The plot catalogue is simply the only corpus that renders
+at `ambiguousWidth: "wide"`, which is why a plot audit found a framework defect.
+
+**Found by the degradation audit, which is what U6 was for.** The trace classified the
+`ambiguousWidth` edge as `layout` for nine forms, and the record said *which of the two it is per
+form is read from the frame*. Reading them: `pie` and `radar` **substitute** a different figure at
+ASCII rather than degrading, which is legitimate and worth naming; and the `wide` frames mix ASCII
+furniture with box-drawing content, which is what led to measuring the width.
+
+**`U6e` asserts the defect as it stands**, with the exemption recorded **by equality** so a new
+overflow cannot hide behind an old one, and `U6e2` proves the mechanism by direct call. Both fail
+the day the budget takes the marker's measured width — which is the fix, and it moves terminal
+frames, so it lands alone.
+
 ## F291 — a decision covered only by whole-frame gates, and the disposition that said so all along ★★★★☆
 
 **D2 was *the SVG hardcodes five ticks where the terminal derives them from height*.** The seam

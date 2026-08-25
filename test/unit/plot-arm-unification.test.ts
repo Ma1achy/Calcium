@@ -40,6 +40,7 @@ import {
   barFigure, curveFigure, distributionFigure, matrixFigure, scatterFigure, tilesFigure,
   type Figure,
 } from "../../src/presentation/plot/figure.js";
+import { cells, truncate } from "../../src/presentation/text.js";
 import { DARK_THEME } from "../support/render.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -459,6 +460,69 @@ describe("U — the seam, asserted from both arms", () => {
       const inColour = lines.filter((l) => strip(l) !== l).map(strip);
       expect(inColour.every((l) => l.includes("more")), `tree/${variant} colours only its notice`).toBe(true);
     }
+  });
+
+  it("U6e (C12 I63, §3ak.15): no rendered row is wider than the terminal, and the exemption is named", () => {
+    // **The degradation audit's one finding, and it is the failure CLAUDE.md
+    // singles out**: a row wider than the terminal wraps, and a wrapped line
+    // scrolls the alternate screen — the one corruption the application cannot
+    // see afterwards. Measured with `cells()` at each set's own ambiguity, which
+    // is the measurement no byte-comparison gate performs: the frames are stable
+    // bytes, and stable bytes 61 cells wide still wrap.
+    //
+    // **`truncate` budgets one cell for a marker that takes two** (F292,
+    // `src/presentation/text.ts`). Every measurement in that function honours
+    // `caps.ambiguousWidth` — `cells(clean, …)`, `clusterCells(segment, …)` —
+    // except the width of the character the function itself appends: `…` is
+    // East-Asian Ambiguous, so `limit - 1` is right at narrow and one short at
+    // wide. Every overflow is therefore **exactly one cell**, and every
+    // overflowing row ends in the marker. `unicode: "ascii"` uses `~` and is
+    // correct, which is why four of the five sets are clean.
+    //
+    // **Recorded by equality rather than excluded** — a subset check lets a row
+    // that starts overflowing hide behind one that already does, and the day the
+    // budget is fixed this map must go empty rather than merely shrink.
+    const OVERFLOWING = {
+      "contour/style-line": 2, "graph/crowded": 1, "tree/default": 1,
+      "violin/vertical": 13, "radar/line": 12,
+    };
+    const measured: Record<string, number> = {};
+    const byRung: Record<string, number> = {};
+    for (const { name, caps: set } of caps) {
+      const amb = (set["ambiguousWidth"] ?? "narrow") as "narrow" | "wide";
+      let over = 0;
+      for (const [bucket, variants] of Object.entries(CATALOGUE_FORMS)) {
+        for (const [variant, raw] of Object.entries(variants as Record<string, Spec>)) {
+          for (const line of frame(specOf(raw), set, WIDTH, `o-${bucket}`)) {
+            if (cells(strip(line), amb) <= WIDTH) continue;
+            over += 1;
+            if (name === "wide") measured[`${bucket}/${variant}`] = (measured[`${bucket}/${variant}`] ?? 0) + 1;
+          }
+        }
+      }
+      byRung[name] = over;
+    }
+    // Four of five rungs are clean, and that is the control: a measurement that
+    // reported overflow everywhere would be measuring itself.
+    expect(byRung, "rows wider than the terminal, per capability set")
+      .toEqual({ "24bit": 0, "8bit": 0, ascii: 0, wide: 29, "1bit": 0 }); // cells-ok — row counts
+    expect(measured, "the wide rung's overflow, by variant").toEqual(OVERFLOWING);
+  });
+
+  it("U6e2 (C12 I63, §3ak.15): the marker's own width is the mechanism, proved without a frame", () => {
+    // **The frame is where it was found and this is what it is** — a direct call,
+    // so the finding does not rest on inferring a cause from rendered output.
+    // Asked for six cells, `truncate` returns seven whenever its marker is the
+    // ellipsis and the ambiguity is wide.
+    const at = (unicode: "full" | "bmp" | "ascii", ambiguousWidth: "narrow" | "wide"): number =>
+      cells(truncate("abcdefghij", 6, { unicode, ambiguousWidth }), ambiguousWidth);
+    expect(at("full", "narrow"), "narrow: the budget of one is right").toBe(6); // cells-ok — a cell count
+    expect(at("ascii", "wide"), "`~` is not ambiguous, so the ascii rung is right").toBe(6); // cells-ok — a cell count
+    // **The defect, asserted as it stands** (F292). This row fails the day the
+    // budget takes the marker's own measured width — which is the fix, and it
+    // moves the terminal, so it lands in its own commit with the frames read.
+    expect(at("full", "wide"), "F292: one cell over, and `bmp` is the same marker").toBe(7); // cells-ok — a cell count
+    expect(at("bmp", "wide"), "F292: `bmp` keeps the ellipsis and so keeps the defect").toBe(7); // cells-ok — a cell count
   });
 
   it("U6d (§3ak.15): the trace responds to a rung moving, and to the edges being wrong", () => {

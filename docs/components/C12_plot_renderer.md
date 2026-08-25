@@ -5198,6 +5198,45 @@ about what the SVG does and describes a terminal that does not exist (F289).
 
 ---
 
+### 3ak.18 — Reading the trace's `layout` cells, which is the audit U6 was for
+
+§3ak.15 records the tally and states its own limit: `layout` means *more than the character
+vocabulary changed*, and the classifier cannot separate a coarser rasteriser from a moved
+coordinate. **Eighteen cells were left owed a reading. Reading them found two things.**
+
+**A third kind of rung: substitution.** `pie` and `radar` at `unicode: "ascii"` do not degrade —
+they are **replaced**. A pie becomes four labelled `#` runs; a radar becomes a grouped bar table with
+its axis names down the left. Both preserve the *reading* — a share of a whole, a value per axis —
+where a blocky ASCII circle would not, so the substitution is right. It is not a rasteriser change,
+and filing it beside braille-falling-to-`-` is the classifier flattening two different events. The
+discriminator is the per-row ink **span**: a coarser rasteriser keeps it, a substitution does not.
+
+*And the ink-density measure that looked like a discriminator is not one.* `violin` reads
+`1234 → 550` and is the same figure throughout — blank braille, U+2800, is not a space, so a braille
+frame's density is inflated by every empty cell it fills.
+
+**The other thing is F292, and it is a corruption rather than a classification.** The `wide` frames
+mix ASCII furniture with box-drawing content — `glyphs()` falls the frame back and the rasterisers do
+not — which is what prompted measuring the rendered width. Measured with `cells()` at each set's own
+ambiguity: **29 rows of 1841 are 61 cells wide at `ambiguousWidth: "wide"`, and zero at the other
+four sets.** A row wider than the terminal wraps, and a wrapped line scrolls the alternate screen.
+
+`truncate` budgets `limit - 1` for its marker; `…` is East-Asian Ambiguous and takes two cells at
+that rung. Every overflow is exactly one cell, every overflowing row ends in the marker, and
+`unicode: "ascii"` — whose marker is `~` — is correct. **The defect is C09's**, with 50 call sites
+across 14 files; this corpus is simply the only one rendered at `wide`.
+
+**Why the audit reached it and no gate did.** Every gate here compares bytes — the golden frames, both
+baselines, the catalogue digest — and the bytes are stable: a 61-cell frame is 61 cells every run.
+`cells()` is the measurer and **nothing runs it over rendered output**. An instrument that measures
+what it renders finds what an instrument comparing output to itself cannot.
+
+`U6e` asserts the exemption **by equality**, so a new overflow cannot hide behind an old one, and
+`U6e2` proves the mechanism by direct call so the finding does not rest on inferring a cause from a
+frame. Both fail when the budget takes the marker's measured width, which moves terminal frames and
+therefore lands alone.
+
+---
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
