@@ -221,7 +221,13 @@ describe("PC — the phase catalogue's two claims", () => {
     // the same directory, and `clearGenerated` removes every `.txt`. Measured
     // once by watching 66 files become 1 (F257).
     const sweeper = sourceOf("tools/plot-catalogue.mjs");
-    expect(sweeper, "the sweeper takes .txt").toMatch(/\\\.\(txt\|plain\|png\)/u);
+    // **`svg` joined the pattern when T2 landed** and this row is what noticed —
+    // a source assertion doing the job it exists for. The SVG baseline is
+    // generated into a tracked directory by the same sweep-then-write shape, so
+    // a removed fixture must leave a *deletion* in its diff too (F275). The
+    // hazard this row is about is unchanged: a `.txt` extension is what makes
+    // the phase frames vulnerable to running the two tools out of order.
+    expect(sweeper, "the sweeper takes .txt").toMatch(/\\\.\(txt\|plain\|png\|svg\)/u);
     const phase = sourceOf("tools/phase-catalogue.mjs");
     expect(phase, "and the phase frames are .txt").toMatch(/\.txt/u);
     // **The precondition, which is the half that could stop being true.** The

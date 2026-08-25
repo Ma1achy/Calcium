@@ -103,7 +103,9 @@ export function frameFor(spec, caps, width, id = "cat") {
 export function clearGenerated(dir) {
   let removed = 0;
   for (const f of readdirSync(dir)) {
-    if (/\.(txt|plain|png)$/.test(f)) {
+    // `.svg` joined when T2 landed: the SVG baseline is generated the same way
+    // and a removed fixture must leave a deletion in the diff there too (F275).
+    if (/\.(txt|plain|png|svg)$/.test(f)) {
       rmSync(join(dir, f));
       removed += 1;
     }

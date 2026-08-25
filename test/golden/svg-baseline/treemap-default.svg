@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<rect x="89.6" y="12.8" width="404.096" height="164.405" fill="#e69f00" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-0"><rect x="89.6" y="12.8" width="404.096" height="164.405"/></clipPath>
+<text x="92.6" y="24.8" clip-path="url(#tsvgb-0)" font-size="12" font-family="monospace" fill="#141414">render</text>
+<rect x="89.6" y="177.205" width="404.096" height="110.795" fill="#8fa8ff" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-4"><rect x="89.6" y="177.205" width="404.096" height="110.795"/></clipPath>
+<text x="92.6" y="189.205" clip-path="url(#tsvgb-4)" font-size="12" font-family="monospace" fill="#141414">layout</text>
+<rect x="493.696" y="12.8" width="120.704" height="275.2" fill="#cfcfcf" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-7"><rect x="493.696" y="12.8" width="120.704" height="275.2"/></clipPath>
+<text x="496.696" y="24.8" clip-path="url(#tsvgb-7)" font-size="12" font-family="monospace" fill="#141414">parse</text>
+<rect x="90.6" y="13.324" width="222.211" height="163.356" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-1"><rect x="90.6" y="13.324" width="222.211" height="163.356"/></clipPath>
+<text x="93.6" y="25.324" clip-path="url(#tsvgb-1)" font-size="12" font-family="monospace" fill="#141414">curve</text>
+<rect x="312.811" y="13.324" width="179.885" height="163.356" fill="#f0e442" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-3"><rect x="312.811" y="13.324" width="179.885" height="163.356"/></clipPath>
+<text x="315.811" y="25.324" clip-path="url(#tsvgb-3)" font-size="12" font-family="monospace" fill="#141414">paint</text>
+<rect x="90.6" y="177.73" width="268.064" height="109.746" fill="#f07a3c" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-5"><rect x="90.6" y="177.73" width="268.064" height="109.746"/></clipPath>
+<text x="93.6" y="189.73" clip-path="url(#tsvgb-5)" font-size="12" font-family="monospace" fill="#141414">measure</text>
+<rect x="358.664" y="177.73" width="134.032" height="109.746" fill="#e4a3c4" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-6"><rect x="358.664" y="177.73" width="134.032" height="109.746"/></clipPath>
+<text x="361.664" y="189.73" clip-path="url(#tsvgb-6)" font-size="12" font-family="monospace" fill="#141414">wrap</text>
+<rect x="91.6" y="13.849" width="220.211" height="162.308" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
+<clipPath id="tsvgb-2"><rect x="91.6" y="13.849" width="220.211" height="162.308"/></clipPath>
+<text x="94.6" y="25.849" clip-path="url(#tsvgb-2)" font-size="12" font-family="monospace" fill="#141414">raster</text>
+</svg>

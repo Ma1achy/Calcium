@@ -4760,11 +4760,25 @@ keeps its own loop over `flatten` and `graphLayers` and takes the decisions from
 what `nodesDecisions` returning `Omit<Figure, "marks">` is *for*, and it is why `marks: []` was
 refused as its shape.
 
-**The gate inverts for this step, and it is the first time it has.** Every commit of step 3 reported
-*nothing moved* on both populations. Here the terminal digest stays frozen — 890 frames at
-`64b8845e6408c819`, 1780 baseline frames unmoved — and **the phase digest moves on every commit**,
-66 frames at `6b7ae9bbc0692d30` today. F264 split the two populations for exactly this reason: an
-addition to one read as a change to the other. Every move is read.
+**The gate inverts for this step, and it did not exist** (F275). The sentence above read *the phase
+digest moves on every commit and every move is read*, on F264's *the 66 `phase*` frames are the SVG
+arm's own output*. **Measured: `digestOf` hashes `.txt` only and zero of those 66 contain `<svg`** —
+the `phase3-*` files are `-cells.txt`, terminal renderings of the forms this arm **refuses**. No
+golden snapshot holds SVG. Changing the axis for every ticked form moved **0 of 382 golden rows** and
+neither digest.
+
+What *did* fire is `AD1`, and it is a **cell** gate: five decisions, blind to shape, which is §3ak's
+own recorded blind spot arriving at the instrument built on top of it. It reported one cell moving and
+could not report that the axis a reader looks at had changed on seventy variants.
+
+> **So T2 lands before the rest of the step.** `test/golden/svg-baseline/` — 178 `.svg` frames,
+> `SB1`–`SB5`, T1's mirror for the opposite reason: T1 gates an arm that must not move, this gates an
+> arm that is supposed to. **No capability axis**, because this arm has no ladder and five identical
+> copies would report five times the coverage; **a refusal is a frame**, because 86 of the 178 are
+> `null` and a claimed form must not be able to stop drawing quietly.
+
+**The terminal half of the gate is unchanged and holds**: 890 frames at `64b8845e6408c819`, 1780
+baseline frames unmoved, on every commit of this step.
 
 
 ---

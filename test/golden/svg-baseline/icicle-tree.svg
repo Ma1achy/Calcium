@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<rect x="89.6" y="12.8" width="524.8" height="67.8" fill="#e69f00"/>
+<clipPath id="ssvgb-0"><rect x="89.6" y="12.8" width="524.8" height="67.8"/></clipPath>
+<text x="92.6" y="24.8" clip-path="url(#ssvgb-0)" font-size="12" font-family="monospace" fill="#141414">root</text>
+<rect x="89.6" y="81.6" width="241.408" height="67.8" fill="#56b4e9"/>
+<clipPath id="ssvgb-1"><rect x="89.6" y="81.6" width="241.408" height="67.8"/></clipPath>
+<text x="92.6" y="93.6" clip-path="url(#ssvgb-1)" font-size="12" font-family="monospace" fill="#141414">render</text>
+<rect x="89.6" y="150.4" width="133.41" height="67.8" fill="#3cbf9a"/>
+<clipPath id="ssvgb-2"><rect x="89.6" y="150.4" width="133.41" height="67.8"/></clipPath>
+<text x="92.6" y="162.4" clip-path="url(#ssvgb-2)" font-size="12" font-family="monospace" fill="#141414">curve</text>
+<rect x="89.6" y="219.2" width="133.41" height="67.8" fill="#f0e442"/>
+<clipPath id="ssvgb-3"><rect x="89.6" y="219.2" width="133.41" height="67.8"/></clipPath>
+<text x="92.6" y="231.2" clip-path="url(#ssvgb-3)" font-size="12" font-family="monospace" fill="#141414">raster</text>
+<rect x="223.01" y="150.4" width="107.998" height="67.8" fill="#8fa8ff"/>
+<clipPath id="ssvgb-4"><rect x="223.01" y="150.4" width="107.998" height="67.8"/></clipPath>
+<text x="226.01" y="162.4" clip-path="url(#ssvgb-4)" font-size="12" font-family="monospace" fill="#141414">paint</text>
+<rect x="331.008" y="81.6" width="162.688" height="67.8" fill="#f07a3c"/>
+<clipPath id="ssvgb-5"><rect x="331.008" y="81.6" width="162.688" height="67.8"/></clipPath>
+<text x="334.008" y="93.6" clip-path="url(#ssvgb-5)" font-size="12" font-family="monospace" fill="#141414">layout</text>
+<rect x="331.008" y="150.4" width="108.459" height="67.8" fill="#e4a3c4"/>
+<clipPath id="ssvgb-6"><rect x="331.008" y="150.4" width="108.459" height="67.8"/></clipPath>
+<text x="334.008" y="162.4" clip-path="url(#ssvgb-6)" font-size="12" font-family="monospace" fill="#141414">measure</text>
+<rect x="439.467" y="150.4" width="54.229" height="67.8" fill="#cfcfcf"/>
+<clipPath id="ssvgb-7"><rect x="439.467" y="150.4" width="54.229" height="67.8"/></clipPath>
+<text x="442.467" y="162.4" clip-path="url(#ssvgb-7)" font-size="12" font-family="monospace" fill="#141414">wrap</text>
+<rect x="493.696" y="81.6" width="120.704" height="67.8" fill="#e69f00"/>
+<clipPath id="ssvgb-8"><rect x="493.696" y="81.6" width="120.704" height="67.8"/></clipPath>
+<text x="496.696" y="93.6" clip-path="url(#ssvgb-8)" font-size="12" font-family="monospace" fill="#141414">parse</text>
+</svg>

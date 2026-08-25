@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
+<line x1="89.6" y1="242.133" x2="614.4" y2="242.133" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="246.133" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">2.5</text>
+<line x1="89.6" y1="165.689" x2="614.4" y2="165.689" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="169.689" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">5</text>
+<line x1="89.6" y1="89.244" x2="614.4" y2="89.244" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="93.244" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">7.5</text>
+<line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">10</text>
+<path d="M89.6 288 L118.756 288 L147.911 257.422 L177.067 257.422 L206.222 257.422 L235.378 226.844 L264.533 226.844 L293.689 196.267 L322.844 165.689 L352 165.689 L381.156 165.689 L410.311 165.689 L439.467 135.111 L468.622 104.533 L497.778 73.956 L526.933 73.956 L556.089 73.956 L585.244 43.378 L614.4 12.8" fill="none" stroke="#e69f00" stroke-width="2"/>
+</svg>

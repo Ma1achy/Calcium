@@ -13640,8 +13640,54 @@ than repairing what sits on it: **a class of defect that cannot be written down 
 gate**, and this one had survived every frame read of every other family.
 
 
+---
 
+## F275 — the gate this pass's next step rests on does not watch the arm it names ★★★★★
 
+**Step 4's rule is that the terminal digest stays frozen and the phase digest moves on every commit,
+every move read.** I wrote that in `C12 §3ak.10` and in two commit messages, on F264's sentence:
 
+> *the 66 `phase*` frames are the **SVG arm's own** output*
 
+**Measured. `digestOf` hashes `.txt` only, and zero of those 66 contain `<svg`.** The `phase3-*`
+files are `-cells.txt` — *terminal* renderings of the forms this arm **refuses**. The SVG output goes
+to `phase3-*-SIDE-BY-SIDE.png`, 27 files the digest does not touch. No golden snapshot mentions
+`svg` either, and the 61 `plotToSvg` references in `test/` are property assertions.
 
+**So the SVG arm had no frame-level gate at all**, and the demonstration was already in hand: I
+changed its axis for **every ticked form** — the gutter went `1 2 3 4 5` to `0 2 4 6`, matching the
+terminal at last — and
+
+```
+382 golden rows          0 fired
+890 catalogue frames     digest unchanged
+66  phase frames         digest unchanged
+```
+
+Three rows did fire, and they are the arm's *real* gate: `plot-arm-disagreement.test.ts`'s `AD1`,
+plus two property rows. **`AD1` is a cell gate** — it compares five decisions and is blind to shape,
+the blind spot §3ak already records for D14 and F268 — so it reported one cell moving
+(`line.interiorRules` 68/70 → 70/70) and could not report that the axis a reader looks at had changed
+on seventy variants.
+
+**The claim's history is the sixth blind spot exactly.** F264 wrote it while fixing a real defect in
+the *other* population; §3ak.10 cited F264; two commits restated §3ak.10. Four documents, no
+measurement, and the measurement is one `grep -l "<svg"` away. *Repetition across documents is not
+corroboration.*
+
+**And it is wrong in the useful direction.** F264's split is real work and still right — an addition
+to the terminal corpus no longer reads as a change to it. What is false is only the sentence about
+what the second population *contains*, and that sentence is the one this pass built a gate on.
+
+**Fixed — T2, `test/golden/svg-baseline/`**, 178 `.svg` frames, T1's mirror and for the opposite
+reason: T1 gates an arm that must not move, this gates an arm that is supposed to. `SB3` reports the
+count compared and names what moved; `SB5` corrupts a frame in a temp directory written through the
+real tool and requires the diff to see it, then deletes it and requires *missing* rather than
+*unchanged*. `make golden` went 382 rows to 387, so the gate sits in the default path.
+
+**Two rulings the corpus needed.** **No capability axis** — this arm has no ladder (§3aj hazard 5),
+so crossing five capability sets would write five identical copies and report five times the coverage
+it has; T1 crosses widths because the terminal's truncation rungs are width decisions, and this arm's
+layout is fractions. **A refusal is a frame** — `plotToSvg` returns `null` for 86 of the 178, every
+one a decision (F259), and a corpus that skipped them would let a claimed form quietly stop drawing,
+which is the one thing a `null` arm must not do.

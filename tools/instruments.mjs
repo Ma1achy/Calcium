@@ -86,6 +86,10 @@ const COVERED = [
   // name it; `TB1`–`TB4` assert the count, the set equality and that the rungs
   // are constructed at all.
   ["tools/terminal-baseline.mjs", ["npx", "vitest", "run", "test/golden/terminal-baseline.test.ts"]],
+  // T2, and it is here for the opposite reason to T1: that gates an arm which
+  // must not move, this gates one that is supposed to. Its own fixture is
+  // `SB5`, which corrupts a frame written through the real tool (F275).
+  ["tools/svg-baseline.mjs", ["npx", "vitest", "run", "test/golden/svg-baseline.test.ts"]],
   // Covered by that same fixture all along — `plot-catalogue.test.ts` imports
   // `CATALOGUE_FORMS` and compares it against `ALL_FORMS` by equality. It was
   // simply not *seen*, being a `.ts`. See the note on `SUFFIX`.
