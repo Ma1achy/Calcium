@@ -18,6 +18,7 @@ import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { ladderFor } from "./ramp.js";
 import { cells, truncate } from "../text.js";
 import { FACING_MATRIX, facingOf, seriesRange } from "./scale.js";
+import { matrixFigure } from "./figure.js";
 import { formatValue } from "./axes.js";
 import { tone } from "../blocks/paint.js";
 import { plotAreaRows, AXIS_GUTTER } from "./height.js";
@@ -787,7 +788,11 @@ export function heatmapFormRows(
     ? { ...raw, series: magnitudeSeries(raw.vectors) }
     : calendarRows(raw);
   const block = fieldAxes(withField);
-  const range = seriesRange(block.series, block);
+  // **The ramp's domain read back rather than computed here** (C12 I60, §3ak.7).
+  // A matrix has no value axis — `figure.value` is `null` and that is the ruling
+  // this family, `tiles` and `nodes` each got wrong separately — but the ramp
+  // still has a domain, and it is this one, shared with the second arm.
+  const range = matrixFigure(block).extent;
   const layout = layoutFor(block, width, ctx.capabilities);
 
   if (layout === null) {

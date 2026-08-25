@@ -17,12 +17,13 @@ import {
   barFigure,
   baselineOf,
   categoricalDecisions,
+  matrixFigure,
   positionalDecisions,
   scatterFigure,
 } from "../../src/presentation/plot/figure.js";
 import { legendEntries } from "../../src/presentation/plot/furniture.js";
 import { ecdfSeries } from "../../src/presentation/plot/derive.js";
-import { rowOf } from "../../src/presentation/plot/scale.js";
+import { FACING_MATRIX, rowOf } from "../../src/presentation/plot/scale.js";
 import { DARK_THEME, FULL_CAPS, MONO_CAPS } from "../support/render.js";
 import type { Plot } from "../../src/data/viewmodel/index.js";
 import type { RenderContext } from "../../src/presentation/blocks/types.js";
@@ -352,5 +353,66 @@ describe("FB — the bar family's figure (C12 §3ak.7)", () => {
     expect(f.value, "nothing was measured").toBeNull();
     expect(f.marks).toEqual([]);
     expect(f.identity, "and the categories are still what the figure would name").toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("FM — the matrix family's figure (C12 §3ak.7)", () => {
+  const grid = (over: Partial<Plot> = {}): Plot => plot({
+    form: "heatmap", height: 4,
+    series: [{ values: [0, 5], label: "a" }, { values: [10, 20] }], ...over,
+  });
+
+  it("FM1 (C12 I60): no value axis, and the ramp still has a domain", () => {
+    // The pair is the family's whole shape. Three renderers furnished an axis
+    // out of `seriesRange([]) ?? {0, 1}` over readings that are colours — so
+    // `value` is null — but the ramp maps a *domain* to a colour, and that
+    // domain is a figure fact with no axis over it.
+    const f = matrixFigure(grid());
+    expect(f.value, "readings that are colours have no axis").toBeNull();
+    expect(f.extent, "and the ramp's domain is still shared").toEqual({ min: 0, max: 20 });
+    // Empty is a refusal, and it takes the extent with it.
+    const none = matrixFigure(grid({ series: [] }));
+    expect([none.value, none.extent, none.marks]).toEqual([null, null, []]);
+  });
+
+  it("FM2 (C12 I62, §3ak.1): the reading crosses on the mark, because the coordinate is spent on the grid", () => {
+    // A matrix cell has no length and no position to carry its value — `point`'s
+    // `size` argument one mark along. Each arm turns the normalised reading into
+    // a colour at its own depth: `colormapFor` here, `continuousColour` there.
+    const f = matrixFigure(grid());
+    const cells = f.marks.filter((d) => d.layer === "series");
+    expect(cells.length, "one rect per finite cell").toBe(4);
+    const vals = cells.map((d) => (d.mark.kind === "rect" ? d.mark.value : "not a rect"));
+    expect(vals, "normalised over the extent, uninverted").toEqual([0, 0.25, 0.5, 1]);
+    expect(cells.every((d) => d.ref === undefined), "a ramp position is not a palette slot").toBe(true);
+    // **The whole grid, not the first cell — the second time this exact mistake
+    // was caught by the same instrument.** `FB4` checked `rects[0]` and a
+    // mutation collapsing the rest onto it survived, because element zero is at
+    // the origin either way. An assertion about the first member of an ordered
+    // set is an assertion about nothing that can move.
+    const at = cells.map((d) => (d.mark.kind === "rect" ? [d.mark.x, d.mark.y] : []));
+    expect(at, "row-major over the unit square: row r of 2, column c of 2")
+      .toEqual([[0, 0], [0.5, 0], [0, 0.5], [0.5, 0.5]]);
+    const first = cells[0]!.mark;
+    if (first.kind !== "rect") throw new Error("not a rect");
+    expect([first.w, first.h], "and each cell is one slot of each axis").toEqual([0.5, 0.5]);
+  });
+
+  it("FM3 (C12 I61): the facing default is the family's, not the component's", () => {
+    // `heatmap.ts` takes `FACING_MATRIX` where every positional form takes
+    // `FACING_DEFAULT` — a matrix's first row is at the top, a curve's first
+    // value at the bottom — and that difference was reachable from two files.
+    expect(matrixFigure(grid()).facing, "the matrix default").toEqual(FACING_MATRIX);
+    expect(matrixFigure(grid()).facing).not.toEqual(curveFigure(plot({})).facing);
+  });
+
+  it("FM4 (C12 I59): the identity is what the gutter shows, and the file had two answers", () => {
+    // Measured writing this: an unlabelled row is `""` to `labelColumnWidth` and
+    // `row N` to the overflow notice — two answers to *what is this row called*,
+    // twenty-five lines apart. The gutter's wins: it is the one beside the cells.
+    expect(matrixFigure(grid()).identity).toEqual(["a", ""]);
+    // And it is NOT the positional families' answer, which invents `series N`.
+    expect(identityOf(grid()), "the other rule, asserted so the difference is on purpose")
+      .toEqual(["a", "series 2"]);
   });
 });

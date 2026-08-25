@@ -13558,6 +13558,47 @@ range the gutter is labelled from*) and the only one of the three with a labelle
 **The horizontal arm's is invisible rather than absent**: its gutter holds categories, so no label
 disagrees with the fraction, which is exactly how a third range survived inside one family.
 
+---
+
+## F273 — a named constant that reads as a family ruling and can never be consulted ★★★☆☆
+
+`heatmap.ts` calls `facingOf(block, FACING_MATRIX)` at two sites, and the argument is **dead at both**.
+
+```ts
+export function facingOf(block, whenRefused) {
+  const origin = block.origin ?? ORIGIN_DEFAULT[block.form];
+  return origin === null ? whenRefused : facingFor(origin);   // ← the fallback
+}
+```
+
+Every form in the matrix family has `ORIGIN_DEFAULT` = `"top-left"` — `heatmap`, `correlation`,
+`confusion`, `spectrogram`, `density2d`, `latency`, `utilisation`, all seven — so `origin` is never
+`null` and `whenRefused` is never returned. Measured: the facing is `{x: right, y: down}` whether
+`FACING_MATRIX` or `FACING_DEFAULT` is passed, for all seven.
+
+**Found by a mutation that changed nothing**, which is F265's class — dead arithmetic wearing a
+guard's clothes. But this instance is worse than a dead clamp, and the difference is what makes it
+worth recording separately: **`FACING_MATRIX` is a named constant that reads as a family ruling.**
+*The matrix family faces down* is a real statement about the component, it is written where a reader
+looks for it, and it is enforced somewhere else entirely — by each form's own `ORIGIN_DEFAULT` entry.
+Two mechanisms for one statement, one of them unreachable, and the unreachable one is the one with
+the explanatory name.
+
+**A dead clamp is invisible; a dead ruling is misleading.** Someone changing `ORIGIN_DEFAULT.heatmap`
+to `"bottom-left"` would flip every heatmap in the corpus and find `FACING_MATRIX` still saying,
+correctly-looking and untouched, that the family faces down.
+
+**Not fixed here.** The unification pass freezes the terminal arm, and removing an argument is a
+change to its source inside a commit whose claim is *nothing moved*. `matrixFigure` passes the same
+dead constant, deliberately, because a figure that computed the facing differently from the renderer
+would be a divergence no commit announced — the same call made for F269, F271 and F272.
+
+**The mutation is what changes.** A row aimed at a dead argument can never be caught, so it is
+replaced by one that drops the origin honouring altogether — which `FM3` does catch, because
+`ORIGIN_DEFAULT` is what the assertion was really about all along. *A mutation that fails nothing
+indicts the seam, not the test*, and here it indicted the constant.
+
+
 
 
 

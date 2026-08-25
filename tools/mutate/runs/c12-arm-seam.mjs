@@ -42,6 +42,7 @@ const CMD =
 const FIGURE = "src/presentation/plot/figure.ts";
 const DEFINITION = "src/presentation/plot/definition.ts";
 const FURNITURE = "src/presentation/plot/furniture.ts";
+const HEATMAP = "src/presentation/plot/heatmap.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -65,6 +66,61 @@ const results = runPass({
     why: "the terminal stops reading the shared axis and furnishes two raw bounds instead. If this survives, nothing downstream reads the figure and every row below is a claim about a value nobody takes",
   },
   mutations: [
+    {
+      // **THE RULE INTERACTION.** A matrix's rows are named `""` by the gutter
+      // and `row N` by the overflow notice, and the positional families invent
+      // `series N` — three answers to *what is this row called*. Taking the
+      // positional one puts a name in every matrix gutter that nothing else in
+      // the frame agrees with.
+      name: "THE INTERACTION: a matrix row takes the positional families' name",
+      file: FIGURE,
+      from: "    identity: block.series.map((sr) => sr.label ?? \"\"),",
+      to: "    identity: identityOf(block),",
+      expect: "FM4",
+    },
+    {
+      // **The origin honouring dropped**, which flips every matrix vertically —
+      // a plausible figure of the same data upside down.
+      //
+      // *The first form of this row swapped `FACING_MATRIX` for `FACING_DEFAULT`
+      // and could never be caught: `facingOf` consults its fallback only when
+      // `origin` is `null`, and all seven matrix forms declare `"top-left"`. The
+      // constant is dead at every call site (F273), and the mutation indicted
+      // the constant rather than the test.*
+      name: "THE DEFECT: a matrix stops honouring its origin and draws flipped",
+      file: FIGURE,
+      from: "    facing: facingOf(block, FACING_MATRIX),",
+      to: "    facing: FACING_DEFAULT,",
+      expect: "FM3",
+    },
+    {
+      // The ramp read up the page rather than up the map — every colour
+      // inverted, and every cell still a colour from the right ramp.
+      name: "the matrix's reading is inverted, so the ramp runs backwards",
+      file: FIGURE,
+      from: "            value: normalisedOf(v, extent, false),",
+      to: "            value: normalisedOf(v, extent, true),",
+      expect: "FM2",
+    },
+    {
+      // The grid transposed by row: every cell in row 0. Still a rect in the
+      // unit square, still one per reading.
+      name: "every matrix row lands on the first one",
+      file: FIGURE,
+      from: "            y: seriesIndex / rows, // cells-ok — a row count",
+      to: "            y: 0,",
+      expect: "FM2",
+    },
+    {
+      // The read-back severed: the ramp's domain computed a second time, which
+      // is where a matrix and its own legend come to disagree about what the
+      // darkest cell means.
+      name: "the ramp's domain is computed again instead of read back",
+      file: HEATMAP,
+      from: "  const range = matrixFigure(block).extent;",
+      to: "  const range = seriesRange(block.series, { ...block, yMin: 0 });",
+      expect: "golden",
+    },
     {
       // **THE RULE INTERACTION** (§3ak.7). `identity` is *what the figure's slots
       // are named* — a curve's series, a bar's categories — and taking the series
@@ -194,8 +250,11 @@ const results = runPass({
       // figure and leaves it upright in the arm that does not.
       name: "THE INTERACTION: the family's orientation is read from the block",
       file: FIGURE,
-      from: "    orientation: \"vertical\",",
-      to: "    orientation: block.orientation === \"horizontal\" ? \"horizontal\" : \"vertical\",",
+      // Two lines: the matrix family says `orientation: "vertical"` too — and
+      // means nothing by it — so one line is ambiguous, which reports as
+      // SURVIVED rather than as a bad anchor (F219).
+      from: "    orientation: \"vertical\",\n    facing: facingOf(block, FACING_DEFAULT),",
+      to: "    orientation: block.orientation === \"horizontal\" ? \"horizontal\" : \"vertical\",\n    facing: facingOf(block, FACING_DEFAULT),",
       expect: "FC7",
     },
     {

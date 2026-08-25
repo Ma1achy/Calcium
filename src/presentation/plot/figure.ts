@@ -19,7 +19,7 @@ import { axisFor, tickLabels, ticksFor, type Axis } from "./axes.js";
 import { candlesOf } from "./candles.js";
 import { plotAreaRows } from "./height.js";
 import { refOf } from "./marks.js";
-import { facingOf, seriesRange, FACING_DEFAULT, type Facing, type Range } from "./scale.js";
+import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
 
 /**
  * An axis, **carrying the strings it prints** (I59, §3ak.1 finding 4).
@@ -154,7 +154,28 @@ export type GlyphRole = "point" | "median" | "mean" | "outlier" | "cap" | "targe
  */
 export type Mark =
   | Readonly<{ kind: "polyline"; points: readonly Pt[]; closed?: boolean }>
-  | Readonly<{ kind: "rect"; x: number; y: number; w: number; h: number; fill?: boolean }>
+  | Readonly<{
+      kind: "rect";
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      fill?: boolean;
+      /**
+       * **The reading, where the mark's *appearance* is the datum** —
+       * normalised, and `point.size`'s argument one mark along (§3ak.1
+       * finding 2).
+       *
+       * A matrix cell has no length and no position to carry its value: the
+       * coordinate is spent on the grid and the reading is spent on colour.
+       * So the value crosses the seam the way a bubble's radius does, and
+       * each arm turns it into a colour at its own depth — `colormapFor` in
+       * the terminal, `continuousColour` in SVG, one ramp either way.
+       *
+       * Absent on a bar, whose reading is its `h`.
+       */
+      value?: number;
+    }>
   | Readonly<{ kind: "point"; x: number; y: number; role: GlyphRole; size?: number }>
   | Readonly<{ kind: "text"; x: number; y: number; text: string; anchor: TextAnchor; room: number }>;
 
@@ -388,6 +409,74 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     facing: facingOf(block, FACING_DEFAULT),
     frame: block.plotFrame ?? "box",
     legend: legendSlots(block),
+  };
+}
+
+/**
+ * The matrix family's figure — **`heatmap`, `correlation`, `confusion`,
+ * `spectrogram`, `density2d`, `latency`, `utilisation`** (§3ak.7).
+ *
+ * **`value` is `null` and `extent` is not, and the pair is the family's whole
+ * shape** (I60). A matrix reads its numbers as colours, so there is no axis to
+ * tick — the ruling three renderers reached separately and got wrong three
+ * times, each furnishing one out of `seriesRange([]) ?? {0, 1}`. But the *ramp*
+ * still has a domain, and it is the same `seriesRange` both arms already
+ * compute. So the extent is a figure fact with no axis over it.
+ *
+ * **The facing default is the family's, not the component's.** `heatmap.ts`
+ * takes `FACING_MATRIX` where every positional form takes `FACING_DEFAULT` — a
+ * matrix's first row is at the top and a curve's first value is at the bottom —
+ * and that difference was reachable from two files before it was decided once.
+ *
+ * **`orientation` is vacuous here and is recorded as such.** A matrix has rows
+ * and columns rather than a value axis to run one way or the other; what the
+ * terminal calls a matrix layout — `stretch` against `anchor` — is a different
+ * question, about which columns a short row occupies. Stated rather than left
+ * for a reader to infer from a member that means something on three families.
+ *
+ * **The identity is what the *gutter* shows.** Measured while writing this: an
+ * unlabelled row is `""` to `labelColumnWidth` and `row N` to the overflow
+ * notice — two answers to *what is this row called* in one file, twenty-five
+ * lines apart — and the positional families invent a third, `series N`. The
+ * gutter's wins, because it is the one a reader sees beside the cells.
+ */
+export function matrixFigure(block: Plot): Figure {
+  const extent = seriesRange(block.series, block);
+  const marks: Drawn[] = [];
+  if (extent !== null) {
+    const rows = Math.max(1, block.series.length); // cells-ok — a row count
+    const cols = Math.max(1, block.series.reduce((m, r) => Math.max(m, r.values.length), 0)); // cells-ok — a column count
+    block.series.forEach((series, seriesIndex) => {
+      series.values.forEach((v, c) => {
+        if (v === null || !Number.isFinite(v)) return;
+        marks.push({
+          mark: {
+            kind: "rect",
+            x: c / cols, // cells-ok — a column count
+            y: seriesIndex / rows, // cells-ok — a row count
+            w: 1 / cols, // cells-ok — a column count
+            h: 1 / rows, // cells-ok — a row count
+            fill: true,
+            // **`invert: false`, and both arms already say so**: a matrix reads
+            // low-to-high up the *map* rather than up the page, which is the one
+            // place the facing does not reach.
+            value: normalisedOf(v, extent, false),
+          },
+          layer: "series",
+          seriesIndex,
+        });
+      });
+    });
+  }
+  return {
+    value: null,
+    extent,
+    identity: block.series.map((sr) => sr.label ?? ""),
+    orientation: "vertical",
+    facing: facingOf(block, FACING_MATRIX),
+    frame: block.plotFrame ?? "box",
+    legend: legendSlots(block),
+    marks,
   };
 }
 

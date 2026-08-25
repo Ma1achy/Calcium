@@ -2441,6 +2441,12 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // rasterisers — a curve is Bresenham at dot resolution and folded, which is
   // not a polyline walk — so wiring the marks into *this* arm would be a rewrite
   // of the thing the pass promises not to touch.
+  // **`matrixFigure` is NOT on this list and the equality arm is what said so.**
+  // It has no decisions half to split off — a matrix has no value axis — so
+  // `heatmapFormRows` calls the emitter itself for the ramp's domain, and the
+  // entry written for it was refused as excusing nothing. The first family whose
+  // emitter the terminal actually calls.
+  //
   // **The scatter family's, and its decisions ARE consumed** — `positionalForm`
   // draws scatter and bubble through `positionalDecisions` like everything else
   // positional, so what waits here is the marks alone. Same expiry symbol:

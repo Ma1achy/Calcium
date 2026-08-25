@@ -4686,6 +4686,43 @@ reach** — a golden frame records whatever is drawn, artefact A compares labels
 mutation on dead code fails nothing by construction.
 
 
+### 3ak.9 — The tie-break has three counterexamples, and the answer was the same each time
+
+**§3ak.8 recorded the first as *the* counterexample. It is the first of three**, and three instances
+is where a pattern stops being a coincidence and becomes something to state once:
+
+| | the terminal draws | the SVG draws | which is right |
+|---|---|---|---|
+| **F269** `ecdf` | one fixed staircase for every dataset of a given size | the raw samples, stepped | **neither** — the ECDF wants a uniform grid over the data range |
+| **F271** `bubble` | the size channel as a second bubble series, named in the legend | one series, sized | **the SVG** |
+| **F272** `bar`, signed | every bar from the range floor, so no negative bars | zero-anchored, growing both ways | **the SVG** |
+
+**The tie-break is still right.** *The terminal is right by default* is a claim about where to look
+first, not a guarantee — it is fourteen thousand lines with a golden corpus, a capability ladder and
+years of read frames against a thousand-line arm with none of that. Three exceptions in seven
+families is what a good default looks like.
+
+**What matters is that the response was identical each time, and it is not the obvious one.** In all
+three the figure reproduces the terminal's answer, *including where the terminal is wrong*:
+
+> **Correcting inside a refactor is the one move this pass forbids.** No frame moves, so no gate
+> fires; the two arms disagree at step 4 for a reason nothing announced; and the frame-read that
+> found the defect is buried in a commit about something else.
+
+**Landing the wrong answer in both arms is worth more than fixing one.** Unified, there is one figure
+to repair and one repair fixes both; today each defect would have to be fixed twice and the arms
+would still disagree afterwards. That is the pass's whole claim, stated against the three cases where
+it is least flattering — and it is why every one of the three is **asserted** rather than described:
+`FS3`, `FB4` and `DS1`/`DS4` fail the day the defect is fixed, which closes each finding by failing
+rather than by anyone remembering.
+
+**The instrument, across all three: none was found by a test written to look for it.** F269 came
+from reading a function while moving it, F271 from a mutation that survived because its fixture was
+degenerate, F272 from writing a test that asserted what a bar chart does and watching it fail. That
+is the same table CLAUDE.md keeps — *every instrument that found something is a way of looking rather
+than a thing asserted* — arriving inside one component in one pass.
+
+
 ---
 
 ## 3q. One value axis across the bands, and the record it never had
@@ -6154,11 +6191,16 @@ Six tiers. No state machine — C12 is pure over the block.
 
 #### The arm unification rows (§3ak, I59–I66)
 
+**The emitters land one family at a time and their rows land with them** — `FC` curve, `FS` scatter, `FB` bar, `FM` matrix, `FD` distribution — because a family is the smallest unit in which the disagreement matrix's cells are jointly satisfiable (§3ak.7). Every one of those commits reports the same gate: **1780 baseline frames compared, 0 moved**, and the catalogue at `64b8845e6408c819`.
+
 - **FV1–FV3** (I60, §3ak): **`HAS_VALUE_AXIS`' true direction over the corpus** — a form marked `false` never draws a numeric gutter label, at both widths and every capability set, with the count of forms checked reported rather than assumed. **`FV1` failed on the commit that introduced it**, four offenders, against a record its own author had just written (F267). `FV2` refuses the converse — a form marked `true` need draw no numeric label, because whether the gutter holds values is orientation and rung — and `FV3` pins the strings the axis carries, so the arm that stopped computing them cannot start again.
 - **DS1–DS4** (I66, §3ak.8): **every catalogue fixture rendered twice, with its numbers moved by a position-varying factor** — a uniform scale leaves a normalised figure identical and a reversal leaves a histogram identical, and neither is a defect. `DS2` is the row that makes `DS1`'s number mean anything: the exempt set is the fixtures with **nothing to perturb**, compared by equality, and it is 15 of the 16 unmoving frames. `DS3` is the fabricated violation — a comparison that never reports equality reports every form as moving, on any corpus. `DS4` names `ecdf`'s mechanism, so a repair that moves the frame for the wrong reason still has to face it.
 - **FC1–FC9** (I59, I61, I64, I65, §3ak.7): **the curve family's emitter, and the terminal reading it back.** `FC1` is the seam's claim as an assertion — a mark's `y` and `rowOf`'s row are one coordinate with the facing applied once each side, which no frame shows because a frame wrong in both arms is a frame that agrees. `FC2` breaks a run where the samples stop being consecutive; `FC3` composes the legend once and projects the swatch twice, at two capability rungs; `FC4` refuses with an empty list rather than a throw, including the pinned-bounds case where an axis exists and nothing was measured; `FC5` asserts the figure describes the block that is **drawn**; `FC6` holds the decisions and the marks apart, so no caller can hold a figure with another family's marks on it; `FC7`–`FC9` came from the mutation pass — **the orientation, the mark's own slot and the scale each had a row named after them and no assertion in it**, and `FC9`'s subject is a unit block because no rendered fixture anywhere constructs a `yScale` (F270).
 - **FS1–FS3** (I59, I62, §3ak.7): **the scatter family, whose decisions are the curve's** — both reach `positionalForm`, so the extent, the nicing, the tick count and the facing are one computation and only the marks differ, which is what makes a *family* the unit rather than a form. `FS3` carries the size channel: a bubble's radius **is data** and crosses normalised against the size series' own maximum, where a scatter dot's radius is each renderer's and does not. **It also asserts F271** — the channel is a member of `series`, so the terminal draws it as a second bubble series and the figure says so; correcting that here would be a divergence no commit announced, and the row fails the day the channel stops being a series.
 - **FB1–FB5** (I59, I62, I64, §3ak.7): **the bar family, where `identity` stops meaning the series.** The member is *what the figure's slots are named* — a curve's are its series, a bar's its categories — so the legend and the identity are one list there and **two** here, and `FB1` asserts both answers side by side so the difference is on purpose. `FB2` holds the zero-anchored extent (`[10, 25, 15]` anchored at 10 draws nothing for its first category); `FB3` is D11, the orientation the two arms defaulted opposite ways; `FB4` puts the rects in the **figure's** space rather than the screen's, `x` along the identity axis whatever the orientation says — and **asserts F272**, that both terminal arms fill from the range floor so a signed bar chart draws no negative bars. `FB5` keeps the identity through a refusal.
+- **FM1–FM4** (I60, I61, I62, §3ak.7): **the matrix family, where `value` is `null` and `extent` is not** — the pair is the family's whole shape. Three renderers furnished an axis out of `seriesRange([]) ?? {0, 1}` over readings that are colours; there is no axis, and the *ramp* still has a domain, so `FM1` holds both halves. `FM2` carries the type's one extension: a matrix cell has no length and no position to spend on its value, so **the reading crosses on the mark** — `point.size`'s argument one mark along — and each arm turns it into a colour at its own depth. `FM3` pins the family's own facing default, reachable from two files before it was decided once. `FM4` takes the identity from the **gutter**, because an unlabelled row is `""` there and `row N` to the overflow notice twenty-five lines away, and `series N` to the positional families — three answers to *what is this row called*.
+- **FD1–FD5** (I59, I62, I64, §3ak.7): **the distribution family, and the reason `GlyphRole` exists.** A median is `┃` at full unicode, `|` in ASCII and a distinct mark below the colour floor; a mean is a different character; an outlier a third — and the SVG draws a line and two circles. What both arms agree about is **which of the seven things this is**, which is the whole content of the seam here. `FD2` holds `quartileRange`'s two arms: a boxplot's extent is the whiskers plus outliers, a forest plot's is the interval, because a confidence bound can reach past the observed range. `FD3` is `absent` — `normalisedSummary` falls `centre` back to the median, so the *summary* cannot say **nothing was reported** and the role is what does, which is how the SVG refuses where the terminal draws.
+- **FT1–FT3 · FN1–FN2** (I60, I61, §3ak.7, §3aj.6): **tiles and nodes, and the two families that end differently.** `FT1` is the distinction that makes `extent: null` a statement: a matrix has no axis and its **ramp** still has a domain; a tiles figure reads its numbers as **areas**, and an area is the reading itself — `hierarchy.ts` divides by the total while it walks. `FT3` records that the facing is **live** here where the matrix's is dead (F273), because these three forms declare `ORIGIN_DEFAULT: null`. **`FN1` asserts that there is no `nodesFigure`**: §3aj.6 ruled that a tree's placement is a function of its labels' widths in one arm and of slots in the other, so a `Mark` — which is a position — would carry one arm's answer and the other would fail `U1b` for a reason the type cannot express. `marks: []` is not the alternative, because I64 makes an empty list a **refusal**.
 
 - **AD1–AD5** (I59, §3ak): **the disagreement matrix, and it is walk artefact A** — every form, every variant, both widths, at 24-bit, with each cell's disposition stated as *the relation the row asserts*: `agree` fails if the arms drift apart, `n/m` fails if it closes silently **or becomes a different disagreement**, `legitimate` fails if they ever start agreeing. Shipped ahead of the type, because the list of disagreements is what the type is designed against. `AD5` corrupts one side and requires the comparison to see it, since a sweep certified only by its own record agrees with itself whatever it does.
 - **U1a** (I59, §3ak): **a decision mutated inside `figureOf` moves BOTH arms.** *The row U1 was written as — `the same block yields an identical Drawn[] for both arms` — is `f(x) === f(x)` the moment one emitter serves both, which is A03 §2's vacuity class arriving in the assertion the pass exists for.* One arm moving alone is the finding: the other still decides it itself.
