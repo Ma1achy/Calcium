@@ -54,6 +54,39 @@ const OWN = argDir === -1;
  * anchoring a mutation without running it produces a row that applies and
  * asserts nothing, which is worse than one that says it could not apply.
  */
+/**
+ * Anchors that resolve to **more than one site** today, with the run they
+ * belong to — a debt list, on `KNOWN_STALE`'s terms and for its reasons (F219).
+ *
+ * These are not broken runs: the harness replaces the **first** match, and for
+ * every one of them the first match may well be the site the run names. What
+ * they are is *unchecked* — nothing said which site was mutated, so the run's
+ * name and the run's subject were never compared.
+ *
+ * **Eleven on the sweep's first run, across five components, one of them 5×.**
+ * They pre-date the check by a long way, which is the argument for recording
+ * them by count rather than fixing them inside the commit that found them: a
+ * repair here is a repair to a mutation nobody is running today, and repairing
+ * an anchor without running its pass produces a mutation that applies and
+ * asserts nothing — `KNOWN_STALE`'s own note, one property along.
+ *
+ * Compared by **equality**, both directions: an entry that becomes unique is a
+ * failure too, because a list nobody prunes outlives its reason unread.
+ */
+const KNOWN_AMBIGUOUS = {
+  "c04-kv-bar.mjs": 1,
+  "c04-ohlc.mjs": 1,
+  "c04-round-trip.mjs": 1,
+  "c10-categorical.mjs": 1,
+  "c10-colormap.mjs": 1,
+  "c10-named-set.mjs": 1,
+  "c12-annotate.mjs": 1,
+  "c12-calendar.mjs": 1,
+  "c12-distribution.mjs": 1,
+  "c12-origin.mjs": 1,
+  "c12-value-bar.mjs": 1,
+};
+
 const KNOWN_STALE = {
   // **Re-anchoring is not always the fix, and this one shows both halves.**
   // `summaryLine(live)` gained a `unicode` argument, so the statement is still
@@ -192,6 +225,9 @@ const runs = readdirSync(RUNS_AT)
 let checked = 0;
 let suites = 0;
 const missing = {};
+/** Anchors matching more than once — see the note in the loop below (F219). */
+const ambiguous = [];
+const ambiguousBy = {};
 const unresolvable = [];
 
 // **Two roots, because a run cwds to the package it mutates.** The docker runs
@@ -214,8 +250,27 @@ for (const run of runs) {
       continue;
     }
     checked += 1;
-    if (readFileSync(path, "utf8").includes(from)) continue;
-    missing[run] = (missing[run] ?? 0) + 1;
+    const body = readFileSync(path, "utf8");
+    // **Existence is one property and uniqueness is another** (F219).
+    //
+    // The harness mutates by `String.replace`, which takes the **first** match.
+    // So an anchor matching twice is not a missing anchor — it is a run that
+    // still passes while testing a site nobody chose, and this sweep called it
+    // `ok` because it asked `includes`. Measured on the commit that extracted
+    // `tickLabels`: the precision line was copied rather than shared, two runs
+    // anchored on it, and both reported clean.
+    //
+    // **A duplicated anchor is reported as its own kind rather than folded into
+    // `missing`**, because the remedy is different — a missing anchor is
+    // re-pointed and an ambiguous one means the source has two copies of
+    // something that should have one.
+    const hits = body.split(from).length - 1;
+    if (hits === 1) continue;
+    if (hits === 0) missing[run] = (missing[run] ?? 0) + 1;
+    else {
+      ambiguousBy[run] = (ambiguousBy[run] ?? 0) + 1;
+      ambiguous.push(`${run}: an anchor matches ${String(hits)}x in ${file} — replace() takes the first`);
+    }
   }
 }
 
@@ -224,10 +279,24 @@ const total = Object.values(missing).reduce((a, n) => a + n, 0);
 console.log(
   `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
     `${String(suites)} test paths · ` +
-    `${String(total)} missing across ${String(runsWith)} run(s)`,
+    `${String(total)} missing across ${String(runsWith)} run(s)` +
+    `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}`,
 );
 
 const problems = [...unresolvable];
+
+// The ambiguity arm, on the same equality terms as the stale one below.
+const AMBIG = OWN ? KNOWN_AMBIGUOUS : {};
+for (const [run, n] of Object.entries(ambiguousBy)) {
+  const known = AMBIG[run];
+  if (known === undefined) problems.push(`${run}: ${String(n)} ambiguous anchor(s) and it is not on the list`);
+  else if (known !== n) problems.push(`${run}: ${String(n)} ambiguous anchor(s), the list says ${String(known)}`);
+}
+for (const [run, n] of Object.entries(AMBIG)) {
+  if (ambiguousBy[run] === undefined) {
+    problems.push(`${run}: the list says ${String(n)} ambiguous and every anchor is unique — remove it`);
+  }
+}
 
 // The equality arm, both directions.
 const LIST = OWN ? KNOWN_STALE : {};

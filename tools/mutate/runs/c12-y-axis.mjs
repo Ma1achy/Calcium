@@ -61,8 +61,8 @@ const results = runPass({
       // frame rows rather than the label rows.
       name: "the curve is rasterised against a range the gutter does not describe",
       file: DEF,
-      from: "      : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale);",
-      to: "      : axisFor(axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale).range, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      from: "      : valueAxisOf(data, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      to: "      : valueAxisOf(valueAxisOf(data, ticksFor(plotAreaRows(block)), block, block.yScale).range, ticksFor(plotAreaRows(block)), block, block.yScale);",
       expect: "YA1",
     },
     {
@@ -97,8 +97,8 @@ const results = runPass({
       // nicing's coarser step it wrote `13` on the row holding `12.5`.
       name: "the labels take the magnitude's decimals rather than the step's",
       file: AXES,
-      from: "  const places = axis.step > 0 ? stepDecimals(axis.step) : undefined;",
-      to: "  const places = undefined;",
+      from: "  return axis.step > 0 ? stepDecimals(axis.step) : undefined;",
+      to: "  return undefined;",
       expect: "YA1",
     },
   ],

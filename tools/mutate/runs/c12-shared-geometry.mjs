@@ -330,8 +330,12 @@ const results = runPass({
       // beside tiles — which is what the frame caught and no row did.
       name: "the tiles family gets a value axis",
       file: SVG,
-      from: '  const noValueAxis = family === "matrix" || family === "tiles" || family === "nodes";',
-      to: '  const noValueAxis = family === "matrix";',
+      // Re-anchored when the decision moved into `HAS_VALUE_AXIS` (C12 I60):
+      // three renderers had reached the same wrong answer separately, so the
+      // arm stopped deciding it. The mutation is the same defect against the
+      // new seam — every form gets an axis, tiles and nodes included.
+      from: "  const noValueAxis = !HAS_VALUE_AXIS[block.form];",
+      to: "  const noValueAxis = false;",
       expect: "G6d6",
     },
     {

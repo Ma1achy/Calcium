@@ -27,12 +27,13 @@ import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
+import { valueAxisOf } from "./figure.js";
 import { treeArea } from "./tree.js";
 import { graphArea } from "./graph.js";
 import { curveRows, isBlank } from "./curve.js";
 import { crossRow, gridRow, xRowFor, xTitleRow } from "./furniture.js";
 import type { Axis, XAxis } from "./axes.js";
-import { formatReadout, labelWidth, ticksFor, yLabels, axisFor, xAxis } from "./axes.js";
+import { formatReadout, labelWidth, ticksFor, yLabels, xAxis } from "./axes.js";
 import {
   areaText,
   bandLayout,
@@ -1562,7 +1563,7 @@ function categoricalColumnForm(
   // A bar's baseline is zero unless the data goes below it — the same rule
   // `barRow` takes, and the reason `[10, 25, 15]` used to draw nothing at 10.
   const zeroed = { min: baselineFor(data.min), max: data.max };
-  const axis = axisFor(zeroed, ticksFor(areaRows), block, block.yScale);
+  const axis = valueAxisOf(zeroed, ticksFor(areaRows), block, block.yScale);
   const range = axis.range;
   const layout = reserving(layoutFor(block, axis, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
 
@@ -1686,7 +1687,7 @@ function stackedForm(
   // area width the gutter leaves. Two passes because the range decides the
   // label column and the label column decides the width the bands are cut to.
   const rough = stackRange(stackBands(block.series, Math.max(1, width), centred));
-  const axis = axisFor(rough, ticksFor(areaRows), block, block.yScale);
+  const axis = valueAxisOf(rough, ticksFor(areaRows), block, block.yScale);
   const range = axis.range;
   const layout = reserving(layoutFor(block, axis, usableWidth(block, width, ctx), false, ctx.capabilities) ?? fallback, block, width, ctx);
 
@@ -2028,7 +2029,7 @@ function positionalForm(
     ? null
     : stacked
       ? { range: data, ticks: [data.min, data.max], step: 0 }
-      : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale);
+      : valueAxisOf(data, ticksFor(plotAreaRows(block)), block, block.yScale);
   const usable = usableWidth(block, width, ctx);
   // **With no data the axis cannot reach the frame, and that was worth checking
   // rather than asserting.** The comment here first said a bare unit axis would

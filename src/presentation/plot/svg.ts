@@ -40,6 +40,7 @@ import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
 import { refOf } from "./marks.js";
+import { HAS_VALUE_AXIS } from "./figure.js";
 import { ORIGIN_DEFAULT } from "../../data/viewmodel/index.js";
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
@@ -977,11 +978,14 @@ export function plotToSvg(
   // whose readings are **areas**. That is C12's own ruling for a field form
   // (*its ordinate is the series and its readings are the colours*) arriving at
   // the family whose readings are sizes.
-  const family = svgFamilyOf(block.form);
-  // **`nodes` has no value axis either.** A tree's readings are its structure
-  // and a graph's are its edges; the ticks came from `seriesRange([]) ?? {0,1}`
-  // again, and the frame is what said so — for the second family running.
-  const noValueAxis = family === "matrix" || family === "tiles" || family === "nodes";
+  // **The third family said the same thing, so the decision moved** (C12 I60,
+  // §3ak). `matrix`, `tiles` and `nodes` each furnished an axis out of
+  // `seriesRange([]) ?? {0,1}` — over readings that are colours, areas and
+  // structure — and each was found by reading a frame, one family at a time.
+  // Three renderers reaching the same wrong answer separately is the seam being
+  // in the wrong place, so this arm no longer decides it: `HAS_VALUE_AXIS` does,
+  // for both arms, over every form rather than over the three this one claims.
+  const noValueAxis = !HAS_VALUE_AXIS[block.form];
   if (!noValueAxis && rule !== undefined && label !== undefined) {
     for (const tick of axis.ticks) {
       if (valueOnX) {

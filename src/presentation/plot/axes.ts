@@ -428,8 +428,7 @@ export function yLabels(
   // from the *span* before, which is the same number divided by the tick count —
   // right when there were three labels and wrong the moment there are five, and
   // wrong in the direction that drops a digit two adjacent ticks differ by.
-  const places = axis.step > 0 ? stepDecimals(axis.step) : undefined;
-  const at = (v: number): string => formatValue(v, format, places);
+  const at = (v: number): string => formatValue(v, format, placesFor(axis));
 
   if (h === 1) return [{ row: 0, text: at(axis.range.max) }];
 
@@ -490,6 +489,41 @@ function stepDecimals(step: number): number {
     if (Number(step.toFixed(d)) === step) return d;
   }
   return MAX_DECIMALS;
+}
+
+/**
+ * Every tick's label, at the axis's own precision — **the strings, beside the
+ * numbers that produced them** (C12 I59, §3ak).
+ *
+ * `yLabels` answers *which rows carry a label*, which is a question about cells
+ * and belongs to the terminal. This answers *what a tick says*, which is a
+ * question about the axis and belongs to both arms — and the two were computed
+ * in different places from different inputs, so the SVG printed `String(tick)`
+ * and got `1` where the terminal's uniform precision gives `1.0`, and
+ * `0.6000000000000001` where it gives `0.6`.
+ *
+ * **The precision is `stepDecimals` and not `decimalsFor`**, which is `yLabels`'
+ * own ruling and the reason this function is here rather than in the figure: a
+ * step is exact by construction, so the question has an exact answer, and asking
+ * a magnitude formatter instead put a decimal on every label of an integer axis.
+ * One derivation, read by both.
+ */
+export function tickLabels(axis: Axis, format: Plot["yFormat"]): readonly string[] {
+  return axis.ticks.map((v) => formatValue(v, format, placesFor(axis)));
+}
+
+/**
+ * An axis's precision — **one derivation, and it was two for a commit.**
+ *
+ * `tickLabels` landed with its own copy of `yLabels`' line, under a comment
+ * saying *one derivation, read by both*. Two identical lines is not only the
+ * duplication the comment denied: the mutation harness replaces by string, so
+ * an anchor on that line matched **twice**, and `anchors.mjs` did not report it
+ * because the sweep checks whether an anchor **exists** and not whether it is
+ * **unique** (F219).
+ */
+function placesFor(axis: Axis): number | undefined {
+  return axis.step > 0 ? stepDecimals(axis.step) : undefined;
 }
 
 /** Rows between two labels. One blank line, or the pair reads as one label. */

@@ -13235,3 +13235,49 @@ code the classification describes, rather than to the picture it produces.**
 bars over sample index* — a different wrong figure, because orientation is a `Figure` member and the
 emitter does not exist yet. The entry stays `"curve"` until the renderers land, with the reason
 recorded rather than the symptom moved. C12 §3ak.6.
+
+---
+
+## F267 — the check caught its own author, one commit after F266 ★★★☆☆
+
+**F266 says a total record forces an answer for every member and cannot check one of them.** The
+remedy was `FV1`: a form marked *no value axis* must never draw a numeric gutter label, asserted
+over every catalogue variant at both widths. **It failed on the commit that introduced it, with
+four offenders, and the record was mine.**
+
+```
+smallmultiples/default@40: 100,50,0
+smallmultiples/default@80: 100,50,0,0,25,0,25,0,25,0,25
+pairplot/default@40:       100,50,0
+pairplot/default@80:       100,50,0,0,25,0,25,0,25,0,25
+```
+
+**The measurement was in hand when the wrong value was written.** The sweep that produced the
+record reported `smallmultiples` and `pairplot` at **6 numeric gutter labels and 0 named** — the
+clearest *has a value axis* signal in the table — and both were entered as `false` under the
+comment *composition: each facet answers for itself, and the outer figure has no axis of its own to
+label*.
+
+**That sentence is true.** The outer figure has no axis of its own. It is also not the question the
+record asks, which is whether a reader takes readings off a scale in this figure — and a facet's
+gutter is drawn *inside* the composition, so they do. **MG24's class exactly**: a correct sentence
+justifying the wrong decision survives being read carefully, because review checks whether a
+justification is true and this one was.
+
+**The reusable part is what it says about the remedy rather than about the mistake.** F266's answer
+to *a total record cannot check itself* was a row that checks it, and the row's first run caught the
+author of the record it checks, with the contradicting measurement three scrollbacks away. **A
+measurement does not defend itself against a sentence** — something has to re-read it, and that
+something is a test rather than a habit.
+
+**And FV1 asserts one direction only, stated because an unrecorded limit reads as strength.** A form
+marked `true` may draw no numeric label at all: a horizontal bar chart has a value axis and gutters
+its categories, `line` gutters series names below the colour floor. Measured, `bar` is 8 numeric
+against 50 named and `line` is 256 against 14. **Whether the gutter holds values is orientation and
+capability rung, not form** — so the converse is false and `FV2` exists to stop it being asserted.
+
+**One further limit, from the mutation pass.** Dropping the step's precision from `tickLabels` fails
+`FV3` and **moves no frame**, because no renderer consumes `ValueAxis.labels` yet — the terminal
+still formats through `yLabels` and the SVG still prints `String(tick)`. The member has one consumer
+and it is a test. That is F84's class, and it closes when the SVG walks the figure.
+
