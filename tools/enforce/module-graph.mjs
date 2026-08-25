@@ -2425,84 +2425,19 @@ export function publicSurfaceUseSignal(
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
-  // **The curve family's emitter, landed one commit ahead of its second reader**
-  // (C12 §3ak.7). The pass moves the seam from `value -> [0, 1]` to
-  // `value -> a drawing`, and it moves one family at a time: the *decisions*
-  // half is consumed today — `positionalForm` reads `positionalDecisions` back,
-  // gated by 1780 baseline frames — and the *marks* half has no reader until
-  // `plotToSvg` walks a figure.
+  // **Six entries left here at once, and the equality arm is what removed them.**
   //
-  // **The expiry is a symbol, and grepping it is what picking this entry up
-  // begins with**: `plotToSvg` calling `curveFigure`. On that commit both this
-  // entry and `Figure.marks` below go, and the bidirectional arm is what makes
-  // that mechanical rather than remembered.
+  // The seven family emitters landed one commit at a time, each with the same
+  // deferral: *the expiry is a symbol — `plotToSvg` walking a figure.* On the
+  // commit that met it, `figureFor` called all seven and this rule refused every
+  // exemption in the same run. That is the deferral discipline working
+  // mechanically rather than by anyone remembering: an entry that excuses
+  // nothing is how the next one gets in unread, so it cannot survive its own
+  // condition being satisfied.
   //
-  // **Not deferred to keep the commit small.** The terminal keeps its
-  // rasterisers — a curve is Bresenham at dot resolution and folded, which is
-  // not a polyline walk — so wiring the marks into *this* arm would be a rewrite
-  // of the thing the pass promises not to touch.
-  // **The distribution family's**, and the one whose marks carry the most that
-  // cannot cross: `GlyphRole` names which of seven things a mark is, and each arm
-  // draws it from its own ladder. Its decisions ARE consumed — the vertical arm
-  // reaches `categoricalDecisions` through `categoricalColumnForm`.
-  distributionFigure:
-    "C12 I62, §3ak.7 — the distribution family's shared emitter. The datum is a " +
-    "set of positions derived from the samples, and `normalisedSummary` and " +
-    "`quartileRange` already cross; what waits is the roles those positions " +
-    "carry, for `plotToSvg` at step 4. The terminal draws them from glyph tables " +
-    "per capability rung, which is the half that cannot be shared",
+  // `matrixFigure` was never here — `heatmapFormRows` consumed it on the day it
+  // landed, and the entry written for it was refused then (C12 §3ak.7).
 
-  // **The tiles family's**, and its marks are the family with the shortest
-  // distance to a consumer: `hierarchy.ts` already returns unit-square positions,
-  // so `plotToSvg` walks these almost unchanged at step 4.
-  tilesFigure:
-    "C12 I60, I62, §3ak.7 — the tiles family's shared emitter. `value` and " +
-    "`extent` are both null because an area IS the reading; what waits is the " +
-    "tile rects, for `plotToSvg` at step 4. The terminal composes them into cell " +
-    "spans through `hierarchyStripRows` and `treemapRows`",
-
-  // **The nodes family's decisions, and there is deliberately no `nodesFigure`**
-  // (§3aj.6). A tree's placement is a function of its labels' widths in one arm
-  // and of slots in the other, so a `Mark` — which is a position — could only
-  // carry one arm's answer. What crosses is the topology, which `flatten` and
-  // `graphLayers` already share; this adds the decisions above them, and the
-  // consumer for those is `plotToSvg`'s furniture at step 4.
-  nodesDecisions:
-    "C12 I60, §3ak.7, §3aj.6 — the nodes family stops at its decisions because " +
-    "the placement cannot cross the seam. `marks: []` is not the alternative: " +
-    "I64 makes an empty list a refusal, and a figure saying *nothing to draw* " +
-    "over a forty-node tree is a lie. `FN1` asserts the absence",
-
-  // **`matrixFigure` is NOT on this list and the equality arm is what said so.**
-  // It has no decisions half to split off — a matrix has no value axis — so
-  // `heatmapFormRows` calls the emitter itself for the ramp's domain, and the
-  // entry written for it was refused as excusing nothing. The first family whose
-  // emitter the terminal actually calls.
-  //
-  // **The scatter family's, and its decisions ARE consumed** — `positionalForm`
-  // draws scatter and bubble through `positionalDecisions` like everything else
-  // positional, so what waits here is the marks alone. Same expiry symbol:
-  // `plotToSvg` walking a figure.
-  // **The bar family's, and it is the third with the same shape.** Its decisions
-  // ARE consumed — `categoricalColumnForm` reads `categoricalDecisions` back for
-  // all four of its callers — and the rects wait for the same reader.
-  barFigure:
-    "C12 I59, I62, §3ak.7 — the bar family's shared emitter. Its decisions are " +
-    "`categoricalDecisions`, consumed by `categoricalColumnForm`; the rects wait " +
-    "for `plotToSvg` to walk a figure at step 4. The terminal's bars are eighths " +
-    "of a cell filled from a ladder, not rectangles in a normalised space",
-  scatterFigure:
-    "C12 I59, I62, §3ak.7 — the scatter family's shared emitter. Its decisions " +
-    "are `positionalDecisions`, consumed by `positionalForm` today; what has no " +
-    "reader is the point marks and the size channel, which `plotToSvg` takes at " +
-    "step 4. The terminal's bubbles are dots in a braille grid, not points in a " +
-    "normalised space",
-  curveFigure:
-    "C12 I59, §3ak.7 — the curve family's shared emitter. Its decisions half is " +
-    "consumed by `positionalForm` through `positionalDecisions`; the marks half " +
-    "waits for `plotToSvg` to walk a figure, which is step 4 of the pass. The " +
-    "terminal cannot be the consumer: its curve arm rasterises at dot resolution " +
-    "and folds, so it reads the decisions and never the marks",
   // `renderToLines` was here and the equality arm removed it on the commit that
   // moved the conformance suites into `src/testing/` — which is the arm working,
   // and also **the rule's known false negative, shared with MG24.**

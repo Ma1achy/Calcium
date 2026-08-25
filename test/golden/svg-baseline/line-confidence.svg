@@ -1,16 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
 <line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
-<line x1="89.6" y1="226.241" x2="614.4" y2="226.241" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="230.241" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
-<line x1="89.6" y1="164.482" x2="614.4" y2="164.482" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="168.482" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">70</text>
-<line x1="89.6" y1="102.723" x2="614.4" y2="102.723" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="106.723" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">80</text>
-<line x1="89.6" y1="40.964" x2="614.4" y2="40.964" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="44.964" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">90</text>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">40</text>
+<line x1="89.6" y1="196.267" x2="614.4" y2="196.267" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
+<line x1="89.6" y1="104.533" x2="614.4" y2="104.533" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">80</text>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<path d="M89.6 288 L137.309 257.172 L185.018 226.652 L232.727 196.745 L280.436 167.75 L328.145 139.956 L375.855 113.641 L423.564 89.069 L471.273 66.484 L518.982 46.113 L566.691 28.158 L614.4 12.8" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M89.6 242.133 L137.309 219.238 L185.018 196.572 L232.727 174.361 L280.436 152.827 L328.145 132.185 L375.855 112.642 L423.564 94.393 L471.273 77.62 L518.982 62.49 L566.691 49.156 L614.4 37.75" fill="none" stroke="#e69f00" stroke-width="2"/>
 </svg>

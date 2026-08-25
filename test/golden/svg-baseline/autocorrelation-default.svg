@@ -2,17 +2,11 @@
 <rect width="100%" height="100%" fill="#141414"/>
 <line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">-0.5</text>
-<line x1="89.6" y1="271.447" x2="614.4" y2="271.447" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="275.447" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">-0.25</text>
-<line x1="89.6" y1="219.717" x2="614.4" y2="219.717" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="223.717" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
-<line x1="89.6" y1="167.988" x2="614.4" y2="167.988" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="171.988" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.25</text>
-<line x1="89.6" y1="116.259" x2="614.4" y2="116.259" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="120.259" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.5</text>
-<line x1="89.6" y1="64.529" x2="614.4" y2="64.529" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="68.529" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.75</text>
+<line x1="89.6" y1="196.267" x2="614.4" y2="196.267" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.0</text>
+<line x1="89.6" y1="104.533" x2="614.4" y2="104.533" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.5</text>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">1</text>
-<path d="M89.6 12.8 L155.2 70.737 L220.8 134.881 L286.4 194.887 L352 256.962 L417.6 288 L483.2 263.17 L548.8 211.441 L614.4 180.403" fill="none" stroke="#e69f00" stroke-width="2"/>
+<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">1.0</text>
+<path d="M89.6 12.8 L155.2 64.171 L220.8 121.045 L286.4 174.251 L352 229.291 L417.6 256.811 L483.2 234.795 L548.8 188.928 L614.4 161.408" fill="none" stroke="#e69f00" stroke-width="2"/>
 </svg>

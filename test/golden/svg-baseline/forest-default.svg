@@ -1,37 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
 <line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-2.5</text>
-<line x1="167.348" y1="12.8" x2="167.348" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="167.348" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-2</text>
-<line x1="264.533" y1="12.8" x2="264.533" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="264.533" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-1.5</text>
-<line x1="361.719" y1="12.8" x2="361.719" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="361.719" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-1</text>
-<line x1="458.904" y1="12.8" x2="458.904" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="458.904" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-0.5</text>
-<line x1="556.089" y1="12.8" x2="556.089" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="556.089" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-3</text>
+<line x1="220.8" y1="12.8" x2="220.8" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="220.8" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-2</text>
+<line x1="352" y1="12.8" x2="352" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="352" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-1</text>
+<line x1="483.2" y1="12.8" x2="483.2" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="483.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
 <line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0.5</text>
-<rect x="283.97" y="39.82" width="310.993" height="1" fill="#626262"/>
-<rect x="283.47" y="32.064" width="1" height="16.512" fill="#626262"/>
-<rect x="594.463" y="32.064" width="1" height="16.512" fill="#626262"/>
-<rect x="433.704" y="34.557" width="11.525" height="11.525" fill="#e69f00"/>
-<rect x="420.03" y="94.86" width="194.37" height="1" fill="#626262"/>
-<rect x="419.53" y="87.104" width="1" height="16.512" fill="#626262"/>
-<rect x="613.9" y="87.104" width="1" height="16.512" fill="#626262"/>
-<rect x="509.999" y="88.144" width="14.431" height="14.431" fill="#56b4e9"/>
-<rect x="89.6" y="149.9" width="447.052" height="1" fill="#626262"/>
-<rect x="89.1" y="142.144" width="1" height="16.512" fill="#626262"/>
-<rect x="536.152" y="142.144" width="1" height="16.512" fill="#626262"/>
-<rect x="337.336" y="145.455" width="9.891" height="9.891" fill="#3cbf9a"/>
-<rect x="381.156" y="204.94" width="194.37" height="1" fill="#626262"/>
-<rect x="380.656" y="197.184" width="1" height="16.512" fill="#626262"/>
-<rect x="575.026" y="197.184" width="1" height="16.512" fill="#626262"/>
-<rect x="471.579" y="198.678" width="13.523" height="13.523" fill="#f0e442"/>
-<rect x="416.142" y="259.98" width="116.622" height="1" fill="#626262"/>
-<rect x="415.642" y="252.224" width="1" height="16.512" fill="#626262"/>
-<rect x="532.264" y="252.224" width="1" height="16.512" fill="#626262"/>
-<polygon points="474.453,251.357 483.576,260.48 474.453,269.603 465.33,260.48" fill="#8fa8ff"/>
+<text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">1</text>
+<rect x="299.52" y="39.82" width="209.92" height="1" fill="#626262"/>
+<rect x="299.02" y="32.064" width="1" height="16.512" fill="#626262"/>
+<rect x="508.94" y="32.064" width="1" height="16.512" fill="#626262"/>
+<rect x="398.717" y="34.557" width="11.525" height="11.525" fill="#e69f00"/>
+<rect x="391.36" y="94.86" width="131.2" height="1" fill="#626262"/>
+<rect x="390.86" y="87.104" width="1" height="16.512" fill="#626262"/>
+<rect x="522.06" y="87.104" width="1" height="16.512" fill="#626262"/>
+<rect x="449.744" y="88.144" width="14.431" height="14.431" fill="#56b4e9"/>
+<rect x="168.32" y="149.9" width="301.76" height="1" fill="#626262"/>
+<rect x="167.82" y="142.144" width="1" height="16.512" fill="#626262"/>
+<rect x="469.58" y="142.144" width="1" height="16.512" fill="#626262"/>
+<rect x="333.935" y="145.455" width="9.891" height="9.891" fill="#3cbf9a"/>
+<rect x="365.12" y="204.94" width="131.2" height="1" fill="#626262"/>
+<rect x="364.62" y="197.184" width="1" height="16.512" fill="#626262"/>
+<rect x="495.82" y="197.184" width="1" height="16.512" fill="#626262"/>
+<rect x="423.958" y="198.678" width="13.523" height="13.523" fill="#f0e442"/>
+<rect x="388.736" y="259.98" width="78.72" height="1" fill="#626262"/>
+<rect x="388.236" y="252.224" width="1" height="16.512" fill="#626262"/>
+<rect x="466.956" y="252.224" width="1" height="16.512" fill="#626262"/>
+<polygon points="428.096,251.357 437.219,260.48 428.096,269.603 418.973,260.48" fill="#8fa8ff"/>
 </svg>

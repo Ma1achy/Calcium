@@ -330,12 +330,14 @@ const results = runPass({
       // beside tiles — which is what the frame caught and no row did.
       name: "the tiles family gets a value axis",
       file: SVG,
-      // Re-anchored when the decision moved into `HAS_VALUE_AXIS` (C12 I60):
-      // three renderers had reached the same wrong answer separately, so the
-      // arm stopped deciding it. The mutation is the same defect against the
-      // new seam — every form gets an axis, tiles and nodes included.
-      from: "  const noValueAxis = !HAS_VALUE_AXIS[block.form];",
-      to: "  const noValueAxis = false;",
+      // Re-anchored twice, and the second time is the seam arriving. First when
+      // the decision moved into `HAS_VALUE_AXIS` (C12 I60), because three
+      // renderers had reached the same wrong answer separately. Now the record
+      // is applied by the *emitter* — `figure.value` is already `null` for the
+      // three families — so this arm has no lookup left to get wrong and the
+      // mutation is against the read instead (§3ak.10).
+      from: "  if (axis !== null && rule !== undefined && label !== undefined) {",
+      to: "  if (rule !== undefined && label !== undefined) {",
       expect: "G6d6",
     },
     {

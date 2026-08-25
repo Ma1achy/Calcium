@@ -25,6 +25,11 @@ const SHARED = "src/data/viewmodel/distribution.ts";
 const GLYPH = "src/presentation/plot/glyph-row.ts";
 const KDE = "src/presentation/plot/kde.ts";
 const SVG = "src/presentation/plot/svg.ts";
+// **`rangeFor` is gone and its two rows moved here** (C12 §3ak.10). The
+// decision it held — which datum a distribution ranges over — is
+// `distributionFigure`'s now, read by both arms. The defects are unchanged; only
+// the file they can be written in is.
+const FIGURE = "src/presentation/plot/figure.ts";
 
 const FILES =
   "test/unit/plot-distribution-geometry.test.ts test/unit/plot.test.ts " +
@@ -112,14 +117,17 @@ const results = runPass({
       expect: "D3",
     },
     {
-      // **The SVG arm ranging over `series` like every other family.** A
-      // boxplot's `series` is `[]`, so `seriesRange` answers `null` and the
-      // fallback furnishes 0..1 — the figure draws, entirely inside the plot
-      // area, at a scale nothing in the block has.
+      // **The family ranging over `series` like every other one.** A boxplot's
+      // `series` is `[]`, so `seriesRange` answers `null` and the fallback
+      // furnishes 0..1 — the figure draws, entirely inside the plot area, at a
+      // scale nothing in the block has.
+      //
+      // Re-anchored onto `distributionFigure`: the choice of datum is the
+      // figure's now, so the defect is one place instead of two.
       name: "the distribution family takes seriesRange like everything else",
-      file: SVG,
-      from: "  if (svgFamilyOf(block.form) !== \"distribution\" || block.form === \"dumbbell\") {",
-      to: "  if (true) {",
+      file: FIGURE,
+      from: "  const extent = block.form === \"dumbbell\"\n    ? seriesRange(block.series, block)\n    : quartileRange(qs, block.form === \"forest\");",
+      to: "  const extent = seriesRange(block.series, block);",
       expect: "G6",
     },
     {
@@ -132,9 +140,9 @@ const results = runPass({
       // `normalisedOf` clamps. The row now reads the estimate, where the two
       // arms genuinely differ.
       name: "the SVG arm ranges a forest plot over its whiskers",
-      file: SVG,
-      from: "  return quartileRange(block.quartiles ?? [], block.form === \"forest\");",
-      to: "  return quartileRange(block.quartiles ?? []);",
+      file: FIGURE,
+      from: "    : quartileRange(qs, block.form === \"forest\");",
+      to: "    : quartileRange(qs);",
       expect: "G6c4",
     },
     {

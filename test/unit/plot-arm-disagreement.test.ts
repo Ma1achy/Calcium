@@ -101,7 +101,19 @@ type Record_ = "refused" | Claimed;
  * described. `line` at 16 of 86 is the `ohlc` and non-default-`origin` variants.
  */
 const MEASURED = {
-  "line": { silent: "16/86", "numericLabels": "70/70", "identityLabels": "18/70", "border": "64/70", "interiorRules": "68/70", "legend": "26/70" },
+  // **`line.interiorRules` went 68/70 to 70/70 when the SVG's axis became the
+  // figure's — a disagreement WIDENING, and the record says so rather than
+  // rounding it toward the story.** The tick count is `ticksFor(areaRows)` now
+  // instead of a hardcoded five, so two variants that had drawn no interior rule
+  // draw one. The cell is honest and the direction is not the pass's direction;
+  // this row exists to make that visible instead of arguable.
+  //
+  // **And it is one cell against seventy-two moved frames** (F275). The same
+  // commit changed the axis on every ticked form — `1 2 3 4 5` to `0 2 4 6`, the
+  // terminal's own — and this matrix, which compares five *decisions*, could
+  // report only this. It is a decision gate; `test/golden/svg-baseline/` is the
+  // picture gate, and the two answer different questions on purpose.
+  "line": { silent: "16/86", "numericLabels": "70/70", "identityLabels": "18/70", "border": "64/70", "interiorRules": "70/70", "legend": "26/70" },
   "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "6/6", "legend": "agree" },
   "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "8/10", "interiorRules": "10/10", "legend": "2/10" },
   "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "2/4", "interiorRules": "4/4", "legend": "agree" },

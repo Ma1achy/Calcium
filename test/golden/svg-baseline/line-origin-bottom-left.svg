@@ -2,15 +2,9 @@
 <rect width="100%" height="100%" fill="#141414"/>
 <line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
-<line x1="89.6" y1="230.878" x2="614.4" y2="230.878" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="234.878" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
-<line x1="89.6" y1="173.757" x2="614.4" y2="173.757" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="177.757" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">70</text>
-<line x1="89.6" y1="116.635" x2="614.4" y2="116.635" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="120.635" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">80</text>
-<line x1="89.6" y1="59.514" x2="614.4" y2="59.514" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="63.514" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">90</text>
+<line x1="89.6" y1="150.4" x2="614.4" y2="150.4" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">75</text>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<path d="M89.6 288 L129.969 259.487 L170.338 231.258 L210.708 203.597 L251.077 176.779 L291.446 151.072 L331.815 126.734 L372.185 104.006 L412.554 83.117 L452.923 64.276 L493.292 47.669 L533.662 33.464 L574.031 21.802 L614.4 12.8" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M89.6 288 L129.969 260.526 L170.338 233.326 L210.708 206.673 L251.077 180.832 L291.446 156.062 L331.815 132.61 L372.185 110.711 L412.554 90.584 L452.923 72.428 L493.292 56.427 L533.662 42.74 L574.031 31.503 L614.4 22.829" fill="none" stroke="#e69f00" stroke-width="2"/>
 </svg>

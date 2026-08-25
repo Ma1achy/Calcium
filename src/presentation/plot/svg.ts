@@ -29,18 +29,26 @@
  * not to be. Two things called SVG in one repository, and only one of them is a
  * second renderer.
  */
-import { normalisedSummary, quartileRange, type NormalisedSummary } from "../../data/viewmodel/distribution.js";
+import { normalisedSummary, type NormalisedSummary } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
 import { graphLayers } from "./graph.js";
 import { normalisedOf, type PinnedRange } from "../../data/viewmodel/range.js";
-import { seriesRange } from "./scale.js";
-import { niceAxis } from "./axes.js";
+
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
 import { refOf } from "./marks.js";
-import { HAS_VALUE_AXIS } from "./figure.js";
+import {
+  barFigure,
+  curveFigure,
+  distributionFigure,
+  matrixFigure,
+  nodesDecisions,
+  scatterFigure,
+  tilesFigure,
+  type Figure,
+} from "./figure.js";
 import { ORIGIN_DEFAULT } from "../../data/viewmodel/index.js";
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
@@ -190,6 +198,36 @@ export function svgFamilyOf(form: PlotForm): SvgFamily | null {
   return SVG_FAMILY[form];
 }
 
+/**
+ * The figure a block draws, **by family** (C12 §3ak, I59).
+ *
+ * This is where the seam actually moves for this arm. Every decision below it —
+ * the range, the ticks, the strings they print, whether there is an axis at all
+ * — used to be made here and is now read; the emitters are the terminal's own
+ * computations, moved, which is why the terminal did not move a frame while they
+ * landed and this arm moves plenty.
+ *
+ * **`nodes` returns decisions and no marks, and that is not a refusal**
+ * (§3ak.10 S3/S8). A tree's placement is a function of its labels' widths in the
+ * terminal and of slots here, so the topology crosses and the placement does
+ * not — `nodesDecisions` is `Omit<Figure, "marks">` for exactly that, and this
+ * arm keeps its own loop over `flatten` and `graphLayers`. Giving it
+ * `marks: []` would make I64 read it as *nothing to draw* and refuse two forms
+ * this arm draws today.
+ */
+function figureFor(block: Plot): Omit<Figure, "marks"> | null {
+  switch (svgFamilyOf(block.form)) {
+    case "curve": return curveFigure(block);
+    case "scatter": return scatterFigure(block);
+    case "bar": return barFigure(block);
+    case "matrix": return matrixFigure(block);
+    case "distribution": return distributionFigure(block);
+    case "tiles": return tilesFigure(block);
+    case "nodes": return nodesDecisions(block);
+    default: return null;
+  }
+}
+
 /** A number with three decimals, so the output is byte-stable across platforms. */
 function n(v: number): string {
   return (Math.round(v * 1000) / 1000).toString();
@@ -301,31 +339,15 @@ function curvePath(points: readonly (readonly [number, number] | null)[], square
   return out.join(" ");
 }
 
-/**
- * **A distribution's range comes from its own datum, and there are two.**
- *
- * `seriesRange` reads `block.series`, and a boxplot's is `[]` — the summaries
- * are the data (C04 I57's shape, one field along). So the family's range is
- * `quartileRange`, in the arm the terminal uses: the whisker arm for a box and
- * the interval arm for a forest plot.
- *
- * **Except `dumbbell`**, whose datum is two `series` paired by index rather
- * than a summary at all. Its *coordinate* is the family's — positions on one
- * axis from one range — which is why it is in the family; its datum is not,
- * which is why this is a function rather than a line in `plotToSvg`.
- *
- * **No pin.** `seriesRange` applies `yMin`/`yMax` and this does not, because
- * the terminal's boxplot arm does not either: it writes `yMin: lo, yMax: hi`
- * over whatever the author set. **The arms match, and whether that overwrite is
- * right is a separate question** — recorded rather than answered here, because
- * answering it in one arm is how the two come to disagree.
- */
-function rangeFor(block: Plot): PinnedRange | null {
-  if (svgFamilyOf(block.form) !== "distribution" || block.form === "dumbbell") {
-    return seriesRange(block.series, block);
-  }
-  return quartileRange(block.quartiles ?? [], block.form === "forest");
-}
+// **`rangeFor` is gone, and its removal is what this step is for** (C12 §3ak.10).
+//
+// It answered *a distribution's range comes from its own datum, and there are
+// two* — `seriesRange` for most forms, `quartileRange` for a boxplot, in the arm
+// the terminal uses. Every word of that is still true and none of it is decided
+// here any more: each family's emitter answers it, once, for both arms. Its
+// closing note — **no pin, because the terminal's boxplot arm overwrites
+// `yMin`/`yMax` anyway, and whether that overwrite is right is a separate
+// question** — moves with it, unanswered and now askable in one place.
 
 /** A slot along the categorical axis, and the half-width the figure takes in it. */
 function slotOf(index: number, count: number, from: number, to: number): Readonly<{ centre: number; half: number }> {
@@ -928,8 +950,19 @@ export function plotToSvg(
   // and a wrong-way-up chart is a plausible wrong figure today.
   if (block.origin !== undefined && block.origin !== ORIGIN_DEFAULT[block.form]) return null;
 
-  const range = rangeFor(block) ?? { min: 0, max: 1 };
-  const axis = niceAxis(range, 5, block);
+  // **The axis is the figure's, and this is D1 through D7 closing at once**
+  // (C12 §3ak.10). What this arm computed for itself — `rangeFor`, a hardcoded
+  // five ticks, `niceAxis` without the block's scale, `String(tick)` — is one
+  // read now, and the emitter behind it is the terminal's own computation.
+  //
+  // **The range is the NICED one and that is the sharpest of the sixteen.** The
+  // same `line` spanned 0-6 in the terminal and 1-5 here, so the first sample
+  // sat on the bottom edge in one arm and floated in the other: not a
+  // rasterisation difference but a different scale, and no single decision held
+  // it because both arms drew something plausible.
+  const figure = figureFor(block);
+  const range = figure?.value?.range ?? figure?.extent ?? { min: 0, max: 1 };
+  const axis = figure?.value ?? null;
   const box = area(layout);
 
   // **Furniture is not a picture**, and this is the second clause because it is
@@ -985,9 +1018,16 @@ export function plotToSvg(
   // Three renderers reaching the same wrong answer separately is the seam being
   // in the wrong place, so this arm no longer decides it: `HAS_VALUE_AXIS` does,
   // for both arms, over every form rather than over the three this one claims.
-  const noValueAxis = !HAS_VALUE_AXIS[block.form];
-  if (!noValueAxis && rule !== undefined && label !== undefined) {
-    for (const tick of axis.ticks) {
+  // **`value === null` IS the answer now**, where this read a record keyed by
+  // form. The record is still right and still total; what changed is that the
+  // figure already applied it, so there is no second lookup to disagree with the
+  // first (C12 I60).
+  if (axis !== null && rule !== undefined && label !== undefined) {
+    for (const [i, tick] of axis.ticks.entries()) {
+      // **The string is the figure's** (D5). `String(tick)` printed `1` where
+      // the terminal printed `1.0`, and `0.6000000000000001` where its uniform
+      // precision gave `0.6` — one axis, two spellings, both plausible.
+      const text = axis.labels[i] ?? String(tick);
       if (valueOnX) {
         const x = box.left + (box.right - box.left) * normalisedOf(tick, range, false);
         parts.push(
@@ -995,7 +1035,7 @@ export function plotToSvg(
             `stroke="${rule}" stroke-width="1"/>`,
           `<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="middle" ` +
             `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
-            `${escape(String(tick))}</text>`,
+            `${escape(text)}</text>`,
         );
         continue;
       }
@@ -1005,7 +1045,7 @@ export function plotToSvg(
           `stroke="${rule}" stroke-width="1"/>`,
         `<text x="${n(box.left - 6)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
-          `${escape(String(tick))}</text>`,
+          `${escape(text)}</text>`,
       );
     }
   }

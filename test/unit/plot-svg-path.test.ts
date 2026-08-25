@@ -28,6 +28,7 @@ import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/col
 import { rgbOf } from "../support/theme.js";
 import { tiles } from "../../src/presentation/plot/hierarchy.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
+import { curveFigure, distributionFigure } from "../../src/presentation/plot/figure.js";
 import { resolve } from "../../src/presentation/theme/index.js";
 import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
@@ -191,10 +192,22 @@ describe("G3–G5 — the second renderer", () => {
     const layout = SVG_DEFAULT_LAYOUT;
     const top = layout.height * layout.pad;
     const bottom = layout.height * (1 - layout.gutter);
-    // The maximum sample is at t=0 and the minimum at t=1, so the ink spans the
-    // whole plot area — within a stroke's half-width.
-    expect(inkTop, "the peak sits where normalisedOf(9) puts it").toBeCloseTo(top, -1);
-    expect(inkBottom, "and the trough where it puts 1").toBeCloseTo(bottom, -1);
+    // **The range is the figure's now, and this row re-derived it** (C12 §3ak.10).
+    //
+    // It read *the maximum sample is at t=0 and the minimum at t=1, so the ink
+    // spans the whole plot area*, which was true while this arm rasterised
+    // against the data's own extent. The shared axis is **niced** — it reaches
+    // past the data to a round number, which is what puts the same curve on the
+    // same scale in both arms (D1) — so the peak is no longer at the ceiling and
+    // the row's premise was false the moment the seam moved.
+    //
+    // Read rather than recomputed: a test that derives the coordinate itself is
+    // a third place for the two arms to disagree, which is the thing this whole
+    // pass removes. `toBeCloseTo(…, -1)` keeps the stroke's half-width tolerance.
+    const range = curveFigure(block).value!.range;
+    const at = (v: number): number => top + (bottom - top) * normalisedOf(v, range, true);
+    expect(inkTop, "the peak sits where the shared axis puts 9").toBeCloseTo(at(Math.max(...VALUES)), -1);
+    expect(inkBottom, "and the trough where it puts the minimum").toBeCloseTo(at(Math.min(...VALUES)), -1);
   });
 
   it("G5c: a label places itself, which is the whole of what SVG buys", () => {
@@ -641,14 +654,23 @@ describe("G6c — the distribution family, where containment says nothing", () =
     const svg = plotToSvg(wide, THEME, layout) ?? "";
     const xs = rects(svg).flatMap((r) => [r["x"] ?? 0, (r["x"] ?? 0) + (r["width"] ?? 0)])
       .filter((x) => x >= box.left - 1 && x <= box.right + 1);
-    // The interval is the extent, so it spans the area edge to edge. Ranged
-    // over the whiskers instead, 4..8 would sit in the middle third.
-    // Half a pixel short at each end, because a tee is one pixel wide centred
-    // on its value. Ranged over the whiskers instead, 4..8 would sit inside the
-    // middle third of an area the interval spans end to end.
-    expect(Math.min(...xs), "the interval's left end is the area's left").toBeLessThanOrEqual(box.left + 1);
-    expect(Math.min(...xs), "and not inside it").toBeGreaterThanOrEqual(box.left - 1);
-    expect(Math.max(...xs), "and its right end the area's right").toBeGreaterThanOrEqual(box.right - 1);
+    // **What this row is for is unchanged and its premise moved** (C12 §3ak.10).
+    // It asserted the interval spans the area *edge to edge*, which held while
+    // the arm rasterised against `quartileRange`'s own output. The shared axis is
+    // niced past it, so the interval now spans its share of a wider range — and
+    // the question the row exists to ask is still answerable: **does this plot
+    // range over its interval or over its whiskers?**
+    //
+    // Ranged over the whiskers, 4..8 of a 1..11 interval would sit inside the
+    // middle third. Ranged over the interval, the ends sit where the shared axis
+    // puts 1 and 11 — read from the figure rather than derived a second time.
+    const fRange = distributionFigure(wide).value!.range;
+    const atX = (v: number): number => box.left + (box.right - box.left) * normalisedOf(v, fRange, false);
+    expect(Math.min(...xs), "the interval's left end is where the axis puts 1")
+      .toBeCloseTo(atX(1), -1);
+    expect(Math.max(...xs), "and its right end where the axis puts 11").toBeCloseTo(atX(11), -1);
+    expect(atX(8) - atX(4), "the whiskers alone would be a third of that span")
+      .toBeLessThan((Math.max(...xs) - Math.min(...xs)) * 0.6);
 
     // **The ends clamp under either arm, so they cannot tell them apart.** An
     // interval of 1..11 ranged over the whiskers 4..8 still reaches both edges,
@@ -659,7 +681,16 @@ describe("G6c — the distribution family, where containment says nothing", () =
     expect(estimate.length, "the estimate is drawn").toBeGreaterThan(0);
     const cx = (estimate[0]?.["x"] ?? 0) + (estimate[0]?.["width"] ?? 0) / 2;
     const t = (cx - box.left) / (box.right - box.left);
-    expect(t, "0.4 of the interval, not 0.25 of the whiskers").toBeCloseTo(0.4, 2);
+    // **The discriminator survives the seam moving; only its arithmetic reads
+    // from somewhere else.** Under the raw interval 1..11 the estimate sat at
+    // 0.4 and under the whiskers 4..8 at 0.25, which is what separates the two
+    // arms of `quartileRange`. The shared axis is niced past the interval, so
+    // both numbers change and **the gap between them does not** — the row asks
+    // the same question with the figure's range instead of a literal.
+    expect(t, "where the shared axis puts the estimate").toBeCloseTo(normalisedOf(5, fRange, false), 2);
+    const whiskers = normalisedOf(5, { min: 4, max: 8 }, false);
+    expect(Math.abs(t - whiskers), "and not where the whiskers would put it")
+      .toBeGreaterThan(0.05);
   });
 });
 
