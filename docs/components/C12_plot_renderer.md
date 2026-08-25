@@ -4485,6 +4485,55 @@ a **trace** finds event-mediated ones. This component has both kinds and therefo
 unexamined**, which is the mistake C19 §8a records: a trace indexed by events cannot reach a
 structural interaction however many rows it has, and C18's table was already in the repository.
 
+### 3ak.6 — `autocorrelation` was going to be refused, and the escape clause is what stopped it
+
+**The largest disagreement in the corpus is that `autocorrelation` is two different charts.** The
+terminal draws horizontal bars, one per lag, signed about a zero rule, with two dashed significance
+bands. The SVG draws a polyline of the same numbers. That is not a rasterisation difference and
+nothing in the five measured decisions holds it, because both arms draw *something* and the cells
+compare labels and furniture rather than shape.
+
+**The tie-break plus F259 gives an immediate answer: refuse.** The terminal is right by default, a
+polyline that reads as a chart of something is the plausible wrong figure the `null` arm exists for,
+so `autocorrelation` becomes `null` in `SVG_FAMILY` and is recorded as owed.
+
+**That answer is wrong, and what found it was treating the escape clause as a claim.** The clause
+was *unless the curve family's emitter reaches the lag figure without new geometry* — the kind of
+sentence that reads as a hedge and gets skipped. Checked instead:
+
+```
+the bar        `lagRow` fills from the zero column to `value / magnitude`, signed
+the zero rule  one solid vertical at the centre column — furniture
+the bands      `block.annotations` filtered to `kind: "line"` — §3e's own mechanism
+the rows       `categoricalForm({ ...block, categories: cats })`, one row per lag
+```
+
+**Every one is a mechanism the shared layer already needs, and the composer is `bar`'s own.**
+`categoricalForm` is what `bar` and `histogram` are drawn through; the bands are not autocorrelation
+machinery but the annotation mechanism §3e already specifies; and this document's own comment on the
+form says it in five words: *one bar per lag, with a confidence band. `barRow` plus the band.*
+
+> **The ruling: `autocorrelation` is not refused, it is misfiled.** `SVG_FAMILY` says
+> `autocorrelation: "curve"` and the figure is a **bar** — horizontally oriented, over a categorical
+> axis of lags, with line annotations. D14's cause is one word, not a missing capability.
+
+**Recording it as owed would have recorded a debt that does not exist**, and it would have removed a
+claimed form from the SVG arm on a wrong diagnosis — the deferral-naming-a-condition-already-met
+class, arriving in the same commit that would have created it.
+
+**The reusable part is about the mechanism that was supposed to prevent this.** `SVG_FAMILY` is
+`satisfies Record<PlotForm, SvgFamily | null>`, and that record has done real work: it is why adding
+a form fails to compile until someone decides. But **an exhaustive record forces an answer for every
+member and cannot check a single one of them.** Totality is a guarantee about *coverage*, never
+about *correctness*, and a wrong entry in a total record reads exactly like a right one — which is
+`a-step-can-name-an-effect-and-have-no-mechanism` one level along: a table of names is satisfied by
+names.
+
+**And the correction does not land here.** Reclassifying to `"bar"` today draws *vertical bars over
+sample index*, which is a different wrong figure — the orientation is a `Figure` member and the
+emitter does not exist yet. So the entry stays `"curve"` until step 4 moves it, with the reason
+recorded rather than the symptom fixed.
+
 ### 3ak.5 — What a refusal leaves behind
 
 **`figureOf` is total and never throws.** I2 says no series input throws, and a figure is one level

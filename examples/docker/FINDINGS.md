@@ -13198,3 +13198,40 @@ can wait. **Recorded now because the mutation that found it will not be run agai
 golden suite does not construct, and this branch is reachable by neither because it is reachable
 by nothing. What the run measured is the fixture's floor, not its ceiling: 1780 frames compared,
 0 moved, and a *stated* reason the mutation was invisible rather than an unexamined green.
+
+---
+
+## F266 — a total record, exhaustively wrong about one entry ★★★☆☆
+
+**`autocorrelation` was one commit from being removed from the SVG arm.** The disagreement is real
+and it is the largest in the corpus: the terminal draws horizontal bars, one per lag, signed about a
+zero rule with two dashed significance bands; the SVG draws a polyline of the same numbers. Two
+charts of one block. The tie-break says the terminal is right and F259 says *refuse a false figure*,
+so the answer is immediate — `null` in `SVG_FAMILY`, recorded as owed.
+
+**The answer is wrong, and what caught it was treating an escape clause as a claim.** The clause read
+*unless the curve family's emitter reaches the lag figure without new geometry* — the shape of
+sentence that reads as a hedge and gets skipped. Checked against the code rather than the frame:
+`lagRow` fills from the zero column to `value / magnitude`; the zero rule is one solid vertical; the
+bands are `block.annotations` filtered to `kind: "line"`, which is §3e's mechanism and not this
+form's; and the rows come from **`categoricalForm`**, which is what `bar` and `histogram` are drawn
+through. This document's own comment on the form says it in five words: *one bar per lag, with a
+confidence band.*
+
+**So `autocorrelation` is not unsupportable, it is misfiled.** `SVG_FAMILY` says
+`autocorrelation: "curve"` and the figure is a **bar**, horizontally oriented over a categorical axis
+of lags. D14's cause is one word, not a missing capability — and the refusal would have removed a
+claimed form on a wrong diagnosis while recording a debt that does not exist.
+
+**The reusable part is about the mechanism that was meant to prevent this.** `SVG_FAMILY` is
+`satisfies Record<PlotForm, SvgFamily | null>`, and that record earns its place: adding a form fails
+to compile until someone decides. But **an exhaustive record forces an answer for every member and
+cannot check one of them.** Totality is a guarantee about coverage and never about correctness, and a
+wrong entry in a total record reads exactly like a right one. It is *a table of names is satisfied by
+names*, one level along — and the thing that reached it was not a rule but a habit: **going to the
+code the classification describes, rather than to the picture it produces.**
+
+**Not fixed here, and the reason is not caution.** Reclassifying to `"bar"` today draws *vertical
+bars over sample index* — a different wrong figure, because orientation is a `Figure` member and the
+emitter does not exist yet. The entry stays `"curve"` until the renderers land, with the reason
+recorded rather than the symptom moved. C12 §3ak.6.
