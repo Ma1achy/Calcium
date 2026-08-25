@@ -153,10 +153,14 @@ const results = runPass({
       // **Also survived first.** A mirrored figure has the same extremes, so
       // the rows that read min and max agreed with both readings — containment
       // one level up. The killer is *which* median is drawn higher.
+      // **Re-anchored to the projector** (§3ak.13). `summaryMarks` had its own
+      // `at()` and the walk replaced it: the inversion is one expression now,
+      // read by every family, so the mutation is against the shared one and a
+      // vertical boxplot is no longer the only thing that can catch it.
       name: "the vertical arm stops inverting its value axis",
       file: SVG,
-      from: "    vertical ? value.to - (value.to - value.from) * t : value.from + (value.to - value.from) * t;",
-      to: "    value.from + (value.to - value.from) * t;",
+      from: "      : ([box.left + wide * along, box.top + tall * (up ? 1 - y : y)] as const);",
+      to: "      : ([box.left + wide * along, box.top + tall * y] as const);",
       expect: "G6c2",
     },
     {
@@ -180,10 +184,14 @@ const results = runPass({
       // the median of every summary that has neither — which is the reading
       // *the mean coincides with the median*, said about data that never had a
       // mean (C04 I53).
+      // Re-anchored to the emitter: the guard is the shared layer's now, and the
+      // distinction it keeps is `normalisedSummary`'s rather than a renderer's
+      // (C04 I53) — *no mean* and *a non-finite one* are one absent member, so
+      // three renderers do not each write the condition.
       name: "a summary with no mean gets one at its median",
-      file: SVG,
-      from: "  if (ns.mean !== undefined) {\n    const r = Math.max(2, slot.half * 0.3);",
-      to: "  {\n    const r = Math.max(2, slot.half * 0.3);\n    ns = { ...ns, mean: ns.mean ?? ns.median };",
+      file: FIGURE,
+      from: "        if (sm.mean !== undefined) marks.push(dot(centre, sm.mean, \"mean\", i));",
+      to: "        marks.push(dot(centre, sm.mean ?? sm.median, \"mean\", i));",
       expect: "G6c3",
     },
     {

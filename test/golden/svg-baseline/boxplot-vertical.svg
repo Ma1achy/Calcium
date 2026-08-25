@@ -10,33 +10,33 @@
 <text x="83.6" y="85.6" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">6</text>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">8</text>
-<rect x="154.7" y="112.56" width="1" height="27.52" fill="#626262"/>
-<rect x="154.7" y="16.24" width="1" height="51.6" fill="#626262"/>
-<rect x="135.52" y="139.58" width="39.36" height="1" fill="#626262"/>
-<rect x="135.52" y="15.74" width="39.36" height="1" fill="#626262"/>
+<path d="M155.2 140.08 L155.2 112.56" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M155.2 67.84 L155.2 16.24" fill="none" stroke="#e69f00" stroke-width="2"/>
+<rect x="135.52" y="139.58" width="39.36" height="1" fill="#e69f00"/>
+<rect x="135.52" y="15.74" width="39.36" height="1" fill="#e69f00"/>
 <rect x="115.84" y="67.84" width="78.72" height="44.72" fill="#e69f00" fill-opacity="0.35" stroke="#e69f00" stroke-width="1.5"/>
-<rect x="115.84" y="88.48" width="78.72" height="0.5" fill="#e69f00"/>
-<polygon points="155.2,73.232 167.008,85.04 155.2,96.848 143.392,85.04" fill="#e69f00" stroke="#626262" stroke-width="0.75"/>
-<rect x="285.9" y="191.68" width="1" height="27.52" fill="#626262"/>
-<rect x="285.9" y="136.64" width="1" height="37.84" fill="#626262"/>
-<rect x="266.72" y="218.7" width="39.36" height="1" fill="#626262"/>
-<rect x="266.72" y="136.14" width="39.36" height="1" fill="#626262"/>
+<rect x="115.84" y="87.48" width="78.72" height="2" fill="#e69f00"/>
+<polygon points="155.2,82.64 157.6,85.04 155.2,87.44 152.8,85.04" fill="#e69f00" stroke="#626262" stroke-width="0.75"/>
+<path d="M286.4 219.2 L286.4 191.68" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<path d="M286.4 174.48 L286.4 136.64" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<rect x="266.72" y="218.7" width="39.36" height="1" fill="#56b4e9"/>
+<rect x="266.72" y="136.14" width="39.36" height="1" fill="#56b4e9"/>
 <rect x="247.04" y="174.48" width="78.72" height="17.2" fill="#56b4e9" fill-opacity="0.35" stroke="#56b4e9" stroke-width="1.5"/>
-<rect x="247.04" y="184.8" width="78.72" height="0.5" fill="#56b4e9"/>
-<polygon points="286.4,169.552 298.208,181.36 286.4,193.168 274.592,181.36" fill="#56b4e9" stroke="#626262" stroke-width="0.75"/>
-<circle cx="286.4" cy="136.64" r="8.659" fill="#56b4e9"/>
-<rect x="417.1" y="232.96" width="1" height="20.64" fill="#626262"/>
-<rect x="417.1" y="50.64" width="1" height="61.92" fill="#626262"/>
-<rect x="397.92" y="253.1" width="39.36" height="1" fill="#626262"/>
-<rect x="397.92" y="50.14" width="39.36" height="1" fill="#626262"/>
+<rect x="247.04" y="183.8" width="78.72" height="2" fill="#56b4e9"/>
+<polygon points="286.4,178.96 288.8,181.36 286.4,183.76 284,181.36" fill="#56b4e9" stroke="#626262" stroke-width="0.75"/>
+<circle cx="286.4" cy="136.64" r="1.8" fill="#56b4e9"/>
+<path d="M417.6 253.6 L417.6 232.96" fill="none" stroke="#3cbf9a" stroke-width="2"/>
+<path d="M417.6 112.56 L417.6 50.64" fill="none" stroke="#3cbf9a" stroke-width="2"/>
+<rect x="397.92" y="253.1" width="39.36" height="1" fill="#3cbf9a"/>
+<rect x="397.92" y="50.14" width="39.36" height="1" fill="#3cbf9a"/>
 <rect x="378.24" y="112.56" width="78.72" height="120.4" fill="#3cbf9a" fill-opacity="0.35" stroke="#3cbf9a" stroke-width="1.5"/>
-<rect x="378.24" y="138.36" width="78.72" height="0.5" fill="#3cbf9a"/>
-<polygon points="417.6,145.472 429.408,157.28 417.6,169.088 405.792,157.28" fill="#3cbf9a" stroke="#626262" stroke-width="0.75"/>
-<rect x="548.3" y="277.68" width="1" height="6.88" fill="#626262"/>
-<rect x="548.3" y="202" width="1" height="24.08" fill="#626262"/>
-<rect x="529.12" y="284.06" width="39.36" height="1" fill="#626262"/>
-<rect x="529.12" y="201.5" width="39.36" height="1" fill="#626262"/>
+<rect x="378.24" y="137.36" width="78.72" height="2" fill="#3cbf9a"/>
+<polygon points="417.6,154.88 420,157.28 417.6,159.68 415.2,157.28" fill="#3cbf9a" stroke="#626262" stroke-width="0.75"/>
+<path d="M548.8 284.56 L548.8 277.68" fill="none" stroke="#f0e442" stroke-width="2"/>
+<path d="M548.8 226.08 L548.8 202" fill="none" stroke="#f0e442" stroke-width="2"/>
+<rect x="529.12" y="284.06" width="39.36" height="1" fill="#f0e442"/>
+<rect x="529.12" y="201.5" width="39.36" height="1" fill="#f0e442"/>
 <rect x="509.44" y="226.08" width="78.72" height="51.6" fill="#f0e442" fill-opacity="0.35" stroke="#f0e442" stroke-width="1.5"/>
-<rect x="509.44" y="243.28" width="78.72" height="0.5" fill="#f0e442"/>
-<polygon points="548.8,234.912 560.608,246.72 548.8,258.528 536.992,246.72" fill="#f0e442" stroke="#626262" stroke-width="0.75"/>
+<rect x="509.44" y="242.28" width="78.72" height="2" fill="#f0e442"/>
+<polygon points="548.8,244.32 551.2,246.72 548.8,249.12 546.4,246.72" fill="#f0e442" stroke="#626262" stroke-width="0.75"/>
 </svg>

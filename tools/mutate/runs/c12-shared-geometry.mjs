@@ -189,8 +189,11 @@ const results = runPass({
       // `G6b` being rewritten with it.
       name: "a bar is drawn from zero, and G6b is not rewritten to match",
       file: FIGURE,
-      from: "            mark: { kind: \"rect\", x, y: 0, w, h: top, fill: true },",
-      to: "            mark: { kind: \"rect\", x, y: Math.min(top, normalisedOf(0, value.range, false)), w, h: Math.abs(top - normalisedOf(0, value.range, false)), fill: true },",
+      // Re-anchored again when the lag arm landed: the floor-filled rect is now
+      // the second half of a conditional, and the zero-based one beside it is
+      // what an autocorrelation already draws (§3ak.14).
+      from: "              : { kind: \"rect\", x, y: 0, w, h: top, fill: true },",
+      to: "              : { kind: \"rect\", x, y: Math.min(zero, top), w, h: Math.abs(top - zero), fill: true },",
       expect: "G6",
     },
     {
@@ -433,8 +436,8 @@ const results = runPass({
       // shape the row predicted every family's first commit would have.
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
-      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar") && "marks" in figure) {',
-      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar") && "marks" in figure) {',
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

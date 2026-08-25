@@ -417,12 +417,24 @@ function orientationOf(block: Pick<Plot, "orientation">): "horizontal" | "vertic
  * across the families for that reason: a second copy would be a second answer to
  * *where does a reference line sit*, and the arms already had two.
  */
-function annotationMarks(block: Pick<Plot, "annotations">, range: Range): readonly Drawn[] {
+function annotationMarks(
+  block: Pick<Plot, "annotations">,
+  range: Range,
+  // **A significance bound is one number and two claims** (§3ak.14). `lagRow`
+  // draws every bound at `±|b|` — a correlation of `-0.4` is as significant as
+  // one of `+0.4`, so a band drawn on one side only says the opposite. The
+  // caller that needs it says so, rather than every annotation acquiring a
+  // mirror it has no meaning for.
+  mirror = false,
+): readonly Drawn[] {
   return (block.annotations ?? []).flatMap((a) => {
     if (a.kind !== "line") return [];
-    const y = normalisedOf(a.value, range, false);
     const ref: ColourRef = a.tone === undefined ? "tone.muted" : `tone.${a.tone}`;
-    return [{ mark: { kind: "polyline" as const, points: [[0, y], [1, y]] as readonly Pt[] }, layer: "annotation" as const, ref }];
+    const values = mirror ? [Math.abs(a.value), -Math.abs(a.value)] : [a.value];
+    return values.map((v) => {
+      const y = normalisedOf(v, range, false);
+      return { mark: { kind: "polyline" as const, points: [[0, y], [1, y]] as readonly Pt[] }, layer: "annotation" as const, ref };
+    });
   });
 }
 
@@ -678,9 +690,23 @@ export function distributionFigure(block: Plot): Figure {
       ? qs.map((_q, i) => `series ${String(i + 1)}`)
       : identityOf(block));
   const marks: Drawn[] = [];
-  if (extent !== null) {
+  // **The marks are drawn against the range the gutter is labelled from**
+  // (F282, F210). This normalised against the **raw** `extent` while `value`
+  // below is the **niced** axis over it, so the figure carried two ranges and
+  // the marks were on the one with no labels behind it — a boxplot at `2 … 9`
+  // drawn against `2 … 9` and ticked `0 · 2 · 4 · 6 · 8 · 10`.
+  //
+  // **Nothing could see it while nothing read the marks.** Both arms rasterised
+  // their own summaries and took the range from `plotToSvg`'s read of `value`,
+  // so the emitter's choice reached no picture until the walk arrived — an
+  // invariant is vacuous until its subject exists. It is the bar family's ruling
+  // applied here rather than a new one: F272b picked the niced range for exactly
+  // this reason, and this family had quietly picked the other.
+  const axis = axisOver(extent, block);
+  const scale = axis?.range ?? extent;
+  if (extent !== null && scale !== null) {
     const n = Math.max(1, block.form === "dumbbell" ? identity.length : qs.length); // cells-ok — a slot count
-    const at = (v: number): number => normalisedOf(v, extent, false);
+    const at = (v: number): number => normalisedOf(v, scale, false);
     const dot = (x: number, y: number, role: GlyphRole, i: number): Drawn =>
       ({ mark: { kind: "point", x, y, role }, layer: "series", seriesIndex: i });
 
@@ -698,27 +724,65 @@ export function distributionFigure(block: Plot): Figure {
       }
     } else {
       qs.forEach((q, i) => {
-        const sm = normalisedSummary(q, extent);
+        const sm = normalisedSummary(q, scale);
         const x = i / n;
         const centre = (i + 0.5) / n;
         if (block.form === "forest") {
           marks.push({ mark: { kind: "polyline", points: [[centre, sm.lower], [centre, sm.upper]] }, layer: "series", seriesIndex: i });
+          // **A tee at each end, because a plain rule stopping is not an
+          // interval ending** — `forestRow`'s own words and its own glyphs,
+          // `whiskerLeft` and `whiskerRight` written over the run's two ends.
+          // The figure was dropping them, so this arm drew them from its own
+          // loop and the terminal from the record; one of the two was going to
+          // stop.
+          marks.push(dot(centre, sm.lower, "cap", i), dot(centre, sm.upper, "cap", i));
           // **`absent` where there is no estimate.** `normalisedSummary` falls
           // `centre` back to the median, so the summary cannot say *nothing was
           // reported* — the role is what says it, and it is why the SVG can
           // refuse to draw where the terminal draws a mark.
           const has = Number.isFinite(q.centre ?? q.median);
-          marks.push(dot(centre, sm.centre, has ? "point" : "absent", i));
+          // **`target` is the pooled estimate, and it is a role rather than a
+          // second member** (I62). `forestRow` picks `g.diamond` for a pooled
+          // summary and `ch.filled` for the rest — *this one is the answer* said
+          // by shape, which is exactly what a `GlyphRole` is for, and the seventh
+          // role had no subject until now.
+          //
+          // **And the weight is a size, the way a bubble's is** (C12 I31,
+          // §3ak.1 finding 2). A wide interval drawn small contributed little and
+          // a narrow one drawn large carried the result, which is the reading a
+          // forest plot exists for — `forestRow` spends it on cells and this arm
+          // on a radius, from one normalised number.
+          const wt = q.weight;
+          const weight = wt !== undefined && Number.isFinite(wt)
+            ? Math.max(0, Math.min(1, wt))
+            : undefined;
+          marks.push({
+            mark: {
+              kind: "point",
+              x: centre,
+              y: sm.centre,
+              role: !has ? "absent" : q.pooled === true ? "target" : "point",
+              ...(weight === undefined ? {} : { size: weight }),
+            },
+            layer: "series",
+            seriesIndex: i,
+          });
           return;
         }
+        // **Whiskers, then their caps, then the box over both, then the median
+        // over that** — and the order is the figure's because a mark list *is* a
+        // paint order (§3ak.12). It is the glyph tables' own composition, kept so
+        // that a cap coincident with a box edge reads the way it reads in the
+        // terminal; a degenerate summary is where the two orders differ, which is
+        // what `boxplot-flat-whisker` is a fixture of.
+        marks.push({ mark: { kind: "polyline", points: [[centre, sm.min], [centre, sm.q1]] }, layer: "series", seriesIndex: i });
+        marks.push({ mark: { kind: "polyline", points: [[centre, sm.q3], [centre, sm.max]] }, layer: "series", seriesIndex: i });
+        marks.push(dot(centre, sm.min, "cap", i), dot(centre, sm.max, "cap", i));
         marks.push({
           mark: { kind: "rect", x, y: Math.min(sm.q1, sm.q3), w: 1 / n, h: Math.abs(sm.q3 - sm.q1), fill: false },
           layer: "series",
           seriesIndex: i,
         });
-        marks.push({ mark: { kind: "polyline", points: [[centre, sm.min], [centre, sm.q1]] }, layer: "series", seriesIndex: i });
-        marks.push({ mark: { kind: "polyline", points: [[centre, sm.q3], [centre, sm.max]] }, layer: "series", seriesIndex: i });
-        marks.push(dot(centre, sm.min, "cap", i), dot(centre, sm.max, "cap", i));
         marks.push(dot(centre, sm.median, "median", i));
         if (sm.mean !== undefined) marks.push(dot(centre, sm.mean, "mean", i));
         for (const o of sm.outliers) marks.push(dot(centre, o, "outlier", i));
@@ -726,7 +790,7 @@ export function distributionFigure(block: Plot): Figure {
     }
   }
   return {
-    value: axisOver(extent, block),
+    value: axis,
     extent,
     identity,
     orientation: orientationOf(block),
@@ -843,9 +907,32 @@ export function baselineOf(dataMin: number): number {
  * side in one arm — which no rasterisation difference can account for. It is
  * decided here now, once.
  */
+/**
+ * A lag plot's magnitude — **`lagRow`'s own, and it is not a `seriesRange`**
+ * (§3ak.14).
+ *
+ * At least one, over the absolute values: a correlation is a number in `[-1, 1]`
+ * and an axis that shrank to fit a weakly correlated series would make noise
+ * look like signal. The floor is what says *this is a correlation* rather than
+ * *these are the numbers I happened to get*.
+ */
+function lagMagnitude(block: Pick<Plot, "series">): number {
+  return Math.max(1, ...(block.series[0]?.values ?? []).map((v) => Math.abs(v ?? 0)));
+}
+
 export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
   const data = seriesRange(block.series, block);
-  const extent = data === null ? null : { min: baselineOf(data.min), max: data.max };
+  // **A lag plot's range is symmetric about zero and the rest of the family's is
+  // not**, which is `lagRow`'s `magnitude` moved rather than re-derived: it maps
+  // `value / magnitude` either side of a centre column, where every other form
+  // here fills from a floor. A form branch in a family function, for the same
+  // reason the stem and the head are one — the family is the unit and the forms
+  // inside it differ in what is drawn at a position the shared decisions gave.
+  const extent = data === null
+    ? null
+    : block.form === "autocorrelation"
+      ? { min: -lagMagnitude(block), max: lagMagnitude(block) }
+      : { min: baselineOf(data.min), max: data.max };
   return {
     value: axisOver(extent, block),
     extent,
@@ -919,6 +1006,16 @@ export function barFigure(block: Plot): Figure {
     // wrong figure, since both encode the same number.
     const stem = block.form !== "dotplot";
     const head = block.form === "lollipop" || block.form === "dotplot";
+    // **A lag's bar grows from zero in either direction, and it is this form's
+    // own behaviour rather than F272's repair** (§3ak.14). `lagRow` puts zero at
+    // the centre column and runs `[zero, end]` or `[end, zero]` by sign — so a
+    // negative correlation draws to the left of centre, where every other form
+    // in this family fills from the range floor. Landing it here is the
+    // terminal's computation moved; landing it for the *rest* of the family
+    // would be correcting the terminal inside a refactor, which is the one thing
+    // this pass forbids.
+    const lag = block.form === "autocorrelation";
+    const zero = normalisedOf(0, value.range, false);
     block.series.forEach((series, seriesIndex) => {
       series.values.forEach((v, i) => {
         if (v === null || !Number.isFinite(v) || i >= n) return;
@@ -929,7 +1026,9 @@ export function barFigure(block: Plot): Figure {
         const w = 1 / (n * per);
         if (stem) {
           marks.push({
-            mark: { kind: "rect", x, y: 0, w, h: top, fill: true },
+            mark: lag
+              ? { kind: "rect", x, y: Math.min(zero, top), w, h: Math.abs(top - zero), fill: true }
+              : { kind: "rect", x, y: 0, w, h: top, fill: true },
             layer: "series",
             seriesIndex,
           });
@@ -949,7 +1048,19 @@ export function barFigure(block: Plot): Figure {
         }
       });
     });
-    marks.push(...annotationMarks(block, value.range));
+    // **The zero rule is furniture and it is drawn under the bars** — `lagRow`
+    // writes `g.vertical` at the centre column before and after the run, because
+    // a lag plot with no zero marked cannot be read at all: the sign of every
+    // bar is measured against it. `layer: "furniture"` rather than an annotation,
+    // since it is a fact about the axis and not a claim beside the data.
+    if (lag) {
+      marks.unshift({
+        mark: { kind: "polyline", points: [[0, zero], [1, zero]] },
+        layer: "furniture",
+        ref: "surface.border",
+      });
+    }
+    marks.push(...annotationMarks(block, value.range, lag));
   }
   return { ...decisions, marks };
 }

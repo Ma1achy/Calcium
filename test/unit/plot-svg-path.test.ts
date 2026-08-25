@@ -471,6 +471,21 @@ describe.each(supported)("G6 — %s", (form) => {
       const stems = marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.h] : []));
       const heads = marks.flatMap((d) => (d.mark.kind === "point" ? [d.mark.y] : []));
       const ts = stems.length > 0 ? stems : heads;
+      // **A lag bar's length is its distance from ZERO, so the extremes are its
+      // longest bars and not its shortest** (§3ak.14). `lagRow` ranges over
+      // `±max(1, |v|)` and grows either way from a centre column, so *far below*
+      // is a full half-span to the left where every other form in this family
+      // reads it as no length at all. The claim below held while the family
+      // behaved one way, which is the third time in this pass.
+      //
+      // The pin is ignored too, and faithfully: the terminal's `mag` is taken
+      // over the raw values, so `yMin`/`yMax` do not reach it.
+      if (form === "autocorrelation") {
+        expect(ts[0], `${form}: the floor is a full half-span from zero`).toBeCloseTo(0.5, 6);
+        expect(ts[4], `${form}: and so is the ceiling`).toBeCloseTo(0.5, 6);
+        expect(ts[1] ?? 1, `${form}: an interior sample is shorter than either`).toBeLessThan(0.5);
+        return;
+      }
       expect(ts[0], `${form}: far below clamps to no length`).toBeCloseTo(0, 6);
       expect(ts[4], `${form}: far above clamps to the full span`).toBeCloseTo(1, 6);
       // **A pinned floor is not a bar's floor** (F272), which this row is the
@@ -788,9 +803,14 @@ describe("G6c — the distribution family, where containment says nothing", () =
     // because `normalisedOf` clamps — the survivor that said so. The
     // **estimate** is where the two disagree: `centre: 5` is 0.4 of 1..11 and
     // 0.25 of 4..8.
-    const estimate = rects(svg).filter((r) => (r["width"] ?? 0) > 2 && (r["height"] ?? 0) > 2);
+    // **A circle, where this looked for a square** — the estimate is a `point`
+    // mark now and the walk draws the role rather than the family's own shape
+    // (§3ak.13). The reader is what changed and not the claim: a matcher that
+    // sees one encoding reports absence when the value changes form, which is
+    // the third time in this pass and the second in this file.
+    const estimate = [...svg.matchAll(/<circle cx="([-\d.]+)"/gu)].map((m) => Number(m[1]));
     expect(estimate.length, "the estimate is drawn").toBeGreaterThan(0);
-    const cx = (estimate[0]?.["x"] ?? 0) + (estimate[0]?.["width"] ?? 0) / 2;
+    const cx = estimate[0] ?? 0;
     const t = (cx - box.left) / (box.right - box.left);
     // **The discriminator survives the seam moving; only its arithmetic reads
     // from somewhere else.** Under the raw interval 1..11 the estimate sat at

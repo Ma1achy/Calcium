@@ -4944,6 +4944,115 @@ landing.
 
 ---
 
+### 3ak.13 — The distribution family: seven roles, seven shapes, and the range the gutter shows
+
+**This is the family `GlyphRole` was written for, and it is the first to use all of it.** A median is
+`┃` at full unicode, `|` in ASCII and a distinct mark below the colour floor; a mean is a different
+character again; an outlier a third. The terminal picks all three off its own ladder and this arm
+draws none of them — it draws a bar, a diamond, a circle. **What both agree about is which of the
+seven things this is**, and that is the whole content of the seam here.
+
+| role | terminal | SVG |
+|---|---|---|
+| `median` | `┃` per rung | a 2px bar across the slot |
+| `cap` | `┬`/`┴`, a tee | a 1px bar, half the slot — a cap as wide as its box reads as a second box edge |
+| `mean` | a distinct glyph | a diamond, edged in the furniture tone |
+| `outlier` | a dot | a smaller circle |
+| `target` | `g.diamond` — *this one is the answer* | a diamond, sized by weight |
+| `point` | `ch.filled` | a circle |
+| `absent` | a character for *nothing was reported* | **nothing** |
+
+**`absent` drawing nothing is the role's entire content.** A forest row with no estimate is a real
+state; a circle at the fallback position is the plausible wrong figure it would otherwise become.
+
+**Three facts the figure was dropping, all of which the terminal draws.** The emitter was written
+against `boxplotBand` and `boxplotColumn` and missed what `forestRow` does one function along:
+
+- **the tees.** `row[xLower] = ch.whiskerLeft` — *a plain `─` at the end of a run does not say the
+  interval stops there.* This arm drew them from its own loop and the terminal from the record; one
+  of the two was going to stop.
+- **the pooled estimate.** `q.pooled === true ? g.diamond : ch.filled`. The seventh role, `target`,
+  had no subject until now.
+- **the weight** (I31). *A wide interval drawn small contributed little and a narrow one drawn large
+  carried the result.* It crosses as a `size`, exactly as a bubble's radius does — one normalised
+  number, spent on cells in one arm and a radius in the other.
+
+**F282 — the figure carried two ranges and the marks were on the wrong one.** `distributionFigure`
+normalised against the raw `extent` while publishing the **niced** axis over it, so a boxplot spanning
+2–9 was drawn against 2–9 and ticked `0 · 2 · 4 · 6 · 8 · 10`. It is F272b's ruling arriving late —
+*the range the figure is drawn against is the range the gutter is labelled from* (F210) — and the same
+asymmetry hid it: the terminal's horizontal boxplot is `bandedForm`, whose gutter holds **categories**,
+so there is no label for the fraction to disagree with, and the vertical arm is not the default.
+
+> **Nothing could see it while nothing read the marks.** `FD1`–`FD5` assert normalised numbers against
+> the same `extent` the emitter used, which agrees with itself whichever range that is. The walk is
+> what made the two visible in one picture, and reading the frame is what caught it: `forest-default`'s
+> interval moved `299.52 … 509.44` → `283.97 … 594.96` in a commit whose only intended changes were
+> colour and shape.
+
+**A mark list is a paint order, so a composition ruling belongs in the emitter.** The arm this walk
+replaces drew *whiskers, then their caps, then the box over both, then the median over that* — the
+glyph tables' own order, "so a cap coincident with an edge reads the way it reads in the terminal" —
+and the emitter had the box first. Invisible on an ordinary summary, where the whiskers abut the box
+rather than crossing it; `boxplot-flat-whisker` is the fixture where they do not.
+
+**And the whiskers are the series' colour, not the furniture's.** This arm drew them muted; the
+terminal rasterises a summary into glyph rows and colours the row by its category, so every part of
+one summary is one colour. The split was this arm's invention and the figure never had it.
+
+**`range` leaves `marks()`' signature here.** Every family that walks takes its coordinate from the
+marks, already normalised; the last caller needing a range of its own was the distribution branch.
+What is left is the nodes family, whose placement is topology and slots and no scale at all.
+
+---
+
+### 3ak.14 — `autocorrelation`, and a deferral whose stated condition was not its real one
+
+**F266 deferred this to *once the bar family walks*, and that condition was met a commit early.**
+Reclassifying `SVG_FAMILY.autocorrelation` from `"curve"` to `"bar"` is one word, the blocker had
+been named as a symbol, and grepping the symbol said *done*. Reading `lagRow` said otherwise:
+
+| what `lagRow` does | what `barFigure` did |
+|---|---|
+| ranges over `±max(1, |v|)` — symmetric, floored at one | `{ min(0, dataMin), dataMax }` |
+| grows a bar from a **centre zero**, `[zero, end]` or `[end, zero]` by sign | fills from the range floor (F272) |
+| writes `g.vertical` at zero, before and after the run | no zero rule |
+| draws every bound at **`±|b|`**, both signs | one line per annotation, at its value |
+
+**Landing the word alone would have drawn a different chart** — D14's shape, in the family that was
+supposed to end it: positive lags only, no zero to measure them against, and half of every
+significance band.
+
+**The escape clause held, and checking it is what this step is for.** §3ak's ruling on D14 is *refuse
+a false figure, record an incomplete one*, with the refusal conditional on the emitter not reaching
+the lag figure **without new geometry**. All four rows above are expressible in the marks that already
+exist — a range is a decision, a bar from zero is a `rect`, a zero rule is a `polyline` on the
+`furniture` layer, a mirrored bound is two `polyline`s — so the refusal was unnecessary and the work
+was an arm rather than a table entry.
+
+**Three of the four are the terminal's computation moved, and the fourth is not F272's repair.** A lag
+bar growing from zero is *this form's own behaviour*, which `lagRow` has always had; making the rest
+of the family grow from zero would be correcting the terminal inside a refactor, which is the one
+thing this pass forbids. The branch is on the form, in the family's function, for the same reason the
+stem and the head are: **the family is the unit and the forms inside it differ in what is drawn at a
+position the shared decisions gave.**
+
+**The magnitude has a floor of one and that is not arithmetic.** A correlation lives in `[-1, 1]`, so
+an axis that shrank to fit a weakly correlated series would make noise look like signal. `max(1, …)`
+is what says *this is a correlation* rather than *these are the numbers I happened to get* — and it
+reads the **raw** values, so a pinned `yMin`/`yMax` does not reach it, exactly as in the terminal.
+
+**A significance bound is one number and two claims.** A correlation of `-0.4` is as significant as
+one of `+0.4`, so a band drawn on one side only says the opposite of what it means. The caller asks
+for the mirror rather than every annotation acquiring one it has no meaning for.
+
+> **The clamp row met the same wall the bar family's position row did.** *Far below clamps to no
+> length* is true of a bar filled from a floor and false of one measured from a centre — the floor
+> sample is a lag's **longest** bar. Third instance in this pass of a claim that held while every form
+> in a family behaved one way.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The

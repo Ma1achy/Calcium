@@ -6,16 +6,16 @@
 <text x="352" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
 <line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">50</text>
-<rect x="194.56" y="46.45" width="209.92" height="1.5" fill="#626262"/>
-<circle cx="194.56" cy="47.2" r="3.5" fill="#e69f00"/>
-<circle cx="404.48" cy="47.2" r="3.5" fill="#56b4e9"/>
-<rect x="299.52" y="115.25" width="52.48" height="1.5" fill="#626262"/>
-<circle cx="299.52" cy="116" r="3.5" fill="#e69f00"/>
-<circle cx="352" cy="116" r="3.5" fill="#56b4e9"/>
-<rect x="404.48" y="184.05" width="104.96" height="1.5" fill="#626262"/>
-<circle cx="404.48" cy="184.8" r="3.5" fill="#e69f00"/>
-<circle cx="509.44" cy="184.8" r="3.5" fill="#56b4e9"/>
-<rect x="352" y="252.85" width="104.96" height="1.5" fill="#626262"/>
-<circle cx="352" cy="253.6" r="3.5" fill="#e69f00"/>
-<circle cx="456.96" cy="253.6" r="3.5" fill="#56b4e9"/>
+<path d="M194.56 47.2 L404.48 47.2" fill="none" stroke="#626262" stroke-width="2"/>
+<circle cx="194.56" cy="47.2" r="3" fill="#e69f00"/>
+<circle cx="404.48" cy="47.2" r="3" fill="#56b4e9"/>
+<path d="M299.52 116 L352 116" fill="none" stroke="#626262" stroke-width="2"/>
+<circle cx="299.52" cy="116" r="3" fill="#e69f00"/>
+<circle cx="352" cy="116" r="3" fill="#56b4e9"/>
+<path d="M404.48 184.8 L509.44 184.8" fill="none" stroke="#626262" stroke-width="2"/>
+<circle cx="404.48" cy="184.8" r="3" fill="#e69f00"/>
+<circle cx="509.44" cy="184.8" r="3" fill="#56b4e9"/>
+<path d="M352 253.6 L456.96 253.6" fill="none" stroke="#626262" stroke-width="2"/>
+<circle cx="352" cy="253.6" r="3" fill="#e69f00"/>
+<circle cx="456.96" cy="253.6" r="3" fill="#56b4e9"/>
 </svg>

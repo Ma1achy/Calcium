@@ -29,10 +29,9 @@
  * not to be. Two things called SVG in one repository, and only one of them is a
  * second renderer.
  */
-import { normalisedSummary, type NormalisedSummary } from "../../data/viewmodel/distribution.js";
 import { flatten } from "./tree.js";
 import { graphLayers } from "./graph.js";
-import { normalisedOf, type PinnedRange } from "../../data/viewmodel/range.js";
+import { normalisedOf } from "../../data/viewmodel/range.js";
 
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
@@ -128,7 +127,15 @@ export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
   // command, which is rasterisation and not geometry.
   line: "curve", sparkline: "curve", step: "curve", ecdf: "curve",
-  density: "curve", autocorrelation: "curve",
+  density: "curve",
+  // **`bar`, and F266's deferral said so before its condition could be
+  // checked** (§3ak.14). The stated condition — *once the bar family walks* —
+  // was met a commit ago and the real one was not: `lagRow` ranges over
+  // `±max(1, |v|)`, grows its bars from a centre zero in either direction, and
+  // mirrors every bound to both signs, none of which `barFigure` did. All three
+  // are expressible in the marks that exist, so the escape clause held and the
+  // work was an arm rather than a table entry.
+  autocorrelation: "bar",
 
   // **Scatter** — the same points, unjoined. `bubble`'s radius is a second
   // encoding this path does not carry yet and its positions are these.
@@ -371,6 +378,41 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
   // is a question each arm answers in its own units and neither can answer in
   // the other's (§3aj hazard 4).
   const boxes = new Map<number, Area>();
+  // **How many slots the categorical axis has, taken from the marks** — needed
+  // by the two roles that are drawn *across* a slot rather than at a point, and
+  // by nothing else. The emitter numbers a summary's every part with its own
+  // slot index, so the count falls out of the marks and this arm does not have
+  // to be told it twice (§3ak.13).
+  const slots = Math.max(1, ...figure.marks.map((d) => (d.seriesIndex ?? 0) + 1)); // cells-ok — a slot count
+  const halfSlot = SLOT_SHARE / slots / 2;
+
+  /**
+   * A bar **across** the identity axis at a value — a median, a cap, a tee.
+   *
+   * The two ends differ only along the identity axis, so whichever page axis
+   * that turned out to be is the long one and the other takes the thickness.
+   * **The first draft of the arm this replaces passed the slot's two edges as
+   * the value pair**, so every cap came out rotated ninety degrees: inside the
+   * area, inside its own category, and a caps-and-whiskers figure with the caps
+   * running the wrong way. That is what a containment assertion agrees with.
+   */
+  const across = (x: number, y: number, half: number, thick: number, colour: string): void => {
+    const a = at(x - half, y);
+    const b = at(x + half, y);
+    const w = Math.max(Math.abs(b[0] - a[0]), thick);
+    const h = Math.max(Math.abs(b[1] - a[1]), thick);
+    const x0 = Math.min(a[0], b[0]) - (a[0] === b[0] ? thick / 2 : 0);
+    const y0 = Math.min(a[1], b[1]) - (a[1] === b[1] ? thick / 2 : 0);
+    out.push(`<rect x="${n(x0)}" y="${n(y0)}" width="${n(w)}" height="${n(h)}" fill="${colour}"/>`);
+  };
+
+  /** A diamond, which is what says *this one is the answer*. */
+  const diamond = (cx: number, cy: number, r: number, colour: string, edge?: string): void => {
+    out.push(
+      `<polygon points="${n(cx)},${n(cy - r)} ${n(cx + r)},${n(cy)} ${n(cx)},${n(cy + r)} ${n(cx - r)},${n(cy)}" ` +
+        `fill="${colour}"${edge === undefined ? "" : ` stroke="${edge}" stroke-width="0.75"`}/>`,
+    );
+  };
   // **A step holds its value until the next sample, and that is *which
   // rasteriser* rather than *where the samples are*.** The terminal picks
   // `stepRows` off the same member — `styleRasteriser(block, caps, stepRows,
@@ -417,9 +459,38 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // §3ak.1 finding 2). The size arrives normalised against its own series'
       // maximum — `bubbleRows`' own figure — and the terminal spends it on 0 to
       // 2 dots. The floor of 2 px is what its radius-0 single dot is: a sample
-      // with no size still draws.
+      // with no size still draws. A forest estimate's weight is the same number
+      // spent the same way (C12 I31).
       const r = m.size === undefined ? 3 : 2 + 5 * m.size;
-      out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="${ink}"/>`);
+      // **Seven roles, seven shapes, and not one character** (I62). The terminal
+      // picks a glyph per rung from the same seven; this arm has no ladder and
+      // draws a shape. What both agree about is **which of the seven this is**,
+      // and that is the whole content of the seam here.
+      switch (m.role) {
+        case "median":
+          across(m.x, m.y, halfSlot, 2, ink);
+          break;
+        case "cap":
+          // Half the slot, because a cap that is as wide as the box it caps
+          // reads as a second box edge rather than as the whisker's end.
+          across(m.x, m.y, halfSlot / 2, 1, ink);
+          break;
+        case "mean":
+          // **A diamond in the series colour, which is what the terminal
+          // draws.** A grey circle inside a filled box is not visible, which the
+          // frame said and no row could: the outliers share the colour and the
+          // shape is what tells them apart (C12 I33, C04 I53).
+          diamond(cx, cy, Math.max(2, r * 0.8), ink, inkOf(LABEL, theme));
+          break;
+        case "target":
+          diamond(cx, cy, r, ink);
+          break;
+        case "outlier":
+          out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(Math.max(1.5, r * 0.6))}" fill="${ink}"/>`);
+          break;
+        default:
+          out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="${ink}"/>`);
+      }
       continue;
     }
 
@@ -472,6 +543,17 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       const w = Math.max(0.5, Math.abs(b[0] - a[0]) - inset * 2);
       const h = Math.max(0.5, Math.abs(b[1] - a[1]) - inset * 2);
       let fill = ink;
+      // **`fill: false` is an outline with the datum showing through**, which is
+      // a boxplot's body: the box is a *range* the whiskers pass behind, so a
+      // solid fill would hide them and a bare outline would not read as a body.
+      // The other rect kinds fill, and the member is what says which.
+      if (m.fill === false) {
+        out.push(
+          `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" ` +
+            `fill="${ink}" fill-opacity="0.35" stroke="${ink}" stroke-width="1.5"/>`,
+        );
+        continue;
+      }
       // **A rect carrying a `value` is coloured by the ramp rather than by its
       // slot**, and the rule is the mark's rather than the family's. A matrix
       // cell has no length and no position left to carry its reading — the
@@ -550,96 +632,6 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
  * the duplication this pass exists to end one layer up.
  */
 const SLOT_SHARE = 0.6;
-
-/** A slot along the categorical axis, and the half-width the figure takes in it. */
-function slotOf(index: number, count: number, from: number, to: number): Readonly<{ centre: number; half: number }> {
-  // **Three fifths of the slot**, which is `boxplotColumn`'s own ruling and
-  // matplotlib's `widths=0.6`: categories drawn to the full slot touch, and a
-  // categorical axis whose categories touch is not saying they are separate.
-  // The terminal takes the same fraction and rounds it to cells; this does not
-  // round at all, which is the whole of the difference (§3aj hazard 1).
-  const slot = (to - from) / Math.max(1, count); // cells-ok — a category count
-  return { centre: from + slot * (index + 0.5), half: (slot * SLOT_SHARE) / 2 };
-}
-
-/**
- * One summary, across a categorical slot.
- *
- * **One function and a flag where the terminal keeps two glyph tables.**
- * `boxplotColumn` and `boxplotBand` are the same figure transposed, and the
- * tables exist because a cell's glyph for a corner is not its own transpose.
- * Here the transpose is a coordinate swap, so it is `vertical` and nothing else.
- */
-function summaryMarks(
-  ns: NormalisedSummary,
-  slot: Readonly<{ centre: number; half: number }>,
-  value: Readonly<{ from: number; to: number }>,
-  vertical: boolean,
-  ink: string,
-  furniture: string,
-): readonly string[] {
-  const out: string[] = [];
-  // The value axis runs bottom-to-top when vertical and left-to-right when not,
-  // which is the only inversion in this family — and it is the renderer's, not
-  // the coordinate's (§3aj hazard 1).
-  const at = (t: number): number =>
-    vertical ? value.to - (value.to - value.from) * t : value.from + (value.to - value.from) * t;
-
-  const box = (a: number, b: number, across: number, thick: number, attrs: string): void => {
-    const lo = Math.min(a, b);
-    const len = Math.abs(b - a);
-    const [x, y, w, h] = vertical
-      ? [across - thick / 2, lo, thick, len]
-      : [lo, across - thick / 2, len, thick];
-    out.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(Math.max(w, 0.5))}" height="${n(Math.max(h, 0.5))}" ${attrs}/>`);
-  };
-  const capAt = (v: number): void => {
-    const [x, y, w, h] = vertical
-      ? [slot.centre - slot.half / 2, v - 0.5, slot.half, 1]
-      : [v - 0.5, slot.centre - slot.half / 2, 1, slot.half];
-    out.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${furniture}"/>`);
-  };
-  const dot = (t: number, r: number, colour: string): void => {
-    const [cx, cy] = vertical ? [slot.centre, at(t)] : [at(t), slot.centre];
-    out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="${colour}"/>`);
-  };
-
-  // Whiskers, then their caps, then the box over both, then the median over
-  // that — the glyph tables' own order, so a cap coincident with an edge reads
-  // the way it reads in the terminal.
-  box(at(ns.min), at(ns.q1), slot.centre, 1, `fill="${furniture}"`);
-  box(at(ns.q3), at(ns.max), slot.centre, 1, `fill="${furniture}"`);
-  // **A cap runs ACROSS the slot at a value**, which is the other axis from
-  // everything above it. The first draft passed the slot's two edges as `a`/`b`
-  // and the value as `across`, so `box` — which reads `a`/`b` along the value
-  // axis — drew every cap **rotated ninety degrees**. Inside the plot area,
-  // inside its own category, and a caps-and-whiskers figure with the caps
-  // running the wrong way: exactly what a containment assertion agrees with.
-  for (const cap of [ns.min, ns.max]) capAt(at(cap));
-
-  box(at(ns.q1), at(ns.q3), slot.centre, slot.half * 2, `fill="${ink}" fill-opacity="0.35" stroke="${ink}" stroke-width="1.5"`);
-  box(at(ns.median), at(ns.median), slot.centre, slot.half * 2, `fill="${ink}"`);
-
-  // **The mean only where the summary has one.** `ns.mean` is absent for *no
-  // mean* and for a non-finite one, which is the distinction the shared summary
-  // keeps so three renderers do not each write the condition (C04 I53).
-  // **A diamond in the series colour, which is what the terminal draws.** The
-  // first version put a grey circle here — `tone.muted`, the furniture slot —
-  // and a grey circle inside a filled box is not visible, which the frame said
-  // and no row could. The terminal's answer is `◈` in the series' own colour:
-  // **same colour as the outliers, different shape**, so the two are told apart
-  // by form rather than by a second tone (C12 I33, C04 I53).
-  if (ns.mean !== undefined) {
-    const r = Math.max(2, slot.half * 0.3);
-    const [cx, cy] = vertical ? [slot.centre, at(ns.mean)] : [at(ns.mean), slot.centre];
-    out.push(
-      `<polygon points="${n(cx)},${n(cy - r)} ${n(cx + r)},${n(cy)} ${n(cx)},${n(cy + r)} ${n(cx - r)},${n(cy)}" ` +
-        `fill="${ink}" stroke="${furniture}" stroke-width="0.75"/>`,
-    );
-  }
-  for (const o of ns.outliers) dot(o, Math.max(1, slot.half * 0.22), ink);
-  return out;
-}
 
 /**
  * Layered nodes and their edges, placed without measuring a single label.
@@ -739,62 +731,20 @@ function nodeMarks(
 }
 
 /**
- * One forest row: a confidence interval, tees at each end, and an estimate.
- *
- * **The estimate is sized by weight** (C12 I31): a wide interval drawn small
- * contributed little and a narrow one drawn large carried the result, which is
- * the reading a forest plot exists for. No weight is the smallest mark, so an
- * ordinary summary still draws a point.
- */
-function forestMarks(
-  ns: NormalisedSummary,
-  slot: Readonly<{ centre: number; half: number }>,
-  value: Readonly<{ from: number; to: number }>,
-  vertical: boolean,
-  ink: string,
-  furniture: string,
-  pooled: boolean,
-  weight: number | undefined,
-): readonly string[] {
-  const out: string[] = [];
-  const at = (t: number): number =>
-    vertical ? value.to - (value.to - value.from) * t : value.from + (value.to - value.from) * t;
-  const rect = (x: number, y: number, w: number, h: number, colour: string): void => {
-    out.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(Math.max(w, 0.5))}" height="${n(Math.max(h, 0.5))}" fill="${colour}"/>`);
-  };
-
-  const lo = Math.min(at(ns.lower), at(ns.upper));
-  const hi = Math.max(at(ns.lower), at(ns.upper));
-  if (vertical) rect(slot.centre - 0.5, lo, 1, hi - lo, furniture);
-  else rect(lo, slot.centre - 0.5, hi - lo, 1, furniture);
-  for (const end of [lo, hi]) {
-    if (vertical) rect(slot.centre - slot.half / 2, end - 0.5, slot.half, 1, furniture);
-    else rect(end - 0.5, slot.centre - slot.half / 2, 1, slot.half, furniture);
-  }
-
-  const w = weight !== undefined && Number.isFinite(weight) ? Math.max(0, Math.min(1, weight)) : 0;
-  const r = Math.max(2.5, slot.half * (0.25 + 0.55 * w));
-  const [cx, cy] = vertical ? [slot.centre, at(ns.centre)] : [at(ns.centre), slot.centre];
-  // A pooled estimate is a diamond, which is what says *this one is the answer*.
-  out.push(
-    pooled
-      ? `<polygon points="${n(cx)},${n(cy - r)} ${n(cx + r)},${n(cy)} ${n(cx)},${n(cy + r)} ${n(cx - r)},${n(cy)}" fill="${ink}"/>`
-      : `<rect x="${n(cx - r)}" y="${n(cy - r)}" width="${n(r * 2)}" height="${n(r * 2)}" fill="${ink}"/>`,
-  );
-  return out;
-}
-
-/**
  * A form's marks, by family.
  *
  * **One function per family and not one per form**, because the forms inside a
  * family differ only in what they put at a position the shared coordinate
  * already gave them — a joined path, a mark, a rectangle, a painted cell.
  */
+// **`range` is gone from this signature and that is the seam arriving** (§3ak.13).
+// Every family that walks takes its coordinate from the figure's marks, already
+// normalised; the last caller that needed a range of its own was the
+// distribution branch, which rasterised summaries here. What is left below is
+// the nodes family, whose placement is topology and slots and no scale at all.
 function marks(
   block: Plot,
   figure: Figure | Omit<Figure, "marks">,
-  range: PinnedRange,
   layout: SvgLayout,
   theme: ResolvedTheme,
 ): readonly string[] {
@@ -812,7 +762,7 @@ function marks(
   // is a function of its labels' widths in the terminal and of slots here, so
   // the topology crosses and the placement does not.
   if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
-    || family === "bar") && "marks" in figure) {
+    || family === "bar" || family === "distribution") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 
@@ -887,85 +837,6 @@ function marks(
     edges = laid.edges;
     return nodeMarks(layers, labelAt, edges, box, w, h, false, ink0, ground, theme, block.id, out);
   }
-
-  if (family === "distribution") {
-    // **Horizontal unless asked, which is the terminal's default and therefore
-    // this arm's.** The first draft read `!== "horizontal"`, so an unset
-    // `orientation` drew vertically here and horizontally there — the same
-    // block, the same theme, transposed between the arms. `definition.ts`
-    // routes a boxplot to `bandedForm` unless `orientation === "vertical"`, and
-    // a forest plot is rows of studies in every reference there is.
-    const vertical = block.orientation === "vertical";
-    const value = vertical ? { from: box.top, to: box.bottom } : { from: box.left, to: box.right };
-    const across = vertical ? { from: box.left, to: box.right } : { from: box.top, to: box.bottom };
-    const furniture = inkOf(LABEL, theme);
-    if (furniture === undefined) return out;
-
-    if (block.form === "dumbbell") {
-      // **Two series paired by index**, the family's other datum. The
-      // coordinate is shared and the shape it reads is not.
-      const [a, b] = [block.series[0], block.series[1]];
-      const inkA = inkOf(refOf(0), theme);
-      const inkB = inkOf(refOf(1), theme);
-      if (a === undefined || b === undefined || inkA === undefined || inkB === undefined) return out;
-      const count = Math.min(a.values.length, b.values.length); // cells-ok — a category count
-      const pos = (v: number): number =>
-        vertical
-          ? value.to - (value.to - value.from) * normalisedOf(v, range, false)
-          : value.from + (value.to - value.from) * normalisedOf(v, range, false);
-      for (let i = 0; i < count; i += 1) {
-        const va = a.values[i];
-        const vb = b.values[i];
-        if (va === null || vb === null || va === undefined || vb === undefined) continue;
-        const slot = slotOf(i, count, across.from, across.to);
-        const [pa, pb] = [pos(va), pos(vb)];
-        const lo = Math.min(pa, pb);
-        const len = Math.abs(pb - pa);
-        const [x, y, w, h] = vertical
-          ? [slot.centre - 0.75, lo, 1.5, len]
-          : [lo, slot.centre - 0.75, len, 1.5];
-        out.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(Math.max(w, 0.5))}" height="${n(Math.max(h, 0.5))}" fill="${furniture}"/>`);
-        for (const [p, colour] of [[pa, inkA], [pb, inkB]] as const) {
-          const [cx, cy] = vertical ? [slot.centre, p] : [p, slot.centre];
-          out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="3.5" fill="${colour}"/>`);
-        }
-      }
-      return out;
-    }
-
-    const qs = block.quartiles ?? [];
-    for (const [i, q] of qs.entries()) {
-      const ink = inkOf(refOf(i), theme);
-      if (ink === undefined) continue;
-      // **A forest plot is not a five-number box**, and drawing it as one is
-      // the plausible wrong figure: an interval and a point estimate rendered
-      // as quartiles measures, rasterises and reads as a summary of samples.
-      // Caught by a position row, not by containment — the box sat in the
-      // middle third of an area the interval spans end to end.
-      if (block.form === "forest") {
-        out.push(...forestMarks(
-          normalisedSummary(q, range),
-          slotOf(i, qs.length, across.from, across.to), // cells-ok — a category count
-          value,
-          vertical,
-          ink,
-          furniture,
-          q.pooled === true,
-          q.weight,
-        ));
-        continue;
-      }
-      out.push(...summaryMarks(
-        normalisedSummary(q, range),
-        slotOf(i, qs.length, across.from, across.to), // cells-ok — a category count
-        value,
-        vertical,
-        ink,
-        furniture,
-      ));
-    }
-    return out;
-  }
   return out;
 }
 
@@ -1037,7 +908,7 @@ export function plotToSvg(
   // returns `null` and the `?? { min: 0, max: 1 }` above furnishes an axis out
   // of nothing. Drawn, that is five gridlines labelled 0 to 1 over an empty
   // box: a plot of a range the block never had.
-  const body = marks(block, figure, range, layout, theme);
+  const body = marks(block, figure, layout, theme);
   if (body.length === 0) return null; // cells-ok — a count of SVG elements
 
   const parts: string[] = [

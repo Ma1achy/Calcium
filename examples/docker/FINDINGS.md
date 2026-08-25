@@ -13642,6 +13642,83 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F283 — a deferral whose blocker was a symbol, met a commit before the work was possible ★★★★☆
+
+**The deferral discipline says name the blocker as a symbol so picking the entry up begins by grepping
+it.** F266 did exactly that: `SVG_FAMILY.autocorrelation` moves from `"curve"` to `"bar"` **once the
+bar family walks the figure**. The bar family started walking one commit earlier. Grepping the symbol
+said *done*.
+
+**Reading `lagRow` said otherwise, and the gap is four decisions wide.**
+
+| `lagRow` | `barFigure` |
+|---|---|
+| ranges over `±max(1, \|v\|)`, symmetric, floored at one | `{ min(0, dataMin), dataMax }` |
+| grows a bar from a **centre zero**, either direction by sign | fills from the range floor |
+| writes a zero rule before and after the run | none |
+| draws each bound at **both signs** | one line per annotation |
+
+Landing the one-word change would have drawn positive lags only, with no zero to measure them
+against and half of every significance band — **D14's two-charts-of-one-block, in the family built to
+end it.**
+
+**The stated condition and the real condition are different sentences and only one of them was
+written down.** *The bar family walks* is checkable by grep and was true. *The bar emitter produces a
+lag figure* is the one that mattered and nothing named it. This is the third kind of deferral in
+CLAUDE.md's own table — the citation chain — arriving on a symbol rather than on prose, which is the
+form the habit was supposed to make safe.
+
+**What makes the habit still worth keeping is that it cost twenty minutes.** The symbol got me to the
+right file; reading the function next to it is what found the gap. A deferral naming *no* condition
+would have been picked up the same day and shipped.
+
+**And the escape clause held**, which is the other half of the measurement. §3ak's D14 ruling refuses
+a false figure *unless the emitter reaches the lag figure without new geometry* — all four rows are
+expressible in marks that already exist, so the refusal was unnecessary and would have been a debt
+that did not exist. Checking before writing the `null` is a named step for exactly this reason.
+
+---
+
+## F282 — a figure carrying two ranges, on the family whose gutter could not show it ★★★★☆
+
+**`distributionFigure` normalised its marks against the raw `extent` and published the niced axis over
+it.** Two ranges in one figure, and the marks were on the one with no labels behind it:
+
+```
+extent        quartileRange(qs)   →  2 … 9      the marks
+value.range   axisOver(extent)    →  0 … 10     the gridlines and their strings
+```
+
+A boxplot spanning 2–9 drawn against 2–9 and ticked `0 · 2 · 4 · 6 · 8 · 10`: every summary stretched
+to the full width, and the box a reader lines up against the `4` gridline is not at 4.
+
+**Nothing could see it while nothing read the marks.** Both arms rasterised summaries themselves and
+took their range from `plotToSvg`'s read of `value` — so the emitter's choice reached no picture, and
+`FD1`–`FD5` all assert normalised numbers against the same `extent` the emitter used, which agrees
+with itself whichever range that is. **An invariant is vacuous until its subject exists**, and the
+subject arrived with the marks walk.
+
+**Measured the moment it did.** `forest-default`'s interval went `299.52 … 509.44` to
+`283.97 … 594.96` — a different span for the same data, in a commit whose only intended changes were
+colour and shape. Reading the frame is what caught it, and the fix put the coordinates back to the
+byte, which is what confirmed the diagnosis.
+
+**It is the bar family's ruling arriving late rather than a new one.** F272b picked the niced range
+for this exact reason — *the range the figure is drawn against is the range the gutter is labelled
+from* (F210) — and this family had quietly picked the other. The asymmetry that hid it is the same
+one too: the terminal's **horizontal** boxplot is `bandedForm`, whose gutter holds **categories**, so
+there is no label for the fraction to disagree with. Only the vertical arm has a value axis, and the
+vertical arm is not the default.
+
+**And the paint order was inverted by the same commit, with its reason already written down.** The
+arm this walk replaces composed *whiskers, then their caps, then the box over both, then the median
+over that* — the glyph tables' own order, "so a cap coincident with an edge reads the way it reads in
+the terminal". A mark list **is** a paint order, so that ruling belongs in the emitter, and the
+emitter had the box first. Invisible on every ordinary summary, because the whiskers abut the box
+rather than crossing it: `boxplot-flat-whisker` is the fixture where they do not.
+
+---
+
 ## F281 — the citation checker read two-letter sections as one-letter ones, and its own probes agreed ★★★★★
 
 **Found by writing thirteen citations to a section that did not exist and watching the counter not

@@ -82,7 +82,6 @@ const KNOWN_AMBIGUOUS = {
   "c10-named-set.mjs": 1,
   "c12-annotate.mjs": 1,
   "c12-calendar.mjs": 1,
-  "c12-distribution.mjs": 1,
   "c12-origin.mjs": 1,
   "c12-value-bar.mjs": 1,
 };

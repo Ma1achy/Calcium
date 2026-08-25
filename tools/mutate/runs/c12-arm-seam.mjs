@@ -84,8 +84,10 @@ const results = runPass({
       // to refuse.
       name: "THE DEFECT: a forest row with no estimate draws a point anyway",
       file: FIGURE,
-      from: "          marks.push(dot(centre, sm.centre, has ? \"point\" : \"absent\", i));",
-      to: "          marks.push(dot(centre, sm.centre, \"point\", i));",
+      // Re-anchored: the role moved into the estimate's own literal when the
+      // forest gained its pooled arm and its weight (§3ak.13).
+      from: "              role: !has ? \"absent\" : q.pooled === true ? \"target\" : \"point\",",
+      to: "              role: q.pooled === true ? \"target\" : \"point\",",
       expect: "FD3",
     },
     {
@@ -224,8 +226,8 @@ const results = runPass({
       // Re-anchored: the rect became one line when the family gained its
       // stem-and-head split, so a bar, a lollipop's stem and a histogram bin are
       // one expression (F280).
-      from: "            mark: { kind: \"rect\", x, y: 0, w, h: top, fill: true },",
-      to: "            mark: { kind: \"rect\", x: seriesIndex / per / n, y: 0, w, h: top, fill: true },",
+      from: "              : { kind: \"rect\", x, y: 0, w, h: top, fill: true },",
+      to: "              : { kind: \"rect\", x: seriesIndex / per / n, y: 0, w, h: top, fill: true },",
       expect: "FB4",
     },
     {

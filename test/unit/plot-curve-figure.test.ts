@@ -491,8 +491,33 @@ describe("FD — the distribution family's figure (C12 §3ak.7)", () => {
       quartiles: [{ min: 1, q1: 1, median: Number.NaN, q3: 2, max: 2, lower: 1, upper: 2, outliers: [] }],
     } as Partial<Plot>));
     const pts = f.marks.filter((d) => d.mark.kind === "point");
+    // **Two tees and then the estimate.** The tees are `cap`s, and the figure was
+    // dropping them: `forestRow` writes `whiskerLeft` and `whiskerRight` over the
+    // run's ends because a plain rule stopping is not an interval ending, and
+    // this arm drew them from its own loop while the terminal drew them from the
+    // record. One of the two was going to stop (§3ak.13).
     expect(pts.map((d) => (d.mark.kind === "point" ? d.mark.role : "")))
-      .toEqual(["absent"]);
+      .toEqual(["cap", "cap", "absent"]);
+  });
+
+  it("FD3b (C12 I31, I62, §3ak.13): a pooled estimate is a role and a weight is a size", () => {
+    // **Two facts the figure was dropping, both of which the terminal draws.**
+    // `forestRow` picks `g.diamond` for a pooled summary and `ch.filled` for the
+    // rest — *this one is the answer*, said by shape, which is what the seventh
+    // `GlyphRole` is for and it had no subject until now. And the weight sizes
+    // the estimate (C12 I31): a wide interval drawn small contributed little and
+    // a narrow one drawn large carried the result.
+    type Q = NonNullable<Plot["quartiles"]>[number];
+    const q = (over: Partial<Q>): Q =>
+      ({ min: 1, q1: 2, median: 3, q3: 4, max: 5, lower: 1, upper: 5, outliers: [], ...over });
+    const f = distributionFigure(box({
+      form: "forest",
+      quartiles: [q({ weight: 0.25 }), q({ pooled: true, weight: 2 })],
+    }));
+    const estimates = f.marks.flatMap((d) =>
+      d.mark.kind === "point" && d.mark.role !== "cap" ? [[d.mark.role, d.mark.size]] : []);
+    expect(estimates, "the ordinary one, then the pooled one clamped to 1")
+      .toEqual([["point", 0.25], ["target", 1]]);
   });
 
   it("FD4 (C12 I59): a dumbbell is two positions and a connector, paired by index", () => {
