@@ -233,35 +233,6 @@ function n(v: number): string {
   return (Math.round(v * 1000) / 1000).toString();
 }
 
-/**
- * A plot's samples in the SVG's pixel space — **from the shared coordinate**.
- *
- * `normalisedOf` is the same function `rowOf` calls, so the two paths cannot
- * disagree about where a value sits: one multiplies by `rows - 1` and rounds,
- * the other multiplies by a pixel height and does not. **That is §3aj G5** —
- * only the rasterisation differs — and it is asserted rather than described.
- */
-export function svgPoints(
-  values: readonly (number | null)[],
-  range: PinnedRange,
-  layout: SvgLayout,
-): readonly (readonly [number, number] | null)[] {
-  const left = layout.width * (layout.gutter + layout.pad);
-  const right = layout.width * (1 - layout.pad);
-  const top = layout.height * layout.pad;
-  const bottom = layout.height * (1 - layout.gutter);
-  const span = Math.max(1, values.length - 1); // cells-ok — a sample count
-  return values.map((v, i) => {
-    if (v === null || !Number.isFinite(v)) return null;
-    const x = left + ((right - left) * i) / span;
-    // `invert` is `true` because a curve's values face up and SVG's y grows
-    // down — the same fact `FACING_DEFAULT` carries for the terminal path,
-    // spelled here because L0 does not hold `Facing` (§3ac).
-    const y = top + (bottom - top) * normalisedOf(v, range, true);
-    return [x, y] as const;
-  });
-}
-
 /** The plot area in px. Never a cell count. */
 type Area = Readonly<{ left: number; right: number; top: number; bottom: number }>;
 
@@ -453,8 +424,25 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
     }
 
     if (m.kind === "rect") {
-      const a = at(m.x, m.y);
-      const b = at(m.x + m.w, m.y + m.h);
+      // **Two insets, and which one applies is what `depth` says** (F280).
+      //
+      // A **nested** rect is a member of a partition: its neighbours abut it,
+      // so it comes off a unit on every side and the parent shows through. A
+      // rect with no `depth` is a **measurement** — a bar's length *is* its
+      // value, read against a labelled axis — so it must reach its own gridline
+      // exactly, and what it wants instead is a gap across the *identity* axis
+      // so two categories do not touch.
+      //
+      // The slot inset is taken here, in the figure's own space, because `x`
+      // and `w` run along the identity axis whatever `orientation` says. Taking
+      // it after projection would need this to know which page axis that had
+      // become — the second reading of `orientation` the projector exists to
+      // remove.
+      const nested = m.depth !== undefined;
+      const share = !nested && m.value === undefined && d.layer === "series" ? SLOT_SHARE : 1;
+      const gap = ((1 - share) / 2) * m.w;
+      const a = at(m.x + gap, m.y);
+      const b = at(m.x + m.w - gap, m.y + m.h);
       // **Two corners and a bounding box, so every flip is the projector's.**
       // Mapping a corner and a size separately would need the walk to know which
       // way each axis runs — the second copy of `facing` this function exists to
@@ -478,7 +466,7 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // **Applied after projection it is the better device than the pad it
       // replaces**: the partition stays true, so a tile's area is proportional
       // to its datum rather than to its datum minus the padding.
-      const inset = m.value === undefined && d.layer === "series" ? (m.depth ?? 0) + 1 : 0;
+      const inset = nested ? (m.depth ?? 0) + 1 : 0;
       const x = Math.min(a[0], b[0]) + inset;
       const y = Math.min(a[1], b[1]) + inset;
       const w = Math.max(0.5, Math.abs(b[0] - a[0]) - inset * 2);
@@ -547,6 +535,22 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
 // `yMin`/`yMax` anyway, and whether that overwrite is right is a separate
 // question** — moves with it, unanswered and now askable in one place.
 
+/**
+ * **How much of its slot a categorical figure takes** — this arm's, and one of
+ * them (§3ak.12).
+ *
+ * `boxplotColumn`'s own ruling and matplotlib's `widths=0.6`: categories drawn
+ * to the full slot touch, and a categorical axis whose categories touch is not
+ * saying they are separate. The terminal takes the same fraction and rounds it
+ * to cells; this does not round at all, which is the whole of the difference
+ * (§3aj hazard 1).
+ *
+ * **It was two numbers until the bar family crossed** — `0.6` here and `0.7` in
+ * `marks()`' own bar loop, one arm, two answers to *how wide is a bar*, which is
+ * the duplication this pass exists to end one layer up.
+ */
+const SLOT_SHARE = 0.6;
+
 /** A slot along the categorical axis, and the half-width the figure takes in it. */
 function slotOf(index: number, count: number, from: number, to: number): Readonly<{ centre: number; half: number }> {
   // **Three fifths of the slot**, which is `boxplotColumn`'s own ruling and
@@ -555,7 +559,7 @@ function slotOf(index: number, count: number, from: number, to: number): Readonl
   // The terminal takes the same fraction and rounds it to cells; this does not
   // round at all, which is the whole of the difference (§3aj hazard 1).
   const slot = (to - from) / Math.max(1, count); // cells-ok — a category count
-  return { centre: from + slot * (index + 0.5), half: (slot * 0.6) / 2 };
+  return { centre: from + slot * (index + 0.5), half: (slot * SLOT_SHARE) / 2 };
 }
 
 /**
@@ -807,7 +811,8 @@ function marks(
   // `nodesDecisions` returns `Omit<Figure, "marks">` because a tree's placement
   // is a function of its labels' widths in the terminal and of slots here, so
   // the topology crosses and the placement does not.
-  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles") && "marks" in figure) {
+  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
+    || family === "bar") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 
@@ -961,41 +966,6 @@ function marks(
     }
     return out;
   }
-
-  for (const [si, series] of block.series.entries()) {
-    const points = svgPoints(series.values, range, layout);
-    // **The terminal arm's own slot chooser**, and `refOf` is `marks.ts`'s: the
-    // legend a reader compares the figure against is drawn from this same call,
-    // so the two arms cannot give series three different colours.
-    const ink = inkOf(refOf(si), theme);
-    if (ink === undefined) continue;
-    if (family === "bar") {
-      // **The baseline is zero where the range contains it, and the floor
-      // otherwise** — because a bar's length *is* its value, so signed data
-      // grows both ways from zero.
-      //
-      // **The first draft used `normalisedOf(range.min, …)`, which is not a
-      // coordinate at all**: it is `1` by construction, so the expression was
-      // `box.bottom` written the long way round. A mutation replacing it with
-      // `box.bottom` changed nothing and survived — and that survivor is what
-      // said the line was dead arithmetic wearing the shared layer's clothes.
-      const zero = range.min <= 0 && range.max >= 0 ? 0 : range.min;
-      const base = box.top + (box.bottom - box.top) * normalisedOf(zero, range, true);
-      const slot = (box.right - box.left) / Math.max(1, points.length); // cells-ok — a sample count
-      const w = Math.max(1, slot * 0.7);
-      for (const [i, p] of points.entries()) {
-        if (p === null) continue;
-        const x = box.left + slot * i + (slot - w) / 2;
-        const top = Math.min(p[1], base);
-        const height = Math.max(0.5, Math.abs(base - p[1]));
-        out.push(
-          block.form === "lollipop" || block.form === "dotplot"
-            ? `<circle cx="${n(x + w / 2)}" cy="${n(p[1])}" r="3" fill="${ink}"/>`
-            : `<rect x="${n(x)}" y="${n(top)}" width="${n(w)}" height="${n(height)}" fill="${ink}"/>`,
-        );
-      }
-    }
-  }
   return out;
 }
 
@@ -1100,7 +1070,20 @@ export function plotToSvg(
   //
   // Nothing in the rows caught it. Every one asserts a position against the
   // *area*, and the furniture is inside the area either way.
-  const valueOnX = svgFamilyOf(block.form) === "distribution" && block.orientation !== "vertical";
+  // **The value axis is the figure's, and this is D11 and F274 closing at
+  // once** (§3ak.10 S2). What stood here was
+  // `svgFamilyOf(block.form) === "distribution" && block.orientation !== "vertical"` —
+  // a **third** answer to which way the values run, beside `positionalDecisions`'
+  // fixed `"vertical"` and `orientationOf`'s read of the block, and scoped to
+  // the family the defect was noticed in. Measured on a `bar` at the terminal's
+  // default orientation, which is horizontal: gridlines **across**, the gutter
+  // reading `10 15 20 25`, values running the other way — and
+  // `orientation: "vertical"` gave byte-identical output, so the arm ignored the
+  // member entirely.
+  //
+  // **Closed by construction rather than repaired.** A scoping clause can only
+  // be wrong where there is a clause, and the emitters decided this already.
+  const valueOnX = figure.orientation === "horizontal" && axis !== null;
   // **`tiles` has no value axis either**, and the frame is what said so: a
   // treemap drew ticks at 0, 0.25, 0.5, 0.75, 1 — furnished by
   // `seriesRange([]) ?? {0,1}` out of a block with no series — beside a figure

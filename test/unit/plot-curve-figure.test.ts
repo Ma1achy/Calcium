@@ -351,6 +351,29 @@ describe("FB — the bar family's figure (C12 §3ak.7)", () => {
       .toBeLessThan(hi.h);
   });
 
+  it("FB6 (C12 I62, F280): a bar is a measurement and carries no depth; the form picks stem and head", () => {
+    // **Measured in the terminal rather than assumed.** `lollipopRow` fills
+    // `0 … pos` with `─` and puts `●` at `pos`; `dotplotRow` writes `●` at
+    // `pos` and nothing else. A family drawn as one rect for all four forms
+    // turns a dot plot into a bar chart — the plausible wrong figure, since both
+    // encode the same number.
+    const kindsOf = (form: string): readonly string[] =>
+      barFigure(bars({ form } as unknown as Partial<Plot>)).marks
+        .filter((d) => d.layer === "series")
+        .map((d) => d.mark.kind)
+        .filter((k, i, all) => all.indexOf(k) === i);
+    expect(kindsOf("bar"), "a length").toEqual(["rect"]);
+    expect(kindsOf("histogram"), "a length").toEqual(["rect"]);
+    expect(kindsOf("lollipop"), "a stem and a head, in that order").toEqual(["rect", "point"]);
+    expect(kindsOf("dotplot"), "a head alone — no stem to mistake for a bar").toEqual(["point"]);
+    // **No depth, which is what makes a bar reach its own gridline.** A rect
+    // with one is a partition member and comes off a unit on every side; that
+    // inset shipped on the bar family for the length of a frame read and put the
+    // bar of 20 at `x=351` against a `20` gridline at `352` (F280).
+    expect(barFigure(bars()).marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.depth] : [])))
+      .toEqual([undefined, undefined, undefined]);
+  });
+
   it("FB5 (C12 I64): a categorical refusal is empty, and the identity survives it", () => {
     const f = barFigure(bars({ series: [{ values: [] }] }));
     expect(f.value, "nothing was measured").toBeNull();
@@ -551,12 +574,15 @@ describe("FT / FN — the tiles and nodes families (C12 §3ak.7)", () => {
     // spent on width, which is the family's whole reading.
     const widths = fl.marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.w] : []));
     expect(widths).toEqual([1, 0.75, 0.25]);
-    // **And a strip carries NO depth, which is not depth zero** (F278). These
-    // are stacked bands rather than enclosing boxes: a uniform inset separates
-    // them, and *this rect sits inside that many others* is false of a band
-    // rather than true at zero.
+    // **A strip carries `depth: 0`, and the bar family is what settled that**
+    // (F280). The member was written when tiles were its only subject, so
+    // *absent* had one possible meaning and I gave it the wrong one: a strip is
+    // a **partition member** — the bands tile the line and abut each other — so
+    // it wants the separating inset, and it encloses nothing, so it wants one
+    // unit of it. Absent means *not a partition member at all*, which is a bar:
+    // a length read against an axis, drawn exactly to its own gridline.
     expect(fl.marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.depth] : [])))
-      .toEqual([undefined, undefined, undefined]);
+      .toEqual([0, 0, 0]);
   });
 
   it("FT3 (C12 I61, F273, F276): the facing is live here, and for one commit it was a constant", () => {

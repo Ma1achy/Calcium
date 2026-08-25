@@ -131,9 +131,14 @@ const results = runPass({
       // the two paths now disagree about where a sample sits, which is the
       // divergence §3aj exists to prevent.
       name: "the image path normalises for itself instead of the shared layer",
-      file: SVG,
-      from: "    const y = top + (bottom - top) * normalisedOf(v, range, true);",
-      to: "    const y = top + (bottom - top) * (1 - (v - range.min) / Math.max(1, range.max - range.min));",
+      // **Re-anchored to the emitter** (§3ak.12). `svgPoints` turned values into
+      // pixels and the marks walk took its last caller, so this arm no longer
+      // normalises anything: it projects marks the shared layer already
+      // normalised. The open-coding this restores is one file down, and the
+      // clamp is still the only thing a copy gets wrong.
+      file: FIGURE,
+      from: "    const pt: Pt = [i / span, normalisedOf(v, range, false)];",
+      to: "    const pt: Pt = [i / span, (v - range.min) / Math.max(1, range.max - range.min)];",
       expect: "G5",
     },
     {
@@ -175,10 +180,17 @@ const results = runPass({
       // source.** `normalisedOf(range.min, …)` is `1` by construction, so the
       // expression it mutated was `box.bottom` written the long way round —
       // dead arithmetic wearing the shared layer's clothes.
-      name: "a bar's baseline is the area's floor rather than zero",
-      file: SVG,
-      from: "      const base = box.top + (box.bottom - box.top) * normalisedOf(zero, range, true);",
-      to: "      const base = box.bottom;",
+      // **Turned round, because the arms unified the other way** (F272,
+      // §3ak.9). This arm computed its own zero baseline and the terminal does
+      // not — `barRow` and `barColumn` both fill from `(value - min) / span` —
+      // so the figure reproduces the terminal's answer deliberately and `G6b`
+      // asserts the defect. The mutation is therefore the **repair**, applied
+      // where the repair would go, and the row fails if it ever lands without
+      // `G6b` being rewritten with it.
+      name: "a bar is drawn from zero, and G6b is not rewritten to match",
+      file: FIGURE,
+      from: "            mark: { kind: \"rect\", x, y: 0, w, h: top, fill: true },",
+      to: "            mark: { kind: \"rect\", x, y: Math.min(top, normalisedOf(0, value.range, false)), w, h: Math.abs(top - normalisedOf(0, value.range, false)), fill: true },",
       expect: "G6",
     },
     {
@@ -186,10 +198,13 @@ const results = runPass({
       // with: five literals where C10 has eight slots. The picture still reads
       // as a chart and every curve is still a curve — the difference is that
       // the legend and the figure name different colours for series six.
+      // Re-anchored to the walk's resolver, which is where every colour in this
+      // arm is now chosen — the per-series loop it used to sit in went with the
+      // bar family (§3ak.12).
       name: "a series takes a colour this file chose",
       file: SVG,
-      from: "    const ink = inkOf(refOf(si), theme);",
-      to: '    const ink = "#6ea8fe";',
+      from: "      ? inkOf(d.ref, theme)",
+      to: '      ? "#6ea8fe"',
       expect: "TC4",
     },
     {
@@ -359,8 +374,8 @@ const results = runPass({
       // the right place, and nothing saying which ones belong together.
       name: "the treemap's inset stops compounding, so nesting stops showing",
       file: SVG,
-      from: "      const inset = m.value === undefined && d.layer === \"series\" ? (m.depth ?? 0) + 1 : 0;",
-      to: "      const inset = m.value === undefined && d.layer === \"series\" ? 1 : 0;",
+      from: "      const inset = nested ? (m.depth ?? 0) + 1 : 0;",
+      to: "      const inset = nested ? 1 : 0;",
       expect: "G6d1",
     },
     {
@@ -372,8 +387,8 @@ const results = runPass({
       // ring, which is a border.
       name: "the ring becomes a share of the output rather than a unit of it",
       file: SVG,
-      from: "      const inset = m.value === undefined && d.layer === \"series\" ? (m.depth ?? 0) + 1 : 0;",
-      to: "      const inset = m.value === undefined && d.layer === \"series\" ? ((m.depth ?? 0) + 1) * (box.right - box.left) / 300 : 0;",
+      from: "      const inset = nested ? (m.depth ?? 0) + 1 : 0;",
+      to: "      const inset = nested ? ((m.depth ?? 0) + 1) * (box.right - box.left) / 300 : 0;",
       expect: "G6d4",
     },
     {
@@ -418,8 +433,8 @@ const results = runPass({
       // shape the row predicted every family's first commit would have.
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
-      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles") && "marks" in figure) {',
-      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles") && "marks" in figure) {',
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

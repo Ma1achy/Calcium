@@ -16,7 +16,6 @@ import {
   plotToSvg,
   svgFamilyOf,
   svgLayout,
-  svgPoints,
   SVG_DEFAULT_LAYOUT,
   SVG_FAMILY,
   SVG_FONT_SIZE,
@@ -28,7 +27,7 @@ import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/col
 import { rgbOf } from "../support/theme.js";
 import { tiles } from "../../src/presentation/plot/hierarchy.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
-import { curveFigure, distributionFigure } from "../../src/presentation/plot/figure.js";
+import { barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS } from "../../src/presentation/plot/figure.js";
 import { resolve } from "../../src/presentation/theme/index.js";
 import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
@@ -40,6 +39,56 @@ const hexOf = (ref: string): string => {
   const { colour } = resolve(ref as `${string}.${string}`, THEME, { colourDepth: 24 });
   if (colour === undefined || colour.kind !== "rgb") throw new Error(`no rgb for ${ref}`);
   return colour.hex;
+};
+
+/**
+ * **The page coordinates the arm actually emitted, read off its own path.**
+ *
+ * `svgPoints` used to be the subject of the two rows below, and it was deleted
+ * when the marks walk took its last caller (§3ak.12): the arm no longer turns
+ * values into pixels: it projects a figure's normalised marks. So the rows read
+ * the seam on one side — `curveFigure(...).marks` — and the **drawn document**
+ * on the other, rather than a helper that sat between them and now sits beside
+ * them. That is the house rule applied to a row that had drifted off it: assert
+ * the artefact, not a proxy.
+ */
+const pathPoints = (svg: string): readonly (readonly [number, number])[] =>
+  [...(/<path d="([^"]+)"/u.exec(svg)?.[1] ?? "").matchAll(/[ML]([-\d.]+) ([-\d.]+)/gu)]
+    .map((m) => [Number(m[1]), Number(m[2])] as const);
+
+/**
+ * One y per sample, **whichever of the three ways the arm drew them**.
+ *
+ * **The first version read `M`/`L` alone and it was wrong for two families at
+ * once** — a `step` and an `ecdf` draw `H`/`V` corners, and a `scatter` draws no
+ * path at all. Twenty-one rows failed and every failure was the reader, not the
+ * renderer: *a matcher that sees one encoding reports absence when the value
+ * changes form*. It replaced `svgPoints`, which was form-independent because it
+ * never looked at the output, so the widening is the cost of asserting the
+ * artefact instead of a proxy — and worth paying, since the proxy is what had
+ * stopped being what ships.
+ *
+ * A staircase's samples are its `M` and each `V`: the `H` moves along the
+ * previous value and the `V` is where the new one lands.
+ */
+const sampleYs = (svg: string): readonly number[] => {
+  const path = /<path d="([^"]+)"/u.exec(svg)?.[1];
+  if (path !== undefined) {
+    const ys: number[] = [];
+    for (const m of path.matchAll(/([MLV])([-\d.]+)(?: ([-\d.]+))?/gu)) {
+      const y = m[1] === "V" ? m[2] : m[3];
+      if (y !== undefined) ys.push(Number(y));
+    }
+    return ys;
+  }
+  return [...svg.matchAll(/<circle [^>]*cy="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+};
+
+/** A curve's y values in the figure's space — one run, uninverted, 0 at the floor. */
+const figureYs = (blk: Parameters<typeof plotToSvg>[0]): readonly number[] => {
+  const run = curveFigure(blk).marks.find((d) => d.mark.kind === "polyline");
+  if (run === undefined || run.mark.kind !== "polyline") throw new Error("no polyline");
+  return run.mark.points.map((pt) => pt[1]);
 };
 
 const VALUES = [1, 4, 2, 8, 5, 9, 3, 7];
@@ -117,10 +166,16 @@ describe("G3–G5 — the second renderer", () => {
     const layout = SVG_DEFAULT_LAYOUT;
     const top = layout.height * layout.pad;
     const bottom = layout.height * (1 - layout.gutter);
-    const points = svgPoints(VALUES, RANGE, layout);
+    // **The range is the figure's**, because both arms take it from there now —
+    // asserting against a hand-written `RANGE` would be asserting against the
+    // range this row happens to know rather than the one drawn (D1).
+    const range = curveFigure(block).value?.range ?? RANGE;
+    const ys = figureYs(block);
+    const points = pathPoints(plotToSvg(block, THEME, layout) ?? "");
     for (const [i, v] of VALUES.entries()) {
-      const t = normalisedOf(v, RANGE, true);
-      expect(rowOf(v, RANGE, rows, FACING_DEFAULT), `cells, sample ${String(i)}`).toBe(
+      const t = normalisedOf(v, range, true);
+      expect(1 - (ys[i] ?? 0), `the figure's coordinate, sample ${String(i)}`).toBeCloseTo(t, 6);
+      expect(rowOf(v, range, rows, FACING_DEFAULT), `cells, sample ${String(i)}`).toBe(
         Math.round(t * (rows - 1)),
       );
       expect(points[i]?.[1], `pixels, sample ${String(i)}`).toBeCloseTo(top + (bottom - top) * t, 6);
@@ -131,17 +186,23 @@ describe("G3–G5 — the second renderer", () => {
     // mutation replacing `normalisedOf` with open-coded arithmetic survived the
     // rows above. The clamp is C04 I29 — an out-of-range sample presses against
     // the bound it exceeded — and it is the only thing here a copy gets wrong.
-    const pinned = { min: 2, max: 6 };
-    const outside = [-40, 2, 4, 6, 40];
-    const clamped = svgPoints(outside, pinned, layout);
+    const pinnedBlock = b.plot({
+      id: "pin", form: "line", height: 8, yMin: 2, yMax: 6,
+      series: [{ label: "s", values: [-40, 2, 4, 6, 40] }],
+    });
+    const clamped = pathPoints(plotToSvg(pinnedBlock, THEME, layout) ?? "");
     expect(clamped[0]?.[1], "far below pins to the floor's pixel").toBeCloseTo(bottom, 6);
     expect(clamped[4]?.[1], "far above pins to the ceiling's").toBeCloseTo(top, 6);
     expect(clamped[0]?.[1], "and never escapes the plot area").toBe(clamped[1]?.[1]);
     expect(clamped[4]?.[1]).toBe(clamped[3]?.[1]);
     // A span under 1, where open-coded arithmetic reaches for a guard the
     // shared layer does not need.
-    const narrow = { min: 0, max: 0.5 };
-    expect(svgPoints([0, 0.25, 0.5], narrow, layout)[2]?.[1], "a small span is not a special case").toBeCloseTo(top, 6);
+    const narrowBlock = b.plot({
+      id: "nar", form: "line", height: 8, yMin: 0, yMax: 0.5,
+      series: [{ label: "s", values: [0, 0.25, 0.5] }],
+    });
+    expect(pathPoints(plotToSvg(narrowBlock, THEME, layout) ?? "")[2]?.[1],
+      "a small span is not a special case").toBeCloseTo(top, 6);
 
     // Ordering agrees between the two, which is the reader-visible consequence:
     // the highest sample is the topmost row and the topmost pixel.
@@ -382,14 +443,49 @@ describe.each(supported)("G6 — %s", (form) => {
       return;
     }
     const layout = SVG_DEFAULT_LAYOUT;
-    const range = { min: PIN.yMin, max: PIN.yMax };
-    const points = svgPoints(SAMPLES, range, layout);
     const top = layout.height * layout.pad;
     const bottom = layout.height * (1 - layout.gutter);
-    expect(points[0]?.[1], `${form}: far below pins to the floor`).toBeCloseTo(bottom, 6);
-    expect(points[4]?.[1], `${form}: far above pins to the ceiling`).toBeCloseTo(top, 6);
-    expect(points[0]?.[1]).toBe(points[1]?.[1]);
-    expect(points[4]?.[1]).toBe(points[3]?.[1]);
+    // **A bar encodes by length and a curve by position, so *where did the
+    // sample land* is a different measurement for each** — and this row asked
+    // the position of both until D11 turned the bar family on its side, at which
+    // point it was reading the page's ordinate for a figure whose values run
+    // along the abscissa. It agreed for as long as every form was vertical,
+    // which is how one measurement came to stand for two.
+    //
+    // The clamp itself is `normalisedOf`'s and lives in the figure, so the bar
+    // family is asked there: a sample below the floor is a bar of no length and
+    // one above the ceiling is a bar of the whole span.
+    const family = svgFamilyOf(form);
+    // **Three families have no value axis, so there is no bound to clamp
+    // against — and the old row appeared to cover them.** It called `svgPoints`
+    // with the samples directly, which answers for any list of numbers whether
+    // or not the arm ever asks it that question; for a matrix, a treemap and a
+    // tree it never does. Measuring a helper instead of the output is how a row
+    // reports coverage it does not have (§3ak.12).
+    if (family === "matrix" || family === "tiles" || family === "nodes") {
+      expect(HAS_VALUE_AXIS[form], `${form}: no value axis, so no bound to clamp against`).toBe(false);
+      return;
+    }
+    if (family === "bar") {
+      const marks = barFigure(made).marks;
+      const stems = marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.h] : []));
+      const heads = marks.flatMap((d) => (d.mark.kind === "point" ? [d.mark.y] : []));
+      const ts = stems.length > 0 ? stems : heads;
+      expect(ts[0], `${form}: far below clamps to no length`).toBeCloseTo(0, 6);
+      expect(ts[4], `${form}: far above clamps to the full span`).toBeCloseTo(1, 6);
+      // **A pinned floor is not a bar's floor** (F272), which this row is the
+      // first to say out loud. `categoricalDecisions` zero-anchors the extent,
+      // so `yMin: 2` leaves the bars starting at 0 and the sample *at* the pin
+      // is not on the floor — where for a curve the two coincide, which is why
+      // one assertion stood for both families until the bar family crossed.
+      expect(ts[1], `${form}: the pinned floor is not the bar's baseline`).toBeGreaterThan(0);
+      return;
+    }
+    const drawn = sampleYs(plotToSvg(made, THEME, layout) ?? "");
+    expect(drawn[0], `${form}: far below pins to the floor`).toBeCloseTo(bottom, 6);
+    expect(drawn[4], `${form}: far above pins to the ceiling`).toBeCloseTo(top, 6);
+    expect(drawn[0]).toBe(drawn[1]);
+    expect(drawn[4]).toBe(drawn[3]);
     // And the drawn document never puts ink outside the area either.
     const svg = plotToSvg(made, THEME, layout) ?? "";
     const ys = [...svg.matchAll(/(?:\by|cy|y1|y2)="([-\d.]+)"/gu)].map((m) => Number(m[1]));
@@ -431,10 +527,18 @@ describe("G6b — the two assertions containment could not make", () => {
     expect(fills[2], "the ceiling is the map's ceiling").toBe(sampleHex(map, 1));
   });
 
-  it("a bar's baseline is zero where the range holds it, not the area's floor", () => {
-    // The first draft computed `normalisedOf(range.min, …)`, which is `1` by
-    // construction — `box.bottom` the long way round. Signed data is what tells
-    // the difference: a bar of `-3` grows *down* from zero.
+  it("F272: every bar fills from the RANGE FLOOR — the defect both arms now share", () => {
+    // **This row asserted the opposite until the arms were unified, and it was
+    // right.** `plotToSvg` computed its own zero baseline, so a bar of `-3`
+    // grew *down* from zero; the terminal does not, in either orientation —
+    // `barRow` and `barColumn` both compute `(value - min) / span`, so signed
+    // data draws no negative bars at all.
+    //
+    // **The tie-break resolves it the wrong way on purpose** (F272, §3ak.9).
+    // Correcting the terminal inside a refactor moves no frame, splits the arms
+    // at step 4, and is announced by nothing; unified, the two draw one wrong
+    // figure and one repair fixes both. So this row now asserts the defect, and
+    // **it fails the day a bar hangs below zero** — which is the repair landing.
     const signed = b.plot({
       id: "bz",
       form: "bar",
@@ -443,14 +547,21 @@ describe("G6b — the two assertions containment could not make", () => {
     });
     const layout = SVG_DEFAULT_LAYOUT;
     const svg = plotToSvg(signed, THEME, layout) ?? "";
-    const rects = [...svg.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/gu)];
+    const rects = [...svg.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/gu)]
+      .map((m) => ({ x: Number(m[1]), w: Number(m[3]) }));
     expect(rects, "three bars").toHaveLength(3);
-    const bottom = layout.height * (1 - layout.gutter);
-    const [neg, , pos] = rects.map((m) => ({ y: Number(m[2]), h: Number(m[4]) }));
-    // The negative bar's *top* is the baseline; the positive bar's *bottom* is.
-    expect(neg?.y, "the negative bar hangs from the baseline").toBeGreaterThan(layout.height * layout.pad);
-    expect((pos?.y ?? 0) + (pos?.h ?? 0), "and the positive one stands on it").toBeCloseTo(neg?.y ?? -1, 3);
-    expect(neg?.y, "which is not the area's floor").toBeLessThan(bottom - 1);
+    const left = layout.width * (layout.gutter + layout.pad);
+    // **Every bar starts at the same place and that place is the floor**, which
+    // is the whole of the defect in one assertion: nothing marks where zero is,
+    // so `-3` and `5` are told apart by length alone and the sign is gone.
+    for (const [i, r] of rects.entries()) {
+      expect(r.x, `bar ${String(i)} starts at the range floor`).toBeCloseTo(left, 3);
+    }
+    // **The set, not its first member.** Lengths ordered by value is what says
+    // the bars are still a reading of the data rather than three copies.
+    const ws = rects.map((r) => r.w);
+    expect(ws[0], "the most negative gets no length at all").toBeLessThan(ws[1] ?? 0);
+    expect(ws[1], "and zero gets less than the positive").toBeLessThan(ws[2] ?? 0);
   });
 });
 

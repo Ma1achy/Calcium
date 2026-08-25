@@ -4472,9 +4472,27 @@ produces, and it keeps the areas true rather than approximately true.
 > the one thing this pass forbids — and it would have been announced by nothing, because separation
 > and nesting look alike in a diff of rectangles.
 
-**Absent means *not nested*, not depth zero.** A flame's strips are stacked bands rather than
-enclosing boxes, so they take a uniform inset and carry no `depth`; the member says *this rect sits
-inside that many others*, which is false of a band.
+**Absent means *not a partition member*, not depth zero — and that wording is F280's correction.**
+It first read *absent means not nested*, with a flame's strips carrying none, because tiles were the
+member's only subject and there was one plausible reading of the absent case. The bar family arrived
+and there were two:
+
+| the rect is | `depth` | what a renderer does |
+|---|---|---|
+| a tile nested in a partition | its nesting depth | comes off `depth + 1` units on every side, so the parent shows as a ring |
+| a strip in a partition, enclosing nothing | `0` | comes off one unit, so the bands do not touch |
+| a **measurement** — a bar's length *is* its value | absent | drawn exactly, and inset only **across** the identity axis so two categories do not touch |
+
+**The third row is the one the member was silently getting wrong.** A bar carries no `depth`, and
+under the first wording that put it in the same case as a strip: one unit off every side, including
+the ends. Measured on `bar-default`, whose data is `[10, 25, 15, 30, 20]` against a `0 … 40` axis —
+the bar of 20 ended at `x=351` and its own gridline is at `352`. Every bar a pixel short of the tick
+it is read against, and the vertical arm the same at both ends.
+
+**A length and an area are read differently and the inset has to know which it is looking at.** A
+tile's area is read by comparison with its neighbours, so a unit off every side costs nothing; a
+bar's length is read against a labelled axis, so a unit off the end is the figure lying about its
+own number.
 
 ### 3ak.3 — The rungs are decided after the figure, and that is where a diamond becomes a comma
 
@@ -4759,7 +4777,7 @@ them. §3ak.4's rung ladder is the trace half and it is U6's, not this step's.
 | # | one rule | the other | where they meet | what it settles |
 |---|---|---|---|---|
 | **S1** | `value.labels[i]` is `value.ticks[i]` | the SVG takes every tick, the terminal picks | any ticked form | both are indexed together or the pairing breaks — **no `String(tick)` may survive anywhere** |
-| **S2** | `valueOnX` is scoped to `distribution` | four families carry `orientation` | a horizontal `bar` | **F274**, and it closes by construction |
+| **S2** | `valueOnX` is scoped to `distribution` | four families carry `orientation` | a horizontal `bar` | **F274** — **closed** at §3ak.12: `figure.orientation` replaces the expression, so the clause has nowhere to live |
 | **S3** | `value === null` means *no axis* (I60) | empty `marks` means *a refusal* (I64) | `nodes`, which has both | **two refusals with different meanings**, and conflating them draws a tree as *No data.* |
 | **S4** | `Drawn.layer` orders the drawing | the ground is painted, then marks, then furniture | any annotated form | the layer decides among marks; the ground and the frame stay the arm's |
 | **S5** | `seriesIndex` is a categorical slot | `ref` is an explicit one | an annotation beside a series | a mark carries one or the other, never both — the resolver needs both paths and a default |
@@ -4862,6 +4880,67 @@ coordinate is spent on colour instead of position.
 `positionalForm` hands `block.series[1]` to `bubbleRows` as the sizes *for every series* — so the size
 channel is drawn as a series sized by itself, in its own colour, in both arms now. One wrong figure
 rather than two different ones, which is the tie-break's whole argument.
+
+---
+
+### 3ak.12 — The tiles and bar families: what the walk found that the type did not say
+
+**Two families crossed and each falsified a sentence written when it had one subject.** That is the
+section's whole content, and both sentences read as settled when they were written.
+
+**`facing` for the tiles family (F276).** `tilesFigure`'s doc said *a flame grows up from its root and
+an icicle hangs down from it, which is one decision applied twice* — and passed `FACING_DEFAULT` for
+all three forms, so the member said `up` for both and the growth direction stayed written in two
+renderers. Every clause of the justification is true; none of it constrains the decision it is
+attached to, which is MG24's class. **It was unfalsifiable until something read the member**, and the
+projector is what reads it. Measured in the terminal before deciding: `definition.ts` maps
+`t.y0 * areaRows` to a row index, so a **treemap** faces down too — two of the three, and only the
+flame grows up.
+
+**`depth`'s absent case (F280).** Written for tiles, where there were two subjects — nesting tiles and
+stacked strips — and one reading fitted both. The bar family made it three:
+
+| the rect is | `depth` | the inset |
+|---|---|---|
+| a tile nested in a partition | its depth | `depth + 1` units, every side |
+| a strip in a partition, enclosing nothing | `0` | one unit, every side |
+| a **measurement**, whose length *is* its value | absent | none along the value axis; a fraction of the slot across the identity axis |
+
+**A length and an area are read differently.** A tile's area is read against its neighbours, so a unit
+off every side costs nothing; a bar's length is read against a labelled axis, so a unit off the end is
+the figure lying about its own number — measured at `x=351` against a `20` gridline at `352`.
+
+**D11 and F274 close here, by construction.** `valueOnX` was a third answer to which way the values
+run — beside `positionalDecisions`' fixed `"vertical"` and `orientationOf`'s read of the block — and
+scoped to the family the defect was noticed in. It is `figure.orientation` now, so the scoping clause
+has nowhere to live.
+
+**The family's four forms are not one figure.** Measured in the terminal rather than assumed:
+`lollipopRow` fills `0 … pos` and puts `●` at `pos`; `dotplotRow` writes `●` alone. So the emitter
+carries a stem, a head, or both, and a walk drawing rects for all four turns a dot plot into a bar
+chart — the plausible wrong figure, since both encode the same number.
+
+**One slot fraction where the arm had two.** `0.6` in `slotOf` and `0.7` in the bar loop, one arm and
+two answers to *how wide is a categorical figure*, which is the duplication this pass removes one
+layer up. Now `SLOT_SHARE`.
+
+**What the rows were measuring, and stopped being able to.** `svgPoints` lost its last caller and was
+deleted: the arm no longer turns values into pixels, it projects marks the shared layer normalised.
+Three rows moved onto the seam and the drawn document, and two of them **had been reporting coverage
+they did not have** —
+
+> `G6`'s clamp row called `svgPoints` with the samples directly, which answers for any list of numbers
+> whether or not the arm ever asks it that question. For the `matrix`, `tiles` and `nodes` families it
+> never does: they have no value axis, so there is no bound to clamp against. The row now says so.
+>
+> And it asked the *position* of a bar, which agreed for exactly as long as every form was vertical.
+> A bar encodes by length; after D11 the row was reading the page's ordinate for a figure whose values
+> run along the abscissa.
+
+**`G6b` reversed and it was right both times.** It asserted this arm's zero baseline, which the
+terminal does not have in either orientation (F272). The tie-break resolves it the terminal's way, so
+the row now asserts the defect and **fails the day a bar hangs below zero** — which is the repair
+landing.
 
 ---
 

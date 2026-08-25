@@ -13642,6 +13642,55 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F280 — a member's absent case, inferred from the only family that had one ★★★★★
+
+**`Mark.rect.depth` was written for the tiles family and its absent case was given a meaning from
+that family alone.** F278's wording:
+
+> **Absent means *not nested*, not depth zero.** A flame's strips are stacked bands rather than
+> enclosing boxes, so they take a uniform inset and carry no `depth`.
+
+Every word is true *of tiles*. There were two subjects — treemap tiles, which nest, and flame strips,
+which do not — and one reading fitted both, so the reading looked settled. **Two instances fitting a
+rule is the minimum for noticing one, not evidence for it**, and this is that passage measured on a
+type member rather than on a classification.
+
+**The third instance broke it one commit later.** The bar family crossed, and a bar carries no
+`depth` — so under the first wording it landed in the strips' case: one unit off every side,
+including the ends. Measured on `bar-default`, data `[10, 25, 15, 30, 20]` against `0 … 40`:
+
+```
+bar of 20   drawn to x=351          its own gridline   x=352
+bar of 10   width 129.2 of 524.8    = 9.85, not 10
+vertical    tallest bar y=13.8      the 40 gridline    y=12.8
+```
+
+**Every bar a pixel short of the tick it is read against**, at both ends in the vertical arm, and the
+whole family shifted a pixel off the axis origin.
+
+**A length and an area are read differently and the inset has to know which it is looking at.** A
+tile's area is read by comparison with its neighbours, so a unit off every side costs nothing. A
+bar's length *is* its value, read against a labelled axis, so a unit off the end is the figure
+lying about its own number.
+
+**And a second regression rode in with it, from the same commit and the opposite direction.** The
+walk gave bars their full slot, because the emitter states the slot and the arm is supposed to inset
+it — `73` px wide where the old loop drew `52`, so adjacent categories touched. That inset existed
+and was `0.7`, in `marks()`' bar loop, beside `slotOf`'s `0.6` for summaries: **one arm, two answers
+to how wide a categorical figure is.** Now one named constant.
+
+**Found by reading the numbers, not the shape.** The frame was *right* in every way a shape
+assertion tests — horizontal, gridlines vertical, labels along the bottom, D11 and F274 closing
+exactly as intended — and the diff of fourteen frames reads as the migration succeeding. What said
+otherwise was multiplying a width back out: `131.2 / 524.8 × 40 = 9.85`. **Containment is not
+correctness**, and neither is a correct transposition.
+
+**Ruled: `depth` present means partition member, absent means measurement.** Strips move from absent
+to `0` — they tile the line and abut, so they want the inset; they enclose nothing, so they want one
+unit of it. `FB6` asserts the bar family carries none, and asserts the stem/head split beside it.
+
+---
+
 ## F279 — the sweep checks the half of a mutation that did not move ★★★★☆
 
 **A mutation row is a pair and the instrument reads one side of it.** `anchors.mjs` extracts

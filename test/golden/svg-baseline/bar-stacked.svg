@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
-<line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
-<line x1="89.6" y1="196.267" x2="614.4" y2="196.267" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">10</text>
-<line x1="89.6" y1="104.533" x2="614.4" y2="104.533" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">20</text>
-<line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">30</text>
-<rect x="109.28" y="196.267" width="91.84" height="91.733" fill="#e69f00"/>
-<rect x="240.48" y="104.533" width="91.84" height="183.467" fill="#e69f00"/>
-<rect x="371.68" y="150.4" width="91.84" height="137.6" fill="#e69f00"/>
-<rect x="502.88" y="58.667" width="91.84" height="229.333" fill="#e69f00"/>
-<rect x="109.28" y="242.133" width="91.84" height="45.867" fill="#56b4e9"/>
-<rect x="240.48" y="196.267" width="91.84" height="91.733" fill="#56b4e9"/>
-<rect x="371.68" y="214.613" width="91.84" height="73.387" fill="#56b4e9"/>
-<rect x="502.88" y="177.92" width="91.84" height="110.08" fill="#56b4e9"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
+<line x1="264.533" y1="12.8" x2="264.533" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="264.533" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<line x1="439.467" y1="12.8" x2="439.467" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="439.467" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<rect x="89.6" y="19.68" width="174.933" height="20.64" fill="#e69f00"/>
+<rect x="89.6" y="88.48" width="349.867" height="20.64" fill="#e69f00"/>
+<rect x="89.6" y="157.28" width="262.4" height="20.64" fill="#e69f00"/>
+<rect x="89.6" y="226.08" width="437.333" height="20.64" fill="#e69f00"/>
+<rect x="89.6" y="54.08" width="87.467" height="20.64" fill="#56b4e9"/>
+<rect x="89.6" y="122.88" width="174.933" height="20.64" fill="#56b4e9"/>
+<rect x="89.6" y="191.68" width="139.947" height="20.64" fill="#56b4e9"/>
+<rect x="89.6" y="260.48" width="209.92" height="20.64" fill="#56b4e9"/>
 </svg>

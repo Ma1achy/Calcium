@@ -221,8 +221,11 @@ const results = runPass({
       // chart of a different thing.
       name: "every category's rect lands in the first slot",
       file: FIGURE,
-      from: "            x: (i + seriesIndex / per) / n,",
-      to: "            x: seriesIndex / per / n,",
+      // Re-anchored: the rect became one line when the family gained its
+      // stem-and-head split, so a bar, a lollipop's stem and a histogram bin are
+      // one expression (F280).
+      from: "            mark: { kind: \"rect\", x, y: 0, w, h: top, fill: true },",
+      to: "            mark: { kind: \"rect\", x: seriesIndex / per / n, y: 0, w, h: top, fill: true },",
       expect: "FB4",
     },
     {
@@ -231,8 +234,8 @@ const results = runPass({
       // which is why the row is here rather than in a comment.
       name: "the rect's height is the raw value, not the normalised one",
       file: FIGURE,
-      from: "            h: top,",
-      to: "            h: v,",
+      from: "        const top = normalisedOf(v, value.range, false);",
+      to: "        const top = v;",
       expect: "FB4",
     },
     {

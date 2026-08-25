@@ -176,9 +176,11 @@ export type Mark =
        * already-padded would be one arm's picture. The depth crosses; each arm
        * insets by `depth + 1` of its own smallest unit.
        *
-       * Absent on a flame's strips, which are stacked bands rather than
-       * enclosing boxes: a uniform inset separates them and the member would be
-       * false of them.
+       * **Absent means *not a partition member*, and a flame's strips carry
+       * `0`** (F280). They tile the line and abut each other, so they want the
+       * separating inset; they enclose nothing, so they want one unit of it.
+       * What has no `depth` is a **measurement** — a bar, whose length *is* its
+       * value — and it is drawn exactly, inset only across the identity axis.
        */
       depth?: number;
       /**
@@ -562,6 +564,13 @@ export function tilesFigure(block: Plot): Figure {
             w: r.to - r.from,
             h: 1 / (deepest + 1), // cells-ok — a depth
             fill: true,
+            // **`0` and not absent, and the bar family is what settled that**
+            // (F280). A strip is a member of a partition — the bands tile the
+            // line and abut each other — so it wants the separating inset; it
+            // encloses nothing, so it wants one unit of it rather than a depth's
+            // worth. **Absent means *not a partition member at all***, which is
+            // what a bar is: a length read against an axis, drawn exactly.
+            depth: 0,
           },
           layer: "series",
           seriesIndex: r.index,
@@ -901,24 +910,43 @@ export function barFigure(block: Plot): Figure {
     const cats = decisions.identity.length; // cells-ok — a category count
     const n = Math.max(1, cats === 0 ? block.series[0]?.values.length ?? 0 : cats); // cells-ok — a category count
     const per = Math.max(1, block.series.length); // cells-ok — a series count
+    // **Two marks and a form decides which**, because the family's four forms
+    // are not one figure at four resolutions (§3ak.12). Measured in the
+    // terminal rather than assumed: `lollipopRow` fills `0 … pos` with `─` and
+    // puts `●` at `pos`; `dotplotRow` writes `●` at `pos` and nothing else.
+    // A stem is a length and a head is a position, and a renderer that drew a
+    // rect for all four would turn a dot plot into a bar chart — the plausible
+    // wrong figure, since both encode the same number.
+    const stem = block.form !== "dotplot";
+    const head = block.form === "lollipop" || block.form === "dotplot";
     block.series.forEach((series, seriesIndex) => {
       series.values.forEach((v, i) => {
         if (v === null || !Number.isFinite(v) || i >= n) return;
         // From the floor, because that is where both terminal arms fill from
         // (F272) — `(value - min) / span` in `barRow` and in `barColumn`.
         const top = normalisedOf(v, value.range, false);
-        marks.push({
-          mark: {
-            kind: "rect",
-            x: (i + seriesIndex / per) / n,
-            y: 0,
-            w: 1 / (n * per),
-            h: top,
-            fill: true,
-          },
-          layer: "series",
-          seriesIndex,
-        });
+        const x = (i + seriesIndex / per) / n;
+        const w = 1 / (n * per);
+        if (stem) {
+          marks.push({
+            mark: { kind: "rect", x, y: 0, w, h: top, fill: true },
+            layer: "series",
+            seriesIndex,
+          });
+        }
+        // **The head is on the niced range like the stem, and that is F272b's
+        // ruling applied rather than a fourth range invented.** `lollipopRow`
+        // and `dotplotRow` scale against the **raw** `data.min … data.max`
+        // where `barRow` takes the zeroed one and `categoricalColumnForm` the
+        // niced — three ranges inside one family in one arm. The figure has
+        // one, and it is the one with a labelled axis behind it.
+        if (head) {
+          marks.push({
+            mark: { kind: "point", x: x + w / 2, y: top, role: "point" },
+            layer: "series",
+            seriesIndex,
+          });
+        }
       });
     });
     marks.push(...annotationMarks(block, value.range));

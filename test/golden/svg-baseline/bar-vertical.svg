@@ -8,11 +8,11 @@
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">20</text>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">30</text>
-<rect x="100.846" y="177.92" width="52.48" height="110.08" fill="#e69f00"/>
-<rect x="175.817" y="113.707" width="52.48" height="174.293" fill="#e69f00"/>
-<rect x="250.789" y="150.4" width="52.48" height="137.6" fill="#e69f00"/>
-<rect x="325.76" y="86.187" width="52.48" height="201.813" fill="#e69f00"/>
-<rect x="400.731" y="12.8" width="52.48" height="275.2" fill="#e69f00"/>
-<rect x="475.703" y="214.613" width="52.48" height="73.387" fill="#e69f00"/>
-<rect x="550.674" y="251.307" width="52.48" height="36.693" fill="#e69f00"/>
+<rect x="104.594" y="177.92" width="44.983" height="110.08" fill="#e69f00"/>
+<rect x="179.566" y="113.707" width="44.983" height="174.293" fill="#e69f00"/>
+<rect x="254.537" y="150.4" width="44.983" height="137.6" fill="#e69f00"/>
+<rect x="329.509" y="86.187" width="44.983" height="201.813" fill="#e69f00"/>
+<rect x="404.48" y="12.8" width="44.983" height="275.2" fill="#e69f00"/>
+<rect x="479.451" y="214.613" width="44.983" height="73.387" fill="#e69f00"/>
+<rect x="554.423" y="251.307" width="44.983" height="36.693" fill="#e69f00"/>
 </svg>

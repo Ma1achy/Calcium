@@ -166,8 +166,12 @@ const results = runPass({
       // separate. Still inside the area, still one figure per category.
       name: "a category's figure takes the whole slot",
       file: SVG,
-      from: "  return { centre: from + slot * (index + 0.5), half: (slot * 0.6) / 2 };",
-      to: "  return { centre: from + slot * (index + 0.5), half: slot / 2 };",
+      // **The fraction became a named constant when the bar family crossed and
+      // this arm turned out to hold two of them** — `0.6` here and `0.7` in the
+      // bar loop, one arm and two answers to *how wide is a categorical figure*
+      // (F280). Anchored on the constant, so the mutation reaches both.
+      from: "const SLOT_SHARE = 0.6;",
+      to: "const SLOT_SHARE = 1;",
       expect: "G6c",
     },
     {
