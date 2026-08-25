@@ -13598,6 +13598,48 @@ replaced by one that drops the origin honouring altogether — which `FM3` does 
 `ORIGIN_DEFAULT` is what the assertion was really about all along. *A mutation that fails nothing
 indicts the seam, not the test*, and here it indicted the constant.
 
+---
+
+## F274 — a fix scoped to the family it was noticed in, on a member four families have ★★★★☆
+
+`plotToSvg` decides which way its value axis runs with one line:
+
+```ts
+const valueOnX = svgFamilyOf(block.form) === "distribution" && block.orientation !== "vertical";
+```
+
+Its comment records how it was found — *the first frame read said so* — and what it cost: a
+horizontal distribution runs its values left to right, and the loop drew horizontal gridlines with
+the numbers down the gutter regardless, so a box at 6 sat beside a rule marked 6 running **across**
+it. Both normalised, so the numbers looked plausible against a figure they did not describe.
+
+**`orientation` is a member of four families, and the fix reached one.** Measured on a `bar` with the
+terminal's default orientation — horizontal:
+
+```
+bar,  unset       gridlines ACROSS, gutter reads 10 15 20 25   ← values run the other way
+bar,  vertical    gridlines ACROSS, gutter reads 10 15 20 25   ← byte-identical
+boxplot, unset    gridlines DOWN,   axis reads 0 2.5 5 7.5 10  ← the family that was fixed
+```
+
+**The bar arm ignores `orientation` entirely** — the two rows above are the same output — so a
+horizontal bar chart is drawn vertical *and* labelled on the wrong axis. D11 already records the
+first half; this is the second, and it is the furniture rather than the marks.
+
+**The class is the fix applied where the defect was noticed rather than to its subject.** F261 has
+the same shape one tool along — `catalogue-hash.mjs` was given an `isMain` guard in the same commit
+that left its sibling without one, both files touched and one question asked of one of them. Here the
+question *which way does the value axis run* was asked of the family whose frame was on screen, and
+the answer was scoped to that family by a clause nobody had to write: `svgFamilyOf(block.form) ===
+"distribution"` is right there in the expression, and it reads as care.
+
+**It is closed by construction rather than fixed.** Step 4 replaces the whole expression with
+`figure.orientation`, which every family's emitter already decides — so the scoping clause has
+nowhere to live and the defect stops being expressible. That is the argument for moving a seam rather
+than repairing what sits on it: **a class of defect that cannot be written down does not need a
+gate**, and this one had survived every frame read of every other family.
+
+
 
 
 

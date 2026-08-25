@@ -4723,6 +4723,50 @@ is the same table CLAUDE.md keeps — *every instrument that found something is 
 than a thing asserted* — arriving inside one component in one pass.
 
 
+### 3ak.10 — Step 4's walk: what the second arm still decides, and where two rules meet
+
+**A table rather than a trace**, and the choice is deliberate: rewriting a renderer to read a figure
+is a set of structural interactions — *this member* meeting *this mark kind* — with no event between
+them. §3ak.4's rung ladder is the trace half and it is U6's, not this step's.
+
+| # | one rule | the other | where they meet | what it settles |
+|---|---|---|---|---|
+| **S1** | `value.labels[i]` is `value.ticks[i]` | the SVG takes every tick, the terminal picks | any ticked form | both are indexed together or the pairing breaks — **no `String(tick)` may survive anywhere** |
+| **S2** | `valueOnX` is scoped to `distribution` | four families carry `orientation` | a horizontal `bar` | **F274**, and it closes by construction |
+| **S3** | `value === null` means *no axis* (I60) | empty `marks` means *a refusal* (I64) | `nodes`, which has both | **two refusals with different meanings**, and conflating them draws a tree as *No data.* |
+| **S4** | `Drawn.layer` orders the drawing | the ground is painted, then marks, then furniture | any annotated form | the layer decides among marks; the ground and the frame stay the arm's |
+| **S5** | `seriesIndex` is a categorical slot | `ref` is an explicit one | an annotation beside a series | a mark carries one or the other, never both — the resolver needs both paths and a default |
+| **S6** | `rect.value` colours a matrix cell | `rect.fill` fills a bar | one mark kind, two families | **the colour source is whichever member is present**, which is why `value` is optional rather than `-1` |
+| **S7** | `point.size` is a bubble's datum | a scatter dot has none | `scatter` against `bubble` | absent means *the renderer chooses its own radius*, never *zero* |
+| **S8** | the nodes family has decisions and no marks | `plotToSvg` returns `null` on empty marks | `tree`, `graph` | the nodes arm **keeps its own mark loop** and takes only the decisions — S3's trap in the one family that walks into it |
+
+**S2 is the finding and it is the argument for the whole step.** `plotToSvg` decides its axis
+direction with `svgFamilyOf(block.form) === "distribution" && block.orientation !== "vertical"`.
+Measured on a `bar` at the terminal's default orientation — which is horizontal — the gridlines run
+**across** with the numbers down the gutter, and `orientation: "vertical"` gives byte-identical
+output. So a horizontal bar chart is drawn vertical *and* labelled on the wrong axis, which is the
+defect the distribution family's own comment records being fixed for (F274).
+
+> **It is closed by construction rather than repaired.** `figure.orientation` replaces the whole
+> expression, and every family's emitter already decides it — so the scoping clause has nowhere to
+> live and the defect stops being expressible. **A class of defect that cannot be written down does
+> not need a gate**, and this one had survived every frame read of every other family.
+
+**S3 and S8 are the traps, and they are one trap seen twice.** `plotToSvg` refuses on an empty body
+today, which is F259's ruling and stays. But after this step a `nodes` figure has **no marks by
+design** (§3aj.6), so a naive walk would refuse `tree` and `graph` — two forms the arm currently
+draws — and the refusal would look exactly like the one F259 introduced on purpose. The nodes arm
+keeps its own loop over `flatten` and `graphLayers` and takes the decisions from the figure; that is
+what `nodesDecisions` returning `Omit<Figure, "marks">` is *for*, and it is why `marks: []` was
+refused as its shape.
+
+**The gate inverts for this step, and it is the first time it has.** Every commit of step 3 reported
+*nothing moved* on both populations. Here the terminal digest stays frozen — 890 frames at
+`64b8845e6408c819`, 1780 baseline frames unmoved — and **the phase digest moves on every commit**,
+66 frames at `6b7ae9bbc0692d30` today. F264 split the two populations for exactly this reason: an
+addition to one read as a change to the other. Every move is read.
+
+
 ---
 
 ## 3q. One value axis across the bands, and the record it never had
