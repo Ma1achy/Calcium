@@ -5051,6 +5051,151 @@ for the mirror rather than every annotation acquiring one it has no meaning for.
 > sample is a lag's **longest** bar. Third instance in this pass of a claim that held while every form
 > in a family behaved one way.
 
+### 3ak.15 — Walk artefact B: the rung ladder, and why the array order is not one
+
+**Artefact A is a table and this is the trace** (§3ak.4). The events are capability transitions and
+the question is which decisions survive one. Both artefacts were owed; taking the table alone
+because the type is the obvious thing is the mistake C19 §8a records, and this is the other half.
+
+**The edges are not the array's neighbours, and getting that wrong attributes a move to the wrong
+rung.** `CAPS` is written for a catalogue reader, so its order is presentation order:
+`24bit · 8bit · ascii · wide · 1bit`. But `ASCII` is `{ ...FULL, unicode: "ascii", colourDepth: 1 }`
+— **two** capabilities away from full — so the adjacent pair `8bit → ascii` moves the unicode
+repertoire and the colour depth together, which is precisely the confound `CAPS`' own comment says
+the five sets exist to avoid. A trace walking neighbours would report a colour change under the
+unicode rung. The isolating edges are:
+
+| edge | what it isolates | holds fixed |
+|---|---|---|
+| `24bit → 8bit` | colour depth, 24 to 8 | unicode full, narrow |
+| `8bit → 1bit` | colour depth, 8 to 1 — **the colour floor** | unicode full, narrow |
+| `1bit → ascii` | the unicode repertoire | both 1-bit |
+| `24bit → wide` | `ambiguousWidth` | unicode full, 24-bit |
+
+Two of the five sets pair with `24bit` and two pair with each other, which is a fact about the sets
+rather than about the ladder, and it is why the edge list is written down instead of derived.
+
+**What each edge does, measured over 46 forms at width 60**, classified on raw frames — `same`,
+`colour` (identical once SGR is stripped), `glyph` (the inked cells are identical and the characters
+are not), `layout` (the inked set moved):
+
+| edge | same | colour | glyph | layout |
+|---|---|---|---|---|
+| colour 24 → 8 | 1 | 45 | 0 | 0 |
+| colour 8 → 1 | 1 | 21 | 3 | 21 |
+| unicode full → ascii | 0 | 0 | 37 | 9 |
+| `ambiguousWidth` narrow → wide | 1 | 0 | 36 | 9 |
+
+**The colour floor is the only edge that moves geometry**, and the 21 `layout` cells are the stacked
+strips: below the floor `positionalForm` stops overlaying and stacks into labelled strips, so the
+value gutter is replaced by series names and the legend disappears into the gutter. The 3 `glyph`
+cells beside them are `CATEGORY_MARKS` — identity carried by shape where the layout can hold. Both
+are rungs the table already names, and the split between them is per form rather than per family.
+
+**`layout` at the two unicode-ish edges is the rasteriser and not the geometry.** A braille curve
+falling to `-` inks a different set of cells for the same figure, which is §2's legitimate column.
+The classifier cannot tell that from a moved coordinate, and rather than pretend otherwise the
+record states it: `layout` means *more than the character vocabulary changed*, and which of the two
+it is per form is read from the frame.
+
+**`tree` is the control, and it is a measured one.** It is `same` at both colour edges because it
+draws no SGR at all at 24-bit — three of its six variants emit not one escape, and the other three
+emit two, for the `+N more` notice. A tree's reading is its structure; there is no series colour to
+lose. That is the one form the colour ladder does not reach, and it is what makes the other 45 cells
+evidence rather than a tautology about frames differing.
+
+**The instrument that could not be used, and the second reason a matrix compares at 24-bit.**
+`terminalDecisions` reads decisions out of a frame and `test/support/arm-decisions.ts` records its
+blind spots — but every one of them is about *what a label means*, and the ladder breaks it in a
+different place: its **character classes are calibrated at 24-bit**. `+` is the ASCII corner and
+also the ASCII tick junction, so a two-sided rule reads as a border; a braille curve falling to `-`
+reads as interior rules. Measured, it reports `interiorRules` moving across the rungs for 45 of 111
+variants and `border` for 8, and the moves are the parser's. §3ak's disagreement matrix says it
+compares at 24-bit because the arms are not comparable below it. That is true and it is not the only
+reason: **the reader is not comparable below it either**, and a trace built on that reader would have
+reported a degradation audit made entirely of its own alphabet (F285).
+
+### 3ak.16 — The seam's consumers, measured — and three members nothing reads
+
+**U1a's claim is that a decision mutated inside `figureOf` moves both arms.** Measured per member,
+against a fixture chosen to construct that member's state, it holds for five of eight:
+
+| member | terminal | SVG | |
+|---|---|---|---|
+| `value` | moves | moves | |
+| `extent` | moves | moves | the terminal below the colour floor, the SVG where `value` is `null` |
+| `orientation` | moves | moves | |
+| `facing` | moves | moves | |
+| `marks` | moves | moves | |
+| `identity` | moves | **still** | **D10** — the SVG draws no identity axis |
+| `frame` | moves | **still** | **D9** — the SVG draws no frame |
+| `legend` | moves | **still** | **D13** — the SVG draws no legend |
+
+**The three are not arbitrary: they are exactly the three terminal features the second arm has never
+been given**, and they were on the sixteen-decision list from the first measurement. So the type is
+ahead of the arm by precisely the amount the disagreement list says is outstanding, which is the
+honest reading — and it is still F84's class, because a member every emitter writes and no renderer
+takes is a decision made once and consulted never.
+
+**Measured rather than argued**: over 92 drawn documents not one `legend` label appears as `<text>`,
+and over the 83 documents of the five families with a gutter in the terminal, not one `identity`
+string does. `plotFrame: "none"` against `plotFrame: "box"` produces byte-identical SVG.
+
+**MG24 is silent on all three, and the reason is its recorded blind spot arriving three times at
+once.** The rule counts a member as consumed when its *name* is read anywhere in `src/`, without
+regard to owner — the mechanism that let `NavigableRegistry.elementsOf` sit satisfied by C09's
+`BlockRegistry.elementsOf`. `frame`, `identity` and `legend` are three of the most heavily reused
+member names in the tree; `furniture.ts` alone reads `layout.frame` four times. A three-member hole
+in a type the whole pass is built on was invisible to the rule that exists to find exactly that
+(F286).
+
+**And the mutation run's stated survivor named one of them.** `c12-arm-seam.mjs` said `Figure.frame`
+is not mutated because nothing reads it, and that **it closes when the SVG walks the figure**. The
+SVG walks the figure. The member is still unread — the condition was met and the thing it promised
+did not happen, because *walking a figure* and *reading every member of one* are different events
+and the deferral named the one that was easy to check. The habit found it in the twenty minutes it
+is supposed to cost; what it could not do is fire on its own.
+
+**The row's blind spot, stated because an unrecorded limit reads as strength.** A block perturbation
+that moves an arm does not prove the arm read the *figure member* — it may read the block field.
+`definition.ts` applies `block.plotFrame` to its layout directly, so the terminal's `frame: moves`
+is exactly that case. **The negative direction is sound and the positive is not**: an arm that did
+not move read neither. So the record's `still` cells are findings and its `moves` cells are the
+mutation run's subject, which is why `c12-arm-seam.mjs` must run a suite from each arm (F287).
+
+### 3ak.17 — Three of the six U rows had nothing to be wrong about
+
+**A03 §2's vacuity class, in the rows the pass is measured by.** U1 was re-founded during step 2
+because *the same block yields an identical `Drawn[]` for both arms* is `f(x) === f(x)` once one
+emitter serves both. The same question asked of the rest finds two more, and they fail for a
+different reason — not a tautology but a **missing parameter**:
+
+- **U5** — *the SVG arm's figure is identical at every capability set.* `plotToSvg(block, theme,
+  layout)` takes no capabilities and `svg.ts` imports no `Caps`. There is nothing to vary, so the
+  row cannot fail, and it reads as though it were guarding the ladder out of the second arm.
+- **U6's first half** — *the terminal's figure is identical at every capability set.* The emitters
+  take `block` alone; `plotAreaRows(block)` is a block fact. Same shape, same answer.
+- **U2–U3** inherited U1's subject and cross it over the corpus, which is one vacuity 178 times.
+
+**They are kept, and what they assert changes.** U5 and U6a become **structural** guards — the
+signature is the guarantee, so the assertion is on the signature: no capability reaches either
+figure path, checked on the module rather than on a frame, and stated as structural rather than
+behavioural so nobody reads a green run as a measurement. U2 and U3 take **U1b's** subject instead
+of U1's — the projection, crossed over every form and every variant — which is what the sentence was
+reaching for and could not say while U1's own subject was vacuous.
+
+**The distinction worth keeping.** A tautological row and an unfalsifiable-by-signature row read
+identically from a green suite, and they want opposite repairs: the first needs a different claim,
+the second needs a different *instrument*. Mutation is what tells them apart, and CLAUDE.md's own
+note — that a mutation failing nothing can indict the spec rather than the test — is the general
+case of which these are three instances (F288).
+
+**A fourth, which is the rung table rather than a U row.** §3ak.3's first row places *the glyph per
+`GlyphRole` per unicode rung* in "the terminal walker's `Record`". `GlyphRole` is read in one file,
+`figure.ts`, and the terminal picks its median, mean and outlier characters inside its own
+rasterisers as it always has. The table names an effect and there is no mechanism — the row is true
+about what the SVG does and describes a terminal that does not exist (F289).
+
 ---
 
 ## 3q. One value axis across the bands, and the record it never had
@@ -6531,12 +6676,12 @@ Six tiers. No state machine — C12 is pure over the block.
 - **FT1–FT3 · FN1–FN2** (I60, I61, §3ak.7, §3aj.6): **tiles and nodes, and the two families that end differently.** `FT1` is the distinction that makes `extent: null` a statement: a matrix has no axis and its **ramp** still has a domain; a tiles figure reads its numbers as **areas**, and an area is the reading itself — `hierarchy.ts` divides by the total while it walks. `FT3` records that the facing is **live** here where the matrix's is dead (F273), because these three forms declare `ORIGIN_DEFAULT: null`. **`FN1` asserts that there is no `nodesFigure`**: §3aj.6 ruled that a tree's placement is a function of its labels' widths in one arm and of slots in the other, so a `Mark` — which is a position — would carry one arm's answer and the other would fail `U1b` for a reason the type cannot express. `marks: []` is not the alternative, because I64 makes an empty list a **refusal**.
 
 - **AD1–AD5** (I59, §3ak): **the disagreement matrix, and it is walk artefact A** — every form, every variant, both widths, at 24-bit, with each cell's disposition stated as *the relation the row asserts*: `agree` fails if the arms drift apart, `n/m` fails if it closes silently **or becomes a different disagreement**, `legitimate` fails if they ever start agreeing. Shipped ahead of the type, because the list of disagreements is what the type is designed against. `AD5` corrupts one side and requires the comparison to see it, since a sweep certified only by its own record agrees with itself whatever it does.
-- **U1a** (I59, §3ak): **a decision mutated inside `figureOf` moves BOTH arms.** *The row U1 was written as — `the same block yields an identical Drawn[] for both arms` — is `f(x) === f(x)` the moment one emitter serves both, which is A03 §2's vacuity class arriving in the assertion the pass exists for.* One arm moving alone is the finding: the other still decides it itself.
+- **U1a** (I59, §3ak.16): **a decision mutated inside `figureOf` moves BOTH arms.** *The row U1 was written as — `the same block yields an identical Drawn[] for both arms` — is `f(x) === f(x)` the moment one emitter serves both, which is A03 §2's vacuity class arriving in the assertion the pass exists for.* One arm moving alone is the finding: the other still decides it itself. **Measured per member against a fixture that constructs its state, it holds for five of eight.** `identity`, `frame` and `legend` move the terminal and not the SVG, and they are exactly D10, D9 and D13 — the three terminal features the second arm has never been given. **MG24 is silent on all three**, because it counts a member consumed when its *name* is read anywhere in `src/`, and those three names are owned by half the tree (F286). *The negative direction is the sound one — an arm that did not move read neither the member nor the block field — so the `still` cells are this row's findings and the `moves` cells are `c12-arm-seam.mjs`'s subject (F287).*
 - **U1b** (I62, §3ak): **each arm's output is a faithful projection of the figure** — every `Drawn` appears as an element in the SVG and as a glyph at the mapped cell in the terminal. This is what catches *the shared layer says a diamond and the terminal draws a comma*.
-- **U2–U3** (I59, §3ak): identical across every form in `ONE_PER_FORM` and every variant the catalogue holds, including both data shapes where a form has two.
+- **U2–U3** (I59, §3ak.17): **U1b's subject, crossed over every form and every variant** — 86 drawn documents, every mark accounted for by an element. *As written they inherited U1's subject and so inherited its vacuity: crossing `f(x) === f(x)` over the catalogue is one tautology 178 times.* `U3` keys the emitter off **`spec.form`** and not the catalogue bucket, because one variant's bucket lies — `line/whiskers` is a `scatter` — and an instrument keyed off the bucket compares a curve figure against a scatter document and reports a dropped mark that never existed (F290).
 - **U4** (I62, §3ak): identical across themes, because the refs are unresolved — a theme change moves nothing in the figure.
-- **U5** (I59, §3ak): the SVG arm's figure is identical at every capability set, because it has no ladder.
-- **U6** (I59, §3ak): **the terminal's figure is identical at every capability set, and where its *projection* differs the difference is a stated rung** — which is walk artefact B, the trace, and the degradation audit this component has never had. The capability sets supply the events a table cannot.
+- **U5** (I59, §3ak.17): **the SVG arm cannot see a capability, asserted on the signature rather than on a frame.** *As written — `identical at every capability set` — the row had no parameter to vary and therefore nothing to be wrong about.* `plotToSvg` takes a block, a theme and a layout; `svg.ts` imports no `Caps`. The guard is structural and says so, so a green run is not read as a measurement.
+- **U6** (I59, §3ak.15, §3ak.17): **walk artefact B — the rung ladder as a trace, and the degradation audit this component has never had.** Its first half, *the terminal's figure is identical at every capability set*, is unfalsifiable for U5's reason and becomes the same structural guard: the emitters take `block` alone. **The content is the second half**, and it is a record — 46 forms against the four edges that isolate one capability each, classified on raw frames. *The `CAPS` array's neighbours are not those edges*: `ascii` is two capabilities from full, so a trace walking the array would attribute a colour change to the unicode rung. `U6c` is the control — `tree` draws no SGR at 24-bit, so its `same` cells are what make the other 45 evidence.
 - **T1–T5** (§3ak, §6b): the terminal arm is byte-identical throughout — `TB1`–`TB5` over 1780 baseline frames crossed on width as well as capability set, plus the glyph-per-role, 1-bit strip, truncation-ladder and `ambiguousWidth` rows named in the rung table.
 
 ### Tier 2 — contract / interface

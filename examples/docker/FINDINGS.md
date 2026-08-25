@@ -13642,6 +13642,164 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F290 — a catalogue bucket that lies about its form, and the instrument that believed it ★★★☆☆
+
+**`CATALOGUE_FORMS` is keyed by form and one of its variants is filed under the wrong one.**
+`line/whiskers` carries `form: "scatter"`. That is harmless to the catalogue, which renders whatever
+the spec says, and it is not harmless to a sweep that decides *which family emitter to call* from the
+bucket name.
+
+**The sweep reported a dropped mark.** Keying `svgFamilyOf(bucket)` gave `curve` for a scatter
+document, so it compared `curveFigure`'s single polyline against an SVG made of twelve circles and
+found a polyline mark with no element — a clean, specific, entirely fabricated defect, one in
+eighty-six. Keyed off `spec.form` instead: eighty-six documents, zero short.
+
+**This is the third shape of manufactured evidence** — real bytes reassembled by a wrong model. The
+frames were real, the marks were real, and the pairing was wrong. It reads as a finding precisely
+because everything in it is genuine except the join, and it is the shape that survives a careful
+read of both sides.
+
+**One variant of 178, and the rule is not *fix the bucket*.** A bucket name is a filing decision and
+a `form` field is data; the sweep is wrong to prefer the filing. Any instrument that resolves a
+fixture to a code path takes the path from the fixture.
+
+## F289 — the rung table names a `Record` in the terminal, and the terminal has no such thing ★★★★☆
+
+**§3ak.3's first row places *the glyph per `GlyphRole` per unicode rung* in "the terminal walker's
+`Record`".** `GlyphRole` is read in exactly one file — `figure.ts`, which declares it — and the
+terminal picks its median, mean and outlier characters inside its own rasterisers, as it did before
+the seam existed.
+
+**The row is true about the SVG and describes a terminal that does not exist.** The seam's claim for
+the distribution family is that both arms agree on *which of the seven things this is*; the SVG walks
+`GlyphRole` and draws seven shapes, and the terminal reaches the same characters by a path that has
+never heard of the type. The two agree today by construction — the roles were extracted *from* the
+terminal's own composition — and nothing holds them together.
+
+**A step can name an effect and have no mechanism, and the way to find it is to grep the name outside
+the file that declares it.** One file. The rung table is a table of names, and a table of names is
+satisfied by names.
+
+## F288 — three rows with no parameter to vary, which is not the same as a tautology ★★★★☆
+
+**U1 was re-founded during step 2 for A03 §2's vacuity class**: *the same block yields an identical
+`Drawn[]` for both arms* is `f(x) === f(x)` once one emitter serves both. Asking the same question of
+the remaining rows finds two more — and they are vacuous for a **different reason**, which is what
+makes them worth separating:
+
+| row | as written | why it cannot fail |
+|---|---|---|
+| U1 | the same block yields an identical `Drawn[]` for both arms | a tautology — one emitter |
+| U5 | the SVG arm's figure is identical at every capability set | **no parameter**: `plotToSvg` takes no `Caps` |
+| U6a | the terminal's figure is identical at every capability set | **no parameter**: the emitters take `block` |
+| U2–U3 | *identical* across every form and variant | inherited U1's subject |
+
+**A tautology and an unfalsifiable-by-signature row read the same from a green suite and want
+opposite repairs.** The first needs a different claim; the second needs a different *instrument* —
+the guarantee is real, it is simply not behavioural, so the honest assertion is on the signature and
+labelled structural. Writing them as behavioural rows is how a reader comes to believe the ladder was
+measured out of the second arm when it was never let in.
+
+**Mutation is the only thing that tells the two apart**, which is CLAUDE.md's own note about a
+mutation that fails nothing indicting the spec, arriving three times in one row list.
+
+## F287 — the run named for the seam ran one arm ★★★★★
+
+**`c12-arm-seam.mjs` exists to assert U1a: a decision changed inside `figureOf` moves BOTH arms.**
+Its command is six suites and every one of them is the terminal — `plot-curve-figure`, `plot`,
+`plot-y-axis`, `plot-bar-values`, `golden/plot`, `golden/terminal-baseline`. There is no SVG suite in
+it, and `test/golden/svg-baseline/` is not in it either.
+
+**So the run can distinguish *caught* from *survived* and cannot distinguish *both arms moved* from
+*the terminal moved*** — which is the whole of the claim it is named for. Twenty-eight mutations,
+all caught, and the half of each one that the pass exists to check was never observed.
+
+**F279 is this finding's sibling and it did not reach this.** That one is about a mutation whose two
+halves diverge — the sweep checking the half that did not move. This is the run's *command* covering
+one arm, so every row inherits it at once, and no amount of reading a mutation's `from`/`to` shows it:
+the defect is in a constant sixty lines above the rows.
+
+**The stated survivor is the tell in hindsight.** The file records that `Figure.frame` is not mutated
+because nothing reads it — a careful, correct note about one member — written in a file that could
+not have detected the same thing about any other member, because it never rendered the arm where the
+reading would happen.
+
+## F286 — three members of the pass's own type that nothing reads, and the rule that exists to find them ★★★★★
+
+**`Figure` has eight members. `identity`, `frame` and `legend` are written by every family emitter
+and read by neither arm.** Measured: over 92 drawn SVG documents not one `legend` label appears as
+`<text>`; over the 83 documents of the five families the terminal gutters, not one `identity` string
+does; `plotFrame: "none"` and `plotFrame: "box"` produce byte-identical SVG.
+
+**MG24 exists for exactly this and is silent, for its own recorded reason.** The rule counts a
+published member as consumed when its **name** is read anywhere in `src/`, without regard to owner —
+the mechanism that kept `NavigableRegistry.elementsOf` satisfied by C09's `BlockRegistry.elementsOf`
+until F223. `frame`, `identity` and `legend` are among the most reused member names in the tree;
+`furniture.ts` reads `layout.frame` four times by itself. **A three-member hole in the type the whole
+pass is built on was invisible to the rule written to find three-member holes.**
+
+**The mitigating reading, which is also the honest one.** The three are not arbitrary — they are
+exactly D9, D10 and D13 from the first measurement, the three terminal features the second arm has
+never been given. The type is ahead of the arm by precisely the amount the disagreement list says is
+outstanding. That makes them **owed** rather than dead, and it does not make them consumed: a
+decision made once and consulted never is F84's class whatever the reason, and the difference between
+*owed* and *dead* is a sentence someone has to write down, which is what this finding is.
+
+**And a deferral of the same three named one of them and expired unnoticed.** `c12-arm-seam.mjs`
+said `Figure.frame` closes *when the SVG walks the figure*. The SVG walks the figure. Walking a
+figure and reading every member of one are different events, and the deferral named the checkable one.
+
+## F285 — a frame reader calibrated at one rung, pointed down a ladder ★★★★★
+
+**`terminalDecisions` reads decisions out of a rendered frame and records its blind spots**, and
+every one of them is about what a *label* means — which axis a number came from, whether an identity
+is numeric, whether in-area text is data. The capability ladder breaks it somewhere else entirely:
+its **character classes are 24-bit classes**.
+
+- `+` is the ASCII frame corner **and** the ASCII tick junction, so `frame-rule` — a left rule and a
+  bottom rule, no box — reads as `border: true` at `ascii` and `false` at `24bit`.
+- A braille curve falling to `-` at `ascii` reads as interior rules: `0` at 24-bit, `8` at ascii, for
+  a figure with no gridlines at either.
+
+Measured over the corpus: **45 of 111 variants report `interiorRules` moving across the rungs and 8
+report `border` moving**, and the movement is the parser's alphabet.
+
+**The matrix says it compares at 24-bit because the arms are not comparable below it.** True, and not
+the only reason — **the reader is not comparable below it either**, and that half was never written
+down. A degradation audit built on this reader would have been made entirely of its own character
+classes, and every cell would have looked like a finding about the renderer.
+
+**This is the one-encoding matcher at its worst case**, which is a degradation ladder: the value does
+not disappear, it changes form, and a matcher that knows one form reports the change as a defect
+rather than as a re-encoding.
+
+## F284 — five capability sets that are not a ladder, and a trace that would have walked them in order ★★★★☆
+
+**`CAPS` is ordered for a catalogue reader**: `24bit · 8bit · ascii · wide · 1bit`. A trace takes
+adjacent pairs, and the adjacent pairs are wrong — `ASCII` is `{ ...FULL, unicode: "ascii",
+colourDepth: 1 }`, **two** capabilities from full, so `8bit → ascii` moves the repertoire and the
+depth together.
+
+**That is the exact confound the five sets were built to remove.** `CAPS`' own comment records it:
+one arm used to vary `unicode`, `ambiguousWidth` and `colourDepth` together, "and two capabilities
+that always move together cannot be told apart by any number of frames" — so `wide` was split off and
+`1bit` kept separate. The fix left `ascii` carrying two, because isolation was designed into the
+**set** and not into the sequence, and nothing walks the sequence until a trace does.
+
+**The edges that isolate one capability each:**
+
+| edge | isolates |
+|---|---|
+| `24bit → 8bit` | depth, 24 to 8 |
+| `8bit → 1bit` | depth, 8 to 1 — the colour floor |
+| `1bit → ascii` | the unicode repertoire, both 1-bit |
+| `24bit → wide` | `ambiguousWidth` |
+
+**Two pair with the top and two pair with each other**, which is why the list is written down rather
+than derived from the array. A trace walking neighbours reports the colour floor's 21 stacked-strip
+layouts under the unicode rung — a wrong attribution that looks like a discovery, since the cells
+genuinely moved.
+
 ## F283 — a deferral whose blocker was a symbol, met a commit before the work was possible ★★★★☆
 
 **The deferral discipline says name the blocker as a symbol so picking the entry up begins by grepping
