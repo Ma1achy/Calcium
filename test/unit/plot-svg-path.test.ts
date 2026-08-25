@@ -728,14 +728,32 @@ describe("G6d — the tiles family, and every default checked against the termin
     // shared function's coordinates are the ones drawn.
     // Sorted by depth, because the renderer paints parents before children —
     // that ordering *is* how nesting reads without a border per node.
-    const expected = [...tiles(HIER, 1 / Math.max(area.right - area.left, area.bottom - area.top))]
-      .sort((p, q) => p.depth - q.depth);
+    //
+    // **The pad is gone from this call and the row is stronger for it** (F278).
+    // It used to read `tiles(HIER, 1 / max(w, h))` — the layout-time pad — which
+    // is one unit of *this* output and therefore cannot be in a figure both arms
+    // read. The partition is now the true one and the inset is `depth + 1` px,
+    // applied here, so the expression below is the ruling rather than a
+    // restatement of the renderer.
+    const expected = [...tiles(HIER, 0)].sort((p, q) => p.depth - q.depth);
     const drawn = boxes(plotToSvg(tileBlock("treemap"), THEME, tl) ?? "");
     expect(drawn.length, "one rect per node").toBe(expected.length);
     for (const [i, t] of expected.entries()) {
-      expect(drawn[i]?.["x"], `tile ${i} x`).toBeCloseTo(area.left + t.x0 * (area.right - area.left), 3);
-      expect(drawn[i]?.["y"], `tile ${i} y`).toBeCloseTo(area.top + t.y0 * (area.bottom - area.top), 3);
+      const inset = t.depth + 1;
+      expect(drawn[i]?.["x"], `tile ${i} x`).toBeCloseTo(area.left + t.x0 * (area.right - area.left) + inset, 3);
+      expect(drawn[i]?.["y"], `tile ${i} y`).toBeCloseTo(area.top + t.y0 * (area.bottom - area.top) + inset, 3);
     }
+    // **And the ring is what the inset is for, so it is asserted rather than
+    // implied.** A uniform inset separates siblings and puts a child's shared
+    // edge exactly on its parent's — the frame that found F278 — so a row that
+    // only checked *the tiles are inside the area* would have agreed with it.
+    const depths = expected.map((t) => t.depth);
+    const deeper = depths.findIndex((d) => d > (depths[0] ?? 0));
+    expect(deeper, "the fixture has a child to nest").toBeGreaterThan(0);
+    expect(
+      (drawn[deeper]?.["x"] ?? 0) - (drawn[0]?.["x"] ?? 0),
+      "a child starting on its parent's own left edge is inset one further, so the parent shows",
+    ).toBeCloseTo(1, 3);
   });
 
   it("G6d2: a tile's fill is the slot its index names — a separate claim", () => {
@@ -765,17 +783,35 @@ describe("G6d — the tiles family, and every default checked against the termin
     expect(rootY("icicle"), "an icicle's root is at the head").toBeLessThan(mid);
   });
 
-  it("G6d4: the treemap's inset is a proportion, which is the terminal's rule", () => {
-    // The terminal passes `1 / max(width, areaRows)` — a cell's worth on the
-    // unit square, resolution-independent. This passes a pixel's worth by the
-    // same expression, so the two arms inset by the same fraction and differ
-    // only in what a unit is.
-    const share = (px: number): number => {
+  it("G6d4 (F278): the PARTITION is a proportion and the inset is not", () => {
+    // **The row used to claim the inset was the proportion, and it was true of a
+    // pad that could not cross the seam.** `tiles(root, 1 / max(w, h))` insets at
+    // layout time by one unit of *this* output — one pixel — where the terminal
+    // insets by one cell, and neither number is a figure's to hold. So the
+    // partition crosses and the inset does not (F278), which splits the old
+    // claim in two and this row asserts both halves.
+    const measured = (px: number): Readonly<{ share: number; inset: number }> => {
       const l = svgLayout(px, px / 2);
-      const w = l.width * (1 - l.pad) - l.width * (l.gutter + l.pad);
-      return Math.max(...boxes(plotToSvg(tileBlock("treemap"), THEME, l) ?? "").map((r) => r["width"] ?? 0)) / w;
+      const left = l.width * (l.gutter + l.pad);
+      const w = l.width * (1 - l.pad) - left;
+      const drawn = boxes(plotToSvg(tileBlock("treemap"), THEME, l) ?? "");
+      const widest = Math.max(...drawn.map((r) => r["width"] ?? 0));
+      // A depth-0 tile starts at the area's own left edge, so whatever it is
+      // offset by is the inset.
+      const first = drawn.find((r) => Math.abs((r["width"] ?? 0) - widest) < 0.01);
+      // Added back, because the tile drawn is the partition minus the inset.
+      return { share: (widest + 2) / w, inset: (first?.["x"] ?? 0) - left };
     };
-    expect(share(300), "the same share of the area at either size").toBeCloseTo(share(1200), 1);
+    const small = measured(300);
+    const large = measured(1200);
+    expect(small.share, "the partition is the same share of the area at either size")
+      .toBeCloseTo(large.share, 3);
+    // **One unit, not one share** — which is the half that used to be missing,
+    // and it is the half a resolution sweep is blind to when the tolerance is
+    // wide enough to cover a pixel at both sizes.
+    expect(small.inset, "a depth-0 tile is inset one unit at 300px").toBeCloseTo(1, 3);
+    expect(large.inset, "and one unit at 1200px — the same pixel, not the same fraction")
+      .toBeCloseTo(1, 3);
   });
 
   it("G6d5: a label clips itself and nothing measures it", () => {

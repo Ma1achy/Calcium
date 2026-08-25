@@ -522,29 +522,61 @@ describe("FT / FN — the tiles and nodes families (C12 §3ak.7)", () => {
     // depths are offset by one as a consequence. Asserted rather than described,
     // because a reader of `hierarchy.ts` sees a matched pair.
     const tm = tilesFigure(plot({ form: "treemap", hierarchy: tree3 } as Partial<Plot>));
-    const rects = tm.marks.map((d) => (d.mark.kind === "rect" ? [d.mark.x, d.mark.y, d.mark.w, d.mark.h] : []));
+    const rects = tm.marks.flatMap((d) => (d.mark.kind === "rect" ? [[d.mark.x, d.mark.y, d.mark.w, d.mark.h]] : []));
     expect(rects, "the children fill the square; the root is the canvas")
       .toEqual([[0, 0, 0.75, 1], [0.75, 0, 0.25, 1]]);
     expect(tm.identity, "so the treemap names two where the flame names three").toEqual(["a", "b"]);
+    // **The partition is the true one and the depth rides with it** (F278). A
+    // pad is one unit of the *output* — one cell in the terminal, one pixel in
+    // SVG — so what crosses is how deeply nested the rect is, and each arm
+    // insets by `depth + 1` of its own unit. The whole square here is
+    // `0 … 0.75` and `0.75 … 1`: nothing is taken off for legibility, which is
+    // what makes a tile's area proportional to its datum rather than to its
+    // datum minus the padding.
+    expect(tm.marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.depth] : [])), "both children are depth 0")
+      .toEqual([0, 0]);
+    // **A label is a mark keyed to its rect, not a parallel list** (§3ak.12).
+    // `identity` is what the *gutter* would show; this is what is written inside
+    // the tile, and the renderer needs to find the box to know whether it fits.
+    expect(tm.marks.flatMap((d) => (d.mark.kind === "text" ? [[d.seriesIndex, d.mark.text, d.mark.room]] : [])))
+      .toEqual([[0, "a", 0.75], [1, "b", 0.25]]);
     // A flame's strips share the line and stack by depth. `h` is one row of the
     // deepest budget, because stating a fraction of the renderer's row count
     // would be this layer guessing at the other's.
     const fl = tilesFigure(plot({ form: "flame", hierarchy: tree3 } as Partial<Plot>));
-    const bars = fl.marks.map((d) => (d.mark.kind === "rect" ? [d.mark.y, d.mark.h] : []));
+    const bars = fl.marks.flatMap((d) => (d.mark.kind === "rect" ? [[d.mark.y, d.mark.h]] : []));
     expect(fl.identity, "the root IS a bar here").toEqual(["root", "a", "b"]);
     expect(bars, "two depths, so each is half").toEqual([[0, 0.5], [0.5, 0.5], [0.5, 0.5]]);
     // **`a` is three quarters of the line and `b` one quarter** — the values are
     // spent on width, which is the family's whole reading.
-    const widths = fl.marks.map((d) => (d.mark.kind === "rect" ? d.mark.w : -1));
+    const widths = fl.marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.w] : []));
     expect(widths).toEqual([1, 0.75, 0.25]);
+    // **And a strip carries NO depth, which is not depth zero** (F278). These
+    // are stacked bands rather than enclosing boxes: a uniform inset separates
+    // them, and *this rect sits inside that many others* is false of a band
+    // rather than true at zero.
+    expect(fl.marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.depth] : [])))
+      .toEqual([undefined, undefined, undefined]);
   });
 
-  it("FT3 (C12 I61, F273): the facing is live here, unlike the matrix's", () => {
+  it("FT3 (C12 I61, F273, F276): the facing is live here, and for one commit it was a constant", () => {
     // `flame`, `icicle` and `treemap` all declare `ORIGIN_DEFAULT: null`, so
     // `facingOf` reaches its fallback and the argument decides — where every
     // matrix form declares `"top-left"` and the fallback is dead.
-    expect(tilesFigure(plot({ form: "flame", hierarchy: tree3 } as Partial<Plot>)).facing)
-      .toEqual({ x: "right", y: "up" });
+    //
+    // **And the argument was `FACING_DEFAULT` for all three** (F276), so the
+    // member said `up` for an icicle and the growth direction stayed written in
+    // two renderers. Every clause of the paragraph that excused it is true; it
+    // is attached to a decision it did not constrain, which is why the three are
+    // asserted together rather than one being taken as the family's.
+    const facingOfForm = (form: string): unknown =>
+      tilesFigure(plot({ form, hierarchy: tree3 } as unknown as Partial<Plot>)).facing;
+    expect(facingOfForm("flame"), "only the flame grows up from its root").toEqual({ x: "right", y: "up" });
+    expect(facingOfForm("icicle"), "an icicle hangs down from it").toEqual({ x: "right", y: "down" });
+    // Measured in the terminal rather than reasoned: `definition.ts` maps
+    // `t.y0 * areaRows` to a **row index**, so a treemap's `y0 = 0` is the top
+    // edge exactly as an icicle's depth 0 is.
+    expect(facingOfForm("treemap"), "and a treemap's y0 is its top").toEqual({ x: "right", y: "down" });
   });
 
   it("FN1 (C12 §3aj.6): the nodes family stops at its decisions, and there is no `nodesFigure`", () => {

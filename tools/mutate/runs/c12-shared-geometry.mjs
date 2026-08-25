@@ -319,10 +319,16 @@ const results = runPass({
       // flag and the terminal passes `false` for a flame and `true` for an
       // icicle. Both figures still draw, inside the area, with every band the
       // right width — the only difference is which end the root is at.
+      //
+      // **Re-anchored, and the mutation is now F276 verbatim** (§3ak.12). This
+      // arm's `inverted` flag is gone: the growth direction is the figure's
+      // facing, which is what C12 I61 said it was while two renderers each kept a
+      // copy. Restoring the constant restores the defect exactly — the member
+      // says `up` for an icicle and nothing downstream can tell.
       name: "a flame and an icicle grow the same way",
-      file: SVG,
-      from: '    const inverted = block.form === "icicle";',
-      to: '    const inverted = block.form !== "icicle";',
+      file: FIGURE,
+      from: '    facing: facingOf(block, block.form === "flame" ? FACING_DEFAULT : FACING_MATRIX),',
+      to: "    facing: facingOf(block, FACING_DEFAULT),",
       expect: "G6d3",
     },
     {
@@ -330,21 +336,44 @@ const results = runPass({
       // painted, then its children over it — so an unsorted walk puts a parent
       // over its own children and the figure loses its structure while every
       // rectangle stays in the right place.
+      //
+      // **Re-anchored to the emitter, where the paint order now is** (§3ak.12).
+      // Both arms sorted separately before; a figure's mark list *is* its paint
+      // order, so the sort is one line and the renderers have none.
       name: "a treemap paints its nodes in walk order rather than by depth",
-      file: SVG,
-      from: "      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);",
-      to: "      const placed = tiles(root, 1 / Math.max(w, h));",
+      file: FIGURE,
+      from: "      for (const t of [...tiles(root)].sort((a, b) => a.depth - b.depth)) { // cells-ok — a depth",
+      to: "      for (const t of tiles(root)) { // cells-ok — a depth",
       expect: "G6d1",
     },
     {
-      // **The inset as a constant.** One pixel at every output size rather
-      // than one pixel's *worth* of the unit square: correct at the size it was
-      // tuned for and a different figure at every other, which is exactly what
-      // `svgLayout`'s fractions exist to prevent (§3aj hazard 3).
-      name: "the treemap's inset stops being a proportion",
+      // **Rewritten rather than re-anchored, because the subject changed** — the
+      // old row asserted the inset was a *proportion*, which was true of a
+      // layout-time pad that cannot cross the seam (F278). It is now two claims
+      // and this pass carries one row for each.
+      //
+      // **The first is the defect that shipped for the length of a frame read.**
+      // A **uniform** inset separates siblings and puts a child's shared edge
+      // exactly on its parent's, so the nesting ring vanishes at every depth and
+      // the figure reads as a flat mosaic of outlined boxes — every rectangle in
+      // the right place, and nothing saying which ones belong together.
+      name: "the treemap's inset stops compounding, so nesting stops showing",
       file: SVG,
-      from: "      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);",
-      to: "      const placed = [...tiles(root, 0.004)].sort((a, b) => a.depth - b.depth);",
+      from: "      const inset = m.value === undefined && d.layer === \"series\" ? (m.depth ?? 0) + 1 : 0;",
+      to: "      const inset = m.value === undefined && d.layer === \"series\" ? 1 : 0;",
+      expect: "G6d1",
+    },
+    {
+      // **And the second is the claim the old row was making, kept.** One unit
+      // of the output at every size, rather than a share of it: a share is what
+      // `svgLayout`'s fractions are for and it is the wrong answer *here*,
+      // because the ring's job is to be visible and a visible line is a fixed
+      // number of pixels. Tuned to 300px and drawn at 1200 it is four pixels of
+      // ring, which is a border.
+      name: "the ring becomes a share of the output rather than a unit of it",
+      file: SVG,
+      from: "      const inset = m.value === undefined && d.layer === \"series\" ? (m.depth ?? 0) + 1 : 0;",
+      to: "      const inset = m.value === undefined && d.layer === \"series\" ? ((m.depth ?? 0) + 1) * (box.right - box.left) / 300 : 0;",
       expect: "G6d4",
     },
     {
@@ -389,8 +418,8 @@ const results = runPass({
       // shape the row predicted every family's first commit would have.
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
-      from: '  if ((family === "curve" || family === "scatter" || family === "matrix") && "marks" in figure) {',
-      to: '  if ((family === "scatter" || family === "matrix") && "marks" in figure) {',
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

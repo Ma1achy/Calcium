@@ -488,20 +488,61 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
  * `icicle` and `treemap` all declare `ORIGIN_DEFAULT: null`, so `facingOf`
  * reaches its fallback and the argument decides. A flame grows up from its root
  * and an icicle hangs down from it, which is one decision applied twice.
+ *
+ * **And for one commit that paragraph was true of a constant** (F276). Every
+ * clause of it is measured and holds — the record does say `null`, the fallback
+ * is reached, the argument does decide — and the argument was `FACING_DEFAULT`
+ * for all three forms, so the member said `up` for an icicle and the growth
+ * direction stayed written in two renderers: `rowFor = inverted ? depth :
+ * areaRows - 1 - depth` and `block.form === "icicle"`. **The two copies I61
+ * exists to end, under a comment asserting they had been ended.** It survived
+ * review because it is not a wrong sentence; it is a correct one attached to a
+ * decision it did not constrain, which is MG24's class, and it was unfalsifiable
+ * while nothing read the member.
+ *
+ * **Two of the three face down, and it is the treemap that is easy to miss.**
+ * Measured in the terminal rather than reasoned: `definition.ts` maps
+ * `t.y0 * areaRows` to a **row index**, so a treemap's `y0 = 0` is the top edge
+ * exactly as an icicle's depth 0 is. Only the flame grows the other way.
+ *
+ * **The labels are marks and are keyed to their tiles** (§3ak.12). A `text` mark
+ * carries the same `seriesIndex` as the rect it names, so a renderer that has to
+ * decide whether the box is big enough for the string can find the box — which
+ * is the terminal's gate too, in its own units, and neither arm can measure the
+ * other's.
  */
 export function tilesFigure(block: Plot): Figure {
   const root = block.hierarchy;
   const marks: Drawn[] = [];
   const identity: string[] = [];
+  const named = (x: number, y: number, w: number, label: string, index: number): void => {
+    if (label === "") return;
+    marks.push({
+      mark: { kind: "text", x, y, text: label, anchor: "start", room: w },
+      layer: "label",
+      seriesIndex: index,
+    });
+  };
   if (root !== undefined) {
     if (block.form === "treemap") {
-      for (const t of tiles(root)) {
+      // **Depth order, and it is the figure's rather than the renderer's**
+      // (§3ak.12). A parent is painted and then its children are painted over
+      // it, which is how nesting reads without a border per node — and `tiles`
+      // walks depth-first, so its emission order interleaves a deep child with a
+      // shallow uncle. Both arms sorted it separately before this line existed.
+      for (const t of [...tiles(root)].sort((a, b) => a.depth - b.depth)) { // cells-ok — a depth
         identity.push(t.label);
         marks.push({
-          mark: { kind: "rect", x: t.x0, y: t.y0, w: t.x1 - t.x0, h: t.y1 - t.y0, fill: true },
+          // **The true partition and the depth, never a padded partition**
+          // (F278). `tiles` takes a pad and insets a parent before laying its
+          // children out, which is what makes nesting visible — and the pad is
+          // one unit of the *output*, so it is one cell in the terminal and one
+          // pixel here and cannot cross. The depth crosses instead.
+          mark: { kind: "rect", x: t.x0, y: t.y0, w: t.x1 - t.x0, h: t.y1 - t.y0, fill: true, depth: t.depth },
           layer: "series",
           seriesIndex: t.index,
         });
+        named(t.x0, t.y0, t.x1 - t.x0, t.label, t.index);
       }
     } else {
       // **`strips` is the line with a depth**, and the depth is a *row* rather
@@ -525,6 +566,7 @@ export function tilesFigure(block: Plot): Figure {
           layer: "series",
           seriesIndex: r.index,
         });
+        named(r.from, r.depth / (deepest + 1), r.to - r.from, r.label, r.index); // cells-ok — a depth
       }
     }
   }
@@ -533,7 +575,11 @@ export function tilesFigure(block: Plot): Figure {
     extent: null,
     identity,
     orientation: ORIENTATION_UNUSED,
-    facing: facingOf(block, FACING_DEFAULT),
+    // **Only the flame grows up** (F276). `FACING_MATRIX` is named for the
+    // family it was written for and holds the shape three families want — the
+    // second axis running down the page — which is a treemap's `y0` and an
+    // icicle's depth alike.
+    facing: facingOf(block, block.form === "flame" ? FACING_DEFAULT : FACING_MATRIX),
     frame: block.plotFrame ?? "box",
     legend: legendSlots(block),
     marks,

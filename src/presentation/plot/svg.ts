@@ -30,7 +30,6 @@
  * second renderer.
  */
 import { normalisedSummary, type NormalisedSummary } from "../../data/viewmodel/distribution.js";
-import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
 import { graphLayers } from "./graph.js";
 import { normalisedOf, type PinnedRange } from "../../data/viewmodel/range.js";
@@ -393,6 +392,14 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
   const at = projected(figure, box);
   const map = COLORMAPS[block.colormap ?? "viridis"];
   const furniture = inkOf(LABEL, theme);
+  const ground = inkOf(GROUND, theme);
+  // **Where each slot's rectangle landed, so a label can find the box it
+  // names** (§3ak.12). A `text` mark and the `rect` it belongs to carry the same
+  // `seriesIndex`, which is a key rather than a position — the pairing survives
+  // a reordering, and the walk needs it because *is there room for this string*
+  // is a question each arm answers in its own units and neither can answer in
+  // the other's (§3aj hazard 4).
+  const boxes = new Map<number, Area>();
   // **A step holds its value until the next sample, and that is *which
   // rasteriser* rather than *where the samples are*.** The terminal picks
   // `stepRows` off the same member — `styleRasteriser(block, caps, stepRows,
@@ -452,10 +459,30 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // Mapping a corner and a size separately would need the walk to know which
       // way each axis runs — the second copy of `facing` this function exists to
       // remove.
-      const x = Math.min(a[0], b[0]);
-      const y = Math.min(a[1], b[1]);
-      const w = Math.abs(b[0] - a[0]);
-      const h = Math.abs(b[1] - a[1]);
+      // **A hairline off every side, and it is the nesting rather than a
+      // margin** (§3ak.12). `tiles`' own comment is the argument: *filling the
+      // parent exactly is arithmetically right and draws a mosaic — the leaves
+      // are correct, the siblings are adjacent, and nothing says which ones
+      // belong together.* It used to be `tiles(root, 1 / max(w, h))`, a pad
+      // baked into the layout, which is not a thing a shared partition can carry
+      // — the terminal's unit is a cell and this arm's is a pixel, and the
+      // figure knows neither (§3aj hazard 1).
+      //
+      // **`depth + 1` units, not one** — and the difference is the whole of
+      // F278. A uniform inset separates *siblings* and leaves a child's shared
+      // edge exactly on its parent's, so the ring vanishes at every depth and
+      // the figure reads as a flat mosaic of outlined boxes. Measured: the
+      // parent went `x=89.6 w=404.096` to `x=90.6 w=402.096` while its child
+      // stayed at `90.6`, and nothing of the parent was left showing.
+      //
+      // **Applied after projection it is the better device than the pad it
+      // replaces**: the partition stays true, so a tile's area is proportional
+      // to its datum rather than to its datum minus the padding.
+      const inset = m.value === undefined && d.layer === "series" ? (m.depth ?? 0) + 1 : 0;
+      const x = Math.min(a[0], b[0]) + inset;
+      const y = Math.min(a[1], b[1]) + inset;
+      const w = Math.max(0.5, Math.abs(b[0] - a[0]) - inset * 2);
+      const h = Math.max(0.5, Math.abs(b[1] - a[1]) - inset * 2);
       let fill = ink;
       // **A rect carrying a `value` is coloured by the ramp rather than by its
       // slot**, and the rule is the mark's rather than the family's. A matrix
@@ -468,9 +495,41 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
         if (colour === undefined || colour.kind !== "rgb") continue;
         fill = colour.hex;
       }
+      // **A partition's neighbours must be told apart and a field's must not**,
+      // and `value` is what says which this is. A treemap without the hairline
+      // is one colour chart with invisible nesting; a heatmap with it is a grid
+      // drawn over a continuous field. One device where there were two — the
+      // strips carried a one-pixel gap and the tiles a stroke, both expressed in
+      // the renderer's units, both saying *these are separate*.
+      const edge = inset > 0 ? ` stroke="${ground ?? fill}" stroke-width="1"` : "";
+      if (d.seriesIndex !== undefined) boxes.set(d.seriesIndex, { left: x, top: y, right: x + w, bottom: y + h });
       out.push(
-        `<rect x="${n(x)}" y="${n(y)}" width="${n(Math.max(w, 0.5))}" height="${n(Math.max(h, 0.5))}" ` +
-          `fill="${fill}"/>`,
+        `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}"${edge}/>`,
+      );
+      continue;
+    }
+
+    if (m.kind === "text") {
+      // **The label places itself and stops itself, and nothing here asks how
+      // wide the string is** (§3aj hazard 4). A `clipPath` is this renderer's
+      // own mechanism; the terminal truncates to the cells its tile owns, which
+      // it can do because it measures text and this cannot.
+      const slot = d.seriesIndex === undefined ? undefined : boxes.get(d.seriesIndex);
+      const clip = slot ?? { left: at(m.x, m.y)[0], top: at(m.x, m.y)[1], right: box.right, bottom: box.bottom };
+      // **Too short for its own name is a decision in page units** — the
+      // terminal's is *does the tile still own a run this wide*, in cells. Two
+      // gates in two unit systems for one shared fact, which is what hazard 4
+      // makes unavoidable rather than untidy.
+      if (clip.bottom - clip.top < SVG_FONT_SIZE) continue;
+      const id = `${m.kind[0] ?? "t"}${block.id}-${String(d.seriesIndex ?? 0)}`;
+      out.push(
+        `<clipPath id="${id}"><rect x="${n(clip.left)}" y="${n(clip.top)}" ` +
+          `width="${n(clip.right - clip.left)}" height="${n(clip.bottom - clip.top)}"/></clipPath>`,
+        `<text x="${n(clip.left + 3)}" y="${n(clip.top + SVG_FONT_SIZE)}" clip-path="url(#${id})" ` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ground ?? ink}"` +
+          // `start` is SVG's own default, so naming it would be a byte in every
+          // frame saying nothing — the attribute appears only where it decides.
+          `${m.anchor === "start" ? "" : ` text-anchor="${m.anchor}"`}>${escape(m.text)}</text>`,
       );
       continue;
     }
@@ -748,7 +807,7 @@ function marks(
   // `nodesDecisions` returns `Omit<Figure, "marks">` because a tree's placement
   // is a function of its labels' widths in the terminal and of slots here, so
   // the topology crosses and the placement does not.
-  if ((family === "curve" || family === "scatter" || family === "matrix") && "marks" in figure) {
+  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 
@@ -822,98 +881,6 @@ function marks(
     }
     edges = laid.edges;
     return nodeMarks(layers, labelAt, edges, box, w, h, false, ink0, ground, theme, block.id, out);
-  }
-
-  if (family === "tiles") {
-    const root = block.hierarchy;
-    // **Refused where the terminal takes its other arm.** `flame` and `icicle`
-    // fall back to `legacyDepthBars` when there is no `hierarchy` — a bar chart
-    // of depths, which is the bar family's geometry and not this one. Drawing
-    // tiles for it would be a different figure from the terminal's.
-    if (root === undefined) return out;
-
-        const w = box.right - box.left;
-    const h = box.bottom - box.top;
-    const ground = inkOf(GROUND, theme);
-    const ink0 = inkOf(LABEL, theme);
-
-    /**
-     * A node's name inside its own rectangle, **clipped by SVG rather than
-     * measured** (§3aj hazard 4).
-     *
-     * The terminal truncates a label to the cells its tile has, which it can do
-     * because it measures text. This cannot and must not: a `<clipPath>` is the
-     * renderer's own mechanism, so the label places itself *and* stops itself,
-     * and nothing here asks how wide the string is.
-     *
-     * **The frame is what said the labels were missing.** Every row asserted
-     * rectangles and every one passed; a treemap with no names is a colour
-     * chart.
-     */
-    const named = (id: string, x: number, y: number, tw: number, th: number, text: string): void => {
-      if (text === "" || ink0 === undefined || th < SVG_FONT_SIZE) return;
-      out.push(
-        `<clipPath id="${id}"><rect x="${n(x)}" y="${n(y)}" width="${n(tw)}" height="${n(th)}"/></clipPath>`,
-        `<text x="${n(x + 3)}" y="${n(y + SVG_FONT_SIZE)}" clip-path="url(#${id})" ` +
-          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ground ?? ink0}">` +
-          `${escape(text)}</text>`,
-      );
-    };
-
-    if (block.form === "treemap") {
-      // **A pixel's worth of padding, expressed on the unit square** — which is
-      // the terminal's own rule at its own resolution: it passes
-      // `1 / max(width, areaRows)`, one cell. Resolution-independent by
-      // construction, so the two arms inset by the same *proportion* of the
-      // figure and differ only in what a unit is.
-      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);
-      for (const t of placed) {
-        const ink = inkOf(refOf(t.index), theme);
-        if (ink === undefined) continue;
-        // **Depth order, painted over** — a parent is drawn and then its
-        // children are drawn on top, which is how nesting reads without a
-        // border per node. The sort above is what makes that true.
-        out.push(
-          `<rect x="${n(box.left + t.x0 * w)}" y="${n(box.top + t.y0 * h)}" ` +
-            `width="${n(Math.max((t.x1 - t.x0) * w, 0.5))}" height="${n(Math.max((t.y1 - t.y0) * h, 0.5))}" ` +
-            `fill="${ink}" stroke="${ground ?? ink}" stroke-width="1"/>`,
-        );
-        named(
-          `t${block.id}-${String(t.index)}`,
-          box.left + t.x0 * w, box.top + t.y0 * h,
-          (t.x1 - t.x0) * w, (t.y1 - t.y0) * h,
-          t.label,
-        );
-      }
-      return out;
-    }
-
-    // **`flame` grows up from depth 0 and `icicle` grows down from it**, which
-    // is the terminal's `inverted` flag read from its own source rather than
-    // from what reads naturally: `rowFor` is `areaRows - 1 - depth` for a flame
-    // and `depth` for an icicle. Getting this from the convention rather than
-    // from the code is how family 1's orientation default came out transposed.
-    const inverted = block.form === "icicle";
-    const placed = strips(root);
-    const depth = placed.reduce((m, st) => Math.max(m, st.depth), 0); // cells-ok — a depth count
-    const band = h / (depth + 1);
-    for (const st of placed) {
-      const ink = inkOf(refOf(st.index), theme);
-      if (ink === undefined) continue;
-      const y = inverted ? box.top + st.depth * band : box.bottom - (st.depth + 1) * band;
-      out.push(
-        `<rect x="${n(box.left + st.from * w)}" y="${n(y)}" ` +
-          `width="${n(Math.max((st.to - st.from) * w, 0.5))}" height="${n(Math.max(band - 1, 0.5))}" ` +
-          `fill="${ink}"/>`,
-      );
-      named(
-        `s${block.id}-${String(st.index)}`,
-        box.left + st.from * w, y,
-        (st.to - st.from) * w, band - 1,
-        st.label,
-      );
-    }
-    return out;
   }
 
   if (family === "distribution") {
