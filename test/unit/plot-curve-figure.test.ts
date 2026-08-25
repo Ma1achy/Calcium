@@ -17,8 +17,11 @@ import {
   barFigure,
   baselineOf,
   categoricalDecisions,
+  distributionFigure,
   matrixFigure,
+  nodesDecisions,
   positionalDecisions,
+  tilesFigure,
   scatterFigure,
 } from "../../src/presentation/plot/figure.js";
 import { legendEntries } from "../../src/presentation/plot/furniture.js";
@@ -414,5 +417,157 @@ describe("FM — the matrix family's figure (C12 §3ak.7)", () => {
     // And it is NOT the positional families' answer, which invents `series N`.
     expect(identityOf(grid()), "the other rule, asserted so the difference is on purpose")
       .toEqual(["a", "series 2"]);
+  });
+});
+
+describe("FD — the distribution family's figure (C12 §3ak.7)", () => {
+  const box = (over: Partial<Plot> = {}): Plot => plot({
+    form: "boxplot", height: 8,
+    quartiles: [{ min: 0, q1: 2, median: 4, q3: 6, max: 10, mean: 5, outliers: [12] }],
+    ...over,
+  } as Partial<Plot>);
+
+  it("FD1 (C12 I62): every mark carries a role, and the roles are the family's vocabulary", () => {
+    // A median is `┃` at full unicode, `|` in ASCII and a distinct mark below the
+    // colour floor; a mean is a different character; an outlier a third. The
+    // terminal picks all three from its ladder and the SVG draws a line and two
+    // circles. **What both agree about is which of the seven things this is.**
+    const roles = distributionFigure(box()).marks
+      .flatMap((d) => (d.mark.kind === "point" ? [d.mark.role] : []));
+    expect(new Set(roles), "cap, median, mean and outlier — no glyph anywhere")
+      .toEqual(new Set(["cap", "median", "mean", "outlier"]));
+    expect(roles.filter((r) => r === "cap").length, "one at each whisker's end").toBe(2);
+    // A summary with no mean must be distinguishable from one whose mean is its
+    // median, which is what `NormalisedSummary` makes optional and why.
+    const noMean = distributionFigure(box({
+      quartiles: [{ min: 0, q1: 2, median: 4, q3: 6, max: 10, outliers: [] }],
+    } as Partial<Plot>));
+    expect(noMean.marks.some((d) => d.mark.kind === "point" && d.mark.role === "mean")).toBe(false);
+  });
+
+  it("FD2 (C12 §3aj): the extent is the family's own datum, and it has two arms", () => {
+    // A boxplot's extent is the whiskers plus outliers; a forest plot's is the
+    // interval, because a confidence bound is not a whisker and can reach past
+    // the observed range. Two arms of one function, deliberately.
+    expect(distributionFigure(box()).extent, "whiskers plus the outlier at 12")
+      .toEqual({ min: 0, max: 12 });
+    const forest = distributionFigure(box({
+      form: "forest",
+      quartiles: [{ min: 3, q1: 3, median: 4, q3: 5, max: 5, lower: 1, upper: 9, centre: 4, outliers: [] }],
+    } as Partial<Plot>));
+    expect(forest.extent, "the interval reaches past the observed range")
+      .toEqual({ min: 1, max: 9 });
+  });
+
+  it("FD3 (C12 I62): `absent` is a role, so the SVG can refuse where the terminal draws", () => {
+    // `normalisedSummary` falls `centre` back to the median, so the summary
+    // cannot say *nothing was reported* — a mark at the origin is the plausible
+    // wrong figure that would become. The role is what says it.
+    const f = distributionFigure(box({
+      form: "forest",
+      quartiles: [{ min: 1, q1: 1, median: Number.NaN, q3: 2, max: 2, lower: 1, upper: 2, outliers: [] }],
+    } as Partial<Plot>));
+    const pts = f.marks.filter((d) => d.mark.kind === "point");
+    expect(pts.map((d) => (d.mark.kind === "point" ? d.mark.role : "")))
+      .toEqual(["absent"]);
+  });
+
+  it("FD4 (C12 I59): a dumbbell is two positions and a connector, paired by index", () => {
+    const f = distributionFigure(plot({
+      form: "dumbbell", categories: ["a", "b"],
+      series: [{ values: [1, 3] }, { values: [5, 7] }],
+    }));
+    expect(f.extent, "both series, because the datum is the pair").toEqual({ min: 1, max: 7 });
+    const lines = f.marks.filter((d) => d.mark.kind === "polyline");
+    const ends = f.marks.filter((d) => d.mark.kind === "point");
+    expect([lines.length, ends.length], "one connector and two ends per pair").toEqual([2, 4]);
+    // **The connector is emitted before its ends**, which is `mergedRow`'s order
+    // and the order a reader resolves an overlap in.
+    expect(f.marks[0]!.mark.kind).toBe("polyline");
+    expect(ends.map((d) => d.seriesIndex), "and each end keeps its own slot").toEqual([0, 1, 0, 1]);
+  });
+
+  it("FD5 (C12 I64): a refusal is empty, and the identity survives it", () => {
+    const f = distributionFigure(box({ quartiles: [] } as Partial<Plot>));
+    expect([f.value, f.extent, f.marks]).toEqual([null, null, []]);
+    expect(distributionFigure(box({ categories: ["x"] })).identity).toEqual(["x"]);
+  });
+});
+
+describe("FT / FN — the tiles and nodes families (C12 §3ak.7)", () => {
+  const tree3 = {
+    label: "root",
+    children: [{ label: "a", value: 3 }, { label: "b", value: 1 }],
+  };
+
+  it("FT1 (C12 I60): a tiles figure has no axis AND no domain, where a matrix has one of the two", () => {
+    // **The pair is what separates the two families.** A matrix reads its numbers
+    // as colours — no axis, and the ramp still has a domain. A tiles figure reads
+    // them as **areas**, and an area is the reading itself: `hierarchy.ts` divides
+    // by the total while it walks, so the positions arrive on the unit interval
+    // and there is nothing left for a domain to be over.
+    const f = tilesFigure(plot({ form: "treemap", hierarchy: tree3 } as Partial<Plot>));
+    expect([f.value, f.extent], "neither an axis nor a domain").toEqual([null, null]);
+    const m = matrixFigure(plot({ form: "heatmap", series: [{ values: [1, 2] }] }));
+    expect(m.value, "the matrix has no axis either").toBeNull();
+    expect(m.extent, "and it does have a domain — this is the difference").not.toBeNull();
+  });
+
+  it("FT2 (C12 I62): a treemap's tiles are the unit square, and a strip's depth is a row", () => {
+    // **`tiles` and `strips` disagree about whether the root is a node, and both
+    // are right for their form.** Measured: `tiles` emits the *children*
+    // squarified into the square — a treemap's root is the canvas, not a tile —
+    // and `strips` emits the root at depth 0, because a flame's root is its base
+    // bar. Two walks in one module that look parallel and are not, and their
+    // depths are offset by one as a consequence. Asserted rather than described,
+    // because a reader of `hierarchy.ts` sees a matched pair.
+    const tm = tilesFigure(plot({ form: "treemap", hierarchy: tree3 } as Partial<Plot>));
+    const rects = tm.marks.map((d) => (d.mark.kind === "rect" ? [d.mark.x, d.mark.y, d.mark.w, d.mark.h] : []));
+    expect(rects, "the children fill the square; the root is the canvas")
+      .toEqual([[0, 0, 0.75, 1], [0.75, 0, 0.25, 1]]);
+    expect(tm.identity, "so the treemap names two where the flame names three").toEqual(["a", "b"]);
+    // A flame's strips share the line and stack by depth. `h` is one row of the
+    // deepest budget, because stating a fraction of the renderer's row count
+    // would be this layer guessing at the other's.
+    const fl = tilesFigure(plot({ form: "flame", hierarchy: tree3 } as Partial<Plot>));
+    const bars = fl.marks.map((d) => (d.mark.kind === "rect" ? [d.mark.y, d.mark.h] : []));
+    expect(fl.identity, "the root IS a bar here").toEqual(["root", "a", "b"]);
+    expect(bars, "two depths, so each is half").toEqual([[0, 0.5], [0.5, 0.5], [0.5, 0.5]]);
+    // **`a` is three quarters of the line and `b` one quarter** — the values are
+    // spent on width, which is the family's whole reading.
+    const widths = fl.marks.map((d) => (d.mark.kind === "rect" ? d.mark.w : -1));
+    expect(widths).toEqual([1, 0.75, 0.25]);
+  });
+
+  it("FT3 (C12 I61, F273): the facing is live here, unlike the matrix's", () => {
+    // `flame`, `icicle` and `treemap` all declare `ORIGIN_DEFAULT: null`, so
+    // `facingOf` reaches its fallback and the argument decides — where every
+    // matrix form declares `"top-left"` and the fallback is dead.
+    expect(tilesFigure(plot({ form: "flame", hierarchy: tree3 } as Partial<Plot>)).facing)
+      .toEqual({ x: "right", y: "up" });
+  });
+
+  it("FN1 (C12 §3aj.6): the nodes family stops at its decisions, and there is no `nodesFigure`", () => {
+    // **A tree's node positions are a function of its labels' widths in the
+    // terminal** — `tdWidth` measures a subtree by the widest label under it — so
+    // the topology is shared and the placement is not. A `Mark` is a position, so
+    // a figure with marks would carry ONE arm's placement and the other would
+    // fail `U1b` for a reason the type cannot express.
+    const d = nodesDecisions(plot({ form: "tree", hierarchy: tree3 } as Partial<Plot>));
+    expect(Object.keys(d).sort(), "everything but the marks").toEqual(
+      ["extent", "facing", "frame", "identity", "legend", "orientation", "value"],
+    );
+    expect("marks" in d, "and `marks: []` is not the alternative — I64 makes it a refusal").toBe(false);
+    expect([d.value, d.extent], "structure is not a reading on a scale").toEqual([null, null]);
+    expect(d.identity, "what crosses is what already crossed — `flatten`'s walk")
+      .toEqual(["root", "a", "b"]);
+  });
+
+  it("FN2 (C12 I59): a graph names its nodes where a tree names its walk", () => {
+    const g = nodesDecisions(plot({
+      form: "graph",
+      graph: { nodes: [{ id: "x", label: "X" }, { id: "y" }], edges: [] },
+    } as Partial<Plot>));
+    expect(g.identity, "an unlabelled node takes a positional name").toEqual(["X", "node 2"]);
   });
 });

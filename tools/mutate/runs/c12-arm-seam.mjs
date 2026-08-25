@@ -67,6 +67,67 @@ const results = runPass({
   },
   mutations: [
     {
+      // **`quartileRange`'s two arms collapsed into one.** A forest plot's
+      // interval can reach past its observed range, so taking the boxplot arm
+      // clips every confidence bound to the whiskers — still an interval, still
+      // drawn, and narrower than the study reported.
+      name: "THE INTERACTION: a forest plot takes the boxplot's extent",
+      file: FIGURE,
+      from: "    ? seriesRange(block.series, block)\n    : quartileRange(qs, block.form === \"forest\");",
+      to: "    ? seriesRange(block.series, block)\n    : quartileRange(qs, false);",
+      expect: "FD2",
+    },
+    {
+      // **`absent` collapsed into `point`.** `normalisedSummary` falls `centre`
+      // back to the median, so a row with no estimate becomes a mark at a
+      // position the data never had — the plausible wrong figure the role exists
+      // to refuse.
+      name: "THE DEFECT: a forest row with no estimate draws a point anyway",
+      file: FIGURE,
+      from: "          marks.push(dot(centre, sm.centre, has ? \"point\" : \"absent\", i));",
+      to: "          marks.push(dot(centre, sm.centre, \"point\", i));",
+      expect: "FD3",
+    },
+    {
+      // The median given the mean's role. Both are a single mark on the box and
+      // the terminal draws them with different glyphs — so this is the seam
+      // saying one thing and the reader being told another, with every count
+      // agreeing.
+      name: "a median is emitted under the mean's role",
+      file: FIGURE,
+      from: "        marks.push(dot(centre, sm.median, \"median\", i));",
+      to: "        marks.push(dot(centre, sm.median, \"mean\", i));",
+      expect: "FD1",
+    },
+    {
+      // The connector emitted after its ends rather than before, which is
+      // `mergedRow`'s order and the order a reader resolves an overlap in.
+      name: "a dumbbell's connector is drawn over its own ends",
+      file: FIGURE,
+      from: "        marks.push({ mark: { kind: \"polyline\", points: [[x, at(va)], [x, at(vb)]] }, layer: \"series\" });\n        marks.push(dot(x, at(va), \"point\", 0), dot(x, at(vb), \"point\", 1));",
+      to: "        marks.push(dot(x, at(va), \"point\", 0), dot(x, at(vb), \"point\", 1));\n        marks.push({ mark: { kind: \"polyline\", points: [[x, at(va)], [x, at(vb)]] }, layer: \"series\" });",
+      expect: "FD4",
+    },
+    {
+      // Every strip at depth zero: a flame with all its frames on the base row,
+      // which is a legible figure of a tree one level deep.
+      name: "every strip lands at the root's depth",
+      file: FIGURE,
+      from: "            y: r.depth / (deepest + 1), // cells-ok — a depth",
+      to: "            y: 0,",
+      expect: "FT2",
+    },
+    {
+      // The nodes family's identity taken from the graph arm for a tree, which
+      // names nothing — `hierarchy` and `graph` are different fields and a tree
+      // has no `graph`.
+      name: "a tree's identity is read from the graph arm",
+      file: FIGURE,
+      from: "      : flatten(root).map((f) => f.label),",
+      to: "      : [],",
+      expect: "FN1",
+    },
+    {
       // **THE RULE INTERACTION.** A matrix's rows are named `""` by the gutter
       // and `row N` by the overflow notice, and the positional families invent
       // `series N` — three answers to *what is this row called*. Taking the
@@ -138,8 +199,10 @@ const results = runPass({
       // rasterisation difference accounts for it.
       name: "THE DEFECT: the bar family's default orientation flips",
       file: FIGURE,
-      from: "    orientation: block.orientation === \"vertical\" ? \"vertical\" : \"horizontal\",",
-      to: "    orientation: block.orientation === \"horizontal\" ? \"horizontal\" : \"vertical\",",
+      // Re-anchored onto the extracted `orientationOf`, which the bar and
+      // distribution families now share — the sweep found the duplicate.
+      from: "  return block.orientation === \"vertical\" ? \"vertical\" : \"horizontal\";",
+      to: "  return block.orientation === \"horizontal\" ? \"horizontal\" : \"vertical\";",
       expect: "FB3",
     },
     {
@@ -253,8 +316,10 @@ const results = runPass({
       // Two lines: the matrix family says `orientation: "vertical"` too — and
       // means nothing by it — so one line is ambiguous, which reports as
       // SURVIVED rather than as a bad anchor (F219).
-      from: "    orientation: \"vertical\",\n    facing: facingOf(block, FACING_DEFAULT),",
-      to: "    orientation: block.orientation === \"horizontal\" ? \"horizontal\" : \"vertical\",\n    facing: facingOf(block, FACING_DEFAULT),",
+      // Re-anchored when the three vacuous families took `ORIENTATION_UNUSED`:
+      // the literal is `positionalDecisions`' alone now, and it means something.
+      from: "    orientation: \"vertical\",",
+      to: "    orientation: orientationOf(block),",
       expect: "FC7",
     },
     {

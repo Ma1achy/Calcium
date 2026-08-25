@@ -2441,6 +2441,38 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // rasterisers — a curve is Bresenham at dot resolution and folded, which is
   // not a polyline walk — so wiring the marks into *this* arm would be a rewrite
   // of the thing the pass promises not to touch.
+  // **The distribution family's**, and the one whose marks carry the most that
+  // cannot cross: `GlyphRole` names which of seven things a mark is, and each arm
+  // draws it from its own ladder. Its decisions ARE consumed — the vertical arm
+  // reaches `categoricalDecisions` through `categoricalColumnForm`.
+  distributionFigure:
+    "C12 I62, §3ak.7 — the distribution family's shared emitter. The datum is a " +
+    "set of positions derived from the samples, and `normalisedSummary` and " +
+    "`quartileRange` already cross; what waits is the roles those positions " +
+    "carry, for `plotToSvg` at step 4. The terminal draws them from glyph tables " +
+    "per capability rung, which is the half that cannot be shared",
+
+  // **The tiles family's**, and its marks are the family with the shortest
+  // distance to a consumer: `hierarchy.ts` already returns unit-square positions,
+  // so `plotToSvg` walks these almost unchanged at step 4.
+  tilesFigure:
+    "C12 I60, I62, §3ak.7 — the tiles family's shared emitter. `value` and " +
+    "`extent` are both null because an area IS the reading; what waits is the " +
+    "tile rects, for `plotToSvg` at step 4. The terminal composes them into cell " +
+    "spans through `hierarchyStripRows` and `treemapRows`",
+
+  // **The nodes family's decisions, and there is deliberately no `nodesFigure`**
+  // (§3aj.6). A tree's placement is a function of its labels' widths in one arm
+  // and of slots in the other, so a `Mark` — which is a position — could only
+  // carry one arm's answer. What crosses is the topology, which `flatten` and
+  // `graphLayers` already share; this adds the decisions above them, and the
+  // consumer for those is `plotToSvg`'s furniture at step 4.
+  nodesDecisions:
+    "C12 I60, §3ak.7, §3aj.6 — the nodes family stops at its decisions because " +
+    "the placement cannot cross the seam. `marks: []` is not the alternative: " +
+    "I64 makes an empty list a refusal, and a figure saying *nothing to draw* " +
+    "over a forty-node tree is a lie. `FN1` asserts the absence",
+
   // **`matrixFigure` is NOT on this list and the equality arm is what said so.**
   // It has no decisions half to split off — a matrix has no value axis — so
   // `heatmapFormRows` calls the emitter itself for the ramp's domain, and the

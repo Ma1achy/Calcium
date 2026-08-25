@@ -13,6 +13,9 @@
  * refuses, and a `Figure` member no renderer takes is F84's class one type along.
  */
 import type { Plot, PlotForm, ScaleType } from "../../data/viewmodel/index.js";
+import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
+import { strips, tiles } from "./hierarchy.js";
+import { flatten } from "./tree.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { ColourRef } from "../theme/types.js";
 import { axisFor, tickLabels, ticksFor, type Axis } from "./axes.js";
@@ -358,6 +361,34 @@ function axisOver(extent: Range | null, block: Plot): ValueAxis | null {
 }
 
 /**
+ * **The value `orientation` takes where a family has no axis to run either way.**
+ *
+ * `matrix`, `tiles` and `nodes` have rows and columns, areas, and structure —
+ * none of them a value axis with a direction. The member is required, so it gets
+ * a name rather than a bare `"vertical"` that reads as a decision.
+ *
+ * **The anchor sweep is what asked for this.** Three families wrote the literal
+ * and a mutation aimed at the *positional* families' orientation matched all
+ * four, which reports as SURVIVED rather than as a bad anchor (F219). The
+ * duplication was hiding a real distinction: one of the four means *the values
+ * run up the ordinate* and three mean *nothing runs anywhere*.
+ */
+const ORIENTATION_UNUSED = "vertical" as const;
+
+/**
+ * Which way the value axis runs, **for the families where the block decides**
+ * (D11).
+ *
+ * The bar and distribution families both read `block.orientation` and default to
+ * horizontal — the terminal's default, and the one the SVG arm got wrong by
+ * writing `!== "horizontal"` so an unset member drew vertically there and
+ * horizontally here. One expression now, so there is one place left to invert.
+ */
+function orientationOf(block: Pick<Plot, "orientation">): "horizontal" | "vertical" {
+  return block.orientation === "vertical" ? "vertical" : "horizontal";
+}
+
+/**
  * A reference line's mark — **the annotation mechanism, not a form's machinery**
  * (C04 I52, §3e).
  *
@@ -409,6 +440,228 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     facing: facingOf(block, FACING_DEFAULT),
     frame: block.plotFrame ?? "box",
     legend: legendSlots(block),
+  };
+}
+
+/**
+ * The tiles family's figure — **`flame`, `icicle`, `treemap`** (§3ak.7).
+ *
+ * **`value` and `extent` are BOTH `null`, and the pair is what separates this
+ * family from the matrix.** A matrix reads its numbers as colours, so it has no
+ * axis and its *ramp* still has a domain; a tiles figure reads them as **areas**,
+ * and an area is the reading itself. There is nothing left for a domain to be
+ * over — `hierarchy.ts` returns positions already on the unit interval, because
+ * the division by the total happened while the tree was walked.
+ *
+ * That is why `extent: null` here is a statement rather than an omission: the
+ * three families with `value: null` do not all have the same shape, and the one
+ * that furnished a false axis three times would have furnished a false *domain*
+ * here for exactly the same reason.
+ *
+ * **`tiles` and `strips` disagree about whether the root is a node, and both are
+ * right.** Measured while writing this: `tiles` emits the *children* squarified
+ * into the square — a treemap's root is the canvas rather than a tile — and
+ * `strips` emits the root at depth 0, because a flame's root is its base bar.
+ * Their depths are offset by one as a consequence. Two exported walks in one
+ * module, reading as a matched pair and answering different questions; the
+ * emitter takes each at its word rather than normalising them, since the
+ * difference is the forms' and not an inconsistency.
+ *
+ * **The facing is live for this family**, unlike the matrix's (F273): `flame`,
+ * `icicle` and `treemap` all declare `ORIGIN_DEFAULT: null`, so `facingOf`
+ * reaches its fallback and the argument decides. A flame grows up from its root
+ * and an icicle hangs down from it, which is one decision applied twice.
+ */
+export function tilesFigure(block: Plot): Figure {
+  const root = block.hierarchy;
+  const marks: Drawn[] = [];
+  const identity: string[] = [];
+  if (root !== undefined) {
+    if (block.form === "treemap") {
+      for (const t of tiles(root)) {
+        identity.push(t.label);
+        marks.push({
+          mark: { kind: "rect", x: t.x0, y: t.y0, w: t.x1 - t.x0, h: t.y1 - t.y0, fill: true },
+          layer: "series",
+          seriesIndex: t.index,
+        });
+      }
+    } else {
+      // **`strips` is the line with a depth**, and the depth is a *row* rather
+      // than a value — so `h` is one row of however many the renderer has, which
+      // it cannot know here. `1` is the whole figure and each arm divides by its
+      // own depth budget; stating a fraction would be this layer guessing at the
+      // other's row count, which is §3aj hazard 3 in a number.
+      const runs = strips(root);
+      const deepest = runs.reduce((d, r) => Math.max(d, r.depth), 0); // cells-ok — a depth
+      for (const r of runs) {
+        identity.push(r.label);
+        marks.push({
+          mark: {
+            kind: "rect",
+            x: r.from,
+            y: r.depth / (deepest + 1), // cells-ok — a depth
+            w: r.to - r.from,
+            h: 1 / (deepest + 1), // cells-ok — a depth
+            fill: true,
+          },
+          layer: "series",
+          seriesIndex: r.index,
+        });
+      }
+    }
+  }
+  return {
+    value: null,
+    extent: null,
+    identity,
+    orientation: ORIENTATION_UNUSED,
+    facing: facingOf(block, FACING_DEFAULT),
+    frame: block.plotFrame ?? "box",
+    legend: legendSlots(block),
+    marks,
+  };
+}
+
+/**
+ * The nodes family's decisions — **`tree` and `graph`, and there is no
+ * `nodesFigure`** (§3ak.7, §3aj.6).
+ *
+ * **This is the family where the shared layer cannot carry the marks, and that
+ * was ruled before the type existed.** §3aj.6: *a tree's node positions are a
+ * function of its labels' widths in the terminal* — `tdWidth` measures a subtree
+ * by the widest label under it — **so the topology is shared and the placement
+ * is not.** The SVG arm places by slots, which is font-independent by
+ * construction and is a different drawing of the same tree.
+ *
+ * A `Mark` is a position. So a `nodesFigure` returning marks would be returning
+ * *one arm's* placement, and whichever arm it belonged to, the other would fail
+ * `U1b` — each arm's output is a faithful projection of the figure — for a
+ * reason the type could not express.
+ *
+ * **`marks: []` is not the alternative**: I64 makes an empty list a refusal, and
+ * a figure saying *nothing to draw* over a tree with forty nodes is a lie. So the
+ * family stops at its decisions, exactly as `positionalDecisions` and
+ * `categoricalDecisions` do — and for a stronger reason, because for those two
+ * the marks arrive one commit later and here they do not arrive at all.
+ *
+ * **What crosses is what already crossed**: `flatten` and `graphLayers`, which
+ * both arms read today. This adds the decisions above them.
+ */
+export function nodesDecisions(block: Plot): Omit<Figure, "marks"> {
+  const root = block.hierarchy;
+  return {
+    value: null,
+    extent: null,
+    identity: root === undefined
+      ? (block.graph?.nodes ?? []).map((nd, i) => nd.label ?? `node ${String(i + 1)}`)
+      : flatten(root).map((f) => f.label),
+    orientation: ORIENTATION_UNUSED,
+    facing: facingOf(block, FACING_DEFAULT),
+    frame: block.plotFrame ?? "box",
+    legend: legendSlots(block),
+  };
+}
+
+/**
+ * The distribution family's figure — **`boxplot`, `forest`, `dumbbell`**
+ * (§3ak.7).
+ *
+ * **The datum is a *set of positions derived from the samples*, not the
+ * samples**, which is what makes this a family rather than three forms. So the
+ * shared piece is the set — `normalisedSummary` and `quartileRange`, which both
+ * arms already read through — and this emitter is where the roles they produce
+ * finally have somewhere to go.
+ *
+ * **`quartileRange` has two arms and the difference is deliberate**: a boxplot's
+ * extent is `min … max` plus outliers, because the whiskers *are* the extent; a
+ * forest plot's is `lower ?? min … upper ?? max`, because a confidence bound is
+ * not a whisker and an interval can reach past the observed range. `dumbbell` is
+ * the third datum — two series paired by index — and takes `seriesRange`.
+ *
+ * **`GlyphRole` is why a mark carries a role and never a glyph** (I62). A median
+ * is `┃` at full unicode, `|` in ASCII and a distinct mark below the colour
+ * floor; a mean is a different character again; an outlier a third. The terminal
+ * picks all three from its own ladder and the SVG draws none of them — it draws
+ * a line and two circles. **What both agree about is which of the seven things
+ * this is**, and that is the whole content of the seam here.
+ *
+ * **`absent` is a role because the terminal draws something and the SVG must not
+ * draw a point at zero.** A forest row with no estimate is a real state, and a
+ * mark at the origin is the plausible wrong figure it would otherwise become.
+ *
+ * The marks are in the figure's own space, as the bar family's are: `x` along
+ * the identity axis and `y` along the value axis, whatever `orientation` says.
+ * **Three fifths of the slot is not here** — `boxplotColumn` rounds that to
+ * cells and `slotOf` does not round at all, and §3aj hazard 1 makes a renderer's
+ * inset its own.
+ */
+export function distributionFigure(block: Plot): Figure {
+  const qs = block.quartiles ?? [];
+  const extent = block.form === "dumbbell"
+    ? seriesRange(block.series, block)
+    : quartileRange(qs, block.form === "forest");
+  const identity = block.categories
+    ?? (qs.length > 0 // cells-ok — a summary count
+      ? qs.map((_q, i) => `series ${String(i + 1)}`)
+      : identityOf(block));
+  const marks: Drawn[] = [];
+  if (extent !== null) {
+    const n = Math.max(1, block.form === "dumbbell" ? identity.length : qs.length); // cells-ok — a slot count
+    const at = (v: number): number => normalisedOf(v, extent, false);
+    const dot = (x: number, y: number, role: GlyphRole, i: number): Drawn =>
+      ({ mark: { kind: "point", x, y, role }, layer: "series", seriesIndex: i });
+
+    if (block.form === "dumbbell") {
+      const [a, b] = [block.series[0], block.series[1]];
+      const count = Math.min(a?.values.length ?? 0, b?.values.length ?? 0); // cells-ok — a pair count
+      for (let i = 0; i < count; i += 1) { // cells-ok — a pair index
+        const va = a?.values[i], vb = b?.values[i];
+        if (va === null || vb === null || va === undefined || vb === undefined) continue;
+        const x = (i + 0.5) / n;
+        // The connector first, so the two ends read over it — `mergedRow`'s own
+        // order, which is the order a reader resolves an overlap in.
+        marks.push({ mark: { kind: "polyline", points: [[x, at(va)], [x, at(vb)]] }, layer: "series" });
+        marks.push(dot(x, at(va), "point", 0), dot(x, at(vb), "point", 1));
+      }
+    } else {
+      qs.forEach((q, i) => {
+        const sm = normalisedSummary(q, extent);
+        const x = i / n;
+        const centre = (i + 0.5) / n;
+        if (block.form === "forest") {
+          marks.push({ mark: { kind: "polyline", points: [[centre, sm.lower], [centre, sm.upper]] }, layer: "series", seriesIndex: i });
+          // **`absent` where there is no estimate.** `normalisedSummary` falls
+          // `centre` back to the median, so the summary cannot say *nothing was
+          // reported* — the role is what says it, and it is why the SVG can
+          // refuse to draw where the terminal draws a mark.
+          const has = Number.isFinite(q.centre ?? q.median);
+          marks.push(dot(centre, sm.centre, has ? "point" : "absent", i));
+          return;
+        }
+        marks.push({
+          mark: { kind: "rect", x, y: Math.min(sm.q1, sm.q3), w: 1 / n, h: Math.abs(sm.q3 - sm.q1), fill: false },
+          layer: "series",
+          seriesIndex: i,
+        });
+        marks.push({ mark: { kind: "polyline", points: [[centre, sm.min], [centre, sm.q1]] }, layer: "series", seriesIndex: i });
+        marks.push({ mark: { kind: "polyline", points: [[centre, sm.q3], [centre, sm.max]] }, layer: "series", seriesIndex: i });
+        marks.push(dot(centre, sm.min, "cap", i), dot(centre, sm.max, "cap", i));
+        marks.push(dot(centre, sm.median, "median", i));
+        if (sm.mean !== undefined) marks.push(dot(centre, sm.mean, "mean", i));
+        for (const o of sm.outliers) marks.push(dot(centre, o, "outlier", i));
+      });
+    }
+  }
+  return {
+    value: axisOver(extent, block),
+    extent,
+    identity,
+    orientation: orientationOf(block),
+    facing: facingOf(block, FACING_DEFAULT),
+    frame: block.plotFrame ?? "box",
+    legend: legendSlots(block),
+    marks,
   };
 }
 
@@ -472,7 +725,7 @@ export function matrixFigure(block: Plot): Figure {
     value: null,
     extent,
     identity: block.series.map((sr) => sr.label ?? ""),
-    orientation: "vertical",
+    orientation: ORIENTATION_UNUSED,
     facing: facingOf(block, FACING_MATRIX),
     frame: block.plotFrame ?? "box",
     legend: legendSlots(block),
@@ -525,7 +778,7 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     value: axisOver(extent, block),
     extent,
     identity: block.categories ?? [],
-    orientation: block.orientation === "vertical" ? "vertical" : "horizontal",
+    orientation: orientationOf(block),
     facing: facingOf(block, FACING_DEFAULT),
     frame: block.plotFrame ?? "box",
     legend: legendSlots(block),
