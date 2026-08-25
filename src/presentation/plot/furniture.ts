@@ -39,9 +39,10 @@ import { HAS_POSITION_AXIS } from "./marks.js";
 import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import { FACING_DEFAULT, facingOf } from "./scale.js";
-import type { Annotation, Plot } from "../../data/viewmodel/index.js";
+import type { Plot } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
-import { SHARES_CELLS, markOf, refOf } from "./marks.js";
+import { SHARES_CELLS, markOf } from "./marks.js";
+import { legendSlots, type FrameStyle } from "./figure.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -381,7 +382,12 @@ export function bandLayout(
  * against an edge that is not there, which is I26's own clause and the one place
  * the styles are not interchangeable.
  */
-export type FrameStyle = NonNullable<Plot["plotFrame"]>;
+// **`FrameStyle` lives in `figure.ts` now** (C12 §3ak.1 finding 5). This file
+// is what reads a figure back, so the figure importing a shape from here
+// while this imports the figure is a cycle inside L1 — A02 §1, MG1 and MG22.
+// Re-exported rather than moved out of sight: eleven call sites name it from
+// here and none of them is about where a type is declared.
+export type { FrameStyle };
 
 /** One edge's glyphs: the two corners and the run between them. */
 type EdgeGlyphs = Readonly<{ left: string; run: string; right: string }>;
@@ -792,56 +798,35 @@ const POSITIONAL_STACKS: Readonly<Record<string, boolean>> = Object.freeze({
  * *only* thing that means anything where colour does not.
  */
 export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendEntry[] {
-  const segs = block.segments;
-  const source = segs !== undefined && segs.length > 0 // cells-ok — a segment count
-    ? segs.map((sg) => sg.label)
-    : block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
-  // **Through `refOf`, not by indexing the table** — the legend was a second
-  // door to the palette, and the mutation harness proved it: forcing every
-  // series to slot one left the legend drawing four distinct colours, so the
-  // control survived and the harness reported itself blind. A legend whose
-  // swatch is a different colour from the thing it names is the exact defect
-  // this function's own comment warns about.
   const g = glyphs(ctx.capabilities);
-  // **A candlestick names both directions, and the candles come first**
-  // (C12 §6b B4). The overlays are what `source` already holds — a moving
-  // average is a series like any other — and the candles are what the block is
-  // about, so they lead. Their marks are the body glyphs rather than `markOf`'s
-  // ladder: a legend whose swatch is not the glyph it names is this function's
-  // own recorded defect, one category along.
-  const candles: readonly LegendEntry[] =
-    block.plotStyle === "candlestick" && block.ohlc !== undefined
-      ? [
-          { mark: g.candleHollow, label: "rising", ref: "tone.ok" },
-          { mark: g.candleFilled, label: "falling", ref: "tone.error" },
-        ]
-      : [];
-  // **The third source, and it comes last** (C04 I52, C12 §3ag). An annotation
-  // is a claim *about* the data, so it reads after the things it is a claim
-  // about — the same order `mergedRow` draws them in, one layer along.
+  // **One table, keyed by the role the shared layer named** (C12 I62, §3ak.7 C8).
   //
-  // **The swatch is the dash the line is actually drawn with**, not `markOf`'s
-  // ladder: this function's own comment records what a swatch naming a glyph
-  // that appears nowhere cost, and an annotation is dashed at every depth
-  // (C04 I23), so the dash is available on every arm rather than only below the
-  // colour floor.
-  const annotations: readonly LegendEntry[] = (block.annotations ?? [])
-    .flatMap((a) => {
-      const label = (a as { label?: string }).label;
-      if (label === undefined) return [];
-      const t = (a as Annotation).tone;
-      const ref: ColourRef = t === undefined ? "tone.muted" : `tone.${t}`;
-      return [{ mark: g.dashedHorizontal, label, ref }];
-    });
-  return [
-    ...candles,
-    ...source.map((label, i) => ({
-      mark: markOf(i, ctx.capabilities),
-      label,
-      ref: refOf(i),
-    })),
-    ...annotations,
-  ];
+  // The composition — which entries, in what order, from which of the three
+  // sources — is `legendSlots`', and both arms read it. What is left here is the
+  // part that cannot cross the seam: **the swatch descends the capability ladder
+  // with the figure** (I29), so `markOf` is uniform where colour separates the
+  // categories and a distinct mark where it does not, and the SVG arm has no
+  // ladder to descend.
+  //
+  // **The two things this file used to decide twice are now decided once.**
+  // `refOf` was called here *and* by the renderer, which the mutation harness
+  // caught: forcing every series to slot one left the legend drawing four
+  // distinct colours, so the control survived and the harness reported itself
+  // blind. The slot now arrives on the entry.
+  //
+  // A candlestick's swatches are the body glyphs and an annotation's is the dash
+  // it is actually drawn with, at every depth (C04 I23) — a swatch naming a glyph
+  // that appears nowhere is this function's own recorded defect, and it is why
+  // these are roles rather than a fall-through to `markOf`.
+  return legendSlots(block).map((slot) => ({
+    mark:
+      slot.role === "rising" ? g.candleHollow
+      : slot.role === "falling" ? g.candleFilled
+      : slot.role === "annotation" ? g.dashedHorizontal
+      : markOf(slot.seriesIndex ?? 0, ctx.capabilities),
+    label: slot.label,
+    ref: slot.ref,
+  }));
 }
 
 /** `swatch label`, measured in cells. */

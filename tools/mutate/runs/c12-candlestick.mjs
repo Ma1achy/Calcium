@@ -21,6 +21,7 @@ const CANDLES = "src/presentation/plot/candles.ts";
 const DEFN = "src/presentation/plot/definition.ts";
 const SCALE = "src/presentation/plot/scale.ts";
 const FURNITURE = "src/presentation/plot/furniture.ts";
+const FIGURE = "src/presentation/plot/figure.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -144,7 +145,10 @@ const results = runPass({
     {
       // B4 — the legend. Two entries or a reader cannot name what the marks are.
       name: "the legend stops naming the directions",
-      file: FURNITURE,
+      // Re-anchored when `legendEntries` became a projection (C12 §3ak.7): which
+      // entries a legend holds is the shared layer's now, and only the swatch is
+      // this arm's — so the candles are dropped where they are composed.
+      file: FIGURE,
       from: '    block.plotStyle === "candlestick" && block.ohlc !== undefined',
       to: "      false",
       expect: "CS-B4",

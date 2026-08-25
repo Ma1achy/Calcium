@@ -1,0 +1,208 @@
+/**
+ * FC1–FC7 — **the curve family's figure, and the terminal reading it back**
+ * (C12 I59, I61, I64, I65, §3ak.7).
+ *
+ * Step 3's rule is that `figureOf` is the terminal's computation **moved**, not
+ * re-derived — which is what makes byte-identity a property of the extraction
+ * rather than a hope, and it is gated by 1780 baseline frames rather than by
+ * these rows. What these rows are for is the half a frame cannot show: that the
+ * decisions the two arms now share are the ones the terminal actually
+ * rasterises with, and that a member nobody reads yet still means what it says.
+ */
+import { describe, expect, it } from "vitest";
+import {
+  curveFigure,
+  identityOf,
+  legendSlots,
+  positionalDecisions,
+} from "../../src/presentation/plot/figure.js";
+import { legendEntries } from "../../src/presentation/plot/furniture.js";
+import { ecdfSeries } from "../../src/presentation/plot/derive.js";
+import { rowOf } from "../../src/presentation/plot/scale.js";
+import { DARK_THEME, FULL_CAPS, MONO_CAPS } from "../support/render.js";
+import type { Plot } from "../../src/data/viewmodel/index.js";
+import type { RenderContext } from "../../src/presentation/blocks/types.js";
+
+const plot = (over: Partial<Plot>): Plot =>
+  ({ kind: "plot", id: "p", form: "line", series: [{ values: [1, 3, 2, 5, 4] }], ...over }) as Plot;
+
+const ctxWith = (caps: typeof FULL_CAPS): RenderContext =>
+  ({ theme: DARK_THEME, capabilities: caps }) as unknown as RenderContext;
+
+/** Every polyline point in the figure, in order, ignoring the layers. */
+const pointsOf = (f: ReturnType<typeof curveFigure>, layer: string): readonly (readonly [number, number])[] =>
+  f.marks.filter((d) => d.layer === layer).flatMap((d) =>
+    d.mark.kind === "polyline" ? [...d.mark.points] : []);
+
+describe("FC — the curve family's figure (C12 §3ak.7)", () => {
+  it("FC1 (C12 I61): a mark's y and the terminal's row are one coordinate, with the facing applied once each side", () => {
+    // **The seam's whole claim, as an assertion.** The figure carries `y`
+    // uninverted on `[0, 1]`; the terminal multiplies by the last row after
+    // applying the facing. If those two ever stop agreeing, the shared layer is
+    // saying a position the renderer does not draw — which no frame shows,
+    // because a frame that is wrong in both arms is a frame that agrees.
+    const block = plot({ series: [{ values: [1, 3, 2, 5, 4] }] });
+    const f = curveFigure(block);
+    expect(f.value, "the block has data").not.toBeNull();
+    const range = f.value!.range;
+    const rows = 9;
+    const pts = pointsOf(f, "series");
+    expect(pts.length, "one point per finite sample").toBe(5);
+    for (const [i, [, y]] of pts.entries()) {
+      const v = block.series[0]!.values[i]!;
+      const mine = Math.round((f.facing.y === "down" ? y : 1 - y) * (rows - 1));
+      expect(rowOf(v, range, rows, f.facing), `sample ${String(i)}`).toBe(mine);
+    }
+    // **And the nicing is the terminal's, not the raw extent** — D1, the
+    // disagreement no single decision held. The SVG rasterises against
+    // `f.extent` today and must take `f.value.range` at step 4.
+    expect(f.extent, "what the data spans").toEqual({ min: 1, max: 5 });
+    expect(range.min, "what it is drawn against").toBeLessThanOrEqual(1);
+    expect(range.max, "and it is wider, because it is niced").toBeGreaterThanOrEqual(5);
+  });
+
+  it("FC2 (C12 I4, I14): a run breaks where the samples stop being consecutive", () => {
+    // `curveRows` states this as an adjacency test between dot columns; the
+    // figure states it between samples, and the two must mean the same thing or
+    // the SVG spans a gap the terminal breaks across.
+    const f = curveFigure(plot({ series: [{ values: [1, 2, null, 4, 5] }] }));
+    const runs = f.marks.filter((d) => d.layer === "series");
+    expect(runs.length, "two runs, not one polyline through the hole").toBe(2);
+    const lens = runs.map((d) => (d.mark.kind === "polyline" ? d.mark.points.length : -1));
+    expect(lens).toEqual([2, 2]);
+    // A run of one is a degenerate polyline rather than a special case — the
+    // same shape `drawColumnSpan` gives a lone sample.
+    const lone = curveFigure(plot({ series: [{ values: [1, null, null, null, 5] }] }));
+    expect(lone.marks.filter((d) => d.layer === "series").length).toBe(2);
+  });
+
+  it("FC3 (C12 I62, §3ak.7 C8): the legend is composed once and the swatch is each arm's", () => {
+    const block = plot({
+      series: [{ values: [1, 2], label: "a" }, { values: [3, 4], label: "b" }],
+      annotations: [{ kind: "line", value: 2, label: "target", tone: "warn" }],
+    });
+    const slots = legendSlots(block);
+    expect(slots.map((s) => s.label), "series then annotations — `mergedRow`'s order")
+      .toEqual(["a", "b", "target"]);
+    expect(slots.map((s) => s.role)).toEqual(["series", "series", "annotation"]);
+    expect(slots.every((s) => !("mark" in s)), "no glyph crosses the seam").toBe(true);
+
+    // **The projection is the arm's, and it descends the ladder** (C12 I29). Same
+    // slots, two capability sets, and the swatches must differ — a legend whose
+    // marks do not change below the colour floor names marks the figure is not
+    // drawn with.
+    const full = legendEntries(block, ctxWith(FULL_CAPS));
+    const mono = legendEntries(block, ctxWith(MONO_CAPS));
+    expect(full.map((e) => e.label)).toEqual(slots.map((s) => s.label));
+    expect(full.map((e) => e.ref), "and the slot is the figure's, not a second lookup")
+      .toEqual(slots.map((s) => s.ref));
+    expect(mono[0]!.mark, "1-bit gives the categories distinct marks").not.toBe(mono[1]!.mark);
+    expect(full[0]!.mark, "and colour makes them uniform").toBe(full[1]!.mark);
+  });
+
+  it("FC4 (C12 I64): a refusal is a figure with no marks, and never a throw", () => {
+    for (const series of [[], [{ values: [] }], [{ values: [null, null] }]]) {
+      const f = curveFigure(plot({ series: series as Plot["series"] }));
+      expect(f.value, "nothing was measured").toBeNull();
+      expect(f.extent).toBeNull();
+      expect(f.marks, "and a refusal is empty rather than an exception").toEqual([]);
+    }
+    // **Pinned bounds are not a reading** (§3ak.7 C7). `seriesRange` answers even
+    // for an empty series once `yMin`/`yMax` are given, so the figure has an axis
+    // — and whether anything was *drawn* is the marks, which is where the
+    // terminal's own `hasSamples` gate lives.
+    const pinned = curveFigure(plot({ series: [{ values: [] }], yMin: 0, yMax: 1 }));
+    expect(pinned.value, "the bounds were declared").not.toBeNull();
+    expect(pinned.marks, "and nothing was measured").toEqual([]);
+  });
+
+  it("FC5 (C12 I65): the figure describes the block that is drawn, not the one that was written", () => {
+    // `ecdf` and `density` derive their series, and the derivation is above both
+    // arms — so a caller hands over the derived block and the figure is about
+    // that. Handing over the author's block gives a figure about the samples,
+    // which is exactly the chart the second arm was drawing (F268).
+    // `height` is set because `ticksFor(plotAreaRows(block))` is the tick count,
+    // and an undeclared height is one row and therefore two ticks — which would
+    // make the gutter assertion below true for a reason that is not the point.
+    const authored = plot({ form: "ecdf", height: 8, series: [{ values: [5, 1, 4, 2, 3] }] });
+    const drawn = { ...authored, series: authored.series.map((s) => ecdfSeries(s)), yMin: 0, yMax: 1 };
+    expect(curveFigure(authored).extent, "the samples").toEqual({ min: 1, max: 5 });
+    expect(curveFigure(drawn).extent, "the cumulative fractions").toEqual({ min: 0, max: 1 });
+    expect(curveFigure(drawn).value!.labels, "and the gutter is the fraction axis")
+      .toEqual(["0.0", "0.5", "1.0"]);
+  });
+
+  it("FC6 (C12 I59): the decisions are one computation and the marks are the family's", () => {
+    // `positionalForm` draws three families and they differ only in what is drawn
+    // at a point. Splitting the decisions out is what stops a caller holding a
+    // figure whose marks belong to another family — internally consistent, past
+    // every assertion about the decisions, and a different chart.
+    const block = plot({ segments: [{ label: "up", value: 1 }, { label: "down", value: 2 }] });
+    const d = positionalDecisions(block);
+    const f = curveFigure(block);
+    expect(Object.keys(d).sort(), "everything but the marks").toEqual(
+      ["extent", "facing", "frame", "identity", "legend", "orientation", "value"],
+    );
+    for (const k of Object.keys(d) as (keyof typeof d)[]) expect(f[k], k).toEqual(d[k]);
+    // **One identity list**, so the legend cannot name a set the gutter does not.
+    expect(f.identity, "segments replace the series where a form has them").toEqual(["up", "down"]);
+    expect(identityOf(block)).toEqual(f.identity);
+    expect(f.legend.filter((s) => s.role === "series").map((s) => s.label)).toEqual(f.identity);
+  });
+
+  it("FC8 (C12 I62): each mark carries its own slot, so the colour channel survives the seam", () => {
+    // **Also missing, also found by mutation.** `FC3` asserts the *legend*'s
+    // slots and nothing asserted the marks', so collapsing every curve onto
+    // slot one drew four series in one colour past a legend naming four — I25's
+    // rule broken in the channel the figure exists to carry.
+    const f = curveFigure(plot({
+      series: [{ values: [1, 2] }, { values: [3, 4] }, { values: [5, 6] }],
+    }));
+    const series = f.marks.filter((d) => d.layer === "series");
+    expect(series.map((d) => d.seriesIndex), "one slot per series, in order").toEqual([0, 1, 2]);
+    expect(series.every((d) => d.ref === undefined), "unresolved — a slot, not a colour").toBe(true);
+    // An annotation carries an explicit ref instead, because it is not a category.
+    const a = curveFigure(plot({ annotations: [{ kind: "line", value: 2, tone: "warn" }] }));
+    const ann = a.marks.filter((d) => d.layer === "annotation");
+    expect(ann.map((d) => d.ref)).toEqual(["tone.warn"]);
+    expect(ann.every((d) => d.seriesIndex === undefined), "and no categorical slot").toBe(true);
+  });
+
+  it("FC9 (C12 I59, F270): the scale reaches the axis, and nothing rendered anywhere else asks", () => {
+    // **`yScale` has no rendered fixture in this repository.** It appears in no
+    // catalogue variant, so none of the 1780 baseline frames, 890 catalogue
+    // frames or 382 golden rows constructs a log axis — dropping the argument
+    // from `positionalDecisions` moved nothing and failed nothing, which is
+    // F256's lesson arriving on a whole axis mode (F270).
+    //
+    // A unit row rather than a fixture, deliberately: a catalogue variant would
+    // add frames, and this pass's gate is that the corpus does not move.
+    const linear = curveFigure(plot({ height: 8, series: [{ values: [1, 1000] }] }));
+    const log = curveFigure(plot({ height: 8, yScale: "log", series: [{ values: [1, 1000] }] }));
+    expect(log.value!.ticks, "log ticks, not linear ones").not.toEqual(linear.value!.ticks);
+    expect(log.value!.ticks.every((t) => t > 0), "and every one is on the scale").toBe(true);
+  });
+
+  it("FC7 (C12 I59, §3ak.3): the figure is capability-independent, and the stacked axis is not in it", () => {
+    // The rung table read forwards: what changes below the colour floor is not
+    // the figure but what the terminal does to it. `stacksAtOneBit` reads
+    // `colourDepth`, so the two-tick raw-bounds axis it builds is a projection
+    // and `value` stays the niced one at every rung.
+    const block = plot({ series: [{ values: [1, 3] }, { values: [2, 4] }] });
+    const f = curveFigure(block);
+    expect(f.value!.ticks.length, "a niced axis, not two raw bounds").toBeGreaterThan(2);
+    // **`orientation` is the family's, never the block's** (§3ak.7 C9). It means
+    // something else on the bar and distribution families, so reading it here
+    // turns a line plot on its side in the arm that takes the figure and leaves
+    // it upright in the arm that does not. *This assertion was missing and the
+    // mutation pass is what said so — the row named `orientation` in its title
+    // and never mentioned it.*
+    expect(curveFigure(plot({ orientation: "horizontal" })).orientation,
+      "a curve runs its values up the ordinate whatever the block says").toBe("vertical");
+    expect(Object.keys(f).some((k) => /caps|colour|unicode/iu.test(k)), "no capability reaches it")
+      .toBe(false);
+    // The raw bounds the 1-bit arm rasterises against are still a figure fact —
+    // it is the *axis object* built from them that is the projection's.
+    expect(f.extent).toEqual({ min: 1, max: 4 });
+  });
+});

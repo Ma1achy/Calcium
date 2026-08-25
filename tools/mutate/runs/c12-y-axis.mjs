@@ -61,8 +61,12 @@ const results = runPass({
       // frame rows rather than the label rows.
       name: "the curve is rasterised against a range the gutter does not describe",
       file: DEF,
-      from: "      : valueAxisOf(data, ticksFor(plotAreaRows(block)), block, block.yScale);",
-      to: "      : valueAxisOf(valueAxisOf(data, ticksFor(plotAreaRows(block)), block, block.yScale).range, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      // Re-anchored when the decisions moved into `positionalDecisions`
+      // (C12 §3ak.7). The second nicing is now expressed where the terminal
+      // reads the shared axis back, which is the only place left that could
+      // introduce one.
+      from: "      : figure.value;",
+      to: "      : valueAxisOf(figure.value.range, ticksFor(plotAreaRows(block)), block, block.yScale);",
       expect: "YA1",
     },
     {

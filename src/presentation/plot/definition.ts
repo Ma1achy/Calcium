@@ -27,7 +27,7 @@ import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
-import { valueAxisOf } from "./figure.js";
+import { positionalDecisions, valueAxisOf } from "./figure.js";
 import { treeArea } from "./tree.js";
 import { graphArea } from "./graph.js";
 import { curveRows, isBlank } from "./curve.js";
@@ -61,7 +61,7 @@ import { bandRows, stackBands, stackRange } from "./stack.js";
 import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
-import { bubbleRows, scatterRows, stepRows, ecdfSeries } from "./scatter.js";
+import { bubbleRows, scatterRows, stepRows } from "./scatter.js";
 import { quartileRange } from "../../data/viewmodel/distribution.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
@@ -72,7 +72,8 @@ import { pointLabelRows } from "./pointlabels.js";
 import { colormapFor, heatmapFormRows } from "./heatmap.js";
 import { glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
-import { densityRows, densitySeries, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
+import { densityRows, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
+import { densitySeries, ecdfSeries } from "./derive.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
 import { horizonGrid, horizonIsSigned, horizonLegendSpans, horizonSpans } from "./horizon.js";
@@ -2012,7 +2013,14 @@ function positionalForm(
 ): readonly string[] {
   const stacked = stacksAtOneBit(block, ctx.capabilities); // cells-ok — a series count
   const bars = candlesOf(block);
-  const data = seriesRange(block.series, block, bars);
+  // **The decisions are read back rather than made here** (C12 I59, §3ak.7).
+  // Everything this function used to compute above the rasteriser — the extent,
+  // the nicing, the tick count, the scale, the facing — is one call, and the
+  // second arm makes the same one. A renderer that computes a decision is a
+  // renderer that can disagree, and this is the first of the seven families to
+  // stop.
+  const figure = positionalDecisions(block);
+  const data = figure.extent;
   // **One nicing, taken where the data is measured** (F210). The axis the gutter
   // is labelled from must be the axis the curve is rasterised against, and the
   // only arrangement in which two of them cannot drift apart is one of them.
@@ -2025,11 +2033,11 @@ function positionalForm(
   // gutter holds series names rather than a scale (§5), so nothing is ever
   // labelled against this axis; there is no scale here, only the bounds the
   // bands are cut to, and that is what the object says.
-  const axis: Axis | null = data === null
+  const axis: Axis | null = data === null || figure.value === null
     ? null
     : stacked
       ? { range: data, ticks: [data.min, data.max], step: 0 }
-      : valueAxisOf(data, ticksFor(plotAreaRows(block)), block, block.yScale);
+      : figure.value;
   const usable = usableWidth(block, width, ctx);
   // **With no data the axis cannot reach the frame, and that was worth checking
   // rather than asserting.** The comment here first said a bare unit axis would
@@ -2069,7 +2077,7 @@ function positionalForm(
   const xaxis = xRowFor(block, layout.areaWidth, ctx);
   const area = stacked
     ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, facingOf(block, FACING_DEFAULT)), at);
+    : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, figure.facing), at);
   if (marked) {
     return axedWithCursor(block, cursorIdx, at, area, layout, ctx, xaxis);
   }

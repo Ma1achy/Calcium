@@ -8,7 +8,7 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
-import { kde } from "../../src/presentation/plot/kde.js";
+import { kde } from "../../src/presentation/plot/derive.js";
 
 const kit = () => measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
 

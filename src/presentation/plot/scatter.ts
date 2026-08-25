@@ -85,27 +85,6 @@ export function stepRows(
 }
 
 /**
- * ECDF: the empirical cumulative distribution function.
- *
- * Sort the values, compute the cumulative fraction as y, then draw as a step
- * function. The range is always [0, 1] — the fraction axis.
- */
-export function ecdfSeries(series: Series): Series {
-  const finite = finiteSamples(series.values);
-  if (finite.length === 0) return { ...series, values: [] }; // cells-ok — a sample count
-
-  const sorted = [...finite].sort((a, b) => a.v - b.v);
-  const n = sorted.length; // cells-ok — a sample count
-  const values: number[] = [];
-
-  for (let i = 0; i < n; i++) {
-    values.push((i + 1) / n);
-  }
-
-  return { ...series, values };
-}
-
-/**
  * A bubble chart's dots — scatter with a **size** channel (C04 §8).
  *
  * **The fourth encoding axis, and the one a terminal has least room for.** A cell

@@ -11,6 +11,10 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const FURN = "src/presentation/plot/furniture.ts";
+// The legend's *composition* moved into the shared layer when `legendEntries`
+// became a projection (C12 §3ak.7): which entries and in what order is now one
+// computation both arms read, and only the swatch is still this arm's.
+const FIGURE = "src/presentation/plot/figure.ts";
 const VAL = "src/data/viewmodel/validate.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -31,7 +35,7 @@ const results = runPass({
   write,
   run,
   control: {
-    file: FURN,
+    file: FIGURE,
     from: "    ...annotations,\n  ];",
     to: "  ];",
     why:
@@ -64,8 +68,12 @@ const results = runPass({
       // annotation is not drawn with — this function's own recorded defect.
       name: "the annotation's swatch is a category mark",
       file: FURN,
-      from: "      return [{ mark: g.dashedHorizontal, label, ref }];",
-      to: "      return [{ mark: markOf(0, ctx.capabilities), label, ref }];",
+      // Re-anchored when `legendEntries` became a projection of `legendSlots`
+      // (C12 §3ak.7): the composition is the shared layer's and the swatch is
+      // this arm's, so the defect this row restores now lives in the role table
+      // rather than in the annotation branch.
+      from: "      : slot.role === \"annotation\" ? g.dashedHorizontal\n",
+      to: "      : slot.role === \"annotation\" ? markOf(0, ctx.capabilities)\n",
       expect: "TL8",
     },
     {

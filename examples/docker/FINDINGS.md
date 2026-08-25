@@ -13429,4 +13429,35 @@ resamples to 100 points and labels the axis `0 … 99` instead of the data's `10
 series changes what `x` means and nothing tells the axis** — one mechanism, two severities. Owed as a
 C12 ruling after the pass.
 
+---
+
+## F270 — a whole axis mode with no rendered fixture, found by a mutation that moved nothing ★★★☆☆
+
+**`yScale` is a public `Plot` member with three values — `log`, `time`, `symlog` — and no frame in
+this repository constructs one.** Mutating `positionalDecisions` to stop passing it survived: the
+tick *values* change for a log block and nothing renders a log block, so 1780 baseline frames, 890
+catalogue frames and 382 golden rows all agree.
+
+Measured: `yScale` appears **nowhere** in `tools/catalogue-forms.ts`, and three times in `test/` — a
+direct `axisFor` call and two comments. The member reaches exactly one live call site.
+
+**This is F256's lesson arriving on a whole axis mode.** *Zero-moved is evidence about the cases the
+frames construct*, and this pass's central gate — *the terminal arm is byte-identical at every
+capability rung* — is therefore **silent about log, time and symlog axes entirely.** The gate is not
+weakened by this; its scope is narrower than its wording, and the wording is what a reader takes
+away.
+
+**Not closed by a fixture, deliberately.** A catalogue variant would add frames, and this pass's gate
+is that the corpus does not move — so the subject lands as a unit row (`FC9`) asserting that a log
+block's figure picks ticks a linear one does not. **The frame-level gap stays open and is stated**,
+because buying coverage with the digest the pass is gating on is paying with the thing being
+measured.
+
+**And there is a second half already recorded, which is why the gap reads smaller than it is.** F189:
+a `y` value *is* the datum and the rasteriser plots it linearly, so `yScale: "log"` picks log tick
+values and **draws them at linear rows** — documented in `axes.ts`, deliberate, and asymmetric with
+`x`, which does transform. So the untested mode is one already known to be half-implemented, and a
+fixture would have put that in a frame where a reader would meet it.
+
+
 

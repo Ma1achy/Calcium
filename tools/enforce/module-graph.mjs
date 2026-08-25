@@ -1343,6 +1343,20 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // **F84's class, stated where the rule can see it** (C12 §3ak.7). `Figure` is
+  // read by `positionalForm` today and every member but this one is taken; the
+  // marks are what the second arm draws, and the second arm has not been
+  // rewritten yet.
+  //
+  // **The expiry is the same symbol as `curveFigure`'s**: `plotToSvg` walking a
+  // figure. Until then a mutation inside the mark emitter fails `FC1`, `FC2` and
+  // `FC8` and **moves no frame**, which is recorded on those rows rather than
+  // left for someone to rediscover as a survivor.
+  "Figure.marks":
+    "C12 I62, I64, §3ak.7 — normalised marks with unresolved slots, for the arm " +
+    "that does not exist yet. The terminal reads the figure's decisions and " +
+    "rasterises its own geometry; `plotToSvg` is the reader, at step 4 of the " +
+    "unification pass",
   // --- published ahead of the value that makes it readable ------------------
   //
   // **A single-value union has nothing for a consumer to branch on**, which is
@@ -2411,6 +2425,28 @@ export function publicSurfaceUseSignal(
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **The curve family's emitter, landed one commit ahead of its second reader**
+  // (C12 §3ak.7). The pass moves the seam from `value -> [0, 1]` to
+  // `value -> a drawing`, and it moves one family at a time: the *decisions*
+  // half is consumed today — `positionalForm` reads `positionalDecisions` back,
+  // gated by 1780 baseline frames — and the *marks* half has no reader until
+  // `plotToSvg` walks a figure.
+  //
+  // **The expiry is a symbol, and grepping it is what picking this entry up
+  // begins with**: `plotToSvg` calling `curveFigure`. On that commit both this
+  // entry and `Figure.marks` below go, and the bidirectional arm is what makes
+  // that mechanical rather than remembered.
+  //
+  // **Not deferred to keep the commit small.** The terminal keeps its
+  // rasterisers — a curve is Bresenham at dot resolution and folded, which is
+  // not a polyline walk — so wiring the marks into *this* arm would be a rewrite
+  // of the thing the pass promises not to touch.
+  curveFigure:
+    "C12 I59, §3ak.7 — the curve family's shared emitter. Its decisions half is " +
+    "consumed by `positionalForm` through `positionalDecisions`; the marks half " +
+    "waits for `plotToSvg` to walk a figure, which is step 4 of the pass. The " +
+    "terminal cannot be the consumer: its curve arm rasterises at dot resolution " +
+    "and folds, so it reads the decisions and never the marks",
   // `renderToLines` was here and the equality arm removed it on the commit that
   // moved the conformance suites into `src/testing/` — which is the arm working,
   // and also **the rule's known false negative, shared with MG24.**
