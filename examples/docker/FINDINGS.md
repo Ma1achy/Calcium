@@ -13642,6 +13642,78 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F281 — the citation checker read two-letter sections as one-letter ones, and its own probes agreed ★★★★★
+
+**Found by writing thirteen citations to a section that did not exist and watching the counter not
+move.** `§3ak.12` was cited from five files across two commits while `### 3ak.12` had never been
+written, and `make enforce` reported `117 of 5714 resolve to no section` before and after.
+
+**The pattern allows one letter.**
+
+```js
+const SECTION_HEADING = /^#{2,4}\s+(\d+[a-z]?(?:\.\d+)?)\.?\s/u;
+const SECTION_TOKEN   = /§\s?(\d+[a-z]?(?:\.\d+)?)/gu;
+```
+
+Against `§3ak.12`: `\d+` takes `3`, `[a-z]?` takes `a`, and `(?:\.\d+)?` meets `k` and gives up. The
+captured id is **`3a`** — a real section of C12 — so the citation *resolved*, against a document
+saying something else entirely. And `### 3ak.12` matches no heading at all, because after `3a` the
+pattern needs whitespace and finds `k`: **the whole `3a…` family was absent from the index while every
+pointer into it counted as resolved.**
+
+**612 citations in the corpus use two or more letters.** `3aj` ×70, `3ac` ×57, `3ak.7` ×49, `3ag`
+×44 — the entire specification vocabulary this component was rebuilt in.
+
+**This is the class CLAUDE.md says no mechanism can catch, arriving inside the mechanism.** *A
+citation resolving against the wrong invariant* — and the audit's argument for not automating it is
+about invariants. Here the citations are *sections*, there is a checker, and it was resolving them
+against the wrong one by construction.
+
+**The rule's own fabricated violation is why it survived, and it was vacuous.** Two rows assert SP8
+fires. Both handed their stub reader to the *whole* rule — so `sectionsOf` read the stub too, every
+spec's index came back empty, and a rule that finds no sections reports every citation as dangling.
+Measured: **`C12 §3a`, which exists and is cited across the corpus, produced a violation under that
+setup.** So the rows fired for any input at all and could not tell a missing section from a present
+one — A03 §2's vacuity class, in the instrument a rule owes.
+
+And the id they fabricated was `9z`. **One letter — the shape the pattern already handled.** The
+probe agreed with the rule instead of testing it, which is the same failure as *a probe reconstructed
+from intent* (F279) one instrument along.
+
+**What it cost, measured.** Widening both patterns to `[a-z]*`:
+
+```
+dangling      117 → 129   across 74 → 80 targets
+unowned       333 → 347
+```
+
+Ten distinct ids, seventeen citations, every one real — `C04 §3ag` ×4, `C04 §3ab` ×3, `C04 §3aj` ×2,
+`C09 §3ag` ×2 and six more. They are bare `§3ag` written *inside* C04 and attributed to its owner
+where the intended target is C12's; under the old pattern they scanned as `§3a`, **which C04 declares**,
+so they resolved.
+
+**A second blind spot fell out of the first.** The dotted fallback — *`§8b.7` names the seventh item
+inside C26 §8b, a numbered line rather than a heading, so an index of headings cannot see it* — is
+correct, written down, and made `§3ak.12` invisible too, because the two have the same shape and
+different meanings. **One notation for two things, and the rule had to pick which to be blind to.**
+What tells them apart is the parent: C12 §3ak declares `3ak.1 … 3ak.12` as headings, and a document
+numbering its sub-sections that way is not also using inline numbering for the same ids. The fallback
+is withdrawn there and kept everywhere else.
+
+> **The fabricated ids above are written without their `\u00a7`**, because this rule reads prose too: a
+> finding about citations that do not resolve otherwise *creates* them, and the residue it is measured by
+> stops being a worklist. `SECTION_EXCEPTIONS` is the other answer and it excuses a whole file, which is
+> broader than the four words that need it.
+
+**Its limit, stated: a *first* sub-section still falls back.** `9c.1` under a `9c` with no numbered
+children resolves either way, because there the two meanings are genuinely indistinguishable.
+
+**Both new rows were mutated before being trusted**: reverting `[a-z]*` to `[a-z]?` turns them red,
+and every fabricated violation now carries a control — a citation that resolves must produce nothing,
+which is the assertion whose absence let all of this through.
+
+---
+
 ## F280 — a member's absent case, inferred from the only family that had one ★★★★★
 
 **`Mark.rect.depth` was written for the tiles family and its absent case was given a meaning from

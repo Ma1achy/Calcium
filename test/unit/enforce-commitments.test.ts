@@ -806,6 +806,23 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     expect(unkeyed.length, "a removed key fails completeness and the sum").toBe(2);
   });
 
+  /**
+   * A reader that fakes **only the citing file** (F281).
+   *
+   * **The rows below handed their stub to the whole rule**, so `sectionsOf` read
+   * it too and every spec's index came back empty — and a rule that finds no
+   * sections reports every citation as dangling. Measured: `C12 §3a`, which
+   * exists and is cited across the corpus, produced a violation under that
+   * setup. So the two fabricated violations fired for any input at all and could
+   * not tell a missing section from a present one, which is A03 §2's vacuity
+   * class arriving in the instrument a rule owes.
+   *
+   * **That is why the one-letter pattern survived**: the probes agreed with the
+   * rule instead of testing it.
+   */
+  const citing = (path: string, text: string) => (f: string): string =>
+    f === path ? text : readFileSync(f, "utf8");
+
   it("SP8: the real tree is read, and its residue is a worklist rather than a gate", () => {
     // **SP8 is reported and not gated, and this row is what makes that expire.**
     // SP3 shipped with its two findings already fixed; this one arrived with 120
@@ -833,21 +850,61 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // The defect the rule exists for, and the one it found on its first run:
     // `C12 §3q` was pointed at by three source comments and had never been
     // written. A citation reads as a source.
-    const v = checkSectionReferences(
-      ["docs/architecture/A01_fabricated.md"],
-      () => "The rule is stated in C12 §9z, which does not exist.",
-    );
+    const at = "docs/architecture/A01_fabricated.md";
+    const v = checkSectionReferences([at], citing(at, "The rule is stated in C12 §9z, which does not exist."));
     expect(v.violations.map((x) => x.message).join(" ")).toContain("no such section");
+    // **The control, and it is what the row was missing.** A citation that
+    // resolves must produce nothing — otherwise the assertion above is satisfied
+    // by a rule that cannot read any document at all.
+    const ok = checkSectionReferences([at], citing(at, "The rule is stated in C12 §3a."));
+    expect(ok.violations, "a citation that resolves produces nothing").toEqual([]);
+  });
+
+  it("SP8 fires (F281): a two-letter section id, which the rule read as a one-letter one", () => {
+    // **The fabricated violation above used `§9z`, and that is why the blind
+    // spot survived**: one letter is the shape the pattern already handled, so
+    // the probe agreed with the rule instead of testing it. `\d+[a-z]?` reads
+    // `3ag` as **`3a`** — which C12 declares — so the citation resolved against
+    // a section saying something else, and `### 3ak.12` matched no heading at
+    // all. **612 citations in the corpus use two or more letters.**
+    //
+    // The pair below is what discriminates: under the old pattern **both** read
+    // as `3a` and both resolved.
+    const at = "docs/architecture/A01_fabricated.md";
+    const bad = checkSectionReferences([at], citing(at, "As C12 §3aq settles it."));
+    expect(bad.violations.map((x) => x.message).join(" "), "C12 has no §3aq").toContain("§3aq");
+    const ok = checkSectionReferences([at], citing(at, "As C12 §3ag settles it."));
+    expect(ok.violations, "and C12 does have §3ag").toEqual([]);
+  });
+
+  it("SP8 fires (F281): a sub-section of a parent that numbers its own headings", () => {
+    // **The dotted fallback is right about `§8b.7` and it hid a whole class.**
+    // That id names the seventh *item inside* C26 §8b — a numbered line, not a
+    // heading — so an index of headings cannot see it and reporting it would be
+    // over-reporting. `§3ak.12` has the same shape and means a heading.
+    //
+    // What tells them apart is the parent: C12 §3ak declares `3ak.1` … `3ak.12`
+    // as headings, and a document numbering its sub-sections that way is not
+    // also using inline numbering for the same ids.
+    const at = "docs/architecture/A01_fabricated.md";
+    const v = checkSectionReferences([at], citing(at, "As C12 §3ak.99 has it."));
+    expect(v.violations.map((x) => x.message).join(" ")).toContain("§3ak.99");
+    const ok = checkSectionReferences([at], citing(at, "As C12 §3ak.11 has it."));
+    expect(ok.violations, "and a sub-section that was written resolves").toEqual([]);
+
+    // **The limit, stated, because an unrecorded one reads as strength.** A
+    // *first* sub-section under a parent with no numbered children still falls
+    // back — the two meanings are genuinely indistinguishable there.
+    const item = checkSectionReferences([at], citing(at, "As C26 §8b.7 has it."));
+    expect(item.violations, "an item inside a section is not a missing heading").toEqual([]);
   });
 
   it("SP8 fires: a bare § in a file no document owns", () => {
     // The other half — a pointer with nothing before it saying which document
     // owns it. Unresolvable rather than wrong, and it reads the same to a
     // reader either way.
-    const v = checkSectionReferences(
-      ["examples/docker/NOTES.md"],
-      () => "See §4b for the ordering.",
-    );
+    const at = "examples/docker/NOTES.md";
+    const v = checkSectionReferences([at], citing(at, "See §4b for the ordering."));
     expect(v.violations.map((x) => x.message).join(" ")).toContain("bare §4b");
   });
 

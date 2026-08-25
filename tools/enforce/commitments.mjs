@@ -838,10 +838,15 @@ export const REFERENCE_EXCEPTIONS = {
 //   like any other, and prose quoting a broken citation is a broken citation.*
 
 /** A section id a document declares — `3`, `3a`, `6a.1`. */
-const SECTION_HEADING = /^#{2,4}\s+(\d+[a-z]?(?:\.\d+)?)\.?\s/u;
+// **`[a-z]*` and not `[a-z]?`, and the difference was 612 citations** (F281).
+// One optional letter reads `3ak.12` as `3a` — a real section, so the reference
+// resolved, against a document that says something else. The heading `### 3ak.12`
+// matched nothing at all, so the whole `3a…`-suffixed family was absent from the
+// index while every citation to it was counted as resolved.
+const SECTION_HEADING = /^#{2,4}\s+(\d+[a-z]*(?:\.\d+)?)\.?\s/u;
 
-/** `§3a`, `§6a.1` — and `§ 3a`, which the corpus writes in prose. */
-const SECTION_TOKEN = /§\s?(\d+[a-z]?(?:\.\d+)?)/gu;
+/** `§3a`, `§3ak.12`, `§6a.1` — and `§ 3a`, which the corpus writes in prose. */
+const SECTION_TOKEN = /§\s?(\d+[a-z]*(?:\.\d+)?)/gu;
 
 /** Every section id a spec or architecture document declares. */
 export function sectionsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
@@ -957,7 +962,28 @@ export function checkSectionReferences(
       // declares 3 and 3c and no 3a, which is this rule's largest finding and
       // a prefix rule would have hidden it.
       const parent = ref.id.includes(".") ? ref.id.slice(0, ref.id.lastIndexOf(".")) : null;
-      if (own !== null && (own.has(ref.id) || (parent !== null && own.has(parent)))) {
+      // **And the fallback is withdrawn where the parent numbers its own
+      // headings** (F281). The paragraph above is right about `§8b.7` and it
+      // made a whole class invisible: `§3ak.12` has the same *shape* and means
+      // a heading, so thirteen citations to a section that had never been
+      // written were counted as **resolved**, in the same run that reports how
+      // many resolve to nothing. One notation for two things, and the rule had
+      // to pick which to be blind to.
+      //
+      // **What tells them apart is the parent.** C12 §3ak declares `3ak.1` …
+      // `3ak.11` as headings, so a document that numbers its sub-sections that
+      // way is not also using inline numbering for the same ids — `§3ak.12`
+      // must be one of them. C26 §8b declares no `8b.N` heading at all, so
+      // `§8b.7` is an item inside it and still falls back.
+      //
+      // **Known limit, because an unrecorded one reads as strength**: a
+      // *first* sub-section still falls back. `§9c.1` under a `§9c` that has no
+      // numbered children resolves, and that is the same shape as `§8b.7`
+      // whichever it means. The rule closes the class it can see the grammar
+      // for and says so.
+      const numbered = own !== null && parent !== null
+        && [...own].some((id) => new RegExp(`^${parent.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\.\\d+$`, "u").test(id));
+      if (own !== null && (own.has(ref.id) || (parent !== null && !numbered && own.has(parent)))) {
         resolved += 1;
         continue;
       }
