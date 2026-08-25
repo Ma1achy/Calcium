@@ -4485,6 +4485,17 @@ a **trace** finds event-mediated ones. This component has both kinds and therefo
 unexamined**, which is the mistake C19 §8a records: a trace indexed by events cannot reach a
 structural interaction however many rows it has, and C18's table was already in the repository.
 
+### 3ak.5 — What a refusal leaves behind
+
+**`figureOf` is total and never throws.** I2 says no series input throws, and a figure is one level
+above the rasteriser it feeds — a throw here would abandon a half-built figure in a component whose
+whole claim is that both arms read the same one.
+
+**A refusal is a figure with no marks**, which is F259's ruling arriving as a type: *refuse a false
+figure, record an incomplete one*. `plotToSvg` already returns `null` on an empty body and keeps
+doing so; the terminal already draws its empty rows and keeps doing that. **The two arms refuse
+differently and that is legitimate** — what must be identical is *whether there was anything to
+draw*, and after this pass there is one answer to that question instead of two.
 ### 3ak.6 — `autocorrelation` was going to be refused, and the escape clause is what stopped it
 
 **The largest disagreement in the corpus is that `autocorrelation` is two different charts.** The
@@ -4534,17 +4545,81 @@ sample index*, which is a different wrong figure — the orientation is a `Figur
 emitter does not exist yet. So the entry stays `"curve"` until step 4 moves it, with the reason
 recorded rather than the symptom fixed.
 
-### 3ak.5 — What a refusal leaves behind
+### 3ak.7 — The curve family's walk, and D14's shape a second time
 
-**`figureOf` is total and never throws.** I2 says no series input throws, and a figure is one level
-above the rasteriser it feeds — a throw here would abandon a half-built figure in a component whose
-whole claim is that both arms read the same one.
+**Artefact A's shape at one family's scale**: the cells where two rules both hold at rest, over the
+six forms `SVG_FAMILY` calls `curve`. Nine of them, and the first is a finding.
 
-**A refusal is a figure with no marks**, which is F259's ruling arriving as a type: *refuse a false
-figure, record an incomplete one*. `plotToSvg` already returns `null` on an empty body and keeps
-doing so; the terminal already draws its empty rows and keeps doing that. **The two arms refuse
-differently and that is legitimate** — what must be identical is *whether there was anything to
-draw*, and after this pass there is one answer to that question instead of two.
+| # | one rule | the other | where they meet | what it settles |
+|---|---|---|---|---|
+| **C1** | the figure describes the block's series | `ecdf` and `density` draw a **derived** series | those two forms | **F268** — two charts of one block, again |
+| **C2** | a figure is capability-independent (§3ak.3) | at 1 bit a stacked plot rasterises against **raw** bounds | `line`, 1 bit, two series | `value` is the niced axis always; the raw-bounds object is a *projection* |
+| **C3** | `HAS_VALUE_AXIS.line` is `true` | at 1 bit that gutter holds **names** | the same cell | consistent, and the reason the record answers *readings on a scale* rather than *what the gutter holds* |
+| **C4** | `identity` is the series' labels | `segments` replace the series in the legend | a curve with `segments` | one list, or the legend names a set the gutter does not |
+| **C5** | the figure carries the facing (I61) | the SVG refuses a non-default `origin` | `origin: "top-left"` | the refusal is the arm's; the figure decides regardless, and step 4 removes the refusal |
+| **C6** | the range is `seriesRange(series, block, bars)` | candles contribute bars | `line` with `ohlc` | the bars are in the range, or the terminal moves |
+| **C7** | a refusal is a figure with no marks (I64) | pinned bounds make `seriesRange` non-null with no samples | `ecdf` with `yMin`/`yMax` and no data | the refusal is `hasSamples`, never the axis |
+| **C8** | one legend slot per series | a labelled annotation earns one (C04 I52) | one series, one annotation | slots are series, then candles, then annotations — `legendEntries`' own order |
+| **C9** | curve is `orientation: "vertical"` | a sparkline is one row with no axis | `sparkline` | vacuous, and recorded so it is not later mistaken for a decision |
+
+**C1 is D14's shape found by walking a family rather than a form.** `ecdf` sorts its samples and
+replaces them with a cumulative fraction; `density` replaces five samples with a hundred kernel
+estimates. Both derivations happen in the terminal's dispatch table, *above* the renderer, so the
+SVG arm has nowhere to read them from and draws the raw series:
+
+```
+              terminal                                    SVG
+ecdf          [0.2, 0.4, 0.6, 0.8, 1.0] over 0…1          5 1 4 2 3 over 1…5
+density       100 kernel estimates over 0…0.19            5 1 4 2 3 over 1…5
+```
+
+**An ECDF that descends is not an ECDF**, and `curvePath` steps it, so it reads as one. The density
+plot is worse: there is no density in it. Both are the plausible wrong figure the `null` arm exists
+to refuse — and neither is refused, because `svgFamilyOf` is **right**. They *are* curves. The
+family is correct and the *datum* is wrong, which is why the total record could not catch this one
+either (§3ak.6): the entry it holds is not the entry that is wrong.
+
+> **The ruling: the derivation moves into the shared layer, and it is not a refusal.** §3ak.6's
+> escape clause, applied to the second family that needed it — check whether the emitter reaches the
+> figure without new geometry *before* writing a `null`. It does. `ecdfSeries` and `densitySeries`
+> are pure functions of the samples, already written, already in L1, and neither calls `cells()` nor
+> takes a capability.
+
+**What is wrong is where they live.** `ecdfSeries` is in `scatter.ts` and `densitySeries` in
+`kde.ts`, both rasteriser modules, because the terminal was the only arm that ever needed them. **A
+derivation living inside a rasteriser is the seam in the wrong place, stated in the file tree.**
+
+**And the move has a direction, which hazard 3 sets.** `figure.ts` must not import `kde.ts`: that
+module calls `cells()`, and the shared layer reaching a cell measurement *through an import* is
+§3aj hazard 3 arriving in the module graph rather than in a signature. So the two functions move
+**down** into the shared layer and their old homes import them back — the same direction §3ak.1
+finding 5 gives for `FrameStyle` and `LegendEntry`, for the same reason.
+
+**C2 is what keeps §3ak.3 honest.** `positionalForm` chooses between a niced axis and the raw bounds
+by asking `stacksAtOneBit`, which reads `colourDepth` — so the axis the terminal rasterises against
+is capability-dependent, and a figure member cannot be. The figure's `value` is therefore the niced
+axis at every rung, and the raw-bounds object stays in the terminal's projection beside the
+`stackedRows` call it exists for. This is the rung table's *stacked strips at 1 bit* row read
+forwards: what changes below the colour floor is not the figure but what is done to it.
+
+#### C1 also says something about artefact A, and two instances is the minimum for saying it
+
+§3ak already records that the disagreement matrix cannot see D14 — *both arms draw something, and
+the cells compare labels and furniture rather than shape*. `ecdf` and `density` are that blind spot
+a second time, and the second instance is what makes it a rule rather than a coincidence:
+
+> **The matrix's cells are not independent, and closing one alone can make the figure worse.**
+
+`ecdf`'s recorded disagreement is `numericLabels 2/2`: the terminal ticks 0 to 1, the SVG ticks 1 to
+5. Closing *that cell* gives the SVG the terminal's 0-to-1 gutter over a path of the raw samples —
+**a chart labelled as a cumulative distribution drawing something that is not one**, which is
+strictly worse than today's honestly mismatched pair. A reader can see that two charts disagree; a
+reader cannot see that one chart's axis belongs to a different chart.
+
+So a cell's disposition is a claim about *that decision* and never a licence to fix it alone. **It
+is also why the emitters land per family rather than per decision** — a family is the smallest unit
+in which the cells are jointly satisfiable, and the plan's step 3 was already shaped that way for a
+reason this walk has now measured.
 
 ---
 
@@ -5792,6 +5867,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I62** — **A mark names a role and a slot, never a glyph and never a colour.** `GlyphRole` is an exhaustive `Record`, so a rung with no entry is a compile error rather than a silently different character; `ref` stays unresolved so each arm calls `resolve()` at its own depth — one resolution rule, two depths.
 - **I63** — **The shared layer states how much room a label has and never measures the label.** `room` is a fraction of the figure; the terminal turns it into cells and truncates, the SVG turns it into a `clipPath`. *§3aj hazard 4 says a shared layout that calls `cells()` cannot serve the image path, so the two arms cannot agree about which labels fit — measured, a `treemap` names five tiles in one arm and eight in the other. The threshold is shared and the outcome is each arm's.*
 - **I64** — **`figureOf` is total, and a refusal is a figure with no marks.** No block throws, because a throw one level above the rasteriser abandons a half-built figure in the component whose claim is that both arms read the same one (I2, one level up). *How each arm refuses stays its own — `null` in SVG, empty rows in the terminal — because what must be identical is whether there was anything to draw.*
+- **I65** — **A form whose datum is derived derives it once, above both arms.** `ecdf` replaces its samples with a sorted cumulative fraction and `density` replaces five of them with a hundred kernel estimates; both answer *what is drawn* and never *how*, so a derivation one renderer can reach and the other cannot is a second figure rather than a second rasterisation. *Measured before the rule: for one block the terminal drew `[0.2 … 1.0]` over 0–1 and the SVG drew `5 1 4 2 3` over 1–5 — an ECDF that descends, and a density plot with no density in it. Both functions were pure, written and living in rasteriser modules, which is the one place the second arm could not reach them (F268).*
 
 ## 8. Commitments
 
@@ -5853,6 +5929,7 @@ orientation — and belongs in the classification table as its own rows.
 56. **A mark carries a role and an unresolved slot, so neither arm holds a glyph or a colour** (I62, §3ak). The role table is exhaustive, so a missing rung fails to compile in both arms rather than drawing a different character in one.
 57. **The label allowance crosses the seam and the label does not** (I63, §3ak). §2 asked for the same labels dropped and hazard 4 forbids the measurement that would achieve it; the threshold is shared and the truncation is each arm's.
 58. **A figure is total and a refusal is an empty one** (I64, §3ak). F259's *refuse a false figure, record an incomplete one*, expressed as a type rather than as a clause in two renderers.
+59. **The datum a form draws is derived once, above both renderers** (I65, §3ak.7). A derivation inside one arm's dispatch table is a figure the other arm cannot reach: `ecdf` and `density` drew their raw samples in SVG while the terminal drew a cumulative fraction and a kernel estimate — D14's shape found a second time, by walking a family rather than a form.
 
 ---
 
@@ -6008,7 +6085,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.88** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
 
-#### The arm unification rows (§3ak, I59–I64)
+#### The arm unification rows (§3ak, I59–I65)
+
+- **FV1–FV3** (I60, §3ak): **`HAS_VALUE_AXIS`' true direction over the corpus** — a form marked `false` never draws a numeric gutter label, at both widths and every capability set, with the count of forms checked reported rather than assumed. **`FV1` failed on the commit that introduced it**, four offenders, against a record its own author had just written (F267). `FV2` refuses the converse — a form marked `true` need draw no numeric label, because whether the gutter holds values is orientation and rung — and `FV3` pins the strings the axis carries, so the arm that stopped computing them cannot start again.
 
 - **AD1–AD5** (I59, §3ak): **the disagreement matrix, and it is walk artefact A** — every form, every variant, both widths, at 24-bit, with each cell's disposition stated as *the relation the row asserts*: `agree` fails if the arms drift apart, `n/m` fails if it closes silently **or becomes a different disagreement**, `legitimate` fails if they ever start agreeing. Shipped ahead of the type, because the list of disagreements is what the type is designed against. `AD5` corrupts one side and requires the comparison to see it, since a sweep certified only by its own record agrees with itself whatever it does.
 - **U1a** (I59, §3ak): **a decision mutated inside `figureOf` moves BOTH arms.** *The row U1 was written as — `the same block yields an identical Drawn[] for both arms` — is `f(x) === f(x)` the moment one emitter serves both, which is A03 §2's vacuity class arriving in the assertion the pass exists for.* One arm moving alone is the finding: the other still decides it itself.

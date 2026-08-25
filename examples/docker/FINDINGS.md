@@ -13281,3 +13281,53 @@ capability rung, not form** — so the converse is false and `FV2` exists to sto
 still formats through `yLabels` and the SVG still prints `String(tick)`. The member has one consumer
 and it is a test. That is F84's class, and it closes when the SVG walks the figure.
 
+---
+
+## F268 — the same block, two charts, in the family the walk was meant to confirm ★★★★☆
+
+**The curve family's walk was meant to confirm an extraction and found a second D14.** `ecdf` and
+`density` do not draw their samples. `ecdf` sorts them and replaces them with a cumulative fraction;
+`density` replaces five samples with a hundred kernel estimates. Both derivations live in the
+terminal's dispatch table — *above* `positionalForm` — so the second arm has nowhere to read them
+from, and `svgPoints` draws `series.values`. Measured on `[5, 1, 4, 2, 3]`:
+
+```
+              terminal                                  SVG
+ecdf          [0.2, 0.4, 0.6, 0.8, 1.0] over 0…1        5 1 4 2 3 over 1…5
+density       100 kernel estimates over 0…0.19          5 1 4 2 3 over 1…5
+```
+
+**An ECDF that descends is not an ECDF**, and `curvePath(points, square)` steps it, so it reads as
+one. The density plot is the worse of the two: there is no density in it at all. Both are the
+plausible wrong figure the `null` arm exists to refuse.
+
+**Neither is refused, because `svgFamilyOf` is right.** They *are* curves. The family is correct and
+the **datum** is wrong — which is F266's mechanism with the cause inverted: there a total record
+held a wrong entry, here it holds the right one and the wrong thing is not in the record at all. **A
+record cannot be wrong about a question it does not ask**, and totality does not make it ask more.
+
+**What the gate was not checking.** Walk artefact A — the disagreement matrix, 135 cells over 27
+forms — reports both forms as `numericLabels n/n`, which says *the ticks differ*. It has no cell for
+*which figure*, because every cell compares labels and furniture and **both arms draw something**.
+§3ak already records that blind spot for `autocorrelation`. This is the second instance, and the
+second is what makes it a property of the instrument rather than a miss.
+
+**And the second instance carries what the first could not.** The matrix's cells are not independent,
+**so closing one alone can make the figure worse.** Give the SVG the terminal's 0-to-1 gutter and
+leave the raw path underneath, and `ecdf` becomes a chart *labelled as a cumulative distribution
+drawing something that is not one* — strictly worse than today's honestly mismatched pair, because a
+reader can see that two charts disagree and cannot see that one chart's axis belongs to another. A
+cell's disposition is a claim about that decision and never a licence to fix it alone.
+
+**The fix is where the functions live, not what they do.** `ecdfSeries` and `densitySeries` are pure
+functions of the samples, already written, already in L1, calling no `cells()` and taking no
+capability — §3ak.6's escape clause satisfied a second time, so neither form is refused. They sit in
+`scatter.ts` and `kde.ts`, both **rasteriser** modules, because the terminal was the only arm that
+ever needed them. **A derivation living inside a rasteriser is the seam in the wrong place, stated in
+the file tree.**
+
+**Ruled** — C12 I65, §3ak.7: the datum a form draws is derived once and above both arms. The move is
+**downward** into the shared layer with the old homes importing it back, because `figure.ts` cannot
+import `kde.ts` — that module calls `cells()`, and the shared layer reaching a cell measurement
+through an import is §3aj hazard 3 arriving in the module graph rather than in a signature.
+
