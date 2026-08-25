@@ -13326,8 +13326,23 @@ capability — §3ak.6's escape clause satisfied a second time, so neither form 
 ever needed them. **A derivation living inside a rasteriser is the seam in the wrong place, stated in
 the file tree.**
 
-**Ruled** — C12 I65, §3ak.7: the datum a form draws is derived once and above both arms. The move is
-**downward** into the shared layer with the old homes importing it back, because `figure.ts` cannot
-import `kde.ts` — that module calls `cells()`, and the shared layer reaching a cell measurement
-through an import is §3aj hazard 3 arriving in the module graph rather than in a signature.
+**Ruled** — C12 I65, §3ak.7: the datum a form draws is derived once and above both arms, and the
+move is **downward** into the shared layer with the old homes importing it back.
+
+**The first reason given for that direction was false, and the code is what said so.** It read
+*`figure.ts` cannot import `kde.ts` — that module calls `cells()`, and the shared layer reaching a
+cell measurement through an import is §3aj hazard 3 in the module graph*. Measured one commit later:
+`figure.ts → axes.ts → text.ts` and `svg.ts → tree.ts → text.ts` **both already exist**, so the
+property was true of both arms before `kde.ts` was a candidate. **Hazard 3 is a rule about what a
+shared *function* does** — `G1`/`G1b` assert it by arity — and a module is not a function. A rule
+restated over the wrong unit forbids what it was never about and permits what it was.
+
+**This is the walk's own recorded failure mode arriving in the walk's own ruling** (C23 §8a A4): the
+interaction was real and the remedy named a mechanism that does not exist. The ruling survives
+because the direction has a true reason — `kde.ts` and `scatter.ts` are the terminal's rasterisers
+for two of seven families, and the edge makes the SVG arm load **10 modules and 3,874 lines** of
+braille, dot grid, glyph ladder and strips to reach five lines of arithmetic. **And the number that
+undercuts it, reported because an unreported one becomes a threshold**: `figure.ts`'s closure is
+already 92 modules and 28,268 lines, so that is +11% and +14%, not a clean layer spoiled. The force
+is direction, not size.
 

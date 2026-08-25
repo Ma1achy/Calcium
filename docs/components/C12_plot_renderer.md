@@ -4589,11 +4589,32 @@ either (§3ak.6): the entry it holds is not the entry that is wrong.
 `kde.ts`, both rasteriser modules, because the terminal was the only arm that ever needed them. **A
 derivation living inside a rasteriser is the seam in the wrong place, stated in the file tree.**
 
-**And the move has a direction, which hazard 3 sets.** `figure.ts` must not import `kde.ts`: that
-module calls `cells()`, and the shared layer reaching a cell measurement *through an import* is
-§3aj hazard 3 arriving in the module graph rather than in a signature. So the two functions move
-**down** into the shared layer and their old homes import them back — the same direction §3ak.1
-finding 5 gives for `FrameStyle` and `LegendEntry`, for the same reason.
+**And the move has a direction. The first reason given for it was false, and the code is what said
+so** — which is this section's own subject one level up: a walk can be right about the interaction it
+found and wrong about a mechanism it assumed existed (C23 §8a A4).
+
+> *`figure.ts` must not import `kde.ts`: that module calls `cells()`, and the shared layer reaching a
+> cell measurement through an import is §3aj hazard 3 arriving in the module graph.*
+
+**Withdrawn.** Measured at the commit that wrote it: `figure.ts → axes.ts → text.ts` and
+`svg.ts → tree.ts → text.ts` both already exist, so the property the sentence forbids was true of
+both arms before `kde.ts` was ever a candidate. **Hazard 3 is a rule about what a shared *function*
+does** — `G1` and `G1b` assert it by *arity*, that `niceAxis`, `seriesRange` and `pinnedRange` take
+no width — and a module is not a function. A rule stated over the wrong unit forbids things it was
+never about and permits the thing it was.
+
+**What is true is smaller and checkable.** `kde.ts` and `scatter.ts` are the **terminal's
+rasterisers** for two of the seven families, and an edge into them from the shared layer makes the
+SVG arm load braille, the dot grid, the glyph ladder and the strip renderers — measured, **10
+modules and 3,874 lines** — to reach five lines of arithmetic over samples.
+
+**And the number that undercuts the argument, since an unreported one is how a figure becomes a
+threshold**: `figure.ts`'s closure is *already* 92 modules and 28,268 lines, so this is +11% and
++14% rather than a clean layer being spoiled. The force is not size. It is that **arithmetic over
+samples is below both arms and is sitting inside one arm's rasteriser for no reason but who needed it
+first** — the same direction §3ak.1 finding 5 gives for `FrameStyle` and `LegendEntry`, and there the
+reason *was* a cycle. Here a cycle is a **prediction** — those two modules are where families 2 and 5
+read their figure back — and it is written as one.
 
 **C2 is what keeps §3ak.3 honest.** `positionalForm` chooses between a niced axis and the raw bounds
 by asking `stacksAtOneBit`, which reads `colourDepth` — so the axis the terminal rasterises against
