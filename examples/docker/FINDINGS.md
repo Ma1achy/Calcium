@@ -13642,6 +13642,49 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F312 — the legend reader's name is one word, and 122 labels could not say so ★★★★☆
+
+F307 gave `terminalDecisions` a `LEGEND_TAIL` so it could see a key drawn **beside** a figure
+rather than under it, and the tail asks the *shape*: two or more spaces, a swatch of one to three
+non-word characters, a **name**, an optional number. The name was `[A-Za-z][\w.\-]*`.
+
+**One word.** Measured over `tools/catalogue-forms.ts`: **123 label literals across 46 forms, and
+exactly one contains a space** — `"Half again"`, in `waffle/over-100`, added three commits later.
+
+**A fixture written to make one unreachable rule contradictable falsified a different unstated
+assumption on the way past.** F305's finding was that a pie's merge and a waffle's rounding had
+never fired here; the frames built to fire them carried a two-word label because a segment called
+`Half again` is what that fixture wanted to say. Nothing aimed at the reader.
+
+The effect is F307's own defect one variant along, in the reader F307 wrote: the key stayed in the
+body, so the terminal reported `["Half","again"]` as **identity labels** where the SVG reported
+none — **two cells of the disagreement matrix claiming the arms disagree about identity while they
+agree about everything.**
+
+**Two clauses, and removing each in turn shows both are load-bearing and that they close different
+cells:**
+
+```
+internal single space   closes waffle/over-100@80    "Half again 50%"
+the truncation ellipsis closes waffle/over-100@40    "Half a… 50%"
+```
+
+The name field truncates before it wraps, and **no one-word label in the corpus is long enough to
+reach an ellipsis** — so `…` is a second character this matcher had never been shown, for the same
+reason as the first. Removing either clause leaves one cell open. That is the mutation pass's
+question asked of a regular expression, and both halves answer it.
+
+**The widening moved two cells of 246, and both closed.** Measured cell by cell before and after
+rather than off the matrix: a matrix aggregates into fractions, and a widened reader is exactly the
+change that can close one cell and open another inside the same `2/10`.
+
+**Fixed** — `(?: [A-Za-z][\w.\-…]*)*`, with a **single literal space** between words and not
+`\s+`. `\s+` would let a name run across `LEGEND_GAP`'s two columns and swallow the next entry's
+swatch, which is the guard F307 identified; a one-space rule keeps it, because the column gap is
+two.
+
+---
+
 ## F308 — a lookup with a missing key reports exactly one ★★★★☆
 
 **`U1b`'s shortfall row maps a mark kind to the elements it should produce**, and the record was not

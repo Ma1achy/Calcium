@@ -701,6 +701,26 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "waffle", series: [],
       segments: [{ label: "Yes", value: 65 }, { label: "No", value: 25 }, { label: "Maybe", value: 10 }],
     },
+    // **The rounding, which the one existing variant could not reach** (F305).
+    // 65/25/10 sums to exactly 100, so `scale === 1` and `Math.round` is the
+    // identity function — the hundred-square assignment was being asserted by a
+    // fixture that never asks it anything. Two directions, and they fail
+    // differently:
+    //
+    //   under-100   1/1/1 → 33.33 each → 33/33/33 = 99. **A square is left
+    //               empty**, and the grid has to say which.
+    //   over-100    50/50/1 → 49.5/49.5/0.99 → 50/50/1 = 101 against a
+    //               `pos < 100` guard. **The last segment receives no square at
+    //               all** — it holds a share of the whole and is invisible,
+    //               which is the frame worth having.
+    "under-100": {
+      form: "waffle", series: [],
+      segments: [{ label: "One", value: 1 }, { label: "Two", value: 1 }, { label: "Three", value: 1 }],
+    },
+    "over-100": {
+      form: "waffle", series: [],
+      segments: [{ label: "Half", value: 50 }, { label: "Half again", value: 50 }, { label: "Sliver", value: 1 }],
+    },
   },
   flame: {
     tree: {
@@ -1382,6 +1402,26 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         { label: "D", value: 5 }, { label: "E", value: 5 }, { label: "F", value: 3 },
         { label: "G", value: 3 }, { label: "H", value: 2 }, { label: "I", value: 1 },
         { label: "J", value: 1 },
+      ],
+    },
+    // **The merge, which nothing in this repository had ever made fire** (F305).
+    // A slice below one dot of arc folds into `other`, and the threshold is
+    // `1 / 2πr` with `r` in **dots** — so it is a resolution rule and it needs a
+    // radius small enough to have one. `many-segments` above is ten slices at
+    // height 10, where the threshold is 0.82% against a smallest slice of 1%:
+    // correct, terminal-only and **unreachable**, and a green corpus agreed with
+    // it by never asking.
+    //
+    // **Six segments and not ten, which the first frame settled.** The ten-slice
+    // list does merge at height 8 — and its legend elides the result behind
+    // `⋯ 2 more`, so the frame that exists to show a merge hides it. Measured on
+    // this list, the boundary is exactly 8 against 9: at 9 `E` and `F` are two
+    // rows of 1%, at 8 they are one row reading **`other  2%`**.
+    "merged": {
+      form: "pie", height: 8, series: [],
+      segments: [
+        { label: "A", value: 50 }, { label: "B", value: 25 }, { label: "C", value: 15 },
+        { label: "D", value: 8 }, { label: "E", value: 1 }, { label: "F", value: 1 },
       ],
     },
   },

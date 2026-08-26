@@ -136,7 +136,7 @@ function isLegendRun(text: string): boolean {
  * `AD1` is where that would show, because it compares 46 forms and the cell
  * would move.
  */
-const LEGEND_TAIL = /\s{2,}(?:[^\s\w]{1,3}\s+[A-Za-z][\w.\-]*(?:\s+[\d.]+%?)?\s*)+$/u;
+const LEGEND_TAIL = /\s{2,}(?:[^\s\w]{1,3}\s+[A-Za-z][\w.\-…]*(?: [A-Za-z][\w.\-…]*)*(?:\s+[\d.]+%?)?\s*)+$/u;
 
 export function terminalDecisions(lines: readonly string[]): ArmDecisions {
   const rows = lines.filter((l) => l.length > 0);

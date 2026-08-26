@@ -128,7 +128,7 @@ const MEASURED = {
   "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
-  "waffle": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "waffle": { silent: "0/6", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "funnel": "refused",
@@ -174,7 +174,7 @@ const MEASURED = {
   // as a whole row or past a frame edge — and these three draw no border and
   // put the key beside the figure. Five cells on four *other* forms closed
   // with it, every one of them narrowing.
-  "pie": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/8" },
+  "pie": { silent: "0/10", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/10" },
   // **Every cell agrees, including the value axis** — `radarCeiling` became
   // `valueAxisOf` and both arms normalise against the same ceiling (F304).
   "radar": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
