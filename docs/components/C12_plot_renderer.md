@@ -5273,10 +5273,19 @@ computed, so an arm need only take them.
 |---|---|---|
 | `plotFrame` | which of I26's four shapes | **yes** — `frame` |
 | `axes: false` | whether there is **any** furniture | no — `frame` still says `"box"` |
-| `yAxis: false` | drop the value labels, keep the frame and the x axis | no |
-| `xAxis: false` | drop the position axis | no |
+| `yAxis: false` | drop the value labels, keep the frame and the position axis | no |
+| `yAxis: "left" \| "right" \| "both"` | which side, and whether both | no |
 | `legend: false` | no legend at all | no — the slot list is unchanged |
 | `legend: "above" \| "below" \| "left" \| "right"` | where it goes | no — all four give one list |
+| `xLabels` | the position axis's three strings, given rather than derived | no |
+| `xTitle` | the position axis's caption | no |
+
+**Five of six, and the first version of this table said four of six — with a row for `xAxis:
+false`, which is not a field.** `Plot` has `axes`, `xLabels`, `xTitle`, `legend`, `plotFrame` and
+`yAxis`; there is no `xAxis`. The invented row was plausible because `yAxis` exists and the pair
+reads as symmetric, and it went in beside two real fields the same sentence had missed. **A table
+of *what governs this* is worth grepping in full rather than filling out from the one member you
+came for**, which is the audit's own rule turned on the audit.
 
 So an arm consuming these members as they stand draws **a box on a plot that asked for no furniture,
 value labels on one that asked for none, and a legend on one that explicitly suppressed it**, in a
@@ -5300,9 +5309,21 @@ a decision made once is indistinguishable from a decision made twice when only o
   an **author's** surface, where two independent questions want two fields. After resolution there is
   one answer, and a figure carrying both would let a renderer pick the wrong one. The block splits;
   the figure collapses. **The direction is the ruling.**
-- **`valueLabels` and `positionLabels`** — `yAxis: false` and `xAxis: false` remove labels and keep
-  the frame, which no frame style can say. Two booleans rather than one, because a form can drop
-  either alone.
+- **The gutter and the position axis are resolved facts, not flags** — and this is where the first
+  ruling was too coarse. *One member answering what furniture is drawn* is what §3ak.19 said before
+  the call sites were read; measured, **`axes` governs three different things and each has a per-form
+  override**:
+
+  | site | what it gates | the override beside it |
+  |---|---|---|
+  | `height.ts` `axedFurniture` | the **rows reserved** for axis and frame | `FURNITURE_ROWS` is per form |
+  | `definition.ts` `axed` | the **gutter and label column** | `\|\| block.form === "heatmap"` — a matrix's row labels *are* its ordinate, so `axes: false` is refused rather than honoured (C04 I50b) |
+  | `furniture.ts` | the **position axis row** | `&& HAS_POSITION_AXIS[block.form]`, and `xLabels` short-circuits both |
+
+  So a single `"none"` cannot carry it: a heatmap with `axes: false` still guts its rows. The figure
+  carries **`gutter`** and **`positionAxis`** as resolved booleans — each already computed, each with
+  its override applied — and `frame` carries the border shape alone. **`frame: "none"` therefore
+  means *no border*, not *no furniture*, which is a narrower claim than the one first written down.
 - **`legend` becomes placed or absent** — `Readonly<{ slots, placement }> | null`, where `null` is
   `legend: false`. **`null` rather than an empty list**, because an empty list already means *this
   figure has nothing to name* — a single-series curve — and *the author refused a legend* is a

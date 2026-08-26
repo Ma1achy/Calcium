@@ -13654,10 +13654,18 @@ decisions exist; an arm need only take them. That framing is what the walk was r
 |---|---|---|
 | `plotFrame` | which of four shapes | **yes** |
 | `axes: false` | whether there is **any** furniture | no |
-| `yAxis: false` | drop value labels, keep the frame | no |
-| `xAxis: false` | drop the position axis | no |
+| `yAxis` | value labels: suppressed, or which side | no |
 | `legend: false` | no legend at all | no |
 | `legend: "above"…"right"` | where it goes | no — all four give one list |
+| `xLabels` | the position axis's three strings | no |
+| `xTitle` | its caption | no |
+
+**Five of six, and this table first said four of six with a row for `xAxis: false` — which is not a
+field.** `Plot` has `axes`, `xLabels`, `xTitle`, `legend`, `plotFrame`, `yAxis`. The invented row was
+plausible because `yAxis` exists and the pair reads as symmetric, and it displaced two real fields
+the same sentence had missed. **The finding survives and one of its rows did not**, which is the
+shape worth keeping: a table of *what governs this* gets grepped in full, not filled in from the one
+member you arrived for.
 
 Measured directly: `curveFigure` returns `frame: "box"` for `axes: false`, and `legendSlots` returns
 the same two entries for `legend: false` as for `legend: "right"`.
@@ -13665,6 +13673,16 @@ the same two entries for `legend: false` as for `legend: "right"`.
 **So consuming them naively is worse than ignoring them.** The arm would draw a box on a plot that
 asked for no furniture, value labels on one that asked for none, and a legend on one that explicitly
 suppressed it, in a placement nobody chose. **Not wiring. Design.**
+
+**And the design's first ruling was too coarse, which the call sites said and the members did not.**
+*`frame` absorbs `axes`, one member answering what furniture is drawn* — measured, `axes` gates
+**three** things and each carries a per-form override: the **rows reserved** (`height.ts`, per form
+via `FURNITURE_ROWS`), the **gutter** (`definition.ts`, `|| block.form === "heatmap"`, because a
+matrix's row labels *are* its ordinate and `axes: false` is refused there), and the **position axis**
+(`furniture.ts`, `&& HAS_POSITION_AXIS[form]`, with `xLabels` short-circuiting). A heatmap with
+`axes: false` still guts its rows, so one `"none"` cannot carry it. `frame: "none"` means *no
+border*; `gutter` and `positionAxis` are separate resolved booleans. **The implementation is the
+first thing that can disprove a walk, and this is it doing that.**
 
 **The class**: a ruling can be right about the interaction it found and wrong about a mechanism it
 assumed existed. *Consume `figure.legend`* names an operation, and the operation as specified cannot
