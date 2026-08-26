@@ -420,8 +420,14 @@ export function violinColumn(
     put(at(ns.q3), gl.horizontal);
     put(at(ns.median), gl.teeRight);
     if (ns.mean !== undefined) {
+      const roles = roleGlyphs(caps);
       const rm = at(ns.mean);
-      if (rm !== at(ns.median)) put(rm, roleGlyphs(caps).of.mean);
+      // **Mean on median gets its own glyph rather than no glyph** — the third
+      // of five call sites to be given the ruling `boxOnSpine` states (C04 I53,
+      // C12 I33, F301). Skipping avoided hiding the median tee, which was right,
+      // and left a band with no mean mark beside two that had one, so *they
+      // coincide* read as *it is missing*.
+      put(rm, rm === at(ns.median) ? roles.meanOnMedian : roles.of.mean);
     }
   }
 
@@ -668,7 +674,9 @@ function boxOnSpineColumn(
   put(at(ns.median), gl.teeRight);
   if (ns.mean !== undefined) {
     const rm = at(ns.mean);
-    if (rm !== at(ns.median)) put(rm, roles.of.mean);
+    // **The same ruling as its transpose, which had it and this did not**
+    // (F301). A cell holds one glyph, so the glyph names both.
+    put(rm, rm === at(ns.median) ? roles.meanOnMedian : roles.of.mean);
   }
   return out.map((r) => r.join(""));
 }

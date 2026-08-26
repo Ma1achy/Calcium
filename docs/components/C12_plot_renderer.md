@@ -5478,6 +5478,57 @@ corpus constructed the state** — and that is the finding rather than a caveat 
 invisible to every gate this repo has, and the thing it removes is a defect that would have appeared
 the first time a caller passed a row with no estimate.
 
+### 3ak.23 — The second terminal move: three of five call sites had the ruling
+
+**Extracting the alphabet is what made this findable, and that is the reusable half.** Every mean in
+the tree now comes off one record, so the five renderers that draw one beside a median are five
+expressions naming the same two members — and **three ask about coincidence while two do not**.
+Before the extraction the same duplication was there with nothing to compare against: `gl.diamondTee`
+in one function and `gl.diamond` in another are two glyph lookups, and it takes reading both to see
+that one asks a question the other does not.
+
+`boxOnSpine` already carried the whole reason: *skipping the diamond avoided hiding the median tee,
+which was right, and left a band with no mean mark beside two that had one — so **they coincide** read
+as **it is missing**. A cell holds one glyph, so the glyph names both.* `boxplotColumn` and
+`boxplotBand` had it. `violinColumn`'s inline spine and `boxOnSpineColumn` — the braille arm of the
+same form — did not.
+
+**One frame carries the whole argument**, which is why this is a frame-read and not a diff:
+
+```
+before                                  after
+│ │    ─    │    ╰─┼─╯    │   ◆   │ │   │ │    ─    │    ╰─┼─╯    │   ◆   │ │
+│ ╰╮   │   ╭╯      │      │   ┤   │ │   │ ╰╮   │   ╭╯      │      │   ┤   │ │
+│  ╰╮  ┤  ╭╯       │     ╭╯   │   ╰╮│   │  ╰╮  ◈  ╭╯       │     ╭╯   │   ╰╮│
+```
+
+`violin/vertical` draws three bands. `dose-b`'s mean sits away from its median and says so; `control`
+and `dose-a` said nothing, in the same figure, with no way to read *coincident* from *absent*.
+
+**What moved, read.** 30 baseline frames — `violin-vertical`, `violin-vertical-braille` and
+`violin-vertical-braille-filled` at five capability sets and two widths, and **nothing else**. No
+horizontal violin and no boxplot, which is the control the mechanism predicts: those arms already had
+the ruling.
+
+**Classified rather than eyeballed**: 60 lines changed, **no line gained or lost**, and every changed
+cell is one of two substitutions — `┤ → ◈` 36 times and `+ → X` 24 times, which is the same
+substitution in the two alphabets `glyphs()` has. **One cell per changed line, sixty for sixty.** A
+frame-read that reports *it looks right* is a frame-read that has not been done; a classified diff is
+what says the change is the mechanism and not a side effect of it.
+
+Four golden snapshots move with them, and **`-u` was not used**: each was verified to differ from its
+fresh render by exactly two cells of that same pair before being rewritten. A snapshot records, it
+does not check.
+
+The catalogue's terminal digest moves with it, `d06687b479814a56` → `40ec44bcc4d321ce`, the second
+terminal move of this campaign and the reason it is a commit of its own.
+
+**§3q records the same class on the same family**, and that is the finding rather than a coincidence:
+*a rule that has to be applied N times is applied N−1 times eventually, which is why it is here rather
+than only in the code that got it right.* The shared-axis fix was three instances; this is two. The
+arms are written as transposes of one another, so a fix goes into the one whose frame was being read
+and the transpose keeps the defect — and neither is wrong when read on its own (F301).
+
 ---
 ## 3q. One value axis across the bands, and the record it never had
 

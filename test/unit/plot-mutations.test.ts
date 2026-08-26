@@ -11,6 +11,7 @@ import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from 
 import { HIERARCHY_ROLE, block, type Plot, type QuartileSummary } from "../../src/data/viewmodel/index.js";
 import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
+import { violinColumn } from "../../src/presentation/plot/kde.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "../../src/presentation/plot/ramp.js";
@@ -2087,6 +2088,48 @@ describe("C12 I33 — no whisker, no stub", () => {
     const none = { min: 3, q1: 3, median: 5, q3: 7, max: 7 };
     expect(spine(none)).not.toContain(g.diamond);
     expect(spine(none)).not.toContain(g.diamondTee);
+  });
+
+  it("T1.100d (C12 I33, C04 I53): the violin's column arms say it too — three of five had the ruling", () => {
+    // **Fail-on-revert.** Restoring either column arm's `if (rm !== at(median))`
+    // — which skipped the write rather than combining the two marks — fails this
+    // row, and moves 30 baseline frames (F301).
+    //
+    // T1.100c is this row's sibling and it found the same defect in the boxplot
+    // pair. **The ruling landed in one of the five places that needed it**: the
+    // two boxplot renderers and `boxOnSpine` combined the marks, and the two
+    // *column* arms skipped — so a violin whose mean is its median rendered
+    // identically to one carrying no mean, in the vertical arm only. A rule that
+    // has to be applied N times is applied N−1 times eventually, which §3q
+    // already records for a different fix on this same family.
+    //
+    // **The frame is where it reads worst**: `violin/vertical` draws three bands
+    // and `dose-b`'s mean sits away from its median, so one band showed `◆` and
+    // the other two showed a plain median tee — *they coincide* and *there is no
+    // mean* wearing one glyph, beside a band that says otherwise.
+    const on = { min: 3, q1: 3, median: 5, q3: 7, max: 7, mean: 5 };
+    const apart = { min: 3, q1: 3, median: 5, q3: 7, max: 7, mean: 6 };
+    const none = { min: 3, q1: 3, median: 5, q3: 7, max: 7 };
+    // **Two arms, and the second is reached only through braille.** The plain
+    // path writes its spine inline; the braille path folds its dots and hands
+    // them to `boxOnSpineColumn`, which had the same skip. Covering one and
+    // letting the baseline gate cover the other would leave the reason recorded
+    // in bytes: a moved frame says *something changed*, never *and here is why*.
+    const vc = (q: Record<string, number>, braille = false): string =>
+      violinColumn(
+        { values: [3, 4, 5, 6, 7] } as never, 9, 11, FULL_CAPS, q as never,
+        "rounded", undefined, undefined, braille,
+      ).join("");
+
+    for (const braille of [false, true]) {
+      const arm = braille ? "the braille arm" : "the line arm";
+      expect(vc(on, braille), `${arm}: mean on median`).toContain(g.diamondTee);
+      expect(vc(apart, braille), `${arm}: mean apart`).toContain(g.diamond);
+      expect(vc(apart, braille), `${arm}: and not the combined mark`).not.toContain(g.diamondTee);
+      // Or the rows above pass against an arm that marks the median twice.
+      expect(vc(none, braille), `${arm}: no mean at all`).not.toContain(g.diamond);
+      expect(vc(none, braille), `${arm}: and no combined mark either`).not.toContain(g.diamondTee);
+    }
   });
 
   it("T1.100b (C12 I33): the vertical arm's lid, and the alphabet that can say it after all", () => {

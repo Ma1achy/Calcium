@@ -13642,6 +13642,53 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F301 — a ruling applied at three of the five call sites that needed it ★★★★☆
+
+**`boxOnSpine` carries the reason in full**: *when the mean lands on the median, say so. Skipping the
+diamond avoided hiding the median tee, which was right, and left a band with no mean mark beside two
+that had one — so **they coincide** read as **it is missing**. A cell holds one glyph, so the glyph
+names both.*
+
+**Five renderers draw a mean beside a median and two of them skip it.** `boxplotColumn`,
+`boxplotBand` and `boxOnSpine` combine the two marks into `◈`; `violinColumn`'s inline spine and
+`boxOnSpineColumn` — the braille arm of the same form — write nothing when the two coincide. So a
+violin whose mean *is* its median rendered identically to one carrying no mean, in the vertical arm
+only.
+
+**The frame is where it reads worst, and it is one frame rather than a comparison of two.**
+`violin/vertical` draws three bands, and `dose-b`'s mean sits away from its median:
+
+```
+before                                  after
+│ │    ─    │    ╰─┼─╯    │   ◆   │ │   │ │    ─    │    ╰─┼─╯    │   ◆   │ │
+│ ╰╮   │   ╭╯      │      │   ┤   │ │   │ ╰╮   │   ╭╯      │      │   ┤   │ │
+│  ╰╮  ┤  ╭╯       │     ╭╯   │   ╰╮│   │  ╰╮  ◈  ╭╯       │     ╭╯   │   ╰╮│
+```
+
+`dose-b` says it has a mean and `control` says nothing, in the same figure, with no way to tell
+*coincident* from *absent* — which is exactly the sentence `boxOnSpine` had already written down.
+
+**How it was found, and it is the extraction rather than a reading.** Every mean in the tree now
+comes off one record, so the five call sites are five expressions naming the same two members —
+`meanOnMedian` and `of.mean` — and three of them ask about coincidence while two do not. **The
+duplication was there before and had nothing to compare against**: `gl.diamondTee` in one function
+and `gl.diamond` in another are two glyph lookups, and it takes reading both to see that one asks a
+question the other does not. A shared record turns *two lookups* into *one member consulted twice*,
+and that is a difference a grep can see.
+
+**The class is CLAUDE.md's own and §3q records it on this same family**: *a rule that has to be
+applied N times is applied N−1 times eventually, which is why it is here rather than only in the
+code that got it right.* The violin's shared-axis fix was three instances for the same reason. This
+is the second time, on the same component, for the same structural reason — the arms are written as
+transposes of each other and a fix goes into the one whose frame was being read.
+
+**30 baseline frames move**, all of them `violin-vertical`, `violin-vertical-braille` and
+`violin-vertical-braille-filled` at five capability sets and two widths — no horizontal violin, no
+boxplot. **Classified**: 60 lines changed, none gained or lost, and every changed cell is `┤ → ◈`
+(36) or `+ → X` (24) — the same substitution in the two alphabets `glyphs()` has, one cell per line. `T1.100d` names both arms: reverting either one fails it, and the braille arm is reachable
+only through `violinColumn`'s folded path, so covering one and letting the baseline cover the other
+would have left the reason recorded in bytes.
+
 ## F300 — the seam's central sentence about this family is false, and its true form is weaker ★★★★★
 
 **§3ak.13 says *what both agree about is which of the seven things this is*, and the terminal draws
