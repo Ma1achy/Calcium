@@ -5344,6 +5344,50 @@ remaining ruling is D7/D8 — how many value labels, and whether a position axis
 `valueLabels` and `positionLabels` make expressible and do not settle.
 
 ---
+### 3ak.20 — Identity is a member and its placement is not, which is I63 with a second subject
+
+**The question asked before the wiring**: the terminal draws categories in a left gutter sized to
+the longest label *in cells*, and the second arm has no metrics. So does `identity` cross the seam
+at all?
+
+**Measured, on a bar in both orientations at width 44:**
+
+| | gutter | the other axis |
+|---|---|---|
+| `orientation: "horizontal"` | `alpha` `beta` `gamma`, right-aligned, one per row | **no numeric axis** — each value is printed at its own bar's end |
+| `orientation: "vertical"` | `10` `5` `0`, the value ticks | `alpha beta gamma` under the bars |
+
+Three separable facts, and they do not have one answer:
+
+- **The strings cross.** Both arms name the same categories in the same order, and `Figure.identity`
+  already carries them. Nothing here is a placement.
+- **The side crosses**, because it is a function of `orientation`, which the figure carries. The
+  gutter holds the identity exactly when the values run along the other axis — which `valueOnX`
+  already computes for the marks, from the same member.
+- **The width does not cross.** `min(cells(widest label), width / 3)` is a cell measurement of a
+  string, and §3aj hazard 4 says a shared layout that calls `cells()` cannot serve the image path.
+  This arm sizes its gutter to **a tenth of the width and not to its content**, deliberately, for a
+  reason already written beside `SVG_DEFAULT_LAYOUT`: sizing to content is what drags metrics back
+  in, and it is affordable here because pixels overflow gracefully and cells do not.
+
+**So this is I63 arriving with a second subject.** *The shared layer states how much room a label has
+and never measures the label* was ruled for `Mark.text.room` — a treemap's tile name — and the
+identity gutter is the same shape one furniture along: the threshold is shared, the outcome is each
+arm's. **No new member.** The strings are `identity`, the side is `orientation`, and the width is
+each arm's own.
+
+**And this is not §3aj.6's answer, which is worth saying because the two look alike.** A tree's
+placement stays per-arm because a `Mark` — a position — would carry one arm's answer and the other
+would fail `U1b`. Here nothing is a position: the identity labels are furniture, drawn beside the
+figure rather than in it, so the arms can differ in gutter width while naming the same things in the
+same order. The disagreement matrix compares the **strings**, and that cell closes.
+
+**The one difference this leaves is legitimate and has no instance yet.** §2's closed list includes
+the font metrics, and *a third of the cells* against *a tenth of the pixels* is exactly that. `AD3`
+asserts no cell claims `legitimate`; this is not a cell, because no decision the matrix measures is
+the gutter's width. The day one is, that is the argument to make.
+
+---
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The

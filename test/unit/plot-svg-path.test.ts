@@ -379,10 +379,15 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
 };
 
 describe.each(supported)("G6 — %s", (form) => {
+  // **`axes: true`, and it is the row's premise rather than decoration.** The
+  // furniture is the figure's now, so a block that does not ask for any has no
+  // border — and the box these rows measure against is read out of that border.
+  // Left unset, `edges` came back empty and every coordinate filtered away.
   const made = b.plot({
     id: `f-${form}`,
     form,
     height: 8,
+    axes: true,
     ...datumFor(form),
   } as Parameters<typeof b.plot>[0]);
 
@@ -423,11 +428,20 @@ describe.each(supported)("G6 — %s", (form) => {
     // killer here.
     if (svgFamilyOf(form) === "distribution") {
       const layout = SVG_DEFAULT_LAYOUT;
-      const top = layout.height * layout.pad;
-      const bottom = layout.height * (1 - layout.gutter);
-      const left = layout.width * (layout.gutter + layout.pad);
-      const right = layout.width * (1 - layout.pad);
       const svg = plotToSvg(made, THEME, layout) ?? "";
+      // **The box is read out of the drawing, not recomputed from the layout.**
+      // These four lines were a copy of `area()`'s arithmetic, and the copy went
+      // stale the day a legend started costing width: the row failed asserting a
+      // right edge at 612.4 against a plot area ending at 486.4, with nothing
+      // wrong in the renderer. A test that rolls its own reader carries the
+      // premise with it — so the frame's own border lines name the box.
+      const edges = [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/gu)]
+        .map((m) => [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] as const);
+      const left = Math.min(...edges.map((e) => Math.min(e[0], e[2])));
+      const right = Math.max(...edges.map((e) => Math.max(e[0], e[2])));
+      const top = Math.min(...edges.map((e) => Math.min(e[1], e[3])));
+      const bottom = Math.max(...edges.map((e) => Math.max(e[1], e[3])));
+      void top; void bottom;
       // **Horizontal is the family's default**, matching the terminal, so the
       // value axis is x and the two outliers define its ends.
       const xs = [...svg.matchAll(/(?:\bcx|\bx)="([-\d.]+)"/gu)]

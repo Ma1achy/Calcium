@@ -81,6 +81,35 @@ const NOTHING: ArmDecisions = Object.freeze({
  * form with no border — the heatmap and the treemap draw none — has no seam, and
  * then every row is area, which is the honest answer rather than a guess.
  */
+/**
+ * A row that is a **legend** — a run of swatch-and-name pairs.
+ *
+ * **The terminal reader could only see a legend on the right** (F297, fourth
+ * instance and the first on this side). Its whole test was *text past the last
+ * frame edge on a row*, which only `left` and `right` produce: `legend: "above"`
+ * put `alpha beta gamma` into `identityLabels` and reported `legend: false`, and
+ * `legend: "below"` was invisible in both. Measured against the second arm, which
+ * draws all four placements, those two variants could never agree whatever either
+ * renderer did — the reader was reporting different facts about the same figure.
+ *
+ * So both sides now ask the **same** structural question, which is also what a
+ * legend *is* in either medium: a swatch and a name. Here that is a block glyph
+ * followed by a word, repeated; in the SVG it is a square `<rect>` followed by a
+ * `<text>`.
+ *
+ * **Stated limit**: the swatch class is the 24-bit and ASCII alphabet, which is
+ * what this instrument compares at (§2). Below the colour floor `markOf` reaches
+ * for shapes — `▚`, `▞` — and those are in the class; a rung that grew a sixth
+ * mark would need adding, and `U6` is where that would be noticed.
+ */
+const SWATCH = /[\u2588\u28ff#\u259a\u259e\u2593\u2592\u2591\/\\]/u;
+const LEGEND_ROW = /^(?:\s*[\u2588\u28ff#\u259a\u259e\u2593\u2592\u2591\/\\]\s+[A-Za-z][\w.-]*)+\s*$/u;
+
+function isLegendRun(text: string): boolean {
+  const t = text.trim();
+  return t !== "" && SWATCH.test(t) && LEGEND_ROW.test(t);
+}
+
 export function terminalDecisions(lines: readonly string[]): ArmDecisions {
   const rows = lines.filter((l) => l.length > 0);
   if (rows.length === 0) return NOTHING;
@@ -99,6 +128,9 @@ export function terminalDecisions(lines: readonly string[]): ArmDecisions {
   for (const l of area) {
     if (RULE_ONLY.test(l)) continue;
     const first = l.search(EDGE);
+    // **A swatch-and-name run is a legend wherever it sits** — above the frame,
+    // below it, or past the right edge (F297).
+    if (isLegendRun(l)) { legend = true; continue; }
     if (first < 0) {
       // **A row with no edge is not an empty row.** The tiles family draws its
       // names inside the figure and frames nothing, so skipping these reported
@@ -118,8 +150,12 @@ export function terminalDecisions(lines: readonly string[]): ArmDecisions {
     if (last >= 0 && l.slice(last + 1).trim() !== "") legend = true;
   }
 
-  // The x row is the first line below the border that is not itself frame.
-  const xRow = below.find((l) => !RULE_ONLY.test(l) && l.trim() !== "");
+  // **The rows below the border carry a `below` legend**, and they were never
+  // scanned for one (F297). The x row is the first line that is neither frame
+  // nor legend — checking the legend first is what keeps a swatch run from being
+  // read as the abscissa.
+  for (const l of below) if (isLegendRun(l)) legend = true;
+  const xRow = below.find((l) => !RULE_ONLY.test(l) && l.trim() !== "" && !isLegendRun(l));
   for (const x of xRow === undefined ? [] : xRow.trim().split(/\s{2,}/u)) {
     if (x !== "") (NUMERIC.test(x) ? numeric : identity).push(x);
   }
@@ -160,16 +196,23 @@ function texts(svg: string): readonly Readonly<{ body: string; clipped: boolean 
 function svgDecisions(svg: string | null): ArmDecisions {
   if (svg === null) return NOTHING;
   const all = texts(svg).filter((t) => t.body !== "");
+  const legendNames = svgLegendNames(svg);
   return {
     drawn: true,
-    numericLabels: all.filter((t) => !t.clipped && NUMERIC.test(t.body)).map((t) => t.body),
-    identityLabels: all.filter((t) => t.clipped || !NUMERIC.test(t.body)).map((t) => t.body),
+    // **The legend's names are not identity labels, on the terminal reader's own
+    // terms** (F297). That side puts anything past the last frame edge into
+    // `legend` and never into `identityLabels`, so counting the SVG's legend
+    // entries as identities compared a gutter against a gutter *plus a legend* —
+    // and `line.identityLabels` went **12/70 to 70/70** the moment this arm grew
+    // one. The arm was right and the reader was asymmetric.
+    numericLabels: all.filter((t) => !legendNames.has(t.body) && !t.clipped && NUMERIC.test(t.body)).map((t) => t.body),
+    identityLabels: all.filter((t) => !legendNames.has(t.body) && (t.clipped || !NUMERIC.test(t.body))).map((t) => t.body),
     // **The ground is not a border.** `<rect width="100%">` paints the page; a
     // border would be a stroked rectangle round the plot area, and this arm
     // draws none.
     border: svgBorder(svg),
     interiorRules: svgInteriorRules(svg),
-    legend: false,
+    legend: legendNames.size > 0, // cells-ok — a legend entry count
   };
 }
 
@@ -193,6 +236,32 @@ function svgDecisions(svg: string | null): ArmDecisions {
  * tag drew it — and the box is the lines' own bounding box rather than a layout
  * constant, so a different `SvgLayout` cannot silently move the answer.
  */
+/**
+ * The names this arm's legend draws — **a swatch and the text beside it**.
+ *
+ * **`legend` was hardcoded `false` here**, so the cell could never have closed
+ * whatever the arm did: the third instance of a reader written before its
+ * subject, in one file (F297). The other two were `border` asking for a stroked
+ * `<rect width="100%">` and `interiorRules` counting every `<line>`.
+ *
+ * **A legend entry is structurally a swatch and a name**, which is what the
+ * terminal draws too — `█ alpha` — so this is the entry's shape rather than a
+ * guess at markup: a small square `<rect>` immediately followed by a `<text>`.
+ * Squareness is the discriminator, because every other `<rect>` this arm emits
+ * is a bar, a tile, a matrix cell or the page ground, and none of those is a
+ * font-sized square by construction.
+ */
+function svgLegendNames(svg: string): ReadonlySet<string> {
+  const out = new Set<string>();
+  const pair = /<rect x="[-\d.]+" y="[-\d.]+" width="([\d.]+)" height="([\d.]+)"[^>]*\/>\s*<text[^>]*>([^<]*)<\/text>/gu;
+  for (const m of svg.matchAll(pair)) {
+    if (m[1] !== m[2]) continue;
+    const body = (m[3] ?? "").trim();
+    if (body !== "") out.add(body);
+  }
+  return out;
+}
+
 function svgLines(svg: string): readonly (readonly [number, number, number, number])[] {
   const out: (readonly [number, number, number, number])[] = [];
   for (const m of svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/gu)) {

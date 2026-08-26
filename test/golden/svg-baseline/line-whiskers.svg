@@ -1,23 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
 <line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">40</text>
 <text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">80</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="288" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">obs</text>
 <circle cx="89.6" cy="242.133" r="3" fill="#e69f00"/>
-<circle cx="137.309" cy="219.238" r="3" fill="#e69f00"/>
-<circle cx="185.018" cy="196.572" r="3" fill="#e69f00"/>
-<circle cx="232.727" cy="174.361" r="3" fill="#e69f00"/>
-<circle cx="280.436" cy="152.827" r="3" fill="#e69f00"/>
-<circle cx="328.145" cy="132.185" r="3" fill="#e69f00"/>
-<circle cx="375.855" cy="112.642" r="3" fill="#e69f00"/>
-<circle cx="423.564" cy="94.393" r="3" fill="#e69f00"/>
-<circle cx="471.273" cy="77.62" r="3" fill="#e69f00"/>
-<circle cx="518.982" cy="62.49" r="3" fill="#e69f00"/>
-<circle cx="566.691" cy="49.156" r="3" fill="#e69f00"/>
-<circle cx="614.4" cy="37.75" r="3" fill="#e69f00"/>
+<circle cx="125.673" cy="219.238" r="3" fill="#e69f00"/>
+<circle cx="161.745" cy="196.572" r="3" fill="#e69f00"/>
+<circle cx="197.818" cy="174.361" r="3" fill="#e69f00"/>
+<circle cx="233.891" cy="152.827" r="3" fill="#e69f00"/>
+<circle cx="269.964" cy="132.185" r="3" fill="#e69f00"/>
+<circle cx="306.036" cy="112.642" r="3" fill="#e69f00"/>
+<circle cx="342.109" cy="94.393" r="3" fill="#e69f00"/>
+<circle cx="378.182" cy="77.62" r="3" fill="#e69f00"/>
+<circle cx="414.255" cy="62.49" r="3" fill="#e69f00"/>
+<circle cx="450.327" cy="49.156" r="3" fill="#e69f00"/>
+<circle cx="486.4" cy="37.75" r="3" fill="#e69f00"/>
 </svg>

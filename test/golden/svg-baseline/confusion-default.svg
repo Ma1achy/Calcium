@@ -1,12 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
-<rect x="89.6" y="12.8" width="174.933" height="91.733" fill="#fde725"/>
-<rect x="264.533" y="12.8" width="174.933" height="91.733" fill="#440154"/>
-<rect x="439.467" y="12.8" width="174.933" height="91.733" fill="#440154"/>
-<rect x="89.6" y="104.533" width="174.933" height="91.733" fill="#481769"/>
-<rect x="264.533" y="104.533" width="174.933" height="91.733" fill="#b0dd2f"/>
-<rect x="439.467" y="104.533" width="174.933" height="91.733" fill="#481769"/>
-<rect x="89.6" y="196.267" width="174.933" height="91.733" fill="#440154"/>
-<rect x="264.533" y="196.267" width="174.933" height="91.733" fill="#472a7a"/>
-<rect x="439.467" y="196.267" width="174.933" height="91.733" fill="#b0dd2f"/>
+<text x="155.733" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">cat</text>
+<text x="288" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">dog</text>
+<text x="420.267" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">bird</text>
+<rect x="89.6" y="12.8" width="132.267" height="91.733" fill="#fde725"/>
+<rect x="221.867" y="12.8" width="132.267" height="91.733" fill="#440154"/>
+<rect x="354.133" y="12.8" width="132.267" height="91.733" fill="#440154"/>
+<rect x="89.6" y="104.533" width="132.267" height="91.733" fill="#481769"/>
+<rect x="221.867" y="104.533" width="132.267" height="91.733" fill="#b0dd2f"/>
+<rect x="354.133" y="104.533" width="132.267" height="91.733" fill="#481769"/>
+<rect x="89.6" y="196.267" width="132.267" height="91.733" fill="#440154"/>
+<rect x="221.867" y="196.267" width="132.267" height="91.733" fill="#472a7a"/>
+<rect x="354.133" y="196.267" width="132.267" height="91.733" fill="#b0dd2f"/>
 </svg>

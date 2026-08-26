@@ -9,6 +9,10 @@
 <text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">4</text>
 <text x="83.6" y="85.6" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">6</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">8</text>
+<text x="155.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">setosa</text>
+<text x="286.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">versicolor</text>
+<text x="417.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">virginica</text>
+<text x="548.8" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">hybrid</text>
 <path d="M155.2 140.08 L155.2 112.56" fill="none" stroke="#e69f00" stroke-width="2"/>
 <path d="M155.2 67.84 L155.2 16.24" fill="none" stroke="#e69f00" stroke-width="2"/>
 <rect x="135.52" y="139.58" width="39.36" height="1" fill="#e69f00"/>

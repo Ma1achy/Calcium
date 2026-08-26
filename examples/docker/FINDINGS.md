@@ -13673,11 +13673,34 @@ along the bottom*, which is `terminalDecisions`' own test (`RULE_ONLY` admits sp
 `   ┌            ┐` counts and `corners` is a border in both arms). An interior rule is a line that
 is not on an edge.
 
+**Four instances in one file, and the last two are the ones that show the shape is general.**
+
+| the reader asked | when its subject arrived |
+|---|---|
+| `border`: a stroked `<rect width="100%">` | drawn as four `<line>`s — reported `false` |
+| `interiorRules`: every `<line>` | the four border edges arrived as four rules |
+| `legend`: **hardcoded `false`** | the cell could never close whatever the arm did |
+| terminal `legend`: *text past the last frame edge on a row* | only `left` and `right` produce that — `legend: "above"` put `alpha beta gamma` into `identityLabels` and reported `legend: false`; `legend: "below"` was invisible in both |
+
+**The fourth is on the terminal side and it is not written-before-its-subject** — the terminal has
+drawn all four placements all along. It is scoped to the placement the author happened to test, which
+is F285's family: a reader calibrated to one case. The two variants it governs **could never agree
+whatever either renderer did**, because the reader was reporting different facts about the same
+figure.
+
+**Both sides ask the same structural question now**, and it is what a legend *is* in either medium:
+**a swatch and a name.** A block glyph followed by a word, repeated, in the terminal; a square
+`<rect>` followed by a `<text>` in the SVG. Squareness is the SVG's discriminator because every other
+`<rect>` this arm emits is a bar, a tile, a matrix cell or the page ground, and none is a font-sized
+square by construction.
+
 **The rule this leaves.** An instrument written before its subject has no fabricated violation
 available — there is nothing to corrupt — so `AD5`'s discipline could not have caught it. What
 does: **when the subject arrives, re-derive the reader from the output rather than trusting that it
 was written for this.** The commit that first draws a thing is the commit that must re-read the
-instrument that measures it.
+instrument that measures it. **And when a cell will not close, ask whether both sides are being asked
+the same question before changing either renderer** — three of this pass's four instances were found
+by a cell moving the wrong way.
 
 ## F296 — a family fact wearing a style's clothes, found by a disagreement opening ★★★★☆
 

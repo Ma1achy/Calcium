@@ -3,6 +3,6 @@
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">5</text>
 <circle cx="89.6" cy="232.96" r="3" fill="#e69f00"/>
-<circle cx="352" cy="12.8" r="3" fill="#e69f00"/>
-<circle cx="614.4" cy="177.92" r="3" fill="#e69f00"/>
+<circle cx="288" cy="12.8" r="3" fill="#e69f00"/>
+<circle cx="486.4" cy="177.92" r="3" fill="#e69f00"/>
 </svg>

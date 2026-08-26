@@ -183,10 +183,13 @@ describe("U — the seam, asserted from both arms", () => {
     // coverage.
     gutter: { terminal: "moves", svg: "moves" },
     positionAxis: { terminal: "moves", svg: "moves" },
-    // **Still unread, and these are the remaining two of F286's three.**
-    // `identity` is D10, the identity axis; `legend` is D13. 19 and 7 open cells.
-    identity: { terminal: "moves", svg: "still" },
-    legend: { terminal: "moves", svg: "still" },
+    // **F286's three are all read now**, and the last two were D10 and D13 —
+    // the identity axis and the legend. What crossed is the strings and the
+    // *side*; the gutter's width did not, and §3ak.20 is the ruling: the
+    // terminal sizes it to `cells(widest)` and this arm to a tenth of the width,
+    // which is C12 I63's *the threshold is shared and the outcome is each arm's*.
+    identity: { terminal: "moves", svg: "moves" },
+    legend: { terminal: "moves", svg: "moves" },
   } as const satisfies Readonly<Record<keyof Figure, { terminal: string; svg: string }>>;
 
   function patched(base: Spec, how: unknown): Spec {
@@ -230,7 +233,14 @@ describe("U — the seam, asserted from both arms", () => {
     expect(measured).toEqual(CONSUMERS);
   });
 
-  it("U1a2 (C12 I59, §3ak.16): the three unread members, counted over the corpus", () => {
+  it("U1a2 (C12 I59, §3ak.16): the three members that were unread, now counted as drawn", () => {
+    // **This row asserted zero and now asserts the corpus.** It was written to
+    // count what the second arm did *not* draw — no legend label in 92 drawn
+    // documents, no identity string in 83 — and both are D10 and D13, which have
+    // closed. **Kept and inverted rather than deleted**: a row that stops being
+    // able to fail is worth less than one that fails when a member goes quiet
+    // again, and the counts are what would say so.
+    //
     // **Measured rather than argued**, and each count is the row's own size. A
     // green sweep says nothing about how much it swept.
     let drawn = 0;
@@ -254,9 +264,17 @@ describe("U — the seam, asserted from both arms", () => {
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
     expect(drawn, "drawn SVG documents").toBe(86); // cells-ok — a document count
-    expect(legendDrawn, "documents drawing a legend label — D13 open").toBe(0); // cells-ok — a document count
+    // **D13 closed**: the legend is drawn where the author asked and where it is
+    // load-bearing — `SHARES_CELLS` and more than one series — which is the form
+    // half of the terminal's auto-enable. The rung half stays there, because one
+    // of its clauses reads `caps.colourDepth`.
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(48); // cells-ok — a document count
     expect(gutterFamilies, "documents in the five families the terminal gutters").toBe(83); // cells-ok — a document count
-    expect(identityDrawn, "documents drawing an identity string — D10 open").toBe(0); // cells-ok — a document count
+    // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
+    // name the caller supplied. Drawing it for every family made the cell worse
+    // rather than better: a curve's identity is its series, which belongs in the
+    // legend, and `line.identityLabels` went 12/70 to 70/70 before the gate.
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(69); // cells-ok — a document count
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {

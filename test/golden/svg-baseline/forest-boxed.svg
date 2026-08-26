@@ -7,6 +7,12 @@
 <text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="352" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
 <text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<clipPath id="isvgb-0"><rect x="0" y="46.667" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="62.667" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">Study A</text>
+<clipPath id="isvgb-1"><rect x="0" y="138.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">Study B</text>
+<clipPath id="isvgb-2"><rect x="0" y="230.133" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="246.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">Study C</text>
 <path d="M247.04 58.667 L456.96 58.667" fill="none" stroke="#e69f00" stroke-width="2"/>
 <rect x="246.54" y="44.907" width="1" height="27.52" fill="#e69f00"/>
 <rect x="456.46" y="44.907" width="1" height="27.52" fill="#e69f00"/>

@@ -9,6 +9,16 @@
 <text x="352" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">-1</text>
 <text x="483.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="614.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">1</text>
+<clipPath id="isvgb-0"><rect x="0" y="28.32" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="44.32" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">Aalborg 92</text>
+<clipPath id="isvgb-1"><rect x="0" y="83.36" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="99.36" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">Basel 88</text>
+<clipPath id="isvgb-2"><rect x="0" y="138.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">Cardiff 95</text>
+<clipPath id="isvgb-3"><rect x="0" y="193.44" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="209.44" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#626262">Delft 01</text>
+<clipPath id="isvgb-4"><rect x="0" y="248.48" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="264.48" text-anchor="end" clip-path="url(#isvgb-4)" font-size="12" font-family="monospace" fill="#626262">pooled</text>
 <path d="M299.52 40.32 L509.44 40.32" fill="none" stroke="#e69f00" stroke-width="2"/>
 <rect x="299.02" y="32.064" width="1" height="16.512" fill="#e69f00"/>
 <rect x="508.94" y="32.064" width="1" height="16.512" fill="#e69f00"/>

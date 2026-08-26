@@ -36,7 +36,7 @@ import { normalisedOf } from "../../data/viewmodel/range.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
-import { refOf } from "./marks.js";
+import { ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf } from "./marks.js";
 import {
   barFigure,
   curveFigure,
@@ -47,6 +47,7 @@ import {
   tilesFigure,
   type Drawn,
   type Figure,
+  type FigureLegend,
 } from "./figure.js";
 import { ORIGIN_DEFAULT } from "../../data/viewmodel/index.js";
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
@@ -268,13 +269,28 @@ function n(v: number): string {
 type Area = Readonly<{ left: number; right: number; top: number; bottom: number }>;
 
 /** The plot area in px, from the layout's fractions. Never a cell count. */
-function area(layout: SvgLayout): Area {
-  return {
+function area(layout: SvgLayout, legend: FigureLegend | null = null): Area {
+  const box = {
     left: layout.width * (layout.gutter + layout.pad),
     right: layout.width * (1 - layout.pad),
     top: layout.height * layout.pad,
     bottom: layout.height * (1 - layout.gutter),
   };
+  if (legend === null || legend.slots.length === 0) return box; // cells-ok — a legend entry count
+  // **The legend costs space on the side it sits, and the two axes cost
+  // differently** — C04's own asymmetry arriving in pixels. `left` and `right`
+  // cost width; `above` and `below` cost a band of height, which is the terminal's
+  // *declared row* with the constraint that made it declared removed.
+  //
+  // **A fifth of the width and not the widest entry**, on `SVG_DEFAULT_LAYOUT`'s
+  // own reason: sizing to content is what drags metrics back in (§3ak.20).
+  const band = layout.width * LEGEND_SHARE;
+  const rows = SVG_FONT_SIZE * 1.6 * legend.slots.length; // cells-ok — a legend entry count
+  const place = legend.placement ?? "right";
+  if (place === "right") return { ...box, right: box.right - band };
+  if (place === "left") return { ...box, left: box.left + band };
+  if (place === "above") return { ...box, top: box.top + rows };
+  return { ...box, bottom: box.bottom - rows };
 }
 
 /**
@@ -655,6 +671,9 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
  * `marks()`' own bar loop, one arm, two answers to *how wide is a bar*, which is
  * the duplication this pass exists to end one layer up.
  */
+/** The share of the width a side legend takes — a fifth, never the widest entry. */
+const LEGEND_SHARE = 0.2;
+
 const SLOT_SHARE = 0.6;
 
 /**
@@ -773,7 +792,7 @@ function marks(
   theme: ResolvedTheme,
 ): readonly string[] {
   const family = svgFamilyOf(block.form);
-  const box = area(layout);
+  const box = area(layout, figure.legend);
   const out: string[] = [];
 
   // **The families that have crossed**, and the list is the diff (§3ak.10).
@@ -924,7 +943,7 @@ export function plotToSvg(
   if (figure === null) return null;
   const range = figure.value?.range ?? figure.extent ?? { min: 0, max: 1 };
   const axis = figure.value;
-  const box = area(layout);
+  const box = area(layout, figure.legend);
 
   // **Furniture is not a picture**, and this is the second clause because it is
   // a second failure. `series: []` on a plain form, and a series that is all
@@ -1092,6 +1111,115 @@ export function plotToSvg(
       parts.push(`<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="${anchor}" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
         `${escape(text)}</text>`);
+    }
+  }
+
+  // **The identity axis, and the strings are the figure's while the room is not**
+  // (C12 I63, I67, §3ak.20, D10). The terminal guts its categories in a column
+  // sized to the longest label **in cells**; this arm has no metrics and sizes
+  // to a tenth of the width, deliberately. So what crosses is the list and the
+  // *side* — the gutter holds the identity exactly when the values run along the
+  // other axis, which `valueOnX` already answered from `orientation` — and the
+  // width stays each arm's own. That is I63's ruling with the identity gutter as
+  // its second subject rather than a treemap tile.
+  //
+  // **`nodes` and `tiles` name themselves inside the figure** and are excluded:
+  // their labels are `text` marks placed by the walk, so drawing the identity
+  // here as well would name every tile twice.
+  const named = figure.identity.filter((i) => i !== "");
+  const slots = named.length; // cells-ok — an identity slot count, not a width
+  // **`ROW_IS_AN_IDENTITY` is the gate, and drawing without it made the cell
+  // worse rather than better** — `line.identityLabels` went 12/70 to 70/70 on
+  // the first attempt. A curve's `identity` is its **series**, which the
+  // terminal names in the legend and never in the gutter; a bar's is its
+  // categories, which it guts. `FB1` records that the two lists are one thing
+  // for the curve family and two for the bar family, and this is the same fact
+  // deciding where the strings land.
+  //
+  // **The record is the terminal's own** — *one row, column or band per name the
+  // caller supplied* — read rather than restated, so there is no second answer
+  // to disagree with the first. `tiles` and `nodes` are `false` in it already,
+  // which is also why they are not excluded by name here: their labels are
+  // `text` marks placed by the walk.
+  if (figure.gutter && slots > 0 && label !== undefined && ROW_IS_AN_IDENTITY[block.form]) {
+    for (const [i, text] of named.entries()) {
+      const t = (i + 0.5) / slots;
+      if (valueOnX) {
+        // Values along x, so the identity owns the gutter: one label per row,
+        // right-aligned against the plot area exactly as the terminal's is.
+        const y = box.top + (box.bottom - box.top) * t;
+        parts.push(
+          `<clipPath id="i${block.id}-${String(i)}"><rect x="0" y="${n(y - SVG_FONT_SIZE)}" ` +
+            `width="${n(box.left - 6)}" height="${n(SVG_FONT_SIZE * 2)}"/></clipPath>`,
+          `<text x="${n(box.left - 6)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
+            `clip-path="url(#i${block.id}-${String(i)})" font-size="${n(SVG_FONT_SIZE)}" ` +
+            `font-family="monospace" fill="${label}">${escape(text)}</text>`,
+        );
+        continue;
+      }
+      const x = box.left + (box.right - box.left) * t;
+      parts.push(
+        `<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="middle" ` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
+          `${escape(text)}</text>`,
+      );
+    }
+  }
+
+  // **The legend, placed** (C12 I67, §3ak.19, D13). `legendSlots` composed these
+  // entries from the first commit of the pass and nothing drew them: the member
+  // returned the same list for `legend: false` as for `legend: "right"`, so an
+  // arm consuming it would have drawn a legend the author refused. It carries
+  // the request now and this is where the request is honoured.
+  //
+  // **`"right"` where the block said nothing**, which is the terminal's default
+  // for the reason C04 records — the only placement that can size itself to its
+  // content and so turn itself on. The auto-enable itself stays in the terminal,
+  // because one of its clauses reads `caps.colourDepth` and this arm has no rung.
+  // **`placement: null` means the author said nothing, and *nothing* is not
+  // *yes***. Drawing whenever there were slots put a legend on every
+  // single-series curve — `line.legend` 26/70 to 46/70 — because the terminal
+  // auto-enables only where a legend is **load-bearing**: more than one thing
+  // drawn into shared cells with no adjacent label, which is `SHARES_CELLS`.
+  //
+  // The clause that cannot cross is the rung — `legendPlacement` also suppresses
+  // below the colour floor, where a positional stack writes its names in the
+  // gutter — and this arm has no floor, so it takes the part that is a form fact
+  // and leaves the part that is a capability. **One record, read by both.**
+  const legend = figure.legend;
+  const wanted = legend !== null
+    && (legend.placement !== null || (SHARES_CELLS[block.form] && legend.slots.length > 1)); // cells-ok — a legend entry count
+  if (legend !== null && wanted && legend.slots.length > 0 && label !== undefined) { // cells-ok — a legend entry count
+    const place = legend.placement ?? "right";
+    const swatch = SVG_FONT_SIZE * 0.8;
+    const step = SVG_FONT_SIZE * 1.6;
+    const sideways = place === "left" || place === "right";
+    const originX = place === "right" ? box.right + 12 : place === "left" ? 6 : box.left;
+    const originY = place === "above" ? box.top - step * legend.slots.length : place === "below" // cells-ok — a legend entry count
+      ? box.bottom + SVG_FONT_SIZE * 2
+      : box.top + SVG_FONT_SIZE;
+    // **This arm does not draw annotations, so its legend must not name one**
+    // (F259). `legendSlots` composes the terminal's list — candles, series, then
+    // the annotations, which are claims *about* the data — and this path drops
+    // annotations rather than refusing, because the picture it leaves is a
+    // correct curve with a claim missing from beside it. Naming the claim in the
+    // legend puts it back as a lie: `G8f` caught exactly that.
+    //
+    // **A per-arm filter of a shared list is not a second decision.** The figure
+    // says what the legend contains; each arm names what it drew, and the gap is
+    // the annotation disagreement already on the record rather than a new one.
+    const shown = legend.slots.filter((sl) => sl.role !== "annotation");
+    for (const [i, slot] of shown.entries()) {
+      const ink = inkOf(slot.ref, theme);
+      if (ink === undefined) continue;
+      const x = sideways ? originX : originX + i * (SVG_FONT_SIZE * 8);
+      const y = sideways ? originY + i * step : originY;
+      parts.push(
+        `<rect x="${n(x)}" y="${n(y - swatch)}" width="${n(swatch)}" height="${n(swatch)}" fill="${ink}"/>`,
+        `<text x="${n(x + swatch + 4)}" y="${n(y)}" text-anchor="start" ` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
+          `${escape(slot.label)}</text>`,
+      );
     }
   }
 
