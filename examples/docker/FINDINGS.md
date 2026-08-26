@@ -13642,6 +13642,62 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F321 — a refusal hides the reader as well as the arm ★★★★★
+
+Drawing `treeLayout: "outline"` (F310) compared four pairs that had been `silent`, and comparing
+them found nothing wrong with either renderer. **It found the instrument.**
+
+The terminal's `tree/outline` came back **`legend: true` with two identity labels of nine**:
+
+```
+root                 ← read
+├── render           ← the name went nowhere
+│   ├── curve        ← nor here
+╰── parse            ← read
+```
+
+Two predicates in `terminalDecisions` are keyed on `EDGE`, which matches `├` and `│`:
+
+- *the first edge splits gutter from area* — so `first` was **0** on every connector row, `head` was
+  the empty string before it, and the name after the connector fell in neither the gutter nor the
+  body scan. The two that survived are the two with no connector.
+- *anything past the last edge is a legend* — so each row read as **a figure whose right edge is
+  column 0, with text past it**. `graph` reported a legend on all four pairs; a graph draws none.
+
+**Both statements are true of a bordered figure and neither is true of a figure whose content is
+box-drawing.** The nodes family draws `├` and `┬` *inside* the picture.
+
+### Three drafts, and the corpus rejected two of them
+
+| the condition tried | what it cost |
+|---|---|
+| `border` — the figure has a top rule and a bottom one | **`line/frame-rule` lost its gutter.** It draws a bottom rule and no top one, so `border` is false while `100 ┤` is plainly a reading |
+| `legendTail` on what is past the edge | **`bar`, `bubble`, `histogram` and `scatter` lost their legends.** The tail needs a two-space gap, which is what separates a key from a *figure* on a shared row; past an edge there is no figure to separate it from, and the terminal writes `│ █ value` with one space |
+| `first > 0`, and `isLegendRun` on the remainder | holds |
+
+**The right condition is the row's own, not the frame's.** A gutter is text before the first edge —
+`first > 0` — and a legend past the edge is a swatch and a name, which the reader already knows how
+to ask.
+
+### The numbers
+
+```
+line.legend      16/70 → 8/70     eight invented, and the eight that remain are real:
+                                  a LEFT legend, which sits before the first edge and this
+                                  reader has never seen — stated, not fixed
+graph.legend      4/4  → agree
+tree.legend       6/8  → agree
+tree.identity     6/8  → 8/12     the outline's nine names now read
+open cells        55   → 53       ten were the instrument's; two are the arm's
+```
+
+**F297's seventh instance, and the first found by removing a refusal rather than by reading a
+frame.** A `silent` cell records nothing about the reader, so every refusal is a place the
+instrument is not being checked — which is an argument for drawing a form even where the drawing is
+poor, and against a `null` arm as a way of postponing work.
+
+---
+
 ## F320 — a fixture that types at a clock, against an application that takes three times as long to start ★★★★☆
 
 `examples/minimal`'s PTY harness sends `/list` at **1.5 s** and its Enter at 3.5 s, then captures
@@ -14124,6 +14180,14 @@ The arm draws `topDown` and `leftRight` and refuses `outline`: the layout with t
 geometry above cells, an indented text list, while drawing the two that need connector routing.
 Refused backwards from difficulty, in no document, and **invisible to the disagreement matrix
 because a refused frame has no cells to disagree about.**
+
+**Settled by drawing it.** The refusal's reason — *an indented text listing and not a node placement*
+— is true about the drawing and is not a reason to withhold it: a listing **is** a placement, whose
+across-axis is `depth` and whose along-axis is the walk order, and `flatten` returns both. Fifty
+lines, one row per node, an elbow per edge, and the two arms name the same nine nodes in the same
+order. **Refusals 77 → 75**, and the two declarations that had excused it came back as `dead decls`
+on the next run rather than sitting in the list — which is the equality arm earning its place, since
+a subset check would have left them.
 
 **And the record that should have held it is a range.** SB4's headline is *a refusal is a frame, so
 one cannot appear or vanish silently*, and its assertion is `> 50` and `< 178` — a refusal can do

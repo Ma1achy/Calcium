@@ -29,7 +29,7 @@
  * not to be. Two things called SVG in one repository, and only one of them is a
  * second renderer.
  */
-import { flatten } from "./tree.js";
+import { flatten, type FlatNode } from "./tree.js";
 import { drawnBlock } from "./derive.js";
 import { graphLayers } from "./graph.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
@@ -898,6 +898,67 @@ function nodeMarks(
 }
 
 /**
+ * The indented outline — one node per row, indented by depth (F310).
+ *
+ * **`treeLayout: "outline"` was refused here and it is the layout with the
+ * least geometry above cells**, which is backwards from difficulty. The refusal
+ * read *an indented text listing and not a node placement*, and the second half
+ * is true while the first is a reason to draw it rather than a reason not to: a
+ * listing is a placement whose across-axis is `depth` and whose along-axis is
+ * the walk order, both of which `flatten` already returns. It was in no refusal
+ * record either — nine refusals the corpus had and the record did not.
+ *
+ * **The terminal draws `├── ` and this draws an elbow**, which is the same
+ * difference the other two layouts already have: `strokePolyline` steps
+ * orthogonally into cells, a path goes where it goes. Same figure, two
+ * rasterisations, which is what the arm is for.
+ *
+ * **The row is the unit, so the height is a function of the node count** — a
+ * deep tree gets thin rows rather than a clipped list, because dropping nodes
+ * here would be the terminal's truncation decided a second time.
+ */
+function outlineMarks(
+  flat: readonly FlatNode[],
+  box: Readonly<{ left: number; right: number; top: number; bottom: number }>,
+  ink: string,
+  theme: ResolvedTheme,
+  id: string,
+  out: string[],
+): readonly string[] {
+  if (flat.length === 0) return out; // cells-ok — a node count
+  const rowH = (box.bottom - box.top) / flat.length; // cells-ok — a node count
+  const depth = flat.reduce((m, f) => Math.max(m, f.depth), 0); // cells-ok — a depth index
+  // **The indent is a share of the box and never a constant**, so a four-deep
+  // tree and a one-deep tree both use the width they have. `OUTLINE_INDENT` is
+  // the terminal's answer to the same question in cells.
+  const indent = (box.right - box.left) / Math.max(4, depth + 3); // cells-ok — a depth index
+  const x = (f: FlatNode): number => box.left + f.depth * indent;
+  const y = (i: number): number => box.top + rowH * (i + 0.5); // cells-ok — a node index
+
+  const rule = inkOf(RULE, theme) ?? ink;
+  for (const [i, f] of flat.entries()) { // cells-ok — a node index
+    if (f.parent < 0) continue; // cells-ok — a node index
+    const p = flat[f.parent]!;
+    // The elbow: down the parent's own column, then right to the child's row.
+    out.push(
+      `<path d="M${n(x(p) + indent / 3)} ${n(y(f.parent))} V${n(y(i))} H${n(x(f))}" ` +
+        `stroke="${rule}" stroke-width="1" fill="none"/>`,
+    );
+  }
+  for (const [i, f] of flat.entries()) { // cells-ok — a node index
+    const slot = inkOf(refOf(f.depth), theme);
+    if (slot === undefined || f.label === "") continue;
+    out.push(
+      `<clipPath id="o${id}-${String(i)}"><rect x="${n(x(f))}" y="${n(y(i) - rowH / 2)}" ` +
+        `width="${n(Math.max(0, box.right - x(f)))}" height="${n(rowH)}"/></clipPath>`,
+      `<text x="${n(x(f) + 2)}" y="${n(y(i) + SVG_FONT_SIZE / 3)}" clip-path="url(#o${id}-${String(i)})" ` +
+        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${slot}">${escape(f.label)}</text>`,
+    );
+  }
+  return out;
+}
+
+/**
  * A form's marks, by family.
  *
  * **One function per family and not one per form**, because the forms inside a
@@ -956,11 +1017,14 @@ function marks(
       // `["topDown", "leftRight", "outline"]` whose size fits the budget, and
       // an SVG has no budget. Read out of the source rather than chosen.
       const wanted = block.treeLayout ?? "topDown";
-      // **`outline` is an indented text listing and not a node placement.**
-      // Drawing it as boxes would be a different figure from the terminal's,
-      // which is the plausible wrong figure the `null` arm refuses.
-      if (wanted === "outline") return out;
       const flat = flatten(root);
+      // **Drawn rather than refused** (F310). The old reason — *an indented text
+      // listing and not a node placement* — is true about the drawing and not a
+      // reason to withhold it: a listing is a placement whose across-axis is
+      // `depth` and whose along-axis is the walk order, and `flatten` returns
+      // both. Refusing the cheapest of the three layouts while drawing the other
+      // two is backwards from difficulty, and it was in no refusal record.
+      if (wanted === "outline") return outlineMarks(flat, box, ink0, theme, block.id, out);
       const byDepth: number[][] = [];
       for (const [i, f] of flat.entries()) (byDepth[f.depth] ??= []).push(i);
       layers = byDepth;

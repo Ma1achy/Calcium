@@ -102,7 +102,14 @@ export function pairLayout(leftH, rightH) {
  * form.** Five discriminators, not three — the two above, plus an empty value
  * list, plus `flame`/`icicle`'s legacy `categories`+`series` datum (recorded one
  * tool along, in `phase-catalogue.mjs`), plus **`treeLayout: "outline"`, which
- * is in no document at all.**
+ * was in no document at all.**
+ *
+ * **The fifth is gone and this list is how it went** (F310). `outline` was the
+ * layout with the *least* geometry above cells and the only one refused, which
+ * is backwards from difficulty; it draws now, and the two declarations that had
+ * named it came back as **dead decls** on the next run rather than sitting here
+ * excusing a refusal nobody makes. That is the equality arm earning its place —
+ * a subset check would have left them.
  *
  * Compared by **equality**, never as a subset: a subset check lets a dead entry
  * outlive its reason unread, and lets a new refusal in silently — which is the
@@ -127,10 +134,6 @@ export const VARIANT_REFUSALS = {
   scatter: { empty: "the series carries an empty value list" },
   sparkline: { empty: "the series carries an empty value list" },
   step: { empty: "the series carries an empty value list" },
-  tree: {
-    outline: "treeLayout: \"outline\" — in no record, and the arm draws topDown and leftRight",
-    "overflow-outline": "treeLayout: \"outline\" — in no record, and the arm draws topDown and leftRight",
-  },
 };
 
 /** Every committed SVG frame, as `form → variant → refused?`. */

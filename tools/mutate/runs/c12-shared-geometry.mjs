@@ -326,6 +326,35 @@ const results = runPass({
       expect: "G6e3",
     },
     {
+      // **The refusal, restored** (C12 §3ak, F310). `outline` was the layout
+      // with the least geometry above cells and the only one of three refused,
+      // for a reason true about the drawing and not about whether to draw it.
+      name: "the outline is refused again, for being a listing",
+      file: SVG,
+      from: '      if (wanted === "outline") return outlineMarks(flat, box, ink0, theme, block.id, out);',
+      to: '      if (wanted === "outline") return out;',
+      expect: "G6e4",
+    },
+    {
+      // **Every node at the root's indent**, which draws the right labels in the
+      // right order and says nothing about the tree — the shape a listing exists
+      // to carry.
+      name: "the outline flattens its depths onto one indent",
+      file: SVG,
+      from: "  const x = (f: FlatNode): number => box.left + f.depth * indent;",
+      to: "  const x = (_f: FlatNode): number => box.left;",
+      expect: "G6e4",
+    },
+    {
+      // **One row per node is the other half.** Sharing a row draws the same
+      // labels in the same order on top of each other.
+      name: "the outline's rows collapse onto one another",
+      file: SVG,
+      from: "  const y = (i: number): number => box.top + rowH * (i + 0.5); // cells-ok — a node index",
+      to: "  const y = (_i: number): number => box.top + rowH * 0.5; // cells-ok — a node index",
+      expect: "G6e4",
+    },
+    {
       // **A dummy node given a box.** The pipeline inserts them to carry an
       // edge across a layer, so a box there is a node the graph does not have —
       // and it draws in the right place with the right colour.

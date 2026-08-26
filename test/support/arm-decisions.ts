@@ -164,6 +164,35 @@ function isLegendRun(text: string): boolean {
 const LEGEND_TAIL = /\s{2,}(?:[^\s\w]{1,3}\s+[A-Za-z][\w.\-…]*(?: [A-Za-z][\w.\-…]*)*(?:\s+[\d.]+%?)?\s*)+$/u;
 
 /**
+ * **A frame glyph is never a swatch** (F297, seventh instance).
+ *
+ * `LEGEND_TAIL` asks the *shape* — one to three non-word glyphs, two spaces
+ * before them — because the radar's swatch is braille and a character list could
+ * not hold it. A tree's indented outline has that shape exactly: `│   ├── curve`
+ * is two-plus spaces, three box-drawing glyphs, and a name.
+ *
+ * So the terminal's `tree/outline` reported **`legend: true` and two identity
+ * labels of nine** — `root`, which has no prefix, and `parse`, whose `╰── ` sits
+ * at column 0 with no gap before it. Seven names swallowed and a legend invented,
+ * on a form that draws neither.
+ *
+ * **It was invisible until the second arm stopped refusing the layout** (F310).
+ * A refused pair is never compared, so a refusal hides the *reader* as well as
+ * the arm — and the cell that would have shown it read `silent`.
+ *
+ * The alphabet is `RULE_ONLY`'s, which the reader already holds: a run made
+ * entirely of frame is furniture, whatever follows it.
+ */
+const FRAME_GLYPH = /^[\s┌┐└┘╭╮╰╯├┤┬┴┼─│+|-]+$/u;
+
+function legendTail(line: string): RegExpExecArray | null {
+  const m = LEGEND_TAIL.exec(line);
+  if (m === null) return null;
+  const swatch = /\s{2,}([^\s\w]{1,3})\s/u.exec(m[0]);
+  return swatch !== null && FRAME_GLYPH.test(swatch[1]!) ? null : m;
+}
+
+/**
  * A **colour ramp**, on either arm: three or more adjacent swatches carrying
  * different colours, bracketed by the two readings they run between.
  *
@@ -338,10 +367,25 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
     // **A legend beside the figure is stripped before the identity scan**, or
     // its names are counted twice — once as a legend and once as the labels the
     // gutter shows (F307).
-    const tail = LEGEND_TAIL.exec(l);
+    const tail = legendTail(l);
     const body = tail === null ? l : l.slice(0, tail.index);
     if (tail !== null) legend = true;
-    if (first < 0) {
+    // **An edge glyph at column 0 is content, not a gutter boundary** (F297,
+    // seventh instance). A tree's outline begins every row with `│` or `├`, so
+    // `first` was 0 and `head` the empty string before it — the name after the
+    // connector fell in neither the gutter nor the body scan, and **seven of
+    // nine went unread**. The two that survived were the two with no connector.
+    //
+    // **The condition is the row's own and not the frame's.** Gating on `border`
+    // instead reads correctly here and loses `line/frame-rule`'s gutter: that
+    // form draws a bottom rule and no top one, so `border` is false while
+    // `100 ┤` is plainly a reading in a gutter. A gutter is text *before* the
+    // first edge, which is exactly `first > 0`.
+    //
+    // **Invisible until the second arm stopped refusing the layout** (F310): a
+    // refused pair is never compared, so a refusal hides the reader as well as
+    // the arm.
+    if (first <= 0) {
       // **A row with no edge is not an empty row.** The tiles family draws its
       // names inside the figure and frames nothing, so skipping these reported
       // the terminal's treemap as having no labels while it was drawing six —
@@ -355,9 +399,26 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
 
     // **The last edge is the right frame**, and anything past it is furniture
     // outside the figure — which is where the terminal puts a vertical legend.
+    //
+    // **Reached only from a row with a gutter**, by the `first <= 0` return
+    // above: `EDGE` matches `├`, so every row of a tree's outline read as *a
+    // figure whose right edge is column 0, with text past it* — a legend, on a
+    // form that draws none (F297, seventh instance).
     let last = -1;
     for (let i = l.length - 1; i >= 0; i -= 1) if (EDGE.test(l[i]!)) { last = i; break; }
-    if (last >= 0 && l.slice(last + 1).trim() !== "") legend = true;
+    // **What is past the edge has to read as a legend, not merely exist.** The
+    // test was *anything at all*, and the last edge is only the right frame on a
+    // row that ends at one — the nodes family draws `┬` and `├` **inside** its
+    // figure, so `╭─render┬─curve────raster` came back as a right legend naming
+    // `curve raster`. Measured: three of `graph`'s rows and four of `tree`'s.
+    // The remainder is asked the same structural question the rest of the reader
+    // asks — `isLegendRun`, a swatch and a name — and not `legendTail`, whose
+    // two-space gap is what separates a key from a *figure* on a shared row. Past
+    // an edge there is no figure to separate it from, and the terminal writes
+    // `│ █ value` with one space: asking for two lost the legend on `bar`,
+    // `bubble`, `histogram` and `scatter`, which is this fix overshooting by one
+    // predicate and the corpus saying so.
+    if (last >= 0 && isLegendRun(l.slice(last + 1))) legend = true;
   }
 
   // **The lines below the border carry a `below` legend**, and they were never

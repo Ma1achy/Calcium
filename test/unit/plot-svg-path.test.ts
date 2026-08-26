@@ -26,6 +26,7 @@ import { decodePng } from "../../src/presentation/image/index.js";
 import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/colormap.js";
 import { rgbOf } from "../support/theme.js";
 import { tiles } from "../../src/presentation/plot/hierarchy.js";
+import { flatten } from "../../src/presentation/plot/tree.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
 import { barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS, proportionFigure } from "../../src/presentation/plot/figure.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
@@ -1144,10 +1145,32 @@ describe("G6e — the nodes family, where the placement is per-arm", () => {
     expect(new Set(right.map((r) => r["x"])).size, "leftRight puts each depth on its own x").toBe(3);
   });
 
-  it("G6e4: `outline` is refused, because it is a listing and not a placement", () => {
-    // An indented text listing drawn as boxes would be a different figure from
-    // the terminal's — the plausible wrong figure the `null` arm refuses.
-    expect(plotToSvg(treeAt({ treeLayout: "outline" }), THEME, nl), "outline has no node placement").toBeNull();
+  it("G6e4: `outline` is drawn, and it names every node the terminal does", () => {
+    // **This row asserted a refusal and the refusal was backwards** (F310). Its
+    // reason — *a listing and not a placement* — is true about the drawing and
+    // is not a reason to withhold it: a listing **is** a placement, whose
+    // across-axis is `depth` and whose along-axis is the walk order, and
+    // `flatten` returns both. It was the layout with the **least** geometry
+    // above cells and the only one refused, and it was in no refusal record.
+    const svg = plotToSvg(treeAt({ treeLayout: "outline" }), THEME, nl);
+    expect(svg, "the cheapest of the three layouts draws").not.toBeNull();
+    const labels = [...(svg ?? "").matchAll(/<text\b[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1]);
+    const flat = flatten(HIER);
+    expect(labels, "every node, in walk order").toEqual(flat.map((f) => f.label));
+    // **One row per node, indented by depth** — the two properties that make it
+    // the same figure as the terminal's, asserted rather than eyeballed.
+    const rows = [...(svg ?? "").matchAll(/<text\b[^>]*\by="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+    expect(new Set(rows).size, "a row each, none shared").toBe(flat.length); // cells-ok — a node count
+    expect([...rows].sort((a, c) => a - c), "in the walk's order down the page").toEqual(rows);
+    const xs = [...(svg ?? "").matchAll(/<text\b[^>]*\bx="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+    const byDepth = new Map<number, Set<number>>();
+    for (const [i, f] of flat.entries()) (byDepth.get(f.depth) ?? byDepth.set(f.depth, new Set()).get(f.depth)!).add(xs[i]!); // cells-ok — a node index
+    for (const [d, set] of byDepth) expect(set.size, `depth ${String(d)} shares one indent`).toBe(1); // cells-ok — a depth index
+    expect(byDepth.size, "and the depths are distinct indents")
+      .toBe(new Set([...byDepth.values()].map((v) => [...v][0])).size); // cells-ok — a depth index
+    // The elbows: one per node that has a parent.
+    expect([...(svg ?? "").matchAll(/<path\b/gu)].length, "an elbow per edge")
+      .toBe(flat.filter((f) => f.parent >= 0).length); // cells-ok — a node count
   });
 
   it("G6e5: a graph's edges are diagonals, which the terminal cannot draw", () => {

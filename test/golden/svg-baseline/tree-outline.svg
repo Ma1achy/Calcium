@@ -1,1 +1,29 @@
-REFUSED — plotToSvg returned null
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<path d="M118.756 28.089 V58.667 H177.067" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<path d="M206.222 58.667 V89.244 H264.533" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<path d="M293.689 89.244 V119.822 H352" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<path d="M206.222 58.667 V150.4 H264.533" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<path d="M118.756 28.089 V180.978 H177.067" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<path d="M206.222 180.978 V211.556 H264.533" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<path d="M206.222 180.978 V242.133 H264.533" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<path d="M118.756 28.089 V272.711 H177.067" stroke="#2c2c2c" stroke-width="1" fill="none"/>
+<clipPath id="osvgb-0"><rect x="89.6" y="12.8" width="524.8" height="30.578"/></clipPath>
+<text x="91.6" y="32.089" clip-path="url(#osvgb-0)" font-size="12" font-family="monospace" fill="#e69f00">root</text>
+<clipPath id="osvgb-1"><rect x="177.067" y="43.378" width="437.333" height="30.578"/></clipPath>
+<text x="179.067" y="62.667" clip-path="url(#osvgb-1)" font-size="12" font-family="monospace" fill="#56b4e9">render</text>
+<clipPath id="osvgb-2"><rect x="264.533" y="73.956" width="349.867" height="30.578"/></clipPath>
+<text x="266.533" y="93.244" clip-path="url(#osvgb-2)" font-size="12" font-family="monospace" fill="#3cbf9a">curve</text>
+<clipPath id="osvgb-3"><rect x="352" y="104.533" width="262.4" height="30.578"/></clipPath>
+<text x="354" y="123.822" clip-path="url(#osvgb-3)" font-size="12" font-family="monospace" fill="#f0e442">raster</text>
+<clipPath id="osvgb-4"><rect x="264.533" y="135.111" width="349.867" height="30.578"/></clipPath>
+<text x="266.533" y="154.4" clip-path="url(#osvgb-4)" font-size="12" font-family="monospace" fill="#3cbf9a">paint</text>
+<clipPath id="osvgb-5"><rect x="177.067" y="165.689" width="437.333" height="30.578"/></clipPath>
+<text x="179.067" y="184.978" clip-path="url(#osvgb-5)" font-size="12" font-family="monospace" fill="#56b4e9">layout</text>
+<clipPath id="osvgb-6"><rect x="264.533" y="196.267" width="349.867" height="30.578"/></clipPath>
+<text x="266.533" y="215.556" clip-path="url(#osvgb-6)" font-size="12" font-family="monospace" fill="#3cbf9a">measure</text>
+<clipPath id="osvgb-7"><rect x="264.533" y="226.844" width="349.867" height="30.578"/></clipPath>
+<text x="266.533" y="246.133" clip-path="url(#osvgb-7)" font-size="12" font-family="monospace" fill="#3cbf9a">wrap</text>
+<clipPath id="osvgb-8"><rect x="177.067" y="257.422" width="437.333" height="30.578"/></clipPath>
+<text x="179.067" y="276.711" clip-path="url(#osvgb-8)" font-size="12" font-family="monospace" fill="#56b4e9">parse</text>
+</svg>

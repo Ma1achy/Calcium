@@ -135,7 +135,7 @@ const MEASURED = {
   // terminal's own — and this matrix, which compares five *decisions*, could
   // report only this. It is a decision gate; `test/golden/svg-baseline/` is the
   // picture gate, and the two answer different questions on purpose.
-  "line": { silent: "16/86", "numericLabels": "62/70", "identityLabels": "51/70", "border": "2/70", "interiorRules": "4/70", "legend": "16/70", "ramp": "agree", "notice": "agree" },
+  "line": { silent: "16/86", "numericLabels": "62/70", "identityLabels": "51/70", "border": "2/70", "interiorRules": "4/70", "legend": "8/70", "ramp": "agree", "notice": "agree" },
   "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "6/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "2/4", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
@@ -162,8 +162,8 @@ const MEASURED = {
   "timeline": "refused",
   "bullet": "refused",
   "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "agree" },
-  "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "2/4", "legend": "4/4", "ramp": "agree", "notice": "2/4" },
-  "tree": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "2/8", "legend": "6/8", "ramp": "agree", "notice": "4/8" },
+  "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "notice": "2/4" },
+  "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "2/12", "legend": "agree", "ramp": "agree", "notice": "6/12" },
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "stackedarea": "refused",
   "streamgraph": "refused",
@@ -321,6 +321,13 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // open — every matrix-family pair, the terminal drawing a key and the second
     // arm drawing none — and `notice`'s 30 are legitimate rather than owed
     // (F318), so they are counted apart instead of inflating the work.
+    //
+    // **55 → 53 without a renderer moving** (F321). Drawing `treeLayout:
+    // "outline"` compared four pairs that had been `silent`, and comparing them
+    // showed the *reader* inventing a legend on every row of a tree and a graph:
+    // `EDGE` matches `├`, so an indented outline read as a figure whose right
+    // edge is column 0 with text past it. Ten cells were the instrument's and
+    // two are the arm's.
     const claimed = (Object.values(MEASURED) as readonly Record_[]).filter((v): v is Claimed => v !== "refused");
     let open = 0;
     let closed = 0;
@@ -335,8 +342,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(16); // cells-ok — a form count
     expect(open + closed + legitimate, "cells over claimed forms").toBe(210); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(30); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(55); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(125); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(53); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(127); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
@@ -382,6 +389,40 @@ describe("AD — the two arms decide separately, and here is where", () => {
       `<rect x="${String(100 + c * 20)}" y="${String(200 + r * 14)}" width="20" height="14" fill="#${String(c)}0${String(r)}0${String(c)}0"/>`)).join("");
     expect(svgRamp(`<svg>${grid}</svg>`), "a grid of cells is not a key").toBe(false);
     expect(svgRamp(`<svg>${grid}${ends}</svg>`), "and it is one when its row is bracketed").toBe(true);
+  });
+
+  it("AD9 (F321): an edge glyph inside a figure is not a frame", () => {
+    // **Two predicates keyed on `EDGE`, and a tree's outline breaks both.** The
+    // reader splits a row at its first edge — gutter before, area after — and
+    // calls anything past its last edge a legend. Both hold for a bordered
+    // figure and neither holds for a figure whose *content* is box-drawing.
+    //
+    // **Found because a refusal stopped hiding it.** The outline was refused by
+    // the second arm, so its pairs were never compared, and a `silent` cell
+    // records nothing about the reader.
+    const outline = [
+      "root",
+      "├── render",
+      "│   ├── curve",
+      "│   ╰── raster",
+      "╰── parse",
+    ];
+    const d = terminalDecisions(outline);
+    expect(d.legend, "a tree draws no legend").toBe(false);
+    expect(d.identityLabels, "and every node is a name, connector or not")
+      .toEqual(["root", "render", "curve", "raster", "parse"]);
+
+    // **The gutter still exists where a row has one**, which is what keys this
+    // on the row rather than on the frame: `line/frame-rule` draws a bottom rule
+    // and no top one, so a `border` gate would have lost its readings.
+    const gutter = terminalDecisions(["100 ┤ ╭──╮", " 50 ┤╭╯  ╰╮", "  0 ┤╯    ╰"]);
+    expect(gutter.numericLabels, "text before the first edge is a reading").toEqual(["100", "50", "0"]);
+
+    // **And a legend past the edge is still a legend** — a swatch and a name,
+    // one space after the frame, which is what the terminal writes.
+    expect(terminalDecisions(["100 ┤ ╭──╮ │ \u2588 value"]).legend, "a right legend survives").toBe(true);
+    expect(terminalDecisions(["    \u256d\u2500render\u252c\u2500curve\u2500\u2500raster"]).legend,
+      "and a node's own connectors do not become one").toBe(false);
   });
 
   it("AD7 (F316, F318): the notice reader sees both vocabularies", () => {
