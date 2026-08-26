@@ -20,6 +20,12 @@ Two rules carry over because they are about the application, not the instrument:
   together are pasted text, and a carriage return inside one burst inserts a
   newline instead of submitting.
 - **SIGTERM, never SIGKILL.** The shell gets to flush.
+- **Wait for the prompt, never for a clock.** This typed at a fixed 1.5 s and
+  the package takes **3.3–4.4 s to import `dist`**, measured three times in the
+  devcontainer — so both the command and its Enter were written into a terminal
+  whose application had not started, and were gone. It passed on a quick machine
+  and failed on a busy one, which is a fixture asserting the machine rather than
+  the chain. The command now goes when the prompt appears.
 """
 
 import os
@@ -48,12 +54,32 @@ def main(argv: list[str]) -> int:
 
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 
-    script = [(1.5, COMMAND), (3.5, b"\r")]
+    # **The prompt is the signal, and the two writes still go separately.**
+    # `PROMPT` is what the shell draws when it is ready to read; `SETTLE` is the
+    # paste window C16 opens, so the Enter has to arrive after it or the burst
+    # reads as pasted text carrying a newline.
+    PROMPT = "\u276f".encode()
+    SETTLE = 0.5
     captured = bytearray()
+    ready: float | None = None
+    sent = False
+    enter_at: float | None = None
+    done_at = 0.0
     start = time.monotonic()
-    while time.monotonic() - start < 9.0:
-        while script and time.monotonic() - start >= script[0][0]:
-            os.write(fd, script.pop(0)[1])
+    while time.monotonic() - start < 20.0:
+        now = time.monotonic() - start
+        if ready is None and PROMPT in captured:
+            ready = now
+        if ready is not None and not sent and now >= ready + SETTLE:
+            os.write(fd, COMMAND)
+            sent = True
+            enter_at = now + SETTLE
+        if sent and enter_at is not None and now >= enter_at:
+            os.write(fd, b"\r")
+            enter_at = None
+            done_at = now + 4.0
+        if enter_at is None and sent and now >= done_at:
+            break
         r, _, _ = select.select([fd], [], [], 0.1)
         if fd in r:
             try:

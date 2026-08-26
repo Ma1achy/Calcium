@@ -13642,6 +13642,51 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F320 — a fixture that types at a clock, against an application that takes three times as long to start ★★★★☆
+
+`examples/minimal`'s PTY harness sends `/list` at **1.5 s** and its Enter at 3.5 s, then captures
+until 9 s. Measured in the devcontainer, three times:
+
+```
+3.35s   3.79s   4.35s      to import dist and reach the prompt
+```
+
+**So both writes went into a terminal whose application had not started**, and were gone. The
+capture ends with `❯ /list` — the prompt drawn *after* the keystrokes, with the text echoed by the
+editor and no submit behind it — which reads exactly like a shell that ignored a command.
+
+**It passed on a quick machine and failed on a busy one**, which is a row asserting the host. Traced
+by timestamping the exchange:
+
+```
+[ 1.51] send b'/list'        ← nothing is listening
+[ 3.54] send b'\r'           ← nor here
+[ 4.33] read 38B             ← the application starts
+[ 4.35] read 2370B           ← and draws its banner into an empty prompt
+```
+
+### Two hours of the wrong hypothesis, and what actually ended it
+
+The failure appeared mid-session in a run whose only preceding event was a **killed `make e2e`**, so
+the first three hypotheses were all about residue: a half-written `dist` (a clean rebuild did not fix
+it), a stale symlink (it resolves to `/workspace/dist`, correctly), and **1098 zombie processes**
+left by the killed run — a real and startling number, reaped by restarting the container, and **not
+the cause either**. Then `git stash` and a checkout back to the commit before the day's work: it
+failed there too, which is what removed the day's four commits from suspicion and left the harness.
+
+**Every one of those was a measurement about the environment, and the question that ended it was
+about the fixture** — *what is this row waiting for?* Nothing. It waits for a clock.
+
+**Fixed**: the command goes when the prompt appears, the Enter one paste-window later, and the
+capture closes four seconds after that. Three consecutive green runs, and a control — a prompt string
+that never appears — still captures the banner and no table, so the row fails when the application
+does not draw.
+
+**The stated limit**: a 20-second outer deadline replaces the 9-second window, so a genuinely hung
+shell now takes 20 seconds to fail rather than 9. That is the cost of not asserting the host.
+
+---
+
 ## F319 — I8 is honoured for series and not for categories, and a histogram loses a fifth of its distribution in silence ★★★★★
 
 **Found by reading the moved frames, and only because the second arm started binning.** Wiring
@@ -13854,8 +13899,23 @@ legend · isotropic · marks` — **no `drops`.** The terminal computes the noti
 for it, and nothing between the two says so. F309's instrument pointed at the type it wrote itself:
 the member was named in the design and is not in the tree.
 
-**Open**, and named rather than fixed — a sixth column and a `drops` member are both renderer work,
-and this is the review that says what the remaining forms have to match.
+**Fixed, and half of it inverted** (F318). The record has **seven** columns now and 210 cells over 30
+claimed forms. `ramp` is open: it differs on **7 forms and on every pair of each** — the whole matrix
+family, the terminal drawing a key under each frame and the second arm drawing none. `notice` is
+`legitimate`, carried by a named set rather than by a cell value, because the terminal withholds only
+where a frame is too small and a blanket cell would be false about the pairs that agree.
+
+**Both readers went through three drafts and the middle one is the lesson.** Asking for three
+consecutive `<rect>` of differing fill reported a ramp on **96 of 362 cells** — every `line` with a
+three-entry legend, because a discrete key is also a run of swatches. Adding geometry gave **0**,
+which is the right answer for the wrong reason: a heatmap draws 450 touching rects of differing fill,
+and what saved the reader was sorting every row's cells into one list by `x`, which interleaves the
+rows and breaks each run at its second element. A single-row matrix would have gone straight through.
+**What separates a key from a figure is that a key is bracketed by its bounds** — Granite's
+`Min ▮▮▮▮▮ Max` — and that is one predicate for both arms.
+
+Open: 48 → **55**, the seven new ones all `ramp`. Closed: 102 → 125. Legitimate: 30, counted apart so
+they do not inflate the work.
 
 ---
 

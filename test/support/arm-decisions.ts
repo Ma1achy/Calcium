@@ -67,10 +67,35 @@ export type ArmDecisions = Readonly<{
   interiorRules: number;
   /** Is a legend drawn — entries beside the figure rather than on it. */
   legend: boolean;
+  /**
+   * Is a **colour ramp** drawn — a continuous key, as against a discrete one.
+   *
+   * **The sixth column, and the record had five** (F316). The paired sheet shows
+   * a ramp under every matrix-family terminal frame and none under any SVG, and
+   * `heatmap.legend` reads `agree` because both arms answer `false` — the SVG
+   * having none, the terminal because its ramp is *coloured spaces* and the
+   * reader took stripped text. **A rule table is exhaustive over the rules you
+   * stated and blind to one you did not**, so this is an axis the record lacked
+   * rather than a reader to widen.
+   */
+  ramp: boolean;
+  /**
+   * Does the frame **say that data was withheld** — a drop, a truncation.
+   *
+   * The seventh column, and its disposition is `legitimate` (F318). The terminal
+   * withholds because a cell is a quantum: a heatmap past its width drops leading
+   * columns and says `· N older not shown`, a form with more rows than it has
+   * says `+N more` (C12 I8). The second arm scales its box across whatever it is
+   * given and has **nothing to drop** — not *has not implemented dropping*. So
+   * the two differ and always will, and the row fails the day the SVG grows a
+   * drop rule of its own, which is the seam leaking the other way.
+   */
+  notice: boolean;
 }>;
 
 const NOTHING: ArmDecisions = Object.freeze({
   drawn: false, numericLabels: [], identityLabels: [], border: false, interiorRules: 0, legend: false,
+  ramp: false, notice: false,
 });
 
 /**
@@ -138,16 +163,167 @@ function isLegendRun(text: string): boolean {
  */
 const LEGEND_TAIL = /\s{2,}(?:[^\s\w]{1,3}\s+[A-Za-z][\w.\-…]*(?: [A-Za-z][\w.\-…]*)*(?:\s+[\d.]+%?)?\s*)+$/u;
 
-export function terminalDecisions(lines: readonly string[]): ArmDecisions {
-  const rows = lines.filter((l) => l.length > 0);
+/**
+ * A **colour ramp**, on either arm: three or more adjacent swatches carrying
+ * different colours, bracketed by the two readings they run between.
+ *
+ * **Bracketed is what makes it a legend rather than the figure.** A heatmap's
+ * own cells are runs of background-coloured spaces too, so *a run of swatches*
+ * matches the picture; what only the key has is a number at each end — Granite's
+ * `Min ▮▮▮▮▮ Max`, and the terminal's own comment says the bounds bracket the bar
+ * so that the two numbers name the two ends they sit against.
+ *
+ * **This reader takes the frame with its colours in it, and that is the whole
+ * finding** (F316, F297's sixth instance). The ramp *is* spaces, so a reader on
+ * stripped text sees `0.19          100 · 16 older not shown` and an entirely
+ * blank figure above it — reporting `false` for a thing plainly on the page, and
+ * `agree` for a cell where one arm draws a key and the other draws nothing.
+ *
+ * **Stated limit**: a figure row of background-coloured cells with a reading at
+ * each end would match. None exists — measured over 362 cells, the eleven forms
+ * that answer `true` are the matrix family plus `contour`, `quiver` and
+ * `horizon`, and every one of them draws a key — and `AD6` holds the case that
+ * would collapse it: the heatmap's own cells, same alphabet, no bounds.
+ */
+const BG = /\x1b\[48;2;(\d+;\d+;\d+)m/gu;
+const BOUND = /-?[\d.,]+\s*[%a-zA-Z]{0,3}/u;
+
+export function terminalRamp(raw: string): boolean {
+  BG.lastIndex = 0;
+  const runs: { colours: Set<string>; from: number; to: number }[] = [];
+  let current: { colours: Set<string>; from: number; to: number } | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = BG.exec(raw)) !== null) {
+    // A swatch is the background sequence plus the single cell it paints, so
+    // two swatches are adjacent when the next match begins one cell on.
+    const adjacent = current !== null && m.index === current.to;
+    if (adjacent && current !== null) { current.colours.add(m[1]!); current.to = BG.lastIndex + 1; }
+    else { current = { colours: new Set([m[1]!]), from: m.index, to: BG.lastIndex + 1 }; runs.push(current); }
+  }
+  return runs.some((r) => {
+    if (r.colours.size < 3) return false; // cells-ok — a swatch count
+    const before = stripSgr(raw.slice(0, r.from)).trim();
+    const after = stripSgr(raw.slice(r.to)).trim();
+    return BOUND.test(before) && BOUND.test(after);
+  });
+}
+
+/**
+ * The same question of an SVG: a gradient, or three adjacent equal rects in a
+ * progression, with text at both ends.
+ *
+ * **Measured before the column existed: 0 of 181 frames.** The arm has no ramp
+ * at all — no `<linearGradient>`, no `<defs>` — so this returns `false` for the
+ * whole corpus today, which is what makes the cell an open disagreement rather
+ * than a reader defect.
+ */
+export function svgRamp(svg: string): boolean {
+  if (/<(?:linearGradient|defs)\b/u.test(svg)) return true;
+  // **Bracketing, not adjacency — and the two drafts before this one are why.**
+  //
+  // The first asked for three consecutive `<rect>` of differing fill in document
+  // order. That is a *discrete* key: **96 of 362 cells**, every `line` with a
+  // three-entry legend.
+  //
+  // The second added geometry and reported **0**, which is the right answer for
+  // the wrong reason. A heatmap draws 450 touching rects of differing fill, so it
+  // *is* a run of swatches; what saved the reader was sorting every row's cells
+  // into one list by `x`, which interleaves the rows and breaks every run at its
+  // second element. A single-row matrix would have gone straight through, and a
+  // cell reading `false` because the sort was wrong is indistinguishable from one
+  // reading `false` because the arm has no ramp.
+  //
+  // **What separates a key from a figure is that a key is bracketed by its
+  // bounds** — Granite's `Min ▮▮▮▮▮ Max`, which is the terminal side's own test.
+  // So: a run along one row, and a `<text>` beside each end of it.
+  const swatches = [...svg.matchAll(/<rect\b[^>]*\/?>/gu)].map((r) => r[0]).flatMap((el) => {
+    const num = (k: string): number | null => {
+      const m = new RegExp(`\\b${k}="(-?[\\d.]+)"`, "u").exec(el);
+      return m === null ? null : Number(m[1]);
+    };
+    const fill = /\bfill="([^"]+)"/u.exec(el)?.[1];
+    const x = num("x"), y = num("y"), w = num("width"), h = num("height");
+    return fill === undefined || x === null || y === null || w === null || h === null
+      ? [] : [{ fill, x, y, w, h }];
+  });
+
+  const labels = [...svg.matchAll(/<text\b[^>]*\bx="(-?[\d.]+)"[^>]*\by="(-?[\d.]+)"[^>]*>[^<]+<\/text>/gu)]
+    .map((m) => ({ x: Number(m[1]), y: Number(m[2]) }));
+
+  const byRow = new Map<string, { fill: string; x: number; y: number; w: number; h: number }[]>();
+  for (const sw of swatches) {
+    const key = `${String(Math.round(sw.y))}:${String(Math.round(sw.h))}`;
+    const bucket = byRow.get(key) ?? [];
+    bucket.push(sw);
+    byRow.set(key, bucket);
+  }
+
+  for (const row of byRow.values()) {
+    row.sort((a, b) => a.x - b.x);
+    let from = 0;
+    for (let i = 1; i <= row.length; i += 1) { // cells-ok — an element index
+      const a = row[i - 1]!;
+      const b = row[i];
+      if (b !== undefined
+        && Math.abs(b.x - (a.x + a.w)) <= 1 && Math.abs(a.w - b.w) <= 1 && a.fill !== b.fill) continue;
+      const run = row.slice(from, i);
+      from = i;
+      if (run.length < 3) continue; // cells-ok — a swatch count
+      const head = run[0]!;
+      const tail = run[run.length - 1]!;
+      // **Beside the bar, not merely near it.** A bound *names the end it sits
+      // against*, so it is centred on the swatch's own band within one text
+      // line. Measured: with a slack of `2 · h` the `latency` figure fired — 90
+      // touching cells 92 px tall, with `p50 · p90 · p99` a hundred pixels below
+      // them landing inside the window. A key is a bar and a figure is not.
+      const mid = head.y + head.h / 2;
+      const band = (l: { y: number }): boolean => Math.abs(l.y - mid) <= SVG_FONT_ROW;
+      if (labels.some((l) => band(l) && l.x < head.x) && labels.some((l) => band(l) && l.x > tail.x + tail.w)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Does the frame say something was withheld — `+N more`, `N older not shown`.
+ *
+ * **One predicate for both halves of the same statement.** C12 I8's notice and the
+ * matrix's drop notice are the same claim in two vocabularies, and a column that
+ * saw only one would report the axis as covered while missing the other.
+ */
+const WITHHELD = /\+\d+\s+more\b|\b\d+\s+older not shown\b/u;
+
+export function saysWithheld(text: string): boolean {
+  return WITHHELD.test(stripSgr(text));
+}
+
+/** Escape sequences out, so a reader that wants text gets text and nothing else. */
+export function stripSgr(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/gu, "");
+}
+
+/**
+ * **Takes the frame with its colours in it** (F316). This used to be handed
+ * stripped lines by every caller, which is a decision about what the reader may
+ * see made at the call site — and it cost the ramp column: the heatmap's key is
+ * background-coloured spaces, so stripped text shows a blank figure and no key.
+ * The reader strips what it needs and keeps what it needs.
+ */
+export function terminalDecisions(raw: readonly string[]): ArmDecisions {
+  const rows = raw.filter((l) => stripSgr(l).length > 0);
   if (rows.length === 0) return NOTHING;
+  const ramp = rows.some((l) => terminalRamp(l));
+  const notice = rows.some((l) => saysWithheld(l));
+  const lines = rows.map(stripSgr);
 
   let bottom = -1;
-  for (const [i, l] of rows.entries()) if (BOTTOM.test(l) && RULE_ONLY.test(l)) bottom = i;
-  const border = rows.some((l) => TOP.test(l) && RULE_ONLY.test(l)) && bottom >= 0;
+  for (const [i, l] of lines.entries()) if (BOTTOM.test(l) && RULE_ONLY.test(l)) bottom = i;
+  const border = lines.some((l) => TOP.test(l) && RULE_ONLY.test(l)) && bottom >= 0;
 
-  const area = bottom >= 0 ? rows.slice(0, bottom) : rows;
-  const below = bottom >= 0 ? rows.slice(bottom + 1) : [];
+  const area = bottom >= 0 ? lines.slice(0, bottom) : lines;
+  const below = bottom >= 0 ? lines.slice(bottom + 1) : [];
 
   const numeric: string[] = [];
   const identity: string[] = [];
@@ -184,7 +360,7 @@ export function terminalDecisions(lines: readonly string[]): ArmDecisions {
     if (last >= 0 && l.slice(last + 1).trim() !== "") legend = true;
   }
 
-  // **The rows below the border carry a `below` legend**, and they were never
+  // **The lines below the border carry a `below` legend**, and they were never
   // scanned for one (F297). The x row is the first line that is neither frame
   // nor legend — checking the legend first is what keeps a swatch run from being
   // read as the abscissa.
@@ -196,6 +372,8 @@ export function terminalDecisions(lines: readonly string[]): ArmDecisions {
 
   return {
     drawn: true,
+    ramp,
+    notice,
     numericLabels: numeric,
     identityLabels: identity,
     border,
@@ -250,6 +428,13 @@ function svgDecisions(svg: string | null): ArmDecisions {
   const legendNames = svgLegendNames(svg);
   return {
     drawn: true,
+    ramp: svgRamp(svg),
+    // **`false` for every document this arm can produce, and that is the claim.**
+    // The terminal withholds because a cell is a quantum; this arm scales its box
+    // across whatever it is given and has nothing to drop (F318). Written as a
+    // predicate over the text rather than as a constant, so it answers the day
+    // the arm grows one and the `legitimate` row fails as it should.
+    notice: saysWithheld(svg),
     // **The legend's names are not identity labels, on the terminal reader's own
     // terms** (F297). That side puts anything past the last frame edge into
     // `legend` and never into `identityLabels`, so counting the SVG's legend
