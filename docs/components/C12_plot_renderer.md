@@ -5776,6 +5776,150 @@ radar passes `""` — it has a swatch and a series name and no reading to put be
 string and *no reading* are the same on the page and different in the record, and F280 is the
 standing instance of an absent case taking its meaning from the only case that had one.
 
+### 3ak.27 — The derivation's other half: the ruling landed, the module landed, the wiring did not
+
+**§3ak.7 C1 ruled this and F314 found it still true**, which is the finding rather than the
+repetition. The ruling was *the derivation moves into the shared layer, and it is not a refusal*;
+`derive.ts` was created for it, `ecdfSeries` and `densitySeries` moved out of `scatter.ts` and
+`kde.ts`, and I65 was written. Measured at the commit the paired sheet was built from:
+
+| what the ruling asked for | at HEAD |
+|---|---|
+| the derivations are pure and live below both arms | **done** — `derive.ts`, no `cells()`, no capability, 148 lines |
+| the figure describes the block that is **drawn** | **done** — `curveFigure` is a function of whatever it is handed |
+| **a caller hands it the drawn block** | **never landed** — `derive.ts` is imported by `definition.ts` and `kde.ts`, and by nothing on the second arm's side |
+
+**The third row is the whole of the effect**, and the two above it are what made its absence
+invisible. A module in the right layer and a figure with the right shape are both true statements
+about the tree, and neither of them draws a cumulative fraction.
+
+#### The row that covers it supplies its own subject
+
+`FC5 (C12 I65)` is the row written for this ruling. Its comment says *a caller hands over the derived
+block and the figure is about that*, and its body builds one:
+
+```ts
+const drawn = { ...authored, series: authored.series.map((s) => ecdfSeries(s)), yMin: 0, yMax: 1 };
+expect(curveFigure(drawn).extent, "the cumulative fractions").toEqual({ min: 0, max: 1 });
+```
+
+**No caller does what that line does.** The row passes on the day nothing calls the mechanism,
+because it *is* the caller — the seam-level assertion holding while the wiring is absent, which is
+the class the campaign already records for a mechanism tested by calling it directly. A row of this
+shape is verified by mutating the **call site**, and there was no call site to mutate.
+
+#### `histogram` is a third instance, in a family whose walk did not index for it
+
+§3ak.7's artefact was the **curve** family's — nine cells over six forms. `histogram` is
+`SVG_FAMILY: "bar"`: `binValues` counts its samples into an `asBar` block inside the terminal's
+dispatch, exactly as `ecdf` and `density` do, and §3ak.12's bar-family walk has no C1-shaped row.
+So a walk indexed by rule interaction found the class and the *family* bounded it — which is worth
+saying because the remedy for that is not a better walk but running the found class across the other
+families, once, as a sweep.
+
+**The sweep, run before the rule was written.** Ten `{ ...block,` sites in the dispatch table.
+Three derive the series — `ecdf`, `density`, `histogram`. Four default `categories`. One is
+`boxplot`'s range from quartiles, and `quartileRange` already crosses. **No fourth block-level
+derivation exists**, so the list is closed at three rather than left open.
+
+> **I70 — a form whose figure is a derivation of its series computes that derivation above both
+> renderers, and each arm draws the derived block.**
+
+I65 says the derivation happens once, above both arms. **I70 is the half that makes it observable**:
+somebody has to apply it, at each arm's entry, before anything reads the block. The two are not the
+same claim, and holding only the first is precisely the state this section is about.
+
+#### F259's two kinds, because they read alike
+
+**A refusal is for a figure that cannot be drawn.** `ohlc` is a datum this path does not read; a
+non-default `origin` draws the same data upside down. In both, the arm has everything it needs to
+produce a picture and the picture would be *false* — the plausible wrong figure.
+
+**It is not for a figure whose data has not been computed yet.** A histogram of 240 unbinned samples
+is not a form the arm cannot draw; it is the arm drawing the wrong *quantity* because the quantity
+was computed one layer above it, in the other arm. The remedy is to move the derivation, and reaching
+for `null` here costs every form that shares the missing derivation rather than the one in hand.
+
+The two states are told apart by a single question: **is there a pure function of the block that
+produces the datum, and does it already exist?** Where it does, the refusal is unnecessary and
+recording it as owed would record a debt that does not exist.
+
+#### What this does *not* open, measured rather than assumed
+
+**`violin` and `ridgeline` are not opened by moving a call**, and the reason is one line of
+`violinColumn`:
+
+```ts
+for (let r = 0; r < n; r += 1) points.push(hi + pad - ((hi - lo + 2 * pad) * r) / Math.max(1, n - 1));
+```
+
+`n` is `rows`. **The estimate is evaluated at the renderer's row count**, so it is not a function of
+the block alone — where `ecdfSeries` is a function of `values.length`, `densitySeries` fixes its
+resolution at 100, and `binValues` takes a binning rule. Their derivation is a per-category set of
+outlines, which is a family emitter and a walk, not a wiring change.
+
+Family 8 carries the same distinction: `stackBands(series, columns, centred)` folds freely and
+**resamples across `columns`**, so the fold crosses and the resampling does not.
+
+**Stated because the opposite is the natural inference.** Five forms are refused for wanting a
+density and three are fixed by moving a call, and *therefore all five open* is one step that does not
+hold. Two of the five want a different piece of work, and the cheapest moment to know that is before
+the commit that was going to include them.
+
+### 3ak.28 — The record's two missing columns, and the member that cannot exist
+
+**F316 measured two decisions the arms make differently that no cell of the matrix asks about**: the
+matrix family's colour ramp, on every terminal frame and no SVG frame, and the `· N older not shown`
+notice, on four terminal frames and none. `DECISIONS` is
+`numericLabels · identityLabels · border · interiorRules · legend`, and neither is any of them —
+**a rule table is exhaustive over the rules you stated and blind to one you did not.**
+
+`heatmap.legend: "agree"` is what that blindness looks like from inside: both arms report `false`,
+the SVG because it draws no legend and the terminal because **its ramp is coloured spaces** and the
+reader takes stripped text. Two different facts, one cell, and the cell is right about neither.
+
+| column | the terminal | the second arm | disposition |
+|---|---|---|---|
+| `ramp` | a colour bar the ladder descends with the cells (I29) | **0 of 181 frames carry a gradient or `<defs>`** | **open** |
+| `notice` | `· N older not shown` below the seam | never, and never will | **legitimate** |
+
+#### The notice is legitimate, and `drops` is not a member a `Figure` can have
+
+The plan's §2 sketch declared `drops: Readonly<{ hidden: number; notice: string | null }>` and the
+shipped type does not carry it. **The omission is correct and the sketch was wrong**, which is the
+opposite of how it reads:
+
+```ts
+const dropped = Math.max(0, longest - layout.areaWidth);
+```
+
+`longest` is a sample count and `layout.areaWidth` is **cells**. §3aj hazard 3 is *anything measured
+in cells stays in cells*, and `G1`/`G1b` assert the shared layer's side of it by arity — `niceAxis`
+takes three arguments and none is a width, `seriesRange` three and none is a width. A member computed
+from `areaWidth` would put the rendering width inside the object both arms read, which is the one
+property that makes a figure a figure.
+
+**So the difference is a resolution difference and belongs in §2's closed list.** The terminal drops
+leading columns because a cell is a quantum and 100 readings do not fit in 62 of them; the second arm
+scales its 640 px across whatever it is given and has nothing to drop. Recorded as `legitimate`, the
+row asserts *they differ and always will* — and fails the day the SVG grows a drop rule of its own,
+which is the seam leaking the other way and worth a failure.
+
+**The ramp is not legitimate.** A colour bar is a legend entry with a continuous ref rather than a
+discrete one, the terminal's descends the same ladder as its cells, and nothing about an SVG prevents
+one. It is an open disagreement with the second arm owing the work.
+
+#### The ramp reader reads the frame with its colours in it
+
+`terminalDecisions` takes stripped lines, which is right for every column it had — a border, a rule
+and a label all survive stripping. **A ramp does not**: the heatmap's ramp is spaces carrying a
+background colour, so a stripped frame shows the figure as blank, and a reader on `.plain` reports
+`false` for a thing plainly on the page.
+
+This is the sixth instance of a reader calibrated to an encoding nobody wrote, and the fourth on the
+terminal's side. Both readers get a fabricated violation in both directions before either is trusted:
+a frame with a ramp that must read `true`, and one without that must read `false`.
+
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7026,6 +7170,8 @@ orientation — and belongs in the classification table as its own rows.
 - **I67** — **A decision the block splits, the figure resolves — and a decision that needs a capability stays out.** `axes` and `plotFrame` are two fields because an **author** has two questions; after resolution there is one border, so `frame` carries it with `"none"` and the renderers stop asking. `gutter`, `positionAxis` and `valueLabels` are separate members and not one, because `axes` gates three things and each carries a per-form override — a heatmap guts its rows whatever `axes` says, since its row labels *are* its ordinate. *Measured before the rule: five of the six block fields governing furniture reached no member, so `frame: "box"` came back for `axes: false` and `legendSlots` returned the same list for `legend: false` as for `legend: "right"` — an arm consuming them would have drawn furniture the author refused* (F295). **And the boundary is `caps`**: `legendPlacement` auto-enables through a clause reading `caps.colourDepth`, so `Figure.legend` carries the author's request and each arm resolves it. A figure that could answer differently at two rungs is not a figure.
 - **I68** — **A role is drawn distinguishably from every role it can share a figure with, and each arm holds a record keyed exhaustively by the role.** Not *seven roles, seven shapes*: the terminal draws `◆` for `mean` and for `target`, which is legitimate because `distributionFigure` cannot emit them together — and unfalsifiable stated the other way, so the claim is scoped to co-occurrence. Exhaustiveness is the compile-time half; the co-occurrence claim is the behavioural one, and neither alone holds the arms together. *Measured before the rule: `GlyphRole` was read in one file, the one declaring it; the terminal's own `GlyphChars` carried eleven slots of which **five were dead** and the dead five were exactly the role-named ones — `median`, `outlier`, `whiskerH`, `boxLeft`, `boxRight`; and the SVG's `switch` ended in a `default:` that would have drawn an eighth role as a circle. The arms agreed because the roles were extracted from the terminal's composition, which is agreement by history* (F289, F298, F300).
 - **I69** — **A figure whose two normalised axes carry one unit says so, and each arm fits a centred square inside its own box rather than filling it.** `isotropic` is a figure member because it is a property of the *figure* — a disc, a ring and a mosaic of squares are round or square in any renderer — and it is not the cell aspect, which stays a terminal fact under G2 and never crosses. *Measured before the rule: every pie and every radar in the catalogue is height-bound at every width, so `radiusFor`'s `byWidth` arm is dead across the corpus and its `min` reads as though it decided nothing; the second arm's plot area is 1.44× wider than tall with a right legend, so a unit square through `projected` is an ellipse and a waffle's hundred squares are 39.7 × 27.5 px. The plan's sentence — the aspect compensation disappears because an SVG square is square — is true about `CELL_ASPECT` and attached to a decision about the box* (F303).
+- **I70** — **A form whose figure is a derivation of its series computes that derivation above both renderers, and each arm draws the derived block.** I65 puts the derivation below both arms; this is the half that makes it observable, because a pure function in the right layer draws nothing until somebody applies it at an arm's entry. *Measured before the rule: `derive.ts` had existed since §3ak.7 ruled on it, holding `ecdfSeries` and `densitySeries`, and was imported by the terminal's dispatch table and by `kde.ts` — **by nothing on the second arm's side**. The row written for I65 builds the derived block itself and asserts the figure against it, so it passed while no caller did that; and a third form, `histogram`, was never named at all, because the walk that found the class was one family's. Three forms, closed at three by a sweep of the ten sites in the dispatch that reshape a block* (F268, F314, F317).
+
 
 ## 8. Commitments
 
@@ -7089,6 +7235,7 @@ orientation — and belongs in the classification table as its own rows.
 58. **A figure is total and a refusal is an empty one** (I64, §3ak). F259's *refuse a false figure, record an incomplete one*, expressed as a type rather than as a clause in two renderers.
 59. **The datum a form draws is derived once, above both renderers** (I65, §3ak.7). A derivation inside one arm's dispatch table is a figure the other arm cannot reach: `ecdf` and `density` drew their raw samples in SVG while the terminal drew a cumulative fraction and a kernel estimate — D14's shape found a second time, by walking a family rather than a form.
 60. **A form that is drawn is drawn from its data, and a sweep says so rather than a reader** (I66, §3ak.8). `G7b` asks whether a claimed form puts ink on the page; `ecdf` passes it and draws the same picture for every dataset. The rung above is the one a golden frame, a disagreement matrix and a mutation on dead code all structurally cannot reach.
+61. **A derivation is applied at each arm's entry, and the record has a column for every decision the arms make differently** (I70, §3ak.27, §3ak.28). A pure function in the shared layer is not a seam until a caller uses it: `derive.ts` sat one import away from the second arm for the length of the pass while `histogram`, `density` and `ecdf` drew a different quantity in each. And what caught it was a frame rather than a cell — the matrix had no column for a colour ramp or a drop notice, and a rule table is exhaustive over the rules you stated.
 
 ---
 

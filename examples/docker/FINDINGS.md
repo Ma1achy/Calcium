@@ -13642,6 +13642,104 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F318 — the member the design named is one the layer cannot hold, and the difference it hides is legitimate ★★★★☆
+
+F316 recorded two remedies: **a sixth column** for the colour ramp, and **a `drops` member** on
+`Figure` for the drop notice. Measuring the second before building it says the shipped type is right
+and the design was wrong — which is the reverse of how the finding reads, because a declared member
+absent from the tree reads as an omission every time.
+
+```ts
+// heatmap.ts — the notice the figure was to carry
+const dropped = Math.max(0, longest - layout.areaWidth);
+```
+
+`longest` is a sample count. **`layout.areaWidth` is cells.** §3aj hazard 3 is *anything measured in
+cells stays in cells*, and `G1`/`G1b` assert the shared layer's side of it **by arity** — `niceAxis`
+takes `(range, maxTicks, pin)` and `seriesRange` takes `(series, pin, bars)`, neither with a width.
+A `drops.hidden` computed from `areaWidth` puts the rendering width inside the object whose whole
+definition is that it does not have one, and `notice` carries the count in its string, so both halves
+of the member fail for the same reason.
+
+**And the difference it was reaching for is legitimate.** The terminal drops leading columns because
+a cell is a quantum and 100 readings do not fit in 62 of them. The second arm scales 640 px across
+whatever it is given and has nothing to drop — not *has not implemented dropping*, but has no
+quantum to drop against. The row belongs in §2's closed list, asserted as *they differ and always
+will*, which fails the day the SVG grows a drop rule of its own.
+
+**The ramp half stands unchanged and is open.** A colour bar is a legend entry with a continuous ref,
+the terminal's descends the same ladder as its cells, and nothing about an SVG prevents one.
+
+### The shape: a ruling that names an operation the layer below does not have
+
+C23 §8a A4 is the standing instance — a walk correct about the interaction it found and wrong about
+a mechanism it assumed existed. This is the same thing in a **type sketch**: §2 wrote ten members and
+nine of them are properties of the block, so the tenth read as one. Nothing in the sketch is false
+about the *notice*; what is false is that the figure could compute it.
+
+**No index by rule interaction reaches it**, because the flaw is not between two rules. It is a
+quantity the design assumed was free of a width and is not, and the only thing that asks the question
+is going to the expression that computes it. Twenty minutes, and the remedy inverts.
+
+---
+
+## F317 — the ruling landed, the module landed, and the caller that was the whole point never did ★★★★★
+
+**F314's remedy was ruled fourteen commits ago and two-thirds of it is in the tree.** C12 §3ak.7's C1
+found `ecdf` and `density` drawing raw samples in the second arm, ruled *the derivation moves into
+the shared layer, and it is not a refusal*, created `src/presentation/plot/derive.ts` for it, and
+wrote I65. Measured at HEAD:
+
+| the ruling asked for | at HEAD |
+|---|---|
+| the derivations pure and below both arms | **done** — 148 lines, no `cells()`, no capability |
+| the figure describing the block that is **drawn** | **done** — `curveFigure` is a function of what it is handed |
+| **a caller handing it the drawn block** | **absent** — `derive.ts` is imported by `definition.ts` and `kde.ts`, and by nothing on the SVG side |
+
+The third row is the entire effect. The two above it are why its absence was invisible: a module in
+the right layer and a figure with the right shape are both true statements about the tree, and
+neither of them draws a cumulative fraction.
+
+### The row written for the ruling is its own caller
+
+```ts
+// FC5 (C12 I65) — test/unit/plot-curve-figure.test.ts
+const drawn = { ...authored, series: authored.series.map((s) => ecdfSeries(s)), yMin: 0, yMax: 1 };
+expect(curveFigure(drawn).extent, "the cumulative fractions").toEqual({ min: 0, max: 1 });
+```
+
+Its comment says *a caller hands over the derived block and the figure is about that*. **No caller
+does.** The row constructs the derived block itself, so it asserts the seam's behaviour on the day
+nothing in `src/` reaches it — the seam-level row passing while the wiring is absent, and the only
+mutation that reaches it is one on a **call site** that does not exist.
+
+### And the third form was never named, because the walk was a family's
+
+§3ak.7's artefact covered the six forms `SVG_FAMILY` calls `curve`. `histogram` is `"bar"`, and
+`binValues` counts its samples into an `asBar` block inside the terminal's dispatch exactly as the
+other two do. §3ak.12's bar-family walk has no row of that shape, so the class was found, bounded by
+its family, and never swept.
+
+**The sweep is cheap and was owed**: ten `{ ...block,` sites in the dispatch table, three of them
+derivations — `ecdf`, `density`, `histogram` — four defaulting `categories`, one a range from
+quartiles that already crosses. **No fourth exists.** A class found by a walk wants running across
+the other families once, and that is a step rather than a better artefact.
+
+### What it costs to state the rule the other way
+
+Five forms are refused for wanting a density and three are fixed by moving a call, so *all five open*
+is the natural inference and it does not hold. `violinColumn` builds its sample points over
+`n = rows` — **the estimate is evaluated at the renderer's row count** — where `ecdfSeries` is a
+function of `values.length` and `densitySeries` fixes its resolution at 100. Two of the five want a
+family emitter, not a wiring change, and the same line divides family 8: `stackBands` folds freely
+and resamples across `columns`.
+
+**Ruled — I70 (§3ak.27), and open until a caller exists.** The rule commits ahead of the code, so
+this finding is closed by the commit that wires `drawnBlock` into both arms and not by the one that
+names it.
+
+---
+
 ## F316 — two decisions the arms make differently, one with no column and one with no seam member ★★★★☆
 
 The paired sheet shows the matrix family with a **colour ramp** under every terminal frame and
