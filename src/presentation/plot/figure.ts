@@ -12,7 +12,7 @@
  * nothing lands here without a consumer — an export nothing reads is what MG25
  * refuses, and a `Figure` member no renderer takes is F84's class one type along.
  */
-import type { Plot, PlotForm, QuartileSummary, ScaleType } from "../../data/viewmodel/index.js";
+import type { Plot, PlotForm, QuartileSummary, ScaleType, Segment } from "../../data/viewmodel/index.js";
 import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
@@ -111,9 +111,23 @@ export const HAS_VALUE_AXIS = {
   latency: false, density2d: false, utilisation: false,
   flame: false, icicle: false, treemap: false,
   tree: false, graph: false,
-  // Proportion: an angle, a polygon's radius, a count of squares. The reading is
-  // a share of a whole, which is not a position on a scale.
-  pie: false, radar: false, waffle: false,
+  // **Proportion — and the row had three subjects with one reason** (F304,
+  // §3ak.26 finding 2). *An angle, a polygon's radius, a count of squares: the
+  // reading is a share of a whole, which is not a position on a scale.* An angle
+  // is a share of a whole and a count of squares is a share of a whole.
+  //
+  // **A polygon's radius is not.** `radarCeiling` nices `{min: 0, max: top}` to
+  // six ticks, every vertex is `v / ceiling` clamped, and the four value rings at
+  // a fifth through four fifths of the radius **are that scale, drawn** — so a
+  // radar's reading is a position on a scale by construction. `false` was right
+  // about the gutter, which this record's own doc says is a different question.
+  //
+  // **F267 is the same defect on the row below**, and neither is carelessness:
+  // three forms were bundled and the shared reason on a bundled row is rarely
+  // any of the subjects'. The correction also closed what the row hid —
+  // `radarCeiling` passed `{}` where every other axis passes the block, so a
+  // radar's `yMin`, `yMax` and `yFormat` were read by nothing.
+  pie: false, waffle: false, radar: true,
   // **Composition: the facets' axes are in the figure, so the figure has them.**
   //
   // Written `false` first, on the sentence *each facet answers for itself and
@@ -291,6 +305,21 @@ export type LegendSlot = Readonly<{
   ref: ColourRef;
   /** Present for `role: "series"` — the palette slot the swatch must match. */
   seriesIndex?: number;
+  /**
+   * **The reading beside the name** — `65%` — as a string, and `ValueAxis.labels`
+   * is the precedent (§3ak.26 finding 5).
+   *
+   * A pie's legend is `swatch label 65%` and a radar's is `swatch label`; the
+   * percentage is a formatted number derived from the data, which is the class
+   * that already crosses, while the swatch is the class that must not (I62).
+   *
+   * **Optional, and `radar` is why.** `segmentLegend` is called by all three
+   * proportion forms and the radar passes `""` — it has a name and no reading to
+   * put beside it. An empty string and *no reading* are the same on the page and
+   * different in the record, and F280 is the standing instance of an absent case
+   * taking its meaning from the only case that had one.
+   */
+  value?: string;
 }>;
 
 /**
@@ -396,6 +425,30 @@ export type Figure = Readonly<{
   valueLabels: "left" | "right" | "both" | null;
   /** Placed, or `null` where the author refused one — never an empty list (I67). */
   legend: FigureLegend | null;
+  /**
+   * **Both normalised axes carry one unit, so each arm fits a centred square
+   * inside its own box rather than filling it** (I69, §3ak.26 finding 1).
+   *
+   * Not the cell aspect, which stays a terminal fact under G2 and never crosses:
+   * a braille dot is square and a pixel is square, so `squareColumns` and
+   * `rx = 2·ry` are `aspect.ts`' business. **This is the other quantity that was
+   * wearing its name** — `radiusFor`'s `min`, fitting an isotropic figure into
+   * an anisotropic box, which the terminal does in dots and the second arm does
+   * in pixels.
+   *
+   * Measured before the member existed: every pie and every radar in the
+   * catalogue is height-bound at *every* width, so `radiusFor`'s `byWidth` arm
+   * is dead across the corpus and its `min` reads as deciding nothing; the
+   * second arm's plot area is 1.44× wider than tall with a right legend, which
+   * makes a unit square an ellipse and a waffle's hundred squares 39.7 × 27.5 px
+   * (F303).
+   *
+   * **A boolean and not a ratio**, deliberately — `arcDots`' own rule about a
+   * knob nothing turns. The day a form wants three-by-two the member widens and
+   * every call site is a compile error, which is what a premature `number` buys
+   * nothing towards.
+   */
+  isotropic: boolean;
   /** Normalised, uninverted, refs unresolved. Empty is a refusal (I64). */
   marks: readonly Drawn[];
 }>;
@@ -649,6 +702,7 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     // rather than read from `block.orientation`, which means something else on
     // the bar and distribution families — reading it here would turn a line plot
     // on its side in one arm and not the other.
+    isotropic: false,
     orientation: "vertical",
     facing: facingOf(block, FACING_DEFAULT),
     frame: frameOf(block),
@@ -780,6 +834,7 @@ export function tilesFigure(block: Plot): Figure {
     value: null,
     extent: null,
     identity,
+    isotropic: false,
     orientation: ORIENTATION_UNUSED,
     // **Only the flame grows up** (F276). `FACING_MATRIX` is named for the
     // family it was written for and holds the shape three families want — the
@@ -839,6 +894,7 @@ export function nodesDecisions(block: Plot): Omit<Figure, "marks"> {
     identity: root === undefined
       ? (block.graph?.nodes ?? []).map((nd, i) => nd.label ?? `node ${String(i + 1)}`)
       : flatten(root).map((f) => f.label),
+    isotropic: false,
     orientation: ORIENTATION_UNUSED,
     facing: facingOf(block, FACING_DEFAULT),
     // **This family draws no border, whatever `plotFrame` says** (C12 I67,
@@ -1011,6 +1067,7 @@ export function distributionFigure(block: Plot): Figure {
     value: axis,
     extent,
     identity,
+    isotropic: false,
     orientation: orientationOf(block),
     facing: facingOf(block, FACING_DEFAULT),
     frame: frameOf(block),
@@ -1082,6 +1139,7 @@ export function matrixFigure(block: Plot): Figure {
     value: null,
     extent,
     identity: block.series.map((sr) => sr.label ?? ""),
+    isotropic: false,
     orientation: ORIENTATION_UNUSED,
     facing: facingOf(block, FACING_MATRIX),
     // **This family draws no border, whatever `plotFrame` says** (C12 I67,
@@ -1172,6 +1230,7 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     value: axisOver(extent, block),
     extent,
     identity: block.categories ?? [],
+    isotropic: false,
     orientation: orientationOf(block),
     facing: facingOf(block, FACING_DEFAULT),
     frame: frameOf(block),
@@ -1407,4 +1466,132 @@ export function curveFigure(block: Plot): Figure {
     marks.push(...annotationMarks(block, value.range));
   }
   return { ...decisions, marks };
+}
+
+// --- the proportion family (§3ak.26) ----------------------------------------
+
+
+
+/**
+ * A segment's share of the whole — **before any renderer's minimum** (F305).
+ *
+ * This is `slicesOf`'s first half. Its second half merges everything below one
+ * dot of arc into an `other` slice, and that threshold is `1 / 2πr` with `r` in
+ * **dots**: a resolution limit, so it stays in the arm that has a resolution.
+ * The shares crossing unmerged is what lets the second arm draw the slices the
+ * terminal cannot, and it is why `identity` names every segment rather than the
+ * ones one arm kept.
+ */
+export type Share = Readonly<{ label: string; fraction: number; index: number }>;
+
+export function sharesOf(segments: readonly Segment[]): readonly Share[] {
+  const total = segments.reduce((a, sg) => a + Math.max(0, sg.value), 0);
+  if (!(total > 0)) return [];
+  return segments.map((sg, i) => ({
+    label: sg.label,
+    fraction: Math.max(0, sg.value) / total,
+    index: i, // cells-ok — a segment index
+  }));
+}
+
+/** The percentage a share reads as. One derivation, three call sites. */
+export function percentOf(fraction: number): string {
+  return `${String(Math.round(fraction * 100))}%`;
+}
+
+/**
+ * The mosaic's rows — **ten, so one square is one per cent** (C12 §3g).
+ *
+ * Here rather than in `waffle.ts` because the grid's shape is a property of the
+ * figure and not of the renderer: an SVG waffle is ten by ten as well, and the
+ * *columns* are where the arms differ — twenty of them in the terminal, because
+ * `squareColumns` compensates for a cell being twice as tall as it is wide.
+ */
+export const WAFFLE_ROWS = 10;
+const WAFFLE_SQUARES = WAFFLE_ROWS * WAFFLE_ROWS;
+
+/**
+ * Which segment owns each of the hundred squares, row-major — or `-1`.
+ *
+ * **The rounding is shared and it does not always sum**, which the catalogue
+ * cannot say: its one fixture is `65/25/10`, summing to exactly a hundred, so
+ * `scale` is 1 and `Math.round` is the identity function. `1/1/1` rounds to
+ * 33/33/33 and leaves a square empty; `50/50/1` asks for 101 and the guard drops
+ * the last one — **a segment holding a share of the whole and receiving no
+ * square at all** (F305).
+ */
+export function waffleGrid(segments: readonly Segment[]): readonly number[] {
+  const sum = segments.reduce((a, sg) => a + sg.value, 0);
+  const scale = sum > 0 ? WAFFLE_SQUARES / sum : 0;
+  const grid = new Array<number>(WAFFLE_SQUARES).fill(-1);
+  let pos = 0;
+  segments.forEach((sg, idx) => {
+    const count = Math.round(sg.value * scale);
+    for (let i = 0; i < count && pos < WAFFLE_SQUARES; i += 1) grid[pos++] = idx; // cells-ok — a square index
+  });
+  return grid;
+}
+
+
+/** The ceiling a radar is read against — a round one, so the rings are round. */
+function radarRange(block: Pick<Plot, "series">): Range {
+  const all = block.series.flatMap((sr) =>
+    sr.values.filter((v): v is number => v !== null && Number.isFinite(v)),
+  );
+  const top = Math.max(...all, 0);
+  return { min: 0, max: top > 0 ? top : 1 };
+}
+
+/**
+ * Everything the proportion family decides, **and `marks` is not all of it**
+ * (§3ak.26).
+ *
+ * `Omit<Figure, "marks">` for `nodesDecisions`' reason one family along: the
+ * terminal reads these back and keeps its own rasterisation, because a pie is
+ * filled dot by dot inside an angular range and a radar's polygon is strung
+ * through a braille grid. **What crosses is the decision** — which segments,
+ * what each one's share is, what the radar is read against, and what the legend
+ * names — and every one of those was computed inside a renderer before this.
+ */
+export function proportionDecisions(block: Plot): Omit<Figure, "marks"> {
+  const radar = block.form === "radar";
+  const shares = sharesOf(block.segments ?? []);
+  const base = legendOf(block);
+  return {
+    // **A radar's readings are on a scale and the record now says so** (F304).
+    // `valueAxisOf` is `radarCeiling` with the pin threaded, which is the half
+    // the old expression could not have: it passed `{}`, so `yMin`, `yMax` and
+    // `yFormat` were read by nothing on this form alone.
+    value: radar ? valueAxisOf(radarRange(block), 6, block) : null,
+    extent: radar ? radarRange(block) : null,
+    // **Two name lists, and the precedent already chose.** A radar's legend
+    // names its *series* and the labels around its ring name its *categories*;
+    // `categoricalDecisions` sets exactly this pair, and the curve family's rows
+    // assert the two differ. `identity` is the figure's own names.
+    identity: radar ? block.categories ?? [] : identityOf(block),
+    orientation: ORIENTATION_UNUSED,
+    // **`FACING_DEFAULT` and not `facingOf`**, which is a decision rather than
+    // an omission. `origin` mirrors a cartesian figure; the terminal's three
+    // proportion renderers do not read it, so honouring it in one arm would be
+    // a new disagreement introduced by a refactor — the one thing this pass
+    // forbids.
+    facing: FACING_DEFAULT,
+    // The terminal composes all three of these into a bare area: `layout` is
+    // `{ gutter: 0, labelColumn: 0 }` and no border is drawn at any width.
+    frame: "none",
+    gutter: false,
+    positionAxis: false,
+    valueLabels: null,
+    legend:
+      base === null || radar
+        ? base
+        : {
+            ...base,
+            slots: base.slots.map((sl) => {
+              const share = sl.seriesIndex === undefined ? undefined : shares[sl.seriesIndex];
+              return share === undefined ? sl : { ...sl, value: percentOf(share.fraction) };
+            }),
+          },
+    isotropic: true,
+  };
 }

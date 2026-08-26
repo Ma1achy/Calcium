@@ -377,7 +377,19 @@ function curvePath(points: readonly (readonly [number, number] | null)[], square
  * applications: the same `up` that makes a vertical figure's values run bottom
  * to top makes a horizontal figure's run left to right.
  */
-function projected(figure: Omit<Figure, "marks">, box: Area): (x: number, y: number) => readonly [number, number] {
+function projected(figure: Omit<Figure, "marks">, outer: Area): (x: number, y: number) => readonly [number, number] {
+  // **A figure whose two axes carry one unit gets a centred square, not the
+  // box** (I69, §3ak.26 finding 1). The terminal does this in dots and calls it
+  // `radiusFor`'s `min`; here it is the same decision in pixels, and it is here
+  // rather than in each family's renderer because an inset written per arm is
+  // written twice and drifts — which is exactly the defect `aspect.ts` exists to
+  // have ended.
+  //
+  // **This is not the cell aspect.** That one really does disappear: a braille
+  // dot is square and a pixel is square. What does not disappear is fitting an
+  // isotropic figure into an anisotropic box, and the plan retired the second
+  // under the first one's name (F303).
+  const box = boxFor(figure, outer);
   const wide = box.right - box.left;
   const tall = box.bottom - box.top;
   const sideways = figure.orientation === "horizontal";
@@ -389,6 +401,15 @@ function projected(figure: Omit<Figure, "marks">, box: Area): (x: number, y: num
       ? ([box.left + wide * (up ? y : 1 - y), box.top + tall * along] as const)
       : ([box.left + wide * along, box.top + tall * (up ? 1 - y : y)] as const);
   };
+}
+
+/** The square a `isotropic` figure draws inside, centred — or the box itself. */
+function boxFor(figure: Omit<Figure, "marks">, box: Area): Area {
+  if (!figure.isotropic) return box;
+  const side = Math.min(box.right - box.left, box.bottom - box.top);
+  const dx = (box.right - box.left - side) / 2;
+  const dy = (box.bottom - box.top - side) / 2;
+  return { left: box.left + dx, right: box.right - dx, top: box.top + dy, bottom: box.bottom - dy };
 }
 
 /**
@@ -1222,9 +1243,12 @@ export function plotToSvg(
       const y = sideways ? originY + i * step : originY;
       parts.push(
         `<rect x="${n(x)}" y="${n(y - swatch)}" width="${n(swatch)}" height="${n(swatch)}" fill="${ink}"/>`,
+        // **The reading beside the name, where the slot carries one** (§3ak.26
+        // finding 5). A pie's legend is `swatch label 65%` in both arms; a
+        // radar's has no reading and the member is absent rather than empty.
         `<text x="${n(x + swatch + 4)}" y="${n(y)}" text-anchor="start" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
-          `${escape(slot.label)}</text>`,
+          `${escape(slot.value === undefined ? slot.label : `${slot.label} ${slot.value}`)}</text>`,
       );
     }
   }

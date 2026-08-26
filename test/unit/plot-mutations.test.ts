@@ -24,6 +24,20 @@ import { kde, scaledBandwidth } from "../../src/presentation/plot/derive.js";
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
 import { aggregate, candleColumn, candleLeft, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
 import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
+import { proportionDecisions, sharesOf } from "../../src/presentation/plot/figure.js";
+/**
+ * The two figure members `circle.ts` used to compute for itself (§3ak.26).
+ *
+ * A test passing its own ceiling or its own shares would be the
+ * reimplemented-rule class one layer up — so both come off the same emitter
+ * `definition.ts` reads.
+ */
+const ceilingOf = (series: readonly { values: readonly (number | null)[] }[], categories: readonly string[]): number =>
+  proportionDecisions(block({
+    kind: "plot", id: "ceil", form: "radar", height: 10,
+    categories: [...categories], series: series.map((s) => ({ values: [...s.values] })),
+  })).value?.range.max ?? 1;
+
 import { formatReadout, readoutSet, xTickRow } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
@@ -1815,7 +1829,7 @@ describe("GROUP 7: pie merges sub-threshold slices", () => {
       { label: "Tiny2", value: 0.3 },
       { label: "Tiny3", value: 0.2 },
     ];
-    const { layers } = pieRender(segs, 10, 5, FULL_CAPS);
+    const { layers } = pieRender(sharesOf(segs), segs.length, 10, 5, FULL_CAPS);
     // Four segments in, two layers out — and the survivor of the merge carries
     // `segments.length` as its index, which is what makes it "other" rather than
     // the last tiny slice wearing the others' colour.
@@ -1859,7 +1873,7 @@ describe("GROUP 7a: the circle forms are readable without colour (C12 I25)", () 
       return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? " ";
     };
     const fillsAt = (caps: typeof MONO_UNICODE_CAPS): string[] =>
-      pieRender(segments, 80, 10, caps).layers.map((l) => fillOf(l.glyphRows));
+      pieRender(sharesOf(segments), segments.length, 80, 10, caps).layers.map((l) => fillOf(l.glyphRows));
 
     const mono = fillsAt(MONO_UNICODE_CAPS);
     expect(mono.length).toBe(4); // cells-ok — a layer count
@@ -1875,10 +1889,11 @@ describe("GROUP 7a: the circle forms are readable without colour (C12 I25)", () 
   it("a 1-bit radar strokes each series differently, and a coloured one does not", () => {
     const twins = [{ values: [80, 60, 90, 40, 70] }, { values: [80, 60, 90, 40, 70] }];
     const cats = ["Speed", "Power", "Range", "Defence", "HP"];
-    const mono = radarRender(twins, cats, 80, 10, MONO_UNICODE_CAPS).polygons;
+    const ceiling = ceilingOf(twins, cats);
+    const mono = radarRender(twins, cats, 80, 10, MONO_UNICODE_CAPS, ceiling).polygons;
     expect(mono.length).toBe(2); // cells-ok — a series count
     expect(mono[0]!.join("\n")).not.toBe(mono[1]!.join("\n"));
-    const full = radarRender(twins, cats, 80, 10, FULL_CAPS).polygons;
+    const full = radarRender(twins, cats, 80, 10, FULL_CAPS, ceiling).polygons;
     expect(full[0]!.join("\n")).toBe(full[1]!.join("\n"));
   });
 

@@ -27,7 +27,10 @@ import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
-import { baselineOf, categoricalDecisions, frameOf, gutterOf, positionalDecisions, valueAxisOf } from "./figure.js";
+import {
+  baselineOf, categoricalDecisions, frameOf, gutterOf, positionalDecisions,
+  proportionDecisions, sharesOf, valueAxisOf, WAFFLE_ROWS,
+} from "./figure.js";
 import { treeArea } from "./tree.js";
 import { graphArea } from "./graph.js";
 import { curveRows, isBlank } from "./curve.js";
@@ -67,7 +70,7 @@ import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, 
 import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
-import { WAFFLE_ROWS, waffleCells } from "./waffle.js";
+import { waffleCells } from "./waffle.js";
 import { pointLabelRows } from "./pointlabels.js";
 import { colormapFor, heatmapFormRows } from "./heatmap.js";
 import { flatAlphabet, glyphs } from "../blocks/glyphs.js";
@@ -2457,13 +2460,17 @@ const FORM_ROWS: Readonly<
     // third of the width, drops labels before starving the figure and truncates
     // with a count, and a waffle wants all three. Two builders for one job is
     // the drift a shared one cannot have.
-    const total = segs.reduce((a, sg) => a + Math.max(0, sg.value), 0);
+    // **The names and the readings are the figure's, read back** (§3ak.26
+    // finding 5). The percentage was computed here and again in `circle.ts`, in
+    // two expressions that agreed — one derivation now, and the swatch is the
+    // part that stays, because a swatch descends the capability ladder (I62).
+    const slots = proportionDecisions(block).legend?.slots ?? [];
     const legend = segmentLegend(
-      segs.map((sg, i) => ({
+      slots.map((sl) => ({
         swatch: pairFor(ctx.capabilities).filled,
-        label: sg.label,
-        value: total > 0 ? `${String(Math.round((Math.max(0, sg.value) / total) * 100))}%` : "",
-        index: i, // cells-ok — a segment index
+        label: sl.label,
+        value: sl.value ?? "",
+        index: sl.seriesIndex ?? -1, // cells-ok — a segment index
       })),
       WAFFLE_ROWS,
       Math.floor(width / 3), // cells-ok — a cell width
@@ -2867,8 +2874,13 @@ const FORM_ROWS: Readonly<
     // them wide puts two cells in each one-cell slot of a mask built in cells —
     // and the answer is the same replacement, because a shape has no coarser
     // form that is still that shape.
+    // **The shares are the figure's and the merge is this arm's** (§3ak.26
+    // finding 3). `sharesOf` is what the segments *are*; the threshold below
+    // which two slices become `other` is `1 / 2πr` in **dots**, a resolution
+    // limit, so it stays where there is a resolution.
+    const shares = sharesOf(segs);
     if (flatAlphabet(ctx.capabilities)) {
-      return pieAsciiRows(segs, width, areaRows, ctx.capabilities).map((row) =>
+      return pieAsciiRows(shares, segs.length, width, areaRows, ctx.capabilities).map((row) => // cells-ok — a segment count
         line(markedSpans(row, (i) => categoryRef(i), ctx), layout, ctx),
       );
     }
@@ -2879,7 +2891,7 @@ const FORM_ROWS: Readonly<
     // spare what a figure needs, the honest answer is the thing that fits and
     // not an error the caller could not have avoided.
     const solid = block.plotStyle === "solid" && ctx.capabilities.colourDepth !== 1;
-    const pie = pieRender(segs, width, areaRows, ctx.capabilities, solid);
+    const pie = pieRender(shares, segs.length, width, areaRows, ctx.capabilities, solid); // cells-ok — a segment count
     if (pie.layers.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     const fills: readonly Layer[] = pie.layers.map((pl) => ({
       glyphRows: pl.glyphRows,
@@ -2913,13 +2925,17 @@ const FORM_ROWS: Readonly<
     // them wide puts two cells in each one-cell slot of a mask built in cells —
     // and the answer is the same replacement, because a shape has no coarser
     // form that is still that shape.
+    // **The ceiling is the figure's** (I60, F304) — it was `radarCeiling` here,
+    // and it passed `{}` where every other axis passes the block, so a radar's
+    // `yMin`, `yMax` and `yFormat` were read by nothing.
+    const ceiling = proportionDecisions(block).value?.range.max ?? 1;
     if (flatAlphabet(ctx.capabilities)) {
-      return radarAsciiRows(block.series, cats, width, areaRows, ctx.capabilities).map((row) =>
+      return radarAsciiRows(block.series, cats, width, areaRows, ctx.capabilities, ceiling).map((row) =>
         line(markedSpans(row, seriesRef, ctx), layout, ctx),
       );
     }
     const radar = radarRender(
-      block.series, cats, width, areaRows, ctx.capabilities,
+      block.series, cats, width, areaRows, ctx.capabilities, ceiling,
       block.plotStyle === "line", block.plotGrid ?? "polygon",
     );
     if (radar.polygons.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count

@@ -8,10 +8,14 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
 
-/** Ten rows of ten, one square per percent. */
-/** The mosaic's rows — ten, so one square is one per cent (C12 §3g). */
-export const WAFFLE_ROWS = 10;
 import { markOf } from "./marks.js";
+// **The grid's shape and its assignment are the figure's** (§3ak.26). Ten rows
+// of ten is a property of the mosaic and not of the terminal — an SVG waffle is
+// ten by ten as well — and what is terminal is the *columns*, twenty of them,
+// because `squareColumns` compensates for a cell being twice as tall as it is
+// wide. That compensation is the one that really does disappear at the second
+// arm (F303).
+import { WAFFLE_ROWS, waffleGrid } from "./figure.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
 
@@ -31,22 +35,10 @@ export function waffleCells(
   // mosaic belongs, and the one file that knew about cell aspect was
   // `circle.ts`. Each square of the waffle is `CELL_ASPECT` cells wide.
   const cols = Math.min(w, squareColumns(WAFFLE_ROWS));
-  const gridSize = 100;
   const perSquare = Math.max(1, Math.floor(cols / WAFFLE_ROWS)); // cells-ok — a cell width
 
   const pair = pairFor(caps);
-
-  const sum = segments.reduce((a, s) => a + s.value, 0);
-  const scale = sum > 0 ? gridSize / sum : 0;
-
-  const grid = new Array(gridSize).fill(-1) as number[];
-  let pos = 0;
-  segments.forEach((seg, idx) => {
-    const count = Math.round(seg.value * scale);
-    for (let i = 0; i < count && pos < gridSize; i++) {
-      grid[pos++] = idx;
-    }
-  });
+  const grid = waffleGrid(segments);
 
   const rows: WaffleCell[][] = [];
   for (let r = 0; r < WAFFLE_ROWS; r++) {

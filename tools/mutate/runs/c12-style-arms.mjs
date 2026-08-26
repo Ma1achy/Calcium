@@ -109,15 +109,18 @@ const results = runPass({
     {
       name: "the legend keeps its braille swatch beside a block-glyph disc",
       file: CIRC,
-      from: "      swatch: solid ? pairFor(caps).filled : patternSwatch(patternFor(s.originalIndex, caps)),",
-      to: "      swatch: patternSwatch(patternFor(s.originalIndex, caps)),",
+      // Re-anchored: `Slice.originalIndex` became `Share.index` when the shares
+      // moved to the figure (§3ak.26). Same line, same mutation.
+      from: "      swatch: solid ? pairFor(caps).filled : patternSwatch(patternFor(s.index, caps)),",
+      to: "      swatch: patternSwatch(patternFor(s.index, caps)),",
       expect: "SA7",
     },
     {
       name: "the radar's line arm is not wired",
       file: DEFN,
-      from: '      block.plotStyle === "line", block.plotGrid ?? "polygon",',
-      to: '      false, block.plotGrid ?? "polygon",',
+      // Re-anchored: `ceiling` is now a parameter, read off the figure (F304).
+      from: '      block.series, cats, width, areaRows, ctx.capabilities, ceiling,\n      block.plotStyle === "line", block.plotGrid ?? "polygon",',
+      to: '      block.series, cats, width, areaRows, ctx.capabilities, ceiling,\n      false, block.plotGrid ?? "polygon",',
       expect: "SA6",
     },
     {

@@ -149,7 +149,7 @@ describe("FC — the curve family's figure (C12 §3ak.7)", () => {
     const d = positionalDecisions(block);
     const f = curveFigure(block);
     expect(Object.keys(d).sort(), "everything but the marks").toEqual(
-      ["extent", "facing", "frame", "gutter", "identity", "legend", "orientation", "positionAxis", "value", "valueLabels"],
+      ["extent", "facing", "frame", "gutter", "identity", "isotropic", "legend", "orientation", "positionAxis", "value", "valueLabels"],
     );
     for (const k of Object.keys(d) as (keyof typeof d)[]) expect(f[k], k).toEqual(d[k]);
     // **One identity list**, so the legend cannot name a set the gutter does not.
@@ -638,7 +638,7 @@ describe("FT / FN — the tiles and nodes families (C12 §3ak.7)", () => {
     // fail `U1b` for a reason the type cannot express.
     const d = nodesDecisions(plot({ form: "tree", hierarchy: tree3 } as Partial<Plot>));
     expect(Object.keys(d).sort(), "everything but the marks").toEqual(
-      ["extent", "facing", "frame", "gutter", "identity", "legend", "orientation", "positionAxis", "value", "valueLabels"],
+      ["extent", "facing", "frame", "gutter", "identity", "isotropic", "legend", "orientation", "positionAxis", "value", "valueLabels"],
     );
     expect("marks" in d, "and `marks: []` is not the alternative — I64 makes it a refusal").toBe(false);
     expect([d.value, d.extent], "structure is not a reading on a scale").toEqual([null, null]);

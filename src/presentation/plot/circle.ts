@@ -25,7 +25,7 @@
  * use. They name the segments instead (C12 §3g's `"right"` placement, the only
  * one that costs width rather than a declared row).
  */
-import type { Segment, Series } from "../../data/viewmodel/index.js";
+import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, foldSolid, setDot, type Grid } from "./raster.js";
 import { glyphs } from "../blocks/glyphs.js";
@@ -33,7 +33,7 @@ import { pad, padStart } from "../blocks/paint.js";
 import { cells, truncate } from "../text.js";
 import { extentFor, extentRun, pairFor } from "./ramp.js";
 import { QUAD_BL, QUAD_BR, QUAD_TL, QUAD_TR, quadrantGlyph } from "./linedraw.js";
-import { niceAxis } from "./axes.js";
+import { percentOf, type Share } from "./figure.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
 
@@ -326,8 +326,6 @@ export type PieRender = Readonly<{
   discWidth: number;
 }>;
 
-type Slice = Readonly<{ label: string; fraction: number; originalIndex: number }>;
-
 /**
  * Minimum-segment ruling: below some fraction a slice is less than a dot wide,
  * and drawing it is a lie. The threshold depends on the radius.
@@ -337,22 +335,30 @@ function minSegmentFraction(radius: number): number {
   return circumference > 0 ? 1 / circumference : 1;
 }
 
-function slicesOf(segments: readonly Segment[], radius: number): readonly Slice[] {
-  const total = segments.reduce((a, sg) => a + Math.max(0, sg.value), 0);
-  if (total <= 0) return [];
-
+/**
+ * The shares this arm can actually draw — **`sharesOf`'s second half, and it
+ * stays here** (§3ak.26 finding 3).
+ *
+ * The shares themselves are the figure's: they are what the segments *are*, and
+ * the second arm draws every one of them. What is terminal is the threshold —
+ * `1 / 2πr` with `r` in **dots** — because it is a resolution limit and a
+ * resolution is a thing only a grid has. So `identity` names every segment and
+ * this list is what one renderer kept.
+ *
+ * **The corpus has never seen it fire**: 0 merges over every pie variant at 40,
+ * 60 and 80, because `many-segments`' smallest slice is 1% against a 0.82%
+ * threshold at height 10. `pie/tiny-slices` is the fixture that makes the
+ * ruling contradictable (F305).
+ */
+function mergeShares(shares: readonly Share[], radius: number, count: number): readonly Share[] {
   const minFrac = minSegmentFraction(radius);
-  const visible: Slice[] = [];
+  const visible: Share[] = [];
   let otherFrac = 0;
-  for (let i = 0; i < segments.length; i += 1) { // cells-ok — a segment count
-    const sg = segments[i]!;
-    const frac = Math.max(0, sg.value) / total;
-    if (frac < minFrac) otherFrac += frac;
-    else visible.push({ label: sg.label, fraction: frac, originalIndex: i });
+  for (const sh of shares) {
+    if (sh.fraction < minFrac) otherFrac += sh.fraction;
+    else visible.push(sh);
   }
-  if (otherFrac > 0) {
-    visible.push({ label: "other", fraction: otherFrac, originalIndex: segments.length }); // cells-ok — a segment count
-  }
+  if (otherFrac > 0) visible.push({ label: "other", fraction: otherFrac, index: count });
   return visible;
 }
 
@@ -388,13 +394,10 @@ function fillWedge(
   }
 }
 
-/** The percentage a fraction reads as, for a legend. */
-function percent(fraction: number): string {
-  return `${String(Math.round(fraction * 100))}%`;
-}
-
 export function pieRender(
-  segments: readonly Segment[],
+  /** The figure's shares, read back — never the block's segments (§3ak.26). */
+  shares: readonly Share[],
+  segmentCount: number,
   areaWidth: number,
   areaRows: number,
   caps: Caps,
@@ -414,7 +417,7 @@ export function pieRender(
   if (w === 0 || h === 0) return empty;
 
   const radius = radiusFor(w, h, 0);
-  const slices = slicesOf(segments, radius);
+  const slices = mergeShares(shares, radius, segmentCount);
   if (slices.length === 0) return empty; // cells-ok — a slice count
 
   const legend = segmentLegend(
@@ -422,10 +425,10 @@ export function pieRender(
       // **The swatch is the vocabulary the wedge is drawn in.** A braille key
       // beside a block-glyph disc names the right colour with the wrong mark,
       // which is what a legend exists to stop.
-      swatch: solid ? pairFor(caps).filled : patternSwatch(patternFor(s.originalIndex, caps)),
+      swatch: solid ? pairFor(caps).filled : patternSwatch(patternFor(s.index, caps)),
       label: s.label,
-      value: percent(s.fraction),
-      index: s.originalIndex,
+      value: percentOf(s.fraction),
+      index: s.index,
     })),
     h,
     Math.floor(w / 3),
@@ -450,7 +453,7 @@ export function pieRender(
   for (const s of slices) {
     const grid = createGrid(disc.dotWidth, disc.dotHeight);
     const end = angle + s.fraction * TAU;
-    fillWedge(grid, disc, angle, end, patternFor(s.originalIndex, caps));
+    fillWedge(grid, disc, angle, end, patternFor(s.index, caps));
     // **The two radial edges and the arc, solid whatever the fill is.** A wedge
     // narrower than the sampling grid would otherwise draw nothing at all, and
     // at one bit the edges are what separates two hatches that meet.
@@ -459,7 +462,7 @@ export function pieRender(
     arcDots(grid, disc, 1, angle, end);
     layers.push({
       glyphRows: solid ? foldSolid(grid, pairFor(caps).filled) : foldBraille(grid),
-      segmentIndex: s.originalIndex,
+      segmentIndex: s.index,
     });
     angle = end;
   }
@@ -481,7 +484,8 @@ export function pieRender(
  * divide the total.
  */
 export function pieAsciiRows(
-  segments: readonly Segment[],
+  shares: readonly Share[],
+  segmentCount: number,
   width: number,
   areaRows: number,
   caps: Caps,
@@ -491,14 +495,14 @@ export function pieAsciiRows(
   const blank: readonly (readonly MarkedText[])[] = Array.from({ length: h }, () => []);
   if (w === 0 || h === 0) return blank;
 
-  const slices = slicesOf(segments, radiusFor(w, h, 0));
+  const slices = mergeShares(shares, radiusFor(w, h, 0), segmentCount);
   if (slices.length === 0) return blank; // cells-ok — a slice count
 
   const ambiguous = caps.ambiguousWidth;
   const mark = glyphs(caps).filled;
   const ext = extentFor(caps);
   const markW = cells(mark, ambiguous);
-  const valueW = slices.reduce((m, s) => Math.max(m, cells(percent(s.fraction), ambiguous)), 0);
+  const valueW = slices.reduce((m, s) => Math.max(m, cells(percentOf(s.fraction), ambiguous)), 0);
   const natural = slices.reduce((m, s) => Math.max(m, cells(s.label, ambiguous)), 0);
   const labelW = Math.max(1, Math.min(natural, Math.floor(w / 3)));
   const barW = Math.max(0, w - markW - labelW - valueW - 3);
@@ -513,7 +517,7 @@ export function pieAsciiRows(
     const label = pad(truncate(s.label, labelW, caps), labelW, ambiguous);
     const bar = barW > 0 ? ` ${pad(extentRun(s.fraction, barW, ext), barW, ambiguous)}` : "";
     lines[top + i] = [
-      { text: `${mark} ${label} ${padStart(percent(s.fraction), valueW, ambiguous)}${bar}`, index: s.originalIndex },
+      { text: `${mark} ${label} ${padStart(percentOf(s.fraction), valueW, ambiguous)}${bar}`, index: s.index },
     ];
   }
   if (dropped > 0) {
@@ -538,16 +542,6 @@ export type RadarRender = Readonly<{
   /** The line arm's composed figure, owners and all — absent for braille. */
   figure?: readonly (readonly MarkedText[])[];
 }>;
-
-/** The scale a radar is read against — a round ceiling, so the rings are round. */
-function radarCeiling(series: readonly Series[]): number {
-  const all = series.flatMap((ss) =>
-    ss.values.filter((v): v is number => v !== null && Number.isFinite(v)),
-  );
-  const top = Math.max(...all, 0);
-  if (!(top > 0)) return 1;
-  return niceAxis({ min: 0, max: top }, 6, {}).range.max;
-}
 
 /**
  * The frame: the outer ring, the value rings inside it, and one spoke per
@@ -812,6 +806,15 @@ export function radarRender(
   areaWidth: number,
   areaRows: number,
   caps: Caps,
+  /**
+   * The scale the polygons are read against — **the figure's, read back**
+   * (I60, §3ak.26 finding 2).
+   *
+   * This was `radarCeiling(series)`, computed here, and it passed `{}` where
+   * every other axis in the component passes the block — so a radar's `yMin`,
+   * `yMax` and `yFormat` were read by nothing (F304).
+   */
+  ceiling: number,
   /** A connected figure in quadrant blocks rather than braille dots (C12 I43, §3w). */
   lineDraw = false,
   /** The value rings' shape (C12 I45, §3w). */
@@ -855,7 +858,6 @@ export function radarRender(
   const discWidth = withLegend ? room : w;
   const disc = discAt((discWidth - 1) / 2, discWidth, h, radiusFor(discWidth, h, 1));
 
-  const ceiling = radarCeiling(series);
   const polygons = series.map((sr, si) => {
     const grid = createGrid(disc.dotWidth, disc.dotHeight);
     const points: (readonly [number, number])[] = [];
@@ -927,6 +929,8 @@ export function radarAsciiRows(
   width: number,
   areaRows: number,
   caps: Caps,
+  /** The figure's scale, read back — see `radarRender` (F304). */
+  ceiling: number,
 ): readonly (readonly MarkedText[])[] {
   const w = Math.max(0, Math.floor(width));
   const h = Math.max(0, Math.floor(areaRows));
@@ -937,7 +941,6 @@ export function radarAsciiRows(
 
   const ambiguous = caps.ambiguousWidth;
   const ext = extentFor(caps);
-  const ceiling = radarCeiling(series);
   const reading = (v: number | null | undefined): string =>
     v !== null && v !== undefined && Number.isFinite(v) ? String(Math.round(v * 10) / 10) : "";
 

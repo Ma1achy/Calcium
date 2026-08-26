@@ -153,6 +153,16 @@ describe("U — the seam, asserted from both arms", () => {
     valueLabels: { form: "bar", patch: { yAxis: false } },
     legend: { form: "line", variant: "legend-right", patch: "labels" },
     marks: { form: "bar", patch: "values" },
+    // **`null` because no block field can move this one, and that is a third
+    // kind of cell rather than an omission** (§3ak.26 finding 1).
+    //
+    // `isotropic` is a **form constant**: `true` for the three proportion forms
+    // and `false` for every other, with nothing in `Plot` behind it. So there is
+    // no perturbation to measure it through, and the perturbation that *would*
+    // move it — changing the form — moves every member at once and isolates
+    // none. Counted below rather than excluded: an exemption dropped from a
+    // corpus is a corpus that shrank without saying so.
+    isotropic: null,
   } as const satisfies Readonly<Record<keyof Figure, unknown>>;
 
   /**
@@ -196,6 +206,13 @@ describe("U — the seam, asserted from both arms", () => {
     // which is C12 I63's *the threshold is shared and the outcome is each arm's*.
     identity: { terminal: "moves", svg: "moves" },
     legend: { terminal: "moves", svg: "moves" },
+    // **Not measurable through a perturbation, and its reader is named
+    // instead.** `projected` insets a centred square when this is true, which
+    // is the whole of what the member buys; the terminal reaches the same answer
+    // through `radiusFor`'s `min`, in dots, and has nothing to read. So this
+    // cell records *who reads it*, not *what moved* — and it is the only cell
+    // in the record that cannot be measured the way its neighbours are.
+    isotropic: { terminal: "radiusFor", svg: "boxFor" },
   } as const satisfies Readonly<Record<keyof Figure, { terminal: string; svg: string }>>;
 
   function patched(base: Spec, how: unknown): Spec {
@@ -216,7 +233,16 @@ describe("U — the seam, asserted from both arms", () => {
 
   it("U1a (C12 I59, §3ak.16): every Figure member's consumers, measured through output", () => {
     const measured: Record<string, { terminal: string; svg: string }> = {};
+    let unperturbable = 0;
     for (const [member, p] of Object.entries(PERTURBATION)) {
+      // **A member with no isolating block field is counted, not skipped.**
+      // Its `CONSUMERS` cell names the reader in each arm instead, which is a
+      // weaker claim than the rest of the record and says so.
+      if (p === null) {
+        unperturbable += 1; // cells-ok — a member count
+        measured[member] = CONSUMERS[member as keyof typeof CONSUMERS];
+        continue;
+      }
       const spec = fixtureFor(p as { form: string; variant?: string });
       const set = capsNamed("at" in p ? (p.at as string) : "24bit");
       const other = patched(spec, p.patch);
@@ -236,6 +262,7 @@ describe("U — the seam, asserted from both arms", () => {
         svg: svgOf(spec) === svgOf(other) ? "still" : "moves",
       };
     }
+    expect(unperturbable, "members no block field can isolate — see `isotropic`").toBe(1); // cells-ok — a member count
     expect(measured).toEqual(CONSUMERS);
   });
 
