@@ -707,3 +707,29 @@ export function glyphCells(token: Glyph): number {
   // make a property of the table depend on the terminal reading it.
   return cells(GLYPH_TABLE[token][0]); // narrow-ok
 }
+
+/**
+ * **Whether the terminal needs the flat alphabet** — the predicate `glyphs()`
+ * applies, named so a rasteriser can apply the same one (F293).
+ *
+ * Two questions wear one answer here and the distinction is the point:
+ * `unicode: "ascii"` is about **repertoire** — can this terminal draw the glyph
+ * at all — and `ambiguousWidth: "wide"` is about **width**, since box drawing,
+ * quadrant blocks, `▌`, `●` and the arrows are East-Asian Ambiguous throughout.
+ * `glyphs()` collapses them because *its whole set* is ambiguous, and that is
+ * the condition under which collapsing is right.
+ *
+ * **A vocabulary with a narrow non-ASCII alternative must not use this.**
+ * Braille is not ambiguous, so `ladderFor("height")` answers `wide` by moving to
+ * braille rather than to ASCII, and `curve.ts` keeps its dots at every rung. A
+ * blanket *fall back when wide* would take a curve's resolution away for a
+ * width problem it does not have.
+ *
+ * So the question a caller asks is **is my vocabulary ambiguous**, and this is
+ * the answer for the ones that are.
+ */
+export function flatAlphabet(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): boolean {
+  return caps.unicode === "ascii" || caps.ambiguousWidth === "wide";
+}

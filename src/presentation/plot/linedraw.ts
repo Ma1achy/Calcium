@@ -14,6 +14,7 @@
  * rather than being cases.
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
+import { flatAlphabet } from "../blocks/glyphs.js";
 import type { Series } from "../../data/viewmodel/index.js";
 import { finiteSamples, columnsOf, rowOf, type Facing, type Range } from "./scale.js";
 
@@ -94,7 +95,7 @@ export function lineDrawRows(
   corners: "rounded" | "sharp",
   facing: Facing,
   interpolation: Interpolation = "linear",
-  caps?: Pick<TerminalCapabilities, "unicode">,
+  caps?: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): readonly string[] {
   const w = Math.max(0, Math.floor(areaWidth));
   const h = Math.max(0, Math.floor(areaRows));
@@ -197,9 +198,21 @@ const ASCII: readonly string[] = Object.freeze([
 export function glyphForMask(
   mask: number,
   corners: "rounded" | "sharp",
-  caps?: Pick<TerminalCapabilities, "unicode">,
+  caps?: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): string {
-  const table = caps?.unicode === "ascii" ? ASCII : corners === "sharp" ? SHARP : ROUNDED;
+  // **The ambiguous arm, which this table needed and its parameter could not
+  // express** (F293). Box drawing is East-Asian Ambiguous throughout, so on a
+  // terminal that draws it wide every one of these is two cells in a slot the
+  // grid measured as one — and `glyphs()` has fallen the *frame* back to ASCII
+  // by then, so a `ridgeline` drew `+------+` around `╭────╮`. One row, two
+  // alphabets.
+  //
+  // **`arrowsFor` already asked the right question** — `ascii || wide`, in the
+  // same layer, for the same reason — so this is a ruling applied rather than
+  // one made. The parameter is why it was not: typed `Pick<"unicode">`, it could
+  // not see the field that decides.
+  const flat = caps !== undefined && flatAlphabet(caps);
+  const table = flat ? ASCII : corners === "sharp" ? SHARP : ROUNDED;
   return table[mask & 15] ?? " ";
 }
 
@@ -277,6 +290,13 @@ export function strokePolyline(
  * **Unicode only, and the caller must not reach it below that** — a radar
  * degrades to `radarAsciiRows` before this, so there is no ASCII rung to state
  * rather than one omitted.
+ *
+ * **And `wide` is below that too, which the callers did not say** (F293). Every
+ * one of U+2596–U+259F is East-Asian Ambiguous, so a terminal drawing them wide
+ * puts two cells in each one-cell slot of a mask that was built in cells. The
+ * substitution the ASCII rung takes is the right answer at both, because it is a
+ * *replacement* rather than a coarser rasterisation — §3ak.18's third kind of
+ * rung — and a shape has no coarser form that stays a shape.
  */
 export const QUAD_TL = 1;
 export const QUAD_TR = 2;

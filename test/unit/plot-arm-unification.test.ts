@@ -485,11 +485,26 @@ describe("U — the seam, asserted from both arms", () => {
     // braille curve falling to `-` inks a different set of cells for the same
     // figure, which is §2's legitimate column. The classifier cannot tell that
     // from a moved coordinate and the record says so rather than pretending.
+    //
+    // **The `wide` edge moved four cells and the net was two, which is why the
+    // record is per edge and read rather than summed** (F293, §3ak.24). Each of
+    // the four says something different about the fix:
+    //
+    // | form | was | now | what the cell is saying |
+    // |---|---|---|---|
+    // | `graph` | `same` | `glyph` | **the rung was doing nothing at all** — the connectors were unicode at both ends of the edge, which is the defect stated as a classification |
+    // | `ridgeline` | `layout` | `glyph` | the ink moved because the figure was being **truncated**; now only the vocabulary changes |
+    // | `tree` | `layout` | `glyph` | the same, and the pair of them is what *width-correct, not figure-correct* meant |
+    // | `pie` | `glyph` | `layout` | the **substitution** rung — a share of a whole redrawn as a labelled table, which is §3ak.18's third kind and one the classifier cannot separate from a moved coordinate |
+    //
+    // A `same` cell on a capability edge is the one to distrust: it reads as
+    // *this rung does not reach this form* and it can mean *this form does not
+    // answer this rung*.
     expect(tally).toEqual([
       { same: 1, colour: 45, glyph: 0, layout: 0 },
       { same: 1, colour: 21, glyph: 3, layout: 21 },
       { same: 0, colour: 0, glyph: 37, layout: 9 },
-      { same: 1, colour: 0, glyph: 36, layout: 9 },
+      { same: 0, colour: 0, glyph: 38, layout: 8 },
     ]);
   });
 
@@ -562,6 +577,39 @@ describe("U — the seam, asserted from both arms", () => {
     expect(byRung, "rows wider than the terminal, per capability set")
       .toEqual({ "24bit": 0, "8bit": 0, ascii: 0, wide: 0, "1bit": 0 }); // cells-ok — row counts
     expect(measured, "the wide rung's overflow, by variant").toEqual(OVERFLOWING);
+  });
+
+  it("U6f (C12 I54, §3ak.24): nothing rendered takes two cells at the rung that draws wide", () => {
+    // **`U6e`'s sibling, one level down.** That row asks whether a *row* fits;
+    // this asks whether a *cell* does. A figure can be within its width and still
+    // be built from glyphs the grid measured as one and the terminal draws as
+    // two — which is the state F292 left behind and F293 names: width-correct,
+    // figure-correct not yet.
+    //
+    // **Every gate in this repo compares bytes**, so a stable wrong answer passes
+    // all of them. This one runs `cells()` over rendered output, which is the
+    // only thing that can see it.
+    const seen = new Map<string, number>();
+    let frames = 0; // cells-ok — a frame count
+    for (const { bucket, variant, spec } of corpus()) {
+      let lines: readonly string[];
+      try { lines = frame(spec, capsNamed("wide"), WIDTH, "u-w").map(strip); } catch { continue; }
+      frames += 1; // cells-ok — a frame count
+      for (const line of lines) {
+        for (const ch of line) {
+          if (ch === " " || cells(ch, "wide") !== 2) continue; // cells-ok — the subject
+          seen.set(ch, (seen.get(ch) ?? 0) + 1); // cells-ok — a character count
+          expect(ch, `${bucket}/${variant} draws a two-cell glyph at wide`).toBe("…");
+        }
+      }
+    }
+    // **The corpus, so a green run says how much it swept** — and the marker is
+    // the one exemption, named rather than filtered out of the loop: `…` is
+    // drawable at this rung and `truncate` reserves both its cells since F292,
+    // so its width is a cost and not a defect. `~` is the *repertoire* fallback,
+    // which is a different question (§3ak.24).
+    expect(frames, "catalogue variants rendered at the wide rung").toBe(178); // cells-ok — a frame count
+    expect([...seen.keys()].sort(), "two-cell characters still emitted").toEqual(["…"]);
   });
 
   it("U6e2 (C12 I63, §3ak.15): the marker's own width is the mechanism, proved without a frame", () => {

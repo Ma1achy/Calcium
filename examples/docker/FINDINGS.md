@@ -13980,10 +13980,43 @@ was refused. **F292 made the frames width-correct and this is what makes them fi
 the difference matters: a wrapped row is a correctness failure the application cannot see afterwards,
 and a truncated figure is a legibility failure it can.
 
-**Why it is recorded and not fixed here.** It is the degradation pass — `CALCIUM_ARM_UNIFICATION.md`
-scopes it out in as many words (*not the terminal's degradation audit — U6 measures it, fixing it is
-a separate pass*), and it is a change to eight rasterisers rather than a line. `U6e` holds the floor
-underneath it: no row may exceed the terminal's width at any rung, exemption compared by equality.
+**Why it was recorded and not fixed at the time.** It is the degradation pass —
+`CALCIUM_ARM_UNIFICATION.md` scopes it out in as many words — and it read as a change to eight
+rasterisers. `U6e` held the floor underneath it: no row may exceed the terminal's width at any rung.
+
+**Fixed, and it was three places rather than eight.** `glyphForMask` — one table, reached by the
+contour, tree, graph, violin and ridgeline arms through `field.ts` and `chargrid.ts` — plus the two
+substitution gates `pie` and `radar` already had for `ascii`. The eight rasterisers share three
+decisions, which is what an extraction is worth.
+
+**The parameter is why it was invisible.** `glyphForMask`'s `caps` was typed `Pick<TerminalCapabilities,
+"unicode">`: **the field that decides was not in scope at the point of decision.** Widening the type
+made the compiler name the two callers that had narrowed it the same way — the defect's own trail,
+walked backwards. A capability a function cannot see is one no reader will notice it ignoring.
+
+**Measured, before and after.** 27 distinct two-cell characters across 18 of 178 forms → **one
+character across three**, and the one left is `…`, the truncation marker, which is drawable and
+correctly budgeted since F292. Rows carrying the marker: **174 → 5**, and the five are the ones the
+marker is for — `graph/crowded` and three `tree/overflow-*`, whose *content* overflows rather than
+whose glyphs do. 46 baseline frames moved, **every one `-wide-`**.
+
+**The control that matters: the rung has not collapsed onto `ascii`.** Every variant rendered at width
+60 under both sets, colour stripped — **154 of 178 still differ**, and the radar shows why: `⣿` at
+`wide`, `#` at `ascii`. The substitution's shape is shared; the fill still answers to the repertoire.
+
+**A `same` cell on a capability edge is the one to distrust — and one was sitting in the record.**
+`U6b`'s rung ladder had `graph` as **`same`** across `24bit → wide`, which reads as *this rung does not
+reach this form* and meant *this form does not answer this rung*. The whole of the finding was in a
+committed artefact through the pass that wrote it. Four cells moved in all and the net was two, which
+is the argument for reading a record per edge rather than summing it: `ridgeline` and `tree` went
+`layout → glyph` because their ink had been moving through **truncation**, and `pie` went
+`glyph → layout` because a substitution is not a coarser rasterisation.
+
+**And I54 is where the hole was, not the rasterisers.** That rule partitions *repertoire* from *width*
+correctly and assigns width to **one** of the two decisions it governs — which rasteriser, never which
+alphabet. An explicit `plotStyle: "line"` has no narrow line-drawing alternative, so the width question
+had nowhere to go and the alphabet stayed unicode. A correct partition with a decision missing from one
+side reads exactly like a complete one.
 
 **The reusable half.** A capability honoured at one layer and ignored at the layer below reads as
 honoured, because the layer that honours it is the one a reader checks first — the frame is the

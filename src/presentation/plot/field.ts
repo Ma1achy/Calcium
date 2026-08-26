@@ -180,7 +180,7 @@ export function contourCellRows(
   areaRows: number,
   levels: readonly number[],
   corners: "rounded" | "sharp",
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): readonly string[] {
   const w = Math.max(0, Math.floor(areaWidth));
   const h = Math.max(0, Math.floor(areaRows));

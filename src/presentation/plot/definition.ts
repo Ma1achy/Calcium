@@ -70,7 +70,7 @@ import { squareColumns } from "./aspect.js";
 import { WAFFLE_ROWS, waffleCells } from "./waffle.js";
 import { pointLabelRows } from "./pointlabels.js";
 import { colormapFor, heatmapFormRows } from "./heatmap.js";
-import { glyphs } from "../blocks/glyphs.js";
+import { flatAlphabet, glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
 import { densityRows, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { densitySeries, ecdfSeries } from "./derive.js";
@@ -2854,7 +2854,12 @@ const FORM_ROWS: Readonly<
     const areaRows = plotAreaRows(block);
     const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
     if (segs.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a segment count
-    if (ctx.capabilities.unicode === "ascii") {
+    // **The substitution rung is `ascii` **or** `wide`** (F293, §3ak.18). The
+    // quadrant blocks are ambiguous-width throughout, so a terminal that draws
+    // them wide puts two cells in each one-cell slot of a mask built in cells —
+    // and the answer is the same replacement, because a shape has no coarser
+    // form that is still that shape.
+    if (flatAlphabet(ctx.capabilities)) {
       return pieAsciiRows(segs, width, areaRows, ctx.capabilities).map((row) =>
         line(markedSpans(row, (i) => categoryRef(i), ctx), layout, ctx),
       );
@@ -2895,7 +2900,12 @@ const FORM_ROWS: Readonly<
     const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
     if (cats.length === 0 || block.series.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a category count
     const seriesRef = (index: number): ColourRef => refOf(block.series[index] ?? { values: [] }, index);
-    if (ctx.capabilities.unicode === "ascii") {
+    // **The substitution rung is `ascii` **or** `wide`** (F293, §3ak.18). The
+    // quadrant blocks are ambiguous-width throughout, so a terminal that draws
+    // them wide puts two cells in each one-cell slot of a mask built in cells —
+    // and the answer is the same replacement, because a shape has no coarser
+    // form that is still that shape.
+    if (flatAlphabet(ctx.capabilities)) {
       return radarAsciiRows(block.series, cats, width, areaRows, ctx.capabilities).map((row) =>
         line(markedSpans(row, seriesRef, ctx), layout, ctx),
       );

@@ -1,10 +1,10 @@
 ── tree · outline · wide · 60w
 root
-├── render
-│   ├── curve
-│   │   ╰── raster
-│   ╰── paint
-├── layout
-│   ├── measure
-│   ╰── wrap
-╰── parse
++-- render
+|   +-- curve
+|   |   +-- raster
+|   +-- paint
++-- layout
+|   +-- measure
+|   +-- wrap
++-- parse
