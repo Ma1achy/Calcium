@@ -1,10 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
-<line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
-<line x1="89.6" y1="150.4" x2="614.4" y2="150.4" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">2</text>
-<line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">4</text>
 <path d="M89.6 219.2 L352 81.6 L614.4 150.4" fill="none" stroke="#e69f00" stroke-width="2"/>
 </svg>

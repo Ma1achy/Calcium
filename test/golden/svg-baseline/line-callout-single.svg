@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
-<line x1="89.6" y1="150.4" x2="614.4" y2="150.4" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
+<line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
-<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="620.4" y="292" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="620.4" y="154.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="620.4" y="16.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">100</text>
 <path d="M89.6 150.4 L100.31 136.663 L111.02 123.063 L121.731 109.736 L132.441 96.816 L143.151 84.431 L153.861 72.705 L164.571 61.756 L175.282 51.692 L185.992 42.614 L196.702 34.614 L207.412 27.77 L218.122 22.151 L228.833 17.814 L239.543 14.802 L250.253 13.145 L260.963 12.859 L271.673 13.947 L282.384 16.399 L293.094 20.189 L303.804 25.281 L314.514 31.622 L325.224 39.151 L335.935 47.791 L346.645 57.456 L357.355 68.05 L368.065 79.467 L378.776 91.593 L389.486 104.306 L400.196 117.479 L410.906 130.982 L421.616 144.679 L432.327 158.432 L443.037 172.106 L453.747 185.562 L464.457 198.668 L475.167 211.291 L485.878 223.305 L496.588 234.592 L507.298 245.037 L518.008 254.536 L528.718 262.995 L539.429 270.329 L550.139 276.464 L560.849 281.34 L571.559 284.908 L582.269 287.132 L592.98 287.989 L603.69 287.472 L614.4 285.585" fill="none" stroke="#e69f00" stroke-width="2"/>
 </svg>

@@ -147,8 +147,12 @@ const results = runPass({
       // discovered as a wrong-looking image, caught here at the seam.
       name: "a label is anchored at its start and needs its width to sit right",
       file: SVG,
-      from: "        `<text x=\"${n(box.left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" text-anchor=\"end\" ` +",
-      to: "        `<text x=\"${n(box.left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" ` +",
+      // **Re-anchored** when the value labels learned `yAxis: "left" |
+      // "right" | "both"` (C12 I67): the anchor is chosen per side now, so
+      // the mutation drops the choice rather than one literal. Same defect,
+      // and it reaches both sides where it used to reach one.
+      from: "          `text-anchor=\"${side === \"left\" ? \"end\" : \"start\"}\" ` +",
+      to: "          `` +",
       expect: "G5c",
     },
     {

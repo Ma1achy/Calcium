@@ -35,7 +35,7 @@ import { clampSpans, pad, padStart, paint, slot, tone, type Span } from "../bloc
 import { cells, truncate, type AmbiguousWidth } from "../text.js";
 import { xAxis, xTickRow } from "./axes.js";
 import type { XAxis } from "./axes.js";
-import { HAS_POSITION_AXIS } from "./marks.js";
+import { legendOf, positionAxisOf, valueLabelsOf } from "./figure.js";
 import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import { FACING_DEFAULT, facingOf } from "./scale.js";
@@ -250,7 +250,9 @@ export function rightGutterWidth(rightColumn: number): number {
 
 /** Which sides of the plot area carry y labels (I47). */
 export function yAxisSides(block: Pick<Plot, "yAxis">): { left: boolean; right: boolean } {
-  const y = block.yAxis ?? "left";
+  // **Read back** (C12 I67, §3ak.19): `false` is *no labels, keep the frame*,
+  // which `frame` cannot say and `gutter` must not.
+  const y = valueLabelsOf(block) ?? false;
   return { left: y === "left" || y === "both", right: y === "right" || y === "both" };
 }
 
@@ -613,7 +615,10 @@ export function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAx
   // class arriving in a guard rather than in a sentence.
   const facing = facingOf(block, FACING_DEFAULT);
   if (block.xLabels !== undefined) return xAxis(block.xLabels, areaWidth, ctx.capabilities, facing);
-  if (block.axes !== true || !HAS_POSITION_AXIS[block.form]) {
+  // **One answer, and `xLabels` is inside it** (C12 I67, §3ak.19). The early
+  // return above short-circuits on the same field, so the two clauses were one
+  // condition split across four lines; `positionAxisOf` carries both.
+  if (!positionAxisOf(block)) {
     return xAxis(undefined, areaWidth, ctx.capabilities);
   }
   const domain = xDomain(block);
@@ -735,8 +740,12 @@ export function legendPlacement(
   block: Plot,
   caps?: Pick<TerminalCapabilities, "colourDepth">,
 ): "above" | "below" | "left" | "right" | null {
-  if (block.legend === false) return null;
-  if (block.legend !== undefined) return block.legend;
+  // **Read back** (C12 I67, §3ak.19). These two lines were the whole of what
+  // `Figure.legend` could not express, which is why an arm consuming the old
+  // member drew a legend the author had refused (F295).
+  const placed = legendOf(block);
+  if (placed === null) return null;
+  if (placed.placement !== null) return placed.placement;
   // **A name at the line's end *is* the legend** (C12 I55, §3ag A2). C12 I48
   // ruled that a callout does not replace one — *it names a value where a legend
   // names an identity* — and that sentence selects rather than excludes: the

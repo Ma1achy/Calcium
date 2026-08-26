@@ -167,10 +167,84 @@ function svgDecisions(svg: string | null): ArmDecisions {
     // **The ground is not a border.** `<rect width="100%">` paints the page; a
     // border would be a stroked rectangle round the plot area, and this arm
     // draws none.
-    border: /<rect[^>]*width="100%"[^>]*stroke=/u.test(svg),
-    interiorRules: [...svg.matchAll(/<line\s/gu)].length,
+    border: svgBorder(svg),
+    interiorRules: svgInteriorRules(svg),
     legend: false,
   };
+}
+
+/**
+ * Every `<line>` this arm drew, as four numbers.
+ *
+ * **The reader stops guessing an encoding here** (F297). `border` was
+ * `/<rect[^>]*width="100%"[^>]*stroke=/` — a stroked full-page rectangle — which
+ * is what a border *would have been* had this arm ever drawn one, and it never
+ * had. The day it did, drawing four `<line>`s, the reader reported `false` and
+ * the matrix reported the disagreement as open. `interiorRules` counted **every**
+ * `<line>`, so the four border edges arrived as four interior rules and that cell
+ * did not close either.
+ *
+ * **An instrument that anticipates an implementation measures the
+ * anticipation**, which is the frame reader's blind spot one arm along (F285):
+ * that one was calibrated to a capability rung, this one to an encoding nobody
+ * had written yet. Both read as correct until the subject exists.
+ *
+ * So these two ask a **geometric** question instead — where is the line, not what
+ * tag drew it — and the box is the lines' own bounding box rather than a layout
+ * constant, so a different `SvgLayout` cannot silently move the answer.
+ */
+function svgLines(svg: string): readonly (readonly [number, number, number, number])[] {
+  const out: (readonly [number, number, number, number])[] = [];
+  for (const m of svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/gu)) {
+    out.push([Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] as const);
+  }
+  return out;
+}
+
+/** The bounding box of every line, which is the plot area this arm drew into. */
+function svgBox(ls: readonly (readonly [number, number, number, number])[]): Readonly<{
+  left: number; right: number; top: number; bottom: number;
+}> {
+  const xs = ls.flatMap((l) => [l[0], l[2]]);
+  const ys = ls.flatMap((l) => [l[1], l[3]]);
+  return {
+    left: Math.min(...xs), right: Math.max(...xs),
+    top: Math.min(...ys), bottom: Math.max(...ys),
+  };
+}
+
+/**
+ * A border, on the terminal reader's own terms: **something along the top and
+ * something along the bottom.**
+ *
+ * `terminalDecisions` asks for a `RULE_ONLY` row opening with `┌` and one with
+ * `└`, and `RULE_ONLY` admits spaces — so `   ┌            ┐`, which is the whole
+ * of what `plotFrame: "corners"` draws, counts. Two corner marks are a border
+ * there, so two corner segments are a border here, and the four styles line up:
+ * `box` and `grid` have both edges, `rule` has a bottom and no top, `corners`
+ * has segments at both.
+ */
+function svgBorder(svg: string): boolean {
+  const ls = svgLines(svg);
+  if (ls.length === 0) return false;
+  const b = svgBox(ls);
+  const flat = (l: readonly [number, number, number, number], y: number): boolean =>
+    l[1] === l[3] && l[1] === y;
+  return ls.some((l) => flat(l, b.top)) && ls.some((l) => flat(l, b.bottom));
+}
+
+/**
+ * A rule **across the plot area**, which is not an edge of it — the same
+ * distinction `terminalDecisions` draws when it skips `RULE_ONLY` rows.
+ */
+function svgInteriorRules(svg: string): number {
+  const ls = svgLines(svg);
+  if (ls.length === 0) return 0; // cells-ok — a count of SVG elements
+  const b = svgBox(ls);
+  const onEdge = (l: readonly [number, number, number, number]): boolean =>
+    (l[1] === l[3] && (l[1] === b.top || l[1] === b.bottom)) ||
+    (l[0] === l[2] && (l[0] === b.left || l[0] === b.right));
+  return ls.filter((l) => !onEdge(l)).length; // cells-ok — a count of SVG elements
 }
 
 export function svgArm(block: Plot, theme: ResolvedTheme): ArmDecisions {

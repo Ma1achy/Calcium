@@ -27,7 +27,7 @@ import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
-import { baselineOf, categoricalDecisions, positionalDecisions, valueAxisOf } from "./figure.js";
+import { baselineOf, categoricalDecisions, frameOf, gutterOf, positionalDecisions, valueAxisOf } from "./figure.js";
 import { treeArea } from "./tree.js";
 import { graphArea } from "./graph.js";
 import { curveRows, isBlank } from "./curve.js";
@@ -678,7 +678,11 @@ function axed(
     ? [" ".repeat(layout.gutter) + legendRow(entries, layout.areaWidth, ctx)]
     : [];
   // **Composed once**, where it used to be built twice for its two halves.
-  const furniture = block.axes === true ? furnitureFor(layout, xaxis, ctx, null, block.xTitle) : null;
+  // **Read back rather than asked again** (C12 I67, §3ak.19). `axes` gated the
+  // furniture here and styled the layout twenty lines up, which was one
+  // decision in two places; `frameOf` is that decision and the second arm
+  // makes the same call.
+  const furniture = frameOf(block) !== "none" ? furnitureFor(layout, xaxis, ctx, null, block.xTitle) : null;
   const top = furniture === null ? [] : [indent(furniture.top)];
   const bottom = furniture === null ? [] : furniture.bottom.map(indent);
   return composeRows(
@@ -1345,7 +1349,7 @@ function layoutFor(
   // labels *are* its ordinate — an unlabelled matrix is a picture of numbers
   // with no way to tell which row is which. `axes: false` is refused rather than
   // honoured (C04 I50b), so this reads the form and not the flag.
-  const axed = block.axes === true || block.form === "heatmap";
+  const axed = gutterOf(block);
   if (!axed) return { ...base, gutter: 0, labelColumn: 0, areaWidth: width };
 
   // **What the column holds depends on the form.** A stacked plot puts series
@@ -1467,7 +1471,7 @@ function categoricalForm(
   const cats = block.categories ?? [];
   const areaRows = plotAreaRows(block);
   const labels = cats.slice(0, areaRows);
-  const axedBlock = block.axes === true;
+  const axedBlock = gutterOf(block);
   const layout = reserving(bandLayout(labels, usableWidth(block, width, ctx), axedBlock, areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
 
   const out: string[] = [];
@@ -1596,7 +1600,7 @@ function categoricalColumnForm(
     }
     out.push(plotRow(r, byRow.get(r) ?? "", spans, layout, ctx));
   }
-  if (block.axes !== true) return composeRows(plotHeight(block), [], out, []);
+  if (frameOf(block) === "none") return composeRows(plotHeight(block), [], out, []);
   // The frame composed here rather than through `axed`, because `furnitureFor`
   // derives its label row from `block.xLabels` and this form's labels are one
   // per column — a shape that tuple cannot hold.
@@ -2065,7 +2069,7 @@ function positionalForm(
   const range = axis.range;
 
   const cursorIdx = ctx.cursorPositions?.[block.id];
-  const marked = block.axes === true && cursorIdx !== undefined && Number.isFinite(cursorIdx);
+  const marked = frameOf(block) !== "none" && cursorIdx !== undefined && Number.isFinite(cursorIdx);
   const at = marked ? cursorColumn(block, cursorIdx, layout.areaWidth) : null;
   // **One x axis, computed here and handed to both halves** (§3ad B2). The
   // crossing axis's column is on it, and it is needed while the area is composed
@@ -2103,7 +2107,7 @@ function bandedForm(
   const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
   if (n === 0) return emptyRows(block, fallback, ctx);
 
-  const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
+  const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), gutterOf(block), areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
   const areaWidth = layout.areaWidth;
 
   const rowsPer = Math.max(1, Math.floor(areaRows / n));
@@ -2784,7 +2788,7 @@ const FORM_ROWS: Readonly<
     const fallback: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
     if (block.series.length === 0) return emptyRows(block, fallback, ctx); // cells-ok — a series count
 
-    const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), block.axes === true, areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
+    const layout = reserving(bandLayout(cats, usableWidth(block, width, ctx), gutterOf(block), areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
     const { rows, baselines, owners } = ridgelineArea(
       block.series, layout.areaWidth, areaRows, ctx.capabilities, block.bandwidth, block.plotCorners ?? "rounded",
     );

@@ -113,21 +113,21 @@ const MEASURED = {
   // terminal's own — and this matrix, which compares five *decisions*, could
   // report only this. It is a decision gate; `test/golden/svg-baseline/` is the
   // picture gate, and the two answer different questions on purpose.
-  "line": { silent: "16/86", "numericLabels": "70/70", "identityLabels": "18/70", "border": "64/70", "interiorRules": "70/70", "legend": "26/70" },
-  "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "6/6", "legend": "agree" },
-  "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "8/10", "interiorRules": "10/10", "legend": "2/10" },
-  "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "2/4", "interiorRules": "4/4", "legend": "agree" },
-  "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "2/2", "interiorRules": "2/2", "legend": "agree" },
+  "line": { silent: "16/86", "numericLabels": "70/70", "identityLabels": "12/70", "border": "2/70", "interiorRules": "4/70", "legend": "26/70" },
+  "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/10" },
+  "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "2/4", "legend": "agree" },
+  "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "8/8", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "contour": "refused",
   "quiver": "refused",
-  "bar": { silent: "2/14", "numericLabels": "12/12", "identityLabels": "12/12", "border": "12/12", "interiorRules": "12/12", "legend": "6/12" },
-  "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "12/12", "interiorRules": "12/12", "legend": "4/12" },
-  "boxplot": { silent: "0/10", "numericLabels": "10/10", "identityLabels": "10/10", "border": "10/10", "interiorRules": "10/10", "legend": "agree" },
-  "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "4/4", "border": "4/4", "interiorRules": "4/4", "legend": "agree" },
-  "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "2/2", "interiorRules": "2/2", "legend": "agree" },
-  "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "2/2", "border": "2/2", "interiorRules": "2/2", "legend": "agree" },
-  "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "2/2", "border": "2/2", "interiorRules": "2/2", "legend": "agree" },
+  "bar": { silent: "2/14", "numericLabels": "12/12", "identityLabels": "12/12", "border": "agree", "interiorRules": "6/12", "legend": "6/12" },
+  "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "2/12", "legend": "4/12" },
+  "boxplot": { silent: "0/10", "numericLabels": "10/10", "identityLabels": "10/10", "border": "agree", "interiorRules": "6/10", "legend": "agree" },
+  "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "waffle": "refused",
   "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
@@ -135,8 +135,8 @@ const MEASURED = {
   "gantt": "refused",
   "waterfall": "refused",
   "slope": "refused",
-  "bubble": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "2/2", "interiorRules": "2/2", "legend": "2/2" },
-  "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "2/2", "interiorRules": "2/2", "legend": "agree" },
+  "bubble": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/2" },
+  "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "timeline": "refused",
   "bullet": "refused",
   "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
@@ -151,7 +151,7 @@ const MEASURED = {
   "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "2/2", "legend": "agree" },
   "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
-  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "4/4", "interiorRules": "4/4", "legend": "agree" },
+  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "3/4", "legend": "agree" },
   "violin": "refused",
   "ridgeline": "refused",
   "smallmultiples": "refused",
@@ -254,8 +254,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(claimed.length, "forms the SVG arm claims").toBe(27); // cells-ok — a form count
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(19); // cells-ok — a form count
     expect(open + closed, "cells over claimed forms").toBe(135); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(73); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(62); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(51); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(84); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

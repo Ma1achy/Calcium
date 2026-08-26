@@ -149,13 +149,13 @@ describe("FC — the curve family's figure (C12 §3ak.7)", () => {
     const d = positionalDecisions(block);
     const f = curveFigure(block);
     expect(Object.keys(d).sort(), "everything but the marks").toEqual(
-      ["extent", "facing", "frame", "identity", "legend", "orientation", "value"],
+      ["extent", "facing", "frame", "gutter", "identity", "legend", "orientation", "positionAxis", "value", "valueLabels"],
     );
     for (const k of Object.keys(d) as (keyof typeof d)[]) expect(f[k], k).toEqual(d[k]);
     // **One identity list**, so the legend cannot name a set the gutter does not.
     expect(f.identity, "segments replace the series where a form has them").toEqual(["up", "down"]);
     expect(identityOf(block)).toEqual(f.identity);
-    expect(f.legend.filter((s) => s.role === "series").map((s) => s.label)).toEqual(f.identity);
+    expect(f.legend?.slots.filter((s) => s.role === "series").map((s) => s.label)).toEqual(f.identity);
   });
 
   it("FC8 (C12 I62): each mark carries its own slot, so the colour channel survives the seam", () => {
@@ -282,13 +282,13 @@ describe("FB — the bar family's figure (C12 §3ak.7)", () => {
     // naming its own rows.
     const f = barFigure(bars());
     expect(f.identity, "the gutter's names").toEqual(["a", "b", "c"]);
-    expect(f.legend.map((sl) => sl.label), "and the legend names the series").toEqual(["series 1"]);
-    expect(f.identity).not.toEqual(f.legend.map((sl) => sl.label));
+    expect(f.legend?.slots.map((sl) => sl.label), "and the legend names the series").toEqual(["series 1"]);
+    expect(f.identity).not.toEqual(f.legend?.slots.map((sl) => sl.label));
     // The curve family's own answer, asserted beside it so the difference is on
     // purpose rather than by omission.
     const c = curveFigure(plot({ series: [{ values: [1, 2], label: "x" }] }));
     expect(c.identity, "a curve's slots are its series").toEqual(["x"]);
-    expect(c.legend.map((sl) => sl.label)).toEqual(c.identity);
+    expect(c.legend?.slots.map((sl) => sl.label)).toEqual(c.identity);
   });
 
   it("FB2 (C12 I59, §3ak.7): the extent is zero-anchored, and it is what the horizontal arm draws against", () => {
@@ -638,7 +638,7 @@ describe("FT / FN — the tiles and nodes families (C12 §3ak.7)", () => {
     // fail `U1b` for a reason the type cannot express.
     const d = nodesDecisions(plot({ form: "tree", hierarchy: tree3 } as Partial<Plot>));
     expect(Object.keys(d).sort(), "everything but the marks").toEqual(
-      ["extent", "facing", "frame", "identity", "legend", "orientation", "value"],
+      ["extent", "facing", "frame", "gutter", "identity", "legend", "orientation", "positionAxis", "value", "valueLabels"],
     );
     expect("marks" in d, "and `marks: []` is not the alternative — I64 makes it a refusal").toBe(false);
     expect([d.value, d.extent], "structure is not a reading on a scale").toEqual([null, null]);

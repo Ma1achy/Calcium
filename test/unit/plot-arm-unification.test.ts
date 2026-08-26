@@ -131,7 +131,20 @@ describe("U — the seam, asserted from both arms", () => {
     identity: { form: "bar", patch: "categories" },
     orientation: { form: "bar", patch: { orientation: "horizontal" } },
     facing: { form: "line", patch: { origin: "top-left" } },
-    frame: { form: "bar", patch: { plotFrame: "none" } },
+    // **`grid` moves a curve and not a bar**, measured: the categorical family
+    // draws no interior rules at any frame style. That is the scope of D6's
+    // repair as well — gridlines are the positional family's.
+    frame: { form: "line", patch: { plotFrame: "grid" } },
+    gutter: { form: "bar", patch: { axes: false } },
+    // **No block field isolates this member and the record says so.** It is a
+    // conjunction — `xLabels !== undefined || (axes && HAS_POSITION_AXIS[form])`
+    // — so `xLabels` on a curve moves the axis's *content* while the boolean
+    // stays true, and on a bar it moves nothing at all. `axes: false` flips it,
+    // and flips `frame` and `gutter` with it. The cell is therefore about a
+    // perturbation that moves three members, which is weaker than its
+    // neighbours and is worth stating rather than dressing up.
+    positionAxis: { form: "line", patch: { axes: false } },
+    valueLabels: { form: "bar", patch: { yAxis: false } },
     legend: { form: "line", variant: "legend-right", patch: "labels" },
     marks: { form: "bar", patch: "values" },
   } as const satisfies Readonly<Record<keyof Figure, unknown>>;
@@ -154,8 +167,25 @@ describe("U — the seam, asserted from both arms", () => {
     orientation: { terminal: "moves", svg: "moves" },
     facing: { terminal: "moves", svg: "moves" },
     marks: { terminal: "moves", svg: "moves" },
+    frame: { terminal: "moves", svg: "moves" },
+    valueLabels: { terminal: "moves", svg: "moves" },
+    // **These two say `moves` and the second arm reads neither.** Their only
+    // perturbation is `axes: false`, which sets `frame: "none"` in the same
+    // breath — so the SVG moves because it read `frame`, and this cell cannot
+    // tell that from reading `gutter`. `figure.gutter` and `figure.positionAxis`
+    // have no reader in `svg.ts`; `positionAxis` gates the `xLabels` row and
+    // `gutter` gates nothing yet.
+    //
+    // **Recorded rather than dressed up.** The negative direction is the sound
+    // one — an arm that did not move read neither the member nor the block field
+    // — and a positive under a perturbation that moves three members is the
+    // weakest cell in this record. It says so here so nobody reads it as
+    // coverage.
+    gutter: { terminal: "moves", svg: "moves" },
+    positionAxis: { terminal: "moves", svg: "moves" },
+    // **Still unread, and these are the remaining two of F286's three.**
+    // `identity` is D10, the identity axis; `legend` is D13. 19 and 7 open cells.
     identity: { terminal: "moves", svg: "still" },
-    frame: { terminal: "moves", svg: "still" },
     legend: { terminal: "moves", svg: "still" },
   } as const satisfies Readonly<Record<keyof Figure, { terminal: string; svg: string }>>;
 
@@ -215,7 +245,7 @@ describe("U — the seam, asserted from both arms", () => {
       drawn += 1;
       const texts = new Set([...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1]));
       const fig = EMITTER[family as WalkedFamily](b);
-      if (fig.legend.some((l) => texts.has(l.label))) legendDrawn += 1;
+      if (fig.legend?.slots.some((l) => texts.has(l.label)) === true) legendDrawn += 1;
       // `tiles` draws its labels from **marks**, not from `identity` — so the
       // gutter families are the ones where an identity string could only have
       // come from the member.

@@ -21,7 +21,7 @@ import type { ColourRef } from "../theme/types.js";
 import { axisFor, tickLabels, ticksFor, type Axis } from "./axes.js";
 import { candlesOf } from "./candles.js";
 import { plotAreaRows } from "./height.js";
-import { refOf } from "./marks.js";
+import { HAS_POSITION_AXIS, refOf } from "./marks.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
 
 /**
@@ -249,6 +249,60 @@ export type LegendSlot = Readonly<{
 export type FrameStyle = NonNullable<Plot["plotFrame"]>;
 
 /**
+ * The border a figure draws, **`"none"` included** (I67, §3ak.19).
+ *
+ * `axes: false` removes the border, and no value of `plotFrame` says that — C04
+ * splits the two questions because an **author** has two: *is there furniture*
+ * and *what shape is it*, and one enum spelling `"none"` would make
+ * `axes: false, plotFrame: "box"` expressible and meaningless. After resolution
+ * there is one answer, so the figure collapses what the block splits. **The
+ * direction is the ruling**, and it is not a disagreement with C04.
+ *
+ * **`"none"` means no border and not *no furniture***, which is narrower than
+ * this member was first specified as. `axes` gates three things — the reserved
+ * rows, the gutter and the position axis — and each carries a per-form override,
+ * so `gutter` and `positionAxis` answer separately.
+ */
+export type FigureFrame = FrameStyle | "none";
+
+/**
+ * Where a legend goes, or that there is none (I67, §3ak.19).
+ *
+ * **`null` rather than an empty slot list.** An empty list already means *this
+ * figure has nothing to name* — a single-series curve — and *the author refused
+ * a legend* is a different fact about a figure that has plenty. Collapsing them
+ * is F280's shape one member along: an absent case given its meaning from the
+ * only case that had one.
+ *
+ * The placement is here because `legendSlots` returned the same list for all
+ * four values and for `false`, so an arm consuming the member drew a legend the
+ * author suppressed, in a place nobody chose (F295).
+ */
+export type FigureLegend = Readonly<{
+  slots: readonly LegendSlot[];
+  /**
+   * **The author's placement, or `null` where they said nothing** — never the
+   * resolved one.
+   *
+   * `legendPlacement` auto-enables when a legend is load-bearing, and one of its
+   * clauses reads `caps.colourDepth === 1`: below the colour floor a positional
+   * stack writes its names in the gutter, so the legend it would otherwise want
+   * is a second copy of that list. **A resolved placement is therefore
+   * capability-dependent, and a figure is capability-independent by
+   * construction** (§3ak.2's own test — would a 1-bit terminal and a 24-bit SVG
+   * both want this answer). So the member carries the request and each arm
+   * resolves: the terminal through `legendPlacement`, the second arm through
+   * `"right"`, the placement that can size itself to its content.
+   *
+   * **Three facts, not two.** `false`, an explicit placement, and *nothing said*
+   * are different — the outer `null` is the refusal and this one is the
+   * deferral. Collapsing the second pair is what made the first read-back put a
+   * legend on every plot that had not asked for one: 812 baseline frames.
+   */
+  placement: "above" | "below" | "left" | "right" | null;
+}>;
+
+/**
  * **Everything above the shared coordinate, decided once** (I59, §3ak.2).
  *
  * Capability-independent by construction: every rung the terminal descends is a
@@ -276,11 +330,83 @@ export type Figure = Readonly<{
   orientation: "horizontal" | "vertical";
   /** Decided once and applied twice (I61). */
   facing: Facing;
-  frame: FrameStyle;
-  legend: readonly LegendSlot[];
+  /** The border shape, `"none"` where `axes: false` removes it (I67). */
+  frame: FigureFrame;
+  /** Is the leading label column drawn — the heatmap's override applied (I67). */
+  gutter: boolean;
+  /** Is the position axis row drawn — `xLabels` short-circuits it (I67). */
+  positionAxis: boolean;
+  /** Which side the value labels sit on, `null` where `yAxis: false` (I67). */
+  valueLabels: "left" | "right" | "both" | null;
+  /** Placed, or `null` where the author refused one — never an empty list (I67). */
+  legend: FigureLegend | null;
   /** Normalised, uninverted, refs unresolved. Empty is a refusal (I64). */
   marks: readonly Drawn[];
 }>;
+
+/**
+ * The border, with `axes` applied (I67, §3ak.19).
+ *
+ * `definition.ts` styles its layout from `block.plotFrame` and gates the whole
+ * of the furniture on `block.axes` twenty lines apart, so the two were one
+ * decision in two places. This is that decision.
+ */
+export function frameOf(block: Pick<Plot, "axes" | "plotFrame">): FigureFrame {
+  return block.axes === true ? block.plotFrame ?? "box" : "none";
+}
+
+/**
+ * Whether the leading label column is drawn — **the gutter, not the labels**
+ * (I67, §3ak.19).
+ *
+ * `definition.ts`' `axed`, moved with its override intact. **A heatmap is always
+ * guttered whatever `axes` says**, because the row labels *are* its ordinate and
+ * an unlabelled matrix is a picture of numbers with no way to tell which row is
+ * which — `axes: false` is refused there rather than honoured (C04 I50b). That
+ * override is why `frame: "none"` could not carry this: the two answers differ
+ * for one form and a single member would have to pick one.
+ */
+export function gutterOf(block: Pick<Plot, "axes" | "form">): boolean {
+  return block.axes === true || block.form === "heatmap";
+}
+
+/**
+ * Whether the position axis row is drawn (I67, §3ak.19).
+ *
+ * `furniture.ts`' condition, moved. **`xLabels` short-circuits it** — a caller
+ * that supplied the three strings gets them drawn whatever `axes` says, which is
+ * the same shape as the heatmap's gutter and the reason this is a third answer
+ * rather than a second reading of `frame`.
+ */
+export function positionAxisOf(block: Pick<Plot, "axes" | "form" | "xLabels">): boolean {
+  return block.xLabels !== undefined || (block.axes === true && HAS_POSITION_AXIS[block.form]);
+}
+
+/**
+ * Which side the value labels sit on, or that there are none (I67, §3ak.19).
+ *
+ * `furniture.ts` reads `block.yAxis ?? "left"` and treats `false` as *no
+ * labels, keep the frame and the position axis* — which `frame` cannot say and
+ * `gutter` must not, because a guttered figure with `yAxis: false` still spends
+ * the column on something.
+ */
+export function valueLabelsOf(block: Pick<Plot, "yAxis">): "left" | "right" | "both" | null {
+  const y = block.yAxis ?? "left";
+  return y === false ? null : y;
+}
+
+/**
+ * The legend, placed — or `null` where the author refused one (I67, §3ak.19).
+ *
+ * `furniture.ts`' first two lines and **only** those two: `false` is no legend,
+ * an explicit value is where it goes. What follows them there — the auto-enable
+ * — stays in that arm, because one of its clauses reads `caps.colourDepth` and a
+ * figure cannot.
+ */
+export function legendOf(block: Plot): FigureLegend | null {
+  if (block.legend === false) return null;
+  return { slots: legendSlots(block), placement: block.legend ?? null };
+}
 
 /**
  * The names a form's series answer to — **one list, read by the gutter, the
@@ -469,8 +595,11 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     // on its side in one arm and not the other.
     orientation: "vertical",
     facing: facingOf(block, FACING_DEFAULT),
-    frame: block.plotFrame ?? "box",
-    legend: legendSlots(block),
+    frame: frameOf(block),
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
   };
 }
 
@@ -601,8 +730,22 @@ export function tilesFigure(block: Plot): Figure {
     // second axis running down the page — which is a treemap's `y0` and an
     // icicle's depth alike.
     facing: facingOf(block, block.form === "flame" ? FACING_DEFAULT : FACING_MATRIX),
-    frame: block.plotFrame ?? "box",
-    legend: legendSlots(block),
+    // **This family draws no border, whatever `plotFrame` says** (C12 I67,
+    // §3ak.19, F296). A matrix's cells bound themselves, a tiles figure's
+    // rectangles do, and a tree's edges do. `height.ts` spends the matrix's
+    // two furniture rows on the **ramp legend** rather than an axis rule for
+    // exactly this reason, and its comment says so.
+    //
+    // **Found by the record widening rather than by a frame** — giving the
+    // second arm `frame` turned `heatmap.interiorRules` from `agree` to
+    // `8/8`, a disagreement that OPENED, because `frameOf` answers a style
+    // and this is a family fact. It is the same three families `value: null`
+    // names, and it is decided here for the same reason.
+    frame: "none",
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
     marks,
   };
 }
@@ -642,8 +785,22 @@ export function nodesDecisions(block: Plot): Omit<Figure, "marks"> {
       : flatten(root).map((f) => f.label),
     orientation: ORIENTATION_UNUSED,
     facing: facingOf(block, FACING_DEFAULT),
-    frame: block.plotFrame ?? "box",
-    legend: legendSlots(block),
+    // **This family draws no border, whatever `plotFrame` says** (C12 I67,
+    // §3ak.19, F296). A matrix's cells bound themselves, a tiles figure's
+    // rectangles do, and a tree's edges do. `height.ts` spends the matrix's
+    // two furniture rows on the **ramp legend** rather than an axis rule for
+    // exactly this reason, and its comment says so.
+    //
+    // **Found by the record widening rather than by a frame** — giving the
+    // second arm `frame` turned `heatmap.interiorRules` from `agree` to
+    // `8/8`, a disagreement that OPENED, because `frameOf` answers a style
+    // and this is a family fact. It is the same three families `value: null`
+    // names, and it is decided here for the same reason.
+    frame: "none",
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
   };
 }
 
@@ -795,8 +952,11 @@ export function distributionFigure(block: Plot): Figure {
     identity,
     orientation: orientationOf(block),
     facing: facingOf(block, FACING_DEFAULT),
-    frame: block.plotFrame ?? "box",
-    legend: legendSlots(block),
+    frame: frameOf(block),
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
     marks,
   };
 }
@@ -863,8 +1023,22 @@ export function matrixFigure(block: Plot): Figure {
     identity: block.series.map((sr) => sr.label ?? ""),
     orientation: ORIENTATION_UNUSED,
     facing: facingOf(block, FACING_MATRIX),
-    frame: block.plotFrame ?? "box",
-    legend: legendSlots(block),
+    // **This family draws no border, whatever `plotFrame` says** (C12 I67,
+    // §3ak.19, F296). A matrix's cells bound themselves, a tiles figure's
+    // rectangles do, and a tree's edges do. `height.ts` spends the matrix's
+    // two furniture rows on the **ramp legend** rather than an axis rule for
+    // exactly this reason, and its comment says so.
+    //
+    // **Found by the record widening rather than by a frame** — giving the
+    // second arm `frame` turned `heatmap.interiorRules` from `agree` to
+    // `8/8`, a disagreement that OPENED, because `frameOf` answers a style
+    // and this is a family fact. It is the same three families `value: null`
+    // names, and it is decided here for the same reason.
+    frame: "none",
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
     marks,
   };
 }
@@ -939,8 +1113,11 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     identity: block.categories ?? [],
     orientation: orientationOf(block),
     facing: facingOf(block, FACING_DEFAULT),
-    frame: block.plotFrame ?? "box",
-    legend: legendSlots(block),
+    frame: frameOf(block),
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
   };
 }
 

@@ -41,9 +41,15 @@ const paints = (svg: string): readonly string[] =>
     .map((m) => (m[1] ?? "").toLowerCase())
     .filter((v) => v !== "none");
 
+// **`axes: true`, and it is load-bearing rather than tidy** (C12 I67). This arm
+// used to draw a gridline per tick whatever the block said, so a fixture with no
+// furniture still produced one and `TC1` could assert its colour. The furniture
+// is the figure's now — `frameOf` answers `"none"` when `axes` is unset, which is
+// what the terminal does — so a block that asks for no furniture has none to
+// paint, and a colour row needs a block that has some.
 const series = (n: number, values: readonly number[]): Plot =>
   b.plot({
-    id: "tc", form: "line", height: 8,
+    id: "tc", form: "line", height: 8, axes: true,
     series: Array.from({ length: n }, (_, i) => ({ label: `s${i}`, values: [...values] })),
   });
 
@@ -89,7 +95,7 @@ describe("TC — the SVG arm takes its colour from the theme", () => {
     // are surfaces because they are drawn on the page rather than said about
     // the data.
     expect(svg, "the ground is a surface").toContain(`fill="${hexOf("surface.bgDeep", DARK_THEME)}"`);
-    expect(svg, "the gridline is the border surface").toContain(`stroke="${hexOf("surface.border", DARK_THEME)}"`);
+    expect(svg, "the frame is the border surface").toContain(`stroke="${hexOf("surface.border", DARK_THEME)}"`);
     expect(svg, "the tick labels are muted, not toned").toContain(`fill="${hexOf("tone.muted", DARK_THEME)}"`);
     expect(svg.includes(hexOf("tone.error", DARK_THEME)), "nothing here carries meaning").toBe(false);
   });

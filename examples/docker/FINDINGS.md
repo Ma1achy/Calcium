@@ -13642,6 +13642,69 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F297 — a reader that anticipated an implementation, and measured its anticipation ★★★★★
+
+**`svgDecisions` asked for a border like this:**
+
+```ts
+border: /<rect[^>]*width="100%"[^>]*stroke=/u.test(svg),
+interiorRules: [...svg.matchAll(/<line\s/gu)].length,
+```
+
+A stroked full-page rectangle — which is what a border *would have been* had this arm ever drawn
+one, and it never had. The day it did, drawing four `<line>`s, the reader answered **`false`** and
+the matrix reported the disagreement as still open. `interiorRules` counted **every** `<line>`, so
+the four border edges arrived as four interior rules and that cell did not close either.
+
+**Measured, it is 22 cells.** With the reader repaired: `line.border` **64/70 → 2/70**,
+`line.interiorRules` **68/70 → 4/70**, and `scatter`, `step` and `ecdf` close outright. The arm's
+behaviour did not change between those two measurements — only the question did.
+
+**This is F285's shape one arm along.** That reader was calibrated to a **capability rung**: `+` is
+the ASCII corner and the ASCII tick junction, so it reported the parser's alphabet as the renderer's
+movement. This one is calibrated to an **encoding nobody had written yet**. Both read as correct
+right up until their subject exists, and both are invisible to review, because a regex for a thing
+that does not exist matches nothing and reports a true negative.
+
+**The repair is to ask a geometric question rather than a syntactic one** — where is the line, not
+which tag drew it — with the plot box taken as the lines' own bounding box so a different
+`SvgLayout` cannot silently move the answer. A border is *something along the top and something
+along the bottom*, which is `terminalDecisions`' own test (`RULE_ONLY` admits spaces, so
+`   ┌            ┐` counts and `corners` is a border in both arms). An interior rule is a line that
+is not on an edge.
+
+**The rule this leaves.** An instrument written before its subject has no fabricated violation
+available — there is nothing to corrupt — so `AD5`'s discipline could not have caught it. What
+does: **when the subject arrives, re-derive the reader from the output rather than trusting that it
+was written for this.** The commit that first draws a thing is the commit that must re-read the
+instrument that measures it.
+
+## F296 — a family fact wearing a style's clothes, found by a disagreement opening ★★★★☆
+
+**Giving the second arm `Figure.frame` closed 14 border cells and opened one.**
+`heatmap.interiorRules` went from `agree` to **`8/8`** — a cell that had been closed since the
+matrix was written.
+
+`frameOf(block)` answers `axes === true ? plotFrame ?? "box" : "none"`, which is right for every
+form that has a border and wrong for the three families that do not. **The terminal draws no border
+for a matrix**: its cells bound themselves, and `height.ts` spends the matrix's two furniture rows
+on the **ramp legend** rather than an axis rule — its comment says exactly that. So the SVG drew a
+box where the terminal drew none, and the reader counted the box's edges as rules.
+
+**The same three families `value: null` names**, measured: `matrix`, `tiles`, `nodes`. A tiles
+figure's rectangles bound themselves and a tree's edges do; none of the three has an area to frame.
+
+**Why the walk missed it.** §3ak.19's table found the heatmap override on the **gutter** — `axed`
+reads `|| block.form === "heatmap"` and the note beside it is explicit. Having found one override,
+the ruling recorded one, and `frame` was ruled a style with no per-form arm. The border's absence is
+not written down anywhere as a rule: it is the *absence* of a call, and an absence has no comment.
+
+**So the two overrides are asymmetric in the source and symmetric in the figure**, which is the
+reusable half: a per-form exception that is spelled out is easy to move, and one that consists of
+nobody calling a function is invisible until a second arm calls it. **Giving a member a reader is
+what surfaces the difference**, and a disagreement *opening* is a better signal than one failing to
+close — it names the form.
+
 ## F295 — three members that cannot be consumed correctly, and a ruling that was already in the type ★★★★★
 
 **F286 read as the shortest path to the largest number**: `identity`, `frame` and `legend` are

@@ -996,31 +996,102 @@ export function plotToSvg(
   // form. The record is still right and still total; what changed is that the
   // figure already applied it, so there is no second lookup to disagree with the
   // first (C12 I60).
+  // **The border is the figure's, and `"none"` is one of its five values**
+  // (C12 I67, §3ak.19, D9). This arm drew no frame at all, on 14 of the
+  // matrix's open cells; the terminal draws four shapes and none. Each is the
+  // same rectangle's edges, so the style names which of them land.
+  if (rule !== undefined && figure.frame !== "none") {
+    const edge = (x1: number, y1: number, x2: number, y2: number): string =>
+      `<line x1="${n(x1)}" y1="${n(y1)}" x2="${n(x2)}" y2="${n(y2)}" stroke="${rule}" stroke-width="1"/>`;
+    if (figure.frame === "corners") {
+      // **A tick of each edge at each corner**, which is what `┌ ┐ └ ┘` alone
+      // are: the terminal draws the glyph and has no length to choose, so the
+      // length is this arm's and the *shape* is the figure's. §2's legitimate
+      // column, and the reason this is not a disagreement.
+      const c = Math.min(12, (box.right - box.left) / 8, (box.bottom - box.top) / 8);
+      for (const [x, sx] of [[box.left, 1], [box.right, -1]] as const) {
+        for (const [y, sy] of [[box.top, 1], [box.bottom, -1]] as const) {
+          parts.push(edge(x, y, x + c * sx, y), edge(x, y, x, y + c * sy));
+        }
+      }
+    } else {
+      // `rule` is a left rule and a bottom rule — what shipped before
+      // `plotFrame` existed — and `box` and `grid` close the rectangle.
+      parts.push(edge(box.left, box.top, box.left, box.bottom));
+      parts.push(edge(box.left, box.bottom, box.right, box.bottom));
+      if (figure.frame !== "rule") {
+        parts.push(edge(box.right, box.top, box.right, box.bottom));
+        parts.push(edge(box.left, box.top, box.right, box.top));
+      }
+    }
+  }
+
+  // **Interior rules are `"grid"` and nothing else** (C12 I67, §3ak.19, D6).
+  // This arm drew one per tick unconditionally, which *is* the grid style
+  // applied to every plot — so D6 was never a ruling about gridlines, it was
+  // this member having no reader. The terminal draws `┄` at every value tick
+  // and `┊` at every position tick; **both ways**, and drawing one was half of
+  // what the style means.
+  const gridded = figure.frame === "grid";
   if (axis !== null && rule !== undefined && label !== undefined) {
     for (const [i, tick] of axis.ticks.entries()) {
       // **The string is the figure's** (D5). `String(tick)` printed `1` where
       // the terminal printed `1.0`, and `0.6000000000000001` where its uniform
       // precision gave `0.6` — one axis, two spellings, both plausible.
       const text = axis.labels[i] ?? String(tick);
+      // **The rule and the label answer to different members**, which is why
+      // they are no longer pushed together. A rule is `frame`; a label on the
+      // value axis is `valueLabels`, and on the position axis `positionAxis`.
+      // `yAxis: false` removes the labels and keeps the frame — a sentence
+      // neither member could say while one call drew both.
       if (valueOnX) {
         const x = box.left + (box.right - box.left) * normalisedOf(tick, range, false);
-        parts.push(
-          `<line x1="${n(x)}" y1="${n(box.top)}" x2="${n(x)}" y2="${n(box.bottom)}" ` +
-            `stroke="${rule}" stroke-width="1"/>`,
-          `<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="middle" ` +
+        if (gridded) {
+          parts.push(`<line x1="${n(x)}" y1="${n(box.top)}" x2="${n(x)}" y2="${n(box.bottom)}" ` +
+            `stroke="${rule}" stroke-width="1"/>`);
+        }
+        if (figure.valueLabels !== null) {
+          parts.push(`<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="middle" ` +
             `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
-            `${escape(text)}</text>`,
-        );
+            `${escape(text)}</text>`);
+        }
         continue;
       }
       const y = box.top + (box.bottom - box.top) * normalisedOf(tick, range, true);
-      parts.push(
-        `<line x1="${n(box.left)}" y1="${n(y)}" x2="${n(box.right)}" y2="${n(y)}" ` +
-          `stroke="${rule}" stroke-width="1"/>`,
-        `<text x="${n(box.left - 6)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
+      if (gridded) {
+        parts.push(`<line x1="${n(box.left)}" y1="${n(y)}" x2="${n(box.right)}" y2="${n(y)}" ` +
+          `stroke="${rule}" stroke-width="1"/>`);
+      }
+      // **Both sides where the block asked for both**, which the terminal has
+      // had since I47 and this arm could not express: `"left"`, `"right"` and
+      // `"both"` are one member and the same ticks, never a second scale.
+      const sides = figure.valueLabels === null ? []
+        : figure.valueLabels === "both" ? ["left", "right"] as const
+        : [figure.valueLabels];
+      for (const side of sides) {
+        const at = side === "left" ? box.left - 6 : box.right + 6;
+        parts.push(`<text x="${n(at)}" y="${n(y + SVG_FONT_SIZE / 3)}" ` +
+          `text-anchor="${side === "left" ? "end" : "start"}" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
-          `${escape(text)}</text>`,
-      );
+          `${escape(text)}</text>`);
+      }
+    }
+  }
+
+  // **The position axis is a member now, and it was drawn by nothing before**
+  // (C12 I67, §3ak.19, D8). A curve's abscissa runs `0 … n-1` and this arm drew
+  // no x labels at all; `positionAxis` says whether the row exists and
+  // `xLabels` — three strings, given rather than derived — is inside the
+  // resolver, so a caller that supplied them gets them here too.
+  if (figure.positionAxis && !valueOnX && label !== undefined && block.xLabels !== undefined) {
+    const [first, mid, last] = block.xLabels;
+    const spots = [[box.left, first, "start"], [(box.left + box.right) / 2, mid, "middle"],
+                   [box.right, last, "end"]] as const;
+    for (const [x, text, anchor] of spots) {
+      if (text === "") continue;
+      parts.push(`<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="${anchor}" ` +
+        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
+        `${escape(text)}</text>`);
     }
   }
 
