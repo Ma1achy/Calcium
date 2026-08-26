@@ -13642,6 +13642,146 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F316 — two decisions the arms make differently, one with no column and one with no seam member ★★★★☆
+
+The paired sheet shows the matrix family with a **colour ramp** under every terminal frame and
+nothing under any SVG. Measured across the committed corpora:
+
+```
+gradient or <defs>            0 of 181 SVG frames — the arm has no ramp at all
+"· N older not shown"         4 of 191 terminal 24-bit frames, across heatmap, latency,
+                              spectrogram · 0 of 181 SVG frames
+```
+
+**And the disagreement matrix says `heatmap.legend: "agree"`.** Both arms report `legend: false`
+— the SVG because it has none, the terminal because its ramp is *coloured spaces* and
+`terminalDecisions` reads stripped text. Reading the frame stripped is the whole demonstration:
+
+```
+row0 ┤
+row1 ┤                        ← the entire figure, painted in background colour
+...
+0.19          100 · 16 older not shown
+```
+
+The five columns are `numericLabels · identityLabels · border · interiorRules · legend`, and
+neither a ramp nor a drop notice is any of them. **A rule table is exhaustive over the rules you
+stated and blind to one you did not** — so this is not a reader defect to widen but an axis the
+record does not have.
+
+**The notice half is sharper, because the seam was designed to carry it and does not.** The plan's
+§2 `Figure` block declares
+
+```ts
+drops: Readonly<{ hidden: number; notice: string | null }>;
+```
+
+and the shipped type has `value · extent · identity · orientation · facing · frame · gutter ·
+legend · isotropic · marks` — **no `drops`.** The terminal computes the notice, the SVG cannot ask
+for it, and nothing between the two says so. F309's instrument pointed at the type it wrote itself:
+the member was named in the design and is not in the tree.
+
+**Open**, and named rather than fixed — a sixth column and a `drops` member are both renderer work,
+and this is the review that says what the remaining forms have to match.
+
+---
+
+## F315 — width was the right axis and the fit was the wrong rule ★★★★☆
+
+F311 corrected the pair's scale from *equal height* to *equal width*, and the first sheet built that
+way showed the same mistake one level down. **Fitting each pair to the slot is not a constant
+scale.**
+
+Measured over the 191 twenty-four-bit frames: they run **27 to 80 columns**, so a per-pair fit
+applies **0.99× to 2.84×**. 79% sit at 78 columns or more and land near 1.0; the rest are magnified,
+and the sheet showed a 33-column waffle and a 31-column tree arriving two and a half times the size
+of the line beside them — **captions in headline type, tiles that cannot be compared with each
+other.** A contact sheet whose tiles are at different scales is a directory listing with extra
+steps, which is the argument `contact-defaults.mjs` was written on.
+
+**MG24's class a fifth time, and the tell is that the correction inherits it.** F311's sentence —
+*a comparison at different sizes is a comparison of two pictures rather than two renderings* — is
+the thing the fit violates, and the fit was written to satisfy it. A remedy can be right about the
+axis and still be the wrong rule on that axis.
+
+**Fixed** — `terminalWidthFor` is linear in the frame's natural width against an 80-column
+reference, and the reference is **measured by rendering eighty columns and reading the `viewBox`
+back** rather than restating `ansiToSvg`'s cell width here. A frame narrower than 80 columns is
+drawn narrower, because it is. PR7 asserts linearity, which is the property a fit cannot have.
+
+---
+
+## F314 — three claimed forms where the terminal draws a derivation and the SVG draws the input ★★★★★
+
+**The catalogue's first read, and no cell of the disagreement matrix can reach it.**
+
+| form | the terminal draws | the SVG draws | measured |
+|---|---|---|---|
+| `histogram` | 8 bins × 2 series, counted and labelled `[20.0, 25.1) · before  47` | **240 raw samples as 240 bars** | 243 rects = 240 + background + 2 swatches |
+| `density` | a kernel density estimate, y **0.00–0.11** | the sorted raw values as a staircase, y **0–10** | 6 marks, axis `series 1` |
+| `ecdf` | a cumulative distribution, monotone, y **0.0–1.0** | the raw values in input order, **not monotone**, y 0–10 | an ECDF is monotone by definition |
+
+**This is D14's class, and D14 was recorded as one form.** The sweep that produced D1–D16 found
+`autocorrelation` — *lag bars with significance bands against a polyline of the same values, two
+different charts of one block* — ruled on it, and stopped. Three more forms have the same defect and
+none was ever named.
+
+**Why every gate agrees.** The matrix compares five decisions and both arms have all five: a
+histogram's SVG has a value axis, identity labels, a border, interior rules and a legend, and each
+is separately defensible. `histogram` reads `numericLabels: 12/12, identityLabels: 10/12` — twelve
+recorded disagreements about *labels*, and not one of them says the chart is of something else.
+`plotToSvg` returns a document, so the refusal path never fires; the SVG baseline compares 181
+frames clean because the wrong figure is stable.
+
+**The discriminator is a transform, not a decision.** In all three the terminal computes a quantity
+the samples do not contain — a bin count, a density, a cumulative fraction — and the SVG plots the
+samples. The y-axis is where it is visible with no reading at all: `0.00–0.11` against `0–10` is not
+a niced range against a raw one (D1), it is a different **quantity**.
+
+**Open.** The fix is either the transform moving above the seam or three entries in `SVG_FAMILY`,
+and F259 says which by default: *refuse a false figure, record an incomplete one.* A histogram of
+240 unbinned samples measures, rasterises and reads as a chart of something, which is the plausible
+wrong figure a `null` refuses.
+
+**And this is the whole argument for the sheet, in one finding.** Eleven or twelve defects in this
+campaign came from reading a frame and none from a row written to look for one. The matrix asserted
+these three forms for the length of the pass.
+
+---
+
+## F313 — the defaults sheet dropped two forms, duplicated a third, and reported 45 ★★★★☆
+
+`contact-defaults.mjs` collected its tiles with `readdirSync(OUT).filter((f) =>
+f.endsWith("-default-24bit.png"))` — **a substring test standing in for *is this the form's
+representative frame***, and wrong in both directions.
+
+```
+dropped     horizon   bands-2 · bands-3 · bands-5 · folded-1x3 · signed — no variant named default
+            pie       solid · default-40 · narrow-20 · many-segments · merged — its `default`
+                      became `default-40` during this campaign, and it fell out silently
+added       violin    bimodal-default matched the suffix, tiled a second time and labelled
+                      `violin-bimodal` as though it were a form
+```
+
+**44 distinct forms, one of them twice, two absent — printed as `45 forms`** against a corpus of 46.
+A sheet built to answer *can I see the whole system at once* was answering it about 44/46 and saying
+so in a number that looked right.
+
+**`catalogue-png.mjs` carries a comment about this exact filter**, naming `horizon`: *that filter
+silently excluded `histogram` and `horizon` entirely — so the sheet showed 24 of 34 forms and read
+as complete.* It was fixed there and **not in the sibling** — the same file pair and the same
+relationship F261 already caught once, when `catalogue-hash.mjs` got its `isMain` guard in the same
+commit and `contact-defaults.mjs` did not. **Twice now, between the same two files.**
+
+**Fixed** — `representativeVariant` is exported from `plot-catalogue.mjs` and the sheet enumerates
+`CATALOGUE_FORMS`, never filenames. The rule had **three** hand-written copies (`phase-catalogue`'s
+`fixture`, `pair-catalogue`'s fallback, and this filename match); there is one now. A form whose
+representative is not called `default` gets the variant in its label, which the old code could not
+do because it had thrown the variant away. CD4 asserts one tile per form, no form twice, and names
+`horizon` and `pie` rather than counting them.
+
+---
+
 ## F312 — the legend reader's name is one word, and 122 labels could not say so ★★★★☆
 
 F307 gave `terminalDecisions` a `LEGEND_TAIL` so it could see a key drawn **beside** a figure
@@ -13682,6 +13822,123 @@ change that can close one cell and open another inside the same `2/10`.
 `\s+`. `\s+` would let a name run across `LEGEND_GAP`'s two columns and swallow the next entry's
 swatch, which is the guard F307 identified; a one-space rule keeps it, because the column gap is
 two.
+
+---
+
+## F311 — the pair's scale sentence protects the right thing on the wrong axis ★★★☆☆
+
+`CALCIUM_ARM_CATALOGUE.md` §3, on the side-by-side: *the terminal frame is rendered at its cell
+size; the SVG is scaled to the same pixel height.* **A comparison at different sizes is a
+comparison of two pictures rather than two renderings.**
+
+**The second sentence is the argument and it is right. The first is the remedy and it is on the
+wrong axis.**
+
+Measured before building it. A terminal frame at width 80 rasterises to **685 px across** and
+three to twenty rows down — 92 px for a five-row form, 60 px for the three-row heatmap. And every
+drawn frame in `test/golden/svg-baseline/` is **640 × 320**, which is not a property of the
+fixtures: `viewBox="0 0 640 320"` is on all 101 of them **whatever the block's `height` says**, so
+a heatmap sized at 3 rows and a line sized at 12 get the same canvas.
+
+So *scale the SVG to the terminal's pixel height* scales a five-row pair by 0.29, and read the
+other way it **magnifies the three-row heatmap tenfold into a 6800-pixel tile of blocky cells.**
+Neither is a rendering anybody compares.
+
+**Equal width protects exactly what the sentence was defending** — neither half larger than the
+other, both at reading size — and it does something the height rule destroys: the height
+difference **becomes the visible thing.** At 680 px across, the SVG half is 3.7× the terminal
+half's height, and that is a real disagreement that no row in the matrix reaches.
+
+**MG24's class again, and this is the fourth instance in two passes** — F303 in a plan, F304 in a
+record, F306 in code, this in a plan again. The question that reaches all four is *does this
+sentence constrain the decision it is attached to*, and review does not ask it because review
+checks whether the sentence is **true**. This one is.
+
+**Fixed** — `PAIR_WIDTH` and `pairLayout` in `tools/pair-catalogue.mjs`, with the terminal half's
+native pixel height printed in every pair's caption so the ratio the scaling removed is recorded
+rather than inferred. PR6, and it asserts the symmetric case too: the box must be set by whichever
+half is taller, or it clips the side the corpus happens to make short.
+
+---
+
+## F310 — the refusal counter compares frames against forms, and the partition finds nine refusals no record holds ★★★★★
+
+`CALCIUM_ARM_CATALOGUE.md`'s second counter: *how many refusals were drawn, against `SVG_FAMILY`'s
+null count. **They must agree**, or a form is refused somewhere the record does not say.*
+
+**They cannot agree, because they are different units.** The left is **frames** — one per
+form·variant — and the right is **forms**. At HEAD: 178 frames, **77 refused**, `SVG_FAMILY` holds
+**16** nulls. Run as written the counter reports a failure on a gate that is holding.
+
+Restated in units that can be true — *every refused frame is attributable to a named cause, and
+the causes are enumerated* — the same counter does the job it was reaching for:
+
+| cause | frames | recorded where |
+|---|---|---|
+| `SVG_FAMILY[form] === null` | 58 · 16 forms | `svg-baseline.mjs`, SB4 |
+| `ohlc` | 4 | `svg-baseline.mjs`, SB4 |
+| a non-default `origin` | 4 | `svg-baseline.mjs`, SB4 |
+| **an empty value list** | **7** | **nowhere** |
+| `flame`/`icicle`'s legacy `categories`+`series` datum | 2 | one tool along, in `phase-catalogue.mjs` |
+| **`treeLayout: "outline"`** | **2** | **nowhere** |
+
+58 + 4 + 4 + 7 + 2 + 2 = 77, exactly. **The record names three causes and the corpus has six.**
+
+**The last row is the one nothing knew.** `tree`'s six variants are one hierarchy at six heights,
+and the only field that differs between them is `treeLayout` — measured, by reading the fixture.
+The arm draws `topDown` and `leftRight` and refuses `outline`: the layout with the **least**
+geometry above cells, an indented text list, while drawing the two that need connector routing.
+Refused backwards from difficulty, in no document, and **invisible to the disagreement matrix
+because a refused frame has no cells to disagree about.**
+
+**And the record that should have held it is a range.** SB4's headline is *a refusal is a frame, so
+one cannot appear or vanish silently*, and its assertion is `> 50` and `< 178` — a refusal can do
+either and both bounds still hold. Its neighbours SB2 and SB3 catch it by name, so the mechanism is
+sound and **the row that states the property is the one that cannot see it**: the gate is where you
+look and the checking is next door.
+
+**Fixed** — `partition()` in `tools/pair-catalogue.mjs`, with `VARIANT_REFUSALS` declared and
+compared **by equality in both directions** (PR2), the family half compared against `SVG_FAMILY` as
+**forms against forms**, which is the counter in the units that make it true (PR3), and a
+fabricated violation for each direction (PR4). A refusal appearing and a declaration going dead are
+now two named lists rather than one number that could not move.
+
+---
+
+## F309 — the plan's new tool already existed, tracked, one directory along ★★★★☆
+
+`CALCIUM_ARM_CATALOGUE.md` §How names three tools and marks one **NEW**, above it the instruction
+*extend the existing tools rather than writing a third*:
+
+```
+tools/svg-catalogue.mjs       phase-catalogue widened to the full corpus
+```
+
+Measured against HEAD before writing a line. **`tools/svg-baseline.mjs` is that tool.** It renders
+one `.svg` per form·variant over the whole of `CATALOGUE_FORMS` — 178 frames, the same corpus, not
+the 66 phase frames — into **`test/golden/svg-baseline/`**, which is **tracked** rather than
+gitignored; it derives its expected count instead of writing a literal (F256); and it **already
+writes a placard for a refusal** so one cannot vanish silently, which is §2's second paragraph
+almost word for word. Every clause of §2 except the raster.
+
+**The condition was written where the deferral is and the thing satisfying it was written somewhere
+else** — CLAUDE.md's three-row table, a fourth row. And the direction that found it is the one that
+table names: **from the satisfier, not from the deferral.** Nothing was watching for
+`svg-catalogue.mjs` to become unnecessary; what reached it was reading the entry's premises against
+the tree, which is the seventh pass's own method.
+
+**What is actually missing is narrower, and the narrower statement changes the build.** The SVG
+corpus is text and a paired sheet needs pixels — so the work is a rasterise-and-compose pass over
+two corpora that are **each already gated**, and there is **no `svg-catalogue.mjs` at all.** A
+second tool rendering the same 178 frames is precisely the drift `frameFor` and `everyFrame` exist
+to stop one floor down, and it is what the plan's own sentence forbade two lines above naming it.
+
+**The same reading retires the third digest.** §How asks for *terminal, SVG, and now paired* under
+F264. F264's lesson is that a digest which cannot tell an addition from a change reports a gate
+failing when it holds — and a digest over **derived** pixels is worse than that: it moves whenever
+either input moves, saying *one of the two changed* without saying which, over two corpora whose
+own gates already name the frame. Kept split by **not hashing the pairs at all**, which is the
+concern honoured rather than the remedy copied.
 
 ---
 

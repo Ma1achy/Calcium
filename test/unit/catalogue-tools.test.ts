@@ -20,8 +20,13 @@ import { afterAll, describe, expect, it } from "vitest";
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { digestOf } from "../../tools/catalogue-hash.mjs";
 // @ts-expect-error — same.
-import { COLS, sheetSize, tileAt } from "../../tools/contact-defaults.mjs";
+import { COLS, defaultTiles, sheetSize, tileAt } from "../../tools/contact-defaults.mjs";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
+import { PAIR_WIDTH, VARIANT_REFUSALS, drawablePick, pairLayout, partition, refusalMap, terminalWidthFor } from "../../tools/pair-catalogue.mjs";
 import { SVG_FAMILY } from "../../src/presentation/plot/svg.js";
+import type { PlotForm } from "../../src/data/viewmodel/index.js";
+import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { sourceOf } from "../support/source.js";
 
 const dir = mkdtempSync(join(tmpdir(), "cat-hash-"));
@@ -136,6 +141,35 @@ describe("CD — the defaults sheet's geometry", () => {
     }
   });
 
+  it("CD4 (F313): one tile per form, every form, and no form twice", () => {
+    // **The sheet collected `*-default-24bit.png`** — a substring test standing
+    // in for *is this the form's representative frame*, and wrong in both
+    // directions. It dropped every form with no variant called `default`
+    // (`horizon`, `pie`) and picked up every *variant* whose name ends in
+    // `-default` (`violin/bimodal-default`, tiled twice and labelled
+    // `violin-bimodal` as though it were a form). 44 forms, one doubled, two
+    // absent — **reported as 45** against a corpus of 46.
+    //
+    // `catalogue-png.mjs` carries a comment about this exact filter naming
+    // `horizon` as its victim. It was fixed there and not here: the same file
+    // pair, and the same relationship F261 already caught once.
+    const tiles = (defaultTiles as () => { form: string; variant: string; file: string; name: string }[])();
+    const forms = Object.keys(CATALOGUE_FORMS);
+    expect(tiles.map((t) => t.form).sort()).toEqual([...forms].sort());
+    expect(new Set(tiles.map((t) => t.form)).size, "no form appears twice").toBe(tiles.length);
+    // **And the two that were absent are the rule's own subjects**, so this row
+    // fails if either grows a `default` variant and the coverage question stops
+    // being asked. Named rather than counted: a count reads as satisfied by any
+    // two forms.
+    const noDefault = forms.filter((f) => !("default" in (CATALOGUE_FORMS[f as PlotForm] as object)));
+    expect(noDefault.sort(), "the forms whose representative is not called default").toEqual(["horizon", "pie"]);
+    for (const f of noDefault) {
+      const t = tiles.find((x) => x.form === f)!;
+      expect(t.variant, `${f} still gets a tile`).not.toBe("default");
+      expect(t.name, "and its label says which variant it is showing").toContain(t.variant);
+    }
+  });
+
   it("CD3: the sheet holds every tile it lays out", () => {
     for (const count of [1, 5, 6, 45]) {
       const { width, height, rows } = sheetSize(count, W, H);
@@ -154,6 +188,7 @@ describe("CG — a tool that exports a helper does not run on import", () => {
     "tools/catalogue-png.mjs",
     "tools/plot-catalogue.mjs",
     "tools/phase-catalogue.mjs",
+    "tools/pair-catalogue.mjs",
   ] as const;
 
   it("CG1: every catalogue tool with an export guards its work behind isMain", () => {
@@ -236,5 +271,127 @@ describe("PC — the phase catalogue's two claims", () => {
     for (const tool of ["tools/plot-catalogue.mjs", "tools/phase-catalogue.mjs"]) {
       expect(sourceOf(tool), `${tool} writes to docs/catalogue`).toMatch(/"docs", "catalogue"/u);
     }
+  });
+});
+
+describe("PR — the pair catalogue's partition, which is the counter restated (F309)", () => {
+  const refused = refusalMap as (dir?: string) => Record<string, Record<string, boolean>>;
+  const split = partition as (map?: Record<string, Record<string, boolean>>) => {
+    family: string[]; variant: string[]; undeclared: string[]; declaredUnused: string[];
+  };
+  const pick = drawablePick as (form: string, map?: Record<string, Record<string, boolean>>) => string;
+  const layout = pairLayout as (l: number, r: number) => {
+    width: number; height: number; left: { x: number; y: number }; right: { x: number; y: number };
+  };
+  const declared = VARIANT_REFUSALS as Record<string, Record<string, string>>;
+
+  const map = refused();
+  const part = split(map);
+  const allRefused = Object.entries(map)
+    .flatMap(([form, vs]) => Object.entries(vs).filter(([, r]) => r).map(([v]) => `${form}/${v}`))
+    .sort();
+
+  it("PR1 (F309): every refused frame is attributable to a named cause", () => {
+    // **The plan's counter was *refusals drawn against `SVG_FAMILY`'s null
+    // count, and they must agree*.** They cannot: the left is **frames** and the
+    // right is **forms**. Restated as a total partition it works, and finding
+    // out that it works is what turned up the nine frames no record covered.
+    expect([...part.family, ...part.variant].sort()).toEqual(allRefused);
+    expect(part.family.length + part.variant.length, "and nothing is counted twice")
+      .toBe(allRefused.length);
+    expect(allRefused.length, "the corpus has refusals to partition").toBeGreaterThan(50);
+  });
+
+  it("PR2 (F309): the declared variant refusals match the corpus, both directions", () => {
+    // **Equality, never a subset** — a subset check lets a dead entry outlive
+    // its reason unread, and lets a new refusal in silently, which is the one
+    // thing a `null` arm must not do (F259).
+    expect(part.undeclared, "a refusal in the corpus that no declaration names").toEqual([]);
+    expect(part.declaredUnused, "a declaration for a frame that now draws").toEqual([]);
+  });
+
+  it("PR3 (F309): the family half is exactly SVG_FAMILY's null set — forms against forms", () => {
+    // This **is** the plan's counter, in the units that make it true. A form
+    // whose every variant refuses is a family refusal; the table says which
+    // forms have no emitter. The two sets are the same set or one of them is
+    // wrong, and either way it is a form refused somewhere the record does not
+    // say.
+    const familyForms = [...new Set(part.family.map((s) => s.split("/")[0]))].sort();
+    const nulls = Object.keys(SVG_FAMILY)
+      .filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] === null)
+      .sort();
+    expect(familyForms).toEqual(nulls);
+  });
+
+  it("PR4: the partition responds — a new refusal and a dead declaration are both named", () => {
+    // **The control.** PR1–PR3 are three green assertions over one corpus, and
+    // a classifier that returned empty arrays for everything would satisfy two
+    // of them. Fabricated both violations rather than trusting the shape.
+    const form = Object.keys(declared)[0]!;
+    const variant = Object.keys(declared[form]!)[0]!;
+
+    const appeared = structuredClone(map);
+    const victim = Object.keys(appeared[form]!).find((v) => !appeared[form]![v])!;
+    appeared[form]![victim] = true;
+    expect(split(appeared).undeclared, "a refusal nothing declares is named")
+      .toEqual([`${form}/${victim}`]);
+
+    const vanished = structuredClone(map);
+    vanished[form]![variant] = false;
+    expect(split(vanished).declaredUnused, "a declaration whose frame now draws is named")
+      .toEqual([`${form}/${variant}`]);
+  });
+
+  it("PR5: the sheet shows a form by a variant this arm can draw, not by its name", () => {
+    // **The rule `phase-catalogue.mjs` already had to make**, for the same
+    // measured reason: `flame` and `icicle` carry two datum shapes and their
+    // `default` is the one this arm refuses. A sheet keyed on the name shows
+    // two claimed forms as refused and reads as an arm working for fewer forms
+    // than it does.
+    for (const form of ["flame", "icicle"]) {
+      expect(map[form]?.default, `${form}'s default is the refused datum shape`).toBe(true);
+      expect(map[form]?.[pick(form)], `so ${form} is shown by a drawable variant`).toBe(false);
+    }
+    // And a form with nothing drawable still resolves rather than throwing —
+    // it lands on the refusal placard, which is the honest answer.
+    const allDead = Object.keys(map).find((f) => Object.values(map[f]!).every(Boolean))!;
+    expect(Object.keys(map[allDead]!)).toContain(pick(allDead));
+  });
+
+  it("PR7 (F315): the terminal scale is constant, so tiles compare with each other too", () => {
+    // **Width is the axis and the fit is not the rule.** Fitting each pair to
+    // the slot is F311's mistake one level down, and the first sheet showed it:
+    // the frames run **27 to 80 columns**, so a per-pair fit applies 0.99× to
+    // 2.84× and a 33-column waffle arrives two and a half times the size of an
+    // 80-column line. A contact sheet whose tiles are at different scales is not
+    // a contact sheet.
+    const w = terminalWidthFor as (natural: number) => number;
+    const eighty = w(685); // an 80-column frame, near enough to the reference
+    expect(eighty, "80 columns fills the slot").toBeGreaterThan(670);
+    expect(eighty, "and does not overflow it").toBeLessThanOrEqual(PAIR_WIDTH as number);
+    // **Linear, which is the whole property**: half the columns is half the
+    // width, never half of a refitted slot. A fit would return the same number
+    // for both of these, and that is exactly the defect.
+    expect(w(342)).toBeLessThan(eighty * 0.55);
+    expect(w(342)).toBeGreaterThan(eighty * 0.45);
+    expect(w(171) * 2, "and it composes").toBeCloseTo(w(342), -1);
+  });
+
+  it("PR6 (F309): the halves are laid out at equal width, and the taller one sets the box", () => {
+    // **The plan said equal *height* and the axis is wrong.** A terminal frame
+    // is wide and short — 80 cells across, 3–20 rows down — and every SVG frame
+    // is 640×320 whatever the block's `height` says. Matching heights scales a
+    // 3-row heatmap by ten. Matching widths leaves both at reading size and
+    // makes the height difference the visible thing, which is a real
+    // disagreement no row reaches.
+    const box = layout(92, 340);
+    expect(box.right.x - box.left.x, "the two halves start one width plus a gap apart")
+      .toBeGreaterThan(PAIR_WIDTH as number);
+    expect(box.height, "the taller half sets the body").toBeGreaterThan(340);
+    expect(box.left.y, "and both sit below the caption").toBe(box.right.y);
+    // Symmetric in its argument: the terminal half being the taller one must
+    // work the same way, or the box clips whichever side the corpus happens to
+    // make short.
+    expect(layout(340, 92).height).toBe(box.height);
   });
 });

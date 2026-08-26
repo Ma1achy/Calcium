@@ -123,6 +123,30 @@ export function clearGenerated(dir) {
 export const CATALOGUE_WIDTHS = (capsName) => [capsName === "wide" ? 60 : 80];
 
 /**
+ * **The variant that stands for a form**, when a reader wants one tile per form.
+ *
+ * `default` if the form has one, else its first variant — and it is a function
+ * because the rule was written three times and one copy was a **filename match**
+ * (F313). `contact-defaults.mjs` collected `*-default-24bit.png`, which drops
+ * every form with no variant by that name and picks up every *variant* whose
+ * name ends in `-default`. Measured: `horizon` and `pie` absent, `violin` twice
+ * as `violin` and `violin-bimodal`, and the sheet reporting **45 forms** for 44.
+ *
+ * `catalogue-png.mjs` carries a comment saying this filter *silently excluded
+ * `histogram` and `horizon` entirely — so the sheet showed 24 of 34 forms and
+ * read as complete.* It was fixed there and not in the sibling, which is the same
+ * pair and the same relationship F261 already caught once.
+ *
+ * **A rule about the corpus is answered from the corpus**, never from the names
+ * of files a previous step happened to write.
+ */
+export function representativeVariant(form) {
+  const variants = FORMS[form];
+  if (variants === undefined) throw new Error(`no fixtures for form ${form}`);
+  return "default" in variants ? "default" : Object.keys(variants)[0];
+}
+
+/**
  * Every form × variant × capability set × width, as frames — **the loop, once.**
  *
  * `frameFor` already exists so that nobody renders a second way; this exists so

@@ -105,6 +105,7 @@ const COVERED = [
   ["tools/catalogue-hash.mjs", ["npx", "vitest", "run", "test/unit/catalogue-tools.test.ts"]],
   ["tools/contact-defaults.mjs", null], // same fixture — the sheet's geometry
   ["tools/phase-catalogue.mjs", null], // same fixture — the refusal list and the ordering
+  ["tools/pair-catalogue.mjs", null], // same fixture — the refusal partition and the pair's geometry
   ["tools/refdiff/pair.mjs", ["npx", "vitest", "run", "test/unit/refdiff.test.ts"]],
   ["tools/refdiff/reference.py", null], // same fixture — the two halves of one grid
   ["tools/refdiff/export-fixtures.ts", null], // same fixture — our half and the grid

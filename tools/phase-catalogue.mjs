@@ -29,7 +29,7 @@ import { b } from "../src/shell/builders/index.js";
 import { transmitImage } from "../src/shell/transmit-image.js";
 import { plotToSvg, svgLayout, SVG_FAMILY } from "../src/presentation/plot/svg.js";
 import { sharedRange } from "../src/data/viewmodel/range.js";
-import { CAPS } from "./plot-catalogue.mjs";
+import { CAPS, representativeVariant } from "./plot-catalogue.mjs";
 import { CATALOGUE_FORMS } from "./catalogue-forms.js";
 import { block } from "../src/data/viewmodel/index.js";
 import { ansiToSvg } from "./catalogue-png.mjs";
@@ -205,11 +205,10 @@ write(
 // renderings and never two datasets — and so a form with its own shape (a
 // hierarchy, a graph, OHLC bars) is built correctly rather than by this file
 // guessing at a series.
-const fixture = (form) => {
-  const variants = CATALOGUE_FORMS[form];
-  const key = "default" in variants ? "default" : Object.keys(variants)[0];
-  return { ...variants[key], id: form };
-};
+// **One copy of *which variant stands for a form*** (F313). This was the third
+// hand-written instance of the rule; `contact-defaults.mjs`'s was a filename
+// match and dropped two forms while duplicating a third.
+const fixture = (form) => ({ ...CATALOGUE_FORMS[form][representativeVariant(form)], id: form });
 
 /**
  * The first variant this arm can actually draw, or the default.
