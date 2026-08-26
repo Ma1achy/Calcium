@@ -7097,7 +7097,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I5** — Downsampling preserves per-column minima and maxima. *Composition (§3): a column also keeps its first and last sample, because preserving only the extremes leaves I14 nothing to join.*
 - **I6** — At `colourDepth: 1`, multi-series plots stack; series are never distinguished by colour alone.
 - **I7** — Stacked strips sum to exactly `height`; series labels occupy the y-label column and consume no plot rows.
-- **I8** — When series outnumber available rows, the plot renders the first series plus a legend and marks itself truncated. Series are never dropped silently.
+- **I8** — **A datum that cannot be given a row is named in the area, never dropped silently — and the subject is *rows*, not series.** When series outnumber the rows, the plot draws the first plus a `+N more` legend and marks itself truncated; a tree whose nodes do not fit spends a row on a `warn`-toned notice **before** choosing its layout (I57); and a **category** past the last row is named the same way. *Measured before the third arm existed: `categoricalForm` opened `const labels = cats.slice(0, areaRows)` while the series branch spent twenty lines on the notice with a comment saying a series dropped in silence is the failure it exists to avoid. Three of 45 row-bearing variants in the catalogue were short and all three were histograms — `freedman-diaconis` drawing 8 of 11 bins, **39 of 200 samples and the whole right tail**, as a clean unimodal distribution that had ended. The rule was written about the subject that had the defect, and a histogram's rows are bins a strategy chose rather than categories an author wrote, so the count is not a number anybody could check against the height* (F319).
 - **I9** — The ASCII fallback occupies an identical cell grid to the Unicode form.
 - **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 3` with (the frame's lid, the axis rule, the x-labels), by `width` cells. The matrix family keeps `height + 2`: it has no lid.
 - **I11** — C12 owns no state; every render is a pure function of block, width and context.
@@ -7182,7 +7182,7 @@ orientation — and belongs in the classification table as its own rows.
 5. Every degenerate series in §4 has a defined result and none throws (I2, I3, I4).
 6. Downsampling is by per-column min/max, so spikes survive (I5).
 7. At 1-bit, multi-series plots stack into strips summing exactly to `height`; labels live in the y-label column (I6, I7).
-8. Series that cannot be given a row are named in a legend, never dropped silently (I8).
+8. A series, a node or a category that cannot be given a row is named in the area, never dropped silently (I8, I57).
 9. The ASCII fallback keeps the cell grid identical and only loses subcell resolution (I9).
 10. C12 holds no state and registers through the public mechanism (I11, I12).
 11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
