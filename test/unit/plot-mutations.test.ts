@@ -11,7 +11,7 @@ import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from 
 import { HIERARCHY_ROLE, block, type Plot, type QuartileSummary } from "../../src/data/viewmodel/index.js";
 import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
-import { violinColumn } from "../../src/presentation/plot/kde.js";
+import { brailleOutline, violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "../../src/presentation/plot/ramp.js";
@@ -2088,6 +2088,45 @@ describe("C12 I33 — no whisker, no stub", () => {
     const none = { min: 3, q1: 3, median: 5, q3: 7, max: 7 };
     expect(spine(none)).not.toContain(g.diamond);
     expect(spine(none)).not.toContain(g.diamondTee);
+  });
+
+  it("T1.101 (C12 I54, §3ak.25): an unstyled violin prefers braille at `wide`, and only the outline rung", () => {
+    // **Fail-on-revert.** Dropping `brailleOutline`'s width clause — leaving the
+    // repertoire half `brailleArm` already had — fails this row and moves 10
+    // baseline frames (F302). Giving the clause to `brailleArm` instead, so the
+    // filled-density rungs take it too, moves 11 more and replaces a correct
+    // filled figure with an outline.
+    //
+    // **The predicate is imported and not restated.** The first draft of this row
+    // wrote the three lines out again, which is the finding it is about: a rule
+    // with two copies, the second holding the clauses that existed the day it was
+    // written. A test that keeps its own copy cannot fail when the real one moves.
+    const at = (unicode: string, ambiguousWidth: string, plotStyle?: string): boolean =>
+      brailleOutline(plotStyle as never, { unicode, ambiguousWidth } as never);
+
+    expect(at("full", "narrow"), "unstyled, narrow: box drawing").toBe(false);
+    expect(at("full", "wide"), "unstyled, wide: braille — the clause that was missing").toBe(true);
+    expect(at("full", "wide", "line"), "an explicit line style is still a line, at every rung").toBe(false);
+    expect(at("ascii", "wide"), "no repertoire, no braille — degraded, never refused").toBe(false);
+    expect(at("full", "narrow", "braille"), "the author's request stands where it always did").toBe(true);
+
+    // **And the figure, so the row is not only about a boolean.** `styleRasteriser`
+    // states the rule this restores; `density`, `line` and `histogram` already
+    // obeyed it and this form kept half.
+    const values = Array.from({ length: 30 }, (_, i) => 20 + Math.sin(i * 0.6) * 7);
+    const drawn = (braille: boolean, caps: typeof FULL_CAPS): string =>
+      violinRows(
+        { values } as never, 40, 9, caps, undefined, "rounded", undefined, undefined, braille, false,
+      ).join("");
+    const brailleCells = (t: string): number =>
+      [...t].filter((c) => c >= "\u2800" && c <= "\u28ff").length; // cells-ok — a glyph count
+    const boxCells = (t: string): number =>
+      [...t].filter((c) => c >= "\u2500" && c <= "\u257f").length; // cells-ok — a glyph count
+
+    const wide = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    expect(brailleCells(drawn(true, wide)) > 0, "the wide arm draws braille").toBe(true); // cells-ok — a glyph count
+    expect(boxCells(drawn(true, wide)), "and no box drawing, which is the whole point").toBe(0); // cells-ok — a glyph count
+    expect(boxCells(drawn(false, FULL_CAPS)) > 0, "the narrow arm keeps box drawing").toBe(true); // cells-ok — a glyph count
   });
 
   it("T1.100d (C12 I33, C04 I53): the violin's column arms say it too — three of five had the ruling", () => {

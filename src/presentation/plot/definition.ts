@@ -72,7 +72,7 @@ import { pointLabelRows } from "./pointlabels.js";
 import { colormapFor, heatmapFormRows } from "./heatmap.js";
 import { flatAlphabet, glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
-import { densityRows, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
+import { brailleOutline, densityRows, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
 import { densitySeries, ecdfSeries } from "./derive.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
@@ -2705,7 +2705,15 @@ const FORM_ROWS: Readonly<
     // decision was simply made before it got there, so an ASCII frame came back
     // in braille. Degraded and never refused, on I18's precedent: a caller
     // cannot avoid the terminal they are on.
+    //
     const brailleArm = block.plotStyle === "braille" && ctx.capabilities.unicode !== "ascii";
+    // **The width arm belongs to one rung of three, and it is `brailleOutline`'s
+    // to state** (I54, §3ak.25, F302). `brailleArm` above stays the author's
+    // request, which is what the filled-density rungs answer to; the outline rung
+    // also asks *how wide is this glyph*, and that predicate is exported beside
+    // the renderers rather than written here, because a rule with two copies is
+    // exactly the finding.
+    const outlineInBraille = brailleOutline(block.plotStyle, ctx.capabilities);
     // One value axis for every band, so the categories can be compared — which
     // is what the form is for (C12 §3q).
     const shared = seriesRange(block.series, block) ?? undefined;
@@ -2740,7 +2748,7 @@ const FORM_ROWS: Readonly<
         return violinColumn(
           sr, cw, rows, ctx.capabilities, qs[i] ?? summaryOf(sr),
           block.plotCorners ?? "rounded", block.bandwidth, shared,
-          brailleArm, block.plotFill === "solid",
+          outlineInBraille, block.plotFill === "solid",
         );
       });
     }
@@ -2773,7 +2781,7 @@ const FORM_ROWS: Readonly<
       return violinRows(
         sr, aw, spent, ctx.capabilities, qs[i] ?? summaryOf(sr),
         block.plotCorners ?? "rounded", block.bandwidth, shared,
-        brailleArm, block.plotFill === "solid",
+        outlineInBraille, block.plotFill === "solid",
       );
     });
   },

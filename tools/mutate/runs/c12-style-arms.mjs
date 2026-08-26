@@ -149,9 +149,15 @@ const results = runPass({
       // `brailleArm` predicate — `plotStyle` names the figure and the capability
       // names the alphabet, so the expression moved one scope up. Same mutation,
       // same subject; the pass was re-run rather than only re-anchored.
+      //
+      // **Re-anchored again, and the name moved because the predicate split**
+      // (F302): the outline rung asks *how wide is this glyph* and the
+      // filled-density rungs do not, so `brailleArm` stayed the author's request
+      // and `brailleOutline` took the width clause. The mutation is the same —
+      // this arm stops answering to either.
       name: "the vertical violin ignores plotStyle again",
       file: DEFN,
-      from: '          brailleArm, block.plotFill === "solid",\n        );',
+      from: '          outlineInBraille, block.plotFill === "solid",\n        );',
       to: "          false, false,\n        );",
       expect: "SA10",
     },

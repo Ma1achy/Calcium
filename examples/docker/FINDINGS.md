@@ -13642,6 +13642,38 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F302 — the form that reimplemented a rule kept half of it ★★★★☆
+
+**`styleRasteriser` holds the alphabet-versus-rasteriser rule and states it**: *how wide is this glyph
+is what decides whether an unstyled curve prefers box drawing to braille; can this terminal draw one at
+all is `unicode`.* Measured at `wide`, `density`, `line` and `histogram` all cross to braille and keep
+their shape.
+
+**The violin does not, because it reimplemented the choice.** Its own `brailleArm` predicate is
+`plotStyle === "braille" && unicode !== "ascii"` — the repertoire half and not the width half — so an
+unstyled violin fell to `+--+` where its own siblings kept their curve. A violin's shape is the whole
+of what it is.
+
+**The first fix was too broad and the frames said so before it was committed.** Widening `brailleArm`
+moved **21** frames, and 11 were `violin/compact` and `violin/raindrop`, where it replaced a *filled*
+braille density with an outline — a different figure, for no reason:
+
+```
+before   ⡀⣀⣀⣄⣤⣦⣶⣷⣿⣷⣶⣦⣤⣄⣀⣀⡀
+after    ⢀⣀⣀⠤⠤⠤⠒⠒⠉⠉⠉⠒⠒⠤⠤⠤⣀⣀⡀
+```
+
+Those rungs reach braille through `ladderFor("density")` at every capability set, so there was nothing
+for a width arm to fix. **The discriminator is neither the form nor the capability: it is whether the
+alternative was box drawing**, and only the `violin` rung's outline is. Scoped, 21 → **10**.
+
+**The reusable half is about copies of a rule rather than about widths.** A form that routes through the
+function holding a rule gets every clause of it, including the ones added later; a form that
+reimplements the rule gets the clauses that existed on the day it was written. **Both read as correct**,
+and the second is invisible to anything that checks whether the rule is stated — it is stated, twice,
+and one copy is older. The way to find it is to ask *which forms do not call the function*, which is
+F289's *grep the name outside the file that declares it* pointed at a predicate instead of a type.
+
 ## F301 — a ruling applied at three of the five call sites that needed it ★★★★☆
 
 **`boxOnSpine` carries the reason in full**: *when the mean lands on the median, say so. Skipping the

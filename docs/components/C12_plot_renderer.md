@@ -5541,6 +5541,51 @@ radar makes it concrete — `⣿` at `wide`, `#` at `ascii`: the substitution's 
 
 ---
 
+### 3ak.25 — The other half of I54's width question: which rasteriser, on the form that reimplemented it
+
+§3ak.24 gave the **alphabet** its width arm. This is the **rasteriser** half, and it is the same rule
+arriving at the one form that did not go through the function holding it.
+
+**Measured first, because the claim is about what other forms already do.** Rendered at `24bit` and at
+`wide`, counting braille against box-drawing characters:
+
+| form | 24bit | wide |
+|---|---|---|
+| `density/default` | 189 box, 0 braille | **57 braille**, 0 box |
+| `line/legend-right` | 274 box, 0 braille | **147 braille**, 0 box |
+| `histogram/two-series` | 102 box, 0 braille | **147 braille** |
+| `ridgeline/default` | 353 box | 353 **ascii** — no braille arm exists |
+| `violin/default` | box outline | **ascii** `+--+` |
+
+`styleRasteriser` holds the rule and states it: *how wide is this glyph is what decides whether an
+unstyled curve prefers box drawing to braille.* The violin reimplemented the choice in its own
+`brailleArm` predicate and kept only the repertoire half, so it degraded further than its siblings —
+and a violin's shape is the whole of what it is.
+
+**The first attempt was too broad, and the frames said so before anything was committed.** Widening
+`brailleArm` itself moved **21** frames, and 11 of them were `violin/compact` and `violin/raindrop`,
+where it replaced a *filled* braille density ramp with an outline:
+
+```
+before   ⡀⣀⣀⣄⣤⣦⣶⣷⣿⣷⣶⣦⣤⣄⣀⣀⡀      a filled density, already narrow, already right
+after    ⢀⣀⣀⠤⠤⠤⠒⠒⠉⠉⠉⠒⠒⠤⠤⠤⣀⣀⡀     an outline — a different figure, for no reason
+```
+
+Those rungs reach braille through `ladderFor("density")` at every capability set, so there was nothing
+for a width arm to fix. **The discriminator is neither the form nor the capability: it is whether the
+alternative was box drawing**, and only the `violin` rung's outline is. Scoped to it, 21 → **10**.
+
+**What moved, read.** 10 frames, every one `-wide-`, all five unstyled violin fixtures at two widths.
+No compact rung, no raincloud, no styled variant — `plotStyle: "line"` still means line drawing at
+every rung, exactly as it does in `styleRasteriser`.
+
+**And the control moves the right way**: `wide` against `ascii` at width 60, colour stripped, goes
+**24 → 19 identical of 178**. The alphabet fix brought the two rungs closer where no narrower
+alternative existed; this one pushes them apart again where one does, which is what a ladder with two
+independent questions should look like (F302).
+
+---
+
 ### 3ak.23 — The second terminal move: three of five call sites had the ruling
 
 **Extracting the alphabet is what made this findable, and that is the reusable half.** Every mean in

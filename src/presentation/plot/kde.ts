@@ -4,7 +4,7 @@
  * Gaussian kernel density estimation, then three folds over the curve.
  */
 import { normalisedSummary } from "../../data/viewmodel/distribution.js";
-import type { QuartileSummary, Series } from "../../data/viewmodel/index.js";
+import type { Plot, QuartileSummary, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { curveRows } from "./curve.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
@@ -641,6 +641,34 @@ export function rainColumns(
  * quartile is a position and not a shape. One placer means the two arms cannot
  * drift about where a median is.
  */
+/**
+ * Whether a violin's outline is drawn in braille rather than box drawing
+ * (C12 I54, §3ak.25).
+ *
+ * **The rule lives in `styleRasteriser` and this form reimplemented it** (F302),
+ * keeping the repertoire clause and not the width one — so an unstyled violin
+ * fell to `+--+` at `wide` where `density`, `line` and `histogram` all crossed to
+ * braille and kept their shape. Exported rather than inline because a predicate
+ * with two copies is what the finding is about: the second copy has the clauses
+ * that existed the day it was written, and both read as correct.
+ *
+ * **Only the outline rung asks this.** `rain` and `raindrop` draw a filled
+ * density through `ladderFor("density")`, braille at every capability set, so
+ * they are already narrow and a width arm has nothing to fix there — widening
+ * the shared predicate replaced a correct filled figure with an outline in 11
+ * frames. The discriminator is *whether the alternative was box drawing*.
+ *
+ * `plotStyle: "line"` still means line drawing at every rung, exactly as it does
+ * in `styleRasteriser`.
+ */
+export function brailleOutline(
+  plotStyle: Plot["plotStyle"],
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): boolean {
+  if (caps.unicode === "ascii") return false;
+  return plotStyle === "braille" || ((plotStyle ?? "auto") === "auto" && caps.ambiguousWidth === "wide");
+}
+
 /**
  * The summary marks on a vertical violin's spine — `boxOnSpine` stood up.
  *
