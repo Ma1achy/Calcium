@@ -13642,6 +13642,106 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F308 — a lookup with a missing key reports exactly one ★★★★☆
+
+**`U1b`'s shortfall row maps a mark kind to the elements it should produce**, and the record was not
+total. A kind with no entry looked up `undefined`, and `String.prototype.match(undefined)` matches
+the **empty string** — so the lookup returned `[""]` and the row reported *one element*.
+
+```
+arc: 4 marks, 1 elements      ← the row's own message, naming the wrong defect
+```
+
+**A new mark kind therefore passes this row whenever the figure emits exactly one of it**, and fails
+it as a *shortfall* whenever it emits more — so the failure points at the emitter rather than at the
+missing key. The pie's four wedges reported a shortfall; a radar's single circular ring would have
+reported none.
+
+**F289's `default:` branch in a test.** A lookup without a total record answers plausibly for a case
+nobody decided, and the answer is worse than an error because it is in range. Closed the same way:
+`satisfies Readonly<Record<Mark["kind"], RegExp>>`, so the next kind is a compile error in the row
+that exists to catch it.
+
+---
+
+## F307 — the terminal reader cannot see a legend beside a figure ★★★★★
+
+**F297's fifth instance, and the first found by a family rather than by reading the reader.**
+`terminalDecisions` recognises a legend two ways: a row that **is** swatch-and-name pairs, or text
+past the last frame edge. The proportion family has neither — a pie, a radar and a waffle draw **no
+border at any width** and put their key on the same rows as the figure.
+
+```
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧  ⣿ Chrome  65%      the pie: swatch, name, reading — beside the disc
+⡞⠉ ⢸⡠⠊⠁ ⡜        ⠒⠒ alpha        the radar: a DASH swatch, beside the polygons
+```
+
+**Wrong in both directions at once, which is the reader's signature.** `legend: false` where the
+terminal draws one, **and** the key's names filed as `identityLabels` — so twenty cells across three
+forms would have entered the disagreement matrix as open disagreements about arms that agree.
+
+**The swatch cannot be a character class here, and the radar is why.** Its swatch is `dashSwatch` —
+two braille cells of `⠒` — and adding that codepoint would make every braille curve in the corpus a
+legend candidate. So the tail asks the *shape*: at least two spaces (`LEGEND_GAP`, the terminal's
+own), then one to three non-word glyphs and a name, to the end of the row. **The gap is what keeps
+it from matching a figure.**
+
+**And a second reader, on the other side.** `svgArm` reported labels in **document** order, which for
+a ring is the category order; the terminal walks rows. The same five names came back as two arrays
+and the matrix compares arrays. F297's own ruling — *both sides now ask the same structural
+question* — applied to ordering: this arm bands by `y` and sorts by `x`, which is what having rows
+gives the other side for free.
+
+**Five cells on four other forms closed with it, every one narrowing**: `line` 70/70 → 62/70, `bar`
+12/12 → 10/12, `boxplot` 10/10 → 8/10, `flame` and `icicle` 2/2 → 1/2. Verified on `flame/tree@80`,
+where both arms now report the same nine names in the same order — so the cells closed because the
+reader stopped being wrong, not because a figure changed.
+
+**The measured shape of the fix**: eighteen of family 6's twenty cells agree on arrival, and the two
+that do not are a genuine width disagreement — a disc of eighteen rows is 36 columns wide, so at
+width 40 the terminal drops its key and this arm, reserving a fifth of 640 px, never has to.
+
+---
+
+## F306 — one branch, four rules, and every one of them is a treemap's ★★★★★
+
+**The walk's `text` branch was written for a tiles figure and named for every figure.** A label
+naming a rectangle and a label sitting at a point are different objects; the branch had four
+decisions and all four are right for the first:
+
+| the rule | right for a tile because | wrong at a point because |
+|---|---|---|
+| drawn in the **ground** colour | a dark word on a filled tile reads | nothing is behind it, so the label **is** the background |
+| clip id keyed by `seriesIndex` | one label names one tile | several labels share a slot or have none, and SVG resolves `url(#id)` to the **first** |
+| placed at the clip's top-left `+ 3` | a tile's corner is where a label goes | the mark's point **is** the datum, so three pixels is the renderer editing the figure |
+| clip runs right and down from the anchor | a tile extends that way | `anchor: "end"` and `"middle"` run the other way, entirely outside their own clip |
+
+**Every gate agreed.** `tsc` is total over the union, MG24 counts the member consumed, and the SVG
+baseline compared 178 documents with the branch in it. The frame is what said otherwise: a radar
+with **seven `<text>` elements in the document and one smudge on the page** — five category names
+drawn in `#141414` against a `#141414` ground, four of them clipped by a rectangle belonging to a
+different label.
+
+**MG24's class a third time in one pass, and this time in code rather than in a record.** F303 is a
+plan sentence true about `CELL_ASPECT` and attached to a decision about the box; F304 is a record's
+row true of an angle and a count of squares and attached to a polygon's radius; this is a branch
+true of a tile and attached to every `text` mark there is. **The question that reaches all three is
+the same** — *does this justification constrain the decision it is attached to* — and it is the one
+review does not ask, because review checks whether a justification is **true**.
+
+**The member that already answered was `boxes.get(seriesIndex)`.** A mark with a box is a tile's
+label; a mark without one is at a point. The branch computed it, used it for the clip, and then
+applied the tile rules to both arms of its own conditional.
+
+**And the fifth rule is the one only the frame could have shown.** An SVG `y` is a **baseline**, so a
+name at the bottom of a ring has its body *above* the point and lands on the ring it names. The
+terminal already pays for this — `labelRows` anchors at `cy + (ry + 0.75)·sin(a)`, three quarters of
+a cell outward — and the compensation cannot cross, because one arm's unit is a cell and the other's
+is a font size. **What crosses is the point; the legibility margin is each arm's**, which is F278's
+ruling about a treemap's ring arriving on a label.
+
+---
+
 ## F305 — two terminal-only rules the corpus has never been able to contradict ★★★★☆
 
 **A pie merges slices below one dot of arc and a waffle rounds its segments into a hundred squares.**

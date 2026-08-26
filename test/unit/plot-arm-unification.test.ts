@@ -37,8 +37,9 @@ import { describe, expect, it } from "vitest";
 import { block, type Plot, type PlotForm } from "../../src/data/viewmodel/index.js";
 import { plotToSvg, svgFamilyOf } from "../../src/presentation/plot/svg.js";
 import {
-  barFigure, curveFigure, distributionFigure, matrixFigure, scatterFigure, tilesFigure,
+  barFigure, curveFigure, distributionFigure, matrixFigure, proportionFigure, scatterFigure, tilesFigure,
   type Figure,
+  type Mark,
 } from "../../src/presentation/plot/figure.js";
 import { estimateRole } from "../../src/presentation/plot/figure.js";
 import { roleGlyphs } from "../../src/presentation/plot/roles.js";
@@ -89,6 +90,7 @@ const termOf = (spec: Spec, set: Record<string, unknown>): string =>
 const EMITTER = {
   curve: curveFigure, scatter: scatterFigure, bar: barFigure,
   matrix: matrixFigure, distribution: distributionFigure, tiles: tilesFigure,
+  proportion: proportionFigure,
 } as const;
 type WalkedFamily = keyof typeof EMITTER;
 
@@ -296,18 +298,24 @@ describe("U — the seam, asserted from both arms", () => {
       gutterFamilies += 1;
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
-    expect(drawn, "drawn SVG documents").toBe(86); // cells-ok — a document count
+    expect(drawn, "drawn SVG documents").toBe(95); // cells-ok — a document count
     // **D13 closed**: the legend is drawn where the author asked and where it is
     // load-bearing — `SHARES_CELLS` and more than one series — which is the form
     // half of the terminal's auto-enable. The rung half stays there, because one
     // of its clauses reads `caps.colourDepth`.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(48); // cells-ok — a document count
-    expect(gutterFamilies, "documents in the five families the terminal gutters").toBe(83); // cells-ok — a document count
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(52); // cells-ok — a document count
+    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(92); // cells-ok — a document count
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
     // rather than better: a curve's identity is its series, which belongs in the
     // legend, and `line.identityLabels` went 12/70 to 70/70 before the gate.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(69); // cells-ok — a document count
+    // **+4 and not +9, and the four are the radar's** (§3ak.26). This counter is an
+    // exact-string test, and a pie and a waffle draw `Chrome 65%` rather than
+    // `Chrome` — the name and its reading in one `<text>`, which is what the
+    // terminal draws too. So the eight proportion documents that name their
+    // segments are invisible here, and the limit is stated rather than left as a
+    // number that looks like a gap.
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(73); // cells-ok — a document count
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {
@@ -345,12 +353,30 @@ describe("U — the seam, asserted from both arms", () => {
    * type. They agree because the roles were extracted **from** that composition,
    * and nothing holds them there.
    */
+  /**
+   * **Keyed exhaustively over `Mark["kind"]`, and it was not** (F308).
+   *
+   * A kind with no entry looked up `undefined`, and `String.prototype.match`
+   * called with `undefined` matches the **empty string** — so the lookup
+   * returned `[""]` and the row reported *one element*. A new mark kind
+   * therefore passed this row for any figure emitting exactly one of it, and
+   * failed it in a way that reads like a shortfall for any figure emitting more:
+   * `arc: 4 marks, 1 elements`, which names the wrong defect.
+   *
+   * **The SVG's own `default:` branch is the same shape** (F289): a lookup
+   * without a total record answers plausibly for a case nobody decided. Here the
+   * `satisfies` makes the next kind a compile error in the row that is supposed
+   * to catch it.
+   */
   const ELEMENT_FOR = {
     polyline: /<(?:polyline|path)\b/gu,
+    // A sector is a `path`; a full turn has no arc between coincident ends, so
+    // it is a `circle` — the walk's own split.
+    arc: /<(?:path|circle)\b/gu,
     point: /<(?:circle|polygon|rect)\b/gu,
     rect: /<rect\b/gu,
     text: /<text\b/gu,
-  } as const;
+  } as const satisfies Readonly<Record<Mark["kind"], RegExp>>;
 
   function shortfall(spec: Spec, family: WalkedFamily): readonly string[] {
     const b = blockOf(spec);
@@ -387,7 +413,7 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(seen.size, "distinct forms walking a figure").toBe(25); // cells-ok — a form count
+    expect(seen.size, "distinct forms walking a figure").toBe(28); // cells-ok — a form count
   });
 
   it("U3 (C12 I59, §3ak.17): and over every variant, including both data shapes", () => {
@@ -404,7 +430,7 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(checked, "variants walking a figure").toBe(103); // cells-ok — a variant count
+    expect(checked, "variants walking a figure").toBe(112); // cells-ok — a variant count
     // The bucket that lies, pinned. If a second one appears, the emitter key is
     // the first thing to check — this is the count F290 rests on.
     expect(lying, "variants whose spec.form differs from their catalogue bucket").toBe(1); // cells-ok — a variant count
@@ -421,7 +447,7 @@ describe("U — the seam, asserted from both arms", () => {
       const json = JSON.stringify(EMITTER[family as WalkedFamily](blockOf(spec)));
       expect(json, `${bucket}/${variant} carries a resolved colour`).not.toMatch(/#[0-9a-f]{6}/iu);
     }
-    expect(checked, "figures checked for a resolved colour").toBe(103); // cells-ok — a variant count
+    expect(checked, "figures checked for a resolved colour").toBe(112); // cells-ok — a variant count
   });
 
   it("U5 (C12 I59, §3ak.17): the SVG arm cannot see a capability — structural, not measured", () => {

@@ -43,6 +43,7 @@ import {
   distributionFigure,
   matrixFigure,
   nodesDecisions,
+  proportionFigure,
   scatterFigure,
   tilesFigure,
   type Drawn,
@@ -124,7 +125,7 @@ function escape(text: string): string {
  * own: a curve spends it on a y, a matrix spends it on a colour. That is the
  * overlay's ruling from phase 2 arriving one component along (C04 §3h.2).
  */
-export type SvgFamily = "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes";
+export type SvgFamily = "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -184,9 +185,19 @@ export const SVG_FAMILY = {
   // topology is shared and the placement is not** (§3aj.6). This arm places by
   // slots and clips its labels, which is font-independent by construction.
   tree: "nodes", graph: "nodes",
-  // *Its own domain*: a date grid, a time span, a category ring, an angle.
-  calendar: null, gantt: null, timeline: null, pie: null, radar: null,
-  waffle: null, funnel: null,
+  // *Its own domain*: a date grid, a time span.
+  calendar: null, gantt: null, timeline: null, funnel: null,
+  // **Proportion** — an angle, a polygon's radius, a count of squares, and the
+  // three terminal compensations named as terminal (§3ak.26). What crosses is
+  // the shares, the ceiling and the hundred-square assignment; what stays is
+  // the minimum-segment merge (`1 / 2πr`, in **dots**), the twenty columns
+  // `squareColumns` buys, and `MIN_RING_DOTS`. Each is a resolution limit, and a
+  // resolution is a thing only a grid has.
+  //
+  // **The one that was misfiled is the aspect** (F303): the *cell's* really does
+  // disappear here, and fitting a round figure into a rectangular box does not —
+  // it is `Figure.isotropic`, and `projected` insets a centred square for it.
+  pie: "proportion", radar: "proportion", waffle: "proportion",
   // *Paired or banded*: two positions per datum, or a band ladder.
   //
   // `forest` and `dumbbell` are the distribution family's other two — a forest
@@ -258,6 +269,7 @@ function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
     case "distribution": return distributionFigure(block);
     case "tiles": return tilesFigure(block);
     case "nodes": return nodesDecisions(block);
+    case "proportion": return proportionFigure(block);
     default: return null;
   }
 }
@@ -510,6 +522,49 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       continue;
     }
 
+    if (m.kind === "arc") {
+      // **A sector and a ring from one mark kind, and `fill` is what separates
+      // them** (§3ak.26 finding 4). A pie's wedge runs from the centre; a
+      // radar's circular ring does not, and drawing the second as a degenerate
+      // first would put a spike from the middle of every radar to twelve
+      // o'clock.
+      //
+      // **The turn convention is the figure's and the arithmetic is this
+      // arm's.** `from` and `to` are turns from twelve o'clock clockwise, which
+      // is the terminal's `START_ANGLE` said out loud rather than kept in one
+      // file's head.
+      const [cx, cy] = at(0.5, 0.5);
+      const rx = Math.abs(at(1, 0.5)[0] - cx);
+      const ry = Math.abs(at(0.5, 1)[1] - cy);
+      const rad = Math.min(rx, ry) * m.radius;
+      const pt = (turn: number): readonly [number, number] => {
+        const a = turn * Math.PI * 2 - Math.PI / 2;
+        return [cx + rad * Math.cos(a), cy + rad * Math.sin(a)] as const;
+      };
+      const span = m.to - m.from;
+      if (span <= 0) continue;
+      // **A full turn has no arc, because its two ends are the same point.** An
+      // `A` command between coincident points draws nothing at all, which is how
+      // a single-segment pie and every radar ring would have come out blank.
+      if (span >= 1) {
+        out.push(
+          `<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(rad)}" ` +
+            (m.fill ? `fill="${ink}"/>` : `fill="none" stroke="${ink}" stroke-width="1.5"/>`),
+        );
+        continue;
+      }
+      const a0 = pt(m.from);
+      const a1 = pt(m.to);
+      const large = span > 0.5 ? 1 : 0;
+      const sweep = `A${n(rad)} ${n(rad)} 0 ${String(large)} 1 ${n(a1[0])} ${n(a1[1])}`;
+      out.push(
+        m.fill
+          ? `<path d="M${n(cx)} ${n(cy)} L${n(a0[0])} ${n(a0[1])} ${sweep} Z" fill="${ink}"/>`
+          : `<path d="M${n(a0[0])} ${n(a0[1])} ${sweep}" fill="none" stroke="${ink}" stroke-width="1.5"/>`,
+      );
+      continue;
+    }
+
     if (m.kind === "point") {
       // **`absent` draws nothing, and that is the role's entire content here**
       // (I62, §3ak.22). A forest row with no estimate is a real state; a circle
@@ -651,18 +706,59 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // wide the string is** (§3aj hazard 4). A `clipPath` is this renderer's
       // own mechanism; the terminal truncates to the cells its tile owns, which
       // it can do because it measures text and this cannot.
+      //
+      // **A label names a box, or it sits at a point — and this branch had four
+      // rules that only hold for the first** (F306). Each is right for a
+      // treemap and each was wearing the name of the general case, which is
+      // MG24's class a third time in one pass. The proportion family is the
+      // first to emit a `text` mark with no rect behind it, and it is what
+      // showed them: five category names in the document and one smudge on the
+      // page.
+      //
+      // | the rule | right for a tile because | wrong at a point because |
+      // |---|---|---|
+      // | drawn in the **ground** colour | a dark word on a filled tile | nothing is behind it, so it is the background |
+      // | clip id keyed by `seriesIndex` | one label, one tile | several labels share a slot, and SVG takes the **first** `url(#id)` |
+      // | placed at the clip's top-left + 3 | a tile's corner is where a label goes | the mark's point **is** the datum |
+      // | clip runs right and down from the anchor | a tile extends that way | `end` and `middle` run the other way |
       const slot = d.seriesIndex === undefined ? undefined : boxes.get(d.seriesIndex);
-      const clip = slot ?? { left: at(m.x, m.y)[0], top: at(m.x, m.y)[1], right: box.right, bottom: box.bottom };
+      if (slot === undefined) {
+        // **At a point: the mark's own position, its own ink, and the plot area
+        // as the only bound.** A radar's spoke end is a coordinate, so moving it
+        // three pixels for legibility would be the renderer editing the figure.
+        const [tx, ty] = at(m.x, m.y);
+        // **A baseline is not a centre, and the terminal already pays for
+        // that** — `labelRows` anchors at `cy + (ry + 0.75)·sin(a)`, three
+        // quarters of a cell outward, so a name below a ring sits below it. An
+        // SVG `y` is the **baseline**, so a label at the bottom of a figure has
+        // its body *above* the point and lands on the ring it names.
+        //
+        // **In this arm's units, because the two arms have different ones**
+        // (§3aj hazard 4, F278's own shape): the terminal's is a cell and this
+        // one's is the font size. What crosses is the *point*; the legibility
+        // margin is each arm's, and a figure carrying one would be carrying a
+        // cell count or a pixel count and could not be both.
+        //
+        // `m.y` is figure space with `y` up, so `1` is the top: a name there
+        // wants its body above the baseline and one at `0` wants it below.
+        const drop = SVG_FONT_SIZE * (0.35 + 0.65 * (1 - 2 * m.y));
+        out.push(
+          `<text x="${n(tx)}" y="${n(ty + drop)}" ` +
+            `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}"` +
+            `${m.anchor === "start" ? "" : ` text-anchor="${m.anchor}"`}>${escape(m.text)}</text>`,
+        );
+        continue;
+      }
       // **Too short for its own name is a decision in page units** — the
       // terminal's is *does the tile still own a run this wide*, in cells. Two
       // gates in two unit systems for one shared fact, which is what hazard 4
       // makes unavoidable rather than untidy.
-      if (clip.bottom - clip.top < SVG_FONT_SIZE) continue;
+      if (slot.bottom - slot.top < SVG_FONT_SIZE) continue;
       const id = `${m.kind[0] ?? "t"}${block.id}-${String(d.seriesIndex ?? 0)}`;
       out.push(
-        `<clipPath id="${id}"><rect x="${n(clip.left)}" y="${n(clip.top)}" ` +
-          `width="${n(clip.right - clip.left)}" height="${n(clip.bottom - clip.top)}"/></clipPath>`,
-        `<text x="${n(clip.left + 3)}" y="${n(clip.top + SVG_FONT_SIZE)}" clip-path="url(#${id})" ` +
+        `<clipPath id="${id}"><rect x="${n(slot.left)}" y="${n(slot.top)}" ` +
+          `width="${n(slot.right - slot.left)}" height="${n(slot.bottom - slot.top)}"/></clipPath>`,
+        `<text x="${n(slot.left + 3)}" y="${n(slot.top + SVG_FONT_SIZE)}" clip-path="url(#${id})" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ground ?? ink}"` +
           // `start` is SVG's own default, so naming it would be a byte in every
           // frame saying nothing — the attribute appears only where it decides.
@@ -832,7 +928,7 @@ function marks(
   // is a function of its labels' widths in the terminal and of slots here, so
   // the topology crosses and the placement does not.
   if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
-    || family === "bar" || family === "distribution") && "marks" in figure) {
+    || family === "bar" || family === "distribution" || family === "proportion") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 

@@ -1,1 +1,20 @@
-REFUSED — plotToSvg returned null
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">alpha</text>
+<rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">beta</text>
+<path d="M288 12.8 L407.165 219.2 L168.835 219.2 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 122.88 L311.833 164.16 L264.167 164.16 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 95.36 L335.666 177.92 L240.334 177.92 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 67.84 L359.499 191.68 L216.501 191.68 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 40.32 L383.332 205.44 L192.668 205.44 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L288 12.8" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L407.165 219.2" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L168.835 219.2" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 40.32 L359.499 191.68 L180.751 212.32 Z" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M288 81.6 L389.29 208.88 L234.376 181.36 Z" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<text x="288" y="9.2" font-size="12" font-family="monospace" fill="#626262" text-anchor="middle">Speed</text>
+<text x="407.165" y="227.3" font-size="12" font-family="monospace" fill="#626262">Power</text>
+<text x="168.835" y="227.3" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">Range</text>
+</svg>

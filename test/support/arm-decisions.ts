@@ -110,6 +110,34 @@ function isLegendRun(text: string): boolean {
   return t !== "" && SWATCH.test(t) && LEGEND_ROW.test(t);
 }
 
+/**
+ * A legend **beside** a figure, on the same row (F307, F297's fifth instance).
+ *
+ * The two tests above find a legend that **is** a row, or text past a frame
+ * edge. The proportion family has neither: a pie, a radar and a waffle draw no
+ * border at any width and put their key on the same rows as the disc. So
+ * `legend: false` was reported for twenty cells where the terminal draws one,
+ * and the names went into `identityLabels` — the reader inventing a
+ * disagreement in both directions at once, which is what F297 was.
+ *
+ * **`LEGEND_GAP` is the structural signal, and it is the terminal's own.**
+ * `segmentLegend` prefixes every entry with two spaces, so the tail is *at
+ * least two spaces, then swatch-and-name pairs to the end of the row* — where a
+ * figure's own glyphs run edge to edge and its labels are single words.
+ *
+ * **The swatch class cannot be a character list here**, and the radar is why:
+ * its swatch is `dashSwatch`, two braille cells of `⠒`, and adding that
+ * codepoint to `SWATCH` would make every braille curve in the corpus a
+ * candidate. So the tail asks the *shape* — one to three non-word glyphs — and
+ * the two-space gap is what keeps it from matching a figure.
+ *
+ * **Stated limit**: a form drawing a word inside its area, preceded by two
+ * spaces, at the end of a row, is indistinguishable from a one-entry legend.
+ * `AD1` is where that would show, because it compares 46 forms and the cell
+ * would move.
+ */
+const LEGEND_TAIL = /\s{2,}(?:[^\s\w]{1,3}\s+[A-Za-z][\w.\-]*(?:\s+[\d.]+%?)?\s*)+$/u;
+
 export function terminalDecisions(lines: readonly string[]): ArmDecisions {
   const rows = lines.filter((l) => l.length > 0);
   if (rows.length === 0) return NOTHING;
@@ -131,13 +159,19 @@ export function terminalDecisions(lines: readonly string[]): ArmDecisions {
     // **A swatch-and-name run is a legend wherever it sits** — above the frame,
     // below it, or past the right edge (F297).
     if (isLegendRun(l)) { legend = true; continue; }
+    // **A legend beside the figure is stripped before the identity scan**, or
+    // its names are counted twice — once as a legend and once as the labels the
+    // gutter shows (F307).
+    const tail = LEGEND_TAIL.exec(l);
+    const body = tail === null ? l : l.slice(0, tail.index);
+    if (tail !== null) legend = true;
     if (first < 0) {
       // **A row with no edge is not an empty row.** The tiles family draws its
       // names inside the figure and frames nothing, so skipping these reported
       // the terminal's treemap as having no labels while it was drawing six —
       // a disagreement invented by the parser. Found by reading the extraction
       // beside the frame it came from.
-      for (const w of l.matchAll(WORD)) identity.push(w[0]);
+      for (const w of body.matchAll(WORD)) identity.push(w[0]);
       continue;
     }
     const head = l.slice(0, first).trim();
@@ -177,20 +211,37 @@ export function terminalDecisions(lines: readonly string[]): ArmDecisions {
 
 /** Every `<text>` element's body, paired with whether it is clipped to a shape. */
 function texts(svg: string): readonly Readonly<{ body: string; clipped: boolean }>[] {
-  const out: { body: string; clipped: boolean }[] = [];
+  const out: { body: string; clipped: boolean; y: number; x: number }[] = [];
   for (const m of svg.matchAll(/<text\s([^>]*)>([^<]*)<\/text>/gu)) {
+    const attrs = m[1] ?? "";
     out.push({
+      x: Number(/\bx="([-\d.]+)"/u.exec(attrs)?.[1] ?? 0),
+      y: Number(/\by="([-\d.]+)"/u.exec(attrs)?.[1] ?? 0),
       body: (m[2] ?? "").trim(),
       // **A clipped label names a thing; an unclipped one names a value.** The
       // tiles and nodes families clip every label to its own rectangle, which is
       // what lets a label stop itself without font metrics — so the attribute
       // that exists for hazard 4 also partitions the two kinds of text this arm
       // draws.
-      clipped: (m[1] ?? "").includes("clip-path="),
+      clipped: attrs.includes("clip-path="),
     });
   }
-  return out;
+  // **Reading order, because that is the question the other side answers**
+  // (F307, and F297's own ruling one reader along). `terminalDecisions` walks
+  // rows top to bottom and takes what each row holds left to right; document
+  // order here is *emission* order, which for a ring is the category order and
+  // for the terminal is neither. The five names of a radar came back as the same
+  // set in two orders, and the matrix compares arrays.
+  //
+  // **A row is a band, not a line**, since two labels at the same height sit at
+  // different baselines by a pixel or two — the same tolerance the terminal gets
+  // for free from having rows at all.
+  const band = (v: number): number => Math.round(v / SVG_FONT_ROW);
+  return [...out].sort((a, b) => band(a.y) - band(b.y) || a.x - b.x);
 }
+
+/** The height a label's row occupies, for banding two labels onto one line. */
+const SVG_FONT_ROW = 14;
 
 /** The SVG's decisions, read out of its elements. Private: `svgArm` is the seam. */
 function svgDecisions(svg: string | null): ArmDecisions {

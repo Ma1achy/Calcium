@@ -268,6 +268,24 @@ export type Mark =
        */
       value?: number;
     }>
+  /**
+   * **A sector or a ring, in turns from twelve o'clock, clockwise** (§3ak.26
+   * finding 4).
+   *
+   * The residue ruling refuses to widen `Mark` for `contour`, `quiver` and
+   * `horizon` because *what is missing is a derivation above cells* — those
+   * forms never separated their geometry from their rasterisation, so a mark
+   * kind would be a hole punched for a picture. **A pie is the inverse.**
+   * `sharesOf` is its geometry above cells and it already exists; what was
+   * missing is a member for an angle. So the test is *does the form already have
+   * a coordinate*, never *is the type short of a case*.
+   *
+   * **The direction is stated because a sign convention living in two files ends
+   * up different in them.** `radius` is a fraction of the figure's own radius, so
+   * a wedge is `1` and a radar's ring is the ring's `t`; `fill` separates a
+   * sector from a ring, which is the only thing the two need to differ by.
+   */
+  | Readonly<{ kind: "arc"; from: number; to: number; radius: number; fill: boolean }>
   | Readonly<{ kind: "point"; x: number; y: number; role: GlyphRole; size?: number }>
   | Readonly<{ kind: "text"; x: number; y: number; text: string; anchor: TextAnchor; room: number }>;
 
@@ -1470,6 +1488,23 @@ export function curveFigure(block: Plot): Figure {
 
 // --- the proportion family (§3ak.26) ----------------------------------------
 
+/** Twelve o'clock, clockwise — the figure's angle convention, said once. */
+const TURN = Math.PI * 2;
+
+/**
+ * A point on the figure's unit circle: `turn` turns from twelve o'clock,
+ * clockwise, `t` of the way out from the centre.
+ *
+ * **Uninverted, like every other coordinate here** (I61) — twelve o'clock is
+ * `y = 1` and the projector is what decides which page edge that is. The
+ * terminal's `at(d, angle, t)` is the same expression in dot space with the
+ * screen's downward `y`, which is why the two agree without either converting.
+ */
+function polar(turn: number, t: number): Pt {
+  const a = turn * TURN - Math.PI / 2;
+  return [0.5 + 0.5 * t * Math.cos(a), 0.5 - 0.5 * t * Math.sin(a)];
+}
+
 
 
 /**
@@ -1533,6 +1568,9 @@ export function waffleGrid(segments: readonly Segment[]): readonly number[] {
 }
 
 
+/** The rings a radar draws inside its outer one — matplotlib's 20/40/60/80. */
+const RADAR_RINGS: readonly number[] = Object.freeze([0.2, 0.4, 0.6, 0.8]);
+
 /** The ceiling a radar is read against — a round one, so the rings are round. */
 function radarRange(block: Pick<Plot, "series">): Range {
   const all = block.series.flatMap((sr) =>
@@ -1594,4 +1632,112 @@ export function proportionDecisions(block: Plot): Omit<Figure, "marks"> {
           },
     isotropic: true,
   };
+}
+
+/**
+ * The proportion family's marks (§3ak.26).
+ *
+ * **Three geometries and one of them needed a mark kind.** A pie is `arc`s
+ * round a circle; a waffle is a hundred `rect`s in a ten-by-ten grid; a radar is
+ * closed `polyline`s over rings and spokes, with its category names as `text`.
+ *
+ * **The rings are all emitted and the terminal drops the small ones.** A ring of
+ * three dots' radius is five stippled dots and reads as dirt, so `MIN_RING_DOTS`
+ * takes it out — a dot-grid resolution limit, which is the third of the family's
+ * three compensations and stays in the arm that has a grid.
+ */
+export function proportionFigure(block: Plot): Figure {
+  const decisions = proportionDecisions(block);
+  const marks: Drawn[] = [];
+
+  if (block.form === "pie") {
+    let from = 0;
+    for (const sh of sharesOf(block.segments ?? [])) {
+      const to = from + sh.fraction;
+      marks.push({ mark: { kind: "arc", from, to, radius: 1, fill: true }, layer: "series", seriesIndex: sh.index });
+      from = to;
+    }
+    return { ...decisions, marks };
+  }
+
+  if (block.form === "waffle") {
+    const grid = waffleGrid(block.segments ?? []);
+    const side = 1 / WAFFLE_ROWS;
+    grid.forEach((owner, i) => {
+      const row = Math.floor(i / WAFFLE_ROWS); // cells-ok — a square index
+      const col = i % WAFFLE_ROWS; // cells-ok — a square index
+      // **`depth: 0` — a strip that tiles and encloses nothing** (F280). The
+      // squares abut, so they want the one-unit separating inset a flame's
+      // bands take; they are not a measurement, so the slot share a bar gets
+      // across its identity axis would be wrong on both counts.
+      const mark: Mark = { kind: "rect", x: col * side, y: 1 - (row + 1) * side, w: side, h: side, fill: true, depth: 0 };
+      marks.push(
+        owner >= 0
+          ? { mark, layer: "series", seriesIndex: owner }
+          : { mark, layer: "furniture", ref: "surface.border" },
+      );
+    });
+    return { ...decisions, marks };
+  }
+
+  const cats = decisions.identity;
+  const n = cats.length; // cells-ok — a category count
+  const ceiling = decisions.value?.range.max ?? 1;
+  if (n === 0 || block.series.length === 0) return { ...decisions, marks }; // cells-ok — a series count
+
+  // **Below three axes the polygon ring is not available**, and the reason is
+  // the shape rather than the renderer: two vertices are a line and one is a
+  // point. `plotGrid` chooses between them above that.
+  const round = (block.plotGrid ?? "polygon") === "circle" || n < 3; // cells-ok — a category count
+  for (const t of [1, ...RADAR_RINGS]) {
+    marks.push({
+      mark: round
+        ? { kind: "arc", from: 0, to: 1, radius: t, fill: false }
+        : { kind: "polyline", points: cats.map((_, i) => polar(i / n, t)), closed: true },
+      layer: "furniture",
+      ref: "tone.muted",
+    });
+  }
+  for (let i = 0; i < n; i += 1) {
+    marks.push({
+      mark: { kind: "polyline", points: [[0.5, 0.5], polar(i / n, 1)] },
+      layer: "furniture",
+      ref: "tone.muted",
+    });
+  }
+  block.series.forEach((sr, si) => {
+    marks.push({
+      mark: {
+        kind: "polyline",
+        points: cats.map((_, i) => {
+          const v = sr.values[i];
+          const t = v !== null && v !== undefined && Number.isFinite(v) ? Math.max(0, Math.min(1, v / ceiling)) : 0;
+          return polar(i / n, t);
+        }),
+        closed: true,
+      },
+      layer: "series",
+      seriesIndex: si, // cells-ok — a series index
+    });
+  });
+  cats.forEach((label, i) => {
+    const [x, y] = polar(i / n, 1);
+    // **The anchor follows the angle, which is `labelRows`' own rule** — a word
+    // to the right of the figure starts at its spoke, one to the left ends
+    // there, and one at the top or the bottom is centred. Anything else puts the
+    // name across the ring it names. The thresholds are the terminal's.
+    const cos = Math.cos((i / n) * TURN - Math.PI / 2);
+    marks.push({
+      mark: {
+        kind: "text",
+        x, y, text: label,
+        anchor: cos > 0.25 ? "start" : cos < -0.25 ? "end" : "middle",
+        // A third of the figure — `labelRows`' `budget`, in fractions.
+        room: 1 / 3,
+      },
+      layer: "label",
+      ref: "tone.muted",
+    });
+  });
+  return { ...decisions, marks };
 }

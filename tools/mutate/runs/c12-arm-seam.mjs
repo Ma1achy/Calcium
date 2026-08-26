@@ -97,8 +97,10 @@ const results = runPass({
       // into elements. Under the old six-suite command it was uncatchable.
       name: "THE ARM: every text mark is clipped out of existence",
       file: SVG,
-      from: "      if (clip.bottom - clip.top < SVG_FONT_SIZE) continue;",
-      to: "      if (clip.bottom - clip.top < SVG_FONT_SIZE * 100) continue;",
+      // Re-anchored: the branch split on whether the label names a box
+      // (F306), so the clip is `slot` and the gate reads it by that name.
+      from: "      if (slot.bottom - slot.top < SVG_FONT_SIZE) continue;",
+      to: "      if (slot.bottom - slot.top < SVG_FONT_SIZE * 100) continue;",
       expect: "U3",
     },
     {

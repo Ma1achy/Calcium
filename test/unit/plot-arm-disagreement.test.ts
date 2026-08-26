@@ -113,7 +113,7 @@ const MEASURED = {
   // terminal's own — and this matrix, which compares five *decisions*, could
   // report only this. It is a decision gate; `test/golden/svg-baseline/` is the
   // picture gate, and the two answer different questions on purpose.
-  "line": { silent: "16/86", "numericLabels": "70/70", "identityLabels": "51/70", "border": "2/70", "interiorRules": "4/70", "legend": "16/70" },
+  "line": { silent: "16/86", "numericLabels": "62/70", "identityLabels": "51/70", "border": "2/70", "interiorRules": "4/70", "legend": "16/70" },
   "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "6/10", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "2/4", "border": "agree", "interiorRules": "2/4", "legend": "agree" },
@@ -121,16 +121,16 @@ const MEASURED = {
   "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "contour": "refused",
   "quiver": "refused",
-  "bar": { silent: "2/14", "numericLabels": "12/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "6/12", "legend": "agree" },
+  "bar": { silent: "2/14", "numericLabels": "10/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "6/12", "legend": "agree" },
   "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "2/12", "legend": "agree" },
-  "boxplot": { silent: "0/10", "numericLabels": "10/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "6/10", "legend": "agree" },
+  "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "6/10", "legend": "agree" },
   "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
-  "waffle": "refused",
-  "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
-  "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "waffle": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
+  "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "funnel": "refused",
   "gantt": "refused",
   "waterfall": "refused",
@@ -156,8 +156,28 @@ const MEASURED = {
   "ridgeline": "refused",
   "smallmultiples": "refused",
   "pairplot": "refused",
-  "pie": "refused",
-  "radar": "refused",
+  // **The proportion family, and eighteen of its twenty cells agree on the day
+  // it lands** (§3ak.26). The three renderers were the terminal's own
+  // computations moved, so agreement here is the extraction's property
+  // rather than a result — and the two cells that do not agree are the
+  // interesting half.
+  //
+  // **`legend: 2/8` is a room test in two unit systems.** At width 40 a disc
+  // of eighteen rows is 36 columns wide, so `withLegend` is false and the
+  // terminal drops the key; this arm reserves a fifth of 640 px and always
+  // has room. C12 I63's shape — the threshold is shared and the outcome is
+  // each arm's — on a decision that is *whether to draw at all*.
+  //
+  // **And getting here took fixing the reader twice** (F307). Measured before
+  // that: `legend` was `false` on all twenty and the key's names were filed
+  // as `identityLabels`, because the terminal reader could see a legend only
+  // as a whole row or past a frame edge — and these three draw no border and
+  // put the key beside the figure. Five cells on four *other* forms closed
+  // with it, every one of them narrowing.
+  "pie": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/8" },
+  // **Every cell agrees, including the value axis** — `radarCeiling` became
+  // `valueAxisOf` and both arms normalise against the same ceiling (F304).
+  "radar": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree" },
   "horizon": "refused",
 } as const satisfies Readonly<globalThis.Record<PlotForm, Record_>>;
 
@@ -251,11 +271,21 @@ describe("AD — the two arms decide separately, and here is where", () => {
     let open = 0;
     let closed = 0;
     for (const v of claimed) for (const d of DECISIONS) (v[d] === "agree" ? closed += 1 : open += 1);
-    expect(claimed.length, "forms the SVG arm claims").toBe(27); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(19); // cells-ok — a form count
-    expect(open + closed, "cells over claimed forms").toBe(135); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(47); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(88); // cells-ok — a cell count
+    // **`open` went UP when family 6 landed, and that is arithmetic rather than
+    // a regression** (§3ak.26). A refused form has no cells at all — its five
+    // decisions are counted nowhere — so the refused list and the open count are
+    // not independent, and any family that lands with one disagreement raises
+    // the second while lowering the first. The comment above says *every one of
+    // them downward*, and it was written when nothing had landed refused-first.
+    //
+    // 27 → 30 claimed, 19 → 16 refused, 135 → 150 cells, 88 → 102 closed, and
+    // **47 → 48 open**: fourteen of the fifteen new cells agree on arrival, and
+    // the fifteenth is `pie.legend` at width 40.
+    expect(claimed.length, "forms the SVG arm claims").toBe(30); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(16); // cells-ok — a form count
+    expect(open + closed, "cells over claimed forms").toBe(150); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(48); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(102); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

@@ -440,8 +440,9 @@ const results = runPass({
       // shape the row predicted every family's first commit would have.
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
-      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution") && "marks" in figure) {',
-      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution") && "marks" in figure) {',
+      // Re-anchored: the proportion family joined the disjunction (§3ak.26).
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

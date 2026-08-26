@@ -27,7 +27,7 @@ import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/col
 import { rgbOf } from "../support/theme.js";
 import { tiles } from "../../src/presentation/plot/hierarchy.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
-import { barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS } from "../../src/presentation/plot/figure.js";
+import { barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS, proportionFigure } from "../../src/presentation/plot/figure.js";
 import { resolve } from "../../src/presentation/theme/index.js";
 import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
@@ -349,6 +349,30 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
       },
     };
   }
+  // **A fourth datum shape, and the family holds two of them** (§3ak.26). A
+  // pie and a waffle read `segments`; a radar reads `categories` + `series`, and
+  // it is the only member of its family that has a pin to sit outside of.
+  //
+  // **What plays the clamp's part for a share is the total**, since there is no
+  // range to pin: an open-coded copy divides by 100, or forgets that a negative
+  // value contributes nothing. Neither is visible on segments summing to a
+  // hundred, which is the corpus's only waffle (F305).
+  if (form === "pie" || form === "waffle") {
+    return {
+      series: [],
+      segments: [
+        { label: "one", value: 30 }, { label: "two", value: 12 },
+        { label: "three", value: 7 }, { label: "four", value: -5 },
+      ],
+    };
+  }
+  if (form === "radar") {
+    return {
+      series: [{ label: "s", values: SAMPLES }],
+      categories: ["one", "two", "three", "four", "five"],
+      ...PIN,
+    };
+  }
   if (svgFamilyOf(form) !== "distribution") return { series: [{ label: "s", values: SAMPLES }], ...PIN };
   if (form === "dumbbell") {
     return { series: [{ label: "a", values: [2, 5, 8] }, { label: "b", values: [8, 3, 4] }], ...PIN };
@@ -478,6 +502,30 @@ describe.each(supported)("G6 — %s", (form) => {
     // reports coverage it does not have (§3ak.12).
     if (family === "matrix" || family === "tiles" || family === "nodes") {
       expect(HAS_VALUE_AXIS[form], `${form}: no value axis, so no bound to clamp against`).toBe(false);
+      return;
+    }
+    // **The proportion family splits inside itself, and the record is what
+    // splits it** (F304, §3ak.26). A pie's angle and a waffle's count of squares
+    // are shares of a whole with no bound to clamp against; **a radar's radius
+    // is `v / ceiling` and has one.** Keying this on the family would have given
+    // all three the same answer, which is exactly the mistake the record's own
+    // row made.
+    if (family === "proportion") {
+      if (!HAS_VALUE_AXIS[form]) {
+        expect(form === "pie" || form === "waffle", `${form}: a share of a whole`).toBe(true);
+        return;
+      }
+      // The pin **is** the ceiling here, so far below is the centre and far
+      // above is the outer ring — asked of the figure, because a polygon's
+      // vertices are what carry the clamp and the path string is this arm's
+      // rendering of them.
+      const poly = proportionFigure(made).marks
+        .filter((d) => d.layer === "series" && d.mark.kind === "polyline");
+      expect(poly.length, "the radar drew a series polygon").toBe(1); // cells-ok — a series count
+      const pts = poly[0]!.mark.kind === "polyline" ? poly[0]!.mark.points : [];
+      const radii = pts.map((pt) => Math.hypot(pt[0] - 0.5, pt[1] - 0.5) * 2);
+      expect(Math.min(...radii), "far below pins to the centre").toBeCloseTo(0, 6);
+      expect(Math.max(...radii), "far above pins to the outer ring").toBeCloseTo(1, 6);
       return;
     }
     if (family === "bar") {
