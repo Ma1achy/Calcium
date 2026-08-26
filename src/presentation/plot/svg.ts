@@ -188,15 +188,39 @@ export const SVG_FAMILY = {
   //
   // `forest` and `dumbbell` are the distribution family's other two — a forest
   // plot is an interval and an estimate, a dumbbell is two positions and a
-  // connector, and both are `normalisedSummary`'s members. `slope`, `bullet`
-  // and `horizon` are not: a slope's two positions are on **two axes**, a
-  // bullet carries qualitative bands behind its measure, and a horizon is a
-  // band ladder folded over one row.
+  // connector, and both are `normalisedSummary`'s members. `slope` and `bullet`
+  // are not: a slope's two positions are on **two axes**, and a bullet carries
+  // qualitative bands behind its measure.
+  //
+  // **`horizon`'s reason was wrong and the right one is narrower** (F294). It
+  // read *a band ladder folded over one row* — true, and the ladder is `band`
+  // and `sign`, both of which cross a seam perfectly well. The blocker is that
+  // `horizonGrid` takes `areaWidth` and `areaRows` in **cells** and returns
+  // cells carrying `eighths`, a sub-cell fill: the form never separated its
+  // geometry from its rasterisation, so there is no coordinate to share. The
+  // condition is a symbol — **`horizonFigure`, taking a block and returning
+  // normalised marks with no `areaWidth`, no `areaRows` and no `caps`** — and
+  // the day it exists this is `"bar"`, because a folded band is a `rect` with a
+  // `value`.
   slope: null, dumbbell: "distribution", forest: "distribution", bullet: null, horizon: null,
   // *A composition of other forms*, so it is whatever they are.
   smallmultiples: null, pairplot: null,
-  // *A field with layers over it* — the arrows and contours are a second
-  // geometry the matrix family does not carry.
+  // **A field with layers over it — and that sentence is not the blocker**
+  // (F294). The matrix family carries the field already: a cell is a `rect` with
+  // a `value`, which is what `heatmap` and its five siblings draw. An iso-line
+  // is a `polyline` and an arrow is a `polyline` plus a `closed` triangle, so
+  // nothing in `Mark` is missing.
+  //
+  // What is missing is a derivation above cells. `contourCellRows` takes
+  // `areaWidth`, `areaRows` and `caps.unicode` and returns **`readonly
+  // string[]`** — marching squares over a cell grid, emitting box-drawing
+  // glyphs — so the contour *is* the glyph string and there is no line to
+  // share. `quiver` is one arrow glyph per cell through the same path.
+  //
+  // The condition is a symbol: **`contourFigure`, returning normalised marks
+  // with no `areaWidth`, no `areaRows`, no `caps` and no string in the
+  // signature.** The day it exists these are `"matrix"`. Widening `Mark` would
+  // be the wrong repair and the old sentence invited it.
   contour: null, quiver: null,
 } satisfies Record<PlotForm, SvgFamily | null>;
 

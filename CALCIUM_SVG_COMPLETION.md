@@ -37,7 +37,9 @@ the mechanism that refused the extension.
 
 ## The families to add, and what each one's coordinate is
 
-**Four new families, and the count is what makes this bounded rather than open.**
+**Four new families — and the count did NOT bound the work.** Families 5–8 name sixteen of the
+nineteen refused forms; `contour`, `quiver` and `horizon` are in none of them, and the section
+*The three forms four families do not reach* below is the correction and the ruling.
 
 ### 5 · Distribution — `boxplot · violin · ridgeline · forest · dumbbell`
 
@@ -127,6 +129,51 @@ smallmultiples   contains does
 
 ---
 
+### The three forms four families do not reach — `contour · quiver · horizon`
+
+**The count above is wrong as a bound, and the correction is the reason this section exists.**
+*Four new families, and the count is what makes this bounded rather than open* — but nineteen
+forms are refused and families 5–8 name **sixteen**. `contour`, `quiver` and `horizon` appear
+nowhere in this document, so landing all four families finishes the campaign with the arm still
+refusing three forms and a plan saying it does not.
+
+**This is *a citation reads as coverage* applied to a partition.** The test is never *does the
+plan mention the work* but *would landing it close the list*, and here the answer is no by three.
+
+**They are not a fifth family. They share one blocker, and it is not the reason on record.**
+`SVG_FAMILY` says the field forms carry *a second geometry the matrix family does not carry* and
+that a horizon is *a band ladder folded over one row*. Both sentences are true and neither is the
+blocker — F283's shape a third time, and the way to find it is to read the function rather than
+the note:
+
+| form | what its geometry function actually returns |
+|---|---|
+| `contour` | `contourCellRows(…, areaWidth, areaRows, levels, corners, caps)` → **`readonly string[]`** — marching squares over a **cell** grid, emitting box-drawing glyphs chosen by `caps.unicode` |
+| `quiver` | the same shape through `glyphLayerOrder`, one arrow glyph per cell |
+| `horizon` | `horizonGrid(…, areaWidth, areaRows)` → cells carrying `band`, `sign` and **`eighths`**, a sub-cell fill |
+
+**The marks that would carry all three already exist.** An iso-line is a `polyline`; an arrow is a
+`polyline` plus a `closed` triangle; a folded band is a `rect` with `value`. Nothing in the type is
+missing — **what is missing is a derivation above cells.** These three forms never separated their
+geometry from their rasterisation, so there is no coordinate to share: the contour *is* the glyph
+string, and the horizon band *is* the eighth-block.
+
+**So the condition is a symbol and not a judgement**, which is what makes it checkable when
+somebody picks this up:
+
+> `contour`, `quiver` and `horizon` join **family 4 (matrix)** and **family 3 (bar)** respectively
+> the day `contourFigure` and `horizonFigure` exist — taking a block and returning normalised marks,
+> with no `areaWidth`, no `areaRows`, no `caps` and no string in the signature. Grep the two names.
+
+**Until then the refusal is real and it is a different refusal from the one written down.** It is
+not *the type cannot express this*; it is *this form has no geometry yet, only a picture*. The first
+would be a reason to widen `Mark`, and widening `Mark` would be wrong.
+
+**Family 8 must not land first.** `pairplot` and `smallmultiples` delegate — they render once each
+family they contain does — so a facet holding a `contour` recurses into a refusal and the composite
+inherits it. The last two forms of the last family are the ones these three block.
+
+---
 ## ★ The SVG arm takes its colour from the theme, not from its own palette
 
 **Same data, same theme, same colours.** An SVG plot and a terminal plot of the same block are

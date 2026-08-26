@@ -13642,6 +13642,51 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F294 — three forms in no family, and a refusal reason that names the wrong blocker ★★★★★
+
+**`CALCIUM_SVG_COMPLETION.md` argues its own bound**: *four new families, and the count is what
+makes this bounded rather than open.* Nineteen forms are refused. Families 5–8 name **sixteen**.
+`contour`, `quiver` and `horizon` appear **zero times** in the document.
+
+So landing every family the plan describes finishes the campaign with the arm still refusing three
+forms, and a plan saying it does not. **This is *a citation reads as coverage* applied to a
+partition** — the test is never *does the plan mention the work* but *would landing it close the
+list*, and the answer is no by three.
+
+**They are not a fifth family. They share one blocker, and it is not the reason on record.**
+
+| form | reason in `SVG_FAMILY` | what the function actually returns |
+|---|---|---|
+| `contour` | *a second geometry the matrix family does not carry* | `contourCellRows(…, areaWidth, areaRows, levels, corners, caps)` → **`readonly string[]`** |
+| `quiver` | as `contour` | one arrow **glyph** per cell, through the same path |
+| `horizon` | *a band ladder folded over one row* | `horizonGrid(…, areaWidth, areaRows)` → cells carrying `band`, `sign`, **`eighths`** |
+
+**Both recorded sentences are true and neither blocks anything.** The matrix family already carries
+a field — a cell is a `rect` with a `value`, which is what six forms draw. A band ladder is `band`
+and `sign`, and both cross a seam perfectly well. **F283's shape a third time**: the stated
+condition is about the family as built, and reading the function is what finds the real one.
+
+**Nothing in `Mark` is missing.** An iso-line is a `polyline`; an arrow is a `polyline` plus a
+`closed` triangle; a folded band is a `rect` with a `value`. **What is missing is a derivation above
+cells.** These three never separated their geometry from their rasterisation, so there is no
+coordinate to share: the contour *is* the glyph string and the horizon band *is* the eighth-block.
+
+**The distinction is load-bearing, because the two readings want opposite repairs.** *The type cannot
+express this* is a reason to widen `Mark`; *this form has no geometry yet, only a picture* is a
+reason to write one function. The old sentence invited the first, and widening `Mark` for a form
+whose coordinate does not exist would put one arm's picture in the shared layer — the exact failure
+`Mark.rect.depth` was written to avoid (F278).
+
+**So the condition is a symbol rather than a judgement**, which is what makes it checkable when
+somebody picks it up: **`contourFigure` and `horizonFigure`, taking a block and returning normalised
+marks — no `areaWidth`, no `areaRows`, no `caps`, and no string in the signature.** Grep the two
+names. The day they exist, `contour` and `quiver` are `"matrix"` and `horizon` is `"bar"`.
+
+**And family 8 must not land first.** `pairplot` and `smallmultiples` delegate — they render once
+each family they contain does — so a facet holding a `contour` recurses into a refusal and the
+composite inherits it. The last two forms of the last family are the ones these three block, which
+is the sequencing the plan could not state while the three were missing from it.
+
 ## F293 — the furniture falls back at `wide` and the rasterisers do not ★★★★☆
 
 **One row, two alphabets.** At `ambiguousWidth: "wide"` a `ridgeline` frame draws its border as
