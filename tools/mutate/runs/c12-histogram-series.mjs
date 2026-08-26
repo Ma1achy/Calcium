@@ -91,6 +91,38 @@ const results = runPass({
       to: '        categories: cats.flatMap((c) => block.series.map((sr, k) => `${c} · ${sr.label ?? String(k + 1)}`)),',
       expect: "HS4",
     },
+    {
+      // **The shipped defect, restored** (C12 I8, F319). One `slice` and a bin
+      // past the last row is gone with nothing on the page saying so — which is
+      // what the corpus held while the series branch beside it spent twenty
+      // lines avoiding exactly that.
+      name: "a category past the last row is dropped in silence again",
+      file: DEFN,
+      from: "  const short = cats.length > areaRows; // cells-ok — a category count",
+      to: "  const short = false; // cells-ok — a category count",
+      expect: "HS8",
+    },
+    {
+      // **The notice grows the plot instead of costing a row.** I1 is the other
+      // half of the rule: a form taller than its declaration scrolls whatever a
+      // caller reserved space for, so a fix that added a row would trade one
+      // silent failure for another.
+      name: "the notice is added to the height rather than spent from it",
+      file: DEFN,
+      from: "  const shown = short ? Math.max(0, areaRows - 1) : areaRows; // cells-ok — a row count",
+      to: "  const shown = areaRows; // cells-ok — a row count",
+      expect: "HS8",
+    },
+    {
+      // **The count goes and the names stay.** A reader can see that names were
+      // listed; nothing tells them the list is itself truncated at a narrow
+      // width, which is where `+N` is the only surviving fact.
+      name: "the notice names the withheld bins without counting them",
+      file: DEFN,
+      from: '        `+${String(omitted.length)} more${sep}${omitted.join(sep)}`, // cells-ok — a category count',
+      to: '        `${omitted.join(sep)}`, // cells-ok — a category count',
+      expect: "HS8",
+    },
   ],
 });
 

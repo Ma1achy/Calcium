@@ -13701,8 +13701,18 @@ by comparing `drawnBlock(block).categories.length` against `plotAreaRows(block)`
 form·variant with a horizontal identity axis — a check the arms' own frames cannot perform, because
 the frame is what the drop already happened to.
 
-**Open**, and it is the terminal's. The fix moves terminal frames, so it does not belong in the
-extraction commit whose gate is *0 of 1810 moved*.
+**Fixed**, in its own commit because it moves terminal frames. I8 is widened to name its subject —
+a **row**, which it already had three of in the spec: the series branch's `+N more`, I57's
+`warn`-toned row for a tree that does not fit, and categories. `categoricalForm` spends the last row
+on a notice **before** the drawing rather than after it, so the notice cannot remove itself by making
+the drawing fit (§3ag.4's cycle, ruled the same way one form along).
+
+**30 of 1810 baseline frames moved** — 3 variants × 5 capability sets × 2 widths, and no other form —
+each carrying one changed line. The notice degrades with the terminal: `·` becomes `-` at ASCII,
+`warn` becomes bold at 1 bit, and at width 40 the list truncates while `+2 more` survives, which is
+the fact a reader cannot do without. **0 of 181 SVG frames moved**, because the second arm has no row
+limit and never had the defect — a legitimate difference of F318's kind, and the reason the two
+digests behave as F264 intended: both moved for this terminal change, neither moved for F317's.
 
 ---
 

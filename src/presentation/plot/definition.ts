@@ -1473,12 +1473,54 @@ function categoricalForm(
 ): readonly string[] {
   const cats = block.categories ?? [];
   const areaRows = plotAreaRows(block);
-  const labels = cats.slice(0, areaRows);
+  // **I8's third subject, and it was the one with no implementation** (F319).
+  // This was `cats.slice(0, areaRows)`: a category past the last row simply did
+  // not appear. The series branch above spends twenty lines on a `+N more`
+  // legend, with a comment saying *a series dropped in silence is the failure
+  // this branch exists to avoid*, and I57 gives a tree that does not fit a
+  // `warn`-toned row citing I8 by name — so the rule had two subjects honoured
+  // and a third written the same way it forbids.
+  //
+  // **A histogram is where it bit, because its rows are not an author's.** A
+  // bin count comes from a binning strategy, so nothing in the block can be
+  // checked against the declared height: `freedman-diaconis` produced 11 bins
+  // at height 8 and lost **39 of 200 samples, the whole right tail**, as a
+  // clean unimodal distribution that had simply ended.
+  //
+  // **The row is spent before the drawing rather than after it**, which is
+  // §3ag.4's cycle ruled the same way one form along: a notice that could remove
+  // itself by making the drawing fit would decide whether it was needed by
+  // being there.
+  const short = cats.length > areaRows; // cells-ok — a category count
+  const shown = short ? Math.max(0, areaRows - 1) : areaRows; // cells-ok — a row count
+  const labels = cats.slice(0, shown);
   const axedBlock = gutterOf(block);
   const layout = reserving(bandLayout(labels, usableWidth(block, width, ctx), axedBlock, areaRows, ctx.capabilities, yAxisSides(block)), block, width, ctx);
 
   const out: string[] = [];
   for (let i = 0; i < areaRows; i++) {
+    // **The notice takes the last row, in `warn`, exactly as the series arm's
+    // does** — one shape for one rule, or the two halves of I8 would look like
+    // two decisions. The separator degrades with the terminal (I54) and
+    // `truncate` measures whatever this produces, so the two cannot disagree
+    // about the width.
+    if (short && i === areaRows - 1) { // cells-ok — a row index
+      const omitted = cats.slice(shown);
+      const sep = partSeparator(ctx.capabilities);
+      const notice = truncate(
+        `+${String(omitted.length)} more${sep}${omitted.join(sep)}`, // cells-ok — a category count
+        layout.areaWidth,
+        ctx.capabilities,
+      );
+      out.push(plotRow(
+        i,
+        "",
+        [{ text: areaText(notice, layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) }],
+        layout,
+        ctx,
+      ));
+      continue;
+    }
     const cat = labels[i] ?? "";
     const label = i < labels.length ? truncate(cat, layout.labelColumn, ctx.capabilities) : ""; // cells-ok — a label count
     const built = i < labels.length ? rowBuilder(cat, layout.areaWidth, i) : ""; // cells-ok — a label count
