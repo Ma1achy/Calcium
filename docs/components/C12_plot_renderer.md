@@ -4502,12 +4502,17 @@ where *the shared layer now says a diamond* can quietly become a different chara
 
 | rung | what it changes | where it lives after the pass |
 |---|---|---|
-| the glyph per `GlyphRole` per unicode rung | `◈` · `+` · `*` | the terminal walker's `Record` |
+| the glyph per `GlyphRole` per **alphabet** | `◈` · `+` · `*` | `roleGlyphs(caps)` — §3ak.21 |
 | `CATEGORY_MARKS` below the colour floor | identity carried by shape | `markOf` at projection |
 | stacked strips at 1-bit | the whole answer for a multi-series plot | `stackedRows`, untouched |
 | the truncation ladder | which labels fit `room` | `labelAllowance` at projection |
 | the `+N` notices | the count and the wording | `calloutInto` at projection |
 | the `ambiguousWidth` arms | narrow-only sets falling to their ASCII pair | `glyphs()` at projection |
+
+**This row said *the terminal walker's `Record`* and there was no walker and no record** (F289). It
+was true about this arm and described a terminal that did not exist, which is what a table of names
+is satisfied by. §3ak.21 measures what a role does determine — and *per unicode rung* was wrong twice
+over: the alphabet has **two** rungs and the predicate reads `ambiguousWidth` as well.
 
 **The SVG arm has none of them**, which is §3aj hazard 5 restated: it is always 24-bit and always
 `unicode: "full"`. So a form whose terminal answer *is* a rung — a 1-bit stacked strip — draws the
@@ -4944,13 +4949,21 @@ landing.
 
 ---
 
-### 3ak.13 — The distribution family: seven roles, seven shapes, and the range the gutter shows
+### 3ak.13 — The distribution family: seven roles, six characters, and the range the gutter shows
 
 **This is the family `GlyphRole` was written for, and it is the first to use all of it.** A median is
 `┃` at full unicode, `|` in ASCII and a distinct mark below the colour floor; a mean is a different
 character again; an outlier a third. The terminal picks all three off its own ladder and this arm
 draws none of them — it draws a bar, a diamond, a circle. **What both agree about is which of the
 seven things this is**, and that is the whole content of the seam here.
+
+**Seven things and six characters, which the heading said the other way round until it was
+measured.** The terminal draws `◆` for `mean` *and* for `target`, so *which of the seven this is* is
+not recoverable from the frame — and the sentence read as the seam's central claim while being false.
+It is legitimate: measured over the catalogue the two never share a figure, because the forest branch
+returns before a mean can be added. **The claim that survives being checked is co-occurrence-scoped**
+— two roles that can appear in one figure are drawn differently by each arm — and that is I68 and
+§3ak.21 finding 4.
 
 | role | terminal | SVG |
 |---|---|---|
@@ -4960,10 +4973,12 @@ seven things this is**, and that is the whole content of the seam here.
 | `outlier` | a dot | a smaller circle |
 | `target` | `g.diamond` — *this one is the answer* | a diamond, sized by weight |
 | `point` | `ch.filled` | a circle |
-| `absent` | a character for *nothing was reported* | **nothing** |
+| `absent` | **nothing** — and by accident until §3ak.22 | **nothing** |
 
 **`absent` drawing nothing is the role's entire content.** A forest row with no estimate is a real
 state; a circle at the fallback position is the plausible wrong figure it would otherwise become.
+**This table said the terminal draws a character there and it draws none** — `row[NaN]`, not a
+decision — and no catalogue variant constructs the state at all (§3ak.22, F299).
 
 **Three facts the figure was dropping, all of which the terminal draws.** The emitter was written
 against `boxplotBand` and `boxplotColumn` and missed what `forestRow` does one function along:
@@ -5386,6 +5401,82 @@ same order. The disagreement matrix compares the **strings**, and that cell clos
 the font metrics, and *a third of the cells* against *a tenth of the pixels* is exactly that. `AD3`
 asserts no cell claims `legitimate`; this is not a cell, because no decision the matrix measures is
 the gutter's width. The day one is, that is the argument to make.
+
+### 3ak.21 — What a `GlyphRole` determines, measured — and the four things it does not
+
+**F289's claim, checked.** §3ak.3's rung table places *the glyph per `GlyphRole` per unicode rung* in
+"the terminal walker's `Record`". There is no terminal walker and there is no record: the type is read
+in one file, the one that declares it, and the terminal reaches its median, mean and outlier
+characters inside rasterisers that have never heard of it.
+
+**The artefact is a classification table**, because the interaction here is structural — two
+statements that both hold at rest, with no event between them — and the rung ladder already has its
+trace in §3ak.15. What follows is measured at four rungs against `forestRow`, `dumbbellRow`,
+`boxplotBand` and `boxplotColumn`.
+
+| role | terminal | conditioned on | SVG |
+|---|---|---|---|
+| `point` | `●` / `○` | **which of a pair** — a dumbbell's two ends | a circle, told apart by colour |
+| `median` | `├───┤` across the box, `┬ │ ┴` down it | **orientation** | a 2px bar across the slot |
+| `mean` | `◆`, and `◈` where it lands on the median | **coincidence** | a diamond, edged in the furniture tone |
+| `outlier` | `◌` | — | a smaller circle |
+| `cap` | `├`/`┤`, `╷`/`╵`, `╶─┬─╴` | **orientation and which end** | a 1px bar, half the slot |
+| `target` | `◆` | — | a diamond, sized by weight |
+| `absent` | **nothing** | — | nothing |
+
+**1 · A role does not determine a character.** Four of the seven are conditioned on something the role
+does not carry. So `Record<GlyphRole, string>` is not the type the rung table implied — it would force
+one character where the terminal draws two, and the terminal does not move inside a refactor.
+
+**2 · What *is* shared is the **shape**, and both arms have it and neither states it.** `median` and
+`cap` are drawn **across the slot** — `runRow(…)` in the terminal, `across(…)` here, whose own comment
+names *the two roles that are drawn across a slot rather than at a point*. The other five are marks at
+a point. **One partition written twice** is F289's complaint one level down, so it goes up:
+`GLYPH_SHAPE` is character-free, lives beside the type, and both arms read it.
+
+**3 · The ladder has two rungs, not five.** Measured over every slot this family reaches: `full` and
+`bmp` agree on all of them, and **`ascii` and `full/wide` agree on all of them**, because `glyphs()`
+returns the ASCII set for `unicode === "ascii" || ambiguousWidth === "wide"` — C02 I9's ruling. A record
+keyed by the matrix's five capability sets would carry three duplicate columns; one keyed by `unicode`
+alone would be **wrong at `full/wide`**. So the rung lives in the record, as its `caps` argument rather
+than as a column — which is the answer to *do the rungs live in the mapping*, and the answer is yes and
+the mapping is not the one the question assumed.
+
+**4 · `mean` and `target` are one character, so §3ak.13's sentence over-claims.** *What both agree about
+is which of the seven things this is* is false as written: the terminal draws `◆` for both. The collapse
+is **legitimate** and was never stated — measured over the catalogue, the two never share a figure,
+because `distributionFigure` returns from the forest branch before the boxplot branch can add a mean.
+The true claim is co-occurrence-scoped: **two roles that can appear in one figure are drawn differently
+by each arm.** That is falsifiable where seven-and-seven is not, and it is I68.
+
+**Where the record lives, and why not beside `Figure`.** I62 says a mark names a role and never a glyph,
+and this arm has no characters at all — a shared table of `┃` and `◌` would be one arm's alphabet in the
+layer above both. So the **shape** partition is shared and the **alphabet is the terminal's**: `roles.ts`
+holds a `Record<GlyphRole, …>` resolved against `caps`, and `walk` holds a `Record<GlyphRole, (…) => void>`
+of draw closures. **Exhaustive on both sides is what makes an eighth role a compile error twice** — this
+arm's `switch` ended in a `default:` and would have drawn one as a circle, silently.
+
+**And the record has to be *read*, which is the test the eight `block.axes` reads were held to.** Five
+of the seven roles take their character from it; the two spans keep their orientation tables and the
+record says they are spans. Anything more would be a second table nothing consults, which is the
+`GlyphChars` this replaces: eleven slots, **five of them dead, and the dead five were exactly the
+role-named ones** (F298).
+
+### 3ak.22 — `absent` was an accident on both sides, and no fixture constructs it
+
+§3ak.13's table says the terminal draws *a character for nothing was reported*. **It draws nothing**,
+and not by decision: `normalisedSummary` falls `centre` back to `median`, a row with neither has
+`at(undefined)` — `NaN` — and `row[NaN] = mark` sets a property on an array rather than a cell. The two
+arms agree, and one of them agrees by writing to `row.NaN`.
+
+**Measured over the catalogue: of 17 variants that emit a point mark at all, `absent` is emitted by
+none.** An invariant is vacuous until its subject exists, and this one had its subject only in prose —
+which is why four rungs of frame-reading never showed it and a hand-built summary showed it at once.
+
+`forestRow` reads the role's `none` and skips explicitly. **Zero frames move, because nothing in the
+corpus constructed the state** — and that is the finding rather than a caveat on it: the change is
+invisible to every gate this repo has, and the thing it removes is a defect that would have appeared
+the first time a caller passed a row with no estimate.
 
 ---
 ## 3q. One value axis across the bands, and the record it never had
@@ -6635,6 +6726,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I65** — **A form whose datum is derived derives it once, above both arms.** `ecdf` replaces its samples with a sorted cumulative fraction and `density` replaces five of them with a hundred kernel estimates; both answer *what is drawn* and never *how*, so a derivation one renderer can reach and the other cannot is a second figure rather than a second rasterisation. *Measured before the rule: for one block the terminal drew `[0.2 … 1.0]` over 0–1 and the SVG drew `5 1 4 2 3` over 1–5 — an ECDF that descends, and a density plot with no density in it. Both functions were pure, written and living in rasteriser modules, which is the one place the second arm could not reach them (F268).*
 - **I66** — **A claimed form's frame is a function of its data.** A form the renderer accepts draws something that changes when its readings change; ink on the page is `G7b`'s rung and this is the one above it. *Measured before the rule: `ecdf` draws one fixed staircase for every dataset of a given length — `ecdfSeries` reads its own `sort` only for `.length` — and the sweep that found it reports 16 unmoving frames of 178, of which **15 had no number to perturb** and were never asked (F269). A fixture that cannot answer reads exactly like one that answered well.*
 - **I67** — **A decision the block splits, the figure resolves — and a decision that needs a capability stays out.** `axes` and `plotFrame` are two fields because an **author** has two questions; after resolution there is one border, so `frame` carries it with `"none"` and the renderers stop asking. `gutter`, `positionAxis` and `valueLabels` are separate members and not one, because `axes` gates three things and each carries a per-form override — a heatmap guts its rows whatever `axes` says, since its row labels *are* its ordinate. *Measured before the rule: five of the six block fields governing furniture reached no member, so `frame: "box"` came back for `axes: false` and `legendSlots` returned the same list for `legend: false` as for `legend: "right"` — an arm consuming them would have drawn furniture the author refused* (F295). **And the boundary is `caps`**: `legendPlacement` auto-enables through a clause reading `caps.colourDepth`, so `Figure.legend` carries the author's request and each arm resolves it. A figure that could answer differently at two rungs is not a figure.
+- **I68** — **A role is drawn distinguishably from every role it can share a figure with, and each arm holds a record keyed exhaustively by the role.** Not *seven roles, seven shapes*: the terminal draws `◆` for `mean` and for `target`, which is legitimate because `distributionFigure` cannot emit them together — and unfalsifiable stated the other way, so the claim is scoped to co-occurrence. Exhaustiveness is the compile-time half; the co-occurrence claim is the behavioural one, and neither alone holds the arms together. *Measured before the rule: `GlyphRole` was read in one file, the one declaring it; the terminal's own `GlyphChars` carried eleven slots of which **five were dead** and the dead five were exactly the role-named ones — `median`, `outlier`, `whiskerH`, `boxLeft`, `boxRight`; and the SVG's `switch` ended in a `default:` that would have drawn an eighth role as a circle. The arms agreed because the roles were extracted from the terminal's composition, which is agreement by history* (F289, F298, F300).
 
 ## 8. Commitments
 

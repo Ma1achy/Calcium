@@ -13642,6 +13642,78 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F300 — the seam's central sentence about this family is false, and its true form is weaker ★★★★★
+
+**§3ak.13 says *what both agree about is which of the seven things this is*, and the terminal draws
+`◆` for both `mean` and `target`.** Seven roles, six characters. *Which of the seven this is* is not
+recoverable from the frame, so the sentence that reads as the whole content of the seam here is false
+as written.
+
+**The collapse is legitimate, which is why it survived.** Measured over the catalogue: the two never
+share a figure, because `distributionFigure` returns from the forest branch before the boxplot branch
+can add a mean. Nothing is drawn wrongly and nothing ever was.
+
+**What was wrong is the *claim*, and it was wrong in the direction that cannot fail.** Seven-and-seven
+asserts more than the arms do, so it can only be violated by the arms improving; the version that
+constrains something is **co-occurrence-scoped** — *two roles that can appear in one figure are drawn
+differently by each arm* — and that one fails the day someone gives `outlier` the diamond, or drops
+`◈`, or lets this arm draw `target` as a plain circle. Same subject, opposite falsifiability.
+
+**This is CLAUDE.md's mutation-indicts-the-prose class reached by counting instead.** No mutation was
+available: there was no record to mutate, which is F289. What reached it was building the table the
+section describes and finding two cells with one character in them — **the artefact the walk produces
+is also the thing that checks the prose the walk came from.**
+
+## F299 — a role whose terminal answer is `row[NaN]`, and no fixture that constructs it ★★★★★
+
+**§3ak.13's table says the terminal draws *a character for nothing was reported*.** It draws nothing,
+and not by decision: `normalisedSummary` falls `centre` back to `median`; a forest row with neither
+gives `at(undefined)` — `NaN`; and `row[NaN] = mark` sets a **property** on an array rather than a
+cell, which `join("")` ignores.
+
+**So the two arms agree about `absent`, and one of them agrees by writing to `row.NaN`.** That is
+F289's *agreement by history* in its purest form — an agreement no one decided, that any tidying of
+the fallback would silently end.
+
+**And nothing could have found it from a frame.** Measured over the catalogue: of 17 variants that
+emit a point mark at all, **`absent` is emitted by none**. Four rungs of frame-reading, 1780 baseline
+frames and 178 SVG documents never construct the state; a hand-built summary shows it in one call.
+**An invariant is vacuous until its subject exists, and this one had its subject only in prose** — the
+role is described at greater length than any other in the type, and the corpus has never once
+produced it.
+
+**The repair is invisible to every gate in the repo**, which is the finding rather than a caveat on
+it: `forestRow` reads the role's `none` and skips explicitly, zero frames move, and what it removes
+is a defect that would appear the first time a caller passes a row with no estimate.
+
+## F298 — a table of names whose role-named slots were the dead ones ★★★★☆
+
+**`glyph-row.ts` holds `GlyphChars` — eleven named slots, resolved per rung, in the file F289 is
+about. Five are dead**, and they are not a random five:
+
+| slot | read | what it would have been |
+|---|---|---|
+| `median` | **0** | the role |
+| `outlier` | **0** | the role |
+| `whiskerH` | **0** | the cap's run |
+| `boxLeft` / `boxRight` | **0** | the box's ends |
+| `line`, `filled`, `hollow`, `whiskerLeft`, `whiskerRight`, `boxFill` | 1–2 | what the file actually draws |
+
+**The terminal's role table existed, was resolved against capabilities, and was consulted by nothing
+for the roles it named.** `forestRow` and `dumbbellRow` reach past it to `glyphs(caps)` directly, and
+the two boxplot renderers never had it. So the rung table's *terminal walker's `Record`* had a
+plausible referent sitting in the right file, keyed by the right rung, and the parts that made it look
+like the answer are precisely the parts nothing read.
+
+**MG24 is silent for a reason it records.** `GlyphChars` is not `export`ed — MG24's corpus is
+`export interface`, which F84 already widened from types to members and did not widen to local ones.
+That is a **stated limit**, not a hole: a local interface's members are checkable by `tsc` with
+`noUnusedLocals` only when the *binding* is unused, never when a member is.
+
+**And its ASCII arm disagrees with the boxplot renderers about one of the dead slots.** `outlier: "*"`
+in the table, `g.dotted` — `.` — in `boxplotBand` and `boxplotColumn`. Two answers for one role in one
+arm, and the only reason it is not a defect is that nobody reads the first.
+
 ## F297 — a reader that anticipated an implementation, and measured its anticipation ★★★★★
 
 **`svgDecisions` asked for a border like this:**
