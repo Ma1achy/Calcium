@@ -10,38 +10,43 @@ import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { QuartileSummary, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { glyphs } from "../blocks/glyphs.js";
+import { estimateRole } from "./figure.js";
+import { marksACell, roleGlyphs } from "./roles.js";
 import { ladderFor, pairFor } from "./ramp.js";
 import type { Range } from "./scale.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
+/**
+ * The **furniture** these rows draw with — a run, its two ends, and a fill.
+ *
+ * **Five slots left this table and they were the role-named ones** (F298).
+ * `median`, `outlier`, `whiskerH`, `boxLeft` and `boxRight` were resolved per
+ * rung and read by nothing: `forestRow` and `dumbbellRow` reached past them to
+ * `glyphs(caps)`, and the two boxplot renderers never had them at all. So the
+ * rung table's *terminal walker's `Record`* had a plausible referent, in the
+ * right file, keyed by the right rung — and the parts that made it look like the
+ * answer were precisely the parts nothing read. What a role draws is
+ * `roleGlyphs` now; what remains here is not a role.
+ *
+ * **`outlier` also disagreed with the renderers that draw one**: `"*"` here
+ * against `g.dotted` — `.` — in `boxplotBand` and `boxplotColumn`. Two answers
+ * for one role in one arm, harmless only because nobody read the first.
+ */
 interface GlyphChars {
-  whiskerH: string;
-  boxLeft: string;
-  boxRight: string;
   boxFill: string;
-  median: string;
   whiskerLeft: string;
   whiskerRight: string;
-  outlier: string;
-  filled: string;
-  hollow: string;
   line: string;
 }
 
 function glyphCharsFor(caps: Caps): GlyphChars {
   const g = glyphs(caps);
   if (caps.unicode === "ascii") {
-    return {
-      whiskerH: "-", boxLeft: "[", boxRight: "]", boxFill: "=",
-      median: "|", whiskerLeft: "|", whiskerRight: "|",
-      outlier: "*", filled: g.filled, hollow: g.hollow, line: "-",
-    };
+    return { boxFill: "=", whiskerLeft: "|", whiskerRight: "|", line: "-" };
   }
   return {
-    whiskerH: g.horizontal, boxLeft: "[", boxRight: "]", boxFill: g.bar,
-    median: g.vertical, whiskerLeft: g.teeLeft, whiskerRight: g.teeRight,
-    outlier: g.dotted, filled: g.filled, hollow: g.hollow, line: g.horizontal,
+    boxFill: g.bar, whiskerLeft: g.teeLeft, whiskerRight: g.teeRight, line: g.horizontal,
   };
 }
 
@@ -96,6 +101,7 @@ export function forestRow(
   references: readonly number[] = [],
 ): string {
   const ch = glyphCharsFor(caps);
+  const roles = roleGlyphs(caps);
   const g = glyphs(caps);
   const w = Math.max(1, Math.floor(width));
   const row = new Array<string>(w).fill(" ");
@@ -140,11 +146,25 @@ export function forestRow(
   const wt = q.weight;
   const span = wt !== undefined && Number.isFinite(wt) ? Math.max(0, Math.min(1, wt)) : 0;
   const halfCells = Math.floor((span * Math.max(0, xUpper - xLower)) / 2); // cells-ok — a cell count
-  const mark = q.pooled === true ? g.diamond : ch.filled;
-  for (let i = xCentre - halfCells; i <= xCentre + halfCells; i += 1) {
-    if (i >= 0 && i < w) row[i] = mark; // cells-ok — a column index
+
+  // **Which of the three this estimate is, asked once** (§3ak.22, I68). The
+  // emitter had this three-way test and so did this row, written out separately
+  // — and `absent`'s answer here was not a decision at all: `normalisedSummary`
+  // falls `centre` back to the median, a row with neither gives `NaN`, and
+  // `row[NaN] = mark` sets a **property** on an array rather than a cell. The
+  // two arms agreed about *nothing was reported* and one of them agreed by
+  // writing to `row.NaN`, which any tidying of the fallback would have ended.
+  //
+  // Nothing in the catalogue constructs the state, so no frame moves; what this
+  // removes appears the first time a caller passes a row with no estimate.
+  const role = estimateRole(q);
+  if (marksACell(role)) {
+    const mark = roles.of[role];
+    for (let i = xCentre - halfCells; i <= xCentre + halfCells; i += 1) {
+      if (i >= 0 && i < w) row[i] = mark; // cells-ok — a column index
+    }
+    row[xCentre] = mark;
   }
-  row[xCentre] = mark;
 
   return row.join("");
 }
@@ -161,6 +181,7 @@ export function dumbbellRow(
   caps: Caps,
 ): string {
   const ch = glyphCharsFor(caps);
+  const roles = roleGlyphs(caps);
   const w = Math.max(1, Math.floor(width));
 
   const x1 = scaleX(v1, min, max, w);
@@ -171,8 +192,11 @@ export function dumbbellRow(
   const lo = Math.min(x1, x2);
   const hi = Math.max(x1, x2);
   for (let i = lo; i <= hi; i++) row[i] = ch.line;
-  row[x1] = ch.filled;
-  row[x2] = ch.hollow;
+  // **One role at both ends, told apart by shape rather than by tone** — which
+  // is why `pairedPoint` sits beside the record instead of in it: the figure
+  // says `point` twice and distinguishes them by `seriesIndex` (I68).
+  row[x1] = roles.of.point;
+  row[x2] = roles.pairedPoint;
 
   return row.join("");
 }
@@ -213,6 +237,7 @@ export function boxplotColumn(
   const slot = Math.max(1, Math.floor(width));
   const n = Math.max(1, Math.floor(rows));
   const g = glyphs(caps);
+  const roles = roleGlyphs(caps);
   // `boxplotBand`'s ruling stood up (C12 I46) — a one-column box has no sides,
   // so its interior is a run, and a heavier rule is a run.
   const fill = box === "line" ? g.heavyVertical : pairFor(caps).filled;
@@ -300,9 +325,9 @@ export function boxplotColumn(
   // so *no mean* and *a mean at the median* stay distinguishable here rather
   // than at each call site.
   if (ns.mean !== undefined) {
-    punch(at(ns.mean), at(ns.mean) === yMed ? g.diamondTee : g.diamond);
+    punch(at(ns.mean), at(ns.mean) === yMed ? roles.meanOnMedian : roles.of.mean);
   }
-  for (const o of ns.outliers) punch(at(o), g.dotted);
+  for (const o of ns.outliers) punch(at(o), roles.of.outlier);
   return grid.map((r) => " ".repeat(padL) + r + " ".repeat(padR));
 }
 
@@ -346,6 +371,7 @@ export function boxplotBand(
   // happen to line up; ASCII collapses the corners it cannot spell and the
   // figure still reads.
   const g = glyphs(caps);
+  const roles = roleGlyphs(caps);
   // **Not inverted**, which is the whole difference between this and its
   // transpose: a column index grows the way a value does.
   const ns = normalisedSummary(q, { min, max });
@@ -392,9 +418,9 @@ export function boxplotBand(
     median: [g.teeDown, g.vertical, g.teeUp],
     boxR: [g.topRight, highWhisker ? g.teeLeft : edge, g.bottomRight],
     maxCap: [g.stubDown, g.teeRight, g.stubUp],
-    mean: g.diamond,
-    meanTee: g.diamondTee,
-    outlier: g.dotted,
+    mean: roles.of.mean,
+    meanTee: roles.meanOnMedian,
+    outlier: roles.of.outlier,
   };
 
 

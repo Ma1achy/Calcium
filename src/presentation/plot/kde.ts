@@ -13,6 +13,7 @@ import { stripColumn, stripRow } from "./strip.js";
 import { cells } from "../text.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP, strokePolyline } from "./linedraw.js";
 import { glyphs } from "../blocks/glyphs.js";
+import { roleGlyphs } from "./roles.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, setDot } from "./raster.js";
 import type { Facing, Range } from "./scale.js";
 import { kde, scaledBandwidth, silvermanBandwidth } from "./derive.js";
@@ -373,7 +374,7 @@ export function violinColumn(
     }
 
     const folded = foldBraille(dots).map((r) => r.padEnd(w).slice(0, w));
-    return boxOnSpineColumn(folded, spineCol, n, glyphs(caps), quartiles, lo, hi, pad)
+    return boxOnSpineColumn(folded, spineCol, n, caps, quartiles, lo, hi, pad)
       .map((r) => gap + r);
   }
 
@@ -420,7 +421,7 @@ export function violinColumn(
     put(at(ns.median), gl.teeRight);
     if (ns.mean !== undefined) {
       const rm = at(ns.mean);
-      if (rm !== at(ns.median)) put(rm, gl.diamond);
+      if (rm !== at(ns.median)) put(rm, roleGlyphs(caps).of.mean);
     }
   }
 
@@ -645,7 +646,7 @@ function boxOnSpineColumn(
   rows: readonly string[],
   spineCol: number,
   n: number,
-  gl: ReturnType<typeof glyphs>,
+  caps: Caps,
   quartiles: QuartileSummary | undefined,
   lo: number,
   hi: number,
@@ -655,6 +656,8 @@ function boxOnSpineColumn(
   const ns = normalisedSummary(quartiles, { min: lo - pad, max: hi + pad });
   const at = (t: number): number =>
     Math.max(0, Math.min(n - 1, n - 1 - Math.round(t * (n - 1)))); // cells-ok — a row index
+  const gl = glyphs(caps);
+  const roles = roleGlyphs(caps);
   const out = rows.map((r) => [...r]);
   const put = (r: number, ch: string): void => {
     const row = out[r];
@@ -665,7 +668,7 @@ function boxOnSpineColumn(
   put(at(ns.median), gl.teeRight);
   if (ns.mean !== undefined) {
     const rm = at(ns.mean);
-    if (rm !== at(ns.median)) put(rm, gl.diamond);
+    if (rm !== at(ns.median)) put(rm, roles.of.mean);
   }
   return out.map((r) => r.join(""));
 }
@@ -674,13 +677,15 @@ function boxOnSpine(
   rows: readonly string[],
   spineRow: number,
   w: number,
-  gl: ReturnType<typeof glyphs>,
+  caps: Caps,
   quartiles: QuartileSummary | undefined,
   lo: number,
   hi: number,
   pad: number,
 ): readonly string[] {
   if (quartiles === undefined) return rows;
+  const gl = glyphs(caps);
+  const roles = roleGlyphs(caps);
   const line = [...(rows[spineRow] ?? " ".repeat(w))];
   // Not inverted: a column index grows the way a value does.
   const ns = normalisedSummary(quartiles, { min: lo - pad, max: hi + pad });
@@ -698,7 +703,7 @@ function boxOnSpine(
   // holds one glyph, so the glyph names both.
   if (ns.mean !== undefined) {
     const xm = at(ns.mean);
-    put(xm, xm === at(ns.median) ? gl.diamondTee : gl.diamond);
+    put(xm, xm === at(ns.median) ? roles.meanOnMedian : roles.of.mean);
   }
   return rows.map((r, i) => (i === spineRow ? line.join("") : r));
 }
@@ -809,7 +814,6 @@ export function violinRows(
   // the figure was a capped blob rather than a shape that tapers into the axis.
   // A violin's tails go to nothing and meet the centre line; they are not
   // stopped by a bar.
-  const gl = glyphs(caps);
   const spineRow = spine;
 
   // **The braille arm resamples, and that is where the smoothness is** (C12
@@ -872,7 +876,7 @@ export function violinRows(
     }
 
     const rows = foldBraille(dots).map((r) => r.padEnd(w).slice(0, w));
-    return [...gap, ...boxOnSpine(rows, spineRow, w, gl, quartiles, lo, hi, pad)];
+    return [...gap, ...boxOnSpine(rows, spineRow, w, caps, quartiles, lo, hi, pad)];
   }
 
   strokePolyline(mask, upper, false);
@@ -902,7 +906,7 @@ export function violinRows(
     r.map((m) => glyphForMask(y === spineRow ? m | spineBits : m, corners, caps)),
   );
 
-  return [...gap, ...boxOnSpine(grid.map((r) => r.join("")), spineRow, w, gl, quartiles, lo, hi, pad)];
+  return [...gap, ...boxOnSpine(grid.map((r) => r.join("")), spineRow, w, caps, quartiles, lo, hi, pad)];
 }
 
 /**

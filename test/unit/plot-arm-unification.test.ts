@@ -40,7 +40,11 @@ import {
   barFigure, curveFigure, distributionFigure, matrixFigure, scatterFigure, tilesFigure,
   type Figure,
 } from "../../src/presentation/plot/figure.js";
-import { cells, truncate } from "../../src/presentation/text.js";
+import { estimateRole } from "../../src/presentation/plot/figure.js";
+import { roleGlyphs } from "../../src/presentation/plot/roles.js";
+import { forestRow } from "../../src/presentation/plot/glyph-row.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { cells, truncate, type AmbiguousWidth } from "../../src/presentation/text.js";
 import { DARK_THEME } from "../support/render.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -52,6 +56,8 @@ const frame = frameFor as (s: unknown, c: unknown, w: number, id: string) => rea
 const strip = stripSgr as (s: string) => string;
 const capsNamed = (n: string): Record<string, unknown> => caps.find((c) => c.name === n)!.caps;
 const WIDTH = 60;
+
+type TCaps = TerminalCapabilities;
 
 type Spec = Record<string, unknown>;
 
@@ -593,5 +599,170 @@ describe("U — the seam, asserted from both arms", () => {
     expect(edgeKind(at("8bit"), at("1bit")), "the colour floor alone is a colour move here").toBe("colour");
     expect(edgeKind(at("8bit"), at("ascii")), "and the array's neighbour hides it under unicode")
       .not.toBe("colour");
+  });
+
+  /**
+   * ## U7 — `GlyphRole`, held rather than inherited (C12 I68, §3ak.21)
+   *
+   * **The type was read in one file, the one declaring it** (F289). The arms
+   * agreed because the roles were extracted *from* the terminal's composition,
+   * and the rung table's *terminal walker's `Record`* named an effect with no
+   * mechanism — a table of names, satisfied by names.
+   *
+   * The compile-time half is two exhaustive records and cannot be asserted here:
+   * an eighth role is a type error in `roleGlyphs` and in `walk`'s draw table,
+   * which is F288's *unfalsifiable by signature* and is labelled so rather than
+   * dressed as a row. **These rows are the behavioural half**, and the claim they
+   * take is not §3ak.13's. *Seven roles, seven shapes* is false — six characters
+   * serve seven roles — and it is false in the direction that cannot fail, since
+   * only the arms improving could violate it (F300).
+   */
+  it("U7a (C12 I68, §3ak.21): every role that marks a cell marks exactly one, at both alphabets", () => {
+    // **C09 I5's rule reaching the role table.** A fallback two cells wide where
+    // the original was one makes every measured height wrong, and the marks a
+    // distribution draws sit inside a slot whose width the renderer has already
+    // committed to. `cells()` and not `.length`, or the measurement drifts from
+    // the measurer's.
+    for (const c of caps) {
+      const { of, meanOnMedian, pairedPoint } = roleGlyphs(c.caps as unknown as TCaps);
+      for (const [role, glyph] of Object.entries(of)) {
+        expect(cells(glyph, c.caps["ambiguousWidth"] as AmbiguousWidth), `${c.name}: ${role} is one cell`).toBe(1); // cells-ok — the subject
+      }
+      expect(cells(meanOnMedian, c.caps["ambiguousWidth"] as AmbiguousWidth), `${c.name}: the coincident mean`).toBe(1); // cells-ok — the subject
+      expect(cells(pairedPoint, c.caps["ambiguousWidth"] as AmbiguousWidth), `${c.name}: a dumbbell's far end`).toBe(1); // cells-ok — the subject
+    }
+  });
+
+  it("U7b (C12 I68, §3ak.21): the terminal's characters are distinct — except one pair, which cannot co-occur", () => {
+    // **Six characters for seven roles, and the collapse is `mean` with
+    // `target`.** Legitimate rather than tolerated: U7c measures that the two
+    // never share a figure. Asserted as an equality and not skipped, so the day
+    // the terminal gives a pooled estimate its own mark this row says the
+    // licence is no longer needed.
+    for (const c of caps) {
+      const { of } = roleGlyphs(c.caps as unknown as TCaps);
+      const drawn = Object.entries(of).filter(([r]) => r !== "target");
+      const distinct = new Set(drawn.map(([, g]) => g));
+      expect(distinct.size, `${c.name}: ${drawn.map(([r]) => r).join(" · ")}`).toBe(drawn.length); // cells-ok — a role count
+      expect(of.target, `${c.name}: the recorded collapse (F300)`).toBe(of.mean);
+    }
+  });
+
+  it("U7c (C12 I68, §3ak.21): no figure in the corpus emits both `mean` and `target`", () => {
+    // **This is what licenses U7b's equality, and it is the falsifiable half.**
+    // `distributionFigure` returns from the forest branch before a mean can be
+    // added, so the collapse is unreachable — but that is a property of the
+    // emitter's control flow rather than of the type, and nothing else states
+    // it. A forest plot that grew a mean would make the shared `◆` a defect,
+    // here, rather than in a frame nobody reads at that rung.
+    let withPoints = 0; // cells-ok — a variant count
+    for (const { bucket, variant, spec, family } of corpus()) {
+      if (family === null || !(family in EMITTER)) continue;
+      const fig = EMITTER[family as WalkedFamily](blockOf(spec));
+      const roles = new Set(
+        fig.marks.flatMap((d) => (d.mark.kind === "point" ? [d.mark.role] : [])),
+      );
+      if (roles.size === 0) continue;
+      withPoints += 1; // cells-ok — a variant count
+      expect(roles.has("mean") && roles.has("target"), `${bucket}/${variant}`).toBe(false);
+    }
+    // **The corpus this was measured over**, so a green run says how much it
+    // swept — and so the day a variant stops emitting a point mark, the row that
+    // licenses a shared character notices.
+    expect(withPoints, "catalogue variants emitting a point mark").toBe(17); // cells-ok — a variant count
+  });
+
+  it("U7d (C12 I68, §3ak.22): `absent` draws nothing in both arms, and by decision in both", () => {
+    // **The terminal reached this answer through `row[NaN]`** — a property set
+    // on an array rather than a cell, which `join("")` ignores (F299). The two
+    // arms agreed and one agreed by accident, so any tidying of
+    // `normalisedSummary`'s fallback would have ended the agreement silently.
+    //
+    // **No catalogue variant constructs the state**, which is why 1780 baseline
+    // frames and 178 SVG documents never showed it: an invariant is vacuous
+    // until its subject exists, and this one had its subject only in prose.
+    const none = { min: 2, q1: 3, median: NaN, q3: 7, max: 8, lower: 2, upper: 8 };
+    const some = { ...none, median: 5 };
+    expect(estimateRole(none), "no estimate reported").toBe("absent");
+    expect(estimateRole(some), "an ordinary estimate").toBe("point");
+    expect(estimateRole({ ...some, pooled: true }), "the pooled one").toBe("target");
+
+    const mark = roleGlyphs(capsNamed("24bit") as unknown as TCaps).of.point;
+    const rowFor = (q: typeof none): string =>
+      forestRow(q, 0, 10, 24, capsNamed("24bit") as unknown as TCaps).trim();
+    expect(rowFor(some), "an estimate draws a mark").toContain(mark);
+    // **This next line cannot fail on this arm and it is kept for the pairing,
+    // not as a measurement** (F288's second class, stated rather than dressed
+    // up). `at(undefined)` is `NaN`, `atX(NaN)` is `NaN`, and `row[NaN] = mark`
+    // sets a property on an array rather than a cell — so the terminal draws
+    // nothing for an absent estimate whether or not it asks the role. Making the
+    // guard always true survives every gate in the repo, which is a measurement
+    // about the terminal's insensitivity and not a licence to drop the guard:
+    // one branch against a mark at a position the data never had, the first time
+    // anything clamps that fallback (F299).
+    expect(rowFor(none), "and no estimate draws none — structural, see above").not.toContain(mark);
+    // The interval is still drawn — **the row is not empty, it is unmarked**,
+    // which is the distinction the role exists to keep.
+    expect(rowFor(none).length > 0, "the interval survives").toBe(true); // cells-ok — a run length
+    // **The arm where the role does bite.** `at(x, NaN)` gives `cx="NaN"`, so
+    // the refusal is load-bearing here and this assertion is falsifiable where
+    // its terminal sibling is not — the same claim, measurable on one side.
+
+    const armOf = (q: typeof none): string =>
+      svgOf({ form: "forest", height: 3, quartiles: [q], categories: ["a"], series: [] });
+    expect(armOf(some), "the second arm draws the estimate").toContain("<circle");
+    expect(armOf(none), "and refuses the fallback position").not.toContain("<circle");
+  });
+
+  it("U7e (C12 I68, §3ak.21): the second arm draws a distinct thing per co-occurring role", () => {
+    // **The record replaced a `switch` ending in `default:`**, which drew a
+    // circle — so an eighth role would have arrived as a plausible point mark
+    // with no error and no frame that looks wrong (F289). Exhaustiveness is the
+    // compile-time half; this is the half that can fail today.
+    const box = svgOf({ form: "boxplot", height: 9, series: [], quartiles: [{ min: 1, q1: 3, median: 5, q3: 7, max: 9, mean: 6, outliers: [11] }], categories: ["a"], axes: true });
+    // `median` and `cap` are both spans and both `<rect>`s, so *distinct* here
+    // is the drawn length. **The first version of this assertion counted every
+    // `<rect>` in the document and asked for two distinct widths** — satisfied by
+    // the box, the identity gutter and the page ground, none of which is a span,
+    // so widening a cap to the full slot changed nothing it could see. It
+    // survived its own fabricated violation, which is the only reason it is not
+    // still here: containment is satisfied by every wrong answer inside the
+    // bounds.
+    //
+    // A span is a plain filled rect one or two units thick — `across`'s own
+    // `thick`, which is the *only* thing it puts in that dimension — and the
+    // reading is the other dimension, so this does not care which way the figure
+    // runs. Taken off the document rather than recomputed, which is what `G6` had
+    // to be repaired to do.
+    const spans = [...box.matchAll(/<rect x="[-\d.]+" y="[-\d.]+" width="([\d.]+)" height="([\d.]+)" fill="[^"]*"\/>/gu)]
+      .map((m) => ({ thick: Math.min(Number(m[1]), Number(m[2])), long: Math.max(Number(m[1]), Number(m[2])) }))
+      .filter((r) => r.thick <= 2);
+    const medians = spans.filter((r) => r.thick === 2);
+    const capRects = spans.filter((r) => r.thick === 1);
+    expect(medians.length, "one median span").toBe(1); // cells-ok — a mark count
+    expect(capRects.length, "a cap at each end").toBe(2); // cells-ok — a mark count
+    // **Half the slot, because a cap as wide as the box it caps reads as a
+    // second box edge rather than as the whisker's end** — the arm's own reason,
+    // asserted rather than commented.
+    for (const c of capRects) {
+      expect(c.long * 2, `cap ${c.long} against median ${medians[0]!.long}`).toBeCloseTo(medians[0]!.long, 5);
+    }
+    expect(box, "the mean is a diamond and not a circle").toContain("<polygon");
+    expect(box, "the outlier is a circle").toContain("<circle");
+
+    // A forest plot is the other co-occurrence: `target` against `point`, which
+    // the terminal collapses and this arm does not.
+    const forest = svgOf({
+      form: "forest",
+      height: 6,
+      series: [],
+      quartiles: [
+        { min: 1, q1: 2, median: 3, q3: 4, max: 5, lower: 1, upper: 5 },
+        { min: 1, q1: 2, median: 3, q3: 4, max: 5, lower: 1, upper: 5, pooled: true },
+      ],
+      categories: ["a", "b"],
+    });
+    expect(forest, "a pooled estimate is a diamond here").toContain("<polygon");
+    expect(forest, "and a plain one is a circle").toContain("<circle");
   });
 });

@@ -46,7 +46,9 @@ import {
   scatterFigure,
   tilesFigure,
   type Drawn,
+  GLYPH_SHAPE,
   type Figure,
+  type GlyphRole,
   type FigureLegend,
 } from "./figure.js";
 import { ORIGIN_DEFAULT } from "../../data/viewmodel/index.js";
@@ -489,11 +491,12 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
 
     if (m.kind === "point") {
       // **`absent` draws nothing, and that is the role's entire content here**
-      // (I62). A forest row with no estimate is a real state the terminal has a
-      // character for; this arm's equivalent of that character is not a circle
-      // at the fallback position, which is the plausible wrong figure the role
-      // exists to refuse.
-      if (m.role === "absent") continue;
+      // (I62, §3ak.22). A forest row with no estimate is a real state; a circle
+      // at the fallback position is the plausible wrong figure the role exists
+      // to refuse. The terminal reached the same answer through `row[NaN]` until
+      // it read `GLYPH_SHAPE` too, so the two arms agreed and one agreed by
+      // accident (F299).
+      if (GLYPH_SHAPE[m.role] === "none") continue;
       const [cx, cy] = at(m.x, m.y);
       // **A bubble's radius is data and this scale is not** (§3aj hazard 1,
       // §3ak.1 finding 2). The size arrives normalised against its own series'
@@ -502,35 +505,38 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // with no size still draws. A forest estimate's weight is the same number
       // spent the same way (C12 I31).
       const r = m.size === undefined ? 3 : 2 + 5 * m.size;
-      // **Seven roles, seven shapes, and not one character** (I62). The terminal
-      // picks a glyph per rung from the same seven; this arm has no ladder and
-      // draws a shape. What both agree about is **which of the seven this is**,
-      // and that is the whole content of the seam here.
-      switch (m.role) {
-        case "median":
-          across(m.x, m.y, halfSlot, 2, ink);
-          break;
-        case "cap":
-          // Half the slot, because a cap that is as wide as the box it caps
-          // reads as a second box edge rather than as the whisker's end.
-          across(m.x, m.y, halfSlot / 2, 1, ink);
-          break;
-        case "mean":
-          // **A diamond in the series colour, which is what the terminal
-          // draws.** A grey circle inside a filled box is not visible, which the
-          // frame said and no row could: the outliers share the colour and the
-          // shape is what tells them apart (C12 I33, C04 I53).
-          diamond(cx, cy, Math.max(2, r * 0.8), ink, inkOf(LABEL, theme));
-          break;
-        case "target":
-          diamond(cx, cy, r, ink);
-          break;
-        case "outlier":
+      // **Seven roles and not one character** (I62, I68). The terminal picks a
+      // glyph per alphabet from the same seven; this arm has no ladder and draws
+      // a shape.
+      //
+      // **A record rather than a `switch`, and that is the half F289 was
+      // missing.** The switch ended in a `default:` that drew a circle, so an
+      // eighth role would have arrived here as a point mark and been drawn
+      // *plausibly* — no error, no frame that looks wrong, and the two arms
+      // silently answering different questions. Keyed exhaustively, the same
+      // role is a compile error here and in `roleGlyphs`, which is what makes
+      // the agreement structural rather than inherited from the composition the
+      // roles were extracted from.
+      const draw: Readonly<Record<GlyphRole, () => void>> = {
+        median: () => { across(m.x, m.y, halfSlot, 2, ink); },
+        // Half the slot, because a cap that is as wide as the box it caps
+        // reads as a second box edge rather than as the whisker's end.
+        cap: () => { across(m.x, m.y, halfSlot / 2, 1, ink); },
+        // **A diamond in the series colour, which is what the terminal
+        // draws.** A grey circle inside a filled box is not visible, which the
+        // frame said and no row could: the outliers share the colour and the
+        // shape is what tells them apart (C12 I33, C04 I53).
+        mean: () => { diamond(cx, cy, Math.max(2, r * 0.8), ink, inkOf(LABEL, theme)); },
+        target: () => { diamond(cx, cy, r, ink); },
+        outlier: () => {
           out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(Math.max(1.5, r * 0.6))}" fill="${ink}"/>`);
-          break;
-        default:
-          out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="${ink}"/>`);
-      }
+        },
+        point: () => { out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="${ink}"/>`); },
+        // Unreached — `GLYPH_SHAPE` skipped it above. Present because the record
+        // is keyed by the role and not by the shape, so the two cannot drift.
+        absent: () => {},
+      };
+      draw[m.role]();
       continue;
     }
 

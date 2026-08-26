@@ -86,7 +86,7 @@ const results = runPass({
     {
       name: "the box is drawn in the braille arm's own alphabet",
       file: KDE,
-      from: "    return [...gap, ...boxOnSpine(rows, spineRow, w, gl, quartiles, lo, hi, pad)];",
+      from: "    return [...gap, ...boxOnSpine(rows, spineRow, w, caps, quartiles, lo, hi, pad)];",
       to: "    return [...gap, ...rows];",
       expect: "SA3",
     },

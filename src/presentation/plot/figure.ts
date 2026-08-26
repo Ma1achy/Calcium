@@ -12,7 +12,7 @@
  * nothing lands here without a consumer — an export nothing reads is what MG25
  * refuses, and a `Figure` member no renderer takes is F84's class one type along.
  */
-import type { Plot, PlotForm, ScaleType } from "../../data/viewmodel/index.js";
+import type { Plot, PlotForm, QuartileSummary, ScaleType } from "../../data/viewmodel/index.js";
 import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
@@ -146,6 +146,62 @@ export type TextAnchor = "start" | "middle" | "end";
  * terminal draws something there and the SVG must not draw a point at zero.
  */
 export type GlyphRole = "point" | "median" | "mean" | "outlier" | "cap" | "target" | "absent";
+
+/**
+ * **Whether a role is a mark at a point, a run across the slot, or nothing**
+ * (I68, §3ak.21 finding 2).
+ *
+ * Both arms already had this partition and neither said it. The terminal draws
+ * a median and a cap with `runRow(…)` and everything else with a single cell;
+ * this arm draws them with `across(…)` and everything else with a circle or a
+ * diamond — and its own comment says so, *the two roles that are drawn across a
+ * slot rather than at a point*. **One partition written twice is F289's
+ * complaint one level down**, so it comes up here, where it can be
+ * character-free: `span` says nothing about `┃` or about two pixels.
+ *
+ * `none` is `absent`, and it is a third value rather than a missing entry.
+ * Before this the terminal reached the same answer by `row[NaN] = mark`, which
+ * writes a **property** on an array rather than a cell — the two arms agreed and
+ * one of them agreed by accident (F299).
+ */
+export type GlyphShape = "mark" | "span" | "none";
+
+/** @see GlyphShape — exhaustive, so an eighth role is a compile error here first. */
+export const GLYPH_SHAPE = Object.freeze({
+  point: "mark",
+  median: "span",
+  mean: "mark",
+  outlier: "mark",
+  cap: "span",
+  target: "mark",
+  absent: "none",
+} as const) satisfies Readonly<Record<GlyphRole, GlyphShape>>;
+
+/**
+ * The roles that put a single character in a cell — **derived from
+ * `GLYPH_SHAPE` rather than listed again** (I68).
+ *
+ * A second hand-written list is what this whole section is about: the terminal's
+ * alphabet is keyed by exactly these, so a role that changes shape changes which
+ * keys `RoleGlyphs.of` must have, and it changes them in the compiler rather
+ * than in a comment. Listing them would let a `span` keep a stale character and
+ * be drawn twice — once as a run and once as a cell.
+ */
+export type MarkRole = { [K in GlyphRole]: (typeof GLYPH_SHAPE)[K] extends "mark" ? K : never }[GlyphRole];
+
+/**
+ * Which of the three things a forest plot's estimate is (I68).
+ *
+ * **The classification, not the glyph** — the emitter needs it to write the
+ * mark and `forestRow` needs it to pick a character, and the two had the same
+ * three-way test written out separately. `normalisedSummary` falls `centre`
+ * back to the median, so *nothing was reported* is not recoverable downstream of
+ * it and this is the last place that can say so (§3ak.13).
+ */
+export function estimateRole(q: Pick<QuartileSummary, "centre" | "median" | "pooled">): GlyphRole {
+  if (!Number.isFinite(q.centre ?? q.median)) return "absent";
+  return q.pooled === true ? "target" : "point";
+}
 
 /**
  * One thing to draw, in normalised space.
@@ -895,9 +951,14 @@ export function distributionFigure(block: Plot): Figure {
           marks.push(dot(centre, sm.lower, "cap", i), dot(centre, sm.upper, "cap", i));
           // **`absent` where there is no estimate.** `normalisedSummary` falls
           // `centre` back to the median, so the summary cannot say *nothing was
-          // reported* — the role is what says it, and it is why the SVG can
-          // refuse to draw where the terminal draws a mark.
-          const has = Number.isFinite(q.centre ?? q.median);
+          // reported* — the role is what says it, and it is why both arms can
+          // refuse to draw at a position that is not a reading.
+          //
+          // **The three-way test is `estimateRole`'s and not this loop's**
+          // (§3ak.22). `forestRow` had the same expression written out again, so
+          // the terminal's answer for `absent` came out of a different statement
+          // — and out of `row[NaN]` rather than a statement at all.
+          const role = estimateRole(q);
           // **`target` is the pooled estimate, and it is a role rather than a
           // second member** (I62). `forestRow` picks `g.diamond` for a pooled
           // summary and `ch.filled` for the rest — *this one is the answer* said
@@ -918,7 +979,7 @@ export function distributionFigure(block: Plot): Figure {
               kind: "point",
               x: centre,
               y: sm.centre,
-              role: !has ? "absent" : q.pooled === true ? "target" : "point",
+              role,
               ...(weight === undefined ? {} : { size: weight }),
             },
             layer: "series",

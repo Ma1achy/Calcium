@@ -65,6 +65,8 @@ const DEFINITION = "src/presentation/plot/definition.ts";
 const FURNITURE = "src/presentation/plot/furniture.ts";
 const HEATMAP = "src/presentation/plot/heatmap.ts";
 const SVG = "src/presentation/plot/svg.ts";
+const ROLES = "src/presentation/plot/roles.ts";
+const GLYPHROW = "src/presentation/plot/glyph-row.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -106,7 +108,9 @@ const results = runPass({
       // the mutation is a wrong *answer* rather than a missing one.
       name: "THE ARM: the absent datum draws, and the outlier does not",
       file: SVG,
-      from: "      if (m.role === \"absent\") continue;",
+      // Re-anchored: the test moved from the role's name to `GLYPH_SHAPE`, so
+      // the partition has one statement and both arms answer to it (§3ak.21).
+      from: "      if (GLYPH_SHAPE[m.role] === \"none\") continue;",
       to: "      if (m.role === \"outlier\") continue;",
       expect: "SB",
     },
@@ -151,10 +155,13 @@ const results = runPass({
       // to refuse.
       name: "THE DEFECT: a forest row with no estimate draws a point anyway",
       file: FIGURE,
-      // Re-anchored: the role moved into the estimate's own literal when the
-      // forest gained its pooled arm and its weight (§3ak.13).
-      from: "              role: !has ? \"absent\" : q.pooled === true ? \"target\" : \"point\",",
-      to: "              role: q.pooled === true ? \"target\" : \"point\",",
+      // Re-anchored twice. First the role moved into the estimate's own literal
+      // when the forest gained its pooled arm and its weight (§3ak.13); then the
+      // three-way test left the loop entirely, because `forestRow` had the same
+      // expression written out again and the terminal's answer for `absent` came
+      // out of `row[NaN]` rather than a statement (§3ak.22, F299).
+      from: "  if (!Number.isFinite(q.centre ?? q.median)) return \"absent\";",
+      to: "  if (!Number.isFinite(q.centre ?? q.median)) return \"point\";",
       expect: "FD3",
     },
     {
@@ -461,6 +468,79 @@ const results = runPass({
       from: "        marks.push({ mark: { kind: \"polyline\", points }, layer: \"series\", seriesIndex });",
       to: "        marks.push({ mark: { kind: \"polyline\", points }, layer: \"series\", seriesIndex: 0 });",
       expect: "FC8",
+    },
+    {
+      // **The role table's whole subject: six characters for seven roles is
+      // legitimate and a seventh collapse is not.** `U7b` asserts the mark roles
+      // are pairwise distinct with `mean`/`target` as the one recorded pair, so
+      // giving the outlier the diamond is the defect the record exists to make
+      // findable — and it is one the frame gates would report as 28 moved
+      // baseline frames with no statement about why.
+      name: "THE RECORD: an outlier is drawn with the mean's diamond",
+      file: ROLES,
+      from: "      outlier: g.dotted,",
+      to: "      outlier: g.diamond,",
+      expect: "U7b",
+    },
+    {
+      // **A mean landing on the median given the ordinary mean's mark.** A cell
+      // holds one glyph, so *they coincide* becomes *it is missing* — C04 I53's
+      // subject, and the reason `meanOnMedian` sits beside the record rather than
+      // inside it. No U row can see this: it is a frame fact, which is what a
+      // baseline gate is for.
+      name: "THE RUNG: a coincident mean loses its own mark",
+      file: ROLES,
+      from: "    meanOnMedian: g.diamondTee,",
+      to: "    meanOnMedian: g.diamond,",
+      expect: "baseline",
+    },
+    {
+      // **A dumbbell's two ends told apart by tone alone.** The shape is what
+      // survives the colour floor, which is the same argument `candleHollow`
+      // makes one form along — so this is a 1-bit defect that every coloured
+      // frame agrees with.
+      name: "THE RUNG: a dumbbell's far end takes the near end's mark",
+      file: ROLES,
+      from: "    pairedPoint: g.hollow,",
+      to: "    pairedPoint: g.filled,",
+      expect: "baseline",
+    },
+    {
+      // **A cap as wide as the box it caps**, which is the arm's own stated
+      // reason for halving the slot: it reads as a second box edge rather than
+      // as the whisker's end. `U7e`'s first version could not see this — it
+      // counted every `<rect>` in the document and asked for two distinct
+      // widths, satisfied by the box, the gutter and the page ground — and it
+      // survived exactly this mutation before it was repointed at the spans.
+      name: "THE ARM: a cap spans the whole slot",
+      file: SVG,
+      from: "        cap: () => { across(m.x, m.y, halfSlot / 2, 1, ink); },",
+      to: "        cap: () => { across(m.x, m.y, halfSlot, 1, ink); },",
+      expect: "U7e",
+    },
+    {
+      // **The guard on the estimate, and only one of its two directions can be
+      // measured.** `forestRow` asks `marksACell` before drawing, so severing it
+      // stops every forest estimate being drawn and the frames say so.
+      //
+      // **The other direction cannot be measured and the row says so rather than
+      // implying it.** Making the guard always true does not restore the old
+      // defect: `at(undefined)` is `NaN`, `atX(NaN)` is `NaN`, and
+      // `row[NaN] = mark` sets a property on an array rather than a cell, so the
+      // terminal draws nothing for an absent estimate whatever the role says
+      // (F299). That mutation survives every gate here, which is why it is not a
+      // row — a survivor with no assertion behind it reads as coverage.
+      //
+      // **The guard keeps its place on asymmetry**: one branch against a mark at
+      // a position the data never had, the first time anything clamps that
+      // fallback. **The arm where the role does bite is the other one** —
+      // `at(x, NaN)` yields a circle at `cx="NaN"`, so `GLYPH_SHAPE`'s `none` is
+      // load-bearing in the SVG and the row above proves it.
+      name: "THE RECORD: the terminal stops drawing a forest estimate at all",
+      file: GLYPHROW,
+      from: "  if (marksACell(role)) {",
+      to: "  if (!marksACell(role)) {",
+      expect: "baseline",
     },
   ],
 });
