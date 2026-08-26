@@ -72,13 +72,28 @@ pie      segments → arcs. Trivial in SVG and hard in cells — the terminal ar
          braille and a minimum-segment ruling because a dot is the resolution limit.
          SVG HAS NO SUCH LIMIT, so the minimum-segment merge is a TERMINAL-ONLY rule
 radar    spokes and a closed polygon per series — a <polygon> with computed vertices
-waffle   a grid of squares — <rect> per cell, and the aspect compensation the terminal
-         arm needs DISAPPEARS because an SVG square is square
+waffle   a grid of squares — <rect> per cell, and the CELL's aspect compensation
+         disappears because a pixel is square. The BOX's does not — see below
 ```
 
 **Three things the terminal arm compensates for that SVG simply does not have**: the cell's 2:1
 aspect, the minimum-segment threshold, and the dot grid's resolution. **State each as
 terminal-only rather than porting the compensation.**
+
+**And two of the three are not what that sentence says they are** — measured before the family was
+built, C12 §3ak.26.
+
+**The aspect that disappears is not the aspect that decides (F303).** `CELL_ASPECT` disappears:
+a braille dot is square and a pixel is square, so `squareColumns` and `rx = 2·ry` are terminal facts.
+**`radiusFor`'s `min` does not** — fitting an isotropic figure into an anisotropic box is a decision
+both arms make, in dots and in pixels. This arm's plot area is **396.8 × 275.2 px** with a right
+legend, so a unit square through `projected` is an ellipse and a waffle's hundred squares come out
+39.7 × 27.5. The remedy is `Figure.isotropic` and not an inset written once per arm.
+
+**The minimum-segment merge is terminal-only and the corpus cannot say so (F305).** It fired **zero
+times in twelve variant·width cells**, so deleting it moves no frame — and the same is true of the
+waffle's rounding, whose one fixture sums to exactly 100. Each ruling arrives with the fixture that
+lets it be contradicted, or it is a claim a green corpus agrees with by never asking.
 
 ### 7 · Hierarchy — `treemap · flame · icicle · tree · graph`
 

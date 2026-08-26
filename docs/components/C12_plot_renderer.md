@@ -5638,6 +5638,145 @@ arms are written as transposes of one another, so a fix goes into the one whose 
 and the transpose keeps the defect — and neither is wrong when read on its own (F301).
 
 ---
+
+### 3ak.26 — The proportion family's walk: three compensations, and two of them are not what the plan named
+
+`CALCIUM_SVG_COMPLETION.md` states family 6's subject exactly — **three things the terminal arm
+compensates for that SVG simply does not have**: the cell's 2:1 aspect, the minimum-segment
+threshold, and the dot grid's resolution, each to be *stated as terminal-only rather than ported*.
+
+All three are structural — two rules that hold at rest with no event between them — so the artefact
+is a **classification table** and not a trace (§3ak.4). Measured over the catalogue's nine proportion
+variants at widths 40, 60 and 80, and over `SVG_DEFAULT_LAYOUT`, before anything was written.
+
+| # | the cell | the two rules that meet there | measured | ruling |
+|---|---|---|---|---|
+| 1 | a pie's disc · a radar's rings · a waffle's squares | *positions are normalised and uninverted* (I61) · *aspect compensation is a terminal fact and never crosses* (G2) | the plot area is **524.8 × 275.2 px**, and 396.8 × 275.2 with a right legend — a unit-square figure through `projected` is stretched **1.91×** and **1.44×** across | **the aspect that disappears is not the aspect that decides** — I69 |
+| 2 | a radar's ceiling | *a form whose readings are not on an axis has no value axis* (I60) · `HAS_VALUE_AXIS.radar === false` | `radarCeiling` is `niceAxis({0, top}, 6, {}).range.max`; every vertex is `v / ceiling` and the four rings at 0.2 · 0.4 · 0.6 · 0.8 **are** that scale drawn | the row is right about pie and waffle and **wrong about radar** — `true`, and the pin threaded |
+| 3 | the minimum-segment merge | *the merge is terminal-only* · *`identity` is the list the legend names* | **0 merges in 12 variant·width cells.** `many-segments`' smallest slice is 1% against a 0.82% threshold at height 10 | terminal-only — **and nothing in the corpus can say so** |
+| 4 | a pie's wedge | *a mark carries geometry and never a picture* (§3ak.5's residue ruling) · no mark kind holds an angle | `slicesOf` returns fractions and `fillWedge` spends them as two bounds; a closed `polyline` cannot be read back into them | **widening `Mark` is right here and wrong for the residue** — `arc` |
+| 5 | a pie's legend | *a legend slot names a role, never a glyph* (I62) · the terminal prints `swatch label 65%` | `LegendEntryOf` has four members and `LegendSlot` has four **different** ones; the percent is a formatted string derived from the data — `ValueAxis.labels`' own class | `LegendSlot.value` |
+| 6 | a radar's two name lists | *`identity` is the list the legend names* | the legend names **series** and the ring labels name **categories** | already decided — `categoricalDecisions` sets `identity: block.categories` while its legend names series, and the curve family's rows assert the two differ |
+| 7 | a waffle's square counts | *the square assignment is shared* · `Math.round(v · 100/Σ)` | one variant, `65/25/10`, sums to exactly 100 — so `scale === 1` and the rounding is the identity function | shared — **and nothing in the corpus can say so** either |
+
+**Rows 1 and 2 are the two that change the design.** Rows 3 and 7 change no code and are the reason
+the family's fixtures move. Row 6 was answered before it was asked, which is what a table is for.
+
+#### Finding 1 — a sentence true about the cell, attached to a decision about the box
+
+*The aspect compensation the terminal arm needs **disappears** because an SVG square is square* is
+**true**, and it is about `CELL_ASPECT`. A braille dot is square and a pixel is square, so
+`squareColumns` and `rx = 2·ry` are terminal facts and G2 holds unaltered.
+
+**What does not disappear is `radiusFor`'s `min`** — fitting an isotropic figure into an anisotropic
+box, which the terminal does in dots and the second arm would have to do in pixels. Two different
+quantities, and one was wearing the other's name.
+
+The measurement is what separates them. Every pie and every radar in the catalogue is
+**height-bound at every width**, so `radiusFor`'s `byWidth` arm is dead across the whole corpus — the
+`min` reads as though it were not deciding anything. In the second arm the box is 1.44× wider than
+tall, so a unit square through `projected` is an ellipse, and a waffle's hundred squares come out
+39.7 × 27.5 px. **This is MG24's class arriving in a plan rather than in a rule**: review checks
+whether a justification is true, and this one is.
+
+**So the ruling is a figure member and not an arm's repair.** A figure whose two normalised axes
+carry **one unit** says so, and each arm fits a centred square inside its own box rather than filling
+it — the terminal already, in dots; the second arm in `projected`, which stays the only place in that
+arm reading a figure's directions and now reads three things instead of two. That is I69.
+
+#### Finding 2 — a row with three subjects, and its reason fits two of them
+
+`HAS_VALUE_AXIS` enters the family on one line: *Proportion: an angle, a polygon's radius, a count of
+squares. The reading is a share of a whole, which is not a position on a scale.*
+
+An angle is a share of a whole. A count of squares is a share of a whole. **A polygon's radius is
+not.** `radarCeiling` nices `{min: 0, max: top}` to six ticks and every vertex is `v / ceiling`
+clamped to `[0, 1]`; the value rings at a fifth, two fifths, three fifths and four fifths of the
+radius are that scale, drawn. A radar's reading is a position on a scale by construction, and the
+record says it is not.
+
+**The record's own doc says which question it is answering** — *not whether the terminal draws a
+numeric gutter; that is a different question with a different answer* — and `radar: false` is right
+about the gutter and wrong about the question. F267 is the same defect on the row below, found the
+same way, and neither is carelessness: three forms were bundled and the shared reason is rarely any
+of theirs.
+
+**And the correction exposes a second thing.** `radarCeiling` passes `{}` where every other axis in
+this component passes the block, so a radar's `yMin`, `yMax` and `yFormat` are **read by nothing** —
+an author pinning a radar's ceiling is ignored in silence. `valueAxisOf({min: 0, max: top}, 6, block)`
+is `radarCeiling` with the pin threaded, and it closes both halves in one expression: the record says
+`true` because the figure now carries a `value`, and the `value` honours the pin because it is built
+by the same helper as everyone else's.
+
+#### Findings 3 and 7 — two rules the corpus has never been able to contradict
+
+The minimum-segment merge fired **zero times** in twelve cells. The waffle's rounding ran once, on
+values summing to exactly 100, where it is the identity function. Both rules are correct. **Neither
+has anything to be wrong about in this repository**, which is A03 §2's vacuity class arriving in a
+fixture rather than in a rule: deleting either one moves no frame, and *terminal-only* is a claim a
+green corpus is agreeing with by not asking.
+
+`test/support/README.md` already carries the remedy — *a fixture must be shown to respond to the
+thing under test before it is asserted against* — so the family's fixtures gain the two cases that
+make the claims falsifiable, and the measurements say exactly what those are: `many-segments` at any
+height of 8 or less merges its 1% slices, and any segment list not summing to a hundred leaves
+squares over or drops the last one.
+
+#### Finding 4 — where widening `Mark` is right, and it is the opposite of the residue
+
+§3ak's residue ruling refuses to widen `Mark` for `contour`, `quiver` and `horizon`, and the reason
+is precise: *what is missing is a derivation above cells* — those forms never separated their
+geometry from their rasterisation, so a new mark kind would be a hole punched for a picture.
+
+**A pie is the inverse of that case.** Its geometry above cells already exists and is already
+separate: `slicesOf` returns fractions of the whole, and `fillWedge` is what spends them on dots. The
+missing thing is not a derivation, it is a **member** — an angle, which no mark kind carries. So the
+same test that refuses three forms admits this one, and the test is *does the form already have a
+coordinate*, never *is the type short of a case*.
+
+`arc` is `{ from, to, radius, fill }` in **turns from twelve o'clock, clockwise** — the terminal's
+`START_ANGLE` and its direction, made explicit because a sign convention that lives in two files is
+a sign convention that ends up different in them. A pie's wedge is `from · to · 1 · filled`; a
+radar's circular ring is `0 · 1 · t · unfilled`. **The polygon ring stays a closed `polyline`**,
+because it is one — a mark kind that both is and is not a polygon is how two arms come to draw two
+figures.
+
+#### What the three findings add to the type
+
+`§3ak.2` sketched it and `§3ak.19` amended it; this is the third amendment, and every member is
+character-free, capability-free and read by both arms.
+
+```ts
+type Mark =
+  | …
+  //  turns from twelve o'clock, CLOCKWISE — the terminal's own START_ANGLE, said out loud
+  | { kind: "arc"; from: number; to: number; radius: number; fill: boolean };
+
+type LegendSlot = Readonly<{
+  role: LegendRole;
+  label: string;
+  ref: ColourRef;
+  seriesIndex?: number;
+  value?: string;        // the reading beside the name — `65%`. A STRING, like ValueAxis.labels
+}>;
+
+type Figure = Readonly<{
+  …
+  isotropic: boolean;    // one unit on both axes: each arm fits a centred SQUARE in its own box
+}>;
+```
+
+**`isotropic` is a boolean and not a ratio**, deliberately. A ratio would be a knob with one live
+value, and `arcDots`' own comment is the precedent: *a knob nothing turns is a knob the next reader
+has to check.* The day a form wants three-by-two, the member widens and every call site is a compile
+error — which is the outcome a premature `number` buys nothing towards.
+
+**`value` is optional and `radar` is why.** `segmentLegend` is called by all three forms and the
+radar passes `""` — it has a swatch and a series name and no reading to put beside them. An empty
+string and *no reading* are the same on the page and different in the record, and F280 is the
+standing instance of an absent case taking its meaning from the only case that had one.
+
+---
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -6886,6 +7025,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I66** — **A claimed form's frame is a function of its data.** A form the renderer accepts draws something that changes when its readings change; ink on the page is `G7b`'s rung and this is the one above it. *Measured before the rule: `ecdf` draws one fixed staircase for every dataset of a given length — `ecdfSeries` reads its own `sort` only for `.length` — and the sweep that found it reports 16 unmoving frames of 178, of which **15 had no number to perturb** and were never asked (F269). A fixture that cannot answer reads exactly like one that answered well.*
 - **I67** — **A decision the block splits, the figure resolves — and a decision that needs a capability stays out.** `axes` and `plotFrame` are two fields because an **author** has two questions; after resolution there is one border, so `frame` carries it with `"none"` and the renderers stop asking. `gutter`, `positionAxis` and `valueLabels` are separate members and not one, because `axes` gates three things and each carries a per-form override — a heatmap guts its rows whatever `axes` says, since its row labels *are* its ordinate. *Measured before the rule: five of the six block fields governing furniture reached no member, so `frame: "box"` came back for `axes: false` and `legendSlots` returned the same list for `legend: false` as for `legend: "right"` — an arm consuming them would have drawn furniture the author refused* (F295). **And the boundary is `caps`**: `legendPlacement` auto-enables through a clause reading `caps.colourDepth`, so `Figure.legend` carries the author's request and each arm resolves it. A figure that could answer differently at two rungs is not a figure.
 - **I68** — **A role is drawn distinguishably from every role it can share a figure with, and each arm holds a record keyed exhaustively by the role.** Not *seven roles, seven shapes*: the terminal draws `◆` for `mean` and for `target`, which is legitimate because `distributionFigure` cannot emit them together — and unfalsifiable stated the other way, so the claim is scoped to co-occurrence. Exhaustiveness is the compile-time half; the co-occurrence claim is the behavioural one, and neither alone holds the arms together. *Measured before the rule: `GlyphRole` was read in one file, the one declaring it; the terminal's own `GlyphChars` carried eleven slots of which **five were dead** and the dead five were exactly the role-named ones — `median`, `outlier`, `whiskerH`, `boxLeft`, `boxRight`; and the SVG's `switch` ended in a `default:` that would have drawn an eighth role as a circle. The arms agreed because the roles were extracted from the terminal's composition, which is agreement by history* (F289, F298, F300).
+- **I69** — **A figure whose two normalised axes carry one unit says so, and each arm fits a centred square inside its own box rather than filling it.** `isotropic` is a figure member because it is a property of the *figure* — a disc, a ring and a mosaic of squares are round or square in any renderer — and it is not the cell aspect, which stays a terminal fact under G2 and never crosses. *Measured before the rule: every pie and every radar in the catalogue is height-bound at every width, so `radiusFor`'s `byWidth` arm is dead across the corpus and its `min` reads as though it decided nothing; the second arm's plot area is 1.44× wider than tall with a right legend, so a unit square through `projected` is an ellipse and a waffle's hundred squares are 39.7 × 27.5 px. The plan's sentence — the aspect compensation disappears because an SVG square is square — is true about `CELL_ASPECT` and attached to a decision about the box* (F303).
 
 ## 8. Commitments
 

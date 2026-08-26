@@ -13642,6 +13642,96 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F305 — two terminal-only rules the corpus has never been able to contradict ★★★★☆
+
+**A pie merges slices below one dot of arc and a waffle rounds its segments into a hundred squares.**
+Both are correct. Neither has fired in this repository.
+
+```
+the merge      0 in 12 variant·width cells — every pie variant at 40, 60 and 80
+               many-segments' smallest slice is 1% against a 0.82% threshold at height 10
+the rounding   1 variant, 65/25/10, summing to exactly 100 — so scale === 1 and
+               Math.round is the identity function
+```
+
+**Deleting either moves no frame**, which is the whole finding: *the merge is terminal-only* and *the
+square assignment is shared* are claims a green corpus agrees with by never asking. A03 §2's vacuity
+class, arriving in a fixture rather than in a rule — and the family's walk is what surfaced it,
+because a classification table asks *what happens in this cell* where a suite indexed by inputs asks
+each rule about itself.
+
+**The measurements name the missing fixtures rather than describing them.** A `many-segments` pie at
+any height of 8 or less merges its 1% slices — the threshold is `1 / 2πr` and `r` is height-bound at
+every catalogue width. A segment list not summing to a hundred either leaves squares empty (`1/1/1` →
+33/33/33, one over) or **drops the last one silently** (`50/50/1` → 101 assignments against a
+`pos < 100` guard). The second is worth a frame of its own: a segment can hold a share of the whole
+and receive no square at all.
+
+---
+
+## F304 — a record's row with three subjects, and its reason fits two of them ★★★★★
+
+**`HAS_VALUE_AXIS` enters the proportion family on one line**: *Proportion: an angle, a polygon's
+radius, a count of squares. The reading is a share of a whole, which is not a position on a scale.*
+
+An angle is a share of a whole. A count of squares is a share of a whole. **A polygon's radius is
+not.** `radarCeiling` nices `{min: 0, max: top}` to six ticks; every vertex is `v / ceiling` clamped
+to `[0, 1]`; and the four value rings at a fifth, two fifths, three fifths and four fifths of the
+radius **are that scale, drawn**. A radar's reading is a position on a scale by construction.
+
+**The record's own doc says which question it is answering** — *not whether the terminal draws a
+numeric gutter; that is a different question with a different answer* — so `radar: false` is right
+about the gutter and wrong about the question the record asks. **F267 is the same defect on the row
+below**, found the same way and by the same instrument. Neither is carelessness: three forms were
+bundled onto one row, and *the shared reason on a bundled row is rarely any of the subjects'*.
+
+**And correcting it exposes something the row was hiding.** `radarCeiling` passes `{}` where every
+other axis in this component passes the block, so a radar's **`yMin`, `yMax` and `yFormat` are read
+by nothing** — an author pinning a radar's ceiling is ignored, silently, and no frame in the
+catalogue can show it because no radar fixture pins one. `valueAxisOf({min: 0, max: top}, 6, block)`
+is `radarCeiling` with the pin threaded, and it closes both halves in one expression.
+
+**Wrong in both directions, which is the shape to watch for.** The row is not *false* for the reason
+given — a radar's reading genuinely is a share of something — and it *was* wrong for a reason nobody
+had stated: the share is taken against a **computed ceiling** rather than against the data's own
+total, and a ceiling is an axis.
+
+---
+
+## F303 — the aspect that disappears is not the aspect that decides ★★★★★
+
+**`CALCIUM_SVG_COMPLETION.md` retires a terminal compensation with a sentence that is true**: *waffle
+— a grid of squares — `<rect>` per cell, and the aspect compensation the terminal arm needs
+DISAPPEARS because an SVG square is square.*
+
+**It is true about `CELL_ASPECT` and it is attached to a decision about the box.** A braille dot is
+square and a pixel is square, so `squareColumns` and `rx = 2·ry` really are terminal facts and G2
+holds unaltered. What does not disappear is `radiusFor`'s `min` — **fitting an isotropic figure into
+an anisotropic box** — which the terminal does in dots and the second arm would have to do in pixels.
+Two different quantities, one wearing the other's name.
+
+```
+terminal   radiusFor = min(byHeight, byWidth), in DOTS — and the byWidth arm is
+           DEAD across the corpus: every pie and every radar is height-bound at
+           every width, so the min reads as though it decided nothing
+
+second arm plot area 524.8 × 275.2 px, and 396.8 × 275.2 with a right legend
+           a unit square through projected() is stretched 1.91× / 1.44× across
+           a pie is an ellipse · a waffle's hundred squares are 39.7 × 27.5 px
+```
+
+**MG24's class arriving in a plan rather than in a rule.** Review checks whether a justification is
+true, and this one is — which is why it survived being read carefully into three forms' worth of
+design. The question that reaches it is the one MG24 owes: *does this sentence constrain the decision
+it is attached to*, and it does not, because it constrains a different quantity.
+
+**The remedy is a figure member and not an arm's repair**, and that is the part worth carrying. An
+arm that fixed this locally would have written the inset twice, in two units, and the two would have
+been the same on the day they were written — which is precisely how `squareColumns` and `rx = 2·ry`
+came to be one number derived in two files, the defect `aspect.ts` exists to have ended.
+
+---
+
 ## F302 — the form that reimplemented a rule kept half of it ★★★★☆
 
 **`styleRasteriser` holds the alphabet-versus-rasteriser rule and states it**: *how wide is this glyph
