@@ -13642,6 +13642,57 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F295 — three members that cannot be consumed correctly, and a ruling that was already in the type ★★★★★
+
+**F286 read as the shortest path to the largest number**: `identity`, `frame` and `legend` are
+computed by every emitter and read by neither arm — D10, D9 and D13, **40 of 73 open cells**. The
+decisions exist; an arm need only take them. That framing is what the walk was run against.
+
+**Four of the six block fields that govern this furniture never reach the seam.**
+
+| field | decides | in the figure? |
+|---|---|---|
+| `plotFrame` | which of four shapes | **yes** |
+| `axes: false` | whether there is **any** furniture | no |
+| `yAxis: false` | drop value labels, keep the frame | no |
+| `xAxis: false` | drop the position axis | no |
+| `legend: false` | no legend at all | no |
+| `legend: "above"…"right"` | where it goes | no — all four give one list |
+
+Measured directly: `curveFigure` returns `frame: "box"` for `axes: false`, and `legendSlots` returns
+the same two entries for `legend: false` as for `legend: "right"`.
+
+**So consuming them naively is worse than ignoring them.** The arm would draw a box on a plot that
+asked for no furniture, value labels on one that asked for none, and a legend on one that explicitly
+suppressed it, in a placement nobody chose. **Not wiring. Design.**
+
+**The class**: a ruling can be right about the interaction it found and wrong about a mechanism it
+assumed existed. *Consume `figure.legend`* names an operation, and the operation as specified cannot
+express *no legend*.
+
+**And the decisions are still made twice, in the one place the matrix cannot see.** The terminal
+reads `block.axes` **8** times, `block.plotFrame` **7**, `block.legend` **2** and `block.yAxis`
+**1**, inside its own renderer. A decision made once and a decision made twice are indistinguishable
+while only one arm draws it — which is why the seam looked complete.
+
+**The second finding is better news than the first: D6 is not a ruling.**
+
+The record reads *the terminal draws no gridlines by default and the SVG draws one per tick*, and
+the tie-break says the terminal wins — a framing that makes the repair a choice about gridlines.
+Reading the four frames says otherwise. `plotFrame: "grid"` **is** gridlines: a `┄` at every value
+tick and a `┊` at every position tick, and none at `box`, `corners` or `rule`. **The SVG's
+unconditional rules are `"grid"` applied to every plot**, and the repair is `frame === "grid"` —
+**both ways**, because the second axis is half of what the style means and the arm draws neither.
+
+That folds D6 into D9: **one member, two decisions, 32 cells, no ruling required.** The decision was
+made when `plotFrame` was given four values; the matrix reported it as an open disagreement because
+a boolean `interiorRules` cell cannot say *drawn when asked*.
+
+**The reusable half.** A decision recorded as *needing a ruling* is a decision nobody has looked for
+an existing answer to. The question that reaches it is *which field already governs this* — asked of
+the type rather than of the renderers, because a renderer that reads the field directly makes it
+look like the renderer's own choice.
+
 ## F294 — three forms in no family, and a refusal reason that names the wrong blocker ★★★★★
 
 **`CALCIUM_SVG_COMPLETION.md` argues its own bound**: *four new families, and the count is what

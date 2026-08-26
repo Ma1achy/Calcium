@@ -5260,6 +5260,69 @@ it is the degradation pass's, not this one's: what this fix removes is the wrap,
 correctness failure the application cannot see, and what it leaves is a legibility failure it can.
 
 ---
+### 3ak.19 — F286's three members are incomplete, not merely unconsumed
+
+**The shortest path to the largest number, walked before it was wired.** `identity`, `frame` and
+`legend` are written by every emitter and read by neither arm, and they are exactly D10, D9 and D13
+— 40 of the disagreement matrix's 73 open cells. That reads as consumption: the decisions are
+computed, so an arm need only take them.
+
+**Measured, four of the six block fields that govern this furniture never reach the seam.**
+
+| block field | what it decides | in the figure? |
+|---|---|---|
+| `plotFrame` | which of I26's four shapes | **yes** — `frame` |
+| `axes: false` | whether there is **any** furniture | no — `frame` still says `"box"` |
+| `yAxis: false` | drop the value labels, keep the frame and the x axis | no |
+| `xAxis: false` | drop the position axis | no |
+| `legend: false` | no legend at all | no — the slot list is unchanged |
+| `legend: "above" \| "below" \| "left" \| "right"` | where it goes | no — all four give one list |
+
+So an arm consuming these members as they stand draws **a box on a plot that asked for no furniture,
+value labels on one that asked for none, and a legend on one that explicitly suppressed it**, in a
+placement the author did not choose. Every one of those is a *worse* answer than drawing nothing,
+which is what the arm does today.
+
+**This is the class §3ak.5's neighbour records**: a ruling can be right about the interaction it
+found and wrong about a mechanism it assumed existed. *Consume `figure.legend`* names an operation,
+and the operation as specified cannot express *no legend*.
+
+**And the decisions are still made twice — in one arm.** The terminal reads `block.axes` eight
+times, `block.plotFrame` seven, `block.legend` twice and `block.yAxis` once, inside its own
+renderer. That is the pattern I59 exists to end, surviving in the one place the matrix cannot see it:
+a decision made once is indistinguishable from a decision made twice when only one arm draws it.
+
+#### What each member needs
+
+- **`frame` absorbs `axes`.** One member answering *what furniture is drawn*, with `"none"` as a
+  fifth value. **This does not contradict C04's ruling that the block needs two fields** — that
+  argument is *`axes: false, plotFrame: "box"` would be expressible and meaningless*, and it is about
+  an **author's** surface, where two independent questions want two fields. After resolution there is
+  one answer, and a figure carrying both would let a renderer pick the wrong one. The block splits;
+  the figure collapses. **The direction is the ruling.**
+- **`valueLabels` and `positionLabels`** — `yAxis: false` and `xAxis: false` remove labels and keep
+  the frame, which no frame style can say. Two booleans rather than one, because a form can drop
+  either alone.
+- **`legend` becomes placed or absent** — `Readonly<{ slots, placement }> | null`, where `null` is
+  `legend: false`. **`null` rather than an empty list**, because an empty list already means *this
+  figure has nothing to name* — a single-series curve — and *the author refused a legend* is a
+  different fact. Collapsing them is F280's shape one member along: an absent case given its meaning
+  from the only family that had one.
+
+#### The cell where two rules meet, and it is the one to check first
+
+`"grid"` **is** gridlines — the terminal draws a `┄` rule at every value tick and a `┊` at every
+position tick, and draws none at the other three styles. **So D6 is not a ruling and never was.**
+The record reads *the terminal draws no gridlines by default and the SVG draws one per tick*, which
+is true and frames the repair as a choice; the type already made the choice. The SVG's unconditional
+rules are `"grid"` applied to every plot, and the repair is `frame === "grid"` — **both ways**, since
+the second axis is half of what the style means and the arm draws neither.
+
+**That folds D6 into D9**: one member, two decisions, **32 cells**, no ruling required. The
+remaining ruling is D7/D8 — how many value labels, and whether a position axis is drawn — which
+`valueLabels` and `positionLabels` make expressible and do not settle.
+
+---
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
