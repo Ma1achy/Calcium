@@ -28,6 +28,7 @@ import { rgbOf } from "../support/theme.js";
 import { tiles } from "../../src/presentation/plot/hierarchy.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
 import { barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS, proportionFigure } from "../../src/presentation/plot/figure.js";
+import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { resolve } from "../../src/presentation/theme/index.js";
 import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
@@ -494,6 +495,27 @@ describe.each(supported)("G6 — %s", (form) => {
     // family is asked there: a sample below the floor is a bar of no length and
     // one above the ceiling is a bar of the whole span.
     const family = svgFamilyOf(form);
+    // **A derived form has no sample outside the pin, because it has no
+    // samples** (C12 I70, §3ak.27). `histogram` replaces `SAMPLES` with counted
+    // bins, `ecdf` with cumulative fractions and `density` with kernel
+    // estimates, so `-40` and `40` are inputs to a derivation rather than
+    // readings on the axis this row measures. The premise is gone, and without
+    // this arm the row asserted a coincidence: `ecdf`'s fractions all sit below
+    // a pinned floor of 2, so every one of them clamped and *far above pins to
+    // the ceiling* came back with the floor.
+    //
+    // **An exemption with a claim in it**, on the distribution family's
+    // precedent above: the equivalent assertion is that the derivation *is*
+    // applied — the whole of what F317 found missing — so this fails the day
+    // `drawnBlock` stops being called.
+    const derived = drawnBlock(made);
+    if (derived !== made) {
+      expect(derived.series.map((sr) => sr.values), `${form}: the samples are not the datum`)
+        .not.toEqual(made.series.map((sr) => sr.values));
+      expect((plotToSvg(made, THEME, layout) ?? "").length, `${form}: and the arm still draws`)
+        .toBeGreaterThan(0);
+      return;
+    }
     // **Three families have no value axis, so there is no bound to clamp
     // against — and the old row appeared to cover them.** It called `svgPoints`
     // with the samples directly, which answers for any list of numbers whether

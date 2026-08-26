@@ -30,6 +30,7 @@
  * second renderer.
  */
 import { flatten } from "./tree.js";
+import { drawnBlock } from "./derive.js";
 import { graphLayers } from "./graph.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 
@@ -1015,11 +1016,17 @@ function marks(
  * the placeholder encoding makes for a wrapped diacritic (C04 I73).
  */
 export function plotToSvg(
-  block: Plot,
+  // **Not `given`, and MG24 is why.** The rule matches a published member by
+  // *name* rather than by `owner.name` — a stated limit with three tightenings
+  // measured and rejected (F105, F160) — so a parameter called `given`
+  // satisfies `VerbRatio.given`'s consumption test and turns a live exemption
+  // into a violation. Third instance of that mechanism and the first on a
+  // function parameter rather than a table key.
+  given: Plot,
   theme: ResolvedTheme,
   layout: SvgLayout = SVG_DEFAULT_LAYOUT,
 ): string | null {
-  if (svgFamilyOf(block.form) === null) return null;
+  if (svgFamilyOf(given.form) === null) return null;
 
   // **A datum this path cannot see is a refusal, not a blank** (F259).
   //
@@ -1034,7 +1041,7 @@ export function plotToSvg(
   // from the average alone: ticks 11 to 12 against data spanning 8 to 16. Not a
   // blank frame a reader questions but **a confident chart of the wrong thing**,
   // which is the plausible wrong figure the `null` arm exists to refuse.
-  if (block.ohlc !== undefined) return null;
+  if (given.ohlc !== undefined) return null;
 
   // **A flipped ordinate is the same class, found by asking the same question**
   // (F259). `svgPoints` passes `invert: true` unconditionally — the comment
@@ -1045,7 +1052,21 @@ export function plotToSvg(
   //
   // Refused rather than honoured, because honouring it is the families' work
   // and a wrong-way-up chart is a plausible wrong figure today.
-  if (block.origin !== undefined && block.origin !== ORIGIN_DEFAULT[block.form]) return null;
+  if (given.origin !== undefined && given.origin !== ORIGIN_DEFAULT[given.form]) return null;
+
+  // **The block this arm draws, which is not always the block it was given**
+  // (C12 I70, §3ak.27). `histogram`, `density` and `ecdf` replace their samples
+  // with a quantity the samples do not contain, and for the length of the pass
+  // that happened inside the terminal's dispatch table — so this arm drew 240
+  // raw samples against 8 counted bins, the sorted values against a kernel
+  // estimate, and a non-monotone staircase against a cumulative distribution
+  // (F314, F317).
+  //
+  // **Here rather than inside `figureFor`**, because the furniture below reads
+  // the block too: a figure about the drawn block beside a legend about the
+  // given one is the same defect one level smaller. And **after the two
+  // refusals above**, which are claims about what the author wrote.
+  const block = drawnBlock(given);
 
   // **The axis is the figure's, and this is D1 through D7 closing at once**
   // (C12 §3ak.10). What this arm computed for itself — `rangeFor`, a hardcoded

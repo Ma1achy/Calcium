@@ -13642,6 +13642,70 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F319 — I8 is honoured for series and not for categories, and a histogram loses a fifth of its distribution in silence ★★★★★
+
+**Found by reading the moved frames, and only because the second arm started binning.** Wiring
+`drawnBlock` into both arms (F317) made the SVG draw the same bins the terminal does — and it drew
+**nine** where the terminal draws **eight**.
+
+```
+histogram · default          binValues → 9 bins,  terminal draws 8   — 10 of 200 samples gone
+histogram · scott            binValues → 9 bins,  terminal draws 8   — 10 of 200 samples gone
+histogram · freedman-diaconis  binValues → 11 bins, terminal draws 8 — 39 of 200, 19.5%
+```
+
+**And the frame reads as complete.** `freedman-diaconis` at height 8:
+
+```
+[ 6.7, 13.8) ┤████▍                                                           3│
+…
+[49.5, 56.6) ┤██████████████████████████████████████████████████████████████ 42│
+[56.6, 63.7) ┤█████████████████████████████████████████████▊                 31│
+             └─────────────────────────────────────────────────────────────────┘
+```
+
+A clean unimodal distribution rising to 42 and falling to 31. The three bins it does not draw hold
+**18, 11 and 10** — the whole right tail — and nothing on the page says a bin was withheld.
+
+### The mechanism: one rule, two subjects, and only one of them has it
+
+`categoricalForm` opens with
+
+```ts
+const labels = cats.slice(0, areaRows);
+```
+
+C12 I8 is *series that cannot be given a row are named in a legend, never dropped silently*, and the
+sibling branch honours it exactly — `stripHeights` returning `null` draws the first series and a
+`+N more` legend naming the rest, with a comment saying **a series dropped in silence is the failure
+this branch exists to avoid**. Twenty lines of care for series; a `slice` for categories.
+
+**The rule was written about the subject that had the defect.** Nothing generalised it, and a
+histogram's rows are not categories an author wrote — they are bins a *binning strategy* chose, so
+the count is not a number anybody set and cannot be checked against the height.
+
+### Why nothing saw it
+
+- **The terminal's 1810 baseline frames are byte-identical**, because the terminal has always done
+  this. A corpus of frames cannot report what is missing from every one of them.
+- **The disagreement matrix is unchanged in all five cells** — `histogram` still reads
+  `numericLabels: 12/12 · identityLabels: 10/12 · interiorRules: 2/12`, before and after a change
+  that replaced 240 bars with 18. A dropped row is not a decision either arm makes differently; it
+  is a decision only one arm gets to make.
+- **`plotAreaRows` is the terminal's**, so the second arm never had a limit to hit. The disagreement
+  only became *visible* when the two arms started drawing the same bins — which is F314's remedy
+  producing the finding F314 could not.
+
+**Three of 45 row-bearing variants in the corpus are short, and all three are histograms.** Measured
+by comparing `drawnBlock(block).categories.length` against `plotAreaRows(block)` for every
+form·variant with a horizontal identity axis — a check the arms' own frames cannot perform, because
+the frame is what the drop already happened to.
+
+**Open**, and it is the terminal's. The fix moves terminal frames, so it does not belong in the
+extraction commit whose gate is *0 of 1810 moved*.
+
+---
+
 ## F318 — the member the design named is one the layer cannot hold, and the difference it hides is legitimate ★★★★☆
 
 F316 recorded two remedies: **a sixth column** for the colour ramp, and **a `drops` member** on
@@ -13734,9 +13798,10 @@ function of `values.length` and `densitySeries` fixes its resolution at 100. Two
 family emitter, not a wiring change, and the same line divides family 8: `stackBands` folds freely
 and resamples across `columns`.
 
-**Ruled — I70 (§3ak.27), and open until a caller exists.** The rule commits ahead of the code, so
-this finding is closed by the commit that wires `drawnBlock` into both arms and not by the one that
-names it.
+**Fixed.** `drawnBlock` is called at each arm's entry: **9 SVG frames moved, 0 of 1810 terminal
+frames moved, and 0 of 150 matrix cells moved** — the last being F314's argument arriving as a
+measurement. The row that was its own caller now derives the way the arm does, and the mutation the
+seam owes is on the call site.
 
 ---
 
@@ -13836,10 +13901,11 @@ the samples do not contain — a bin count, a density, a cumulative fraction —
 samples. The y-axis is where it is visible with no reading at all: `0.00–0.11` against `0–10` is not
 a niced range against a raw one (D1), it is a different **quantity**.
 
-**Open.** The fix is either the transform moving above the seam or three entries in `SVG_FAMILY`,
-and F259 says which by default: *refuse a false figure, record an incomplete one.* A histogram of
-240 unbinned samples measures, rasterises and reads as a chart of something, which is the plausible
-wrong figure a `null` refuses.
+**Fixed by moving the transform** (I70, §3ak.27), not by refusing: F259's refusal is for a figure
+that cannot be drawn, and these three had a pure function of the block sitting one import away.
+`ecdf` now ticks `0.0 · 0.5 · 1.0`, `density` `0.00 · 0.05 · 0.10`, and `histogram` draws 9 bins
+where it drew 200 samples. **And moving it produced F319** — with both arms binning, the terminal
+turned out to have been dropping the last bin all along.
 
 **And this is the whole argument for the sheet, in one finding.** Eleven or twelve defects in this
 campaign came from reading a frame and none from a row written to look for one. The matrix asserted

@@ -13,7 +13,8 @@ import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/s
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
 import { brailleOutline, violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
-import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
+import { barRow } from "../../src/presentation/plot/categorical.js";
+import { binValues } from "../../src/presentation/plot/derive.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "../../src/presentation/plot/ramp.js";
 import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";

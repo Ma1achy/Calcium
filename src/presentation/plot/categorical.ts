@@ -25,19 +25,6 @@ type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 type MarkCaps = Caps & Pick<TerminalCapabilities, "colourDepth">;
 
 /**
- * Decimals for a bin edge — enough that two adjacent edges differ.
- *
- * The same argument as an axis step's precision (C12 I22): a label rounded past
- * the gap between it and its neighbour prints two identical bounds, and a bin
- * `[3, 3)` is a statement that no reading can satisfy.
- */
-function binPlaces(binWidth: number): number {
-  if (!Number.isFinite(binWidth) || binWidth <= 0) return 2;
-  const magnitude = Math.floor(Math.log10(binWidth));
-  return Math.max(0, Math.min(6, 1 - magnitude));
-}
-
-/**
  * One horizontal bar of exactly `width` cells, with an optional value label.
  */
 export function barRow(
@@ -266,96 +253,6 @@ export function dotplotRow(
   const row = new Array(w).fill(" ");
   row[pos] = g.filled;
   return row.join("");
-}
-
-/**
- * Histogram binning: Sturges, Freedman–Diaconis, Scott.
- */
-export function binValues(
-  series: readonly (readonly (number | null)[])[],
-  method: "sturges" | "freedman-diaconis" | "scott" = "sturges",
-  maxBins = 40,
-): { labels: string[]; counts: number[][]; edges: string[] } {
-  // **One edge set over the union, and the strategy's inputs come from it too**
-  // (C12 I42, §3v). Binned on its own extent each series fills the width, so two
-  // distributions of different spreads draw the same picture — I35's argument
-  // one form along. And a bin *count* chosen from one series' `n` and spread
-  // would belong to edges that are not that series'.
-  const per = series.map((vs) => vs.filter((v): v is number => v !== null && Number.isFinite(v)));
-  const finite = per.flat();
-  const empty = { labels: [], counts: series.map(() => []) as number[][], edges: [] };
-  if (finite.length === 0) return empty; // cells-ok — a sample count
-
-  const sorted = [...finite].sort((a, b) => a - b);
-  const n = sorted.length; // cells-ok — a sample count
-  const lo = sorted[0]!;
-  const hi = sorted[n - 1]!;
-  if (lo === hi) {
-    return {
-      labels: [String(lo)],
-      counts: per.map((vs) => [vs.length]), // cells-ok — a sample count
-      edges: [String(lo), String(lo)],
-    };
-  }
-
-  let binCount: number;
-  if (method === "freedman-diaconis") {
-    const q1 = sorted[Math.floor(n * 0.25)]!;
-    const q3 = sorted[Math.floor(n * 0.75)]!;
-    const iqr = q3 - q1;
-    const binWidth = iqr > 0 ? 2 * iqr * Math.pow(n, -1 / 3) : (hi - lo) / Math.ceil(Math.log2(n) + 1);
-    binCount = Math.max(1, Math.min(maxBins, Math.ceil((hi - lo) / binWidth)));
-  } else if (method === "scott") {
-    const mean = finite.reduce((a, b) => a + b, 0) / n;
-    const variance = finite.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
-    const sd = Math.sqrt(variance);
-    const binWidth = sd > 0 ? 3.5 * sd * Math.pow(n, -1 / 3) : (hi - lo) / Math.ceil(Math.log2(n) + 1);
-    binCount = Math.max(1, Math.min(maxBins, Math.ceil((hi - lo) / binWidth)));
-  } else {
-    binCount = Math.max(1, Math.min(maxBins, Math.ceil(Math.log2(n) + 1)));
-  }
-
-  const binWidth = (hi - lo) / binCount;
-  const labels: string[] = [];
-  // **A series with no finite values keeps its row of zeroes.** Dropping it
-  // renumbers the groups, so the bin a reader is looking at would hold
-  // different series in different bins (C12 I42).
-  const counts: number[][] = per.map(() => new Array(binCount).fill(0) as number[]);
-
-  // **A bin is an interval, and the label said it was a point.** The old line
-  // pushed the rounded *left edge* alone — `0.03` — with no upper bound and no
-  // notation saying it was a range at all, so a histogram's ordinate read as a
-  // list of values rather than as bins. Half-open brackets, per YouPlot: every
-  // bin takes `[lo, hi)` and the last takes `]`, because the last bin is where
-  // the maximum lands and `floor((v - lo) / binWidth)` clamps it there.
-  //
-  // Decimal-aligned by padding the left number, so a column of intervals reads
-  // down its own separator rather than ragged.
-  // **The edges are returned as well as consumed** (C12 I30). A vertical
-  // histogram labels its bottom axis with the *boundary* rather than the
-  // interval: `[18.3, 23.1)` needs twelve cells and a nine-cell column drops it,
-  // so the axis came back empty. `18.3` under the column's left edge is what
-  // matplotlib draws and what the width affords.
-  const places = binPlaces(binWidth);
-  const edges: string[] = [];
-  for (let i = 0; i <= binCount; i++) edges.push((lo + i * binWidth).toFixed(places));
-  const widest = edges.reduce((m, e) => Math.max(m, e.length), 0); // cells-ok — a digit count
-  for (let i = 0; i < binCount; i++) {
-    const a = (edges[i] ?? "").padStart(widest);
-    const b = (edges[i + 1] ?? "").padStart(widest);
-    labels.push(`[${a}, ${b}${i === binCount - 1 ? "]" : ")"}`);
-  }
-
-  per.forEach((vs, si) => {
-    const row = counts[si]!;
-    for (const v of vs) {
-      let bin = Math.floor((v - lo) / binWidth);
-      if (bin >= binCount) bin = binCount - 1; // cells-ok — a bin index
-      if (bin >= 0 && bin < binCount) row[bin] = (row[bin] ?? 0) + 1; // cells-ok — a bin index
-    }
-  });
-
-  return { labels, counts, edges };
 }
 
 /**

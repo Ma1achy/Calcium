@@ -67,7 +67,7 @@ import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows } from "./scatter.js";
 import { quartileRange } from "../../data/viewmodel/distribution.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
-import { barColumn, barRow, lollipopRow, dotplotRow, binValues, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
+import { barColumn, barRow, lollipopRow, dotplotRow, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
 import { pairFor } from "./ramp.js";
 import { squareColumns } from "./aspect.js";
 import { waffleCells } from "./waffle.js";
@@ -76,7 +76,7 @@ import { colormapFor, heatmapFormRows } from "./heatmap.js";
 import { flatAlphabet, glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
 import { brailleOutline, densityRows, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
-import { densitySeries, ecdfSeries } from "./derive.js";
+import { drawnBlock } from "./derive.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
 import { horizonGrid, horizonIsSigned, horizonLegendSpans, horizonSpans } from "./horizon.js";
@@ -2210,15 +2210,13 @@ const FORM_ROWS: Readonly<
 
   scatter: (block, width, ctx) => positionalForm(block, width, ctx, scatterRows),
   step: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows, "step")),
-  ecdf: (block, width, ctx) => {
-    const ecdfBlock = {
-      ...block,
-      series: block.series.map((s) => ecdfSeries(s)),
-      yMin: block.yMin ?? 0,
-      yMax: block.yMax ?? 1,
-    };
-    return positionalForm(ecdfBlock, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows, "step"));
-  },
+  // **The derived block comes from the seam** (C12 I70, §3ak.27). This built its
+  // own, so the second arm had nowhere to read it from and drew the raw samples
+  // — a staircase labelled as a cumulative distribution and not monotone (F317).
+  // The rasteriser still takes the *authored* block: `plotStyle` is the author's
+  // and the derivation does not touch it.
+  ecdf: (block, width, ctx) =>
+    positionalForm(drawnBlock(block), width, ctx, styleRasteriser(block, ctx.capabilities, stepRows, "step")),
   bar: (block, width, ctx) => {
     const data = seriesRange(block.series, block);
     if (data === null) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
@@ -2318,33 +2316,17 @@ const FORM_ROWS: Readonly<
   histogram: (block, width, ctx) => {
     const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width };
     if (block.series.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a series count
-    // **Every series, on one edge set** (C12 I42, §3v). Binned on its own
-    // extent each series fills the width, so two distributions of different
-    // spreads draw the same picture and the comparison is gone — I35's argument
-    // one form along.
-    const { labels, counts, edges } = binValues(
-      block.series.map((sr) => sr.values), block.binning ?? "sturges",
-    );
-    if (counts[0] === undefined || counts[0].length === 0) return emptyRows(block, layout, ctx); // cells-ok — a bin count
-
-    // **Binned, a histogram *is* a bar chart of counts**, so the drawing is the
-    // bar's and all four layouts arrive together rather than being invented
-    // here. The series keep their labels and tones: the legend names them and
-    // the picture has to agree with it.
-    const counted: readonly Series[] = counts.map((values, i) => {
-      const sr = block.series[i];
-      return {
-        values,
-        ...(sr?.label === undefined ? {} : { label: sr.label }),
-        ...(sr?.tone === undefined ? {} : { tone: sr.tone }),
-      };
-    });
-    // **`overlap` cannot mean *draw the first one*** (C12 I42). Two runs
-    // superimposed in one row of cells is one run, so the name describes a
-    // picture the vocabulary does not have, and dropping the rest is what I8
-    // forbids — with the legend still naming them, which makes it an assertion
-    // rather than an omission.
-    const many = counted.length > 1; // cells-ok — a series count
+    // **The binning is the seam's, not this arm's** (C12 I70, §3ak.27). Every
+    // decision it used to make here — one edge set over the union (I42, §3v),
+    // the counted series keeping their labels and tones, `overlap` meaning
+    // grouped (I42), the bin's lower edge along a bottom axis — is in
+    // `drawnBlock` unchanged, so both arms bin and neither re-derives.
+    //
+    // **This form was the class's third instance and was never named**, because
+    // §3ak.7's walk was the curve family's and a histogram is a bar (F317). The
+    // second arm drew 240 raw samples as 240 bars against 8 counted bins here.
+    const drawn = drawnBlock(block);
+    if (drawn.series[0] === undefined || drawn.series[0].values.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a bin count
     // **`form` stays `histogram`, and the golden corpus is what said so.**
     // Rewriting it to `"bar"` made the delegation an *identity* change as well
     // as a rendering one: `ROW_IS_AN_IDENTITY` is keyed on the form, `bar`'s
@@ -2355,18 +2337,7 @@ const FORM_ROWS: Readonly<
     // Nothing in the bar arm branches on the form's name; the three records it
     // reads — `ROW_IS_AN_IDENTITY`, `HAS_POSITION_AXIS`, `SHARES_CELLS` — all
     // want the histogram's answers, so the delegation is a call and not a cast.
-    const asBar: Plot = {
-      ...block,
-      categories: labels,
-      series: counted,
-      ...(many ? { layout: block.layout === undefined || block.layout === "overlap" ? "grouped" : block.layout } : {}),
-      // The bin's **lower edge** along a bottom axis, not its interval:
-      // `[18.3, 23.1)` needs twelve cells and a nine-cell column drops it.
-      ...(block.orientation === "vertical"
-        ? { categories: edges.slice(0, counts[0].length).map((e) => e.trim()) } // cells-ok — a bin count
-        : {}),
-    };
-    return FORM_ROWS.bar(asBar, width, ctx);
+    return FORM_ROWS.bar(drawn, width, ctx);
   },
   boxplot: (block, width, ctx) => {
     const qs = block.quartiles ?? [];
@@ -2697,11 +2668,8 @@ const FORM_ROWS: Readonly<
   latency: (block, width, ctx) => heatmapFormRows(block, width, ctx),
   density2d: (block, width, ctx) => heatmapFormRows(block, width, ctx),
   density: (block, width, ctx) => {
-    const s = block.series[0];
-    if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    const { series: ds, range } = densitySeries(s, 100, block.bandwidth);
-    const densityBlock = { ...block, series: [ds], yMin: range.min, yMax: range.max };
-    return positionalForm(densityBlock, width, ctx, styleRasteriser(block, ctx.capabilities, densityRows));
+    if (block.series[0] === undefined) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
+    return positionalForm(drawnBlock(block), width, ctx, styleRasteriser(block, ctx.capabilities, densityRows));
   },
   violin: (block, width, ctx) => {
     const cats = block.categories ?? block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);

@@ -36,6 +36,7 @@ import { describe, expect, it } from "vitest";
 
 import { block, type Plot, type PlotForm } from "../../src/data/viewmodel/index.js";
 import { plotToSvg, svgFamilyOf } from "../../src/presentation/plot/svg.js";
+import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import {
   barFigure, curveFigure, distributionFigure, matrixFigure, proportionFigure, scatterFigure, tilesFigure,
   type Figure,
@@ -379,9 +380,16 @@ describe("U — the seam, asserted from both arms", () => {
   } as const satisfies Readonly<Record<Mark["kind"], RegExp>>;
 
   function shortfall(spec: Spec, family: WalkedFamily): readonly string[] {
-    const b = blockOf(spec);
-    const svg = plotToSvg(b, DARK_THEME);
+    const authored = blockOf(spec);
+    const svg = plotToSvg(authored, DARK_THEME);
     if (svg === null) return [];
+    // **The figure is of the block the arm draws** (C12 I70, §3ak.27). This
+    // passed `authored` while `plotToSvg` derives, so the projection was
+    // measured against a figure the arm never held: `histogram/two-series`
+    // reported *240 marks, 21 elements* — the 240 raw samples the seam replaces
+    // with 8 counted bins per series (F317). A row that builds its own subject
+    // agrees with the arm only for as long as the arm does nothing.
+    const b = drawnBlock(authored);
     const want = new Map<string, number>();
     for (const d of EMITTER[family](b).marks) want.set(d.mark.kind, (want.get(d.mark.kind) ?? 0) + 1);
     const out: string[] = [];

@@ -6,7 +6,7 @@
  * restates the histogram that already worked.
  */
 import { describe, expect, it } from "vitest";
-import { binValues } from "../../src/presentation/plot/categorical.js";
+import { binValues } from "../../src/presentation/plot/derive.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";

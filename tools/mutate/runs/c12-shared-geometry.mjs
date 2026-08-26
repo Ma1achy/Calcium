@@ -267,7 +267,7 @@ const results = runPass({
       // form *is* claimed — and neither can a corpus with one variant per form.
       name: "a block whose datum is ohlc is drawn by the curve family",
       file: SVG,
-      from: "  if (block.ohlc !== undefined) return null;",
+      from: "  if (given.ohlc !== undefined) return null;",
       to: "  if (false) return null;",
       expect: "G8a",
     },
@@ -289,8 +289,8 @@ const results = runPass({
       // legal.
       name: "a non-default origin is drawn with the default facing",
       file: SVG,
-      from: "  if (block.origin !== undefined && block.origin !== ORIGIN_DEFAULT[block.form]) return null;",
-      to: "  if (block.origin === undefined) return null;",
+      from: "  if (given.origin !== undefined && given.origin !== ORIGIN_DEFAULT[given.form]) return null;",
+      to: "  if (given.origin === undefined) return null;",
       expect: "G8e",
     },
     {

@@ -67,6 +67,7 @@ const HEATMAP = "src/presentation/plot/heatmap.ts";
 const SVG = "src/presentation/plot/svg.ts";
 const ROLES = "src/presentation/plot/roles.ts";
 const GLYPHROW = "src/presentation/plot/glyph-row.ts";
+const DERIVE = "src/presentation/plot/derive.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -543,6 +544,49 @@ const results = runPass({
       from: "  if (marksACell(role)) {",
       to: "  if (!marksACell(role)) {",
       expect: "baseline",
+    },
+    // **The seam's newest half, and the only rows whose subject is a *call***
+    // (C12 I70, §3ak.27, F317). Every row above mutates a decision inside the
+    // shared layer; these three switch the derivation off at the point of
+    // application, which is the thing that was missing for the length of the
+    // pass while `derive.ts` sat in the tree looking correct.
+    //
+    // **Each must be caught by BOTH gates**, and that is what the row is for. A
+    // terminal gate alone means the second arm never had the derivation — which
+    // is precisely the state F317 found; an SVG gate alone means the terminal
+    // stopped applying it. The report names which fired.
+    {
+      name: "THE CALL: a histogram draws its samples rather than its bins",
+      file: DERIVE,
+      from: '    case "histogram": {\n      if (block.series.length === 0) return block;',
+      to: '    case "histogram": {\n      if (true) return block;',
+      expect: "baseline",
+    },
+    {
+      name: "THE CALL: an ecdf draws its samples rather than its cumulative fraction",
+      file: DERIVE,
+      from: '    case "ecdf":\n      return {',
+      to: '    case "ecdf":\n      return block ?? {',
+      expect: "baseline",
+    },
+    {
+      name: "THE CALL: a density plot draws its samples rather than its estimate",
+      file: DERIVE,
+      from: "      const { series: ds, range } = densitySeries(s, 100, block.bandwidth);",
+      to: "      const { series: ds, range } = { series: s, range: { min: 0, max: 1 } };",
+      expect: "baseline",
+    },
+    {
+      // **The second arm's call site, mutated on its own.** The three above
+      // switch the derivation off for both arms at once; this leaves the
+      // terminal deriving and takes it away from the SVG, which reconstructs
+      // F317's exact state. A gate that cannot tell those apart cannot say the
+      // seam has two consumers.
+      name: "THE SEAM: only the terminal derives, which is the state this rule was written about",
+      file: SVG,
+      from: "  const block = drawnBlock(given);",
+      to: "  const block = given;",
+      expect: "SB",
     },
   ],
 });
