@@ -29,8 +29,8 @@ import { tiles } from "../../src/presentation/plot/hierarchy.js";
 import { flatten } from "../../src/presentation/plot/tree.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
 import {
-  barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS, horizonFigure, proportionFigure,
-  stackedFigure, waterfallFigure,
+  barFigure, curveFigure, distributionFigure, funnelFigure, HAS_VALUE_AXIS, horizonFigure, proportionFigure,
+  stackedFigure, spanFigure,
 } from "../../src/presentation/plot/figure.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { resolve } from "../../src/presentation/theme/index.js";
@@ -612,7 +612,26 @@ describe.each(supported)("G6 — %s", (form) => {
       expect(ts[1], `${form}: the pinned floor is not the bar's baseline`).toBeGreaterThan(0);
       return;
     }
-    if (family === "stacked" || family === "waterfall") {
+    // **A funnel has no bound because its reading is a share** (I73, F330). The
+    // proportion branch above makes the same argument for `pie` and `waffle`;
+    // this is the third form of that shape and the first drawn as a rectangle,
+    // which is why keying it on the family would have missed it.
+    if (family === "funnel") {
+      expect(HAS_VALUE_AXIS[form], `${form}: a share of a whole, so no bound`).toBe(false);
+      const fig = funnelFigure(made);
+      expect(fig.value, `${form}: and no axis to draw it on`).toBeNull();
+      const hs = fig.marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.h] : []));
+      expect(hs.length, `${form}: the shares put something on the page`).toBeGreaterThan(0); // cells-ok — a mark count
+      // Centred: the bar's two ends are `(1 ∓ share) / 2`, so a rect's midpoint
+      // is the axis's midpoint whatever its width, and the widest is the max.
+      for (const d of fig.marks) {
+        if (d.mark.kind !== "rect") continue;
+        expect(d.mark.y + d.mark.h / 2, `${form}: centred, whatever the share`).toBeCloseTo(0.5, 6);
+      }
+      expect(Math.max(...hs), `${form}: the largest stage is the whole span`).toBeCloseTo(1, 6);
+      return;
+    }
+    if (family === "stacked" || family === "span") {
       // **A cumulative coordinate is not a sample's own position**, so *far below
       // pins to the floor* has no subject here: the fold decides where a sample
       // lands and the pin decides the axis it lands on. What the pin must still
@@ -621,7 +640,7 @@ describe.each(supported)("G6 — %s", (form) => {
       // `normalisedOf` is what clamps whatever falls outside it.
       const fig = family === "stacked"
         ? stackedFigure(made, form === "streamgraph")
-        : waterfallFigure(made);
+        : spanFigure(made);
       expect(fig.value, `${form}: the fold has an axis`).not.toBeNull();
       // **The ceiling is the pin's on both; the floor differs and the record
       // says why.** A waterfall reaches `categoricalDecisions`, which
@@ -630,8 +649,15 @@ describe.each(supported)("G6 — %s", (form) => {
       // the anchor is right rather than tolerated. A stacked band is positional
       // and keeps the pin as given.
       expect(fig.value?.range.max, `${form}: the pin's ceiling wins over the fold`).toBe(PIN.yMax);
-      expect(fig.value?.range.min, `${form}: and its floor, zero-anchored where the family is`)
-        .toBe(family === "waterfall" ? Math.min(0, PIN.yMin) : PIN.yMin);
+      // **The floor is keyed on the FORM and the family has two answers**
+      // (§3ak.34). `waterfall` reaches `categoricalDecisions`, which zero-anchors
+      // — *a bar's length is its value, so signed data grows both ways from
+      // zero* (F272), and zero is where a running total starts. **A gantt does
+      // not**: a task is an interval, so a project beginning on day three begins
+      // on day three, and `categoricalDecisions` carries a form branch for it.
+      // A stacked band is positional and keeps the pin as given.
+      expect(fig.value?.range.min, `${form}: and its floor, zero-anchored where the form is`)
+        .toBe(form === "waterfall" ? Math.min(0, PIN.yMin) : PIN.yMin);
       const ts = fig.marks.flatMap((d) => (d.mark.kind === "rect"
         ? [d.mark.y, d.mark.y + d.mark.h]
         : d.mark.kind === "polyline" ? d.mark.points.map((pt) => pt[1]) : []));

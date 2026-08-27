@@ -14,6 +14,12 @@
  * stream graph whose bands cross is not a stream graph with a rendering defect;
  * it is a line chart.
  *
+ * **And two spans that are not a stack** (§3ak.34). `waterfallBars` and
+ * `ganttBars` live here because this is where a fold both arms need already
+ * lived, and because F329 is the argument: a derivation with two
+ * implementations is checked by nothing, since the corpus that separates them is
+ * the corpus neither arm has.
+ *
  * **Bands never cross, and that is the property to hold onto.** Each band's
  * lower bound is the previous band's upper bound, so the ordering is structural
  * rather than something the data can violate. A renderer that computed each
@@ -64,8 +70,15 @@ export function stackBands(
   });
 }
 
-/** One bar of a waterfall: a span on the cumulative axis, drawn or not. */
-export type WaterfallBar = Readonly<{ from: number; to: number; drawn: boolean }>;
+/**
+ * **A bar drawn between two values on a shared axis** — the `span` family's
+ * datum (§3ak.34).
+ *
+ * Named for the shape rather than for the first form that needed it. A
+ * waterfall's step and a gantt's task are the same mark from two different
+ * arithmetics, and the emitter that draws them does not care which.
+ */
+export type Span = Readonly<{ from: number; to: number; drawn: boolean }>;
 
 /**
  * A waterfall's running baseline — **the family's other cumulative fold** (I70,
@@ -98,10 +111,45 @@ export type WaterfallBar = Readonly<{ from: number; to: number; drawn: boolean }
  * the steps, which answers *how big is one change* where a gutter must cover
  * *where the running total went*.
  */
+/**
+ * A gantt's tasks — **a start and a duration, which is a span already**
+ * (§3ak.34, F329).
+ *
+ * Two lines, and here rather than in a renderer for exactly the reason the fold
+ * beside it is: two copies of two lines is how three copies of a fold began. The
+ * mechanical test F329 leaves behind is *does the other arm call the function*,
+ * and a derivation small enough to inline is the one most likely to be inlined
+ * twice.
+ *
+ * **The range has no floor**, which is the one thing that separates it from a
+ * waterfall's. A bar's length is its value, so it grows from zero; a task is an
+ * **interval**, and a project starting on day three starts on day three.
+ *
+ * **A task with no duration still has a start**, so it bounds the axis while
+ * drawing nothing — the terminal's own arithmetic, where `dur` falls back to
+ * zero for the bounds and the row comes out blank.
+ */
+export function ganttBars(
+  values: readonly (number | null)[],
+  offsets: readonly number[],
+): Readonly<{ bars: readonly Span[]; min: number; max: number }> {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  const bars = values.map((v, i) => {
+    const from = offsets[i] ?? 0;
+    const drawn = v !== null && Number.isFinite(v);
+    const to = from + (drawn ? v : 0);
+    min = Math.min(min, from);
+    max = Math.max(max, to);
+    return { from, to, drawn };
+  });
+  return { bars, min, max };
+}
+
 export function waterfallBars(
   values: readonly (number | null)[],
   totals: readonly boolean[],
-): Readonly<{ bars: readonly WaterfallBar[]; min: number; max: number }> {
+): Readonly<{ bars: readonly Span[]; min: number; max: number }> {
   let running = 0;
   let min = 0;
   let max = 0;

@@ -39,7 +39,7 @@ import { plotToSvg, svgFamilyOf } from "../../src/presentation/plot/svg.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import {
   barFigure, curveFigure, distributionFigure, fieldFigure, horizonFigure, matrixFigure,
-  proportionFigure, scatterFigure, stackedFigure, tilesFigure, waterfallFigure,
+  proportionFigure, scatterFigure, stackedFigure, tilesFigure, spanFigure, funnelFigure,
   type Figure,
   type Mark,
 } from "../../src/presentation/plot/figure.js";
@@ -48,6 +48,7 @@ import { RAMP_DEFAULT, rampOf } from "../../src/presentation/plot/figure.js";
 import { COLORMAPS, continuousColour } from "../../src/presentation/theme/colormap.js";
 import type { ColormapName } from "../../src/data/viewmodel/index.js";
 import { roleGlyphs } from "../../src/presentation/plot/roles.js";
+import { ROW_IS_AN_IDENTITY } from "../../src/presentation/plot/marks.js";
 import { forestRow } from "../../src/presentation/plot/glyph-row.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { cells, truncate, type AmbiguousWidth } from "../../src/presentation/text.js";
@@ -96,7 +97,7 @@ const EMITTER = {
   curve: curveFigure, scatter: scatterFigure, bar: barFigure,
   matrix: matrixFigure, distribution: distributionFigure, tiles: tilesFigure,
   proportion: proportionFigure, field: fieldFigure, horizon: horizonFigure,
-  stacked: (b: Plot) => stackedFigure(b, b.form === "streamgraph"), waterfall: waterfallFigure,
+  stacked: (b: Plot) => stackedFigure(b, b.form === "streamgraph"), span: spanFigure, funnel: funnelFigure,
 } as const;
 type WalkedFamily = keyof typeof EMITTER;
 
@@ -315,13 +316,13 @@ describe("U — the seam, asserted from both arms", () => {
       gutterFamilies += 1;
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
-    expect(drawn, "drawn SVG documents").toBe(133); // cells-ok — a document count
+    expect(drawn, "drawn SVG documents").toBe(135); // cells-ok — a document count
     // **D13 closed**: the legend is drawn where the author asked and where it is
     // load-bearing — `SHARES_CELLS` and more than one series — which is the form
     // half of the terminal's auto-enable. The rung half stays there, because one
     // of its clauses reads `caps.colourDepth`.
     expect(legendDrawn, "documents drawing a legend label — D13").toBe(63); // cells-ok — a document count
-    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(130); // cells-ok — a document count
+    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(132); // cells-ok — a document count
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
     // rather than better: a curve's identity is its series, which belongs in the
@@ -332,7 +333,7 @@ describe("U — the seam, asserted from both arms", () => {
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(83); // cells-ok — a document count
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(85); // cells-ok — a document count
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {
@@ -437,7 +438,7 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(seen.size, "distinct forms walking a figure").toBe(35); // cells-ok — a form count
+    expect(seen.size, "distinct forms walking a figure").toBe(37); // cells-ok — a form count
   });
 
   it("U3 (C12 I59, §3ak.17): and over every variant, including both data shapes", () => {
@@ -454,7 +455,7 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(checked, "variants walking a figure").toBe(146); // cells-ok — a variant count
+    expect(checked, "variants walking a figure").toBe(148); // cells-ok — a variant count
     // The bucket that lies, pinned. If a second one appears, the emitter key is
     // the first thing to check — this is the count F290 rests on.
     expect(lying, "variants whose spec.form differs from their catalogue bucket").toBe(1); // cells-ok — a variant count
@@ -471,7 +472,7 @@ describe("U — the seam, asserted from both arms", () => {
       const json = JSON.stringify(EMITTER[family as WalkedFamily](blockOf(spec)));
       expect(json, `${bucket}/${variant} carries a resolved colour`).not.toMatch(/#[0-9a-f]{6}/iu);
     }
-    expect(checked, "figures checked for a resolved colour").toBe(146); // cells-ok — a variant count
+    expect(checked, "figures checked for a resolved colour").toBe(148); // cells-ok — a variant count
   });
 
   it("U5 (C12 I59, §3ak.17): the SVG arm cannot see a capability — structural, not measured", () => {
@@ -993,6 +994,62 @@ describe("U — the seam, asserted from both arms", () => {
     // than a literal, so the row starts asking `horizon` the day its arm opens.
     expect(skipped, "the ones this row cannot reach are exactly the refused ones")
       .toEqual(odd.filter(([f]) => svgFamilyOf(f) === null).map(([f]) => f));
+  });
+
+  it("U10 (C12 I38, §3ak.34): a categorical row's colour names the same slot in both arms", () => {
+    // **The row F331 did not have, and the frame is what found it** (§3ak.34).
+    // `categoricalForm` gives a row its own palette slot when
+    // `ROW_IS_AN_IDENTITY[form]` — `own = i`, where `i` is the **row**, and for
+    // every form but the timeline a row is a category. Every figure emitter
+    // passed the **series** index instead, so `bar/default` drew five colours in
+    // the terminal and one here, and so did `waterfall`, which had shipped.
+    //
+    // **Nothing could see it.** The SVG baseline compares this arm against
+    // itself, the disagreement matrix has no column for which slot a mark takes,
+    // and `ramp` is about colormaps rather than palette slots. It took reading
+    // the pair.
+    //
+    // **Stated limit: this compares counts, not the assignment.** Two arms that
+    // permuted the same five slots would agree here. What it does catch is the
+    // shape the defect actually had — N against 1 — and the assignment is what
+    // the pair sheet is read for.
+    const INK = /\u001b\[38;2;(\d+;\d+;\d+)m/gu;
+    const rows: string[] = [];
+    let asked = 0; // cells-ok — a form count
+
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS) as readonly (readonly [PlotForm, Record<string, Spec>])[]) {
+      // Row-per-category forms only: where a row is a **series** the two arms
+      // have always agreed, because `seriesIndex` was the right index there.
+      if (!ROW_IS_AN_IDENTITY[form] || svgFamilyOf(form) === null) continue;
+      const spec = Object.values(variants)[0];
+      if (spec === undefined) continue;
+      const b = blockOf(specOf(spec));
+      if ((b.categories ?? []).length < 2 || b.series.length !== 1) continue; // cells-ok — a category count
+      const svg = plotToSvg(b, DARK_THEME);
+      if (svg === null) continue;
+
+      // The terminal's, off the painted frame: every foreground colour inside
+      // the figure, which for these forms is the bars and their labels.
+      const painted = frame(spec, FULL_CAPS, 80, "u10").join("\n");
+      const term = new Set([...painted.matchAll(INK)].map((m) => m[1] ?? ""));
+      // This arm's, off the document: every series fill.
+      // **Every element that can carry a series fill, not only `rect`** — a
+      // dotplot draws `circle` and a curve draws `path`, and a matcher that sees
+      // one encoding reports absence when the value changes form.
+      const svgFills = new Set([...svg.matchAll(/<(?:rect|circle|path|polygon)[^>]*fill="(#[0-9a-f]{6})"/gu)]
+        .map((m) => m[1] ?? "")
+        .filter((f) => f !== "#141414"));
+      asked += 1; // cells-ok — a form count
+      rows.push(`${form}: terminal ${String(term.size)} · svg ${String(svgFills.size)}`); // cells-ok — a colour count
+      expect(svgFills.size, `${form}: the same number of slots on both sides`)
+        .toBeGreaterThanOrEqual(Math.min(term.size, (b.categories ?? []).length)); // cells-ok — a colour count
+    }
+
+    // **The counter, because a loop with every `continue` taken is green**
+    // (`test/support/README.md`). Eight frames moved when the emitters started
+    // reading the record, and these are the forms that own them.
+    expect(asked, "row-per-category forms this arm claims, with more than one category").toBe(6); // cells-ok — a form count
+    expect(rows.join(" | "), "and each drew a slot per category").toContain("bar:");
   });
 
   it("U8b (C12 I70, §3ak.29): each of the three is idempotent, because two callers now apply it", () => {

@@ -6357,6 +6357,28 @@ form's one distinguishing operation is invisible in every frame. A claimed form 
 degenerate is claimed on no evidence, which is `G7b`'s argument one level up — so a
 `slope/three-points` variant lands with the arm, and it is what separates `slope` from `line`.
 
+#### `gantt` and `funnel` drew, and reading the pair found what the arithmetic could not
+
+Both agree with the terminal proportion for proportion, checked on the numbers first: `gantt`'s four
+tasks land at `89.6 / 180.364`, `269.964 / 108.218`, `378.182 / 72.145`, `450.327 / 36.073` against a
+plot area of `89.6 … 486.4`, which is `0 … 5`, `5 … 8`, `8 … 10`, `10 … 11` of eleven; `funnel`'s four
+stages are centred at shares `1`, `0.4`, `0.2`, `0.08`, and the terminal's `pad` is `21`, `28` and
+`32` cells of seventy.
+
+**And the picture disagreed anyway.** The terminal draws each task in its own colour and this arm
+drew all four in one — which is F331, and the same frame shows `waterfall` doing it, a form that
+shipped in §3ak.33 with its frame read. **What was read then was the geometry, and the geometry was
+right.** `categoricalForm`'s `own = ROW_IS_AN_IDENTITY[block.form] ? i : 0` is the rule, `i` is the
+**row**, and for every form but the timeline a row is a category; every emitter passed the series
+index. Eight frames moved when `rowSlot` landed, and `histogram` and `autocorrelation` did not.
+
+**`gantt` joins `span` and `funnel` does not**, and the reason is I73's. A task and a running-total
+step are the same rect between two values, so they share an emitter and part only at the extent — a
+running total starts at zero and a project starts on its first day, which is `categoricalDecisions`'
+second form branch. A funnel's bar is `v / max` wide and **centred**, so its two ends are
+`(1 ∓ share) / 2` and neither is the reading: no shared axis can carry it, which is `value: null` and
+its own emitter.
+
 #### A reading with no ramp, which is the bullet's bands
 
 The terminal draws all of a bullet row — bands, measure and target — in **one** colour, measured off

@@ -18,8 +18,8 @@
 <clipPath id="isvgb-4"><rect x="0" y="248.48" width="83.6" height="24"/></clipPath>
 <text x="83.6" y="264.48" text-anchor="end" clip-path="url(#isvgb-4)" font-size="12" font-family="monospace" fill="#626262">epsilon</text>
 <circle cx="188.8" cy="40.32" r="3" fill="#e69f00"/>
-<circle cx="337.6" cy="95.36" r="3" fill="#e69f00"/>
-<circle cx="238.4" cy="150.4" r="3" fill="#e69f00"/>
-<circle cx="387.2" cy="205.44" r="3" fill="#e69f00"/>
-<circle cx="288" cy="260.48" r="3" fill="#e69f00"/>
+<circle cx="337.6" cy="95.36" r="3" fill="#56b4e9"/>
+<circle cx="238.4" cy="150.4" r="3" fill="#3cbf9a"/>
+<circle cx="387.2" cy="205.44" r="3" fill="#f0e442"/>
+<circle cx="288" cy="260.48" r="3" fill="#8fa8ff"/>
 </svg>

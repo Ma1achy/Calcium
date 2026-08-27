@@ -169,8 +169,8 @@ const MEASURED = {
   "waffle": { silent: "0/6", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "funnel": "refused",
-  "gantt": "refused",
+  "funnel": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "gantt": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   // **Family 8's aggregating three, and one fold serves them** (§3ak.33).
   // `waterfall` agrees about everything but the gutter's numbers, which is
   // the terminal reader's stated limit — the frame's numeric row sits below a
@@ -399,12 +399,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
         if (v[d] === "agree") closed += 1; else open += 1;
       }
     }
-    expect(claimed.length, "forms the SVG arm claims").toBe(37); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(9); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(259); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(37); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(65); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(157); // cells-ok — a cell count
+    expect(claimed.length, "forms the SVG arm claims").toBe(39); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(7); // cells-ok — a form count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(273); // cells-ok — a cell count
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(39); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(66); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(168); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

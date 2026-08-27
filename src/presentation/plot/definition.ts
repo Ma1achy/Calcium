@@ -60,7 +60,7 @@ import {
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
 import { FACING_DEFAULT, facingOf, rowOf, seriesRange, type Facing, type Range } from "./scale.js";
-import { bandRows, stackBands, stackRange, waterfallBars } from "./stack.js";
+import { bandRows, ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
@@ -2658,13 +2658,9 @@ const FORM_ROWS: Readonly<
     const offsets = block.offsets ?? [];
     const s = block.series[0];
     if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    let lo = Infinity, hi = -Infinity;
-    for (let i = 0; i < s.values.length; i++) { // cells-ok — a sample count
-      const start = offsets[i] ?? 0;
-      const dur = s.values[i] ?? 0;
-      lo = Math.min(lo, start);
-      hi = Math.max(hi, start + dur);
-    }
+    // **Called rather than walked, before there was a second copy to reconcile**
+    // (F329, §3ak.34). Two lines is what the waterfall's three walks started as.
+    const { min: lo, max: hi } = ganttBars(s.values, offsets);
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
     let ri = 0;
     return categoricalForm(block, width, ctx, (_label, aw) => {

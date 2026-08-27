@@ -1,1 +1,19 @@
-REFUSED — plotToSvg returned null
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<clipPath id="isvgb-0"><rect x="0" y="35.2" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="51.2" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">Visit</text>
+<clipPath id="isvgb-1"><rect x="0" y="104" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="120" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">Sign up</text>
+<clipPath id="isvgb-2"><rect x="0" y="172.8" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="188.8" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">Trial</text>
+<clipPath id="isvgb-3"><rect x="0" y="241.6" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="257.6" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#626262">Pay</text>
+<rect x="89.6" y="26.56" width="396.8" height="41.28" fill="#e69f00"/>
+<rect x="208.64" y="95.36" width="158.72" height="41.28" fill="#56b4e9"/>
+<rect x="248.32" y="164.16" width="79.36" height="41.28" fill="#3cbf9a"/>
+<rect x="272.128" y="232.96" width="31.744" height="41.28" fill="#f0e442"/>
+</svg>

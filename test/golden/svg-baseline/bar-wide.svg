@@ -25,11 +25,11 @@
 <clipPath id="isvgb-7"><rect x="0" y="258.8" width="83.6" height="24"/></clipPath>
 <text x="83.6" y="274.8" text-anchor="end" clip-path="url(#isvgb-7)" font-size="12" font-family="monospace" fill="#626262">Australia</text>
 <rect x="89.6" y="19.68" width="11.11" height="20.64" fill="#e69f00"/>
-<rect x="89.6" y="54.08" width="11.772" height="20.64" fill="#e69f00"/>
-<rect x="89.6" y="88.48" width="24.205" height="20.64" fill="#e69f00"/>
-<rect x="89.6" y="122.88" width="24.337" height="20.64" fill="#e69f00"/>
-<rect x="89.6" y="157.28" width="30.025" height="20.64" fill="#e69f00"/>
-<rect x="89.6" y="191.68" width="37.035" height="20.64" fill="#e69f00"/>
-<rect x="89.6" y="226.08" width="111.104" height="20.64" fill="#e69f00"/>
-<rect x="89.6" y="260.48" width="392.567" height="20.64" fill="#e69f00"/>
+<rect x="89.6" y="54.08" width="11.772" height="20.64" fill="#56b4e9"/>
+<rect x="89.6" y="88.48" width="24.205" height="20.64" fill="#3cbf9a"/>
+<rect x="89.6" y="122.88" width="24.337" height="20.64" fill="#f0e442"/>
+<rect x="89.6" y="157.28" width="30.025" height="20.64" fill="#8fa8ff"/>
+<rect x="89.6" y="191.68" width="37.035" height="20.64" fill="#f07a3c"/>
+<rect x="89.6" y="226.08" width="111.104" height="20.64" fill="#e4a3c4"/>
+<rect x="89.6" y="260.48" width="392.567" height="20.64" fill="#cfcfcf"/>
 </svg>

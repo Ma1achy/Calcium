@@ -24,9 +24,9 @@ import type { ColourRef } from "../theme/types.js";
 import { axisFor, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
 import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
-import { stackBands, stackRange, waterfallBars } from "./stack.js";
+import { ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { plotAreaRows } from "./height.js";
-import { HAS_POSITION_AXIS, refOf } from "./marks.js";
+import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, refOf } from "./marks.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
 
 /**
@@ -102,7 +102,21 @@ export const HAS_VALUE_AXIS = {
   sparkline: true, slope: true, bubble: true, stackedarea: true, streamgraph: true,
   bar: true, histogram: true, lollipop: true, dotplot: true, waterfall: true,
   boxplot: true, violin: true, ridgeline: true, forest: true, dumbbell: true,
-  autocorrelation: true, bullet: true, funnel: true,
+  autocorrelation: true,
+  // **`funnel` and `bullet` are the class I73 is about, and both were `true`**
+  // (F330, §3ak.34). A `Figure` holds **one** `value`, so a form whose marks
+  // want more than one range — or none — cannot have a true one, and the cell
+  // reads as deliberate either way because nothing had ever drawn it.
+  //
+  // A funnel's readings are **shares**: its bar is `v / max` wide and centred, so
+  // neither end of it is the reading, which is the proportion family's own reason
+  // one family along. A bullet's three rows are three quantities in three units,
+  // each scaled to its own `q.min … q.max` — and the reason was already written
+  // in the renderer that draws it, *the bands say what good is, so a reader needs
+  // no legend and no second glance at a dial*, in a different file from this
+  // record. §3q's *one axis across the bands* does not reach it: that rule is
+  // scoped by purpose in its own words, and a bullet's purpose is the opposite.
+  funnel: false, bullet: false,
   // **A field's readings are colours, and the sentence that made these `true`
   // was about the ordinate** (F325). *A field is sampled over a domain, so its
   // columns are positions and its rows are a scale* — true, and about the
@@ -1847,6 +1861,28 @@ export function matrixFigure(block: Plot): Figure {
 }
 
 /**
+ * **The palette slot a categorical row takes** (C12 I38, §3ak.34, F331).
+ *
+ * `categoricalForm` computes exactly this — `ROW_IS_AN_IDENTITY[form] ? i : 0`,
+ * where `i` is the **row**, and for every form but the timeline a row is a
+ * category. Every figure emitter passed the **series** index instead, so a bar
+ * chart of five categories drew five colours in one arm and one in the other,
+ * and a waterfall and a gantt did the same.
+ *
+ * **`Drawn.seriesIndex` is where the conflation lives.** Its doc says *the
+ * categorical slot, unresolved — `refOf`'s index, not a colour*, and its **name**
+ * says series; every emitter read the name. MG24's collision class inside the
+ * member built to carry a slot.
+ *
+ * **`per > 1` is the grouped bar**, whose row genuinely is a *(category,
+ * series)* pair — `categoricalForm`'s own escape, and the reason this takes both
+ * indices rather than replacing one with the other.
+ */
+export function rowSlot(form: PlotForm, category: number, seriesIndex: number, per: number): number {
+  return per > 1 ? seriesIndex : ROW_IS_AN_IDENTITY[form] ? category : 0; // cells-ok — a series count
+}
+
+/**
  * A bar's baseline — **`min(0, dataMin)`, and it is a family decision** (§3ak.7).
  *
  * A bar's *length* is its value, so signed data grows both ways from zero and
@@ -1909,7 +1945,15 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     ? null
     : block.form === "autocorrelation"
       ? { min: -lagMagnitude(block), max: lagMagnitude(block) }
-      : { min: baselineOf(data.min), max: data.max };
+      // **A gantt has no floor, and it is the second form branch for the same
+      // reason as the first** (§3ak.34). *A bar's length is its value, so signed
+      // data grows both ways from zero* (F272) — and a task is an **interval**,
+      // so a project starting on day three starts on day three. `baselineOf`
+      // would drag the axis back to zero and draw every task shifted right of
+      // where the terminal puts it.
+      : block.form === "gantt"
+        ? data
+        : { min: baselineOf(data.min), max: data.max };
   return {
     value: axisOver(extent, block),
     extent,
@@ -2006,13 +2050,14 @@ export function barFigure(block: Plot): Figure {
         const top = normalisedOf(v, value.range, false);
         const x = (i + seriesIndex / per) / n;
         const w = 1 / (n * per);
+        const slotIndex = rowSlot(block.form, i, seriesIndex, per); // cells-ok — a category index
         if (stem) {
           marks.push({
             mark: lag
               ? { kind: "rect", x, y: Math.min(zero, top), w, h: Math.abs(top - zero), fill: true }
               : { kind: "rect", x, y: 0, w, h: top, fill: true },
             layer: "series",
-            seriesIndex,
+            seriesIndex: slotIndex,
           });
         }
         // **The head is on the niced range like the stem, and that is F272b's
@@ -2025,7 +2070,7 @@ export function barFigure(block: Plot): Figure {
           marks.push({
             mark: { kind: "point", x: x + w / 2, y: top, role: "point" },
             layer: "series",
-            seriesIndex,
+            seriesIndex: slotIndex,
           });
         }
       });
@@ -2117,13 +2162,26 @@ export function stackedFigure(block: Plot, centred: boolean): Figure {
  * running values — not `seriesRange` over the steps, which answers *how big is
  * one change* where the gutter must cover *where the running total went*.
  */
-export function waterfallFigure(block: Plot): Figure {
+export function spanFigure(block: Plot): Figure {
   const series = block.series[0];
   // **The fold is called rather than walked** (F329, §3ak.34). This function held
   // its own copy, and the copy followed the terminal's *bounds* walk where the
   // terminal *draws* from another — so a null total reset the running sum here
   // and held it there, and no fixture has a null.
-  const { bars, min: lo, max: hi } = waterfallBars(series?.values ?? [], block.totals ?? []);
+  const values = series?.values ?? [];
+  // **Two arithmetics, one mark** (§3ak.34). A waterfall's span runs from the
+  // running total to the next; a gantt's from a start to a start plus a
+  // duration. What they share is the mark and everything around it, which is
+  // what makes them a family rather than two forms that resemble each other.
+  const { bars, min: lo, max: hi } = block.form === "gantt"
+    ? ganttBars(values, block.offsets ?? [])
+    : waterfallBars(values, block.totals ?? []);
+  // **Non-finite where there is nothing to bound**, which only `ganttBars` can
+  // return: a waterfall's fold starts at zero and a gantt's starts at the first
+  // task. The terminal answers the same case with `emptyRows`.
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+    return { ...categoricalDecisions(block), marks: [] };
+  }
   const pinned: Plot = { ...block, yMin: block.yMin ?? lo, yMax: block.yMax ?? hi };
   const decisions = categoricalDecisions(pinned);
   const { value } = decisions;
@@ -2137,11 +2195,49 @@ export function waterfallFigure(block: Plot): Figure {
       marks.push({
         mark: { kind: "rect", x: i / n, y: Math.min(a, b), w: 1 / n, h: Math.abs(b - a), fill: true }, // cells-ok — a category count
         layer: "series",
-        seriesIndex: 0,
+        seriesIndex: rowSlot(block.form, i, 0, 1), // cells-ok — a category index
       });
     });
   }
   return { ...decisions, marks };
+}
+
+/**
+ * A funnel — **a centred bar whose width is a share** (C04 §8, §3ak.34).
+ *
+ * **`value: null`, and it is I73's second case.** The bar runs from
+ * `(1 − share) / 2` to `(1 + share) / 2`, so neither of its ends is the reading
+ * and an axis under it would label positions nothing is drawn at. The reading is
+ * `v / max` — a **share**, which is the proportion family's own reason for
+ * having no value axis, arriving on a form that is drawn as a rectangle rather
+ * than as an angle.
+ *
+ * **The extent is kept.** The data does have a range and `seriesRange` is what
+ * the terminal measures `max` with; what it has not got is an axis to put it on.
+ *
+ * **The terminal's one-cell floor stays in the terminal.** `funnelRow` takes
+ * `max(1, round(share · w))`, so a stage far below the first still draws — I8's
+ * rule that a band thinner than a cell must not vanish, and a cell is a thing
+ * only a grid has.
+ */
+export function funnelFigure(block: Plot): Figure {
+  const decisions = categoricalDecisions(block);
+  const values = block.series[0]?.values ?? [];
+  const max = decisions.extent?.max ?? 0;
+  const n = Math.max(1, decisions.identity.length || values.length); // cells-ok — a category count
+  const marks: Drawn[] = [];
+  if (max > 0) {
+    values.forEach((v, i) => {
+      if (v === null || !Number.isFinite(v) || i >= n) return; // cells-ok — a category index
+      const share = Math.max(0, Math.min(1, v / max));
+      marks.push({
+        mark: { kind: "rect", x: i / n, y: (1 - share) / 2, w: 1 / n, h: share, fill: true }, // cells-ok — a category count
+        layer: "series",
+        seriesIndex: rowSlot(block.form, i, 0, 1), // cells-ok — a category index
+      });
+    });
+  }
+  return { ...decisions, value: null, marks };
 }
 
 /**

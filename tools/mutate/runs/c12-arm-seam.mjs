@@ -771,8 +771,62 @@ const results = runPass({
       // structural half: sever the call and `waterfallFigure` has no fold at all.
       name: "THE CALL: the second arm walks its own fold rather than calling the shared one",
       file: FIGURE,
-      from: "  const { bars, min: lo, max: hi } = waterfallBars(series?.values ?? [], block.totals ?? []);",
+      from: "  const { bars, min: lo, max: hi } = block.form === \"gantt\"\n    ? ganttBars(values, block.offsets ?? [])\n    : waterfallBars(values, block.totals ?? []);",
       to: "  const { bars, min: lo, max: hi } = { bars: [], min: 0, max: 0 };",
+      expect: "SB",
+    },
+    {
+      // **Family 8's residue** (§3ak.34). A gantt's task and a waterfall's step
+      // are one emitter, so the mutations that separate them are about the two
+      // arithmetics and the extent, not about the mark.
+      name: "THE ORIGIN: a gantt's tasks all start at the axis floor, so it is a bar chart",
+      file: STACK,
+      from: "    const from = offsets[i] ?? 0;",
+      to: "    const from = 0;",
+      expect: "SB",
+    },
+    {
+      name: "THE FLOOR: a gantt zero-anchors like a bar, so a project starting late starts at zero",
+      file: FIGURE,
+      from: '      : block.form === "gantt"\n        ? data\n        : { min: baselineOf(data.min), max: data.max };',
+      to: "      : { min: baselineOf(data.min), max: data.max };",
+      expect: "G6",
+    },
+    {
+      name: "THE CENTRE: a funnel's bars are anchored rather than centred, so it is a bar chart",
+      file: FIGURE,
+      from: "        mark: { kind: \"rect\", x: i / n, y: (1 - share) / 2, w: 1 / n, h: share, fill: true }, // cells-ok — a category count",
+      to: "        mark: { kind: \"rect\", x: i / n, y: 0, w: 1 / n, h: share, fill: true }, // cells-ok — a category count",
+      expect: "SB",
+    },
+    {
+      // **A funnel's reading is a share, so an axis under it labels positions
+      // nothing is drawn at** (I73, F330). The record and the emitter must agree,
+      // and `FV1` is what compares them against the frames.
+      name: "THE SHARE: a funnel gets a value axis, and its bars are widths",
+      file: FIGURE,
+      from: "  return { ...decisions, value: null, marks };\n}",
+      to: "  return { ...decisions, marks };\n}",
+      expect: "SB",
+    },
+    {
+      // **The slot the frame found** (F331). Mutating it collapses every
+      // categorical row onto one colour, which is the state eight frames were in.
+      name: "THE SLOT: a categorical row takes the series' colour rather than its own",
+      file: FIGURE,
+      from: "  return per > 1 ? seriesIndex : ROW_IS_AN_IDENTITY[form] ? category : 0; // cells-ok — a series count",
+      to: "  return per > 1 ? seriesIndex : 0; // cells-ok — a series count",
+      expect: "U10",
+    },
+    {
+      // **And the other direction**: a histogram's bins are one distribution, so
+      // giving them slots draws eight colours for one thing — the defect
+      // `ROW_IS_AN_IDENTITY` was written against, arriving on the arm that had
+      // never read it.
+      name: "THE BINS: every categorical row takes its own colour, including a histogram's",
+      file: FIGURE,
+      from: "  return per > 1 ? seriesIndex : ROW_IS_AN_IDENTITY[form] ? category : 0; // cells-ok — a series count",
+      to: "  return per > 1 ? seriesIndex : category; // cells-ok — a series count",
       expect: "SB",
     },
     {

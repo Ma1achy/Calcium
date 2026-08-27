@@ -13642,6 +13642,44 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F331 — the record that decides a categorical row's colour is read by one arm and by no emitter ★★★★★
+
+`categoricalForm` gives a row its own palette slot when the form says a row is an identity:
+
+```
+const own = i < labels.length && ROW_IS_AN_IDENTITY[block.form] ? i : 0;
+```
+
+`i` is the **row**, and for every form but the timeline a row is a **category**. Every figure
+emitter passed the **series** index instead — `seriesIndex: 0` in `spanFigure` and `funnelFigure`,
+`seriesIndex` in `barFigure` — so a single-series categorical form drew **N colours in one arm and
+one in the other**.
+
+`bar/default`: five categories, five inks in the terminal, one orange in the second arm. Eight frames
+moved when the emitters started reading the record — `bar` at three variants, `lollipop`, `dotplot`,
+`waterfall`, `gantt`, `funnel` — and `histogram` and `autocorrelation` did not, because
+`ROW_IS_AN_IDENTITY` says `false` for them and *eight bins drew eight colours for one distribution*
+is the defect it was written against.
+
+**`Drawn.seriesIndex` is where the conflation lives, and it is MG24's class inside the member built
+to end one.** Its doc says *the categorical slot, unresolved — `refOf`'s index, not a colour*; its
+**name** says series. Every emitter read the name, and the doc was right and unread.
+
+**Nothing could see it.** The SVG baseline compares this arm against itself; the terminal baseline
+compares that one against itself; the disagreement matrix has no column for which slot a mark takes,
+and `ramp` — F316's column, added for exactly this kind of blindness — is about **colormaps**, not
+palette slots. `waterfall` shipped with it in §3ak.33 and the frame was read then. What was read was
+the geometry: *five bars at `x = 89.6 w = 396.8`, `327.68 / 158.72` … the terminal's frame
+proportion for proportion*. **The numbers agreed and the picture did not**, which is why the
+instrument is *read the frame* and not *check the arithmetic*.
+
+**A second half with no fixture, recorded rather than fixed.** `refOf(series, index)` returns
+`tone.${'{'}series.tone{'}'}` before it reaches a slot, and no emitter carries a tone across. All four
+`tone:` uses in the corpus are on **annotations**, so `Series.tone` is a path the pair sheet cannot
+show — an invariant is vacuous until its subject exists, and this one's subject is a fixture.
+
+---
+
 ## F330 — a record answering *are the readings on a scale* is satisfied by a form whose every row is on a different one ★★★★★
 
 `HAS_VALUE_AXIS` marked all five of family 8's residue `true`. None had ever been drawn, so no cell

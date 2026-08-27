@@ -44,7 +44,7 @@ import {
   fieldFigure,
   horizonFigure,
   stackedFigure,
-  waterfallFigure,
+  spanFigure, funnelFigure,
   distributionFigure,
   matrixFigure,
   nodesDecisions,
@@ -132,7 +132,7 @@ function escape(text: string): string {
  */
 export type SvgFamily =
   | "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion"
-  | "field" | "horizon" | "stacked" | "waterfall";
+  | "field" | "horizon" | "stacked" | "span" | "funnel";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -172,7 +172,7 @@ export const SVG_FAMILY = {
   // exactly what `drawnBlock` requires. `stackBands` already took a column count,
   // so passing the data's own length makes its resampler the identity and the
   // fold crosses at native resolution with no second implementation (I71).
-  waterfall: "waterfall", streamgraph: "stacked", stackedarea: "stacked",
+  waterfall: "span", streamgraph: "stacked", stackedarea: "stacked",
   // **Distribution** — the datum is a set of positions derived from the
   // samples rather than the samples, so the shared piece is the *set*:
   // `normalisedSummary` and `quartileRange`, which the terminal arm reads
@@ -206,7 +206,21 @@ export const SVG_FAMILY = {
   // the block is seven weekday rows of week columns with the dates in their
   // labels, which is exactly what `matrixFigure` emits.
   calendar: "matrix",
-  gantt: null, timeline: null, funnel: null,
+  // **`span`, and the family was named after a form until a second form needed
+  // it** (§3ak.34). A gantt's task is a rect between two values on a shared axis
+  // and so is a waterfall's step; only the arithmetic that produces the two
+  // values differs, and `ganttBars` and `waterfallBars` are that arithmetic, both
+  // in `stack.ts` and both called by both arms. **The extent is where they part**
+  // — a running total starts at zero and a project starts on its first day, so
+  // `categoricalDecisions` carries a form branch and states why.
+  gantt: "span",
+  // **`funnel` is its own, because a share is not a position** (I73, F330). Its
+  // bar is `v / max` wide and centred, so it cannot join `span`: the two ends
+  // are `(1 ∓ share) / 2` and neither is the reading. That is the proportion
+  // family's reason on a form drawn as a rectangle, and it is why this one has
+  // `value: null` where every other categorical form has an axis.
+  funnel: "funnel",
+  timeline: null,
   // **Proportion** — an angle, a polygon's radius, a count of squares, and the
   // three terminal compensations named as terminal (§3ak.26). What crosses is
   // the shares, the ceiling and the hundred-square assignment; what stays is
@@ -301,7 +315,8 @@ function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
     case "field": return fieldFigure(block);
     case "horizon": return horizonFigure(block);
     case "stacked": return stackedFigure(block, block.form === "streamgraph");
-    case "waterfall": return waterfallFigure(block);
+    case "span": return spanFigure(block);
+    case "funnel": return funnelFigure(block);
     default: return null;
   }
 }
@@ -1047,7 +1062,7 @@ function marks(
   if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
     || family === "bar" || family === "distribution" || family === "proportion"
     || family === "field" || family === "horizon" || family === "stacked"
-    || family === "waterfall") && "marks" in figure) {
+    || family === "span" || family === "funnel") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 

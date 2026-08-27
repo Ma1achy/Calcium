@@ -18,8 +18,8 @@
 <clipPath id="isvgb-4"><rect x="0" y="248.48" width="83.6" height="24"/></clipPath>
 <text x="83.6" y="264.48" text-anchor="end" clip-path="url(#isvgb-4)" font-size="12" font-family="monospace" fill="#626262">Net</text>
 <rect x="89.6" y="23.808" width="396.8" height="33.024" fill="#e69f00"/>
-<rect x="327.68" y="78.848" width="158.72" height="33.024" fill="#e69f00"/>
-<rect x="228.48" y="133.888" width="99.2" height="33.024" fill="#e69f00"/>
-<rect x="188.8" y="188.928" width="39.68" height="33.024" fill="#e69f00"/>
-<rect x="89.6" y="243.968" width="99.2" height="33.024" fill="#e69f00"/>
+<rect x="327.68" y="78.848" width="158.72" height="33.024" fill="#56b4e9"/>
+<rect x="228.48" y="133.888" width="99.2" height="33.024" fill="#3cbf9a"/>
+<rect x="188.8" y="188.928" width="39.68" height="33.024" fill="#f0e442"/>
+<rect x="89.6" y="243.968" width="99.2" height="33.024" fill="#8fa8ff"/>
 </svg>
