@@ -316,24 +316,40 @@ describe("U — the seam, asserted from both arms", () => {
       gutterFamilies += 1;
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
-    expect(drawn, "drawn SVG documents").toBe(135); // cells-ok — a document count
+    expect(drawn, "drawn SVG documents").toBe(137); // cells-ok — a document count
     // **D13 closed**: the legend is drawn where the author asked and where it is
     // load-bearing — `SHARES_CELLS` and more than one series — which is the form
     // half of the terminal's auto-enable. The rung half stays there, because one
     // of its clauses reads `caps.colourDepth`.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(63); // cells-ok — a document count
-    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(132); // cells-ok — a document count
+    // **63 to 45, and the drop is a reclassification** (F333). The curve family
+    // was drawing its `identity` — its **series names** — along the position
+    // axis, and this counter matches a legend slot's label by **string**, so a
+    // caption printing `obs` under a figure with no legend counted as a legend.
+    // 67 single-series documents carry one legend slot that the arm rightly
+    // never draws: a legend of one names nothing the figure has not said. The
+    // matcher cannot tell which element drew a string, and removing the captions
+    // is what made that visible — *assert the artefact, not a proxy*, on a
+    // counter rather than on an assertion.
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(45); // cells-ok — a document count
+    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(134); // cells-ok — a document count
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
     // rather than better: a curve's identity is its series, which belongs in the
     // legend, and `line.identityLabels` went 12/70 to 70/70 before the gate.
+    // **And the gate was the wrong record, which took a frame to see** (F333).
+    // `ROW_IS_AN_IDENTITY` answers *does each row get its own palette slot*, and
+    // it is `true` for the curve family — so the gate excluded nothing there and
+    // the series names went along the **position axis**, which is neither the
+    // gutter the sentence above rules out nor the legend it names.
+    // `HAS_POSITION_AXIS` is the record for this question: an identity is
+    // captioned along an axis exactly where the identity **is** that axis.
     // **+4 and not +9, and the four are the radar's** (§3ak.26). This counter is an
     // exact-string test, and a pie and a waffle draw `Chrome 65%` rather than
     // `Chrome` — the name and its reading in one `<text>`, which is what the
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(85); // cells-ok — a document count
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(57); // cells-ok — a document count
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {
@@ -438,7 +454,7 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(seen.size, "distinct forms walking a figure").toBe(37); // cells-ok — a form count
+    expect(seen.size, "distinct forms walking a figure").toBe(38); // cells-ok — a form count
   });
 
   it("U3 (C12 I59, §3ak.17): and over every variant, including both data shapes", () => {
@@ -455,7 +471,7 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(checked, "variants walking a figure").toBe(148); // cells-ok — a variant count
+    expect(checked, "variants walking a figure").toBe(150); // cells-ok — a variant count
     // The bucket that lies, pinned. If a second one appears, the emitter key is
     // the first thing to check — this is the count F290 rests on.
     expect(lying, "variants whose spec.form differs from their catalogue bucket").toBe(1); // cells-ok — a variant count
@@ -472,7 +488,7 @@ describe("U — the seam, asserted from both arms", () => {
       const json = JSON.stringify(EMITTER[family as WalkedFamily](blockOf(spec)));
       expect(json, `${bucket}/${variant} carries a resolved colour`).not.toMatch(/#[0-9a-f]{6}/iu);
     }
-    expect(checked, "figures checked for a resolved colour").toBe(148); // cells-ok — a variant count
+    expect(checked, "figures checked for a resolved colour").toBe(150); // cells-ok — a variant count
   });
 
   it("U5 (C12 I59, §3ak.17): the SVG arm cannot see a capability — structural, not measured", () => {
@@ -686,7 +702,7 @@ describe("U — the seam, asserted from both arms", () => {
     // drawable at this rung and `truncate` reserves both its cells since F292,
     // so its width is a cost and not a defect. `~` is the *repertoire* fallback,
     // which is a different question (§3ak.24).
-    expect(frames, "catalogue variants rendered at the wide rung").toBe(181); // cells-ok — a frame count
+    expect(frames, "catalogue variants rendered at the wide rung").toBe(182); // cells-ok — a frame count
     expect([...seen.keys()].sort(), "two-cell characters still emitted").toEqual(["…"]);
   });
 

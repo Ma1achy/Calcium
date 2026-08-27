@@ -8,8 +8,6 @@
 <text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">20</text>
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">40</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
-<text x="188.8" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">value</text>
-<text x="387.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">size</text>
 <rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
 <text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">value</text>
 <rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>

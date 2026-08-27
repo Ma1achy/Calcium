@@ -7,9 +7,6 @@
 <text x="83.6" y="234.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="83.6" y="125.6" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<text x="177.067" y="242.4" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">alpha</text>
-<text x="352" y="242.4" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">beta</text>
-<text x="526.933" y="242.4" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">gamma</text>
 <rect x="89.6" y="244.8" width="9.6" height="9.6" fill="#e69f00"/>
 <text x="103.2" y="254.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">alpha</text>
 <rect x="185.6" y="244.8" width="9.6" height="9.6" fill="#56b4e9"/>

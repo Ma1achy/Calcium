@@ -140,11 +140,11 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "8/86", "numericLabels": "68/78", "identityLabels": "54/78", "border": "4/78", "interiorRules": "10/78", "legend": "14/78", "ramp": "agree", "notice": "agree" },
+  "line": { silent: "8/86", "numericLabels": "68/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "10/78", "legend": "14/78", "ramp": "agree", "notice": "agree" },
   "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "6/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "2/4", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "8/8", "notice": "4/8" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
   // both readers ask the shape now — and `ramp` is F316's open column on the
@@ -177,7 +177,12 @@ const MEASURED = {
   // bottom rule the reader finds, so the two sets are the axis's against the
   // axis's plus the identity's.
   "waterfall": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "slope": "refused",
+  // **`slope` is the curve family, and its refusal reason described a chart this
+  // component does not draw** (§3ak.35, F332). `numericLabels 4/4` is the
+  // position axis: the terminal reads `0.0 … 1.0` and this arm reads nothing,
+  // because a slope's two columns are named by the caller and neither fixture
+  // names them.
+  "slope": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "bubble": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "timeline": "refused",
@@ -201,7 +206,7 @@ const MEASURED = {
   "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "4/4", "notice": "1/4" },
   "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "2/2", "legend": "agree", "ramp": "2/2", "notice": "2/2" },
   "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "1/2" },
-  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "4/4", "border": "agree", "interiorRules": "3/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "3/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "violin": "refused",
   "ridgeline": "refused",
   "smallmultiples": "refused",
@@ -399,12 +404,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
         if (v[d] === "agree") closed += 1; else open += 1;
       }
     }
-    expect(claimed.length, "forms the SVG arm claims").toBe(39); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(7); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(273); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(39); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(66); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(168); // cells-ok — a cell count
+    expect(claimed.length, "forms the SVG arm claims").toBe(40); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(6); // cells-ok — a form count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(280); // cells-ok — a cell count
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(40); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(63); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(177); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

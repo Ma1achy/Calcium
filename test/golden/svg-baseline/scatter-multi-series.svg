@@ -9,8 +9,6 @@
 <text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
 <text x="83.6" y="85.6" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">75</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<text x="188.8" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">setosa</text>
-<text x="387.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">virginica</text>
 <rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
 <text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">setosa</text>
 <rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>

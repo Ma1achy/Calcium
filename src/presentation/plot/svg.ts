@@ -37,7 +37,7 @@ import { normalisedOf } from "../../data/viewmodel/range.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
-import { ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf } from "./marks.js";
+import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf } from "./marks.js";
 import {
   barFigure,
   curveFigure,
@@ -250,7 +250,13 @@ export const SVG_FAMILY = {
   // normalised marks with no `areaWidth`, no `areaRows` and no `caps`** — and
   // the day it exists this is `"bar"`, because a folded band is a `rect` with a
   // `value`.
-  slope: null, dumbbell: "distribution", forest: "distribution", bullet: null,
+  // **`slope` is `curve`, and its reason described a chart this component does
+  // not draw** (§3ak.35, F332). *A slope's two positions are on **two axes*** —
+  // measured, the terminal rasterises `curveRows` over a two-value series on
+  // **one** value axis with two x positions, which is the curve family exactly.
+  // What was actually missing is the derivation: `slopeEnds` in `drawnBlock`, so
+  // both arms take the two columns above the decisions that label the axes.
+  slope: "curve", dumbbell: "distribution", forest: "distribution", bullet: null,
   // **`horizon`'s condition was written as a symbol and it is met** (F294,
   // §3ak.29): `horizonFigure`, a block in and normalised marks out, no
   // `areaWidth`, no `areaRows`, no `caps`. `horizonGrid` computed `within` —
@@ -1432,7 +1438,7 @@ export function plotToSvg(
   // ordinate `0 1 2 3 4 5` down the left, from those same strings. Named as an
   // exception rather than duplicated into a 46-entry table that would agree with
   // the first in 44 places.
-  const captionsRows = ROW_IS_AN_IDENTITY[block.form] || svgFamilyOf(block.form) === "field";
+  const captionsRows = (ROW_IS_AN_IDENTITY[block.form] && !HAS_POSITION_AXIS[block.form]) || svgFamilyOf(block.form) === "field";
   if (figure.gutter && slots > 0 && label !== undefined && captionsRows) {
     for (const [i, text] of named.entries()) {
       const t = (i + 0.5) / slots;

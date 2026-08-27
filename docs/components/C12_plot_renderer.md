@@ -6433,6 +6433,28 @@ indistinguishable, and the convenient input shape is the degenerate one.
 `slope/default` is byte-identical after the move, because there `ends` **is** the identity. Only the
 variant built to show the derivation moves, and it moves to `0.0 … 1.0` over `10 … 40`.
 
+#### And the pair found a gate keyed on the wrong record
+
+`slope/six-readings` agrees on every line — north 12 → 38, south 31 → 14, east 22 → 27, one value
+axis of `10 … 40`, the crossing where the ranking changes. What it does **not** agree on is the
+position axis: the terminal reads `0.0 … 1.0` and this arm reads `north south east`.
+
+The gate is `ROW_IS_AN_IDENTITY[block.form] || svgFamilyOf(block.form) === "field"`, and that record
+answers *does each row get its own palette slot*. **The comment beside it says so** — about the field
+family, because F325 added that exception and left the borrowing. It is `true` for the curve family,
+so the gate excluded nothing there, and every curve document has been captioning its series names
+along the position axis.
+
+**The sentence next to it is true and constrains nothing.** *A curve's identity is its series, which
+the terminal names in the legend and never in the gutter* — correct, and the fall-through draws them
+along **x**, which is neither the gutter nor the legend. MG24's class, in the comment that records
+having fixed this once already.
+
+**`HAS_POSITION_AXIS` is the record for this question**: an identity is captioned along an axis
+exactly where the identity **is** that axis. 51 frames move and every one is curve-family;
+`identityLabels` closes for `density`, `ecdf`, `scatter` and `step`, and `line` goes from **54/78 to
+13/78**. F333.
+
 #### `timeline` is F210's rule, and the pin is the whole of it
 
 Its events are positions on a shared scale, so the record's `true` stands and its rows are **series**

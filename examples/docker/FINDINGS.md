@@ -13642,6 +13642,45 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F333 — a gate keyed on the record for a different question, with the mismatch noticed once and patched by exception ★★★★★
+
+The second arm captions a figure's `identity` along an axis, gated on:
+
+```
+const captionsRows = ROW_IS_AN_IDENTITY[block.form] || svgFamilyOf(block.form) === "field";
+```
+
+**`ROW_IS_AN_IDENTITY` answers a different question** — *does each row get its own palette slot* —
+and the comment beside the gate says so, about the **field** family: *the record excludes for a
+different question's reason.* F325 added that exception and left the borrowing.
+
+It is `true` for the **curve family**, so the gate excluded nothing there, and every `line`,
+`scatter`, `step`, `ecdf`, `density`, `slope`, `bubble`, `stackedarea` and `streamgraph` document
+drew its **series names along the position axis** — where the terminal draws sample positions. Found
+by reading `slope/six-readings`: `north south east` under a figure whose x axis the terminal labels
+`0.0 … 1.0`.
+
+**And the sentence beside it is true and does not constrain the branch it is attached to.** *A
+curve's identity is its series, which the terminal names in the legend and **never in the gutter*** —
+correct, and the code's fall-through puts them along **x**, which is neither. MG24's class, in the
+comment that records having already fixed this once.
+
+**`HAS_POSITION_AXIS` is the record for this question**: an identity is captioned along an axis
+exactly where the identity **is** that axis, which is exactly where the form has no position axis of
+its own. Measured, the change moves **51 frames and every one is curve-family** — line 36, scatter 4,
+streamgraph 3, slope 2, density 2, step 1, stackedarea 1, ecdf 1, bubble 1 — and closes
+`identityLabels` outright for `density`, `ecdf`, `scatter` and `step` while taking `line` from
+**54/78 to 13/78**.
+
+**A counter came down with it, and that half is about the counter.** `D13` fell 63 → 45, because it
+matches a legend slot's label by **string** and cannot tell which element drew it: a caption printing
+`obs` under a figure with **no legend** counted as a legend. **67 single-series documents carry one
+legend slot the arm rightly never draws** — a legend of one names nothing the figure has not said —
+and 18 of them were being counted. *Assert the artefact, not a proxy*, arriving on a counter, and
+only visible because the proxy was removed.
+
+---
+
 ## F332 — a derivation applied inside a rasteriser labels one block and draws another ★★★★★
 
 `positionalForm(block, …)` takes its decisions — the extent, the nicing, the tick count, the

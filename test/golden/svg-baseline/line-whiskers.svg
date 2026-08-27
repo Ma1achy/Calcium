@@ -8,7 +8,6 @@
 <text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">80</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<text x="288" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">obs</text>
 <circle cx="89.6" cy="242.133" r="3" fill="#e69f00"/>
 <circle cx="125.673" cy="219.238" r="3" fill="#e69f00"/>
 <circle cx="161.745" cy="196.572" r="3" fill="#e69f00"/>

@@ -9,7 +9,6 @@
 <text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
 <text x="83.6" y="85.6" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">75</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<text x="352" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">alpha</text>
 <circle cx="89.6" cy="150.4" r="3" fill="#e69f00"/>
 <circle cx="100.31" cy="136.663" r="3" fill="#e69f00"/>
 <circle cx="111.02" cy="123.063" r="3" fill="#e69f00"/>

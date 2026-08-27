@@ -373,6 +373,34 @@ export function calendarRows(raw: Plot): Plot {
 }
 
 /**
+ * A slope graph's two columns — **the first reading and the last** (C04 §8,
+ * §3ak.35, I74, F332).
+ *
+ * **Here rather than in the rasteriser, and the difference is a labelled axis.**
+ * `positionalForm` takes its decisions from the block it is handed and passes
+ * each series to a callback; `slope` took its ends there. So the furniture
+ * described the authored block and the marks described this one, inside a single
+ * renderer — `slope/six-readings` drew a position axis reading `0.0 … 5.0` over a
+ * figure with two points on it, and a value axis of `0 … 50` covering samples
+ * nothing draws.
+ *
+ * **The label survives and the values do not.** The rasteriser's version built a
+ * bare `{ values }`, which was harmless while the legend came from the authored
+ * block; above the decisions it is the legend's source, so a spread carries its
+ * name and its tone across.
+ *
+ * **Nulls are dropped before the ends are taken**, which is the terminal's own
+ * arithmetic: a series whose last reading is absent slopes to its last *reading*,
+ * not to a gap. Fewer than two leaves what there is — one point is a point.
+ */
+export function slopeEnds(series: Series): Series {
+  const vals = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
+  return vals.length >= 2 // cells-ok — a sample count
+    ? { ...series, values: [vals[0]!, vals[vals.length - 1]!] } // cells-ok — a sample index
+    : { ...series, values: vals };
+}
+
+/**
  * The block a form actually draws (C12 I70, §3ak.27).
  *
  * **I65 put the derivation below both arms; this is the half that makes it
@@ -480,6 +508,11 @@ export function drawnBlock(block: Plot): Plot {
       // the block. Composed in the terminal and written out here, because a
       // no-op inside a switch reads as a decision.
       return calendarRows(block);
+    // **A slope's two columns, and it is the fourth `Plot -> Plot`** (I74,
+    // §3ak.35). Its own renderer already computed this — one callback down from
+    // the decisions that label the axis, which is the whole of F332.
+    case "slope":
+      return { ...block, series: block.series.map(slopeEnds) };
 
     default:
       return block;

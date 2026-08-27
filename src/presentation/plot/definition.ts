@@ -2558,13 +2558,11 @@ const FORM_ROWS: Readonly<
    * is why this is not two bar charts side by side. Drawn on the same dot grid
    * as `line`, with the series' first and last readings as the two columns.
    */
-  slope: (block, width, ctx) => positionalForm(block, width, ctx, (sr, range, aw, rows, caps, facing) => {
-    const vals = sr.values.filter((v): v is number => v !== null && Number.isFinite(v));
-    const ends = vals.length >= 2 // cells-ok — a sample count
-      ? { values: [vals[0]!, vals[vals.length - 1]!] } // cells-ok — a sample index
-      : { values: vals };
-    return curveRows(ends, range, aw, rows, caps, facing);
-  }),
+  // **The two columns come from the seam, and above the decisions** (C12 I74,
+  // §3ak.35). This took its ends in the callback, so the axis was labelled from
+  // the authored block while the marks were drawn from the derived one — a
+  // position axis of `0.0 … 5.0` over a figure with two points on it (F332).
+  slope: (block, width, ctx) => positionalForm(drawnBlock(block), width, ctx, curveRows),
 
   /**
    * A bubble chart — scatter with a **size** channel (C04 §8).
