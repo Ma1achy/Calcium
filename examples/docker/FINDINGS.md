@@ -13642,6 +13642,70 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F339 — the closed list says *never a constant* and every stroke in the arm is one ★★★☆☆
+
+C12 §2 names four legitimate differences between the arms *so that a fifth is a finding rather than a
+judgement call*. One of them describes an implementation the file does not have:
+
+> stroke width — a cell is one unit wide; an SVG stroke is a **ratio of the box**, never a constant,
+> or it changes with the output size
+
+**Twelve `stroke-width` sites in `svg.ts` and every one is a constant** — 0.75, 1, 1.5, 2 — and every
+one is right. A `viewBox` maps user units onto whatever the output size is, so **a constant in user
+units already is a ratio of the box**; that is the whole of what a `viewBox` does. The sentence names
+the property correctly and then forbids the only implementation that has it.
+
+**Obeying it would have made things worse, which is how a wrong reason stays invisible.** A reader
+computing `layout.width * k` gets a stroke that scales with the *panel*, so a facet 213 units wide
+draws a thinner line than the 640-unit plot beside it, and a `pairplot` becomes sixteen panels of
+sixteen different line weights. The row is now stated as the constant it is.
+
+**The instrument is *ask where the claim is written down*, pointed at the closed list rather than at a
+plan.** The list's own purpose is to be the thing a fifth difference is measured against, so a row
+that misdescribes the code is the one artefact in the campaign that cannot be checked by finding a
+second copy of it — there is only ever one. Measured in one grep. Its running total is now **four
+claims disproved and four produced**.
+
+---
+
+## F338 — a key names its bounds and not its readings, under an invariant that already forbade it ★★★★☆
+
+The terminal's contour key and this arm's, on the same block:
+
+```
+terminal   1.5  █████  99 · 20 40 60 80
+svg        1.5  █████  99
+```
+
+**The levels are the readings the lines are.** A contour key without them is a legend that does not
+say what its figure means, and `contour/levels` is the variant that shows why: it declares `[25, 50,
+75, 500]` over a field of `1.5 … 99`, so a reader who cannot see the list cannot tell an empty area
+from a constant field.
+
+**It was never an uncovered case.** C12 I49 has said *levels are named in the legend and never on the
+line* since §3y, and the sentence is about **a legend** rather than about a terminal. It reads as
+satisfied because the arm that has the feature satisfies it — and nothing asks the arm that does not.
+That is D13's class, a terminal feature the second arm was never given, arriving under an invariant
+that already forbids it, on a form that landed after D13 closed.
+
+**The derivation had crossed and the third caller was missing.** `contourLevels` is `figure.ts`'s,
+pure, and it is what the terminal's key calls *and* what `contourFigure` marches for its crossings.
+One function, two callers, and the key of the second arm was not one of them.
+
+**The column that would have caught it is a boolean.** `ramp` asks *is a colour key drawn*; it closed
+on eleven forms one commit earlier, and both arms answer `true` here. A presence column cannot see
+contents, so the fix is a column and not a frame: **`keyReadings`**, the readings a key names in
+reading order, measured on both arms — which fails for any form whose key ever says less than the
+other's, not only for this one.
+
+**And the new reader is geometric where the old one was adjacent.** `svgRampBounds` matched *a text,
+the bar, a text* in document order, so a third text after the second falls outside the match and
+anything drawn between them breaks it silently — the bounds would stop being excluded from
+`numericLabels` and six cells would open with nothing wrong. The baseline is `y + height` of the bar
+it already locates, and every text on it belongs to the key. F297's own ruling, one reader along.
+
+---
+
 ## F337 — three readers met a gradient and read its own coordinates as marks ★★★★☆
 
 The colour key closed F316's `ramp` column — eleven forms, **0 of 181** to every pair agreeing — and

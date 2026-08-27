@@ -4224,9 +4224,20 @@ finding rather than a judgement call:
 | | |
 |---|---|
 | antialiasing | an SVG curve is smooth and a braille curve is dots. Same colour, different edge — resolution, not styling |
-| stroke width | a cell is one unit wide; an SVG stroke is a **ratio of the box**, never a constant, or it changes with the output size |
+| stroke width | a cell is one unit wide; an SVG stroke is a **constant in user units**, which is the ratio — a `viewBox` maps those units onto whatever the output size is (F339) |
 | font | the terminal's is the reader's and SVG names a family. **The metrics differ and the colour does not** |
 | no ladder | **the SVG arm does not degrade at all.** It pins truecolour, so there is one rung and nothing below it |
+
+**The first row is about extent as much as about edges, and `boxplot` is the measured instance.** An
+outlier is `◌` — one whole cell, because a cell is the smallest thing a glyph arm can occupy —
+against `r="1.8"` in a 640-unit box. Same position, same colour, same role, **different extent**, and
+a mark present in both. It is this row and not a fifth entry.
+
+**And the row above it says *never a constant* while every `stroke-width` in `svg.ts` is one.** All
+twelve — 0.75, 1, 1.5, 2 — and all twelve are right: user units are what a `viewBox` scales, so a
+constant there already **is** a ratio of the box, and a reader obeying the sentence literally would
+multiply by `layout.width` and draw a facet's strokes thinner than the panel beside it. The sentence
+named the property correctly and forbade the only implementation that has it (F339).
 
 **The last is the one with a consequence.** A form whose terminal rendering leans on a degradation
 rung — stacked strips at 1-bit, `CATEGORY_MARKS` where colour cannot carry a category — draws the
@@ -6613,6 +6624,58 @@ argument, `binValues` bins. This one is not. `G1c` states it as a signature, by 
 `violinRows` stops taking a width the row fails and the refusal is re-read.
 
 ---
+
+### 3ak.38 — A key that names its bounds and not its readings, and the invariant it was already under
+
+The paired sheet, resampled across all 182. The terminal's contour key reads `1.5  █████  99 · 20 40
+60 80` and this arm's reads `1.5 █████ 99`. **The levels are the readings the lines are**, and a
+contour key without them is a legend that does not say what its figure means.
+
+#### It is not an uncovered case — it is I49's second arm
+
+I49 has said *levels are named in the legend and never on the line* since §3y, and the sentence is
+about **a legend** rather than about a terminal. It reads as satisfied because the arm that has the
+feature satisfies it, and nothing asks the arm that does not. That is D13's class — a terminal
+feature the second arm was never given — arriving *under an invariant that already forbids it*, on a
+form that landed after D13 closed.
+
+**The derivation had crossed and the third caller was missing.** `contourLevels` is `figure.ts`'s and
+pure; it is what the terminal's key calls **and** what `contourFigure` marches for its crossings. So
+the levels the key names and the levels the lines are come from one function already — in one arm.
+This arm called it for the lines and not for the key: commitment 65 with furniture as the subject
+rather than a block.
+
+#### The `ramp` column is a presence question, and a key can be present and say less
+
+`ramp` is a boolean: *is a colour key drawn*. It closed on eleven forms in §3ak.37 and it is blind by
+construction to what the key says. **Both arms drew a key, both reported `true`, and one of them
+named six readings while the other named two.**
+
+So the instance closes with a column and not with a frame. **`keyReadings`** is the readings a key
+names, in reading order, on both arms: the terminal's are the numeric tokens of the row `terminalRamp`
+matched with the withheld clause cut out — that is `notice`'s subject, and counting it here would
+measure one thing twice — and this arm's are the numeric tokens of every text on the key's
+**baseline**.
+
+**Geometric, not adjacent**, which is F297's own ruling one reader along. `svgRampBounds` found the
+bounds by document order — a text, the bar, a text — so a third text after the second falls outside
+the match and anything drawn between them breaks it. The baseline is `y + height` of the bar the
+reader already locates, and **every text on it belongs to the key**.
+
+#### Where the levels go, and it is the terminal's shape for this arm's own reason
+
+There is no second row to put them on. `box.bottom` is `height · (1 − gutter)` = **288**, the
+abscissa's baseline is **300**, the key's is **316.8**, and the viewBox ends at **320** — 3.2 px. So
+the run trails the upper bound on the key's own baseline: what the terminal does because it has one
+row, and what this arm does because it has one row's worth of room. The arms agree about the shape
+and neither copied it.
+
+**A level outside the range is still named and has no place on the bar.** `contour/levels` declares
+`[25, 50, 75, 500]` over a field of `1.5 … 99`. The terminal names all four — dropping the fourth
+makes an empty area indistinguishable from a constant field — and this arm names all four for the
+same reason. Nothing is drawn at 500 in either.
+
+---
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7942,6 +8005,7 @@ orientation — and belongs in the classification table as its own rows.
 68. **A reading crosses and the ink it becomes is the arm's, on a channel as much as on a geometry** (I71, I73, §3ak.35). A bullet's qualitative bands are one hue at four glyph densities in the terminal, measured off the painted frame; the ordinal is the datum, the quantisation is the grid's. `Mark.rect.value` already carried readings and the walk dropped them wherever the figure named no ramp, which was every mark that could ever have had one until this form.
 69. **A composition refuses only when nothing in it draws, and a refused child keeps its column** (I8, I64, §3ak.36). The facets recurse, so they inherit `violin` and `ridgeline`'s refusal — and the terminal had already decided what that means, twice: a child with no renderer contributes `[]`, and a facet short of a row contributes blanks *so that a short facet must not pull the ones after it leftwards*. A column belongs to a facet by position. Read out of the arm that had the case rather than chosen by the arm that has it now.
 70. **A key crosses as a name and a range, and each arm draws it at its own resolution** (I71, I72, §3ak.37). The `ramp` column measured *0 of 181* for the length of the pass and the decision had crossed the whole time; what was missing was furniture. Continuous where the reading is and **discrete where the data is** — a horizon's key is one swatch per band, because `horizonBandT` quantises and a gradient would claim a continuity the figure has not got.
+71. **A key names every reading its figure is keyed to, and not only the two it runs between** (I49, I72, §3ak.38). I49 has said *levels are named in the legend and never on the line* since §3y and it reads as satisfied, because the arm that has a legend satisfies it and nothing asks the arm that does not. `contourLevels` is the shared function the terminal's key calls and `contourFigure` marches, and the third caller was missing. **A boolean `ramp` column cannot see it**: both arms drew a key, both reported `true`, and one named six readings against the other's two.
 
 ---
 
