@@ -125,7 +125,7 @@ const results = runPass({
       file: "src/ps.ts",
       from: '      image: { text: str(raw, "Image") },',
       to: '      image: { text: str(raw, "Image").slice(0, 12) + "…" },',
-      expect: "F3b:",
+      expect: "F3 (b):",
     },
     {
       name: "a non-string field is stringified rather than refused",

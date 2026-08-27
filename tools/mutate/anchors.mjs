@@ -55,6 +55,31 @@ const OWN = argDir === -1;
  * asserts nothing, which is worse than one that says it could not apply.
  */
 /**
+ * Expectations that name a gate **outside their own run**, deliberately, with
+ * the run they belong to and the tier that answers instead.
+ *
+ * **A row's `expect` is a claim about which instrument caught it** — the same
+ * sentence `testPathsOf` above is written from, one step further along. That
+ * check asks whether a named test **file** exists; this one asks whether the
+ * named **row** is inside a file the run actually invokes, which is the question
+ * the sentence was about. Measured when it was built: **927 expectations across
+ * 99 runs, three of which named a row their run could not reach** — one in a
+ * file the command does not list, one that had lost the space and the brackets
+ * from a row named `F3 (b):`, and the entry below.
+ *
+ * **A debt list and not an exemption**, on `KNOWN_STALE`'s terms: an entry that
+ * starts resolving is a failure too, because a list nobody prunes outlives its
+ * reason unread.
+ */
+const CROSS_TIER = {
+  // The run mutates `fits = 0;` out of the keys module and says so: *the line
+  // tier 5 restored. Kept as a listed survivor with its reason.* Its integration
+  // corpus cannot see it; `test/e2e/completion.test.ts` can, and this run does
+  // not execute tier 5.
+  "c19-menu-window.mjs": ["C19 T5.1"],
+};
+
+/**
  * Anchors that resolve to **more than one site** today, with the run they
  * belong to — a debt list, on `KNOWN_STALE`'s terms and for its reasons (F219).
  *
@@ -204,6 +229,16 @@ function testPathsOf(src) {
   const flat = src.replace(/"\s*\+\s*\n?\s*"/g, "");
   const consts = {};
   for (const m of flat.matchAll(/^const ([A-Z_][A-Z_0-9]*) =\s*\n?\s*"([^"]*)";/gm)) consts[m[1]] = m[2];
+  // **And an array const, which the single-string form does not reach** (F336).
+  // `c22-construct.mjs` names its files as `const SUITE = [ … ]` and
+  // interpolates the array, so this function found **no paths at all** for it —
+  // and a run with no paths passes the existence check above by having nothing
+  // to check. That is A03 §2's vacuity class inside the gate written against it:
+  // the blind spot was found by building the sibling check on top, which read
+  // every one of that run's expectations as unreachable.
+  for (const m of flat.matchAll(/^const ([A-Z_][A-Z_0-9]*) =\s*\[([\s\S]*?)\]/gm)) {
+    consts[m[1]] = [...m[2].matchAll(/"([^"]+)"/gu)].map((q) => q[1]).join(" ");
+  }
   const out = new Set();
   for (const m of flat.matchAll(/vitest run ([^"`]+)/g)) {
     const expanded = m[1].replace(/\$\{([A-Z_][A-Z_0-9]*)\}/g, (whole, name) => consts[name] ?? whole);
@@ -212,6 +247,44 @@ function testPathsOf(src) {
     }
   }
   return [...out];
+}
+
+/**
+ * A gate name that is not a test row — the whole suite, or a make target.
+ */
+const RESERVED_EXPECTS = new Set([
+  "baseline", "golden", "enforce", "check", "e2e", "instruments",
+  "(none — expected to survive)",
+]);
+
+/** Every `expect:` string a run declares. */
+function expectationsOf(src) {
+  return [...src.matchAll(/expect:\s*"([^"]+)"/g)].map((m) => m[1]);
+}
+
+/**
+ * The text of every test file a run invokes — named files and `--dir` alike.
+ *
+ * **Two roots, and the run's own `ROOT` says which.** The docker runs cwd to
+ * `examples/docker`, so `--dir test` means that package's `test/` and not the
+ * repo's; resolving against the repo root alone walks the wrong tree and reports
+ * every one of their rows unreachable. That is `rootsFor`'s hazard on a
+ * directory rather than on a file, and it fired while this was being written.
+ */
+function testCorpusOf(src, _run) {
+  const pkg = /const ROOT = .*examples\/docker/u.test(src) ? "examples/docker/" : "";
+  const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : "");
+  const walk = (d) => {
+    if (!existsSync(d)) return [];
+    return readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+      (e.isDirectory() ? walk(`${d}/${e.name}`) : /\.test\.[cm]?tsx?$/u.test(e.name) ? [`${d}/${e.name}`] : []));
+  };
+  const parts = testPathsOf(src).map((p) => rootsFor(p).map(read).join(""));
+  for (const m of src.matchAll(/vitest run --dir (\S+)/gu)) {
+    const dir = [`${ROOT}/${pkg}${m[1]}`, `${ROOT}/${m[1]}`].find((d) => existsSync(d));
+    if (dir !== undefined) parts.push(...walk(dir).map(read));
+  }
+  return parts.join("\n");
 }
 
 // An absolute `--dir` is used as given; the default is repo-relative.
@@ -223,6 +296,9 @@ const runs = readdirSync(RUNS_AT)
 
 let checked = 0;
 let suites = 0;
+let expectations = 0;
+/** Expectations naming a row no test path of their own run contains. */
+const unreachable = [];
 const missing = {};
 /** Anchors matching more than once — see the note in the loop below (F219). */
 const ambiguous = [];
@@ -241,6 +317,24 @@ for (const run of runs) {
     suites += 1;
     if (rootsFor(path).some((p) => existsSync(p))) continue;
     unresolvable.push(`${run}: names ${path}, which does not exist — vitest drops it silently`);
+  }
+  // **An expectation names a row, and a row lives in a file the run must run**
+  // (F336). `testPathsOf`'s own note says why: *every row's `expect` becomes a
+  // claim about which instrument caught it, made against an instrument set that
+  // is short.* A file that is absent is caught above; a file that is present and
+  // **unnamed** is caught here, and it reads identically from the report.
+  //
+  // **The corpus is what the run invokes**, so `--dir` is walked rather than
+  // skipped — resolving it against the repo root alone reports every docker row
+  // unreachable, which is this check's own two-roots hazard and it fired while
+  // the check was being written.
+  const corpus = testCorpusOf(src, run);
+  for (const e of expectationsOf(src)) {
+    expectations += 1;
+    if (RESERVED_EXPECTS.has(e) || corpus.includes(e)) continue;
+    const known = (OWN ? CROSS_TIER[run] : undefined) ?? [];
+    if (known.includes(e)) continue;
+    unreachable.push(`${run}: expects "${e}", which no test path it runs contains`);
   }
   for (const { file, from } of anchorsOf(src)) {
     const path = rootsFor(file).find((p) => existsSync(p));
@@ -277,12 +371,12 @@ const runsWith = Object.keys(missing).length;
 const total = Object.values(missing).reduce((a, n) => a + n, 0);
 console.log(
   `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
-    `${String(suites)} test paths · ` +
+    `${String(suites)} test paths · ${String(expectations)} expectations · ` +
     `${String(total)} missing across ${String(runsWith)} run(s)` +
     `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}`,
 );
 
-const problems = [...unresolvable];
+const problems = [...unresolvable, ...unreachable];
 
 // The ambiguity arm, on the same equality terms as the stale one below.
 const AMBIG = OWN ? KNOWN_AMBIGUOUS : {};
@@ -294,6 +388,17 @@ for (const [run, n] of Object.entries(ambiguousBy)) {
 for (const [run, n] of Object.entries(AMBIG)) {
   if (ambiguousBy[run] === undefined) {
     problems.push(`${run}: the list says ${String(n)} ambiguous and every anchor is unique — remove it`);
+  }
+}
+
+// **The cross-tier list, pruned by equality like the others.** An entry whose
+// row has come into the run's corpus is a failure: a list nobody prunes outlives
+// its reason unread.
+for (const [run, names] of Object.entries(OWN ? CROSS_TIER : {})) {
+  const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  const corpus = testCorpusOf(src, run);
+  for (const e of names) {
+    if (corpus.includes(e)) problems.push(`${run}: the list says "${e}" is cross-tier and its run now reaches it — remove it`);
   }
 }
 

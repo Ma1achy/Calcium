@@ -54,11 +54,23 @@ const ROOT = process.cwd();
 // suite (the decision moved), a terminal gate (that arm consumed it), an SVG
 // gate (so did the other). A row expecting `G…` or `SB…` is a row that has
 // proved a renderer read the member, which no figure assertion can.
+// **`plot-mutations.test.ts` is in this list because a row's `expect` is a claim
+// about an instrument, and this run could not invoke that one** (F336). `THE
+// NULL` survived a whole pass while the row written against it — `T1.102`, which
+// fails by hand in one second — sat in a file the command does not name. A
+// `caught` against a corpus that is short is the defect the path list exists to
+// prevent, one step further along than it was checking.
+//
+// **The comment is above the string and not inside it**, because `testPathsOf`
+// collapses `"…" + "…"` and a comment between the two halves stops it: putting
+// this note in the middle made the file it documents invisible to the check that
+// found it.
 const CMD =
   "npx vitest run test/unit/plot-curve-figure.test.ts test/unit/plot.test.ts " +
   "test/unit/plot-y-axis.test.ts test/unit/plot-bar-values.test.ts " +
   "test/unit/plot-arm-unification.test.ts test/unit/plot-svg-path.test.ts " +
   "test/golden/plot.test.ts test/golden/terminal-baseline.test.ts " +
+  "test/unit/plot-mutations.test.ts " +
   "test/golden/svg-baseline.test.ts";
 const FIGURE = "src/presentation/plot/figure.ts";
 const DEFINITION = "src/presentation/plot/definition.ts";
@@ -880,11 +892,16 @@ const results = runPass({
       expect: "U11",
     },
     {
+      // **`SB` could not see this and the pass said so** (F336). Every facet
+      // fixture names its children `f1 … f4`, and a curve facet emits **no clip
+      // path at all** — `smallmultiples/default` has zero where `bar/default`
+      // has five — so the guard had no instance and the mutation survived
+      // reporting nothing. `U11` constructs two `bar` children with one id.
       name: "THE ID: two facets share a clip path, because the child keeps its own id",
       file: SVG,
       from: "      { ...facet, id: `${block.id}-f${String(i)}` }, // cells-ok — a facet index",
       to: "      facet, // cells-ok — a facet index",
-      expect: "SB",
+      expect: "U11",
     },
     {
       // **The gutter is a share and the text in it is not** (I63). Dropping the

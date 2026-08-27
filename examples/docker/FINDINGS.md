@@ -13642,6 +13642,48 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F336 — a mutation's expectation names an instrument, and three of them named one that cannot report ★★★★★
+
+Two mutations survived a full pass, and **neither survival was about the code**.
+
+**`THE NULL` survived while the row written against it fails by hand in a second.** `T1.102` lives in
+`test/unit/plot-mutations.test.ts`, and `c12-arm-seam.mjs`'s command does not name that file. A row's
+`expect` is a claim about **which instrument caught it**, and this one named an instrument the run
+never invokes — so `caught` and `SURVIVED` were both being decided by a corpus that is short.
+
+**`anchors.mjs` already says why, and checks one step before it.** Its own note on `testPathsOf`:
+
+> *An anchor that will not apply throws and stops the run. **A test file that is not there changes
+> nothing anyone can see**, and the pass reports `caught` against a corpus it does not have: every
+> row's `expect` becomes a claim about which instrument caught it, made against an instrument set
+> that is short.*
+
+The check that sentence describes asks whether the named **file** exists. The sentence is about
+whether the named **row** can be reached. **927 expectations across 99 runs; three cannot**: `T1.102`
+above, one in `docker-ps.mjs` whose row is named `F3 (b):` and whose expectation had lost the space and the brackets, and `c19-menu-window.mjs`'s `C19 T5.1`,
+which is deliberate — its comment says *the line tier 5 restored* — and is now on a `CROSS_TIER` debt
+list pruned by equality like the others.
+
+**Building it found the vacuity inside the check it was built beside.** `testPathsOf` substitutes
+single-string consts and **not array ones**, so `const SUITE = [ … ].join(" ")` resolved to nothing:
+for those runs it found **no paths at all**, and a run with no paths passes the existence check by
+having nothing to check. Fifteen test paths were invisible — **197 became 212** — and the file gate
+was vacuous for four runs. A03 §2's class inside the gate written against it.
+
+**And the check was wrong three times before it was right**, each time by seeing one encoding: it
+missed array consts (reporting 92 of 927), then `--dir test` (26), then resolved `--dir` against the
+repo root where the docker runs cwd to `examples/docker` (3). Each wrong version was a confident
+number. The measurement is only worth its last version, and the two roots hazard is one
+`anchors.mjs` documents for **files** and this needed for **directories**.
+
+**The second survivor was honest and about the corpus.** `THE ID` removes the guard that makes each
+facet child's id unique, and the SVG baseline did not move — because every facet fixture names its
+children `f1 … f4` and a curve facet emits **no clip path at all**: `smallmultiples/default` has
+zero where `bar/default` has five. A guard with no instance in the corpus. `U11` now constructs two
+`bar` children with one id, and the mutation reports `expected 2 to be 4`.
+
+---
+
 ## F335 — the public builder cannot construct six of the forms the public type declares ★★★★★
 
 `b.plot`'s spec declares **48** of `Plot`'s **58** members. Two of the ten come from `BlockOpts`

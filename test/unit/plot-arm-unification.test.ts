@@ -1121,6 +1121,25 @@ describe("U — the seam, asserted from both arms", () => {
     expect(kids[1], "and the third is still in the third column")
       .toBeCloseTo((widths[0] ?? 0) + (widths[1] ?? 0), 6);
 
+    // **Two children sharing an id share a clip path**, and the corpus cannot
+    // show it: every facet fixture names its children `f1 … f4`, and a curve
+    // facet emits no clip path at all — `smallmultiples/default` has **zero**
+    // where `bar/default` has five. So the guard that rewrites each child's id
+    // had no instance to fire on, and a mutation removing it survived a whole
+    // pass reporting nothing. Constructed here, on a child that does clip.
+    const clipped = (id: string): Plot => block({
+      kind: "plot", id, form: "bar", height: 6, axes: true,
+      categories: ["alpha", "beta"], series: [{ label: id, values: [3, 9] }],
+    } as Plot);
+    const collide = block({
+      kind: "plot", id: "dup", form: "smallmultiples", height: 10, axes: true, series: [],
+      facets: [clipped("same"), clipped("same")],
+    } as Plot);
+    const doc = plotToSvg(collide, DARK_THEME) ?? "";
+    const ids = [...doc.matchAll(/<clipPath id="([^"]+)"/gu)].map((m) => m[1]);
+    expect(ids.length, "the children clip, so there is something to collide").toBeGreaterThan(0); // cells-ok — a clip count
+    expect(new Set(ids).size, "and no two clip paths share a name").toBe(ids.length); // cells-ok — a clip count
+
     // **The parent refuses only when no child draws**, which is C12 I64 rather than a
     // new rule: a document with nothing on it is refused wherever it comes from.
     const allRefused = block({

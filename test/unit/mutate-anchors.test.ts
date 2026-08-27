@@ -127,6 +127,47 @@ describe("tools/mutate/anchors.mjs", () => {
     expect(r.out, "both paths were read, not zero").toMatch(/· 2 test paths ·/u);
   });
 
+  it("MA6 (F336): an expectation naming a row the run cannot reach fails, and one it can does not", () => {
+    // **A row's `expect` is a claim about which instrument caught it**, which is
+    // `testPathsOf`'s own sentence one step further along: that check asks
+    // whether a named test **file** exists, and this asks whether the named
+    // **row** is inside a file the run invokes. From the report the two are
+    // indistinguishable — a `caught` says nothing about which gate spoke.
+    //
+    // Measured when it was built: 927 expectations across 99 runs, and **three**
+    // named a row their run could not reach. One sat in a file the command does
+    // not list — `THE NULL`, which survived a whole pass while `T1.102` failed
+    // by hand in a second — one had an expectation that had lost the space and the
+    // brackets from a row named `F3 (b):`, and one is deliberate and on `CROSS_TIER`.
+    const withRow = [
+      `const CMD = "npx vitest run test/unit/view-model.test.ts";`,
+      `export const M = [{ name: "x", file: "src/data/viewmodel/types.ts", from: "export", to: "", expect: "T1.1 " }];`,
+      resolving,
+    ].join("\n");
+    expect(run(runsDir("fake.mjs", withRow)).ok, "a row the run's own corpus contains is fine").toBe(true);
+
+    const elsewhere = withRow.replace('expect: "T1.1 "', 'expect: "T9.99 no such row"');
+    const r = run(runsDir("fake.mjs", elsewhere));
+    expect(r.ok, "a row nothing in the corpus contains").toBe(false);
+    expect(r.out).toContain("T9.99 no such row");
+    expect(r.out, "and it says what the claim was about").toContain("no test path it runs contains");
+  });
+
+  it("MA6b (F336): the whole-suite gates are not rows, and the count is reported", () => {
+    // **`baseline`, `golden` and `SB` name a suite rather than a row**, so a
+    // check that resolved every string would fail on the gates it exists to
+    // trust. And the counter is here for MA5b's reason: an arm that reads
+    // nothing passes exactly like one that is satisfied.
+    const reserved = [
+      `const CMD = "npx vitest run test/unit/view-model.test.ts";`,
+      `export const M = [{ name: "x", file: "src/data/viewmodel/types.ts", from: "export", to: "", expect: "baseline" }];`,
+      resolving,
+    ].join("\n");
+    const r = run(runsDir("fake.mjs", reserved));
+    expect(r.ok, r.out).toBe(true);
+    expect(r.out, "the expectation was counted, not skipped").toMatch(/· 1 expectations ·/u);
+  });
+
   it("MA4 (the equality arm): the real tree matches the list exactly", () => {
     // **Both directions.** A new stale anchor fails because it is not on the
     // list; a repaired one fails because the list still claims it. The second is
