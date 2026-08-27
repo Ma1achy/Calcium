@@ -17,7 +17,9 @@ import { rowOf, seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/
 import { niceAxis } from "../../src/presentation/plot/axes.js";
 import { normalisedOf, pinnedRange } from "../../src/data/viewmodel/range.js";
 import type { Facing } from "../../src/presentation/plot/scale.js";
-import { plotToSvg, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import { plotToSvg, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import { violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
+import { FULL_CAPS } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { DARK_THEME } from "../support/render.js";
 
@@ -91,6 +93,49 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     // *units*; a guess about a neighbouring behaviour dressed as a corollary is
     // how a row comes to fail for a reason it was not written about.
     expect(niceAxis(range, 5, { yMin: 0, yMax: 100 })).toEqual(niceAxis(range, 5, { yMin: 0, yMax: 100 }));
+  });
+
+  it("G1c (§3ak.37): the violin's estimate is sampled at the terminal's width, and that is the refusal", () => {
+    // **The refusal `violin` and `ridgeline` keep, stated as a symbol so it can
+    // expire.** `SVG_FAMILY` records *their datum is `series` — samples for a
+    // kernel estimate — and this path computes no density*, which is true and is
+    // not the blocker: a density **could** be computed above both arms, exactly
+    // as `densitySeries` already is for the `density` form, at a resolution the
+    // shared layer chooses.
+    //
+    // **What blocks it is where the resolution comes from.** `violinRows` — the
+    // default orientation's arm — takes `areaWidth` and evaluates the estimate at
+    // one point per **cell**: `const w = Math.max(1, Math.floor(areaWidth))`, then
+    // a point per `i < w`. That width is the terminal's runtime columns, which
+    // C12 may not read outside `lifecycle.ts` and which the second arm has no
+    // analogue for. So a shared curve would be sampled somewhere else, and
+    // resampling it to `w` is not the same numbers — the terminal's frames move,
+    // and this pass freezes them.
+    //
+    // **F314 found three derivations computed in a renderer that never reached
+    // the seam, and the KDE is that shape**, which is why the check is written
+    // down rather than assumed. The difference is that those three were
+    // resolution-free — `ecdfSeries` is a function of `values.length`,
+    // `densitySeries` takes its 100 as an argument, `binValues` bins — and this
+    // one is not.
+    //
+    // **Asserted by arity, like `G1`**: the day `violinRows` stops taking a
+    // width, this row fails and the refusal is re-read against the tree rather
+    // than carried (commitment 64).
+    // `Function.length` counts parameters before the first default, so this is
+    // `series, areaWidth, rowsPerCategory, caps, quartiles?` — five, and the
+    // width is the second of them.
+    expect(violinRows.length, "series, areaWidth, rowsPerCategory, caps, quartiles — a width among them").toBe(5);
+    expect(violinColumn.length, "and its transpose takes a column width too").toBe(5);
+    expect(svgFamilyOf("violin"), "so both stay refused").toBeNull();
+    expect(svgFamilyOf("ridgeline"), "and so does the form built on the same estimate").toBeNull();
+
+    // **And the estimate really does move with the width**, which is the claim
+    // the arity stands for: same data, two widths, different curves — where a
+    // shared geometry would give one curve rasterised twice.
+    const sr = { label: "s", values: [1, 1, 2, 3, 5, 5, 5, 8, 13] };
+    const at = (w: number): string => violinRows(sr, w, 5, FULL_CAPS).join("|");
+    expect(at(40), "a wider area is not the narrow one padded").not.toBe(at(20));
   });
 
   it("G1b (§3aj hazard 3): the layout ladder is cell-bound, and that is the ruling", () => {

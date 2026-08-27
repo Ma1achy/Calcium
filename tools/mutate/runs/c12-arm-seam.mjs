@@ -70,7 +70,7 @@ const CMD =
   "test/unit/plot-y-axis.test.ts test/unit/plot-bar-values.test.ts " +
   "test/unit/plot-arm-unification.test.ts test/unit/plot-svg-path.test.ts " +
   "test/golden/plot.test.ts test/golden/terminal-baseline.test.ts " +
-  "test/unit/plot-mutations.test.ts " +
+  "test/unit/plot-mutations.test.ts test/unit/plot-arm-disagreement.test.ts " +
   "test/golden/svg-baseline.test.ts";
 const FIGURE = "src/presentation/plot/figure.ts";
 const DEFINITION = "src/presentation/plot/definition.ts";
@@ -912,6 +912,33 @@ const results = runPass({
       from: "      { ...layout, width, gutter: Math.min(0.5, layout.gutter * (width > 0 ? layout.width / width : 1)) },",
       to: "      { ...layout, width },",
       expect: "SB",
+    },
+    {
+      // **The colour key** (§3ak.37). Continuous where the reading is, discrete
+      // where the data is — a horizon's bands are a quantisation and not a
+      // resolution, so its key is one swatch per band.
+      name: "THE KEY: a form with a ramp draws no key, which is the cell that was open",
+      file: SVG,
+      from: "  if (figure.ramp !== null && figure.extent !== null && label !== undefined) {",
+      to: "  if (false && figure.ramp !== null && figure.extent !== null && label !== undefined) {",
+      expect: "SB",
+    },
+    {
+      name: "THE BANDS: a horizon's key is a gradient, so it claims a continuity the figure has not got",
+      file: SVG,
+      from: '      const bands = block.form === "horizon" ? horizonBandCount(block) : 0; // cells-ok — a band count',
+      to: "      const bands = 0; // cells-ok — a band count",
+      expect: "SB",
+    },
+    {
+      // **A key with no scale beside it is decoration** (§3). Dropping the
+      // bounds leaves a bar naming nothing, and `terminalRamp`'s SVG twin wants
+      // the bracketing.
+      name: "THE BRACKET: the key loses its bounds, so it is a bar naming nothing",
+      file: SVG,
+      from: '        parts.push(text(left - 4, "end", lo), ...bar, text(right + 4, "start", hi));',
+      to: "        parts.push(...bar);",
+      expect: "AD8",
     },
     {
       name: "THE FILL: a stacked band is an outline, so the reader integrates two curves",

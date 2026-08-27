@@ -639,8 +639,17 @@ export const SCANS = [
   //
   // The `=` is what makes this a prop rather than prose: `color={style}` and
   // `color="red"` both match, a comment about colour does not.
+  // **A hyphen before it is an SVG attribute and not a prop** (§3ak.37). `\b`
+  // matches at the `c` of `stop-color=`, because `-` is a non-word character —
+  // so the second arm's colour key, which writes `<stop stop-color="#440154"/>`,
+  // read as an Ink prop discarding a depth tag. There is no other spelling: a
+  // gradient stop's colour attribute is `stop-color` and nothing else.
+  //
+  // **The lookbehind is narrower than a file exemption and that is the point.**
+  // Allowing `svg.ts` would blind the rule to a real `color=` in the file most
+  // likely to grow one.
   { id: "SS37", spec: "C09 I4 · C09 T2.17",
-    pattern: /\b(?:color|backgroundColor)\s*=/,
+    pattern: /(?<![\w-])(?:color|backgroundColor)\s*=/,
     scope: "src/presentation/", allow: [],
     why: "renderers emit SGR from terminal/escapes.ts; an Ink colour prop discards the depth tag" },
 

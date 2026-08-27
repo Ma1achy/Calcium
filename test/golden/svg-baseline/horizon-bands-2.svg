@@ -1,5 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
+<text x="149.6" y="316.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.0038</text>
+<rect x="153.6" y="307.2" width="134.4" height="9.6" fill="#3b4cc0"/>
+<rect x="288" y="307.2" width="134.4" height="9.6" fill="#b40426"/>
+<text x="426.4" y="316.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">100</text>
 <rect x="89.6" y="287.952" width="4.049" height="0.5" fill="#b40426"/>
 <rect x="93.649" y="260.471" width="8.098" height="27.529" fill="#b40426"/>
 <rect x="101.747" y="233.264" width="8.098" height="54.736" fill="#b40426"/>

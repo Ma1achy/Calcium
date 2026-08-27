@@ -61,6 +61,7 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 import { svgFamilyOf } from "../../src/presentation/plot/svg.js";
+import { RAMP_DEFAULT } from "../../src/presentation/plot/figure.js";
 import { terminalDecisions, svgArm, terminalRamp, svgRamp, saysWithheld, type ArmDecisions } from "../support/arm-decisions.js";
 import { DARK_THEME } from "../support/render.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
@@ -145,7 +146,7 @@ const MEASURED = {
   "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "8/8", "notice": "4/8" },
+  "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "4/8" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
   // both readers ask the shape now — and `ramp` is F316's open column on the
   // family that has always had one. `numericLabels` is the terminal reader's
@@ -155,8 +156,8 @@ const MEASURED = {
   // last edge-bearing line* was measured and rejected: it moves cells in both
   // directions across five other forms, which is a different reader rather than
   // a repair.
-  "contour": { silent: "0/18", "numericLabels": "18/18", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "18/18", "notice": "agree" },
-  "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "12/12", "notice": "agree" },
+  "contour": { silent: "0/18", "numericLabels": "18/18", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "bar": { silent: "2/14", "numericLabels": "10/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "6/12" },
   "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "2/10", "legend": "agree", "ramp": "agree", "notice": "agree" },
@@ -191,7 +192,7 @@ const MEASURED = {
   // three quantities in three units (C12 I73).
   "timeline": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "bullet": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "agree" },
+  "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "2/4" },
   "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "6/12" },
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
@@ -204,12 +205,12 @@ const MEASURED = {
   // arm scales its 640 px across whatever it is given. `identityLabels` 3/12 is
   // the same drop read through another column: the terminal's notice names the
   // dates it withheld.
-  "calendar": { silent: "0/12", "numericLabels": "agree", "identityLabels": "3/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "12/12", "notice": "3/12" },
-  "correlation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "agree" },
-  "confusion": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "agree" },
-  "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "4/4", "notice": "1/4" },
-  "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "2/2" },
-  "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "1/2" },
+  "calendar": { silent: "0/12", "numericLabels": "2/12", "identityLabels": "3/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "3/12" },
+  "correlation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "confusion": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "1/4" },
+  "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "2/2" },
+  "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "1/2" },
   "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "1/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "violin": "refused",
   "ridgeline": "refused",
@@ -247,7 +248,7 @@ const MEASURED = {
   // key has two, which is the reader's threshold answering correctly — and
   // `identityLabels` is the same absence read through another column: the
   // terminal's key is `0.0038  100  3 bands` and `bands` is a word.
-  "horizon": { silent: "0/10", "numericLabels": "agree", "identityLabels": "10/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "8/10", "notice": "agree" },
+  "horizon": { silent: "0/10", "numericLabels": "agree", "identityLabels": "10/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
 } as const satisfies Readonly<globalThis.Record<PlotForm, Record_>>;
 
 /** One arm-pair for a spec, at a width. */
@@ -337,26 +338,50 @@ describe("AD — the two arms decide separately, and here is where", () => {
       .flatMap(([f, v]) => (v === "refused" ? [] : [[f, v as Claimed] as const]));
     const differing = (d: Decision): string[] => claimed.filter(([, v]) => v[d] !== "agree").map(([f]) => f);
 
-    // **Every pair the terminal draws a key on** — and the second arm draws none
-    // at all (0 of 181). `horizon` is the exception and it is the reader's
-    // threshold rather than the arm's: `terminalRamp` wants three adjacent
-    // swatches of differing colour, and `bands-2`'s key has two, so both of its
-    // frames read `false` on both sides and agree. Stated rather than smoothed —
-    // an exception that is the instrument's limit is worth naming next to one
-    // that is a form's.
-    const ramp = differing("ramp");
-    expect(ramp.sort(), "every family whose readings are a colour, and nothing else")
+    // **The column closed, so the assertion is inverted rather than deleted**
+    // (§3ak.37). It used to read *every pair the terminal draws a key on, and
+    // the second arm draws none at all* — 0 of 181 — and now every one of the
+    // eleven agrees. A cell that agrees because **neither** arm draws is
+    // indistinguishable from one that agrees because **both** do, and only the
+    // second is what closing it meant, so this asks the arms rather than the
+    // record: both must draw a key, on every pair, for every form whose readings
+    // are a colour.
+    //
+    // **`horizon`'s exception went with it.** `terminalRamp` wants three adjacent
+    // swatches and `bands-2`'s key has two, so it reads `false` on that side —
+    // and this arm draws **one swatch per band**, because a horizon's reading
+    // really is quantised, so it reads `false` too. The reader's floor is still
+    // the reader's floor; what changed is that both arms are now under it
+    // together, for the form's own reason.
+    expect(differing("ramp"), "the column closed — no form's key differs now").toEqual([]);
+    const withRamp = (Object.keys(RAMP_DEFAULT) as readonly PlotForm[])
+      .filter((f) => RAMP_DEFAULT[f] !== null && svgFamilyOf(f) !== null);
+    expect(withRamp.sort(), "every family whose readings are a colour, and nothing else")
       .toEqual(["calendar", "confusion", "contour", "correlation", "density2d", "heatmap", "horizon",
         "latency", "quiver", "spectrogram", "utilisation"]);
-    for (const f of ramp) {
-      const cell = ((MEASURED as globalThis.Record<string, Record_>)[f] as Claimed).ramp;
-      const [differ, total] = String(cell).split("/");
-      if (f === "horizon") {
-        expect(cell, "a two-band key is two swatches, which is under the reader's floor").toBe("8/10");
-        continue;
+    let bothDrew = 0; // cells-ok — a pair count
+    let neither = 0; // cells-ok — a pair count
+    let refusedVariants = 0; // cells-ok — a pair count
+    for (const f of withRamp) {
+      for (const spec of Object.values((CATALOGUE_FORMS as globalThis.Record<string, globalThis.Record<string, Record<string, unknown>>>)[f] ?? {})) {
+        const { t, s: sv } = pairAt(spec as never, 80);
+        // **A variant this arm refuses is not a key disagreement**, and the
+        // record does not treat it as one: `heatmap/origin` asks for
+        // `bottom-right` and `plotToSvg` refuses a non-default origin outright,
+        // so the pair has no second figure to compare a key against. Counted
+        // rather than skipped — an arm that stopped drawing would land here.
+        if (!sv.drawn) { refusedVariants += 1; continue; } // cells-ok — a pair count
+        if (t.ramp && sv.ramp) bothDrew += 1; // cells-ok — a pair count
+        else if (!t.ramp && !sv.ramp) neither += 1; // cells-ok — a pair count
+        else expect.fail(`${f}: one arm drew a key and the other did not`);
       }
-      expect(differ, `${f}: every pair, not some`).toBe(total);
     }
+    // **Both counters, because the second is the exception and it must not
+    // grow.** `horizon/bands-2` is the only pair where neither arm draws, and it
+    // is the reader's floor rather than a missing key.
+    expect(bothDrew, "pairs where both arms draw a key").toBe(36); // cells-ok — a pair count
+    expect(neither, "and the one where the reader's floor hides both").toBe(1); // cells-ok — a pair count
+    expect(refusedVariants, "and the variants this arm refuses outright").toBe(2); // cells-ok — a pair count
 
     // **The legitimate one, asserted so it can fail.** It differs today; it will
     // read `agree` everywhere the day the SVG grows a drop rule, and that is a
@@ -416,8 +441,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
     expect(open + closed + legitimate, "cells over claimed forms").toBe(308); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(63); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(201); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(53); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(211); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
@@ -463,6 +488,51 @@ describe("AD — the two arms decide separately, and here is where", () => {
       `<rect x="${String(100 + c * 20)}" y="${String(200 + r * 14)}" width="20" height="14" fill="#${String(c)}0${String(r)}0${String(c)}0"/>`)).join("");
     expect(svgRamp(`<svg>${grid}</svg>`), "a grid of cells is not a key").toBe(false);
     expect(svgRamp(`<svg>${grid}${ends}</svg>`), "and it is one when its row is bracketed").toBe(true);
+  });
+
+  it("AD11 (F316, F297): a key is bracketed by readings and a legend by names, and the reader is not blind to either", () => {
+    // **The cell to distrust while the ramp column closes.** `heatmap.legend`
+    // has read `agree` throughout, and the reader's own note says why: *the SVG
+    // having none, the terminal because its ramp is coloured spaces and the
+    // reader took stripped text.* That is a description of a cell agreeing for
+    // two different reasons, which is the shape F297 keeps arriving in — so the
+    // question the ramp landing raises is whether `legend: false` is **wrong**
+    // on the terminal side, and the answer has to be measured rather than
+    // reasoned.
+    //
+    // **Measured over the whole corpus: 74 frames draw a key and report
+    // `legend: false`, and *zero* frames carry a coloured-space swatch beside a
+    // name.** So there is no legend the stripped-text scan is missing. A key is
+    // `0.19 ▮▮▮▮▮▮▮▮ 100` — swatches bracketed by **readings**; a legend is
+    // `█ alpha` — a swatch and a **name**. They are different marks answering
+    // different questions, and after F316 they have a column each.
+    // **Adjacent, with one reset at the end** — the terminal's own emission, and
+    // the thing the reader keys on. A reset between each swatch breaks the run,
+    // which is how this fabrication was wrong on its first attempt.
+    const viridis = ["68;1;84", "59;82;139", "33;145;140", "253;231;37"];
+    const run = (rgbs: readonly string[]): string =>
+      `${rgbs.map((c) => `\u001b[48;2;${c}m `).join("")}\u001b[49m`;
+
+    // A key: swatches between two readings. `ramp` sees it, `legend` does not.
+    const key = `\u001b[38;2;98;98;98m0.19 \u001b[39m${run(viridis)} 100`;
+    expect(terminalRamp(key), "a run of swatches between two readings is a key").toBe(true);
+    expect(terminalDecisions([key]).legend, "and it is not a legend").toBe(false);
+
+    // A legend: a swatch and a name. `legend` sees it, `ramp` does not.
+    const named = "\u2588 alpha  \u2588 beta  \u2588 gamma";
+    expect(terminalDecisions([named]).legend, "a swatch and a name is a legend").toBe(true);
+    expect(terminalRamp(named), "and it is not a key").toBe(false);
+
+    // **The direction that would be the defect**, fabricated because the corpus
+    // has no instance: a legend whose swatch is a *coloured space* rather than a
+    // block glyph would vanish from a stripped scan. It does — and no frame in
+    // the corpus draws one, which is why this is a stated limit rather than an
+    // open cell.
+    const invisible = `${run(["230;159;0"])} alpha  ${run(["86;180;233"])} beta`;
+    expect(terminalDecisions([invisible]).legend,
+      "a coloured-space swatch beside a name is the reader's stated blind spot").toBe(false);
+    expect(stripSgr(invisible).trim(), "because stripping leaves the names and no swatch")
+      .toBe("alpha    beta");
   });
 
   it("AD9 (F321): an edge glyph inside a figure is not a frame", () => {

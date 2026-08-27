@@ -505,6 +505,7 @@ function svgDecisions(svg: string | null): ArmDecisions {
   if (svg === null) return NOTHING;
   const all = texts(svg).filter((t) => t.body !== "");
   const legendNames = svgLegendNames(svg);
+  const rampBounds = svgRampBounds(svg);
   return {
     drawn: true,
     ramp: svgRamp(svg),
@@ -522,7 +523,9 @@ function svgDecisions(svg: string | null): ArmDecisions {
     // one. The arm was right and the reader was asymmetric.
     // **The shape, on both sides** (F326). This asked `clip-path` first, which
     // is where a label is drawn rather than what it says.
-    numericLabels: all.filter((t) => !legendNames.has(t.body) && NUMERIC.test(t.body)).map((t) => t.body),
+    numericLabels: all
+      .filter((t) => !legendNames.has(t.body) && !rampBounds.has(t.body) && NUMERIC.test(t.body))
+      .map((t) => t.body),
     identityLabels: all.filter((t) => !legendNames.has(t.body) && !NUMERIC.test(t.body)).map((t) => t.body),
     // **The ground is not a border.** `<rect width="100%">` paints the page; a
     // border would be a stroked rectangle round the plot area, and this arm
@@ -553,6 +556,46 @@ function svgDecisions(svg: string | null): ArmDecisions {
  * tag drew it — and the box is the lines' own bounding box rather than a layout
  * constant, so a different `SvgLayout` cannot silently move the answer.
  */
+/**
+ * The two readings a colour key is **bracketed by** (F316, §3ak.37).
+ *
+ * **The key's bounds belong to the key, and the `ramp` column is where they are
+ * measured.** Counting them again under `numericLabels` measures one thing
+ * twice — and the terminal reader already excludes them, by construction rather
+ * than by choice: its seam is the bottom border and the key sits below it, so
+ * `terminalDecisions` reports `[]` for a heatmap where this arm reported
+ * `["0.19", "100"]`. Drawing the key closed eleven `ramp` cells and would have
+ * opened six `numericLabels` ones on nothing but that asymmetry.
+ *
+ * **Adjacency in document order, which is `svgLegendNames`' own device** one
+ * shape along: a text, the bar, a text. The bar is either a gradient-filled rect
+ * or a run of swatches sharing a `y` and a `height`, which is what the emitter
+ * writes and what `svgRamp` reads.
+ */
+function svgRampBounds(svg: string): ReadonlySet<string> {
+  const out = new Set<string>();
+  const TEXT = String.raw`<text[^>]*>([^<]*)<\/text>`;
+  const gradient = new RegExp(
+    `${TEXT}\\s*<defs>[\\s\\S]*?<\\/defs>\\s*<rect[^>]*fill="url\\(#[^)]*\\)"[^>]*\\/>\\s*${TEXT}`, "gu");
+  const swatches = new RegExp(`${TEXT}\\s*((?:<rect[^>]*\\/>\\s*){2,})${TEXT}`, "gu");
+  for (const m of svg.matchAll(gradient)) {
+    out.add((m[1] ?? "").trim());
+    out.add((m[2] ?? "").trim());
+  }
+  for (const m of svg.matchAll(swatches)) {
+    // **A run, and every member on one row** — otherwise any two rects between
+    // two labels would look like a key.
+    const rects = [...(m[2] ?? "").matchAll(/<rect[^>]*y="([\d.-]+)"[^>]*height="([\d.-]+)"/gu)];
+    if (rects.length < 2) continue; // cells-ok — a swatch count
+    const [y, h] = [rects[0]?.[1], rects[0]?.[2]];
+    if (!rects.every((r) => r[1] === y && r[2] === h)) continue;
+    out.add((m[1] ?? "").trim());
+    out.add((m[3] ?? "").trim());
+  }
+  out.delete("");
+  return out;
+}
+
 /**
  * The names this arm's legend draws — **a swatch and the text beside it**.
  *

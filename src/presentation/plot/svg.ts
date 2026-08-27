@@ -30,6 +30,8 @@
  * second renderer.
  */
 import { flatten, type FlatNode } from "./tree.js";
+import { formatValue } from "./axes.js";
+import { horizonBandCount } from "./figure.js";
 import { drawnBlock } from "./derive.js";
 import { graphLayers } from "./graph.js";
 import { facetWidths } from "./facet.js";
@@ -1515,6 +1517,70 @@ export function plotToSvg(
       parts.push(`<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="${anchor}" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
         `${escape(text)}</text>`);
+    }
+  }
+
+  // **The colour key, which is the last cell that was open and not a refusal**
+  // (F316, §3ak.37). The record's `ramp` column read *the terminal draws one on
+  // every pair of eleven forms and this arm draws none on any* — 0 of 181 — and
+  // the reason was never a missing decision: `Figure.ramp` names the map and
+  // `Figure.extent` the two readings it runs between, and both have crossed
+  // since I72. What was missing is furniture.
+  //
+  // **Continuous where the reading is and discrete where the data is** (I71).
+  // The terminal draws eight swatches for a matrix because it has eight cells —
+  // a resolution — so this arm's own resolution is a gradient. A horizon's key
+  // is **three swatches for three bands**, and that is not a resolution: the
+  // reading really is quantised, `horizonBandT` says so, and a gradient there
+  // would claim a continuity the figure does not have.
+  //
+  // **Bracketed by its bounds**, which is Granite's `Min ▮▮▮▮▮ Max` and the
+  // terminal's own shape: the two numbers name the two ends they sit against
+  // rather than trailing the bar.
+  if (figure.ramp !== null && figure.extent !== null && label !== undefined) {
+    const map = COLORMAPS[figure.ramp];
+    if (map !== undefined) {
+      const lo = formatValue(figure.extent.min, block.yFormat);
+      const hi = formatValue(figure.extent.max, block.yFormat);
+      const y = box.bottom + SVG_FONT_SIZE * 1.6;
+      const h = SVG_FONT_SIZE * 0.8;
+      // Room for the two bounds either side, on the same tenth-of-the-width
+      // share the gutter takes — this arm has no metrics and does not ask.
+      const pad = layout.width * 0.1;
+      const left = box.left + pad;
+      const right = box.right - pad;
+      const at = (t: number): string | undefined => {
+        const c = continuousColour(map, t, SVG_CAPS);
+        return c === undefined || c.kind !== "rgb" ? undefined : c.hex;
+      };
+      const bands = block.form === "horizon" ? horizonBandCount(block) : 0; // cells-ok — a band count
+      const bar: string[] = [];
+      if (bands > 0) { // cells-ok — a band count
+        const w = (right - left) / bands; // cells-ok — a band count
+        for (let i = 0; i < bands; i += 1) { // cells-ok — a band index
+          const fill = at(bands === 1 ? 1 : i / (bands - 1)); // cells-ok — a band count
+          if (fill === undefined) continue;
+          bar.push(`<rect x="${n(left + i * w)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}"/>`);
+        }
+      } else {
+        const id = `r${block.id}`;
+        const stops = Array.from({ length: 9 }, (_v, i) => { // cells-ok — a stop count
+          const fill = at(i / 8); // cells-ok — a stop count
+          return fill === undefined ? "" : `<stop offset="${n(i / 8)}" stop-color="${fill}"/>`; // cells-ok — a stop count
+        }).filter((t) => t !== "");
+        if (stops.length > 0) { // cells-ok — a stop count
+          bar.push(
+            `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="0">${stops.join("")}</linearGradient></defs>`,
+            `<rect x="${n(left)}" y="${n(y)}" width="${n(right - left)}" height="${n(h)}" fill="url(#${id})"/>`,
+          );
+        }
+      }
+      if (bar.length > 0) { // cells-ok — a count of SVG elements
+        const text = (x: number, at2: string, t: string): string =>
+          `<text x="${n(x)}" y="${n(y + h)}" text-anchor="${at2}" font-size="${n(SVG_FONT_SIZE)}" ` +
+            `font-family="monospace" fill="${label}">${escape(t)}</text>`;
+        parts.push(text(left - 4, "end", lo), ...bar, text(right + 4, "start", hi));
+      }
     }
   }
 

@@ -2048,6 +2048,31 @@ describe("SS52 — a NUL makes a file invisible to every search", () => {
     expect(found[0]?.file).toBe("test/edge/example.test.ts:1");
   });
 
+  it("SS37 does not fire on an SVG gradient stop, which is the narrowing", () => {
+    // **`\b` matches at the `c` of `stop-color=`**, because `-` is a non-word
+    // character — so the second arm's colour key read as an Ink prop discarding
+    // a depth tag (§3ak.37). There is no other spelling: a gradient stop's
+    // colour attribute is `stop-color` and nothing else.
+    //
+    // **A lookbehind rather than a file exemption.** Allowing `svg.ts` would
+    // blind the rule to a real `color=` in the file most likely to grow one —
+    // a scan covers the directory and names its exceptions, and *the file that
+    // writes SVG* is not an exception, it is a hole.
+    const stop = 'out.push(`<stop offset="0" stop-color="${fill}"/>`);';
+    expect(checkSourceScans(["src/presentation/plot/svg.ts"], () => stop)
+      .filter((v) => v.rule === "SS37"), "an SVG attribute is not a prop").toEqual([]);
+
+    // **And the direction that must still fire**, on the same file: the rule is
+    // about a prop, and a prop in `svg.ts` is exactly as wrong as one anywhere
+    // else under `src/presentation/`.
+    const prop = '<Text color={style.colour}>{text}</Text>';
+    expect(checkSourceScans(["src/presentation/plot/svg.ts"], () => prop)
+      .filter((v) => v.rule === "SS37").length, "a prop still fires").toBe(1); // cells-ok — a violation count
+    // `backgroundColor` too, since the pattern names both.
+    expect(checkSourceScans(["src/presentation/plot/svg.ts"], () => '<Box backgroundColor="red"/>')
+      .filter((v) => v.rule === "SS37").length, "and so does the second half").toBe(1); // cells-ok — a violation count
+  });
+
   it("SS52 does not fire on an escape sequence test, which is the narrowing", () => {
     // **The first draft took SS43's whole C0 class and reported 90 hits**, every
     // one a literal ESC in a test about escape sequences — and those files grep

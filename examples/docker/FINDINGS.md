@@ -13642,6 +13642,47 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F337 — three readers met a gradient and read its own coordinates as marks ★★★★☆
+
+The colour key closed F316's `ramp` column — eleven forms, **0 of 181** to every pair agreeing — and
+the `<defs>` it introduced tripped three instruments at once, each in a different way:
+
+```
+SS37   stop-color="#440154"        an Ink colour prop discards the depth tag
+TC5    fill="url(#rheatmap)"       url(#rheatmap) comes from C10 — expected false to be true
+G6     x2="1"                      an x left of the gutter — expected 1 to be >= 76
+```
+
+**None of them is what it saw.** `\b` matches at the `c` of `stop-color` because `-` is a non-word
+character, and an SVG attribute is not a prop. A `url(#…)` is a **reference**, not a colour. A
+gradient's `x1`/`x2` are object-bounding-box coordinates, not page positions.
+
+**The finding is not the three failures — it is that every obvious fix widens a hole.**
+
+| reader | the obvious fix | what it would have cost |
+|---|---|---|
+| `SS37` | allow `svg.ts` | the rule blinded in the file most likely to grow a real `color=` |
+| `TC5` | skip `url(…)` | a whole ramp of foreign colours through one unchecked attribute |
+| `G6` | ignore the value `1` | a `1` that **is** a page position is what the row exists to catch |
+
+The narrow fixes are a lookbehind, **following** the reference to its stops, and stripping `<defs>`
+before the coordinate scan. `TC5`'s is now **stronger** than before: it checks the colours actually
+painted rather than the name of the thing painting them.
+
+**And a fourth reader was measured rather than fixed.** Drawing the key opened `numericLabels` on six
+forms, because its bounds are `<text>` and this arm counted them where the terminal's reader excludes
+them by construction — its seam is the bottom border and the key sits below it. Measured on a
+heatmap: `[]` against `["0.19", "100"]`. A key's bounds are measured in the `ramp` column, so counting
+them again is measuring one thing twice.
+
+**`heatmap.legend` was the cell to distrust and it survived the check.** The reader's own note said it
+reads `agree` because *the SVG has none and the terminal's ramp is coloured spaces and the reader took
+stripped text* — a cell agreeing for two different reasons. Measured: **74 frames draw a key and
+report `legend: false`, and zero carry a coloured-space swatch beside a name.** There is no legend the
+scan is missing; a key is bracketed by readings and a legend is a swatch and a name.
+
+---
+
 ## F336 — a mutation's expectation names an instrument, and three of them named one that cannot report ★★★★★
 
 Two mutations survived a full pass, and **neither survival was about the code**.

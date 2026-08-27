@@ -36,10 +36,19 @@ const hexOf = (ref: string, theme: ResolvedTheme): string => {
 };
 
 /** Every `fill=` and `stroke=` value in an SVG, lowercased, `none` dropped. */
-const paints = (svg: string): readonly string[] =>
-  [...svg.matchAll(/(?:fill|stroke)="([^"]*)"/gu)]
+// **A `url(#…)` is a reference and not a colour, so it is followed rather than
+// skipped** (§3ak.37). The colour key fills its bar from a `<linearGradient>`,
+// and the paint that reaches the page is the gradient's **stops** — so dropping
+// the reference and taking the stops keeps this row's claim true and makes it
+// stronger: it now checks the colours actually painted rather than the name of
+// the thing painting them. Skipping the reference and stopping there would have
+// let a whole ramp of foreign colours through under one unchecked attribute.
+const paints = (svg: string): readonly string[] => [
+  ...[...svg.matchAll(/(?:fill|stroke)="([^"]*)"/gu)]
     .map((m) => (m[1] ?? "").toLowerCase())
-    .filter((v) => v !== "none");
+    .filter((v) => v !== "none" && !v.startsWith("url(")),
+  ...[...svg.matchAll(/stop-color="([^"]*)"/gu)].map((m) => (m[1] ?? "").toLowerCase()),
+];
 
 // **`axes: true`, and it is load-bearing rather than tidy** (C12 I67). This arm
 // used to draw a gridline per tick whatever the block said, so a fixture with no

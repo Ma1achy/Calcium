@@ -513,7 +513,13 @@ describe.each(supported)("G6 — %s", (form) => {
     // **Every x in the document, checked against the fractional bounds.** A
     // gutter pinned to a label's width moves `left` and this fails — which is
     // the point of running it per form rather than once.
-    const xs = [...svg.matchAll(/(?:\bx|cx|x1|x2)="([-\d.]+)"/gu)]
+    // **A gradient's `x1`/`x2` are its own object-bounding-box coordinates and
+    // not page positions** (§3ak.37). `<linearGradient x1="0" … x2="1">` put a
+    // `1` into a scan of page x, and every ramp-bearing form read as painting a
+    // pixel from the left edge. Stripped rather than filtered by value, because
+    // a `1` that *is* a page position is exactly what this row exists to catch.
+    const svgNoDefs = svg.replace(/<defs>[\s\S]*?<\/defs>/gu, "");
+    const xs = [...svgNoDefs.matchAll(/(?:\bx|cx|x1|x2)="([-\d.]+)"/gu)]
       .map((m) => Number(m[1]))
       .filter((v) => Number.isFinite(v) && v !== 0);
     expect(xs.length, "the form drew marks with coordinates").toBeGreaterThan(0);

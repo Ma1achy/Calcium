@@ -6536,6 +6536,83 @@ drop, which is the good direction — and `FigureBuilder.setFacets` exists one f
 builder can and the other cannot. F335, and it is C24's rather than this component's.
 
 ---
+### 3ak.37 — The colour key, and the three readers that saw a gradient's own coordinates
+
+F316's `ramp` column read *the terminal draws a key on every pair of eleven forms and this arm draws
+none on any* — **0 of 181** — and the reason was never a missing decision. `Figure.ramp` has named
+the map since I72 and `Figure.extent` the two readings it runs between; what was missing is
+furniture.
+
+#### Continuous where the reading is, discrete where the data is
+
+The terminal draws **eight** swatches for a matrix because it has eight cells. That is a resolution,
+so this arm's own resolution is a **gradient**. A horizon's key is **three swatches for three bands**
+— and that is not a resolution: `horizonBandT` quantises the reading, so a gradient there would claim
+a continuity the figure has not got. I71 on a key rather than on a geometry.
+
+**Bracketed by its bounds**, which is §3's own rule — *the swatch is a key to a scale the range
+names, and a key with no scale beside it is decoration* — and the terminal's shape.
+
+**Every `ramp` cell closes**, including `horizon`'s. Its `8/10` was the reader's floor:
+`terminalRamp` wants three adjacent swatches and `bands-2`'s key has two. This arm draws one swatch
+per band, so it is under the same floor for the form's own reason, and both arms read `false`
+together where they used to differ.
+
+#### One thing, one column
+
+Drawing the key opened `numericLabels` on six forms, because the key's own bounds are `<text>` and
+the SVG reader counted them — where the terminal's reader excludes them by construction, its seam
+being the bottom border. Measured on a heatmap: `[]` against `["0.19", "100"]`.
+
+`svgRampBounds` excludes them, on `svgLegendNames`' own device one shape along — adjacency in
+document order, a text, the bar, a text. **A key's bounds are measured in the `ramp` column**, and
+counting them twice is measuring one thing twice.
+
+#### `heatmap.legend` agrees, and it took measuring to know why
+
+The cell to distrust: the reader's own note says it reads `agree` because *the SVG has none and the
+terminal's ramp is coloured spaces and the reader took stripped text* — a cell agreeing for two
+different reasons, which is F297's shape. **Measured over the corpus: 74 frames draw a key and report
+`legend: false`, and zero carry a coloured-space swatch beside a name.** There is no legend the scan
+is missing. A key is bracketed by **readings**; a legend is a swatch and a **name**. Different marks,
+different questions, a column each. `AD11` asserts all four directions including the blind spot the
+corpus has no instance of.
+
+#### Three readers saw the gradient's own coordinates
+
+Each read an attribute of the `<defs>` as if it were a mark, and each is a different instrument:
+
+| reader | what it saw | why it is not that |
+|---|---|---|
+| `SS37` | `stop-color=` | `\b` matches at the `c`, because `-` is a non-word character; an SVG attribute is not an Ink prop |
+| `TC5` | `fill="url(#rheatmap)"` | a reference, not a colour — so it is **followed** to the stops rather than skipped |
+| `G6` | `x2="1"` | a gradient's `x1`/`x2` are object-bounding-box coordinates, not page positions |
+
+**Each fix is narrower than the obvious one.** `SS37` takes a lookbehind rather than a file
+exemption, because allowing `svg.ts` would blind the rule in the file most likely to grow a real
+`color=`. `TC5` follows the reference rather than dropping it, because a skipped attribute would let
+a whole ramp of foreign colours through unchecked. `G6` strips `<defs>` rather than filtering the
+value `1`, because a `1` that *is* a page position is what the row exists to catch.
+
+#### And `violin` and `ridgeline` keep their refusal, on a reason that moved
+
+The recorded reason — *their datum is `series` and this path computes no density* — is true and is
+**not the blocker**. A density can be computed above both arms; `densitySeries` already is, for the
+`density` form, at a resolution the shared layer chooses.
+
+**What blocks it is where the resolution comes from.** `violinRows`, the default orientation's arm,
+takes `areaWidth` and evaluates the estimate at **one point per cell** — `const w = Math.max(1,
+Math.floor(areaWidth))`, then a point per `i < w`. That width is the terminal's runtime columns,
+which C12 may not read outside `lifecycle.ts` and which this arm has no analogue for. A shared curve
+would be sampled somewhere else and resampling it to `w` is not the same numbers.
+
+**F314 found three derivations computed in a renderer that never reached the seam, and a KDE is that
+shape** — which is why this was checked rather than assumed. The difference is that those three are
+resolution-free: `ecdfSeries` is a function of `values.length`, `densitySeries` takes its 100 as an
+argument, `binValues` bins. This one is not. `G1c` states it as a signature, by arity, so the day
+`violinRows` stops taking a width the row fails and the refusal is re-read.
+
+---
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7864,6 +7941,7 @@ orientation — and belongs in the classification table as its own rows.
 67. **A fixture is built before the frame that reads it, where the form's own operation is what is being read** (I74, §3ak.35). `slope`'s corpus was three series of two values each, so *take the first and the last* was the identity everywhere and a frame read against it checked the thing that was already correct. The variant that separates the form from `line` found a position axis labelling five intervals nobody draws in — and it also settled where the derivation goes, which reasoning from the current behaviour had got backwards.
 68. **A reading crosses and the ink it becomes is the arm's, on a channel as much as on a geometry** (I71, I73, §3ak.35). A bullet's qualitative bands are one hue at four glyph densities in the terminal, measured off the painted frame; the ordinal is the datum, the quantisation is the grid's. `Mark.rect.value` already carried readings and the walk dropped them wherever the figure named no ramp, which was every mark that could ever have had one until this form.
 69. **A composition refuses only when nothing in it draws, and a refused child keeps its column** (I8, I64, §3ak.36). The facets recurse, so they inherit `violin` and `ridgeline`'s refusal — and the terminal had already decided what that means, twice: a child with no renderer contributes `[]`, and a facet short of a row contributes blanks *so that a short facet must not pull the ones after it leftwards*. A column belongs to a facet by position. Read out of the arm that had the case rather than chosen by the arm that has it now.
+70. **A key crosses as a name and a range, and each arm draws it at its own resolution** (I71, I72, §3ak.37). The `ramp` column measured *0 of 181* for the length of the pass and the decision had crossed the whole time; what was missing was furniture. Continuous where the reading is and **discrete where the data is** — a horizon's key is one swatch per band, because `horizonBandT` quantises and a gradient would claim a continuity the figure has not got.
 
 ---
 
