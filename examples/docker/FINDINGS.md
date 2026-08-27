@@ -13642,6 +13642,32 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F348 — an arm-seam mutation planted in the shared layer moves both arms, so the seam's own rows cannot see it ★★★★☆
+
+The mutation written against F338 reverted `levelCaption` to `return ""`, and the pass reported
+
+```
+CAUGHT ELSEWHERE  AD1   THE LEVELS: the key names the two readings it runs between
+                        and not the ones its lines are
+```
+
+**Caught, and not by what it named.** `levelCaption` is the *shared* function both keys call, so
+emptying it takes the levels off **both** arms — they still agree, `keyReadings` still reads `agree`,
+and `AD1` passes exactly as it should. A golden frame caught it, which is a real catch of a different
+claim: *the caption is drawn at all*.
+
+**The defect it was written for is one arm having a thing the other has not**, and no mutation in the
+layer above either arm can construct that state. Planted in `svg.ts` — `const levels = ""` — it is
+arm-local and `AD1` is the row that answers.
+
+**This is F336's class with a different cause.** There the expectation named an instrument that could
+not report because the row lived in a file the run does not execute. Here the instrument can report
+and the mutation does not produce the state it reports on. Both read as a correct `expect:` field, and
+only `CAUGHT ELSEWHERE` — a disposition the harness prints and nothing gates on — tells them apart.
+**An arm-seam mutation is arm-local or it is testing something else.**
+
+---
+
 ## F347 — `axes: false` reaches one resolver of two, forty lines apart in the same file ★★★★★
 
 ```ts

@@ -944,10 +944,17 @@ const results = runPass({
       // **I49's sentence is about a legend and not about a terminal** (F338).
       // Reverting to the bounds alone is what the arm shipped for the whole
       // campaign, and the `ramp` column read `agree` through all of it.
+      //
+      // **Planted in `svg.ts` and not in `levelCaption`, which is where the
+      // first draft put it** (F348). A mutation in the shared function moves
+      // **both** arms, so they still agree and `AD1` still passes — the run
+      // reported `CAUGHT ELSEWHERE`, by a golden frame, for a mutation whose
+      // whole subject is one arm having a thing the other has not. An arm-seam
+      // mutation is arm-local or it is testing something else.
       name: "THE LEVELS: the key names the two readings it runs between and not the ones its lines are",
-      file: FIGURE,
-      from: "  const levels = contourLevels(block, range);\n  if (levels.length === 0) return \"\"; // cells-ok — a level count",
-      to: "  return \"\";\n  const levels = contourLevels(block, range);",
+      file: SVG,
+      from: "      const levels = levelCaption(block, extent, SVG_CAPS);",
+      to: '      const levels = "";',
       expect: "AD1",
     },
     {
