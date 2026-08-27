@@ -13642,6 +13642,74 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F330 — a record answering *are the readings on a scale* is satisfied by a form whose every row is on a different one ★★★★★
+
+`HAS_VALUE_AXIS` marked all five of family 8's residue `true`. None had ever been drawn, so no cell
+had ever been checked; asking what each figure's axis would be **against what its marks are placed
+on** separates them three to two.
+
+```
+gantt     axis 0 … 5      from seriesRange over the durations      bars span 0 … 11
+funnel    axis 0 … 1000                                            bars are a width, v / max, centred
+bullet    axis 0 … 100    niced from the series' max of 72         rows scaled 0 … 100, 0 … 60, 0 … 40
+timeline  axis 0 … 50     niced                                    events on the raw 0 … 41
+slope     axis 10 … 40    over every value                         marks on the two drawn
+```
+
+**`gantt`'s is the ordinary repair** — the extent is derived from the wrong quantity, and
+`waterfallFigure`'s pin is the fix. **`funnel` and `bullet` are the class**, and it is a rule I60
+does not have: a `Figure` holds **one** `value`, so a form whose marks want more than one range, or
+none, cannot have a true one. A funnel's readings are shares; a bullet's three rows are three
+quantities in three units.
+
+**The strongest part is that the reason was already written down, in the renderer that draws it.**
+`definition.ts`'s `bullet` says *the bands say what good is, so a reader needs no legend and no
+second glance at a dial* — which is why there is no axis — and a record cell in another file said
+there was one. Nothing compares a doc comment with a record, which is F327's shape at its third
+instance and the reason I73 is stated over the **figure** rather than over the form.
+
+**And §3q would have made it worse.** *A categorical distribution form scales every band to one
+axis* is scoped by purpose in its own words — *comparing the categories is the whole of what a
+violin, a raincloud or a ridgeline is for* — and a reader applying it to `bullet` would put revenue
+in pounds beside churn in percent. The per-row scale is the design.
+
+---
+
+## F329 — the fold was ruled shared and shipped twice, and the copy settled a disagreement the original has with itself ★★★★★
+
+§3ak.33 ruled *one fold, three consumers* for the cumulative forms. `stackedarea` and `streamgraph`
+call `stackBands`; **`waterfall` does not.** `definition.ts` walks its series twice and
+`waterfallFigure` walks it a third time — and the first two do not agree with each other.
+
+```
+bounds walk    const v = s.values[i] ?? 0;  if (totals[i]) cumulative = v;      a null total resets to zero
+drawing walk   if (v !== null) { if (isTotal) cumulative = v; else … }          a null total holds
+figure         running = totals[i] === true ? step : running + step;            follows the bounds walk
+```
+
+Measured on `values: [50, null, 30]`, `totals: [false, true, false]`:
+
+```
+terminal   row C is one cell at the right edge     bar 50 → 80, both ends clamped to an axis of 0 … 50
+figure     row C is a rect from 0 to 30            three fifths of the row, from the origin
+```
+
+The terminal's row is internally impossible — a bar whose far end lies outside its own axis — and
+that is only reachable because two walks in one function answer differently. **No fixture has a
+null**, so the disagreement is invisible to the terminal baseline, the SVG baseline, the pair sheet
+and the matrix, all of which are green and stay green.
+
+**The general form is a test, and it is mechanical rather than empirical.** The corpus that separates
+two implementations of one derivation is by definition the corpus neither arm has, so *do the frames
+agree* cannot answer it. **Does the other arm call the function, or contain the walk?** can.
+
+**And the remedy is not `drawnBlock`.** This fold returns bars and a range rather than a block, so
+I70 is not its rule; it goes beside `stackBands` in `stack.ts`, which both arms already import. The
+convention that survives is the drawing walk's — a null is *no reading*, and no reading moves no
+total — and one walk makes the bounds agree with the bars by construction.
+
+---
+
 ## F328 — three rows guard the refusal count with a magnitude, and every one had to be edited ★★★☆☆
 
 `SB4`, `G7` and `PR1` each bound the number of refusals from below:

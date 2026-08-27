@@ -6266,6 +6266,111 @@ business and this section is family 8's.
 middle, then back to the left. That is the terminal's frame proportion for proportion, and it is the
 running baseline crossing rather than being recomputed.
 
+### 3ak.34 — Family 8's residue, and three value axes nobody had ever drawn
+
+Five forms are left — `gantt`, `funnel`, `slope`, `timeline`, `bullet` — and the step opens with a
+check rather than a build: was §3ak.33's ruling **applied**, or **re-derived**? The answer is the
+second, and it is worth more than the forms.
+
+#### The fold was copied, and the copy had to settle a disagreement the original has with itself
+
+`definition.ts`'s `waterfall` walks its series **twice** — once for the bounds, once for the bars —
+and the two walks do not agree. The bounds walk reads `s.values[i] ?? 0`, so a total with no reading
+resets the running sum to zero; the drawing walk guards the advance with `if (v !== null)`, so the
+same total holds it. `waterfallFigure` walks a third time and follows the bounds walk.
+
+**Measured**, on `values: [50, null, 30]` against `totals: [false, true, false]`:
+
+```
+terminal   row C is one cell at the right edge     bar 50 → 80, both ends clamped to an axis of 0 … 50
+figure     row C is a rect from 0 to 30            three fifths of the row, from the origin
+```
+
+That is not a rasterisation difference. And the terminal's own row is internally impossible — a bar
+whose far end is outside its own axis — which is only reachable because two walks inside one
+function disagree about what a null total does.
+
+**No fixture has a null, so every gate is green and stays green.** I71's stated blind spot arriving
+on a form that has already crossed: an unmoved baseline is evidence that nothing was disturbed and
+not evidence that the arms agree.
+
+**The remedy is `stackBands`' shape rather than `drawnBlock`'s.** This fold returns bars and a range,
+not a block, so it is not I70's subject — it goes beside the other cumulative fold in `stack.ts`,
+which both arms already import, and neither arm gains an edge. **The convention is the drawing
+walk's**: a null is *no reading*, and no reading cannot move a running total. One walk also makes the
+bounds agree with the bars by construction, which is the property the three walks could not have.
+
+#### Three value axes, and every one of them would have been drawn wrong
+
+`HAS_VALUE_AXIS` marked all five `true`. Every cell had been silent since the forms were refused, and
+asking what each figure's axis would be **against what its marks need** separates them three to two:
+
+| form | the axis the record would draw | what the marks are placed on |
+|---|---|---|
+| `gantt` | `0 … 5`, from `seriesRange` over the **durations** | `0 … 11`, the span from the earliest start to the latest end |
+| `funnel` | `0 … 1000` | a **width**, `v / max`, centred — neither end of a bar is its reading |
+| `bullet` | `0 … 100`, niced from the series' max of 72 | `0 … 100`, `0 … 60`, `0 … 40` — **one scale per row** |
+| `timeline` | `0 … 50` | `0 … 41`, the raw extent the terminal rasterises against |
+| `slope` | `10 … 40` | the same, over every value and not only the two drawn |
+
+**`gantt` is the ordinary repair**: the extent is derived from the wrong quantity, and the fix is
+`waterfallFigure`'s pin — the block carries the fold's own range before decisions are asked for.
+
+**`funnel` and `bullet` are the class**, and it is new. A `Figure` has **one** `value`, so a form
+whose marks need more than one range, or none, cannot have a true one — and marking it `true`
+produces exactly the confidently-wrong axis this record was created to stop. A funnel's readings are
+**shares**, which is the proportion family's reason one family along; a bullet's rows are three
+quantities in three units, and putting them on one axis is the thing a bullet chart exists not to do.
+
+**§3q does not reach `bullet`, and a reader applying it would break the form.** *A categorical
+distribution form scales every band to one axis* is scoped by purpose in its own words — *comparing
+the categories is the whole of what a violin, a raincloud or a ridgeline is for* — and comparing a
+revenue in pounds against a churn in percent is not what a bullet is for. The per-row scale is the
+design, not the defect.
+
+**The reason was already written down, in the renderer that draws it**: *the bands say what good is,
+so a reader needs no legend and no second glance at a dial.* A record cell said the opposite, in a
+different file, and nothing compared them — F327's shape at its third instance.
+
+#### `timeline` is the honest one, and its repair is F210's
+
+Its events **are** positions on a shared scale, so the record's `true` stands. What does not is the
+range: the terminal places against the raw `0 … 41` and the figure's axis nices to `0 … 50`, so marks
+and labels would come from two ranges again. Pinned, like the fold's, and then there is one.
+
+#### `slope`'s refusal reason is wrong, and its fixture cannot show it
+
+> *a slope's two positions are on **two axes***
+
+Measured, the terminal draws `curveRows` over a two-value series on **one** value axis with two x
+positions — the curve family exactly, which the 24-bit frame shows as three two-point curves between
+a `10 … 40` gutter and a `0.0 … 1.0` scale. The refusal reason describes a chart this component does
+not draw.
+
+**And the derivation is post-range, which is the one thing that keeps it out of `drawnBlock`.**
+`positionalForm` takes its decisions from the **authored** block and the rasteriser takes the
+endpoints, so the axis covers every value and the marks cover two. Deriving in `drawnBlock` would
+narrow the axis — a change to the terminal, in a case no fixture has.
+
+**Every `slope` series in the corpus has exactly two values**, so `ends` is the identity and the
+form's one distinguishing operation is invisible in every frame. A claimed form whose only fixture is
+degenerate is claimed on no evidence, which is `G7b`'s argument one level up — so a
+`slope/three-points` variant lands with the arm, and it is what separates `slope` from `line`.
+
+#### A reading with no ramp, which is the bullet's bands
+
+The terminal draws all of a bullet row — bands, measure and target — in **one** colour, measured off
+the frame as `rgb(230,159,0)` throughout, and varies only the glyph: `●` for the measure, `⠖` and `⠶`
+for the bands. So the band's ordinal is the datum and the ink is the raster.
+
+`Mark.rect.value` is that member already, and the walk drops it when `Figure.ramp` is `null` —
+correct for every mark that has one today, all of which are on a ramp, and silent for the first one
+that is not. **A reading with no ramp is density on the mark's own slot**, which is what the terminal
+does and what this arm can do with an opacity. Not a ramp entry for `bullet`: `FV1c` forbids a form
+from having both, with no exceptions, and it is right — a bullet's *readings* are on its rows'
+scales, and only its *furniture* is on a ladder.
+
+---
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7519,6 +7624,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I70** — **A form whose figure is a derivation of its series computes that derivation above both renderers, and each arm draws the derived block.** I65 puts the derivation below both arms; this is the half that makes it observable, because a pure function in the right layer draws nothing until somebody applies it at an arm's entry. *Measured before the rule: `derive.ts` had existed since §3ak.7 ruled on it, holding `ecdfSeries` and `densitySeries`, and was imported by the terminal's dispatch table and by `kde.ts` — **by nothing on the second arm's side**. The row written for I65 builds the derived block itself and asserts the figure against it, so it passed while no caller did that; and a third form, `histogram`, was never named at all, because the walk that found the class was one family's. Three forms, closed at three by a sweep of the ten sites in the dispatch that reshape a block — **and the sweep's corpus was a file**: `heatmapFormRows` holds three more of exactly that shape one file along, two of which are why two `SVG_FAMILY` entries are `null`* (F268, F314, F317, F322).
 - **I71** — **Where a derivation's output is geometry, the geometry crosses at the data's own resolution and each arm rasterises it at the resolution it has.** I70 says each arm draws the derived *block*, which is what a derivation returning series affords; a derivation returning a figure has no block to hand over. A contour's crossings are interpolations between adjacent readings, so they live on the data's grid — and a glyph-per-cell arm cannot draw them, because `glyphForMask` wants a mask per cell. The rule's observable form is a signature: `contourFigure` and `horizonFigure` take a block and return normalised marks with **no `areaWidth`, no `areaRows`, no `caps` and no string**, while `contourCellRows` and `horizonGrid` keep all four. *Stated blind spot: the terminal does not read the shared geometry back, so an unmoved terminal baseline is evidence that nothing was disturbed and **not** evidence that the arms agree — for I70's three the byte-identity was the proof, and here only the frame is* (F322, F323).
 - **I72** — **Which ramp a reading is on is a figure decision; resolving that ramp to a colour is the arm's.** A `Figure` carries the colormap's **name** and never a colour, which is I62 one member along: a name resolves at each arm's own depth — `continuousColour` descends a capability ladder in one and does not in the other — while *which* map varies by **form**, and a form is not a resolution. *Measured before the rule: `DEFAULT_COLORMAP` lived in a terminal renderer and the second arm's whole ramp decision was `COLORMAPS[block.colormap ?? "viridis"]`, so `correlation` drew sequential where the terminal draws diverging and `utilisation` drew viridis where it draws inferno — the defect the table's own comment calls the single most common chart defect there is, on the form the row was written for. Two sentences licensed it and each was the other's alibi: the seam member's doc said **one ramp either way** and the walk's header called **which ramp a matrix reads** rasterisation* (F324).
+- **I73** — **A form has a value axis only where one range carries every mark.** A `Figure` holds one `value`, so a form whose rows each carry their own scale has no value axis, and neither has one whose readings are shares rather than positions. I60 asks whether a form's readings sit on a value scale *at all*; this is the half that asks whether they sit on **one**, and the two look identical until a form is drawn. *Measured before the rule, over the five that had never been drawn: `gantt`'s axis would have read `0 … 5` over bars spanning `0 … 11`, because the extent came from the durations rather than the spans; `funnel`'s `0 … 1000` labels a **width**, so neither end of a bar is its reading; `bullet`'s `0 … 100` sits over three rows scaled `0 … 100`, `0 … 60` and `0 … 40`, which is the one thing a bullet chart exists not to do — and the reason was already written in the renderer that draws it, in a different file from the record that contradicted it* (F329, F330).
 
 
 ## 8. Commitments
@@ -7587,6 +7693,8 @@ orientation — and belongs in the classification table as its own rows.
 62. **The residue's three forms draw in both arms, and what crosses is their geometry rather than their raster** (I71, §3ak.29). `contour`, `quiver` and `horizon` were refused for the length of the pass with the condition written down as a symbol, and checking the symbols found the prose around them wrong three times: a derivation sweep bounded by a file rather than by a shape, a ruling about mark *kinds* standing in for one about *channels*, and a gate whose meaning inverts when the derivation's output stops being a block.
 64. **A refusal is re-read against the tree before it is carried, never after** (I71, §3ak.31). `ohlc` was refused because *nothing here reads it*, which was true when it was written and false by the time it was checked: the range had crossed, the legend slots had been earned, and the two marks the candles need had been in `Mark` all along. F259's subject is a figure that **cannot be drawn**, and a figure whose data has not been read is a missing derivation wearing a refusal's clothes.
 63. **The ramp a reading is on is named by the figure and resolved by each arm** (I72, §3ak.30). A per-form default table in a terminal renderer is a figure decision the other arm cannot reach, which is F322's class on a lookup rather than on a transform — and the two sentences that licensed it were each the other's alibi, so a reader checking statements one at a time agreed with both.
+65. **A derivation that crosses is *called* by both arms, and a second implementation of it is checked by nothing** (I70, I71, §3ak.34). §3ak.33 ruled one fold for the cumulative three and `waterfall` shipped a second copy, which had to settle a disagreement the first has with itself — its bounds walk and its drawing walk answer differently for a null total, and the copy followed the one that does not draw. The corpus that separates two implementations is by definition the corpus neither arm has, so the test is mechanical and not empirical: does the other arm **call** the function, or contain the walk?
+66. **A form has a value axis only where one range carries every mark** (I73, §3ak.34). A record answering *do the readings sit on a scale* is satisfied by a form whose every row sits on a **different** scale, and the cell reads as deliberate. All five of family 8's residue said `true`; three of them could not be drawn that way, and each had been silent for as long as the form was refused.
 
 ---
 
