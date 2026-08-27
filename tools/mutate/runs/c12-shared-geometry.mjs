@@ -257,8 +257,8 @@ const results = runPass({
       // it says anything, and only a row that counts elements can.
       name: "the SVG arm degrades like the terminal instead of pinning truecolour",
       file: SVG,
-      from: "const SVG_CAPS = Object.freeze({ colourDepth: 24 as const });",
-      to: "const SVG_CAPS = Object.freeze({ colourDepth: 4 as const });",
+      from: 'const SVG_CAPS = Object.freeze({ colourDepth: 24 as const, unicode: "full" as const });',
+      to: 'const SVG_CAPS = Object.freeze({ colourDepth: 4 as const, unicode: "full" as const });',
       expect: "TC5b",
     },
     {

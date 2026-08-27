@@ -31,7 +31,8 @@
  */
 import { flatten, type FlatNode } from "./tree.js";
 import { formatValue } from "./axes.js";
-import { horizonBandCount } from "./figure.js";
+import { horizonBandCount, horizonBandT, horizonBaseline, levelCaption } from "./figure.js";
+import { horizonIsSigned } from "./horizon.js";
 import { drawnBlock } from "./derive.js";
 import { graphLayers } from "./graph.js";
 import { facetWidths } from "./facet.js";
@@ -403,7 +404,12 @@ function area(layout: SvgLayout, legend: FigureLegend | null = null): Area {
  * That is why the two arms are **not byte-comparable below 24-bit**: a cross-arm
  * row compares at this depth or compares structure, never output.
  */
-const SVG_CAPS = Object.freeze({ colourDepth: 24 as const });
+// **The one rung, named as a capability rather than assumed** (§2, *no
+// ladder*). This pinned truecolour and nothing else, so a shared function
+// that degrades on the alphabet — `partSeparator` is the first — had no
+// answer to give it. `unicode: "full"` is the same claim the depth makes:
+// there is one rung here and nothing below it.
+const SVG_CAPS = Object.freeze({ colourDepth: 24 as const, unicode: "full" as const });
 
 /**
  * **Furniture takes the slots the terminal's furniture takes.**
@@ -1540,8 +1546,9 @@ export function plotToSvg(
   if (figure.ramp !== null && figure.extent !== null && label !== undefined) {
     const map = COLORMAPS[figure.ramp];
     if (map !== undefined) {
-      const lo = formatValue(figure.extent.min, block.yFormat);
-      const hi = formatValue(figure.extent.max, block.yFormat);
+      const extent = figure.extent;
+      const lo = formatValue(extent.min, block.yFormat);
+      const hi = formatValue(extent.max, block.yFormat);
       const y = box.bottom + SVG_FONT_SIZE * 1.6;
       const h = SVG_FONT_SIZE * 0.8;
       // Room for the two bounds either side, on the same tenth-of-the-width
@@ -1553,12 +1560,47 @@ export function plotToSvg(
         const c = continuousColour(map, t, SVG_CAPS);
         return c === undefined || c.kind !== "rgb" ? undefined : c.hex;
       };
+      // **The readings the lines *are*, which is C12 I49 and not a new rule**
+      // (§3ak.38, F338). *Levels are named in the legend and never on the line*
+      // has held since §3y, and the sentence is about a legend rather than about
+      // a terminal — so it read as satisfied, because the arm that has the
+      // feature satisfies it. `levelCaption` is now what both keys call, so the
+      // list and the mark that introduces it have one home.
+      //
+      // **One string with the bound**, because there is no second row to put it
+      // on: the abscissa's baseline is `box.bottom + SVG_FONT_SIZE`, the key's is
+      // `y + h`, and the viewBox ends 3.2 px below that. The terminal trails the
+      // bound because it has one row and this trails it because it has one row's
+      // worth of room — and as one element rather than two, no placement can
+      // collide with a bound however wide the bound is.
+      const levels = levelCaption(block, extent, SVG_CAPS);
+      // **A horizon's swatch is `horizonBandT`'s and not a linear ramp** (F341).
+      // This drew `i / (bands − 1)` — a plausible progression that is the
+      // terminal's answer only for a sequential map and an unsigned series. A
+      // diverging map spends its two halves on the two *directions*, so the same
+      // band is a different colour on each side of the baseline, and a signed
+      // horizon has **2n** swatches where this drew n.
+      //
+      // **And the baseline is a reading the key names.** It is the fold — the
+      // one value the figure is *about* — and this arm bracketed min and max and
+      // said nothing about it. The column that found it is `keyReadings`, which
+      // is what F338 built it for.
       const bands = block.form === "horizon" ? horizonBandCount(block) : 0; // cells-ok — a band count
+      const signed = bands > 0 && block.series.some((sr) => horizonIsSigned(sr, extent));
+      const swatches: readonly number[] = bands === 0 ? [] // cells-ok — a band count
+        : [
+            ...(signed
+              ? Array.from({ length: bands }, (_v, i) => // cells-ok — a band count
+                  horizonBandT({ band: bands - 1 - i, sign: -1 }, bands, map.kind === "diverging"))
+              : []),
+            ...Array.from({ length: bands }, (_v, i) => // cells-ok — a band count
+              horizonBandT({ band: i, sign: 1 }, bands, map.kind === "diverging")),
+          ];
       const bar: string[] = [];
-      if (bands > 0) { // cells-ok — a band count
-        const w = (right - left) / bands; // cells-ok — a band count
-        for (let i = 0; i < bands; i += 1) { // cells-ok — a band index
-          const fill = at(bands === 1 ? 1 : i / (bands - 1)); // cells-ok — a band count
+      if (swatches.length > 0) { // cells-ok — a swatch count
+        const w = (right - left) / swatches.length; // cells-ok — a swatch count
+        for (const [i, t] of swatches.entries()) {
+          const fill = at(t);
           if (fill === undefined) continue;
           bar.push(`<rect x="${n(left + i * w)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}"/>`);
         }
@@ -1579,7 +1621,28 @@ export function plotToSvg(
         const text = (x: number, at2: string, t: string): string =>
           `<text x="${n(x)}" y="${n(y + h)}" text-anchor="${at2}" font-size="${n(SVG_FONT_SIZE)}" ` +
             `font-family="monospace" fill="${label}">${escape(t)}</text>`;
-        parts.push(text(left - 4, "end", lo), ...bar, text(right + 4, "start", hi));
+        parts.push(text(left - 4, "end", lo), ...bar, text(right + 4, "start", hi + levels));
+        // The fold, named where it sits — the middle of a mirrored key.
+        if (signed) {
+          parts.push(text((left + right) / 2, "middle",
+            formatValue(horizonBaseline(extent), block.yFormat)));
+        }
+        // **The readings the lines *are*, which is C12 I49 and not a new rule**
+        // (§3ak.38, F338). *Levels are named in the legend and never on the
+        // line* has held since §3y and it reads as satisfied, because the arm
+        // that has a legend satisfies it. `contourLevels` is the shared
+        // function the terminal's key calls and `contourFigure` marches for
+        // its crossings, so this is its third caller and not a second answer.
+        //
+        // **On the key's own baseline, which is the terminal's shape for this
+        // arm's own reason.** There is no second row: the abscissa's baseline
+        // is `box.bottom + SVG_FONT_SIZE`, the key's is `y + h`, and the
+        // viewBox ends 3.2 px below it. The terminal trails the bound because
+        // it has one row; this trails it because it has one row's worth of
+        // room. **A level outside the range is still named** — dropping it
+        // makes an empty area indistinguishable from a constant field — and
+        // it has no place on the bar, which is why nothing is drawn for it.
+
       }
     }
   }

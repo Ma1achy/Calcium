@@ -26,7 +26,7 @@ import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Lay
 import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
 import { calendarCaptions } from "./calendar.js";
 import { drawnBlock, fieldIsMagnitude, magnitudeSeries } from "./derive.js";
-import { contourLevels, rampOf } from "./figure.js";
+import { contourLevels, levelCaption, rampOf } from "./figure.js";
 import { slot } from "../blocks/paint.js";
 import { partSeparator, refOf } from "./marks.js";
 import {
@@ -539,10 +539,13 @@ function matrixFurniture(
   // in it, and at one cell per crossing the hole *is* the crossing. A level
   // outside the range is still named: dropping it makes an empty area
   // indistinguishable from a constant field.
-  const levelText = block.form === "contour"
-    ? `${partSeparator(ctx.capabilities)}` +
-      `${contourLevels(block, range).map((v) => formatValue(v, block.yFormat)).join(" ")}`
-    : "";
+  //
+  // **Shared, because the second arm's key had no levels at all** (§3ak.38,
+  // F338) — and building the caption twice is how that happened. The empty list
+  // is gated there too: this drew `50          50 ·` on a constant field, a mark
+  // announcing a list with nothing after it, and it took the second arm
+  // reproducing the construction to read it off the frame (F340).
+  const levelText = levelCaption(block, range, ctx.capabilities);
   const rungs: readonly (readonly Span[])[] = [
     [muteds(`${lo} `), ...bar(), muteds(` ${hi}${levelText}${clause}`)],
     [muteds(`${lo} `), ...bar(), muteds(` ${hi}${levelText}`)],

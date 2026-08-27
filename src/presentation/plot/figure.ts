@@ -21,11 +21,13 @@ import { flatten } from "./tree.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 import { COLORMAPS } from "../theme/colormap.js";
 import type { ColourRef } from "../theme/types.js";
-import { axisFor, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
+import { axisFor, formatValue, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
 import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
 import { ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { plotAreaRows } from "./height.js";
+import { partSeparator } from "./marks.js";
+import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, refOf } from "./marks.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
 
@@ -1340,6 +1342,44 @@ export function crossing(a: number, b: number, level: number): number {
 export function contourLevels(block: Plot, range: Range): readonly number[] {
   if (block.levels !== undefined) return block.levels.filter((v) => Number.isFinite(v));
   return niceAxis(range, 6, block).ticks.filter((v) => v > range.min && v < range.max);
+}
+
+/**
+ * The levels a key names, as the caption that trails its upper bound (I49, §3ak.38).
+ *
+ * **Both arms call this and neither assembles it**, which is the half F338 was
+ * missing. `contourLevels` already crossed — the terminal's key called it and
+ * `contourFigure` marched it — and the *caption* was built twice, which is how
+ * one arm came to have it and the other not.
+ *
+ * **The separator is a promise about what follows.** A constant field has no
+ * interior ticks, so the list is empty and the terminal drew `50          50 ·`
+ * — a mark announcing a list, with nothing after it. Read off the frame when
+ * the second arm reproduced the construction faithfully, which is what a second
+ * arm is for (F340). Gated here, so there is one place it can be wrong.
+ *
+ * **The caps are the resolution and not the decision** (I72). `partSeparator`
+ * descends to ` - ` on an ASCII terminal and this arm pins one rung, so which
+ * mark separates them is each arm's; *which readings* is neither's.
+ *
+ * **Gated on the layer and not on the form**, which is the same widening
+ * `paintsField` is. Both arms asked `form === "contour"`, so `quiver`'s
+ * `with-contour` variant drew iso-lines off `contourLevels` and named none of
+ * them — the same defect on a form the record files elsewhere. `layersOf` is
+ * a strict superset here: every `contour` block without declared layers gets
+ * `["field", "contour"]`, and the only fixture the widening reaches is the one
+ * that was wrong. A matrix asks `niceAxis` for the same ticks and draws no
+ * lines at all, which is what the gate is for.
+ */
+export function levelCaption(
+  block: Plot,
+  range: Range,
+  caps: Pick<TerminalCapabilities, "unicode">,
+): string {
+  if (!layersOf(block).includes("contour")) return "";
+  const levels = contourLevels(block, range);
+  if (levels.length === 0) return ""; // cells-ok — a level count
+  return `${partSeparator(caps)}${levels.map((v) => formatValue(v, block.yFormat)).join(" ")}`;
 }
 
 /**

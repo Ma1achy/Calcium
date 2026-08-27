@@ -936,9 +936,30 @@ const results = runPass({
       // the bracketing.
       name: "THE BRACKET: the key loses its bounds, so it is a bar naming nothing",
       file: SVG,
-      from: '        parts.push(text(left - 4, "end", lo), ...bar, text(right + 4, "start", hi));',
+      from: '        parts.push(text(left - 4, "end", lo), ...bar, text(right + 4, "start", hi + levels));',
       to: "        parts.push(...bar);",
       expect: "AD8",
+    },
+    {
+      // **I49's sentence is about a legend and not about a terminal** (F338).
+      // Reverting to the bounds alone is what the arm shipped for the whole
+      // campaign, and the `ramp` column read `agree` through all of it.
+      name: "THE LEVELS: the key names the two readings it runs between and not the ones its lines are",
+      file: FIGURE,
+      from: "  const levels = contourLevels(block, range);\n  if (levels.length === 0) return \"\"; // cells-ok — a level count",
+      to: "  return \"\";\n  const levels = contourLevels(block, range);",
+      expect: "AD1",
+    },
+    {
+      // **The two halves of a diverging map are the two directions** (F341), so
+      // a linear ramp over the bands shows a cold end the figure never enters.
+      // `keyReadings` cannot see it and `svg-baseline` can — which is the
+      // division of labour the record is built on.
+      name: "THE HALF: a horizon's key ramps linearly across the bands the figure folds",
+      file: SVG,
+      from: "              horizonBandT({ band: i, sign: 1 }, bands, map.kind === \"diverging\")),",
+      to: "              bands === 1 ? 1 : i / (bands - 1)),",
+      expect: "SB",
     },
     {
       name: "THE FILL: a stacked band is an outline, so the reader integrates two curves",

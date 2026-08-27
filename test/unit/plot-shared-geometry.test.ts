@@ -19,6 +19,7 @@ import { normalisedOf, pinnedRange } from "../../src/data/viewmodel/range.js";
 import type { Facing } from "../../src/presentation/plot/scale.js";
 import { plotToSvg, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
 import { violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
+import { levelCaption } from "../../src/presentation/plot/figure.js";
 import { FULL_CAPS } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { DARK_THEME } from "../support/render.js";
@@ -136,6 +137,41 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     const sr = { label: "s", values: [1, 1, 2, 3, 5, 5, 5, 8, 13] };
     const at = (w: number): string => violinRows(sr, w, 5, FULL_CAPS).join("|");
     expect(at(40), "a wider area is not the narrow one padded").not.toBe(at(20));
+  });
+
+  it("G1d (C12 I49, §3ak.38): the key's levels are one function's, gated on the layer and on the list", () => {
+    // **The caption both keys call** (F338). It was built twice — once in the
+    // terminal's legend and once nowhere, which is how one arm named its levels
+    // and the other named its bounds. Asserted as behaviour rather than by
+    // arity, because the defects it carries are two conditions and not a width.
+    const field = [
+      { label: "r0", values: [0, 25, 50] },
+      { label: "r1", values: [50, 75, 100] },
+    ];
+    const full = { min: 0, max: 100 };
+
+    // **Gated on the layer, not on the form.** Both arms asked `form ===
+    // "contour"`, so a quiver *drawing iso-lines* named none of them.
+    expect(levelCaption({ form: "contour", series: field } as never, full, FULL_CAPS),
+      "a contour names its levels").toBe(" \u00b7 20 40 60 80");
+    expect(levelCaption({ form: "quiver", series: field, layers: ["field", "contour", "quiver"] } as never,
+      full, FULL_CAPS), "and so does anything that draws them").toBe(" \u00b7 20 40 60 80");
+    expect(levelCaption({ form: "quiver", series: field, layers: ["field", "quiver"] } as never, full, FULL_CAPS),
+      "a form with no contour layer names nothing").toBe("");
+    // A matrix asks `niceAxis` for the same ticks and draws no line at all, so
+    // the gate is what keeps 250 terminal frames from growing levels they have
+    // no lines for — which is exactly what happened when it was dropped.
+    expect(levelCaption({ form: "heatmap", series: field } as never, full, FULL_CAPS),
+      "and a matrix has the ticks without the lines").toBe("");
+
+    // **The separator is a promise about what follows.** A constant field has no
+    // interior ticks, and this drew `50          50 \u00b7` on every rung.
+    expect(levelCaption({ form: "contour", series: field } as never, { min: 50, max: 50 }, FULL_CAPS),
+      "an empty list draws no mark announcing it").toBe("");
+
+    // The mark is the arm's, and it descends (C12 I72).
+    expect(levelCaption({ form: "contour", series: field } as never, full, { unicode: "ascii" } as never),
+      "and which mark separates them is a capability").toBe(" - 20 40 60 80");
   });
 
   it("G1b (§3aj hazard 3): the layout ladder is cell-bound, and that is the ruling", () => {

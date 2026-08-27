@@ -95,11 +95,26 @@ export type ArmDecisions = Readonly<{
    * drop rule of its own, which is the seam leaking the other way.
    */
   notice: boolean;
+  /**
+   * The readings a colour **key names**, in reading order.
+   *
+   * **The eighth column, and it exists because the sixth is a boolean** (F338,
+   * §3ak.38). `ramp` asks *is a colour key drawn* and closed on eleven forms;
+   * it is blind by construction to what the key says. The terminal's contour
+   * key named `1.5 … 99 · 20 40 60 80` and this arm's named `1.5 … 99`, both
+   * answered `true`, and the cell read `agree`.
+   *
+   * **The withheld clause is cut out** on the terminal side, because it shares
+   * the row and it is `notice`'s subject — a heatmap at 40w says `· 56 older
+   * not shown` on the same line, and counting its `56` here measures one thing
+   * twice in the way F337's fourth reader did.
+   */
+  keyReadings: readonly string[];
 }>;
 
 const NOTHING: ArmDecisions = Object.freeze({
   drawn: false, numericLabels: [], identityLabels: [], border: false, interiorRules: 0, legend: false,
-  ramp: false, notice: false,
+  ramp: false, notice: false, keyReadings: [],
 });
 
 /**
@@ -221,7 +236,7 @@ function legendTail(line: string): RegExpExecArray | null {
 const BG = /\x1b\[48;2;(\d+;\d+;\d+)m/gu;
 const BOUND = /-?[\d.,]+\s*[%a-zA-Z]{0,3}/u;
 
-export function terminalRamp(raw: string): boolean {
+export function terminalRamp(raw: string, least = 3): boolean {
   BG.lastIndex = 0;
   const runs: { colours: Set<string>; from: number; to: number }[] = [];
   let current: { colours: Set<string>; from: number; to: number } | null = null;
@@ -234,7 +249,7 @@ export function terminalRamp(raw: string): boolean {
     else { current = { colours: new Set([m[1]!]), from: m.index, to: BG.lastIndex + 1 }; runs.push(current); }
   }
   return runs.some((r) => {
-    if (r.colours.size < 3) return false; // cells-ok — a swatch count
+    if (r.colours.size < least) return false; // cells-ok — a swatch count
     const before = stripSgr(raw.slice(0, r.from)).trim();
     const after = stripSgr(raw.slice(r.to)).trim();
     return BOUND.test(before) && BOUND.test(after);
@@ -251,7 +266,29 @@ export function terminalRamp(raw: string): boolean {
  * than a reader defect.
  */
 export function svgRamp(svg: string): boolean {
-  if (/<(?:linearGradient|defs)\b/u.test(svg)) return true;
+  return svgRampFoot(svg) !== null;
+}
+
+/**
+ * **The same bar, as a baseline** — `y + height` of the key's bar (F338).
+ *
+ * `keyReadings` needs to know which texts belong to the key, and the answer is
+ * *the ones on the bar's own foot*. Written as a second detector it drifted
+ * immediately: it took a run of **two** rects where this takes three, so a
+ * two-band `horizon` — the exact variant §3ak.37 records as under the floor on
+ * both arms — had no ramp and a key at the same time. One finder, two questions.
+ */
+function svgRampFoot(svg: string, least = 3): number | null {
+  // **The gradient names itself by its reference**, and the foot has to come
+  // from the rect that *uses* it rather than from the `<defs>`: a gradient's own
+  // `x1`/`y1` are object-bounding-box coordinates and not page positions, which
+  // is the third of F337's three readers making that mistake.
+  const grad = /<rect\b[^>]*fill="url\(#[^)]*\)"[^>]*\/>/u.exec(svg);
+  if (grad !== null) {
+    const y = /\by="(-?[\d.]+)"/u.exec(grad[0])?.[1];
+    const h = /\bheight="(-?[\d.]+)"/u.exec(grad[0])?.[1];
+    if (y !== undefined && h !== undefined) return Number(y) + Number(h);
+  }
   // **Bracketing, not adjacency — and the two drafts before this one are why.**
   //
   // The first asked for three consecutive `<rect>` of differing fill in document
@@ -301,7 +338,7 @@ export function svgRamp(svg: string): boolean {
         && Math.abs(b.x - (a.x + a.w)) <= 1 && Math.abs(a.w - b.w) <= 1 && a.fill !== b.fill) continue;
       const run = row.slice(from, i);
       from = i;
-      if (run.length < 3) continue; // cells-ok — a swatch count
+      if (run.length < least) continue; // cells-ok — a swatch count
       const head = run[0]!;
       const tail = run[run.length - 1]!;
       // **Beside the bar, not merely near it.** A bound *names the end it sits
@@ -312,11 +349,11 @@ export function svgRamp(svg: string): boolean {
       const mid = head.y + head.h / 2;
       const band = (l: { y: number }): boolean => Math.abs(l.y - mid) <= SVG_FONT_ROW;
       if (labels.some((l) => band(l) && l.x < head.x) && labels.some((l) => band(l) && l.x > tail.x + tail.w)) {
-        return true;
+        return head.y + head.h;
       }
     }
   }
-  return false;
+  return null;
 }
 
 /**
@@ -327,6 +364,9 @@ export function svgRamp(svg: string): boolean {
  * saw only one would report the axis as covered while missing the other.
  */
 const WITHHELD = /\+\d+\s+more\b|\b\d+\s+older not shown\b/u;
+
+/** A horizon key's `N bands` — the other count that shares a key row (F338). */
+const BANDS = /\b\d+\s+bands?\b/u;
 
 export function saysWithheld(text: string): boolean {
   return WITHHELD.test(stripSgr(text));
@@ -347,7 +387,15 @@ export function stripSgr(s: string): string {
 export function terminalDecisions(raw: readonly string[]): ArmDecisions {
   const rows = raw.filter((l) => stripSgr(l).length > 0);
   if (rows.length === 0) return NOTHING;
+  // **Two floors, because they are two questions** — and collapsing them into
+  // one finder is what re-opened `horizon.numericLabels` at 2/10 (F338). `ramp`
+  // asks *is a colour ramp drawn*, and three adjacent swatches is what reads as
+  // a progression rather than as two blocks; a two-band horizon key is a
+  // **discrete** key and both arms say `false`. Whether a text *belongs to the
+  // key* is the other question, and a two-swatch key is still a key. One
+  // implementation, one named parameter, and the same two floors on both arms.
   const ramp = rows.some((l) => terminalRamp(l));
+  const keyRow = rows.find((l) => terminalRamp(l, 2));
   const notice = rows.some((l) => saysWithheld(l));
   const lines = rows.map(stripSgr);
 
@@ -439,6 +487,17 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
     drawn: true,
     ramp,
     notice,
+    // **A count is not a reading, and this row carries two of them.** `100 · 56
+    // older not shown` is a bound and a **column** count; `0.0038 100 3 bands`
+    // is two bounds and a **band** count. Neither sits on the value scale, so
+    // neither is what a key names — and the second arm says the band count in
+    // its own medium anyway, drawing one swatch per band. Cut rather than
+    // filtered, because a bare `56` has a reading's shape and nothing about the
+    // token itself could tell them apart.
+    keyReadings: keyRow === undefined
+      ? []
+      : stripSgr(keyRow).replace(WITHHELD, "").replace(BANDS, "")
+        .split(/\s+/u).filter((t) => NUMERIC.test(t)),
     numericLabels: numeric,
     identityLabels: identity,
     border,
@@ -462,7 +521,7 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
 }
 
 /** Every `<text>` element's body, in the order a reader meets it. */
-function texts(svg: string): readonly Readonly<{ body: string }>[] {
+function texts(svg: string): readonly Readonly<{ body: string; x: number; y: number }>[] {
   const out: { body: string; y: number; x: number }[] = [];
   for (const m of svg.matchAll(/<text\s([^>]*)>([^<]*)<\/text>/gu)) {
     const attrs = m[1] ?? "";
@@ -500,15 +559,34 @@ function texts(svg: string): readonly Readonly<{ body: string }>[] {
 /** The height a label's row occupies, for banding two labels onto one line. */
 const SVG_FONT_ROW = 14;
 
-/** The SVG's decisions, read out of its elements. Private: `svgArm` is the seam. */
-function svgDecisions(svg: string | null): ArmDecisions {
+/**
+ * The SVG's decisions, read out of its elements — `svgArm` renders, this reads.
+ *
+ * **Exported so the two arms' readers are symmetric** (F338). `terminalDecisions`
+ * takes a rendered document and this took a `Plot`, so a fabricated violation
+ * could be handed to one reader and not to the other — and `AD11` fabricates on
+ * the terminal side only for exactly that reason. A reader over a document is
+ * testable by handing it a document.
+ */
+export function svgDecisions(svg: string | null): ArmDecisions {
   if (svg === null) return NOTHING;
   const all = texts(svg).filter((t) => t.body !== "");
   const legendNames = svgLegendNames(svg);
-  const rampBounds = svgRampBounds(svg);
+  // **The key's texts are excluded by *where they are*, not by what they say**
+  // — and a body set is what made that necessary rather than tidy. The signed
+  // horizon key names its fold `0`, and `0` is also a tick on the figure above
+  // it, so filtering by body took both and `horizon.numericLabels` opened at
+  // 2/10 with nothing wrong. A geometric reader owes a geometric filter.
+  const foot = svgRampFoot(svg, 2);
+  const onKey = (t: Readonly<{ y: number }>): boolean => foot !== null && Math.abs(t.y - foot) < 0.5;
+  const key = all.filter(onKey).map((t) => t.body);
   return {
     drawn: true,
     ramp: svgRamp(svg),
+    // **Tokenised, because the caption is one element and the terminal's is one
+    // span** — `99 · 20 40 60 80` is a bound and four levels either way, and a
+    // reader that compared elements would be comparing an encoding.
+    keyReadings: key.flatMap((b) => b.split(/\s+/u)).filter((t) => NUMERIC.test(t)),
     // **`false` for every document this arm can produce, and that is the claim.**
     // The terminal withholds because a cell is a quantum; this arm scales its box
     // across whatever it is given and has nothing to drop (F318). Written as a
@@ -524,9 +602,17 @@ function svgDecisions(svg: string | null): ArmDecisions {
     // **The shape, on both sides** (F326). This asked `clip-path` first, which
     // is where a label is drawn rather than what it says.
     numericLabels: all
-      .filter((t) => !legendNames.has(t.body) && !rampBounds.has(t.body) && NUMERIC.test(t.body))
+      .filter((t) => !legendNames.has(t.body) && !onKey(t) && NUMERIC.test(t.body))
       .map((t) => t.body),
-    identityLabels: all.filter((t) => !legendNames.has(t.body) && !NUMERIC.test(t.body)).map((t) => t.body),
+    // **The key's texts are excluded from both label readers and not only from
+    // one** (F338). The bounds happened to be numeric so the filter only ever
+    // needed to reach `numericLabels`; a level caption is `99 · 20 40 60 80`,
+    // which `NUMERIC` rejects, so it would have arrived here as an identity —
+    // a name for a category nothing drew. The terminal excludes the whole key
+    // row by construction, its seam being the bottom border.
+    identityLabels: all
+      .filter((t) => !legendNames.has(t.body) && !onKey(t) && !NUMERIC.test(t.body))
+      .map((t) => t.body),
     // **The ground is not a border.** `<rect width="100%">` paints the page; a
     // border would be a stroked rectangle round the plot area, and this arm
     // draws none.
@@ -572,30 +658,6 @@ function svgDecisions(svg: string | null): ArmDecisions {
  * or a run of swatches sharing a `y` and a `height`, which is what the emitter
  * writes and what `svgRamp` reads.
  */
-function svgRampBounds(svg: string): ReadonlySet<string> {
-  const out = new Set<string>();
-  const TEXT = String.raw`<text[^>]*>([^<]*)<\/text>`;
-  const gradient = new RegExp(
-    `${TEXT}\\s*<defs>[\\s\\S]*?<\\/defs>\\s*<rect[^>]*fill="url\\(#[^)]*\\)"[^>]*\\/>\\s*${TEXT}`, "gu");
-  const swatches = new RegExp(`${TEXT}\\s*((?:<rect[^>]*\\/>\\s*){2,})${TEXT}`, "gu");
-  for (const m of svg.matchAll(gradient)) {
-    out.add((m[1] ?? "").trim());
-    out.add((m[2] ?? "").trim());
-  }
-  for (const m of svg.matchAll(swatches)) {
-    // **A run, and every member on one row** — otherwise any two rects between
-    // two labels would look like a key.
-    const rects = [...(m[2] ?? "").matchAll(/<rect[^>]*y="([\d.-]+)"[^>]*height="([\d.-]+)"/gu)];
-    if (rects.length < 2) continue; // cells-ok — a swatch count
-    const [y, h] = [rects[0]?.[1], rects[0]?.[2]];
-    if (!rects.every((r) => r[1] === y && r[2] === h)) continue;
-    out.add((m[1] ?? "").trim());
-    out.add((m[3] ?? "").trim());
-  }
-  out.delete("");
-  return out;
-}
-
 /**
  * The names this arm's legend draws — **a swatch and the text beside it**.
  *

@@ -62,7 +62,7 @@ import { block } from "../../src/data/viewmodel/index.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 import { svgFamilyOf } from "../../src/presentation/plot/svg.js";
 import { RAMP_DEFAULT } from "../../src/presentation/plot/figure.js";
-import { terminalDecisions, svgArm, terminalRamp, svgRamp, saysWithheld, type ArmDecisions } from "../support/arm-decisions.js";
+import { terminalDecisions, svgArm, svgDecisions, terminalRamp, svgRamp, saysWithheld, type ArmDecisions } from "../support/arm-decisions.js";
 import { DARK_THEME } from "../support/render.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -87,7 +87,8 @@ const WIDTHS = [40, 80] as const;
 // key under every terminal frame and none under any SVG, and the terminal says
 // what it withheld where the second arm has nothing to withhold. A rule table is
 // exhaustive over the rules you stated and blind to one you did not.
-const DECISIONS = ["numericLabels", "identityLabels", "border", "interiorRules", "legend", "ramp", "notice"] as const;
+const DECISIONS =
+  ["numericLabels", "identityLabels", "border", "interiorRules", "legend", "ramp", "keyReadings", "notice"] as const;
 type Decision = (typeof DECISIONS)[number];
 
 /**
@@ -141,12 +142,12 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "8/86", "numericLabels": "68/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "8/78", "legend": "14/78", "ramp": "agree", "notice": "agree" },
-  "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "4/8" },
+  "line": { silent: "8/86", "numericLabels": "68/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "8/78", "legend": "14/78", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/8" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
   // both readers ask the shape now — and `ramp` is F316's open column on the
   // family that has always had one. `numericLabels` is the terminal reader's
@@ -156,48 +157,48 @@ const MEASURED = {
   // last edge-bearing line* was measured and rejected: it moves cells in both
   // directions across five other forms, which is a different reader rather than
   // a repair.
-  "contour": { silent: "0/18", "numericLabels": "18/18", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "bar": { silent: "2/14", "numericLabels": "10/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "6/12" },
-  "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "2/10", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "contour": { silent: "0/18", "numericLabels": "18/18", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "bar": { silent: "2/14", "numericLabels": "10/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
+  "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "2/10", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   //  closed with F326: its two categories are `1` and `2`,
   // numerals that the clip-path rule filed as names on one side only.
-  "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "waffle": { silent: "0/6", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "funnel": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "gantt": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "waffle": { silent: "0/6", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "funnel": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "gantt": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **Family 8's aggregating three, and one fold serves them** (§3ak.33).
   // `waterfall` agrees about everything but the gutter's numbers, which is
   // the terminal reader's stated limit — the frame's numeric row sits below a
   // bottom rule the reader finds, so the two sets are the axis's against the
   // axis's plus the identity's.
-  "waterfall": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "waterfall": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **`slope` is the curve family, and its refusal reason described a chart this
   // component does not draw** (§3ak.35, F332). `numericLabels 4/4` is the
   // position axis: the terminal reads `0.0 … 1.0` and this arm reads nothing,
   // because a slope's two columns are named by the caller and neither fixture
   // names them.
-  "slope": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "bubble": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "slope": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "bubble": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The last two of family 8's residue** (§3ak.35). `timeline` is the one form
   // whose rows are series, pinned to its own range so the marks and the labels
   // come from one axis; `bullet` has no axis at all, because its three rows are
   // three quantities in three units (C12 I73).
-  "timeline": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "bullet": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "2/4" },
-  "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "6/12" },
-  "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "stackedarea": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "streamgraph": { silent: "0/6", "numericLabels": "6/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "timeline": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "bullet": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/4" },
+  "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
+  "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "stackedarea": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "streamgraph": { silent: "0/6", "numericLabels": "6/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The matrix family's eighth, and the only one that needed a derivation to
   // get here** (§3ak.32). `ramp` is F316's column; `notice` is F318's legitimate
   // difference arriving on a third form — a calendar drops leading columns
@@ -205,21 +206,29 @@ const MEASURED = {
   // arm scales its 640 px across whatever it is given. `identityLabels` 3/12 is
   // the same drop read through another column: the terminal's notice names the
   // dates it withheld.
-  "calendar": { silent: "0/12", "numericLabels": "2/12", "identityLabels": "3/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "3/12" },
-  "correlation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "confusion": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "1/4" },
-  "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "2/2" },
-  "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "1/2" },
-  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "1/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  //
+  // **`numericLabels` 2/12 → agree, and the fix was in the reader** (F338). The
+  // key's bounds were excluded by **body**, so a `0` and a `12` anywhere else in
+  // the figure went with them and this arm reported two labels short of the
+  // terminal. Excluding by *position* — the texts on the key bar's own foot —
+  // takes the two that are the key's and leaves the two that are the calendar's.
+  // The same defect would have opened `horizon.numericLabels` at 2/10 the day
+  // the signed key named its fold `0`, which is how it was found.
+  "calendar": { silent: "0/12", "numericLabels": "agree", "identityLabels": "3/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "3/12" },
+  "correlation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "confusion": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "1/4" },
+  "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/2" },
+  "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "1/2" },
+  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "1/4", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "violin": "refused",
   "ridgeline": "refused",
   // **The compositions, which are whatever their children are** (§3ak.36). Both
   // recurse into `plotToSvg`, so a facet holding a refused form leaves its column
   // empty and its siblings draw — the terminal's own answer, read out of
   // `smallMultiplesRows` rather than chosen.
-  "smallmultiples": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "1/2", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "pairplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "smallmultiples": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "1/2", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "pairplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The proportion family, and eighteen of its twenty cells agree on the day
   // it lands** (§3ak.26). The three renderers were the terminal's own
   // computations moved, so agreement here is the extraction's property
@@ -238,17 +247,17 @@ const MEASURED = {
   // as a whole row or past a frame edge — and these three draw no border and
   // put the key beside the figure. Five cells on four *other* forms closed
   // with it, every one of them narrowing.
-  "pie": { silent: "0/10", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/10", "ramp": "agree", "notice": "agree" },
+  "pie": { silent: "0/10", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/10", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **Every cell agrees, including the value axis** — `radarCeiling` became
   // `valueAxisOf` and both arms normalise against the same ceiling (F304).
-  "radar": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "radar": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The residue's third, drawn** (§3ak.29). Both open cells have **one** cause
   // and it is F316's: the second arm draws no ramp key. `ramp` is that directly —
   // 8 of 10, because `terminalRamp` wants three adjacent swatches and a two-band
   // key has two, which is the reader's threshold answering correctly — and
   // `identityLabels` is the same absence read through another column: the
   // terminal's key is `0.0038  100  3 bands` and `bands` is a word.
-  "horizon": { silent: "0/10", "numericLabels": "agree", "identityLabels": "10/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "horizon": { silent: "0/10", "numericLabels": "agree", "identityLabels": "10/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
 } as const satisfies Readonly<globalThis.Record<PlotForm, Record_>>;
 
 /** One arm-pair for a spec, at a width. */
@@ -439,10 +448,10 @@ describe("AD — the two arms decide separately, and here is where", () => {
     }
     expect(claimed.length, "forms the SVG arm claims").toBe(44); // cells-ok — a form count
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(308); // cells-ok — a cell count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(352); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(53); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(211); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(52); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(256); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
@@ -479,7 +488,15 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const ends = '<text x="80" y="211">0.19</text><text x="170" y="211">100</text>';
     expect(svgRamp(`<svg>${rects}${ends}</svg>`), "three touching swatches between two readings").toBe(true);
     expect(svgRamp(`<svg>${rects}</svg>`), "unbracketed is a figure").toBe(false);
-    expect(svgRamp('<svg><defs><linearGradient id="g"/></defs></svg>'), "a gradient needs no bracket").toBe(true);
+    // **A gradient needs no bracket — but it does need something painted with
+    // it** (F338). This asked for `<defs>` or `<linearGradient>` anywhere in the
+    // document, which is a *declaration*: a ramp nothing references paints no
+    // cell, and the reader would have called it a key. The rect that carries the
+    // reference is the ramp; the `<defs>` above it is a name.
+    const grad = '<defs><linearGradient id="g"/></defs>';
+    expect(svgRamp(`<svg>${grad}<rect x="1" y="2" width="9" height="4" fill="url(#g)"/></svg>`),
+      "a painted gradient needs no bracket").toBe(true);
+    expect(svgRamp(`<svg>${grad}</svg>`), "and a declared one paints nothing").toBe(false);
     // **The second draft's false negative, kept as a row.** A heatmap draws 450
     // touching rects of differing fill and read `false` because sorting every
     // row into one list by `x` broke the run at its second element — the right
@@ -533,6 +550,47 @@ describe("AD — the two arms decide separately, and here is where", () => {
       "a coloured-space swatch beside a name is the reader's stated blind spot").toBe(false);
     expect(stripSgr(invisible).trim(), "because stripping leaves the names and no swatch")
       .toBe("alpha    beta");
+  });
+
+  it("AD12 (C12 I49, §3ak.38): the key's readings are read on both arms, and a count is not one", () => {
+    // **The eighth column owes a fabricated violation in both directions**, and
+    // it is the standing rule for a new reader rather than a courtesy: this one
+    // agrees on all 44 forms today, so nothing in the matrix could tell a column
+    // that works from one that answers `[]` twice (F338, A03 §2's vacuity class).
+    const viridis = ["68;1;84", "59;82;139", "33;145;140", "253;231;37"];
+    const run = `${viridis.map((c) => `\u001b[48;2;${c}m `).join("")}\u001b[49m`;
+    const key = (trail: string): string => `\u001b[38;2;98;98;98m1.5 \u001b[39m${run} 99${trail}`;
+
+    expect(terminalDecisions([key("")]).keyReadings, "the two readings a key runs between")
+      .toEqual(["1.5", "99"]);
+    // The levels are readings and they are the point of the column.
+    expect(terminalDecisions([key(" \u00b7 20 40 60 80")]).keyReadings, "and every level it names")
+      .toEqual(["1.5", "99", "20", "40", "60", "80"]);
+    // **A count shares the row and is not a reading.** Both of these have a
+    // reading's *shape*, so nothing about the token could separate them — the
+    // clause is cut by name, which is why there are two named clauses and not a
+    // rule about numbers followed by words.
+    expect(terminalDecisions([key(" \u00b7 56 older not shown")]).keyReadings, "a drop count is `notice`'s")
+      .toEqual(["1.5", "99"]);
+    expect(terminalDecisions([key("  3 bands")]).keyReadings, "and a band count is the swatches'")
+      .toEqual(["1.5", "99"]);
+    // A frame with no key names no readings, which is the negative direction.
+    expect(terminalDecisions(["\u2588 alpha  \u2588 beta"]).keyReadings, "a legend is not a key").toEqual([]);
+
+    // **This arm's are the texts on the bar's own foot** — position, not body.
+    // Excluding by body took a `0` from the figure along with the `0` naming a
+    // signed horizon's fold, which is how the geometric filter was arrived at.
+    const bar = '<rect x="100" y="200" width="60" height="10" fill="url(#g)"/>';
+    const at = (x: number, y: number, t: string): string => `<text x="${String(x)}" y="${String(y)}">${t}</text>`;
+    const svg = `<svg><defs><linearGradient id="g"/></defs>${bar}`
+      + `${at(96, 210, "1.5")}${at(164, 210, "99 \u00b7 20 40")}${at(96, 40, "0")}</svg>`;
+    expect(svgDecisions(svg).keyReadings,
+      "the bar's foot, tokenised — a caption is one element here and one span there")
+      .toEqual(["1.5", "99", "20", "40"]);
+    expect(svgDecisions(svg).numericLabels,
+      "and a label elsewhere is still the figure's").toEqual(["0"]);
+    expect(svgDecisions(`<svg>${at(96, 210, "1.5")}${at(164, 210, "99")}</svg>`).keyReadings,
+      "and with no bar there is no key to belong to").toEqual([]);
   });
 
   it("AD9 (F321): an edge glyph inside a figure is not a frame", () => {
