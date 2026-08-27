@@ -631,6 +631,25 @@ const results = runPass({
       to: "  const block = raw;",
       expect: "baseline",
     },
+    // **The ramp, which is a figure decision two sentences said was not**
+    // (F324, §3ak.30). The first is the shipped defect put back: this arm
+    // guessing a literal while the terminal reads the table. The second severs
+    // the table itself, so **both** arms lose the ramp — which is what says the
+    // member has two consumers and not one.
+    {
+      name: "THE ARM: the second arm guesses its ramp again, as it did for the length of the pass",
+      file: SVG,
+      from: "  const map = figure.ramp === null ? undefined : COLORMAPS[figure.ramp];",
+      to: '  const map = COLORMAPS[block.colormap ?? "viridis"];',
+      expect: "U9",
+    },
+    {
+      name: "THE SEAM: a form's default ramp is dropped, so only a declared one survives",
+      file: FIGURE,
+      from: "  return block.colormap ?? RAMP_DEFAULT[block.form];",
+      to: "  return block.colormap ?? null;",
+      expect: "baseline",
+    },
   ],
 });
 

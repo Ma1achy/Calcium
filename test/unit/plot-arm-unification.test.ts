@@ -43,11 +43,14 @@ import {
   type Mark,
 } from "../../src/presentation/plot/figure.js";
 import { estimateRole } from "../../src/presentation/plot/figure.js";
+import { RAMP_DEFAULT, rampOf } from "../../src/presentation/plot/figure.js";
+import { COLORMAPS, continuousColour } from "../../src/presentation/theme/colormap.js";
+import type { ColormapName } from "../../src/data/viewmodel/index.js";
 import { roleGlyphs } from "../../src/presentation/plot/roles.js";
 import { forestRow } from "../../src/presentation/plot/glyph-row.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { cells, truncate, type AmbiguousWidth } from "../../src/presentation/text.js";
-import { DARK_THEME } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
@@ -156,6 +159,12 @@ describe("U — the seam, asserted from both arms", () => {
     valueLabels: { form: "bar", patch: { yAxis: false } },
     legend: { form: "line", variant: "legend-right", patch: "labels" },
     marks: { form: "bar", patch: "values" },
+    // **A matrix form, because it is the only family whose marks carry a
+    // `value` to spend on a ramp** (C12 I72, §3ak.30). A curve has no ramp at all —
+    // `RAMP_DEFAULT` is `null` for it — so a perturbation there moves a member
+    // that was `null` to a member that is `null`, which is a cell that agrees
+    // with everything.
+    ramp: { form: "heatmap", patch: { colormap: "inferno" } },
     // **`null` because no block field can move this one, and that is a third
     // kind of cell rather than an omission** (§3ak.26 finding 1).
     //
@@ -216,6 +225,11 @@ describe("U — the seam, asserted from both arms", () => {
     // cell records *who reads it*, not *what moved* — and it is the only cell
     // in the record that cannot be measured the way its neighbours are.
     isotropic: { terminal: "radiusFor", svg: "boxFor" },
+    // **Both arms, and the day it was added neither had read it.** The terminal
+    // took the table from `heatmap.ts` and this arm took the literal
+    // `"viridis"`, so a correlation matrix was diverging in one and sequential
+    // in the other while every gate compared clean (F324).
+    ramp: { terminal: "moves", svg: "moves" },
   } as const satisfies Readonly<Record<keyof Figure, { terminal: string; svg: string }>>;
 
   function patched(base: Spec, how: unknown): Spec {
@@ -918,6 +932,65 @@ describe("U — the seam, asserted from both arms", () => {
     }));
     expect(calendar.series.length, "seven weekday rows from one series").toBe(7);
     expect(calendar.series.length, "which is not the one it was given").not.toBe(1);
+  });
+
+  /**
+   * **The ramp a form is on, in both arms** (C12 I72, §3ak.30, F324).
+   *
+   * **The subject is derived from the table and not listed.** The defect was a
+   * literal `"viridis"` in the second arm, so a row naming the forms by hand
+   * agrees with exactly the literal it exists to replace — and a form added to
+   * `RAMP_DEFAULT` with a third ramp would go past it.
+   *
+   * **A refusal is counted rather than skipped.** `horizon`'s default is
+   * `coolwarm` and its arm is `null` today, so it cannot be drawn here — and a
+   * `continue` that says nothing is how a row goes quietly vacuous. The set of
+   * skipped forms is asserted against the refusal itself, which makes the row
+   * pick `horizon` up on the day that arm opens.
+   */
+  it("U9 (C12 I72, §3ak.30): a form whose ramp is not the guess is drawn on its own, in both arms", () => {
+    const odd = (Object.entries(RAMP_DEFAULT) as readonly (readonly [PlotForm, ColormapName | null])[])
+      .filter(([, name]) => name !== null && name !== "viridis");
+    expect(odd.map(([form]) => form).sort(), "the forms a guess would get wrong")
+      .toEqual(["correlation", "horizon", "utilisation"]);
+
+    const rungs = 201;
+    const reachable = (name: ColormapName): ReadonlySet<string> => {
+      const map = COLORMAPS[name];
+      const out = new Set<string>();
+      for (let i = 0; i < rungs; i += 1) {
+        const c = map === undefined
+          ? undefined
+          : continuousColour(map, i / (rungs - 1), FULL_CAPS);
+        if (c !== undefined && c.kind === "rgb") out.add(c.hex);
+      }
+      return out;
+    };
+    const guess = reachable("viridis");
+    const skipped: string[] = [];
+
+    for (const [form, name] of odd) {
+      if (name === null) continue;
+      const variants = (CATALOGUE_FORMS as Record<string, Record<string, Spec>>)[form] ?? {};
+      const first = Object.values(variants)[0];
+      if (first === undefined) continue;
+      const b = blockOf(specOf(first));
+      expect(rampOf(b), `${form}: the figure names its own ramp`).toBe(name);
+      const svg = plotToSvg(b, DARK_THEME);
+      if (svg === null) { skipped.push(form); continue; }
+      const own = reachable(name);
+      const fills = [...svg.matchAll(/<rect[^>]*fill="(#[0-9a-f]{6})"/gu)]
+        .map((m) => m[1] ?? "")
+        .filter((f) => own.has(f) || guess.has(f));
+      expect(fills.length, `${form}: the ramp put something on the page`).toBeGreaterThan(0);
+      expect(fills.filter((f) => !own.has(f)), `${form}: drawn on the guess, not on its own ramp`)
+        .toEqual([]);
+    }
+
+    // **Which forms could not be asked, and why** — against the refusal rather
+    // than a literal, so the row starts asking `horizon` the day its arm opens.
+    expect(skipped, "the ones this row cannot reach are exactly the refused ones")
+      .toEqual(odd.filter(([f]) => svgFamilyOf(f) === null).map(([f]) => f));
   });
 
   it("U8b (C12 I70, §3ak.29): each of the three is idempotent, because two callers now apply it", () => {

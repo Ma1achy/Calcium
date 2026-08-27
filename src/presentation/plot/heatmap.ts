@@ -13,7 +13,6 @@ import type { RenderContext } from "../blocks/types.js";
 import type { Facing, Range } from "./scale.js";
 import type { ColourValue } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
-import type { ColormapName } from "../../data/colormaps/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { ladderFor } from "./ramp.js";
 import { cells, truncate } from "../text.js";
@@ -27,6 +26,7 @@ import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Lay
 import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
 import { calendarCaptions } from "./calendar.js";
 import { drawnBlock, fieldIsMagnitude, magnitudeSeries } from "./derive.js";
+import { rampOf } from "./figure.js";
 import { slot } from "../blocks/paint.js";
 import { partSeparator, refOf } from "./marks.js";
 import {
@@ -101,53 +101,6 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
  * reading it in a sequential one is the single most common chart defect there
  * is. A declared `colormap` still wins.
  */
-/**
- * **Total over `PlotForm`, and `utilisation` is why.**
- *
- * This was `Record<string, string>` — one of the four silent tables — so a
- * matrix form added without an entry did not fail to compile. `utilisation`
- * was, and `colormapFor` returned undefined for it at every colour depth, so a
- * 24-bit terminal drew a braille density ramp and a monochrome legend. The
- * defect is invisible in the stripped frame, because a washed heatmap is blank
- * there by construction: the colour is a background.
- *
- * `MATRIX_LAYOUT` above was closed in the same sweep and this one was not,
- * which is the argument for closing a class rather than an instance.
- */
-const DEFAULT_COLORMAP: Readonly<Record<PlotForm, ColormapName | null>> = Object.freeze({
-  heatmap: "viridis",
-  contour: "viridis",
-  // Magnitude reads as *more*, and a perceptual ramp is what says so.
-  quiver: "viridis",
-  spectrogram: "viridis",
-  latency: "viridis",
-  confusion: "viridis",
-  calendar: "viridis",
-  density2d: "viridis",
-  correlation: "coolwarm",
-  // Load reads as a temperature, and the convention every dashboard uses is a
-  // warm ramp rather than a perceptual one — `viridis` says *more* where a
-  // reader of a utilisation strip wants *hotter*.
-  utilisation: "inferno",
-  // **Not a matrix, and the only non-matrix form with an entry** (I52, §3z).
-  // A horizon's band depth *is* a colour axis — its own header called the
-  // compression *paid for in a colour axis the reader has to learn* while this
-  // row was `null`, so the price was charged and the goods never arrived.
-  // Diverging rather than sequential because the fold has two directions and a
-  // diverging map's two halves are where the sign rides; a sequential map is
-  // refused on signed data rather than drawing a trough in the same ramp as a
-  // peak (§3z H3).
-  horizon: "coolwarm",
-  // Not matrix forms.
-  line: null, sparkline: null, scatter: null, step: null, ecdf: null, density: null,
-  bar: null, histogram: null, boxplot: null, violin: null, ridgeline: null,
-  forest: null, dumbbell: null, lollipop: null, dotplot: null, waffle: null,
-  flame: null, icicle: null, treemap: null, tree: null, graph: null, funnel: null, gantt: null,
-  waterfall: null, streamgraph: null, stackedarea: null,
-  smallmultiples: null, pairplot: null, pie: null, radar: null,
-  slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,
-});
-
 /**
  * **No frame, and §2 is why.** A matrix's cells bound themselves, so there is
  * nothing for a rule to delimit and the row a lid would take pays for the scale
@@ -376,8 +329,12 @@ function heatSpans(
 }
 
 export function colormapFor(block: Plot): Colormap | undefined {
-  const named = block.colormap ?? DEFAULT_COLORMAP[block.form];
-  return named === null || named === undefined ? undefined : COLORMAPS[named];
+  // **The table is `figure.ts`'s now** (I72, §3ak.30, F324). Which ramp a form
+  // is on varies by form, so it is a figure decision, and it lived here while
+  // the second arm's whole answer was the literal `"viridis"` — two forms drawn
+  // on the wrong ramp, one of them the defect the table exists to prevent.
+  const named = rampOf(block);
+  return named === null ? undefined : COLORMAPS[named];
 }
 
 function matrixRows(

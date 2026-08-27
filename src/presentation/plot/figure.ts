@@ -12,7 +12,7 @@
  * nothing lands here without a consumer — an export nothing reads is what MG25
  * refuses, and a `Figure` member no renderer takes is F84's class one type along.
  */
-import type { Plot, PlotForm, QuartileSummary, ScaleType, Segment } from "../../data/viewmodel/index.js";
+import type { ColormapName, Plot, PlotForm, QuartileSummary, ScaleType, Segment } from "../../data/viewmodel/index.js";
 import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
@@ -261,8 +261,17 @@ export type Mark =
        * A matrix cell has no length and no position to carry its value: the
        * coordinate is spent on the grid and the reading is spent on colour.
        * So the value crosses the seam the way a bubble's radius does, and
-       * each arm turns it into a colour at its own depth — `colormapFor` in
-       * the terminal, `continuousColour` in SVG, one ramp either way.
+       * each arm turns it into a colour at its own depth — `continuousColour`
+       * either side, descending a capability ladder in one arm and not in the
+       * other.
+       *
+       * **The ramp it is turned into a colour *on* is `Figure.ramp`, and this
+       * sentence used to say `colormapFor` in the terminal and one ramp either
+       * way** (F324). There was no one ramp: `colormapFor` read a per-form table
+       * in a terminal renderer and the second arm read the literal `"viridis"`,
+       * so a correlation matrix was diverging in one arm and sequential in the
+       * other. Depth is the arm's; **which** map is the figure's, because it
+       * varies by form and a form is not a resolution.
        *
        * Absent on a bar, whose reading is its `h`.
        */
@@ -467,9 +476,77 @@ export type Figure = Readonly<{
    * nothing towards.
    */
   isotropic: boolean;
+  /**
+   * **The colormap's name, or `null` where the figure has no ramp** (I72,
+   * §3ak.30).
+   *
+   * A name and never a colour, which is I62 one member along and for the same
+   * reason: `continuousColour` descends a capability ladder in the terminal and
+   * does not in the second arm, so a resolved colour is the one thing that must
+   * not cross. What *does* cross is which of the ramps this figure is on — and
+   * that varies by **form**, which is what makes it a figure fact rather than a
+   * rasterisation one.
+   *
+   * *Measured before the member existed: the terminal's `DEFAULT_COLORMAP` gave
+   * `correlation` a diverging map and `utilisation` a warm one, and the second
+   * arm's whole ramp decision was `COLORMAPS[block.colormap ?? "viridis"]` — so
+   * two forms were drawn on the wrong ramp, one of them being exactly the defect
+   * the table's own comment calls the most common there is* (F324).
+   */
+  ramp: ColormapName | null;
   /** Normalised, uninverted, refs unresolved. Empty is a refusal (I64). */
   marks: readonly Drawn[];
 }>;
+
+/**
+ * The ramp a form is on, by default — **here rather than in a renderer**
+ * (I72, §3ak.30, F324).
+ *
+ * **Total over `PlotForm`, and `utilisation` is why.** This was
+ * `Record<string, string>` — one of the four silent tables — so a matrix form
+ * added without an entry did not fail to compile. `utilisation` was, and the
+ * terminal's lookup returned undefined for it at every colour depth, so a
+ * 24-bit terminal drew a braille density ramp and a monochrome legend. The
+ * defect is invisible in the stripped frame, because a washed heatmap is blank
+ * there by construction: the colour is a background.
+ *
+ * **A declared `colormap` still wins**, and the default is a *kind* decision: a
+ * correlation runs −1 → 0 → +1 and wants a diverging map, and reading it in a
+ * sequential one is the single most common chart defect there is.
+ */
+export const RAMP_DEFAULT: Readonly<Record<PlotForm, ColormapName | null>> = Object.freeze({
+  heatmap: "viridis",
+  contour: "viridis",
+  // Magnitude reads as *more*, and a perceptual ramp is what says so.
+  quiver: "viridis",
+  spectrogram: "viridis",
+  latency: "viridis",
+  confusion: "viridis",
+  calendar: "viridis",
+  density2d: "viridis",
+  correlation: "coolwarm",
+  // Load reads as a temperature, and the convention every dashboard uses is a
+  // warm ramp rather than a perceptual one — `viridis` says *more* where a
+  // reader of a utilisation strip wants *hotter*.
+  utilisation: "inferno",
+  // **Not a matrix, and the only non-matrix form with an entry** (I52, §3z).
+  // A horizon's band depth *is* a colour axis — its own header called the
+  // compression *paid for in a colour axis the reader has to learn* while this
+  // row was `null`, so the price was charged and the goods never arrived.
+  horizon: "coolwarm",
+  line: null, sparkline: null, scatter: null, step: null, ecdf: null, density: null,
+  bar: null, histogram: null, boxplot: null, violin: null, ridgeline: null,
+  forest: null, dumbbell: null, lollipop: null, dotplot: null, waffle: null,
+  flame: null, icicle: null, treemap: null, tree: null, graph: null, funnel: null, gantt: null,
+  waterfall: null, streamgraph: null, stackedarea: null,
+  smallmultiples: null, pairplot: null, pie: null, radar: null,
+  slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,
+});
+
+/** The ramp this block's readings are on — declared, defaulted, or none (I72). */
+export function rampOf(block: Pick<Plot, "form" | "colormap">): ColormapName | null {
+  return block.colormap ?? RAMP_DEFAULT[block.form];
+}
 
 /**
  * The border, with `axes` applied (I67, §3ak.19).
@@ -721,6 +798,7 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     // the bar and distribution families — reading it here would turn a line plot
     // on its side in one arm and not the other.
     isotropic: false,
+    ramp: rampOf(block),
     orientation: "vertical",
     facing: facingOf(block, FACING_DEFAULT),
     frame: frameOf(block),
@@ -853,6 +931,7 @@ export function tilesFigure(block: Plot): Figure {
     extent: null,
     identity,
     isotropic: false,
+    ramp: rampOf(block),
     orientation: ORIENTATION_UNUSED,
     // **Only the flame grows up** (F276). `FACING_MATRIX` is named for the
     // family it was written for and holds the shape three families want — the
@@ -913,6 +992,7 @@ export function nodesDecisions(block: Plot): Omit<Figure, "marks"> {
       ? (block.graph?.nodes ?? []).map((nd, i) => nd.label ?? `node ${String(i + 1)}`)
       : flatten(root).map((f) => f.label),
     isotropic: false,
+    ramp: rampOf(block),
     orientation: ORIENTATION_UNUSED,
     facing: facingOf(block, FACING_DEFAULT),
     // **This family draws no border, whatever `plotFrame` says** (C12 I67,
@@ -1086,6 +1166,7 @@ export function distributionFigure(block: Plot): Figure {
     extent,
     identity,
     isotropic: false,
+    ramp: rampOf(block),
     orientation: orientationOf(block),
     facing: facingOf(block, FACING_DEFAULT),
     frame: frameOf(block),
@@ -1158,6 +1239,7 @@ export function matrixFigure(block: Plot): Figure {
     extent,
     identity: block.series.map((sr) => sr.label ?? ""),
     isotropic: false,
+    ramp: rampOf(block),
     orientation: ORIENTATION_UNUSED,
     facing: facingOf(block, FACING_MATRIX),
     // **This family draws no border, whatever `plotFrame` says** (C12 I67,
@@ -1249,6 +1331,7 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     extent,
     identity: block.categories ?? [],
     isotropic: false,
+    ramp: rampOf(block),
     orientation: orientationOf(block),
     facing: facingOf(block, FACING_DEFAULT),
     frame: frameOf(block),
@@ -1631,6 +1714,7 @@ export function proportionDecisions(block: Plot): Omit<Figure, "marks"> {
             }),
           },
     isotropic: true,
+    ramp: rampOf(block),
   };
 }
 

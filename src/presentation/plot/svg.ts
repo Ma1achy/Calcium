@@ -433,9 +433,16 @@ function boxFor(figure: Omit<Figure, "marks">, box: Area): Area {
  * of the change: a rect is a rect whether it came from a bar, a heatmap cell or
  * a treemap tile, and the two members that vary its appearance — a `value` to
  * spend on the ramp, a `size` to spend on a radius — are on the mark rather than
- * in a table keyed by form. The form is read twice below and both are
- * rasterisation (§3aj hazard 1): which polyline joint a step takes, and which
- * ramp a matrix reads.
+ * in a table keyed by form. The form is read **once** below and it is
+ * rasterisation (§3aj hazard 1): which polyline joint a step takes.
+ *
+ * **It used to be read twice, and the second was not rasterisation** (F324).
+ * *Which ramp a matrix reads* was called one, and the sentence licensed exactly
+ * what the rule above forbids: the ramp came from `block.colormap ?? "viridis"`
+ * while the terminal read a per-form table, so a correlation matrix was
+ * diverging in one arm and sequential in the other. The **depth** is this arm's
+ * — `continuousColour(map, t, caps)` — and *which* map varies by form, which is
+ * not a resolution. It is `figure.ramp`.
  *
  * **A colour is resolved here and never crosses the seam** (I62). `ref` is an
  * explicit slot and `seriesIndex` is the categorical ladder's; a mark with
@@ -444,7 +451,7 @@ function boxFor(figure: Omit<Figure, "marks">, box: Area): Area {
  */
 function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out: string[]): readonly string[] {
   const at = projected(figure, box);
-  const map = COLORMAPS[block.colormap ?? "viridis"];
+  const map = figure.ramp === null ? undefined : COLORMAPS[figure.ramp];
   const furniture = inkOf(LABEL, theme);
   const ground = inkOf(GROUND, theme);
   // **Where each slot's rectangle landed, so a label can find the box it
