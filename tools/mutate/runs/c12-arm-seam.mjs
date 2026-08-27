@@ -719,6 +719,44 @@ const results = runPass({
       to: "within: size > 0 ? scaled - band : 0 };",
       expect: "G6",
     },
+    // **Family 8's aggregating three** (§3ak.33). The fold is one function at
+    // two arguments, so severing the figure's argument is the only way to take
+    // it from one arm and not the other — which is what these ask.
+    {
+      name: "THE FOLD: the stack is resampled to one column, so every band is a line",
+      file: FIGURE,
+      from: "  const bands = cols === 0 ? [] : stackBands(block.series, cols, centred); // cells-ok — a sample count",
+      to: "  const bands = cols === 0 ? [] : stackBands(block.series, 1, centred); // cells-ok — a sample count",
+      expect: "SB",
+    },
+    {
+      name: "THE AXIS: the stack takes the series' range rather than the fold's",
+      file: FIGURE,
+      from: "  const pinned: Plot = { ...block, yMin: block.yMin ?? span.min, yMax: block.yMax ?? span.max };",
+      to: "  const pinned: Plot = block;",
+      expect: "SB",
+    },
+    {
+      name: "THE BASELINE: a waterfall's bars all start at zero, so it is a bar chart",
+      file: FIGURE,
+      from: "    return { from: totals[i] === true ? 0 : from, to: running, drawn: v !== null };",
+      to: "    return { from: 0, to: running, drawn: v !== null };",
+      expect: "SB",
+    },
+    {
+      name: "THE TOTAL: a total bar adds instead of restarting, so the sum is drawn twice",
+      file: FIGURE,
+      from: "    running = totals[i] === true ? step : running + step;",
+      to: "    running = running + step;",
+      expect: "SB",
+    },
+    {
+      name: "THE FILL: a stacked band is an outline, so the reader integrates two curves",
+      file: FIGURE,
+      from: "        mark: { kind: \"polyline\", points: [...lower, ...upper.reverse()], closed: true, fill: true },",
+      to: "        mark: { kind: \"polyline\", points: [...lower, ...upper.reverse()], closed: true },",
+      expect: "SB",
+    },
   ],
 });
 
