@@ -25,13 +25,13 @@ import { plotAreaRows, AXIS_GUTTER } from "./height.js";
 import { xLabelRow } from "./axes.js";
 import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Layout } from "./furniture.js";
 import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
-import { calendarCaptions, calendarGrid } from "./calendar.js";
-import { parseStartDate } from "../../data/dates.js";
+import { calendarCaptions } from "./calendar.js";
+import { drawnBlock, fieldIsMagnitude, magnitudeSeries } from "./derive.js";
 import { slot } from "../blocks/paint.js";
 import { partSeparator, refOf } from "./marks.js";
 import {
   contourCellRows, contourDotRows, contourLevels, dimColour, dimFactorFor, fieldSampler,
-  arrowsFor, fieldPaintsUnder, glyphLayerOrder, magnitudeAt, magnitudeSeries, mergeFieldLayers,
+  arrowsFor, fieldPaintsUnder, glyphLayerOrder, magnitudeAt, mergeFieldLayers,
   overlayGlyphs, quiverRows,
   type FieldLayer,
 } from "./field.js";
@@ -700,76 +700,6 @@ function fieldLayers(
 }
 
 /**
- * A field's own axes, derived from the grid (C12 I49, §3y).
- *
- * **A matrix's rows are identities and a field's are positions**, which is the
- * distinction I18 draws and which `ROW_IS_AN_IDENTITY` now records for these two
- * forms. Read as a matrix, a field came out with `row0 … row5` down the gutter
- * and no x axis at all — the caller was being asked to caption a domain the
- * renderer already knows.
- *
- * So the labels are derived where the caller named none, and a caller who names
- * one still wins: an explicit `label` on a row, or an explicit `xLabels`, is a
- * caller saying their rows and columns mean something the index does not.
- *
- * The domain is `xMin`–`xMax` where declared and the sample index otherwise.
- * There is no `yMin`/`yMax` arm: on a field those two pin the **value** range —
- * the levels and the colour scale — and spending them on the ordinate as well
- * would give one pair of members two meanings on one form.
- */
-function fieldAxes(block: Plot): Plot {
-  if (!IS_FIELD_FORM[block.form]) return block;
-  const cols = block.series.reduce((n, r) => Math.max(n, r.values.length), 0); // cells-ok
-  const named = block.series.some((r) => r.label !== undefined && r.label !== "");
-  const at = (i: number, n: number): number => {
-    const lo = block.xMin ?? 0;
-    const hi = block.xMax ?? Math.max(0, n - 1);
-    return n <= 1 ? lo : lo + (i / (n - 1)) * (hi - lo);
-  };
-  const series = named
-    ? block.series
-    : block.series.map((r, i) => ({ ...r, label: formatValue(i, block.yFormat) }));
-  const xLabels: readonly [string, string, string] | undefined = block.xLabels ?? (cols === 0
-    ? undefined
-    : [
-        formatValue(at(0, cols), block.xFormat),
-        formatValue(at(Math.floor((cols - 1) / 2), cols), block.xFormat),
-        formatValue(at(cols - 1, cols), block.xFormat),
-      ]);
-  return { ...block, series, ...(xLabels === undefined ? {} : { xLabels }) };
-}
-
-/**
- * A calendar's derived grid, or the block unchanged (C12 I53, §3ae).
- *
- * **The seam is `quiver`'s, one form along**: substituted here rather than in
- * `matrixRows`, so the range, the gutter labels, the legend and the overflow row
- * all see one series list. §3ae.4 is the check that this stays true — B2 says
- * the range is invariant under the substitution because the grid holds the same
- * finite values, and B4 says the overflow notice reads `+17 more · 07 · 08 · …`
- * because it sees the derived labels rather than the caller's one.
- *
- * **Every condition is a silent fall-through and that is I11's price** (§3ae.6
- * A10). A block that reached the renderer without passing a gate renders as the
- * pre-calendar matrix — a frame that is not wrong, because it is what `calendar`
- * has always drawn, and is not a calendar. The refusals live at the gates
- * because this is the layer that cannot have one.
- *
- * `series.length === 1` and not `!== 1`, because zero is not more than one
- * (§3ae A8): an empty calendar is commitment 3's empty plot, not an error.
- */
-function calendarRows(raw: Plot): Plot {
-  const unit = raw.calendarUnit;
-  if (raw.form !== "calendar" || unit === undefined) return raw;
-  const only = raw.series.length === 1 ? raw.series[0] : undefined; // cells-ok — a series count
-  if (only === undefined || only.values.length === 0) return raw; // cells-ok — a reading count
-  if (raw.startDate === undefined) return raw;
-  const start = parseStartDate(raw.startDate);
-  if (start === null) return raw;
-  return { ...raw, series: calendarGrid(unit, start, only.values) };
-}
-
-/**
  * Render a heatmap-family form. All seven forms share this path; the only
  * difference is axis semantics (handled by the caller's field choices).
  */
@@ -778,16 +708,15 @@ export function heatmapFormRows(
   width: number,
   ctx: RenderContext,
 ): readonly string[] {
-  // **The field under a quiver is the vectors' own magnitude** where the caller
-  // named no scalar (I50). It is the only scalar a vector field has, and the
-  // alternative — an unpainted area with arrows on it — throws away the channel
-  // that separates a fast cell from a slow one. Substituted here rather than in
-  // `matrixRows`, so the range, the gutter labels, the legend and the overflow
-  // row all see one series list.
-  const withField: Plot = raw.form === "quiver" && raw.series.length === 0 && raw.vectors !== undefined // cells-ok — a series count
-    ? { ...raw, series: magnitudeSeries(raw.vectors) }
-    : calendarRows(raw);
-  const block = fieldAxes(withField);
+  // **Three derivations, and all three are `drawnBlock`'s now** (F322, §3ak.29).
+  // The field under a quiver is the vectors' own magnitude where the caller
+  // named no scalar (I50); a calendar's grid is a date grid; a field's rows and
+  // columns caption a domain the renderer knows. Each was written here so the
+  // range, the gutter labels, the legend and the overflow row would see one
+  // series list — which is the right argument for deriving *before* the
+  // renderer and the wrong place to have done it, because the second arm never
+  // reached this file.
+  const block = drawnBlock(raw);
   // **The ramp's domain read back rather than computed here** (C12 I60, §3ak.7).
   // A matrix has no value axis — `figure.value` is `null` and that is the ruling
   // this family, `tiles` and `nodes` each got wrong separately — but the ramp
@@ -813,7 +742,7 @@ export function heatmapFormRows(
   // caller reads one of them.
   const matrixLayout = block.matrixAnchor ?? MATRIX_LAYOUT[block.form] ?? "stretch";
   return [
-    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx, withField !== raw), matrixLayout),
+    ...matrixRows(block, range, layout, ctx, fieldLayers(block, range, layout, ctx, fieldIsMagnitude(raw)), matrixLayout),
     ...matrixFurniture(block, range, layout, ctx, matrixLayout),
   ];
 }

@@ -588,6 +588,49 @@ const results = runPass({
       to: "  const block = given;",
       expect: "SB",
     },
+    // **The three the sweep did not see** (F322, §3ak.29). Each lived in
+    // `heatmapFormRows` and each is `Plot → Plot` with no width and no
+    // capability — the shape, not the file, is what makes them one class.
+    //
+    // **They expect a terminal gate and not both**, and that is the honest
+    // reading rather than a weaker one: the second arm refuses all three forms
+    // today, so an SVG gate has nothing to say until the arms open. The row
+    // that will change here is the one to watch — when `contour` draws, this
+    // mutation starts moving SVG frames too, and a row still expecting only the
+    // terminal is a row that stopped asking the second half.
+    {
+      name: "THE CALL: a field is drawn with the caller's own row labels, or none",
+      file: DERIVE,
+      from: '    case "contour":\n      return fieldAxes(block);',
+      to: '    case "contour":\n      return block;',
+      expect: "baseline",
+    },
+    {
+      name: "THE CALL: a quiver has no scalar field, so there is nothing under the arrows",
+      file: DERIVE,
+      from: "      return fieldAxes(fieldIsMagnitude(block) && block.vectors !== undefined",
+      to: "      return fieldAxes(false && block.vectors !== undefined",
+      expect: "baseline",
+    },
+    {
+      name: "THE CALL: a calendar renders as the pre-calendar matrix it always drew",
+      file: DERIVE,
+      from: '    case "calendar":',
+      to: '    case "calendar":\n      if (true) return block;',
+      expect: "baseline",
+    },
+    {
+      // **The wiring, and it is a separate row on purpose.** The three above
+      // sever the derivation; this leaves it intact and stops the terminal
+      // calling it — F317's defect in the mirror, and the class a seam-level
+      // row cannot reach because it passes on the day nothing calls the
+      // mechanism.
+      name: "THE SEAM: the field renderer takes the block it was given",
+      file: HEATMAP,
+      from: "  const block = drawnBlock(raw);",
+      to: "  const block = raw;",
+      expect: "baseline",
+    },
   ],
 });
 

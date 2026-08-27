@@ -19,6 +19,13 @@
  * load braille, the dot grid, the glyph ladder and the strips — **10 modules
  * and 3,874 lines** — to reach five lines of arithmetic over samples.
  *
+ * **So the edges F322 adds were weighed the same way.** `axes.ts` (971 lines) is
+ * already on the second arm's graph through `figure.ts`, and `calendar.ts` is
+ * **153 lines over `dates.ts`'s 117**, importing nothing else. `magnitudeSeries`
+ * came the other way — moved *out* of `field.ts` rather than imported from it —
+ * because taking it in place would have pulled braille and the dot grid in for
+ * `Math.hypot`, which is the paragraph above with a different function in it.
+ *
  * **Nothing here is corrected on the way past.** `ecdfSeries` is a function of
  * `values.length` and of nothing else — its `sort` feeds a variable read only
  * for `.length` — so the terminal draws one fixed staircase for every dataset
@@ -26,8 +33,12 @@
  * terminal arm, and this move is an extraction: byte-identical, or it is not
  * this commit.
  */
-import type { Plot, Series } from "../../data/viewmodel/index.js";
+import type { Plot, Series, VectorSeries } from "../../data/viewmodel/index.js";
+import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
+import { parseStartDate } from "../../data/dates.js";
 import { finiteSamples, type Range } from "./scale.js";
+import { formatValue } from "./axes.js";
+import { calendarGrid } from "./calendar.js";
 
 /**
  * ECDF: the empirical cumulative distribution function.
@@ -251,6 +262,116 @@ export function binValues(
   return { labels, counts, edges };
 }
 
+// --- the field forms' three derivations (F322, §3ak.29) ---------------------
+//
+// **Three block-to-block transforms that lived in `heatmapFormRows`**, each pure,
+// each read by the terminal alone, and each `drawnBlock`'s exact signature. The
+// sweep that closed I70's list at three was bounded by `definition.ts`; these
+// were one file along, and two of them are why two `SVG_FAMILY` entries were
+// `null` — a calendar's date grid **is** its derivation, and a quiver with no
+// scalar series has no field to paint until this has run.
+
+/**
+ * Whether a quiver's field **is** its own vectors' magnitude (C12 I50).
+ *
+ * **The condition, once.** `drawnBlock` applies the substitution and the arrow's
+ * colouring asks whether it happened — the terminal colours an arrow by its
+ * magnitude only where the field carries something else, or the glyph is painted
+ * in exactly its own background. Two call sites, one predicate: a rule applied
+ * twice is applied once eventually.
+ */
+export function fieldIsMagnitude(block: Pick<Plot, "form" | "series" | "vectors">): boolean {
+  return block.form === "quiver" && block.series.length === 0 && block.vectors !== undefined; // cells-ok — a series count
+}
+
+/**
+ * The magnitude of each vector, as a `Series` per row (C12 I50).
+ *
+ * **Here rather than in `field.ts`, and the direction is the header's
+ * argument.** Importing it in place would put braille, the dot grid and the
+ * glyph ladder on the second arm's graph to reach `Math.hypot`; moving it out
+ * costs `field.ts` an import of five lines.
+ */
+export function magnitudeSeries(vectors: readonly VectorSeries[]): readonly Series[] {
+  return vectors.map((row) => ({
+    values: row.values.map((p) => (p === null ? null : Math.hypot(p[0], p[1]))),
+    ...(row.label === undefined ? {} : { label: row.label }),
+  }));
+}
+
+/**
+ * A field's own axes, derived from the grid (C12 I49, §3y).
+ *
+ * **A matrix's rows are identities and a field's are positions**, which is the
+ * distinction I18 draws and which `ROW_IS_AN_IDENTITY` now records for these two
+ * forms. Read as a matrix, a field came out with `row0 … row5` down the gutter
+ * and no x axis at all — the caller was being asked to caption a domain the
+ * renderer already knows.
+ *
+ * So the labels are derived where the caller named none, and a caller who names
+ * one still wins: an explicit `label` on a row, or an explicit `xLabels`, is a
+ * caller saying their rows and columns mean something the index does not.
+ *
+ * The domain is `xMin`–`xMax` where declared and the sample index otherwise.
+ * There is no `yMin`/`yMax` arm: on a field those two pin the **value** range —
+ * the levels and the colour scale — and spending them on the ordinate as well
+ * would give one pair of members two meanings on one form.
+ *
+ * **Idempotent, and it has to be**: applied twice, `named` is true and
+ * `block.xLabels` is set, so the second pass returns what the first produced.
+ */
+export function fieldAxes(block: Plot): Plot {
+  if (!IS_FIELD_FORM[block.form]) return block;
+  const cols = block.series.reduce((n, r) => Math.max(n, r.values.length), 0); // cells-ok
+  const named = block.series.some((r) => r.label !== undefined && r.label !== "");
+  const at = (i: number, n: number): number => {
+    const lo = block.xMin ?? 0;
+    const hi = block.xMax ?? Math.max(0, n - 1);
+    return n <= 1 ? lo : lo + (i / (n - 1)) * (hi - lo);
+  };
+  const series = named
+    ? block.series
+    : block.series.map((r, i) => ({ ...r, label: formatValue(i, block.yFormat) }));
+  const xLabels: readonly [string, string, string] | undefined = block.xLabels ?? (cols === 0
+    ? undefined
+    : [
+        formatValue(at(0, cols), block.xFormat),
+        formatValue(at(Math.floor((cols - 1) / 2), cols), block.xFormat),
+        formatValue(at(cols - 1, cols), block.xFormat),
+      ]);
+  return { ...block, series, ...(xLabels === undefined ? {} : { xLabels }) };
+}
+
+/**
+ * A calendar's derived grid, or the block unchanged (C12 I53, §3ae).
+ *
+ * **Derived here so the range, the gutter labels, the legend and the overflow
+ * row all see one series list** — and, since F322, so the second arm sees it at
+ * all. §3ae.4 is the check that this stays true: B2 says the range is invariant
+ * under the substitution because the grid holds the same finite values, and B4
+ * says the overflow notice reads `+17 more · 07 · 08 · …` because it sees the
+ * derived labels rather than the caller's one.
+ *
+ * **Every condition is a silent fall-through and that is I11's price** (§3ae.6
+ * A10). A block that reached the renderer without passing a gate renders as the
+ * pre-calendar matrix — a frame that is not wrong, because it is what `calendar`
+ * has always drawn, and is not a calendar. The refusals live at the gates
+ * because this is the layer that cannot have one.
+ *
+ * `series.length === 1` and not `!== 1`, because zero is not more than one
+ * (§3ae A8): an empty calendar is commitment 3's empty plot, not an error.
+ */
+export function calendarRows(raw: Plot): Plot {
+  const unit = raw.calendarUnit;
+  if (raw.form !== "calendar" || unit === undefined) return raw;
+  const only = raw.series.length === 1 ? raw.series[0] : undefined; // cells-ok — a series count
+  if (only === undefined || only.values.length === 0) return raw; // cells-ok — a reading count
+  if (raw.startDate === undefined) return raw;
+  const start = parseStartDate(raw.startDate);
+  if (start === null) return raw;
+  return { ...raw, series: calendarGrid(unit, start, only.values) };
+}
+
 /**
  * The block a form actually draws (C12 I70, §3ak.27).
  *
@@ -273,12 +394,15 @@ export function binValues(
  * makes byte-identity a property of the extraction rather than a hope, and the
  * terminal's 1810 baseline frames are what say it held.
  *
- * **Closed at three, by a sweep rather than by a walk.** §3ak.7 found the class
- * in the curve family and its artefact was bounded by that family, so `histogram`
- * — the same derivation, one family along — was never named. Ten sites in the
- * dispatch table reshape a block; three derive the series, four default
- * `categories`, one takes a range from quartiles that already crosses, and there
- * is no fourth.
+ * **Closed at three, by a sweep bounded by a file** (F322). §3ak.7 found the
+ * class in the curve family and its artefact was bounded by that family, so
+ * `histogram` — the same derivation, one family along — was never named. The
+ * sweep that answered for it read the ten sites in the dispatch table that reshape
+ * a block: three derive the series, four default `categories`, one takes a range
+ * from quartiles that already crosses, and there is no fourth **in that file**.
+ * The class is a shape — `Plot → Plot`, no width, no capability — and
+ * `heatmapFormRows` held three more of it one file along. They are the second
+ * group below, and two of them are why two `SVG_FAMILY` entries were `null`.
  *
  * **What is not here, and the line it falls on.** `violinColumn` evaluates its
  * estimate at the renderer's row count, and `stackBands` resamples across the
@@ -338,6 +462,24 @@ export function drawnBlock(block: Plot): Plot {
           : {}),
       };
     }
+
+    // **The field forms' derivation is their *data*, and their geometry is
+    // §3ak.29's separate question.** `fieldAxes` captions a domain the renderer
+    // knows and the caller does not have to; the quiver's substitution is what
+    // gives a vector field a scalar at all. Both were terminal-only until F322.
+    case "contour":
+      return fieldAxes(block);
+
+    case "quiver":
+      return fieldAxes(fieldIsMagnitude(block) && block.vectors !== undefined
+        ? { ...block, series: magnitudeSeries(block.vectors) }
+        : block);
+
+    case "calendar":
+      // No `fieldAxes` arm: `IS_FIELD_FORM` is false here, so it would return
+      // the block. Composed in the terminal and written out here, because a
+      // no-op inside a switch reads as a decision.
+      return calendarRows(block);
 
     default:
       return block;

@@ -874,4 +874,68 @@ describe("U — the seam, asserted from both arms", () => {
     expect(forest, "a pooled estimate is a diamond here").toContain("<polygon");
     expect(forest, "and a plain one is a circle").toContain("<circle");
   });
+
+  /**
+   * **The three derivations a sweep bounded by a file did not see** (C12 I70,
+   * §3ak.29, F322).
+   *
+   * Each was written inside `heatmapFormRows` for a right reason — *so the
+   * range, the gutter labels, the legend and the overflow row all see one series
+   * list* — and each is `Plot → Plot` with no width and no capability, which is
+   * the shape `drawnBlock` is for. Two of them are why two `SVG_FAMILY` entries
+   * were `null`.
+   *
+   * **The row asserts the transform and not the file**, which is the finding's
+   * own lesson: what makes these three the same thing is their signature, and
+   * a sweep indexed by where the last one turned up cannot see that.
+   */
+  it("U8 (C12 I70, §3ak.29): the field forms' three derivations are the seam's, not a renderer's", () => {
+    // `contour` — a field's rows are positions, so the gutter and the x axis are
+    // captioned from the grid's own domain and the caller does not have to.
+    const contour = drawnBlock(blockOf({
+      form: "contour", height: 4, axes: true,
+      series: [{ values: [1, 2, 3] }, { values: [4, 5, 6] }],
+    }));
+    expect(contour.series.map((sr) => sr.label), "rows captioned by index").toEqual(["0", "1"]);
+    expect(contour.xLabels, "and a three-point domain along the bottom").toEqual(["0", "1", "2"]);
+
+    // `quiver` — the field under a vector field is the vectors' own magnitude,
+    // and without the substitution the block has no scalar series at all. That
+    // is the second missing derivation the refusal reason was silent about.
+    const authored = blockOf({
+      form: "quiver", height: 4, axes: true, series: [],
+      vectors: [{ values: [[3, 4], [0, 0]] }],
+    });
+    expect(authored.series, "the caller named no scalar").toEqual([]);
+    const quiver = drawnBlock(authored);
+    expect(quiver.series[0]?.values, "and the magnitudes are the field").toEqual([5, 0]);
+
+    // `calendar` — a date grid *is* the derivation, and after it a calendar is a
+    // matrix at a different column count.
+    const calendar = drawnBlock(blockOf({
+      form: "calendar", height: 8, calendarUnit: "day", startDate: "2026-01-01",
+      series: [{ values: Array.from({ length: 40 }, (_v, i) => i) }],
+    }));
+    expect(calendar.series.length, "seven weekday rows from one series").toBe(7);
+    expect(calendar.series.length, "which is not the one it was given").not.toBe(1);
+  });
+
+  it("U8b (C12 I70, §3ak.29): each of the three is idempotent, because two callers now apply it", () => {
+    // **`plotToSvg` derives at its entry and `heatmapFormRows` derives at its
+    // own**, and nothing composes them today — but the property is what makes
+    // that safe to stop checking, and it is cheap. `fieldAxes` is the one that
+    // could have failed: applied twice it sees labels it wrote itself, and the
+    // guard is that `named` is then true.
+    for (const spec of [
+      { form: "contour", height: 4, axes: true, series: [{ values: [1, 2] }, { values: [3, 4] }] },
+      { form: "quiver", height: 4, axes: true, series: [], vectors: [{ values: [[3, 4] as const] }] },
+      {
+        form: "calendar", height: 8, calendarUnit: "day", startDate: "2026-01-01",
+        series: [{ values: [1, 2, 3, 4, 5, 6, 7, 8] }],
+      },
+    ] as const) {
+      const once = drawnBlock(blockOf(spec as unknown as Spec));
+      expect(drawnBlock(once), `${spec.form} applied twice`).toEqual(once);
+    }
+  });
 });

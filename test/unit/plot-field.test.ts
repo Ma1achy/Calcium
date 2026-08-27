@@ -18,9 +18,10 @@ import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import {
   arrowFor, arrowsFor, contourLevels, dimColour, dimFactorFor, fieldSampler, glyphLayerOrder,
-  magnitudeSeries, marchingMask, saddleJoinsTopLeft,
+  marchingMask, saddleJoinsTopLeft,
 } from "../../src/presentation/plot/field.js";
 import { glyphForMask } from "../../src/presentation/plot/linedraw.js";
+import { magnitudeSeries } from "../../src/presentation/plot/derive.js";
 import { COLORMAPS, ansi256Hex, continuousColour, nearestAnsi256 } from "../../src/presentation/theme/colormap.js";
 import { DEFAULT_FLOOR, ratio } from "../../src/presentation/theme/contrast.js";
 import { FULL_CAPS, measurable } from "../support/render.js";

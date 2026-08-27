@@ -633,13 +633,10 @@ export function arrowFor(
   return arrows[((eighth % 8) + 8) % 8] ?? null; // cells-ok — a direction count
 }
 
-/** The magnitude of each vector, as a `Series` per row. */
-export function magnitudeSeries(vectors: readonly VectorSeries[]): readonly Series[] {
-  return vectors.map((row) => ({
-    values: row.values.map((p) => (p === null ? null : Math.hypot(p[0], p[1]))),
-    ...(row.label === undefined ? {} : { label: row.label }),
-  }));
-}
+// `magnitudeSeries` used to sit here and is now in `derive.ts` (F322): it is a
+// derivation of the block's data, and importing it from here would have put
+// braille, the dot grid and the glyph ladder on the second arm's graph to reach
+// `Math.hypot`.
 
 /**
  * The arrows, one glyph per cell, resampled onto the area (I50).
