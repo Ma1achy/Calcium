@@ -1,1 +1,31 @@
-REFUSED — plotToSvg returned null
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<clipPath id="isvgb-0"><rect x="0" y="46.667" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="62.667" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">revenue</text>
+<clipPath id="isvgb-1"><rect x="0" y="138.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">margin</text>
+<clipPath id="isvgb-2"><rect x="0" y="230.133" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="246.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">churn</text>
+<rect x="89.6" y="12.8" width="158.72" height="91.733" fill="#e69f00" fill-opacity="0.363"/>
+<rect x="248.32" y="12.8" width="99.2" height="91.733" fill="#e69f00" fill-opacity="0.575"/>
+<rect x="347.52" y="12.8" width="79.36" height="91.733" fill="#e69f00" fill-opacity="0.788"/>
+<rect x="426.88" y="12.8" width="59.52" height="91.733" fill="#e69f00" fill-opacity="1"/>
+<rect x="89.6" y="31.147" width="285.696" height="55.04" fill="#e69f00"/>
+<path d="M407.04 12.8 L407.04 104.533" fill="none" stroke="#e69f00" stroke-width="2"/>
+<rect x="89.6" y="104.533" width="132.267" height="91.733" fill="#56b4e9" fill-opacity="0.363"/>
+<rect x="221.867" y="104.533" width="99.2" height="91.733" fill="#56b4e9" fill-opacity="0.575"/>
+<rect x="321.067" y="104.533" width="66.133" height="91.733" fill="#56b4e9" fill-opacity="0.788"/>
+<rect x="387.2" y="104.533" width="99.2" height="91.733" fill="#56b4e9" fill-opacity="1"/>
+<rect x="89.6" y="122.88" width="251.307" height="55.04" fill="#56b4e9"/>
+<path d="M367.36 104.533 L367.36 196.267" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<rect x="89.6" y="196.267" width="99.2" height="91.733" fill="#3cbf9a" fill-opacity="0.363"/>
+<rect x="188.8" y="196.267" width="99.2" height="91.733" fill="#3cbf9a" fill-opacity="0.575"/>
+<rect x="288" y="196.267" width="99.2" height="91.733" fill="#3cbf9a" fill-opacity="0.788"/>
+<rect x="387.2" y="196.267" width="99.2" height="91.733" fill="#3cbf9a" fill-opacity="1"/>
+<rect x="89.6" y="214.613" width="208.32" height="55.04" fill="#3cbf9a"/>
+<path d="M238.4 196.267 L238.4 288" fill="none" stroke="#3cbf9a" stroke-width="2"/>
+</svg>

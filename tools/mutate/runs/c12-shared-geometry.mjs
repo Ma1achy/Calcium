@@ -477,8 +477,8 @@ const results = runPass({
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
       // Re-anchored: the proportion family joined the disjunction (§3ak.26).
-      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel") && "marks" in figure) {',
-      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel") && "marks" in figure) {',
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

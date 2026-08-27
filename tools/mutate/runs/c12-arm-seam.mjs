@@ -788,7 +788,7 @@ const results = runPass({
     {
       name: "THE FLOOR: a gantt zero-anchors like a bar, so a project starting late starts at zero",
       file: FIGURE,
-      from: '      : block.form === "gantt"\n        ? data\n        : { min: baselineOf(data.min), max: data.max };',
+      from: '      : block.form === "gantt" || block.form === "timeline"\n        ? data\n        : { min: baselineOf(data.min), max: data.max };',
       to: "      : { min: baselineOf(data.min), max: data.max };",
       expect: "G6",
     },
@@ -805,8 +805,8 @@ const results = runPass({
       // and `FV1` is what compares them against the frames.
       name: "THE SHARE: a funnel gets a value axis, and its bars are widths",
       file: FIGURE,
-      from: "  return { ...decisions, value: null, marks };\n}",
-      to: "  return { ...decisions, marks };\n}",
+      from: "      });\n    });\n  }\n  return { ...decisions, value: null, marks };\n}",
+      to: "      });\n    });\n  }\n  return { ...decisions, marks };\n}",
       expect: "SB",
     },
     {
@@ -827,6 +827,40 @@ const results = runPass({
       file: FIGURE,
       from: "  return per > 1 ? seriesIndex : ROW_IS_AN_IDENTITY[form] ? category : 0; // cells-ok — a series count",
       to: "  return per > 1 ? seriesIndex : category; // cells-ok — a series count",
+      expect: "SB",
+    },
+    {
+      // **The last two of family 8's residue** (§3ak.35). A timeline's events are
+      // instants and a bullet's rows are three scales, so what these mutate is
+      // the pin and the per-row range rather than a mark.
+      name: "THE PIN: a timeline's marks and its labels come from two ranges",
+      file: FIGURE,
+      from: "  const lo = block.yMin ?? range?.min;\n  const hi = block.yMax ?? range?.max;",
+      to: "  const lo = block.yMin;\n  const hi = block.yMax;",
+      expect: "SB",
+    },
+    {
+      name: "THE SHARED SCALE: a bullet's rows are put on one axis, which is what the form forbids",
+      file: FIGURE,
+      from: "    const own = { min: q.min, max: q.max };",
+      to: "    const own = { min: qs[0]?.min ?? 0, max: qs[0]?.max ?? 1 };",
+      expect: "G6",
+    },
+    {
+      name: "THE TRACK: a timeline's rule stops at its first and last event",
+      file: FIGURE,
+      from: "        mark: { kind: \"polyline\", points: [[centre, 0], [centre, 1]] },",
+      to: "        mark: { kind: \"polyline\", points: [[centre, 0], [centre, 0.5]] },",
+      expect: "SB",
+    },
+    {
+      // **A reading with no ramp** (commitment 68). Dropping it restores the old
+      // `continue`, and every band comes out at full ink — the bullet is the
+      // first mark that could ever have shown it.
+      name: "THE DENSITY: a reading with no ramp is dropped, so four bands are one",
+      file: SVG,
+      from: "          opacity = ` fill-opacity=\"${n(0.15 + 0.85 * Math.max(0, Math.min(1, m.value)))}\"`;",
+      to: "          opacity = \"\";",
       expect: "SB",
     },
     {

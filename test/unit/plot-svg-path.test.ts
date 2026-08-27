@@ -30,7 +30,7 @@ import { flatten } from "../../src/presentation/plot/tree.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
 import {
   barFigure, curveFigure, distributionFigure, funnelFigure, HAS_VALUE_AXIS, horizonFigure, proportionFigure,
-  stackedFigure, spanFigure,
+  stackedFigure, spanFigure, trackFigure, bulletFigure,
 } from "../../src/presentation/plot/figure.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { resolve } from "../../src/presentation/theme/index.js";
@@ -399,6 +399,21 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
       ...PIN,
     };
   }
+  // **A bullet reads `quartiles` and draws nothing without them** — the
+  // distribution family's datum on a form outside that family, and each row
+  // scaled to **its own** summary rather than to one shared range (C12 I73).
+  // Two measures in two units is the shape the form exists for, so the
+  // representative carries two.
+  if (form === "bullet") {
+    return {
+      series: [{ label: "measure", values: [72, 38] }],
+      categories: ["revenue", "churn"],
+      quartiles: [
+        { min: 0, q1: 40, median: 65, q3: 85, max: 100, centre: 80 },
+        { min: 0, q1: 10, median: 20, q3: 30, max: 40, centre: 15 },
+      ],
+    };
+  }
   if (svgFamilyOf(form) !== "distribution") return { series: [{ label: "s", values: SAMPLES }], ...PIN };
   if (form === "dumbbell") {
     return { series: [{ label: "a", values: [2, 5, 8] }, { label: "b", values: [8, 3, 4] }], ...PIN };
@@ -616,6 +631,41 @@ describe.each(supported)("G6 — %s", (form) => {
     // proportion branch above makes the same argument for `pie` and `waffle`;
     // this is the third form of that shape and the first drawn as a rectangle,
     // which is why keying it on the family would have missed it.
+    // **A timeline's events are positions on one shared axis**, so the clamp is
+    // the ordinary one — and it is asked of the *points*, because the rule
+    // across each track spans the axis by construction and would answer for
+    // every input.
+    if (family === "track") {
+      const pts = trackFigure(made).marks.flatMap((d) => (d.mark.kind === "point" ? [d.mark.y] : []));
+      expect(pts.length, `${form}: the events put something on the page`).toBeGreaterThan(0); // cells-ok — a mark count
+      expect(Math.min(...pts), `${form}: far below clamps to the axis floor`).toBeCloseTo(0, 6);
+      expect(Math.max(...pts), `${form}: far above clamps to the ceiling`).toBeCloseTo(1, 6);
+      return;
+    }
+    // **A bullet has no bound to clamp against, and it is I73's first case**
+    // (F330): each row is scaled to its **own** `q.min … q.max`, so a `Figure`'s
+    // one `value` cannot describe it and the pin has nothing to act on. What is
+    // asserted instead is the property that replaces the clamp — every row fills
+    // its own span exactly, whatever units it is in.
+    if (family === "bullet") {
+      expect(HAS_VALUE_AXIS[form], `${form}: three rows, three scales, so no one axis`).toBe(false);
+      const fig = bulletFigure(made);
+      expect(fig.value, `${form}: and no axis to draw it on`).toBeNull();
+      const bands = fig.marks.filter((d) => d.mark.kind === "rect" && d.mark.value !== undefined);
+      expect(bands.length, `${form}: four bands per measure`).toBe(8); // cells-ok — a band count
+      for (const d of fig.marks) {
+        if (d.mark.kind !== "rect") continue;
+        expect(d.mark.y, `${form}: inside its own row's span`).toBeGreaterThanOrEqual(0);
+        expect(d.mark.y + d.mark.h, `${form}: and no further`).toBeLessThanOrEqual(1 + 1e-9);
+      }
+      // The last band reaches the top of its own scale in **both** rows, which
+      // is what per-row scaling means and what one shared axis would break.
+      const tops = bands.filter((d) => d.mark.kind === "rect" && d.mark.value === 1)
+        .map((d) => (d.mark.kind === "rect" ? d.mark.y + d.mark.h : 0));
+      expect(tops.length, `${form}: one full band per measure`).toBe(2); // cells-ok — a measure count
+      for (const t of tops) expect(t, `${form}: each row fills its own span`).toBeCloseTo(1, 6);
+      return;
+    }
     if (family === "funnel") {
       expect(HAS_VALUE_AXIS[form], `${form}: a share of a whole, so no bound`).toBe(false);
       const fig = funnelFigure(made);

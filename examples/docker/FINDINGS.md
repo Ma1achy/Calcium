@@ -13642,6 +13642,35 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F334 — the reader counts a blank row inside a frame as a rule, on nine forms ★★★★☆
+
+`terminalDecisions` reads an interior rule as a row made only of rule characters:
+
+```
+const RULE_ONLY = /^[\s┌┐└┘├┤┬┴┼─│+|-]+$/u;
+interiorRules: area.filter((l) => RULE_ONLY.test(l) && !TOP.test(l) && !BOTTOM.test(l)).length,
+```
+
+**The class admits whitespace**, so `│` + spaces + `│` matches it — which is **every form whose
+categories do not fill its declared height**. A timeline of three tracks in a four-row area, a bullet
+of three measures, a bar chart, a histogram, a tree. The second arm draws no such line and neither
+does the terminal, so the matrix reported the two arms disagreeing about a line that is not there.
+
+**Nine forms carried it**, and closing it moves more cells than most fixes in this pass: `bar` 6/12 →
+agree, `histogram` 2/12 → agree, `graph` 2/4 → agree, `step` 2/4 → agree, `tree` 2/12 → agree,
+`latency` 2/2 → agree, `boxplot` 6/10 → 2/10, `density` 3/4 → 1/4, `line` 10/78 → 8/78.
+
+**Found by drawing a form that had never been drawn.** `timeline` and `bullet` both came in at
+`interiorRules 2/2`, and both are three rows in a four-row area — two new forms landing on the same
+cell is what made it a reader question rather than an emitter one.
+
+**More than two glyphs is the discriminator, and it is not `─`.** A blank row has exactly the two
+borders; a horizontal rule is a run; **a column of vertical gridlines has one glyph per column and no
+horizontal in the row at all** — so a test for `[─-]` would have fixed the phantom and blinded the
+reader to a real rule it can currently see. `AD10` asserts all three directions plus the border case.
+
+---
+
 ## F333 — a gate keyed on the record for a different question, with the mismatch noticed once and patched by exception ★★★★★
 
 The second arm captions a figure's `identity` along an axis, gated on:

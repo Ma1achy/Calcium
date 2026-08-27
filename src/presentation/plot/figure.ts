@@ -1945,13 +1945,19 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     ? null
     : block.form === "autocorrelation"
       ? { min: -lagMagnitude(block), max: lagMagnitude(block) }
-      // **A gantt has no floor, and it is the second form branch for the same
-      // reason as the first** (§3ak.34). *A bar's length is its value, so signed
-      // data grows both ways from zero* (F272) — and a task is an **interval**,
-      // so a project starting on day three starts on day three. `baselineOf`
-      // would drag the axis back to zero and draw every task shifted right of
-      // where the terminal puts it.
-      : block.form === "gantt"
+      // **A floor belongs to a length and not to a position** (§3ak.34, §3ak.35).
+      // *A bar's length is its value, so signed data grows both ways from zero*
+      // (F272) — and a task is an **interval** and an event is an **instant**,
+      // neither of which is measured from anywhere. A project starting on day
+      // three starts on day three, and `timelineRow` rasterises against the raw
+      // `seriesRange`, so zero-anchoring here would put the figure's extent at
+      // `0 … 41` against a terminal drawing on `2 … 41`.
+      //
+      // **Two forms and one reason, stated rather than tabulated.** A third is
+      // the moment to ask for a record; two is the moment to write the rule down
+      // — a 46-entry table agreeing with `baselineOf` in 44 places is a second
+      // answer waiting to disagree with the first.
+      : block.form === "gantt" || block.form === "timeline"
         ? data
         : { min: baselineOf(data.min), max: data.max };
   return {
@@ -2237,6 +2243,139 @@ export function funnelFigure(block: Plot): Figure {
       });
     });
   }
+  return { ...decisions, value: null, marks };
+}
+
+/**
+ * A timeline — **event marks on a shared axis, one row per track** (C04 §8,
+ * §3ak.35).
+ *
+ * **The one form whose rows are series** (I38, §3t). Every other categorical form
+ * draws one row per category and takes the palette slot the category owns; a
+ * track *is* a series, so `refFor` in the terminal indexes it and `rowSlot`
+ * reaches the same answer from the other side.
+ *
+ * **The extent is the raw range and not the zeroed one**, which is
+ * `categoricalDecisions`' second form branch: `timelineRow` scales against
+ * `seriesRange`'s own `min … max`, so a zero anchor would put the figure at
+ * `0 … 41` and the terminal at `2 … 41` — F210's rule, where the axis the marks
+ * are placed on must be the axis the labels come from.
+ *
+ * **The track's rule spans the whole row**, because a timeline's row is a *span
+ * of time* and the events sit on it; a rule that stopped at the first and last
+ * event would say the track began and ended with them.
+ */
+export function trackFigure(block: Plot): Figure {
+  const identity = block.categories
+    ?? block.series.map((sr, i) => sr.label ?? `track ${String(i + 1)}`); // cells-ok — a track index
+  // **Pinned to its own range, which is F210's rule and the reason the branch
+  // above exists.** Unpinned, the marks land on the raw `2 … 41` the terminal
+  // rasterises against while `axisOver` nices the labels to `0 … 50` — so the
+  // earliest event sits on a tick reading `0`. The axis the marks are placed on
+  // must be the axis the labels come from, and the only arrangement where two of
+  // them cannot drift apart is one of them.
+  const range = seriesRange(block.series, block);
+  const lo = block.yMin ?? range?.min;
+  const hi = block.yMax ?? range?.max;
+  const pinned: Plot = {
+    ...block,
+    categories: identity,
+    ...(lo === undefined ? {} : { yMin: lo }),
+    ...(hi === undefined ? {} : { yMax: hi }),
+  };
+  const decisions = categoricalDecisions(pinned);
+  const { extent } = decisions;
+  const n = Math.max(1, identity.length); // cells-ok — a track count
+  const marks: Drawn[] = [];
+  if (extent !== null) {
+    block.series.forEach((series, track) => {
+      if (track >= n) return; // cells-ok — a track index
+      const centre = (track + 0.5) / n; // cells-ok — a track count
+      const slot = rowSlot(block.form, track, track, 1); // cells-ok — a track index
+      marks.push({
+        mark: { kind: "polyline", points: [[centre, 0], [centre, 1]] },
+        layer: "series",
+        seriesIndex: slot,
+      });
+      for (const v of series.values) {
+        if (v === null || !Number.isFinite(v)) continue;
+        marks.push({
+          mark: { kind: "point", x: centre, y: normalisedOf(v, extent, false), role: "point" },
+          layer: "series",
+          seriesIndex: slot,
+        });
+      }
+    });
+  }
+  return { ...decisions, marks };
+}
+
+/**
+ * A bullet graph — **a measure against a target, on qualitative bands** (C04 §8,
+ * §3ak.35).
+ *
+ * **`value: null`, and it is I73's first case rather than an omission.** Three
+ * rows carry three quartile summaries in three units — `0 … 100`, `0 … 60`,
+ * `0 … 40` — so there is no one range for a `Figure`'s one `value` to be. §3q's
+ * *one axis across the bands* is scoped by purpose in its own words, and putting
+ * a revenue in pounds beside a churn in percent is what this form exists not to
+ * do. The renderer that draws it has said so all along: *the bands say what good
+ * is, so a reader needs no legend and no second glance at a dial.*
+ *
+ * **The band's ordinal crosses and the ink is the arm's** (I71, commitment 68).
+ * Measured off the painted frame, the whole row is one colour — `rgb(230,159,0)`
+ * for bands, measure and target alike — and only the glyph varies. So each band
+ * carries `(k + 1) / edges.length` as its reading and each arm spends it at its
+ * own depth: a four-step density ladder there, an opacity here.
+ *
+ * **The measure covers the bands it reaches, because that is what the terminal
+ * draws.** Few's design insets a thinner bar so the bands show behind it, and a
+ * terminal row is one cell tall and cannot; drawing the inset here would be
+ * geometry one arm invented, which is the thing this pass exists to stop.
+ */
+export function bulletFigure(block: Plot): Figure {
+  const qs = block.quartiles ?? [];
+  const identity = block.categories ?? qs.map((_q, i) => `measure ${String(i + 1)}`); // cells-ok — a measure index
+  const decisions = categoricalDecisions({ ...block, categories: identity });
+  const n = Math.max(1, identity.length); // cells-ok — a measure count
+  const marks: Drawn[] = [];
+  qs.forEach((q, i) => {
+    if (i >= n) return; // cells-ok — a measure index
+    const own = { min: q.min, max: q.max };
+    const at = (v: number): number => normalisedOf(v, own, false);
+    const x = i / n; // cells-ok — a measure count
+    const w = 1 / n; // cells-ok — a measure count
+    const slot = rowSlot(block.form, i, 0, 1); // cells-ok — a measure index
+    // The bands first, lightest to darkest, each running from the previous edge.
+    const edges = [q.q1, q.median, q.q3, q.max];
+    let from = 0;
+    edges.forEach((edge, k) => {
+      const to = at(edge);
+      marks.push({
+        mark: { kind: "rect", x, y: from, w, h: Math.max(0, to - from), fill: true, value: (k + 1) / edges.length }, // cells-ok — a band count
+        layer: "series",
+        seriesIndex: slot,
+      });
+      from = to;
+    });
+    const measure = block.series[0]?.values[i]; // cells-ok — a measure index
+    if (measure !== null && measure !== undefined && Number.isFinite(measure)) {
+      marks.push({
+        mark: { kind: "rect", x, y: 0, w, h: at(measure), fill: true },
+        layer: "series",
+        seriesIndex: slot,
+      });
+    }
+    // **The target last, over everything: it is the question the row answers.**
+    if (q.centre !== undefined && Number.isFinite(q.centre)) {
+      const t = at(q.centre);
+      marks.push({
+        mark: { kind: "polyline", points: [[x, t], [x + w, t]] },
+        layer: "series",
+        seriesIndex: slot,
+      });
+    }
+  });
   return { ...decisions, value: null, marks };
 }
 

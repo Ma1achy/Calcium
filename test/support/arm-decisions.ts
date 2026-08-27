@@ -50,6 +50,10 @@ const TOP = /^\s*[┌+]/u;
 const BOTTOM = /^\s*[└+]/u;
 /** A row that is *only* frame — the border itself, rather than a row with edges. */
 const RULE_ONLY = /^[\s┌┐└┘├┤┬┴┼─│+|-]+$/u;
+/** How many of a row's characters are rule glyphs — a blank row inside a frame has two. */
+function ruleGlyphs(line: string): number {
+  return [...line].filter((c) => "┌┐└┘├┤┬┴┼─│+|-".includes(c)).length; // cells-ok — a glyph count
+}
 /** A label shaped like a name rather than a reading. */
 const WORD = /[A-Za-z][A-Za-z0-9_.-]*/gu;
 const NUMERIC = /^-?[\d.,]+\s*[%a-zA-Z]{0,3}$/u;
@@ -443,7 +447,16 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
     // spanning the area. Counting the border's stubs here would report the arms
     // agreeing about a thing neither does the same way, and in ASCII it would
     // count the corners too.
-    interiorRules: area.filter((l) => RULE_ONLY.test(l) && !TOP.test(l) && !BOTTOM.test(l)).length,
+    // **And a blank row inside a frame is not a rule** (F334, §3ak.35).
+    // `RULE_ONLY` admits whitespace, so `│` + spaces + `│` matched it — every
+    // form whose categories do not fill its declared height reported a phantom
+    // rule, and the arms read as disagreeing about a line neither draws.
+    // **More than the two borders** is what separates them: a blank row has
+    // exactly two rule glyphs, a horizontal rule has a run of them, and a column
+    // of gridlines has one per column — so this stays able to see a vertical
+    // rule, which a `[─-]` test would not.
+    interiorRules: area.filter((l) =>
+      RULE_ONLY.test(l) && !TOP.test(l) && !BOTTOM.test(l) && ruleGlyphs(l) > 2).length, // cells-ok — a glyph count
     legend,
   };
 }

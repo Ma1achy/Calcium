@@ -44,7 +44,7 @@ import {
   fieldFigure,
   horizonFigure,
   stackedFigure,
-  spanFigure, funnelFigure,
+  spanFigure, funnelFigure, trackFigure, bulletFigure,
   distributionFigure,
   matrixFigure,
   nodesDecisions,
@@ -132,7 +132,7 @@ function escape(text: string): string {
  */
 export type SvgFamily =
   | "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion"
-  | "field" | "horizon" | "stacked" | "span" | "funnel";
+  | "field" | "horizon" | "stacked" | "span" | "funnel" | "track" | "bullet";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -220,7 +220,11 @@ export const SVG_FAMILY = {
   // family's reason on a form drawn as a rectangle, and it is why this one has
   // `value: null` where every other categorical form has an axis.
   funnel: "funnel",
-  timeline: null,
+  // **`track` — the one family whose rows are series** (I38, §3ak.35). A rule
+  // across the row and a mark per instant, so a track's *positions* are its data
+  // and its magnitudes are not. `categoricalDecisions` keeps the raw range for
+  // it: an event is an instant and an instant has no floor.
+  timeline: "track",
   // **Proportion** — an angle, a polygon's radius, a count of squares, and the
   // three terminal compensations named as terminal (§3ak.26). What crosses is
   // the shares, the ceiling and the hundred-square assignment; what stays is
@@ -256,7 +260,14 @@ export const SVG_FAMILY = {
   // **one** value axis with two x positions, which is the curve family exactly.
   // What was actually missing is the derivation: `slopeEnds` in `drawnBlock`, so
   // both arms take the two columns above the decisions that label the axes.
-  slope: "curve", dumbbell: "distribution", forest: "distribution", bullet: null,
+  slope: "curve", dumbbell: "distribution", forest: "distribution",
+  // **`bullet` is its own, and its rows are three scales rather than one**
+  // (I73, F330, §3ak.35). `quartiles` carries the bands and `centre` the target,
+  // which is `distribution`'s datum — and `quartileRange` gives that family
+  // **one** range over every summary, where a bullet scales each row to its own.
+  // So the data is shared and the emitter is not, and `value: null` is what says
+  // there is no axis under it.
+  bullet: "bullet",
   // **`horizon`'s condition was written as a symbol and it is met** (F294,
   // §3ak.29): `horizonFigure`, a block in and normalised marks out, no
   // `areaWidth`, no `areaRows`, no `caps`. `horizonGrid` computed `within` —
@@ -323,6 +334,8 @@ function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
     case "stacked": return stackedFigure(block, block.form === "streamgraph");
     case "span": return spanFigure(block);
     case "funnel": return funnelFigure(block);
+    case "track": return trackFigure(block);
+    case "bullet": return bulletFigure(block);
     default: return null;
   }
 }
@@ -758,11 +771,23 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // cell has no length and no position left to carry its reading — the
       // coordinate is spent on the grid — so the reading crosses the seam
       // normalised and each arm turns it into a colour at its own depth.
+      // **And a reading with no ramp is density on the mark's own slot**
+      // (commitment 68, §3ak.35). `if (map === undefined) continue` was right
+      // for every mark that had ever carried a `value` — all of them on a
+      // colormap — and silent for the first that does not: a bullet's bands are
+      // one hue at four glyph densities in the terminal, measured off the painted
+      // frame, so the ordinal is the datum and the ink is the arm's. `FV1c`
+      // forbids `bullet` a `RAMP_DEFAULT` entry and is right to: its **readings**
+      // are on its rows' scales and only its **furniture** is on a ladder.
+      let opacity = "";
       if (m.value !== undefined) {
-        if (map === undefined) continue;
-        const colour = continuousColour(map, m.value, SVG_CAPS);
-        if (colour === undefined || colour.kind !== "rgb") continue;
-        fill = colour.hex;
+        if (map === undefined) {
+          opacity = ` fill-opacity="${n(0.15 + 0.85 * Math.max(0, Math.min(1, m.value)))}"`;
+        } else {
+          const colour = continuousColour(map, m.value, SVG_CAPS);
+          if (colour === undefined || colour.kind !== "rgb") continue;
+          fill = colour.hex;
+        }
       }
       // **A partition's neighbours must be told apart and a field's must not**,
       // and `value` is what says which this is. A treemap without the hairline
@@ -773,7 +798,7 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       const edge = inset > 0 ? ` stroke="${ground ?? fill}" stroke-width="1"` : "";
       if (d.seriesIndex !== undefined) boxes.set(d.seriesIndex, { left: x, top: y, right: x + w, bottom: y + h });
       out.push(
-        `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}"${edge}/>`,
+        `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}"${opacity}${edge}/>`,
       );
       continue;
     }
@@ -1068,7 +1093,8 @@ function marks(
   if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
     || family === "bar" || family === "distribution" || family === "proportion"
     || family === "field" || family === "horizon" || family === "stacked"
-    || family === "span" || family === "funnel") && "marks" in figure) {
+    || family === "span" || family === "funnel" || family === "track"
+    || family === "bullet") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 
