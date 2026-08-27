@@ -13642,6 +13642,39 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F335 — the public builder cannot construct six of the forms the public type declares ★★★★★
+
+`b.plot`'s spec declares **48** of `Plot`'s **58** members. Two of the ten come from `BlockOpts`
+(`id`, `kind`); the other eight are simply absent:
+
+```
+facets  offsets  totals  layout  binning  xScale  yScale  emptyMessage
+```
+
+**Four of those are a form's only datum.** So `gantt` has no starts, `waterfall` has no totals,
+`smallmultiples` and `pairplot` have no children, a grouped or stacked `bar` has no layout, and a
+`histogram` cannot choose a binning strategy. Six forms in the union a consumer can name and cannot
+build.
+
+**It refuses rather than drops, which is the good direction**: `b.plot({ form: "gantt", offsets })`
+is `TS2353 — 'offsets' does not exist`, so a caller is told. What they are told is that the sanctioned
+entry point does not reach the form.
+
+**And one builder can while the other cannot.** `FigureBuilder.setFacets` exists at
+`src/shell/builders/figure.ts:207`, with `facets_` and its spread into the built block — so the
+capability is present in the component and absent from the function C24 publishes.
+
+**Found by writing a second consumer from the public surface**, which is the instrument that produced
+three of docker-tui's step 8 findings. The catalogue and every test build with `block({ … })`, the
+viewmodel constructor, which is **transparent to any field** — so no artefact in the repository goes
+through the builder for these forms, and the gap is invisible from inside. It surfaced the moment a
+test needed a faceted block and reached for the builder.
+
+**C24's rather than C12's**, and recorded rather than fixed: widening a published signature is a
+public-contract change and wants its own ruling.
+
+---
+
 ## F334 — the reader counts a blank row inside a frame as a rule, on nine forms ★★★★☆
 
 `terminalDecisions` reads an interior rule as a row made only of rule characters:

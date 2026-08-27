@@ -213,8 +213,12 @@ const MEASURED = {
   "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "1/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "violin": "refused",
   "ridgeline": "refused",
-  "smallmultiples": "refused",
-  "pairplot": "refused",
+  // **The compositions, which are whatever their children are** (§3ak.36). Both
+  // recurse into `plotToSvg`, so a facet holding a refused form leaves its column
+  // empty and its siblings draw — the terminal's own answer, read out of
+  // `smallMultiplesRows` rather than chosen.
+  "smallmultiples": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "1/2", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  "pairplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   // **The proportion family, and eighteen of its twenty cells agree on the day
   // it lands** (§3ak.26). The three renderers were the terminal's own
   // computations moved, so agreement here is the extraction's property
@@ -408,12 +412,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
         if (v[d] === "agree") closed += 1; else open += 1;
       }
     }
-    expect(claimed.length, "forms the SVG arm claims").toBe(42); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(4); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(294); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(42); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(58); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(194); // cells-ok — a cell count
+    expect(claimed.length, "forms the SVG arm claims").toBe(44); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(308); // cells-ok — a cell count
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(63); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(201); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

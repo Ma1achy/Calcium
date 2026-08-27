@@ -30,7 +30,7 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 10 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 24 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 25 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
@@ -100,10 +100,11 @@ view's** producer is defined by the region and has no other bound.
 ---
 
 <a id="2"></a>
-## 2 · A complete mechanism, unreachable from the other side of a seam — **5 open, 9 closed** ⚠
+## 2 · A complete mechanism, unreachable from the other side of a seam — **6 open, 9 closed** ⚠
 
 | | | |
 |---|---|---|
+| **F335** | **the public builder, for six forms in the public union** | `b.plot`'s spec declares **48** of `Plot`'s **58** members, and eight are simply absent — `facets`, `offsets`, `totals`, `layout`, `binning`, `xScale`, `yScale`, `emptyMessage`. **Four of them are a form's only datum**, so `gantt` has no starts, `waterfall` no totals, `smallmultiples` and `pairplot` no children, a grouped `bar` no layout, and a `histogram` no binning strategy. It **refuses rather than drops** — `TS2353 — 'offsets' does not exist` — which is the good direction, and what the caller is told is that the sanctioned entry point does not reach the form. **`FigureBuilder.setFacets` exists one file along**, so the capability is in the component and absent from the function C24 publishes. **Found by writing a second consumer from the public surface**: the catalogue and every test build through `block({ … })`, which is transparent to any field, so no artefact in the repository goes through the builder for these forms. C24's, recorded rather than fixed — widening a published signature wants its own ruling |
 | **F263** | **a builder gap I got wrong, and MG27 is what disproved it** | Claimed: `quartiles`, `categories`, `segments`, `bands` are on `Plot` and absent from `b.plot`, so five forms are *buildable by nothing public* and **MG27 passed throughout**. Field by field the first is **true**; the other two are **false**. `b.figure(…).setQuartiles([…])` and its three siblings have been there all along, and all four fields were on `BUILDER_OMISSIONS` with a stated reason — whose **bidirectional arm refused the commit** the moment the builder set them. So this is scheduled work arriving early, not a defect. **How the wrong claim was reached**: one builder file was read and there are two, and *the rule's own doc comment records exactly that about itself* — the limitation was written down in the file cited as evidence, and the rule's silence was cited instead of its list. A grep answers *is it in this file* and was read as *is it reachable*. **The instrument that caught it costs nothing**: an exemption compared by equality in both directions, third entry disposed of that way after `plot.yFormat` and MG25's `isUsable`. **Landed** — the shorthand beside the chain, four expired entries removed |
 
 The type carries the field, the renderer honours it, the tests cover it, and no consumer can

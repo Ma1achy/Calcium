@@ -35,7 +35,7 @@
 import { describe, expect, it } from "vitest";
 
 import { block, type Plot, type PlotForm } from "../../src/data/viewmodel/index.js";
-import { plotToSvg, svgFamilyOf } from "../../src/presentation/plot/svg.js";
+import { plotToSvg, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import {
   barFigure, curveFigure, distributionFigure, fieldFigure, horizonFigure, matrixFigure,
@@ -50,6 +50,7 @@ import { COLORMAPS, continuousColour } from "../../src/presentation/theme/colorm
 import type { ColormapName } from "../../src/data/viewmodel/index.js";
 import { roleGlyphs } from "../../src/presentation/plot/roles.js";
 import { ROW_IS_AN_IDENTITY } from "../../src/presentation/plot/marks.js";
+import { facetWidths } from "../../src/presentation/plot/facet.js";
 import { forestRow } from "../../src/presentation/plot/glyph-row.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { cells, truncate, type AmbiguousWidth } from "../../src/presentation/text.js";
@@ -303,7 +304,13 @@ describe("U — the seam, asserted from both arms", () => {
     let legendDrawn = 0;
     let identityDrawn = 0;
     for (const { spec, family } of corpus()) {
-      if (family === null || family === "nodes") continue;
+      // **And `facets`, which has no emitter because it has no figure**
+      // (§3ak.36). A composition recurses into `plotToSvg`, so what these rows
+      // are about — the members a figure carries and whether an arm reads them —
+      // is asked of its **children**, which the corpus already covers as `line`
+      // and `scatter`. Skipped for the same reason `nodes` is, and the counters
+      // below are what say how much was swept.
+      if (family === null || family === "nodes" || family === "facets") continue;
       const b = blockOf(spec);
       const svg = plotToSvg(b, DARK_THEME);
       if (svg === null) continue;
@@ -450,7 +457,7 @@ describe("U — the seam, asserted from both arms", () => {
     const seen = new Set<string>();
     const short: string[] = [];
     for (const { bucket, variant, spec, family } of corpus()) {
-      if (family === null || family === "nodes") continue;
+      if (family === null || family === "nodes" || family === "facets") continue;
       if (seen.has(spec["form"] as string)) continue;
       seen.add(spec["form"] as string);
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
@@ -468,7 +475,7 @@ describe("U — the seam, asserted from both arms", () => {
     let lying = 0;
     for (const { bucket, variant, spec, family } of corpus()) {
       if (spec["form"] !== bucket) lying += 1;
-      if (family === null || family === "nodes") continue;
+      if (family === null || family === "nodes" || family === "facets") continue;
       checked += 1;
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
@@ -485,7 +492,7 @@ describe("U — the seam, asserted from both arms", () => {
     // a resolved one is a hex triple, a ref is a dotted slot name.
     let checked = 0;
     for (const { bucket, variant, spec, family } of corpus()) {
-      if (family === null || family === "nodes") continue;
+      if (family === null || family === "nodes" || family === "facets") continue;
       checked += 1;
       const json = JSON.stringify(EMITTER[family as WalkedFamily](blockOf(spec)));
       expect(json, `${bucket}/${variant} carries a resolved colour`).not.toMatch(/#[0-9a-f]{6}/iu);
@@ -1068,6 +1075,59 @@ describe("U — the seam, asserted from both arms", () => {
     // reading the record, and these are the forms that own them.
     expect(asked, "row-per-category forms this arm claims, with more than one category").toBe(7); // cells-ok — a form count
     expect(rows.join(" | "), "and each drew a slot per category").toContain("bar:");
+  });
+
+  it("U11 (C12 I8, §3ak.36): a facet holding a refused form keeps its column and its siblings draw", () => {
+    // **The state no fixture has.** Both facet fixtures hold four drawable
+    // children, so the decision this arm had to make — *does a composition refuse
+    // when a child does* — is invisible in every frame the corpus produces.
+    //
+    // **The terminal's answer is what settles it, and it is written twice.**
+    // `smallMultiplesRows` renders through `formRows[f.form]` and falls back to
+    // `[]`; its row loop states the principle for the case that is live — *a
+    // facet with no row at this index contributes blanks rather than nothing: a
+    // short facet must not pull the ones after it leftwards.* A column belongs
+    // to a facet by **position**.
+    const kid = (form: PlotForm, id: string): Plot => block({
+      kind: "plot", id, form, height: 6, axes: true,
+      series: [{ label: id, values: [3, 9, 4, 12, 7] }],
+      ...(form === "violin" ? { categories: ["a"] } : {}),
+    } as Plot);
+
+    // `violin` and `ridgeline` are refused on measured grounds — this path
+    // computes no density — so a facet holding one inherits that.
+    expect(svgFamilyOf("violin"), "the child this row is about is refused").toBeNull();
+    expect(plotToSvg(kid("violin", "v"), DARK_THEME), "and refused on its own").toBeNull();
+
+    const mixed = block({
+      kind: "plot", id: "mix", form: "smallmultiples", height: 10, axes: true, series: [],
+      facets: [kid("line", "a"), kid("violin", "b"), kid("scatter", "c")],
+    } as Plot);
+    const svg = plotToSvg(mixed, DARK_THEME);
+    expect(svg, "the composition draws").not.toBeNull();
+
+    // **Two children drew and the third's column is empty**, which is countable:
+    // a nested `<svg>` per drawn child, each at the x its position gives it.
+    const kids = [...(svg ?? "").matchAll(/<svg x="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+    expect(kids.length, "one nested document per child that drew").toBe(2); // cells-ok — a facet count
+    // **And the gap is where the refused one is** — the third child is still at
+    // the third column's own offset, so its neighbour's absence did not slide it
+    // left. Asserted against `facetWidths` rather than against `width / 3`,
+    // because the divider **distributes the remainder**: 640 over three is
+    // `214, 213, 213` and not three of `213.33`, and that is the terminal's own
+    // arithmetic being called rather than approximated.
+    const widths = facetWidths(SVG_DEFAULT_LAYOUT.width, 3);
+    expect(kids[0], "the first child is at the left edge").toBeCloseTo(0, 6);
+    expect(kids[1], "and the third is still in the third column")
+      .toBeCloseTo((widths[0] ?? 0) + (widths[1] ?? 0), 6);
+
+    // **The parent refuses only when no child draws**, which is C12 I64 rather than a
+    // new rule: a document with nothing on it is refused wherever it comes from.
+    const allRefused = block({
+      kind: "plot", id: "none", form: "pairplot", height: 10, axes: true, series: [],
+      facets: [kid("violin", "x"), kid("ridgeline", "y")],
+    } as Plot);
+    expect(plotToSvg(allRefused, DARK_THEME), "nothing on the page is refused").toBeNull();
   });
 
   it("U8b (C12 I70, §3ak.29): each of the three is idempotent, because two callers now apply it", () => {

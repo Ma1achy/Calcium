@@ -864,6 +864,39 @@ const results = runPass({
       expect: "SB",
     },
     {
+      // **The facets** (§3ak.36). A composition is whatever its children are, so
+      // what these mutate is the composing rather than any figure.
+      name: "THE COLUMN: a refused child collapses the ones after it leftwards",
+      file: SVG,
+      from: "    x += width;",
+      to: "    if (child !== null) x += width;",
+      expect: "U11",
+    },
+    {
+      name: "THE INHERITANCE: a composition refuses when any child does, rather than when none draws",
+      file: SVG,
+      from: "  return drawn === 0 ? null : parts.join(\"\"); // cells-ok — a facet count",
+      to: "  return drawn === facets.length ? parts.join(\"\") : null; // cells-ok — a facet count",
+      expect: "U11",
+    },
+    {
+      name: "THE ID: two facets share a clip path, because the child keeps its own id",
+      file: SVG,
+      from: "      { ...facet, id: `${block.id}-f${String(i)}` }, // cells-ok — a facet index",
+      to: "      facet, // cells-ok — a facet index",
+      expect: "SB",
+    },
+    {
+      // **The gutter is a share and the text in it is not** (I63). Dropping the
+      // scale clips every child's labels, which the SVG baseline sees as bytes
+      // and a reader sees as `.00`.
+      name: "THE GUTTER: a child's gutter is a share of its own column, so its labels clip",
+      file: SVG,
+      from: "      { ...layout, width, gutter: Math.min(0.5, layout.gutter * (width > 0 ? layout.width / width : 1)) },",
+      to: "      { ...layout, width },",
+      expect: "SB",
+    },
+    {
       name: "THE FILL: a stacked band is an outline, so the reader integrates two curves",
       file: FIGURE,
       from: "        mark: { kind: \"polyline\", points: [...lower, ...upper.reverse()], closed: true, fill: true },",

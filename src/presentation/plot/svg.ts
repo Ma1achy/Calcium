@@ -32,6 +32,7 @@
 import { flatten, type FlatNode } from "./tree.js";
 import { drawnBlock } from "./derive.js";
 import { graphLayers } from "./graph.js";
+import { facetWidths } from "./facet.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
@@ -132,7 +133,8 @@ function escape(text: string): string {
  */
 export type SvgFamily =
   | "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion"
-  | "field" | "horizon" | "stacked" | "span" | "funnel" | "track" | "bullet";
+  | "field" | "horizon" | "stacked" | "span" | "funnel" | "track" | "bullet"
+  | "facets";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -280,8 +282,26 @@ export const SVG_FAMILY = {
   // categorical slot and anchors it on a niced value axis, and a horizon has
   // none of the three. Same correction as `contour`'s, one form along.
   horizon: "horizon",
-  // *A composition of other forms*, so it is whatever they are.
-  smallmultiples: null, pairplot: null,
+  // **A composition of other forms, so it is whatever they are — and that is
+  // now an arm rather than a refusal** (§3ak.36). These recurse into
+  // `plotToSvg`, so they draw exactly what their children draw, and they
+  // **inherit every refusal a child has**: a facet holding a `violin` holds a
+  // form this arm does not compute a density for.
+  //
+  // **The terminal's answer is what settles that, and it is written twice.**
+  // `smallMultiplesRows` renders a child through `formRows[f.form]` and falls
+  // back to `[]` — a column of nothing rather than a composition of nothing —
+  // and its row loop states the principle for the case that is live: *a facet
+  // with no row at this index contributes blanks rather than nothing: a short
+  // facet must not pull the ones after it leftwards.* A column belongs to a
+  // facet by **position**, not by content.
+  //
+  // So a refused child leaves its column empty and its siblings draw. **Nothing
+  // is dropped** — C12 I8 is about a facet that loses its place, and this one
+  // keeps it — and nothing plausible-but-wrong is drawn, which is what F259
+  // refuses. The parent refuses only when **no** child draws, because then there
+  // is nothing on the page and I64 already says so.
+  smallmultiples: "facets", pairplot: "facets",
   // **A field with layers over it, and both halves of the deferral were right**
   // (F294, §3ak.29). The condition was written as a symbol — *`contourFigure`,
   // returning normalised marks with no `areaWidth`, no `areaRows`, no `caps` and
@@ -1176,6 +1196,70 @@ function marks(
 }
 
 /**
+ * `smallmultiples` and `pairplot` — **whatever their children are** (§3ak.36).
+ *
+ * **`facetWidths` is the terminal's own divider, called rather than copied**
+ * (F329's test). It distributes the remainder instead of dropping it — three
+ * columns of `floor(80 / 3)` leave two blank at the right edge, legal under I10
+ * and visible in every faceted frame — and the same arithmetic in pixels gives
+ * the same split, which is what makes the two compositions comparable at all.
+ *
+ * **A refused child leaves its column empty and its siblings draw.** That is the
+ * terminal's answer read rather than chosen: `smallMultiplesRows` falls back to
+ * `[]` for a form with no renderer, and its row loop says why for the case that
+ * is live — *a facet with no row at this index contributes blanks rather than
+ * nothing: a short facet must not pull the ones after it leftwards.* A column
+ * belongs to a facet by position.
+ *
+ * **The parent refuses only when no child draws**, which is I64 rather than a
+ * new rule: a document with nothing on it is refused wherever it comes from.
+ *
+ * **Each child's id is made unique here.** The clip paths a child emits are keyed
+ * `i{id}-{n}` and `o{id}-{n}`, and two facets sharing an id would share a clip —
+ * a hazard the terminal does not have, because its facets compose *rows* and
+ * carry no identifiers at all.
+ *
+ * **Nested `<svg>` rather than a transform**, because a child places itself in
+ * its own `viewBox` and an `x`/`y`/`width`/`height` on the element is what tells
+ * it where that viewport sits. Nothing is rewritten inside the child.
+ */
+function facetSvg(block: Plot, theme: ResolvedTheme, layout: SvgLayout): string | null {
+  const facets = block.facets ?? [];
+  if (facets.length === 0) return null; // cells-ok — a facet count
+  const widths = facetWidths(layout.width, facets.length); // cells-ok — a facet count
+  const parts: string[] = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(layout.width)} ${n(layout.height)}" ` +
+      `width="${n(layout.width)}" height="${n(layout.height)}">`,
+  ];
+  const ground = inkOf(GROUND, theme);
+  if (ground !== undefined) parts.push(`<rect width="100%" height="100%" fill="${ground}"/>`);
+
+  let x = 0;
+  let drawn = 0; // cells-ok — a facet count
+  for (const [i, facet] of facets.entries()) { // cells-ok — a facet index
+    const width = widths[i] ?? 0;
+    // **The gutter is a share and the text in it is not** (I63). This arm sizes
+    // the gutter to a fraction of the width — deliberately, because it has no
+    // metrics — and a quarter-width column gets a quarter-width gutter while the
+    // labels stay 12px: `100` came out as `.00`, clipped at the child's own left
+    // edge. The gutter that must hold text is **absolute**, so the share is
+    // scaled to keep it the width it would have had.
+    const child = plotToSvg(
+      { ...facet, id: `${block.id}-f${String(i)}` }, // cells-ok — a facet index
+      theme,
+      { ...layout, width, gutter: Math.min(0.5, layout.gutter * (width > 0 ? layout.width / width : 1)) },
+    );
+    if (child !== null) {
+      parts.push(child.replace("<svg xmlns=", `<svg x="${n(x)}" y="0" xmlns=`));
+      drawn += 1; // cells-ok — a facet count
+    }
+    x += width;
+  }
+  parts.push("</svg>");
+  return drawn === 0 ? null : parts.join(""); // cells-ok — a facet count
+}
+
+/**
  * A plot as SVG, or `null` where the form carries its own geometry.
  *
  * **`null` rather than a fallback picture**, because a form drawn by the wrong
@@ -1236,6 +1320,12 @@ export function plotToSvg(
   // the block too: a figure about the drawn block beside a legend about the
   // given one is the same defect one level smaller. And **after the two
   // refusals above**, which are claims about what the author wrote.
+  // **The facets recurse, and they go before the derivation** (§3ak.36). A
+  // composition has no series of its own to derive and no figure to ask for; what
+  // it has is children, each of which is a whole block and gets the whole
+  // pipeline — including `drawnBlock`, including the two refusals above.
+  if (svgFamilyOf(given.form) === "facets") return facetSvg(given, theme, layout);
+
   const block = drawnBlock(given);
 
   // **The axis is the figure's, and this is D1 through D7 closing at once**

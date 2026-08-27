@@ -6482,6 +6482,60 @@ reading with no ramp is density on the mark's own slot.** Not a `RAMP_DEFAULT` e
 rows' scales and only its *furniture* is on a ladder.
 
 ---
+### 3ak.36 — The facets, which are whatever their children are
+
+`smallmultiples` and `pairplot` recurse into `plotToSvg`, so they draw exactly what their children
+draw — **and they inherit every refusal a child has.** A facet holding a `violin` holds a form this
+path computes no density for. The campaign's last structural question is what a composition does
+about that, and it is a decision rather than a consequence.
+
+#### The terminal has already answered, twice
+
+`smallMultiplesRows` renders each child through `formRows[f.form]` and falls back to `[]` — **a
+column of nothing rather than a composition of nothing**. That branch is dead in the terminal, since
+`FORM_ROWS` is total; the one beside it is live, and it states the principle:
+
+> *A facet with no row at this index contributes blanks rather than nothing: a short facet must not
+> pull the ones after it leftwards.*
+
+**A column belongs to a facet by position, not by content.** So: a refused child leaves its column
+empty and its siblings draw. Nothing is dropped — C12 I8 is about a facet that loses its place, and
+this one keeps its width and its offset — and nothing plausible-but-wrong is drawn, which is what
+F259 refuses. The parent refuses only when **no** child draws, and that is I64 rather than a new
+rule: a document with nothing on it is refused wherever it comes from.
+
+**`U11` constructs the state, because no fixture has it.** Both facet fixtures hold four drawable
+children, so the decision is invisible in every frame the corpus produces.
+
+#### `facetWidths` is called, not copied
+
+The terminal's divider distributes the remainder rather than dropping it — three columns of
+`floor(80 / 3)` leave two blank at the right edge — and the same arithmetic in pixels gives the same
+split, which is what makes the two compositions comparable at all. 640 over three is `214, 213, 213`,
+and `U11` asserts against the function rather than against `width / 3` for exactly that reason.
+
+#### Two things the recursion needed that a leaf does not
+
+**Each child's id is made unique.** A child's clip paths are keyed `i{id}-{n}` and `o{id}-{n}`, so
+two facets sharing an id would share a clip. The terminal has no such hazard: its facets compose
+*rows* and carry no identifiers at all.
+
+**The gutter is a share and the text in it is not** (I63). This arm sizes the gutter to a fraction of
+the width, deliberately, because it has no metrics — and a quarter-width column gets a quarter-width
+gutter while the labels stay 12px. Read on the frame: `100` came out as `.00`, clipped at the child's
+own left edge, in all four columns. The gutter that must hold text is **absolute**, so the share is
+scaled by `parentWidth / childWidth` to keep it the width it would have had.
+
+#### And the builder cannot construct them
+
+`b.plot`'s spec declares 48 of `Plot`'s 58 members, and `facets` is one of eight that are missing —
+with `offsets`, `totals`, `layout`, `binning`, `xScale` and `yScale`. So **six forms in the public
+union have no builder that can construct them**: `gantt`, `waterfall`, `smallmultiples`, `pairplot`,
+a grouped `bar`, and a `histogram` with a chosen strategy. It is a compile error rather than a silent
+drop, which is the good direction — and `FigureBuilder.setFacets` exists one file along, so one
+builder can and the other cannot. F335, and it is C24's rather than this component's.
+
+---
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7809,6 +7863,7 @@ orientation — and belongs in the classification table as its own rows.
 66. **A form has a value axis only where one range carries every mark** (I73, §3ak.34). A record answering *do the readings sit on a scale* is satisfied by a form whose every row sits on a **different** scale, and the cell reads as deliberate. All five of family 8's residue said `true`; three of them could not be drawn that way, and each had been silent for as long as the form was refused.
 67. **A fixture is built before the frame that reads it, where the form's own operation is what is being read** (I74, §3ak.35). `slope`'s corpus was three series of two values each, so *take the first and the last* was the identity everywhere and a frame read against it checked the thing that was already correct. The variant that separates the form from `line` found a position axis labelling five intervals nobody draws in — and it also settled where the derivation goes, which reasoning from the current behaviour had got backwards.
 68. **A reading crosses and the ink it becomes is the arm's, on a channel as much as on a geometry** (I71, I73, §3ak.35). A bullet's qualitative bands are one hue at four glyph densities in the terminal, measured off the painted frame; the ordinal is the datum, the quantisation is the grid's. `Mark.rect.value` already carried readings and the walk dropped them wherever the figure named no ramp, which was every mark that could ever have had one until this form.
+69. **A composition refuses only when nothing in it draws, and a refused child keeps its column** (I8, I64, §3ak.36). The facets recurse, so they inherit `violin` and `ridgeline`'s refusal — and the terminal had already decided what that means, twice: a child with no renderer contributes `[]`, and a facet short of a row contributes blanks *so that a short facet must not pull the ones after it leftwards*. A column belongs to a facet by position. Read out of the arm that had the case rather than chosen by the arm that has it now.
 
 ---
 

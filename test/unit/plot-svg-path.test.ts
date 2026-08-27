@@ -37,7 +37,8 @@ import { resolve } from "../../src/presentation/theme/index.js";
 import { DARK_THEME as THEME } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
-import type { PlotForm } from "../../src/data/viewmodel/index.js";
+import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
+import { block as vmBlock } from "../../src/data/viewmodel/index.js";
 
 /** A slot's hex at this arm's one depth — the same call the renderer makes. */
 const hexOf = (ref: string): string => {
@@ -404,6 +405,15 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
   // scaled to **its own** summary rather than to one shared range (C12 I73).
   // Two measures in two units is the shape the form exists for, so the
   // representative carries two.
+  // **A composition's datum is its children, and `b.plot` cannot carry them**
+  // (F335). `facets` is one of eight `Plot` members the public builder's spec
+  // does not declare — with `offsets`, `totals`, `layout`, `binning`, `xScale`
+  // and `yScale` — so `b.plot({ facets })` is a compile error rather than a drop,
+  // and six forms in the public union have no builder that can construct them.
+  // The branch below builds its own block through `block()`, which is what the
+  // catalogue does and why nothing had noticed.
+  if (svgFamilyOf(form) === "facets") return { series: [] };
+  // (see `blockFor` below for how a composition is built)
   if (form === "bullet") {
     return {
       series: [{ label: "measure", values: [72, 38] }],
@@ -443,24 +453,61 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
   };
 };
 
+/**
+ * A representative block for a form — **through `b.plot`, except where it cannot
+ * go** (F335).
+ *
+ * `facets` is one of eight `Plot` members the public builder's spec does not
+ * declare, with `offsets`, `totals`, `layout`, `binning`, `xScale` and `yScale`,
+ * so `b.plot({ facets })` is a compile error and six forms in the public union
+ * have no builder that can construct them. The catalogue builds through
+ * `block()`, which is transparent to any field — which is why nothing had
+ * noticed, and why this branch is here rather than a `datumFor` entry.
+ */
+function blockFor(form: PlotForm, id: string, height: number): Plot {
+  if (svgFamilyOf(form) !== "facets") {
+    return b.plot({ id, form, height, axes: true, ...datumFor(form) } as Parameters<typeof b.plot>[0]);
+  }
+  return vmBlock({
+    kind: "plot", id, form, height, axes: true, series: [],
+    facets: [
+      vmBlock({ kind: "plot", id: `${id}-a`, form: "line", height: 6, axes: true, series: [{ label: "a", values: SAMPLES }] } as Plot),
+      vmBlock({ kind: "plot", id: `${id}-b`, form: "scatter", height: 6, axes: true, series: [{ label: "b", values: [...SAMPLES].reverse() }] } as Plot),
+    ],
+  } as Plot);
+}
+
 describe.each(supported)("G6 — %s", (form) => {
   // **`axes: true`, and it is the row's premise rather than decoration.** The
   // furniture is the figure's now, so a block that does not ask for any has no
   // border — and the box these rows measure against is read out of that border.
   // Left unset, `edges` came back empty and every coordinate filtered away.
-  const made = b.plot({
-    id: `f-${form}`,
-    form,
-    height: 8,
-    axes: true,
-    ...datumFor(form),
-  } as Parameters<typeof b.plot>[0]);
+  const made = blockFor(form, `f-${form}`, 8);
 
   it("renders, and its ink stays inside the fractional plot area", () => {
     const layout = svgLayout(600, 300);
     const svg = plotToSvg(made, THEME, layout);
     expect(svg, "a claimed form draws something").not.toBeNull();
     if (svg === null) return;
+    // **A composition has no plot area of its own** (§3ak.36). Its children each
+    // hold one, at their own gutters and inside their own columns, so *left of
+    // the parent's gutter* is where a second facet's gutter is meant to be. What
+    // containment means here is that every child sits inside the parent's
+    // viewBox, which is asserted below rather than skipped — containment is not
+    // correctness, and a row that returns early asserts nothing at all.
+    if (svgFamilyOf(form) === "facets") {
+      const kids = [...svg.matchAll(/<svg x="([-\d.]+)"[^>]*width="([-\d.]+)"/gu)]
+        .map((m2) => ({ x: Number(m2[1]), w: Number(m2[2]) }));
+      expect(kids.length, `${form}: a nested document per child`).toBe(2); // cells-ok — a facet count
+      for (const k of kids) {
+        expect(k.x, `${form}: a child left of the parent`).toBeGreaterThanOrEqual(0);
+        expect(k.x + k.w, `${form}: a child past the parent's right edge`).toBeLessThanOrEqual(layout.width);
+      }
+      // **And they tile it**, which is `facetWidths` distributing the remainder
+      // rather than dropping it: two columns of 300 and not two of 299.
+      expect(kids.reduce((t, k) => t + k.w, 0), `${form}: the columns fill the width`).toBe(layout.width);
+      return;
+    }
     const left = layout.width * (layout.gutter + layout.pad);
     const right = layout.width * (1 - layout.pad);
     // **Every x in the document, checked against the fractional bounds.** A
@@ -635,6 +682,20 @@ describe.each(supported)("G6 — %s", (form) => {
     // the ordinary one — and it is asked of the *points*, because the rule
     // across each track spans the axis by construction and would answer for
     // every input.
+    // **A composition has no clamp of its own, because it has no scale of its
+    // own** (§3ak.36). Each child is a whole block through the whole pipeline, so
+    // the pin the row hands down is the *children's* to honour and this asserts
+    // the property that replaces it: every child that can draw is on the page,
+    // at the offset its position gives it.
+    if (family === "facets") {
+      const doc = plotToSvg(made, THEME, layout) ?? "";
+      const kids = [...doc.matchAll(/<svg x="([-\d.]+)"/gu)].map((m2) => Number(m2[1]));
+      expect(kids.length, `${form}: one nested document per child`).toBe(2); // cells-ok — a facet count
+      expect(kids[0], `${form}: the first child at the left edge`).toBeCloseTo(0, 6);
+      expect(kids[1], `${form}: the second at its own column`).toBeGreaterThan(0);
+      expect(kids[1], `${form}: and inside the parent`).toBeLessThan(layout.width);
+      return;
+    }
     if (family === "track") {
       const pts = trackFigure(made).marks.flatMap((d) => (d.mark.kind === "point" ? [d.mark.y] : []));
       expect(pts.length, `${form}: the events put something on the page`).toBeGreaterThan(0); // cells-ok — a mark count
@@ -1478,7 +1539,7 @@ describe("G7 — the partition itself", () => {
     // guard that a claimed form puts ink on the page has to hand it the form's
     // own data, or it measures the corpus rather than the renderer.
     for (const form of supported) {
-      const made = b.plot({ id: `c-${form}`, form, height: 6, ...datumFor(form) } as Parameters<typeof b.plot>[0]);
+      const made = blockFor(form, `c-${form}`, 6);
       const svg = plotToSvg(made, THEME);
       expect(svg, `${form} is claimed, so it renders`).not.toBeNull();
       const ink = (svg ?? "").split("\n").filter((l) => /^<(path|rect x|circle)/u.test(l));
