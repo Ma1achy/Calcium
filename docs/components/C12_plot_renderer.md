@@ -6393,6 +6393,73 @@ from having both, with no exceptions, and it is right — a bullet's *readings* 
 scales, and only its *furniture* is on a ladder.
 
 ---
+### 3ak.35 — `slope`, `timeline`, `bullet`: three axes, and one of them was labelling a domain that is not drawn
+
+#### The fixture came first, and it is F331's lesson one commit old
+
+Every `slope` series in the corpus had exactly **two** values, so *take the first reading and the
+last* was the identity on every frame — a slope chart with two points **is** a line chart with two
+points. A frame read against that checks the thing that is already correct, which is what §3ak.33
+did to `waterfall`'s colours.
+
+`slope/six-readings` is three series of six quarterly readings, with `south` dipping to 9 and `east`
+peaking at 41 **between** the two columns that are drawn. Rendered against the arm as it stood:
+
+```
+50 ┤                                                                   │ █ north
+40 ┤                                                           ⣀⣀⣀⠤⠤⠤⠒⠒│ █ east
+   └─┬─────┬─────┬──────┬─────┬──────┬──────┬─────┬──────┬─────┬─────┬─┘
+    0.0   0.5   1.0    1.5   2.0    2.5    3.0   3.5    4.0   4.5   5.0
+```
+
+**The position axis reads `0.0 … 5.0` and the figure draws two points.** Five intervals of labelled
+domain, no readings in any of them, and three straight lines crossing the whole width — a reader
+takes the intermediate positions for data. The value axis is `0 … 50`, which covers the 9 and the 41
+that **nothing draws**.
+
+#### A derivation below a form's own decisions is I70's defect one arm smaller
+
+`positionalForm(block, …)` takes its decisions from the block it is handed and hands each series to
+the rasteriser, which is where `slope` takes its two ends. So the axis describes the **authored**
+block and the marks describe the **derived** one, inside a single renderer, and no second arm is
+needed to make the two disagree. That is I74.
+
+**So `drawnBlock` is the right home after all**, and the earlier ruling — *the derivation is
+post-range, which is the one thing that keeps it out of `drawnBlock`* — was reasoning from the
+current behaviour to the rule. It preserved a defect exactly. What made the difference is the
+fixture: with two-value series the two readings of *where does the derivation go* are
+indistinguishable, and the convenient input shape is the degenerate one.
+
+`slope/default` is byte-identical after the move, because there `ends` **is** the identity. Only the
+variant built to show the derivation moves, and it moves to `0.0 … 1.0` over `10 … 40`.
+
+#### `timeline` is F210's rule, and the pin is the whole of it
+
+Its events are positions on a shared scale, so the record's `true` stands and its rows are **series**
+rather than categories — I38's one exception, and `refFor` in the terminal already says so. What did
+not stand is the range: the terminal places against the raw `0 … 41` and `axisOver` nices to
+`0 … 50`, so marks and labels would come from two ranges. The block carries the fold's own range
+before decisions are asked for, exactly as the `span` family does.
+
+#### `bullet` has no value axis, and its bands are a reading with no ramp
+
+Three rows, three quartile summaries, three scales — `0 … 100`, `0 … 60`, `0 … 40` — so there is no
+one range and I73 answers `value: null`. **§3q does not reach it**: *comparing the categories is the
+whole of what a violin, a raincloud or a ridgeline is for*, and comparing a revenue in pounds against
+a churn in percent is what a bullet chart exists not to do.
+
+**Measured off the painted frame, the whole row is one colour.** `rgb(230,159,0)` for the bands, the
+measure and the target alike; only the glyph varies — `●` for the measure, `⠖` and `⠶` for the two
+bands the measure does not cover, `│` for the target. So the band's **ordinal** is the datum and how
+much ink it becomes is the raster, which is I71 on a channel rather than on a geometry.
+
+`Mark.rect.value` is that member and the walk drops it when `Figure.ramp` is `null` — correct for
+every mark that had one, all of which are on a ramp, and silent for the first that is not. **A
+reading with no ramp is density on the mark's own slot.** Not a `RAMP_DEFAULT` entry for `bullet`:
+`FV1c` forbids a form from having both and it is right, because a bullet's *readings* are on its
+rows' scales and only its *furniture* is on a ladder.
+
+---
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7647,6 +7714,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I71** — **Where a derivation's output is geometry, the geometry crosses at the data's own resolution and each arm rasterises it at the resolution it has.** I70 says each arm draws the derived *block*, which is what a derivation returning series affords; a derivation returning a figure has no block to hand over. A contour's crossings are interpolations between adjacent readings, so they live on the data's grid — and a glyph-per-cell arm cannot draw them, because `glyphForMask` wants a mask per cell. The rule's observable form is a signature: `contourFigure` and `horizonFigure` take a block and return normalised marks with **no `areaWidth`, no `areaRows`, no `caps` and no string**, while `contourCellRows` and `horizonGrid` keep all four. *Stated blind spot: the terminal does not read the shared geometry back, so an unmoved terminal baseline is evidence that nothing was disturbed and **not** evidence that the arms agree — for I70's three the byte-identity was the proof, and here only the frame is* (F322, F323).
 - **I72** — **Which ramp a reading is on is a figure decision; resolving that ramp to a colour is the arm's.** A `Figure` carries the colormap's **name** and never a colour, which is I62 one member along: a name resolves at each arm's own depth — `continuousColour` descends a capability ladder in one and does not in the other — while *which* map varies by **form**, and a form is not a resolution. *Measured before the rule: `DEFAULT_COLORMAP` lived in a terminal renderer and the second arm's whole ramp decision was `COLORMAPS[block.colormap ?? "viridis"]`, so `correlation` drew sequential where the terminal draws diverging and `utilisation` drew viridis where it draws inferno — the defect the table's own comment calls the single most common chart defect there is, on the form the row was written for. Two sentences licensed it and each was the other's alibi: the seam member's doc said **one ramp either way** and the walk's header called **which ramp a matrix reads** rasterisation* (F324).
 - **I73** — **A form has a value axis only where one range carries every mark.** A `Figure` holds one `value`, so a form whose rows each carry their own scale has no value axis, and neither has one whose readings are shares rather than positions. I60 asks whether a form's readings sit on a value scale *at all*; this is the half that asks whether they sit on **one**, and the two look identical until a form is drawn. *Measured before the rule, over the five that had never been drawn: `gantt`'s axis would have read `0 … 5` over bars spanning `0 … 11`, because the extent came from the durations rather than the spans; `funnel`'s `0 … 1000` labels a **width**, so neither end of a bar is its reading; `bullet`'s `0 … 100` sits over three rows scaled `0 … 100`, `0 … 60` and `0 … 40`, which is the one thing a bullet chart exists not to do — and the reason was already written in the renderer that draws it, in a different file from the record that contradicted it* (F329, F330).
+- **I74** — **A form's furniture and its marks describe the same block.** I70 puts a derivation above both arms; this is the half that says *above the decisions too*, because a renderer that derives inside its rasteriser labels one block and draws another and needs no second arm to disagree with itself. *Measured before the rule: `positionalForm` takes its decisions from the block it is handed and `slope` takes its two ends in the callback, so `slope/six-readings` drew a position axis reading `0.0 … 5.0` over a figure with two points on it — five intervals of labelled domain with no readings in any of them — and a value axis of `0 … 50` covering a 9 and a 41 that nothing draws. **It took a fixture to see**: every `slope` series in the corpus had exactly two values, where the derivation is the identity and the two readings of the rule are indistinguishable* (F332).
 
 
 ## 8. Commitments
@@ -7717,6 +7785,8 @@ orientation — and belongs in the classification table as its own rows.
 63. **The ramp a reading is on is named by the figure and resolved by each arm** (I72, §3ak.30). A per-form default table in a terminal renderer is a figure decision the other arm cannot reach, which is F322's class on a lookup rather than on a transform — and the two sentences that licensed it were each the other's alibi, so a reader checking statements one at a time agreed with both.
 65. **A derivation that crosses is *called* by both arms, and a second implementation of it is checked by nothing** (I70, I71, §3ak.34). §3ak.33 ruled one fold for the cumulative three and `waterfall` shipped a second copy, which had to settle a disagreement the first has with itself — its bounds walk and its drawing walk answer differently for a null total, and the copy followed the one that does not draw. The corpus that separates two implementations is by definition the corpus neither arm has, so the test is mechanical and not empirical: does the other arm **call** the function, or contain the walk?
 66. **A form has a value axis only where one range carries every mark** (I73, §3ak.34). A record answering *do the readings sit on a scale* is satisfied by a form whose every row sits on a **different** scale, and the cell reads as deliberate. All five of family 8's residue said `true`; three of them could not be drawn that way, and each had been silent for as long as the form was refused.
+67. **A fixture is built before the frame that reads it, where the form's own operation is what is being read** (I74, §3ak.35). `slope`'s corpus was three series of two values each, so *take the first and the last* was the identity everywhere and a frame read against it checked the thing that was already correct. The variant that separates the form from `line` found a position axis labelling five intervals nobody draws in — and it also settled where the derivation goes, which reasoning from the current behaviour had got backwards.
+68. **A reading crosses and the ink it becomes is the arm's, on a channel as much as on a geometry** (I71, I73, §3ak.35). A bullet's qualitative bands are one hue at four glyph densities in the terminal, measured off the painted frame; the ordinal is the datum, the quantisation is the grid's. `Mark.rect.value` already carried readings and the walk dropped them wherever the figure named no ramp, which was every mark that could ever have had one until this form.
 
 ---
 

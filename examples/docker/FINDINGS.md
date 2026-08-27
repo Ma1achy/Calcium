@@ -13642,6 +13642,44 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F332 — a derivation applied inside a rasteriser labels one block and draws another ★★★★★
+
+`positionalForm(block, …)` takes its decisions — the extent, the nicing, the tick count, the
+position axis — from the block it is handed, and hands **each series** to a rasteriser. `slope` takes
+its two ends *in the callback*. So the furniture describes the authored block and the marks describe
+the derived one, **inside one renderer**, and no second arm is needed for the two to disagree.
+
+`slope/six-readings`, three series of six quarterly readings:
+
+```
+50 ┤                                                                   │ █ north
+40 ┤                                                           ⣀⣀⣀⠤⠤⠤⠒⠒│ █ east
+   └─┬─────┬─────┬──────┬─────┬──────┬──────┬─────┬──────┬─────┬─────┬─┘
+    0.0   0.5   1.0    1.5   2.0    2.5    3.0   3.5    4.0   4.5   5.0
+```
+
+**Five intervals of labelled position axis with no reading in any of them**, three straight lines
+crossing the whole width, and a value axis of `0 … 50` covering a 9 and a 41 that nothing draws. A
+reader takes the intermediate positions for data, because everything on the frame says they are.
+
+**It took a fixture to see, and that is the finding's other half.** Every `slope` series in the
+corpus had exactly **two** values, where `ends` is the identity — so the form's one distinguishing
+operation was invisible in every frame, and *a slope chart with two points is a line chart with two
+points*. The corpus could not tell the two arms apart and could not tell **two readings of the rule**
+apart either.
+
+**Which is how the previous ruling got it backwards.** §3ak.34 recorded *the derivation is
+post-range, which is the one thing that keeps it out of `drawnBlock`* — reasoning from the current
+behaviour to the rule, and preserving the defect exactly. The premise was true (`positionalForm`
+does range over the authored block) and the conclusion inverted, because with a degenerate fixture
+*the axis would change* reads as a cost rather than as the repair.
+
+**F331's lesson at one commit old**: a frame read against a corpus that cannot show the operation
+checks the thing that is already correct. There it was the geometry standing in for the colour; here
+it is a two-point series standing in for a slope.
+
+---
+
 ## F331 — the record that decides a categorical row's colour is read by one arm and by no emitter ★★★★★
 
 `categoricalForm` gives a row its own palette slot when the form says a row is an identity:

@@ -796,6 +796,24 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "slope", height: 10, axes: true,
       series: [s([12, 38], "north"), s([31, 14], "south"), s([22, 27], "east")],
     },
+    // **The variant that separates `slope` from `line`** (§3ak.35, F331's lesson
+    // one commit on). Every series above has exactly **two** values, so the
+    // form's one distinguishing operation — take the first reading and the last,
+    // and draw nothing between — is the identity on the whole corpus, and a
+    // frame read against it checks the thing that is already correct.
+    //
+    // Six quarterly readings, drawn as two columns. `south` dips to 9 and `east`
+    // peaks at 41 in between, so the samples that are **not** drawn fall outside
+    // the ones that are — which is what makes the derivation visible in a frame
+    // rather than merely present in the data.
+    "six-readings": {
+      form: "slope", height: 10, axes: true,
+      series: [
+        s([12, 18, 24, 29, 33, 38], "north"),
+        s([31, 26, 9, 15, 12, 14], "south"),
+        s([22, 30, 41, 36, 31, 27], "east"),
+      ],
+    },
   },
   bubble: {
     default: {
