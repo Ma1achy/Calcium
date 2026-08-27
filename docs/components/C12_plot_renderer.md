@@ -6675,6 +6675,55 @@ and neither copied it.
 makes an empty area indistinguishable from a constant field — and this arm names all four for the
 same reason. Nothing is drawn at 500 in either.
 
+#### Three rulings the build made, each of which falsified something written above
+
+**The caption is one function, gated on the layer and on the list** (F340). The list crossed and the
+*string around it* did not, which is how one arm came to name its levels and the other not — so
+`levelCaption` is what both keys call. Two conditions live in it and both were wrong before:
+
+- **Empty.** A constant field has no interior ticks, so the terminal drew `50          50 ·` — a mark
+  announcing a list with nothing after it, on ten frames. Found by the second arm reproducing the
+  construction faithfully, which is the only way a defect in the first arm surfaces from this work.
+- **The gate is the *layer*.** Both arms asked `form === "contour"`, and `layersOf` is what decides
+  whether iso-lines are drawn: `quiver`'s `with-contour` variant marches the same `contourLevels` and
+  named none of them. A strict superset, so the widening reaches exactly the fixture that was wrong.
+  Dropping the gate altogether — the first attempt — gave **250** matrix frames levels for lines they
+  do not draw, and the terminal baseline named all 250 before anything was committed.
+
+**A key's floor and a ramp's floor are two questions** (F338). `ramp` asks *is a colour ramp drawn*,
+and three adjacent swatches is what reads as a progression rather than as two blocks — a two-band
+`horizon` key is **discrete**, and §3ak.37 records both arms answering `false` for that reason.
+Whether a text *belongs to the key* is the other question, and a two-swatch key is still a key. One
+implementation and one named parameter on each arm, with the floors matching across the seam:
+collapsing them into a single finder re-opened `horizon.numericLabels` at 2/10 with nothing wrong.
+
+**A count is not a reading, and the key row carries two of them.** `100 · 56 older not shown` is a
+bound and a column count; `0.0038 100 3 bands` is two bounds and a band count. Neither sits on the
+value scale, and the second arm says the band count in its own medium — one swatch per band. Cut by
+name rather than filtered, because a bare `56` has a reading's shape.
+
+#### The column found its own class again before the commit closed
+
+**`horizon`'s key was drawn by a formula the figure does not use** (F341). It ramped `i / (bands − 1)`
+across the bands; the figure draws `horizonBandT`, which is `0.5 + sign · depth / 2` on a diverging
+map because **the two halves are the two directions**. So the key advertised a cold end and a grey
+centre that appear nowhere in the figure, and only the deepest band agreed:
+
+| | key, before | figure and terminal key |
+|---|---|---|
+| band 0 | `#3b4cc0` | `#f7b89c` |
+| band 1 | `#dddddd` | `#e8755c` |
+| band 2 | `#b40426` | `#b40426` |
+
+**A signed horizon compounds it**: the figure has `2n` bands and the key drew `n`, and it named no
+fold — `-50 ▮▮▮ 50` where the terminal draws `-50 ▮▮▮ 0 ▮▮▮ 50`. The baseline is the one reading a
+horizon is *about*, which is `keyReadings`' subject exactly.
+
+**Two instruments, two halves, and neither reaches the other's.** The missing `0` came from
+`keyReadings` on the commit that added it. The colours came from **reading the diff of a regeneration
+made for a different reason** — no column of the record measures a swatch's fill, and none should,
+because a colour that matches is what `svg-baseline` is for.
+
 ---
 ---
 ## 3q. One value axis across the bands, and the record it never had
@@ -8005,7 +8054,7 @@ orientation — and belongs in the classification table as its own rows.
 68. **A reading crosses and the ink it becomes is the arm's, on a channel as much as on a geometry** (I71, I73, §3ak.35). A bullet's qualitative bands are one hue at four glyph densities in the terminal, measured off the painted frame; the ordinal is the datum, the quantisation is the grid's. `Mark.rect.value` already carried readings and the walk dropped them wherever the figure named no ramp, which was every mark that could ever have had one until this form.
 69. **A composition refuses only when nothing in it draws, and a refused child keeps its column** (I8, I64, §3ak.36). The facets recurse, so they inherit `violin` and `ridgeline`'s refusal — and the terminal had already decided what that means, twice: a child with no renderer contributes `[]`, and a facet short of a row contributes blanks *so that a short facet must not pull the ones after it leftwards*. A column belongs to a facet by position. Read out of the arm that had the case rather than chosen by the arm that has it now.
 70. **A key crosses as a name and a range, and each arm draws it at its own resolution** (I71, I72, §3ak.37). The `ramp` column measured *0 of 181* for the length of the pass and the decision had crossed the whole time; what was missing was furniture. Continuous where the reading is and **discrete where the data is** — a horizon's key is one swatch per band, because `horizonBandT` quantises and a gradient would claim a continuity the figure has not got.
-71. **A key names every reading its figure is keyed to, and not only the two it runs between** (I49, I72, §3ak.38). I49 has said *levels are named in the legend and never on the line* since §3y and it reads as satisfied, because the arm that has a legend satisfies it and nothing asks the arm that does not. `contourLevels` is the shared function the terminal's key calls and `contourFigure` marches, and the third caller was missing. **A boolean `ramp` column cannot see it**: both arms drew a key, both reported `true`, and one named six readings against the other's two.
+71. **A key is drawn by what the figure is drawn by, and names every reading the figure is keyed to** (I49, I72, §3ak.38). I49 has said *levels are named in the legend and never on the line* since §3y and it reads as satisfied, because the arm that has a legend satisfies it and nothing asks the arm that does not. `contourLevels` is the shared function the terminal's key calls and `contourFigure` marches, and the third caller was missing. **A boolean `ramp` column cannot see it**: both arms drew a key, both reported `true`, and one named six readings against the other's two. And the second half is the same rule about colour rather than text — a `horizon` key computed `i / (bands − 1)` where the figure computes `horizonBandT`, so it showed the cold half of a diverging map that the figure never enters (F340, F341).
 
 ---
 

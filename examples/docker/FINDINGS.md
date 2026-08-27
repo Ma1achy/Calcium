@@ -13642,6 +13642,71 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F341 — a key drawn by a formula the figure does not use, showing half a colormap the figure never enters ★★★★★
+
+The second arm's `horizon` key drew one swatch per band at `i / (bands − 1)`. The figure draws
+`horizonBandT`. On a diverging map those are not the same colours and not even the same **half**:
+
+```
+bands: 3, coolwarm      key (before)        figure, and the terminal's key
+band 0                  #3b4cc0  cold       #f7b89c
+band 1                  #dddddd  centre     #e8755c
+band 2                  #b40426  warm       #b40426
+```
+
+`horizonBandT` is `0.5 + sign · depth / 2` on a diverging map, because **the two halves are the two
+directions** — a diverging ramp's cold end is what a *negative* band takes. An unsigned series never
+goes there, so the key advertised a cold end and a grey centre that appear nowhere in the figure, and
+only the deepest band happened to agree. A plausible progression, and a key whose whole job is to say
+what the colours mean.
+
+**A signed horizon compounds it.** The figure has `2n` bands — `n` below the fold and `n` above — and
+the key drew `n`, so half the figure's colours had no swatch at all. And it named no fold: `-50 ▮▮▮ 50`
+where the terminal draws `-50 ▮▮▮ 0 ▮▮▮ 50`, and **the baseline is the one reading a horizon is
+about**.
+
+**Two instruments, two halves, and neither could have found the other's.** The missing `0` came from
+`keyReadings` — F338's new column, on the commit that added it, which is the argument for the column.
+The colours came from **reading the diff of a regeneration made for a different reason**: no column
+of the record measures a swatch's fill, and none should, because a colour that matches is what
+`svg-baseline` is for.
+
+**The fix is that the key calls what the figure calls.** `horizonBandT` and `horizonBaseline` are
+already shared and were already right; the key had its own arithmetic, which is F322's shape — both
+arms need it and one held it — arriving inside a single arm's furniture.
+
+---
+
+## F340 — a separator announcing a list, drawn when the list is empty ★★★☆☆
+
+A constant field has no interior ticks, so a contour has no levels, so the terminal's key reads
+
+```
+50          50 ·
+```
+
+— a mark that promises a list, with nothing after it. Ten frames, every capability rung.
+
+**It was found by the second arm reproducing the construction faithfully**, which is what a second arm
+is for. The SVG key was given the terminal's own assembly —
+`partSeparator(caps) + levels.map(formatValue).join(" ")` — and produced `50 · ` on the first
+regeneration, at which point the question *does the terminal do this too* takes one `tail`.
+
+**The wider half is that the caption was assembled twice.** `contourLevels` had crossed —
+`figure.ts`'s, called by the terminal's key and by `contourFigure`'s march — and the *string* around
+it had not, which is exactly how one arm came to name its levels and the other not (F338). Gated in
+`levelCaption`, where both arms read it, so the empty list has one place it can be wrong.
+
+**And the gate that belongs beside it moved from the form to the layer.** Both arms asked
+`block.form === "contour"`; `layersOf` is what decides whether iso-lines are drawn, and `quiver`'s
+`with-contour` variant drew them off the same `contourLevels` and named none. A strict superset —
+every `contour` block without declared layers gets `["field", "contour"]` — so the widening reaches
+exactly the fixture that was wrong. Dropping the gate entirely, which was the first attempt, gave 250
+matrix frames a list of levels for lines they do not draw; the terminal baseline named all 250 before
+anything was committed.
+
+---
+
 ## F339 — the closed list says *never a constant* and every stroke in the arm is one ★★★☆☆
 
 C12 §2 names four legitimate differences between the arms *so that a fifth is a finding rather than a
