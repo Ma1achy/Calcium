@@ -13642,6 +13642,62 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F324 — which ramp is a figure decision, and two sentences agreed it was not ★★★★★
+
+A correlation matrix is drawn **coolwarm** by the terminal and **viridis** by the second arm.
+Measured off the shipped frames:
+
+```
+correlation   terminal   #3b4cc0 #8db0fe #dddddd #f49a7b #b40426     diverging, blue → white → red
+              SVG        #440154 #3b528b #21918d #5dc863 #fde725     sequential, purple → yellow
+utilisation   terminal   #000004 #57106e #bb3755 #f98d0a #fcffa4     inferno
+              SVG        #440154 …                                    viridis again
+heatmap       both       #440154 #3b528b #21918d #5dc863 #fde725     agree
+```
+
+The terminal holds `DEFAULT_COLORMAP`, a `Record<PlotForm, ColormapName | null>` in `heatmap.ts`,
+and its own comment on the row says the quiet part: *a correlation runs −1 → 0 → +1 and wants a
+diverging map, and reading it in a sequential one is **the single most common chart defect there
+is**.* The second arm's entire ramp decision is one expression:
+
+```ts
+const map = COLORMAPS[block.colormap ?? "viridis"];
+```
+
+So the arm draws the defect the table was written to prevent, on the form it was written for.
+
+### Two sentences, and each is the other's alibi
+
+Neither is a mistake on its own, and together they read as a complete account.
+
+| where | what it says | why it is wrong |
+|---|---|---|
+| `Mark.rect.value`'s doc | *each arm turns it into a colour at its own depth — `colormapFor` in the terminal, `continuousColour` in SVG, **one ramp either way*** | there is no one ramp. `colormapFor` reads a per-form table; the other reads a literal |
+| the SVG walk's header | *the form is read twice below and both are **rasterisation**: which polyline joint a step takes, and **which ramp a matrix reads*** | which ramp is not rasterisation. The **depth** is — `continuousColour(map, t, caps)` — and *which map* varies by **form**, which is not a resolution |
+
+Read the first and the ramp is shared, so the second's exception is a detail. Read the second and
+reading the form is licensed, so the first is aspirational rather than false. **A reader checking
+statements one at a time agrees with both**, and the pair leaves no place to stand and ask.
+
+**It is MG24's class twice over**, and the second is the sharper: *both are rasterisation* is a
+true-sounding classification attached to a decision it does not fit. The test that reaches it is the
+one review does not ask — *does this justification constrain the decision it is attached to* — and
+here it does the opposite, licensing exactly what it should have forbidden.
+
+### The fix is a member, because the walk's own rule is what broke
+
+The walk states it: *nothing here reads the form to decide what is drawn.* Reading `block.form` for
+the ramp is that rule being broken by the sentence that excused it. So the ramp's **name** goes on
+the `Figure` — named, unresolved, `LegendSlot.ref`'s pattern one member along — and each arm
+resolves it at its own depth, which is what the first sentence claimed all along.
+
+**Two SVG frames move and no terminal frame does**, which is the direction that says the table was
+right and the guess was wrong. `horizon` is a third the day it draws: its default is `coolwarm`
+too, and for the reason its own header gives — the fold has two directions and a sequential ramp has
+one.
+
+---
+
 ## F323 — the residue's marks were ruled by kind, and the channel they needed lives on one kind ★★★★☆
 
 `SVG_FAMILY`'s `contour`/`quiver` entry rules the marks the residue would need:

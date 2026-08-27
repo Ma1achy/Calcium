@@ -6026,6 +6026,56 @@ shared geometry back, so an unmoved baseline proves only that nothing was distur
 the only instrument that can say the two arms draw the same figure** — the fourth time this pass that
 has been the answer, and the first time it is true by construction rather than by accident.
 
+### 3ak.30 — Which ramp, which is a figure decision two sentences agreed was not
+
+**A correlation matrix is drawn coolwarm by the terminal and viridis by the second arm** (F324), and
+the terminal's own table says why that matters: *a correlation runs −1 → 0 → +1 and wants a diverging
+map, and reading it in a sequential one is the single most common chart defect there is.* The arm
+draws the defect the table exists to prevent, on the form it was written for.
+
+```
+correlation   terminal   #3b4cc0 #8db0fe #dddddd #f49a7b #b40426     diverging
+              SVG        #440154 #3b528b #21918d #5dc863 #fde725     sequential
+utilisation   terminal   inferno            SVG   viridis
+heatmap       both       viridis                                     agree
+```
+
+`DEFAULT_COLORMAP` is a `Record<PlotForm, ColormapName | null>` in `heatmap.ts` — a **terminal
+renderer** — and the second arm's whole ramp decision is `COLORMAPS[block.colormap ?? "viridis"]`.
+
+**This is F322's class arriving on something that is not a derivation.** A `Plot → Plot` transform
+and a lookup keyed by form are different shapes; what makes them one finding is that both are
+*decisions the figure needs, held by an arm*. So the sweep the class is owed is not over transforms
+either — it is over **anything a renderer decides that is a property of the figure**, and the test is
+whether the other arm would have to reach into this file to agree.
+
+#### The pair of sentences, because neither is wrong on its own
+
+| where | what it says | why it does not hold |
+|---|---|---|
+| `Mark.rect.value` | *each arm turns it into a colour at its own depth — `colormapFor` in the terminal, `continuousColour` in SVG, **one ramp either way*** | there is no one ramp: one side reads a per-form table and the other a literal |
+| the SVG walk's header | *the form is read twice below and both are **rasterisation**: which polyline joint a step takes, and **which ramp a matrix reads*** | the **depth** is rasterisation — `continuousColour(map, t, caps)`. *Which* map varies by **form**, and a form is not a resolution |
+
+Read the first and the ramp is shared, so the second's exception is a detail. Read the second and
+reading the form is licensed, so the first is aspirational rather than false. **Each sentence
+supplies the other's alibi**, and a reader checking statements one at a time agrees with both — which
+is A03 §2's argument arriving on a *pair* rather than on a rule.
+
+**And the second is MG24's class in its sharper form.** *Both are rasterisation* is a true-sounding
+classification attached to a decision it does not fit, and it does not merely fail to constrain that
+decision — it licenses exactly what it should have forbidden. The walk's own rule is *nothing here
+reads the form to decide what is drawn*, and the sentence excusing the exception is what broke it.
+
+#### The remedy is a member, and the member is a name
+
+`Figure.ramp` carries the colormap's **name**, unresolved — `LegendSlot.ref`'s pattern one member
+along, for the same reason: a resolved colour must not cross the seam (I62), and a name resolves at
+each arm's own depth. `RAMP_DEFAULT` moves to the shared layer beside `HAS_VALUE_AXIS`, which is
+already a `Record<PlotForm, …>` answering a figure question, and `colormapFor` reads it from there.
+
+**Two SVG frames move and no terminal frame does**, which is the direction that says the table was
+right and the guess was wrong.
+
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7278,6 +7328,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I69** — **A figure whose two normalised axes carry one unit says so, and each arm fits a centred square inside its own box rather than filling it.** `isotropic` is a figure member because it is a property of the *figure* — a disc, a ring and a mosaic of squares are round or square in any renderer — and it is not the cell aspect, which stays a terminal fact under G2 and never crosses. *Measured before the rule: every pie and every radar in the catalogue is height-bound at every width, so `radiusFor`'s `byWidth` arm is dead across the corpus and its `min` reads as though it decided nothing; the second arm's plot area is 1.44× wider than tall with a right legend, so a unit square through `projected` is an ellipse and a waffle's hundred squares are 39.7 × 27.5 px. The plan's sentence — the aspect compensation disappears because an SVG square is square — is true about `CELL_ASPECT` and attached to a decision about the box* (F303).
 - **I70** — **A form whose figure is a derivation of its series computes that derivation above both renderers, and each arm draws the derived block.** I65 puts the derivation below both arms; this is the half that makes it observable, because a pure function in the right layer draws nothing until somebody applies it at an arm's entry. *Measured before the rule: `derive.ts` had existed since §3ak.7 ruled on it, holding `ecdfSeries` and `densitySeries`, and was imported by the terminal's dispatch table and by `kde.ts` — **by nothing on the second arm's side**. The row written for I65 builds the derived block itself and asserts the figure against it, so it passed while no caller did that; and a third form, `histogram`, was never named at all, because the walk that found the class was one family's. Three forms, closed at three by a sweep of the ten sites in the dispatch that reshape a block — **and the sweep's corpus was a file**: `heatmapFormRows` holds three more of exactly that shape one file along, two of which are why two `SVG_FAMILY` entries are `null`* (F268, F314, F317, F322).
 - **I71** — **Where a derivation's output is geometry, the geometry crosses at the data's own resolution and each arm rasterises it at the resolution it has.** I70 says each arm draws the derived *block*, which is what a derivation returning series affords; a derivation returning a figure has no block to hand over. A contour's crossings are interpolations between adjacent readings, so they live on the data's grid — and a glyph-per-cell arm cannot draw them, because `glyphForMask` wants a mask per cell. The rule's observable form is a signature: `contourFigure` and `horizonFigure` take a block and return normalised marks with **no `areaWidth`, no `areaRows`, no `caps` and no string**, while `contourCellRows` and `horizonGrid` keep all four. *Stated blind spot: the terminal does not read the shared geometry back, so an unmoved terminal baseline is evidence that nothing was disturbed and **not** evidence that the arms agree — for I70's three the byte-identity was the proof, and here only the frame is* (F322, F323).
+- **I72** — **Which ramp a reading is on is a figure decision; resolving that ramp to a colour is the arm's.** A `Figure` carries the colormap's **name** and never a colour, which is I62 one member along: a name resolves at each arm's own depth — `continuousColour` descends a capability ladder in one and does not in the other — while *which* map varies by **form**, and a form is not a resolution. *Measured before the rule: `DEFAULT_COLORMAP` lived in a terminal renderer and the second arm's whole ramp decision was `COLORMAPS[block.colormap ?? "viridis"]`, so `correlation` drew sequential where the terminal draws diverging and `utilisation` drew viridis where it draws inferno — the defect the table's own comment calls the single most common chart defect there is, on the form the row was written for. Two sentences licensed it and each was the other's alibi: the seam member's doc said **one ramp either way** and the walk's header called **which ramp a matrix reads** rasterisation* (F324).
 
 
 ## 8. Commitments
@@ -7344,6 +7395,7 @@ orientation — and belongs in the classification table as its own rows.
 60. **A form that is drawn is drawn from its data, and a sweep says so rather than a reader** (I66, §3ak.8). `G7b` asks whether a claimed form puts ink on the page; `ecdf` passes it and draws the same picture for every dataset. The rung above is the one a golden frame, a disagreement matrix and a mutation on dead code all structurally cannot reach.
 61. **A derivation is applied at each arm's entry, and the record has a column for every decision the arms make differently** (I70, §3ak.27, §3ak.28). A pure function in the shared layer is not a seam until a caller uses it: `derive.ts` sat one import away from the second arm for the length of the pass while `histogram`, `density` and `ecdf` drew a different quantity in each. And what caught it was a frame rather than a cell — the matrix had no column for a colour ramp or a drop notice, and a rule table is exhaustive over the rules you stated.
 62. **The residue's three forms draw in both arms, and what crosses is their geometry rather than their raster** (I71, §3ak.29). `contour`, `quiver` and `horizon` were refused for the length of the pass with the condition written down as a symbol, and checking the symbols found the prose around them wrong three times: a derivation sweep bounded by a file rather than by a shape, a ruling about mark *kinds* standing in for one about *channels*, and a gate whose meaning inverts when the derivation's output stops being a block.
+63. **The ramp a reading is on is named by the figure and resolved by each arm** (I72, §3ak.30). A per-form default table in a terminal renderer is a figure decision the other arm cannot reach, which is F322's class on a lookup rather than on a transform — and the two sentences that licensed it were each the other's alibi, so a reader checking statements one at a time agreed with both.
 
 ---
 
