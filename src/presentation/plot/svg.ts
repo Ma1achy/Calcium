@@ -41,6 +41,7 @@ import { ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf } from "./marks.js";
 import {
   barFigure,
   curveFigure,
+  fieldFigure,
   distributionFigure,
   matrixFigure,
   nodesDecisions,
@@ -126,7 +127,9 @@ function escape(text: string): string {
  * own: a curve spends it on a y, a matrix spends it on a colour. That is the
  * overlay's ruling from phase 2 arriving one component along (C04 §3h.2).
  */
-export type SvgFamily = "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion";
+export type SvgFamily =
+  | "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion"
+  | "field";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -220,23 +223,19 @@ export const SVG_FAMILY = {
   slope: null, dumbbell: "distribution", forest: "distribution", bullet: null, horizon: null,
   // *A composition of other forms*, so it is whatever they are.
   smallmultiples: null, pairplot: null,
-  // **A field with layers over it — and that sentence is not the blocker**
-  // (F294). The matrix family carries the field already: a cell is a `rect` with
-  // a `value`, which is what `heatmap` and its five siblings draw. An iso-line
-  // is a `polyline` and an arrow is a `polyline` plus a `closed` triangle, so
-  // nothing in `Mark` is missing.
+  // **A field with layers over it, and both halves of the deferral were right**
+  // (F294, §3ak.29). The condition was written as a symbol — *`contourFigure`,
+  // returning normalised marks with no `areaWidth`, no `areaRows`, no `caps` and
+  // no string in the signature* — and that is exactly what landed: marching
+  // squares over the **data's own grid**, where a crossing is a linear
+  // interpolation between two adjacent readings and no resampling adds one.
   //
-  // What is missing is a derivation above cells. `contourCellRows` takes
-  // `areaWidth`, `areaRows` and `caps.unicode` and returns **`readonly
-  // string[]`** — marching squares over a cell grid, emitting box-drawing
-  // glyphs — so the contour *is* the glyph string and there is no line to
-  // share. `quiver` is one arrow glyph per cell through the same path.
-  //
-  // The condition is a symbol: **`contourFigure`, returning normalised marks
-  // with no `areaWidth`, no `areaRows`, no `caps` and no string in the
-  // signature.** The day it exists these are `"matrix"`. Widening `Mark` would
-  // be the wrong repair and the old sentence invited it.
-  contour: null, quiver: null,
+  // **The family it named was `"matrix"` and it is `"field"`**, which is the one
+  // thing measuring moved. The prediction was about resemblance and the member
+  // decides **which emitter**: `matrixFigure` emits cells and nothing else, so a
+  // contour routed through it would draw a heatmap with the lines missing and
+  // report as supported — the plausible wrong figure a `null` arm refuses.
+  contour: "field", quiver: "field",
 } satisfies Record<PlotForm, SvgFamily | null>;
 
 /** The family, or `null` where the form carries geometry this path does not. */
@@ -271,6 +270,7 @@ function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
     case "tiles": return tilesFigure(block);
     case "nodes": return nodesDecisions(block);
     case "proportion": return proportionFigure(block);
+    case "field": return fieldFigure(block);
     default: return null;
   }
 }
@@ -519,12 +519,22 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       const annotation = d.layer === "annotation";
       const path = curvePath(m.points.map((pt) => at(pt[0], pt[1])), square && !annotation);
       if (path === "") continue;
+      // **A stroke carrying a `value` is coloured by the ramp rather than by its
+      // slot**, which is the rect branch's rule on the second kind that needs it
+      // (F323). An arrow's colour *is* its magnitude (C12 I50), and the mark is
+      // a polyline because an arrow is a shaft and a chevron.
+      let stroke = ink;
+      if (m.value !== undefined && map !== undefined) {
+        const colour = continuousColour(map, m.value, SVG_CAPS);
+        if (colour === undefined || colour.kind !== "rgb") continue;
+        stroke = colour.hex;
+      }
       // **Dashed, for `annotate.ts`' own reason**: a reference line is a claim
       // *about* the ordinate drawn beside the data, and a solid rule crossing
       // five series reads as a sixth. The terminal draws `┄` and the legend
       // swatch it already shares says the same thing (C04 I52).
       out.push(
-        `<path d="${path}${m.closed === true ? " Z" : ""}" fill="none" stroke="${ink}" ` +
+        `<path d="${path}${m.closed === true ? " Z" : ""}" fill="none" stroke="${stroke}" ` +
           `stroke-width="${annotation ? "1" : "2"}"${annotation ? ' stroke-dasharray="4 3"' : ""}/>`,
       );
       continue;
@@ -997,7 +1007,8 @@ function marks(
   // is a function of its labels' widths in the terminal and of slots here, so
   // the topology crosses and the placement does not.
   if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
-    || family === "bar" || family === "distribution" || family === "proportion") && "marks" in figure) {
+    || family === "bar" || family === "distribution" || family === "proportion"
+    || family === "field") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 
@@ -1356,10 +1367,32 @@ export function plotToSvg(
   // to disagree with the first. `tiles` and `nodes` are `false` in it already,
   // which is also why they are not excluded by name here: their labels are
   // `text` marks placed by the walk.
-  if (figure.gutter && slots > 0 && label !== undefined && ROW_IS_AN_IDENTITY[block.form]) {
+  // **And the field family, which the record excludes for a different
+  // question's reason** (F325). `ROW_IS_AN_IDENTITY` answers *does each row get
+  // its own palette slot* — `definition.ts` reads it exactly three times, all
+  // `refOf(series[0], … ? i : 0)` — and it is `false` for a field because a
+  // field row is a position rather than a name the caller supplied. That is
+  // right, and it is not the gutter's question: the terminal captions a field's
+  // ordinate `0 1 2 3 4 5` down the left, from those same strings. Named as an
+  // exception rather than duplicated into a 46-entry table that would agree with
+  // the first in 44 places.
+  const captionsRows = ROW_IS_AN_IDENTITY[block.form] || svgFamilyOf(block.form) === "field";
+  if (figure.gutter && slots > 0 && label !== undefined && captionsRows) {
     for (const [i, text] of named.entries()) {
       const t = (i + 0.5) / slots;
-      if (valueOnX) {
+      // **`axis === null` is a family with no value axis, and its identity
+      // indexes rows** (F325). The frame is what said so: a heatmap's five row
+      // names came out at `y = 300`, evenly spaced along a **90-column** figure
+      // — `row0` under column 9, `row4` under column 81, naming nothing — while
+      // the terminal draws them down the left, one per band. **The matrix
+      // reported `agree`**, because both readers return the same five strings
+      // and neither asks where they landed.
+      //
+      // The old condition was `valueOnX` alone, which is `orientation ===
+      // "horizontal" && axis !== null`; a matrix declares `ORIENTATION_UNUSED`
+      // and has no axis, so it fell to the *else* — a placeholder value and an
+      // absent one deciding a question neither was asked.
+      if (valueOnX || axis === null) {
         // Values along x, so the identity owns the gutter: one label per row,
         // right-aligned against the plot area exactly as the terminal's is.
         const y = box.top + (box.bottom - box.top) * t;

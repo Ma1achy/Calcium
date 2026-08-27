@@ -170,7 +170,9 @@ const results = runPass({
       // it now, which is the point of moving it.
       name: "the matrix family normalises its colour for itself",
       file: FIGURE,
-      from: "            value: normalisedOf(v, extent, false),",
+      // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
+      // line alone matches two emitters (C12 §3ak.29).
+      from: "            // place the facing does not reach.\n            value: normalisedOf(v, extent, false),",
       to: "            value: (v - extent.min) / Math.max(1, extent.max - extent.min),",
       expect: "G6",
     },
@@ -470,8 +472,8 @@ const results = runPass({
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
       // Re-anchored: the proportion family joined the disjunction (§3ak.26).
-      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion") && "marks" in figure) {',
-      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion") && "marks" in figure) {',
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

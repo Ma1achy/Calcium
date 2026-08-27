@@ -19,8 +19,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { PlotForm } from "../../src/data/viewmodel/index.js";
-import { HAS_VALUE_AXIS, valueAxisOf } from "../../src/presentation/plot/figure.js";
+import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import { HAS_VALUE_AXIS, identityOf, valueAxisOf } from "../../src/presentation/plot/figure.js";
+import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { terminalDecisions } from "../support/arm-decisions.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -33,22 +35,59 @@ const strip = stripSgr as (s: string) => string;
 const FULL = caps.find((c) => c.name === "24bit")!.caps;
 
 describe("FV — the shared axis, and a record with something to be wrong about", () => {
-  it("FV1 (C12 I60): a form with no value axis never draws a numeric label, over the whole corpus", () => {
+  it("FV1 (C12 I60): a form with no value axis never draws a numeric label it did not name, over the whole corpus", () => {
     const offenders: string[] = [];
     let checked = 0;
+    let exempted = 0;
     for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
       if (HAS_VALUE_AXIS[form as PlotForm]) continue;
       for (const [variant, spec] of Object.entries(variants as Record<string, unknown>)) {
         for (const width of [40, 80]) {
           checked += 1;
+          const { cursor, ...rest } = spec as { cursor?: unknown };
+          void cursor;
+          // **A numeric label that IS one of the figure's own identities is not
+          // a number on an axis** (F325). `fieldAxes` captions a field's rows
+          // from their index where the caller named none, so a contour's gutter
+          // reads `0 1 2 3 4 5` — and its readings are on the ramp legend,
+          // `1.5  99 · 20 40 60 80`, exactly where a heatmap's are. The old
+          // clause read that as a value axis and the two forms it is false for
+          // were the two the record marked `true`, so nothing ever asked.
+          //
+          // **The discriminator is general and it does not weaken the row.**
+          // The defect FV1 exists to catch is a furnished axis out of
+          // `seriesRange([]) ?? {0, 1}` — `0.0 0.5 1.0` against row names — and
+          // those are not identities. A form list here would have been the
+          // exemption naming its instances instead of its mechanism.
+          const named = new Set(identityOf(drawnBlock(
+            block({ kind: "plot", id: "p", ...rest } as never) as Plot,
+          )));
           const found = terminalDecisions(frame(spec, FULL, width, "p").map(strip)).numericLabels;
-          if (found.length > 0) offenders.push(`${form}/${variant}@${String(width)}: ${found.join(",")}`);
+          exempted += found.filter((l) => named.has(l)).length; // cells-ok — a label count
+          const bare = found.filter((l) => !named.has(l));
+          if (bare.length > 0) offenders.push(`${form}/${variant}@${String(width)}: ${bare.join(",")}`);
         }
       }
     }
-    // **The counter, because zero offenders and zero checked print the same.**
+    // **The counters, because zero offenders and zero checked print the same** —
+    // and the exemption is counted rather than excluded, because a clause with
+    // no instances reads exactly like one that is satisfied.
     expect(checked, "form-variant-width triples with no value axis").toBeGreaterThan(30); // cells-ok — a frame count
+    expect(exempted, "numeric labels the figure named itself").toBeGreaterThan(0); // cells-ok — a label count
     expect(offenders, "a form marked `false` drew a number on an axis").toEqual([]);
+  });
+
+  it("FV1b (C12 I60): the exemption is an identity, not a number that looks like one", () => {
+    // **The fabricated violation the clause above owes** (F325). A furnished
+    // axis is what FV1 exists to catch, and the exemption must not swallow one:
+    // a heatmap whose rows are named `0`, `1`, `2` exempts those three and still
+    // reports a `0.5` that no identity claims.
+    const named = new Set(["0", "1", "2"]);
+    const asAxis = ["0.0", "0.5", "1.0"];
+    expect(asAxis.filter((l) => !named.has(l)), "a furnished axis survives the exemption")
+      .toEqual(["0.0", "0.5", "1.0"]);
+    expect(["0", "1", "2"].filter((l) => !named.has(l)), "and a numeric identity does not")
+      .toEqual([]);
   });
 
   it("FV2 (C12 I60): the record is not the gutter's content, and the corpus is why", () => {

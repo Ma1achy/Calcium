@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
-<text x="139.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">A</text>
-<text x="238.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">B</text>
-<text x="337.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">C</text>
-<text x="436.8" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">D</text>
+<clipPath id="isvgb-0"><rect x="0" y="35.2" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="51.2" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">A</text>
+<clipPath id="isvgb-1"><rect x="0" y="104" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="120" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">B</text>
+<clipPath id="isvgb-2"><rect x="0" y="172.8" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="188.8" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">C</text>
+<clipPath id="isvgb-3"><rect x="0" y="241.6" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="257.6" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#626262">D</text>
 <rect x="89.6" y="12.8" width="99.2" height="68.8" fill="#b40426"/>
 <rect x="188.8" y="12.8" width="99.2" height="68.8" fill="#e46e56"/>
 <rect x="288" y="12.8" width="99.2" height="68.8" fill="#3b4cc0"/>

@@ -6026,6 +6026,43 @@ shared geometry back, so an unmoved baseline proves only that nothing was distur
 the only instrument that can say the two arms draw the same figure** — the fourth time this pass that
 has been the answer, and the first time it is true by construction rather than by accident.
 
+#### What building it moved, and none of it was the geometry
+
+The two conditions were right and the geometry landed as written. **Four things around them did not.**
+
+**The family is `"field"` and the record predicted `"matrix"`.** That prediction is about
+resemblance, and the member decides **which emitter**: `matrixFigure` emits cells and nothing else,
+so a contour routed through it draws a heatmap with the lines missing and reports as supported — the
+plausible wrong figure a `null` arm refuses and a wrong family would not.
+
+**`HAS_VALUE_AXIS` was `true` for both, and the sentence that made it true is about the ordinate.**
+*A field is sampled over a domain, so its columns are positions and its rows are a scale* — true, and
+the record's own doc says it answers whether the **readings** sit on a value scale. Measured on the
+frame: a contour's readings are on the **ramp legend**, `1.5  99 · 20 40 60 80`, exactly where a
+heatmap's are, and its y gutter reads `0 1 2 3 4 5`, which `fieldAxes` writes into `identity`. So it
+is the matrix family's answer, reached by the matrix family's argument. **FV1 could not have caught
+it**: it skips every form marked `true`, which is the refusal-hides-the-instrument shape on a record
+cell rather than on a reader.
+
+**A matrix's row names were on the wrong axis, on ten frames that had been drawing all along**
+(F325). Two mechanisms each borrowed for a question it does not answer — `figure.orientation`, which
+a matrix sets to `ORIENTATION_UNUSED`, and `ROW_IS_AN_IDENTITY`, which answers *does each row get its
+own palette slot*. A matrix has the placeholder **and** no value axis, so the identity fell to the
+*else* and five row names were drawn evenly along a ninety-column figure. The missing condition is
+that **a family with no value axis has an identity that indexes rows**.
+
+**And the second arm's reader classified a label by `clip-path`** (F326) — *a clipped label names a
+thing; an unclipped one names a value*, a true observation about the tiles and nodes families
+promoted to the rule that classifies every label the arm draws. It held until a form's row captions
+were numbers. Removing it closed **27 cells and opened none**.
+
+**The residue's own cells, and both open ones have a named cause.** `ramp` is F316's column on a
+family that has always had a key; `numericLabels` is the terminal reader's stated limit — its x-row
+scan is gated on a bottom rule and a field draws none, so its numeric set is the gutter's six where
+the second arm's is the axis's three, and both arms draw both axes. Widening the boundary to *the
+last edge-bearing line* was measured and rejected: it moves cells in both directions across five
+other forms, which is a different reader rather than a repair.
+
 ### 3ak.30 — Which ramp, which is a figure decision two sentences agreed was not
 
 **A correlation matrix is drawn coolwarm by the terminal and viridis by the second arm** (F324), and

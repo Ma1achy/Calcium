@@ -13642,6 +13642,106 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F326 — the second arm's reader classifies a label by whether it is clipped ★★★★☆
+
+`svgDecisions` split every `<text>` two ways:
+
+```ts
+numericLabels:  !t.clipped && NUMERIC.test(t.body)
+identityLabels:  t.clipped || !NUMERIC.test(t.body)
+```
+
+The justification is in the file and it is **true**:
+
+> **A clipped label names a thing; an unclipped one names a value.** The tiles and nodes families
+> clip every label to its own rectangle, which is what lets a label stop itself without font
+> metrics — so the attribute that exists for hazard 4 also partitions the two kinds of text this
+> arm draws.
+
+Both sentences hold. `clip-path` is a **fitting mechanism**, and the observation that it happens to
+separate names from numbers is a true observation about the corpus it was written against —
+promoted to the rule that classifies every label the arm draws.
+
+**It holds until a form's row captions are numbers.** `fieldAxes` captions a field's ordinate from
+its row index where the caller named none, so a contour's gutter is `0 1 2 3 4 5`; the gutter clips
+them like any name. The terminal's reader asks the **shape** — `NUMERIC.test` on the gutter head —
+and filed the same six under `numericLabels`.
+
+```
+contour/default   terminal   numeric ["0","1","2","3","4","5"]   identity []
+                  SVG        numeric ["0","11","23"]             identity ["0","1","2","3","4","5"]
+```
+
+**Both arms drew the same six numerals in the same gutter and the matrix reported 26
+disagreements.** Removing the clause closed **27 cells and opened none** — the twenty-six, plus
+`dumbbell`'s, whose two categories are `1` and `2` and which had been open since the reader was
+written.
+
+**F297's eighth instance, and the second found by removing a refusal** rather than by reading a
+frame. A `silent` cell records nothing about the reader, and the only forms that discriminate this
+rule were the two the second arm refused.
+
+---
+
+## F325 — a matrix's row names are drawn along the x axis, naming nothing ★★★★★
+
+The second arm places a heatmap's five row identities at `y = 300`, evenly spaced across a
+**90-column** figure:
+
+```
+row0 at x=129.28    under column  9      the terminal draws them down the LEFT,
+row1 at x=208.64    under column 27      one per band, against the rows they name
+row2 at x=288       under column 45
+row3 at x=367.36    under column 63
+row4 at x=446.72    under column 81
+```
+
+They name rows and they are placed as though they named columns. **The disagreement matrix reported
+`identityLabels: agree`**, because both readers return the same five strings and neither asks where
+they landed — containment's class on a label's *axis* rather than on its bounds.
+
+### Two mechanisms, each borrowed for a question it does not answer
+
+```ts
+const valueOnX = figure.orientation === "horizontal" && axis !== null;
+if (figure.gutter && slots > 0 && label !== undefined && ROW_IS_AN_IDENTITY[block.form]) {
+  … if (valueOnX) { down the gutter } else { along the bottom }
+```
+
+| the mechanism | what it answers | what it was read as |
+|---|---|---|
+| `figure.orientation` on a matrix | **nothing** — the family sets `ORIENTATION_UNUSED = "vertical"`, a placeholder | which page axis the identity runs along |
+| `ROW_IS_AN_IDENTITY` | *does each row get its own palette slot* — `definition.ts` reads it three times, all `refOf(series[0], … ? i : 0)` | does the identity belong in the gutter |
+
+A matrix declares the placeholder **and** has no value axis, so `valueOnX` is false twice over and
+the identity fell to the *else* — a placeholder value and an absent one deciding a question neither
+was asked. **A family with no value axis has an identity that indexes rows**, which is the condition
+that was missing: `valueOnX || axis === null`.
+
+The second borrowing is the one that hid the field family. `ROW_IS_AN_IDENTITY` is `false` for
+`contour` and `quiver` **for a correct reason** — a field row is a position, not a name the caller
+supplied — and the terminal captions that ordinate down its gutter from those very strings. So the
+record is right about palette slots and wrong about this, and it is named as an exception rather
+than duplicated into a 46-entry table that would agree with the first in 44 places.
+
+### 25 frames, measured before the change and read after it
+
+10 matrix and 15 field, and nothing else — no bar, no pie, no tiles. Dropping `ROW_IS_AN_IDENTITY`
+altogether was measured too and moves 20 more, including curves, whose identity **is** the legend's:
+the record is load-bearing and only its reach was wrong.
+
+Read after: `row0 … row4` at `x = 83.6`, right-aligned against the plot area's left edge, at
+`y = 44.32, 99.36, 154.4, 209.44, 264.48` — the five band centres plus a baseline offset. One label
+per band, which is where the terminal's are.
+
+**`HAS_VALUE_AXIS` was wrong for the same two forms and for the same shape of reason.** Its row read
+*a field is sampled over a domain, so its columns are positions and its rows are a scale* — true,
+about the **ordinate**, in a record whose own doc says it answers whether the **readings** sit on a
+value scale. A contour's readings are on the ramp legend, `1.5  99 · 20 40 60 80`, exactly where a
+heatmap's are. FV1 could not have caught it: it skips every form marked `true`.
+
+---
+
 ## F324 — which ramp is a figure decision, and two sentences agreed it was not ★★★★★
 
 A correlation matrix is drawn **coolwarm** by the terminal and **viridis** by the second arm.

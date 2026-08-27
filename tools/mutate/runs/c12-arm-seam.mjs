@@ -214,7 +214,9 @@ const results = runPass({
       // the frame agrees with.
       name: "THE INTERACTION: a matrix row takes the positional families' name",
       file: FIGURE,
-      from: "    identity: block.series.map((sr) => sr.label ?? \"\"),",
+      // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
+      // line alone matches two emitters (C12 §3ak.29).
+      from: "    extent,\n    identity: block.series.map((sr) => sr.label ?? \"\"),",
       to: "    identity: identityOf(block),",
       expect: "FM4",
     },
@@ -229,7 +231,9 @@ const results = runPass({
       // the constant rather than the test.*
       name: "THE DEFECT: a matrix stops honouring its origin and draws flipped",
       file: FIGURE,
-      from: "    facing: facingOf(block, FACING_MATRIX),",
+      // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
+      // line alone matches two emitters (C12 §3ak.29).
+      from: "    orientation: ORIENTATION_UNUSED,\n    facing: facingOf(block, FACING_MATRIX),",
       to: "    facing: FACING_DEFAULT,",
       expect: "FM3",
     },
@@ -238,7 +242,9 @@ const results = runPass({
       // inverted, and every cell still a colour from the right ramp.
       name: "the matrix's reading is inverted, so the ramp runs backwards",
       file: FIGURE,
-      from: "            value: normalisedOf(v, extent, false),",
+      // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
+      // line alone matches two emitters (C12 §3ak.29).
+      from: "            // place the facing does not reach.\n            value: normalisedOf(v, extent, false),",
       to: "            value: normalisedOf(v, extent, true),",
       expect: "FM2",
     },
@@ -247,8 +253,10 @@ const results = runPass({
       // unit square, still one per reading.
       name: "every matrix row lands on the first one",
       file: FIGURE,
-      from: "            y: seriesIndex / rows, // cells-ok — a row count",
-      to: "            y: 0,",
+      // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
+      // line alone matches two emitters (C12 §3ak.29).
+      from: "            y: seriesIndex / rows, // cells-ok — a row count\n            w: 1 / cols, // cells-ok — a column count\n            h: 1 / rows, // cells-ok — a row count\n            fill: true,\n            // **`invert: false`, and both arms already say so**: a matrix reads",
+      to: "            y: 0, // cells-ok — a row count\n            w: 1 / cols, // cells-ok — a column count\n            h: 1 / rows, // cells-ok — a row count\n            fill: true,\n            // **`invert: false`, and both arms already say so**: a matrix reads",
       expect: "FM2",
     },
     {
@@ -649,6 +657,46 @@ const results = runPass({
       from: "  return block.colormap ?? RAMP_DEFAULT[block.form];",
       to: "  return block.colormap ?? null;",
       expect: "baseline",
+    },
+    // **The residue, drawn** (§3ak.29, F325, F326). These expect an **SVG** gate
+    // and not the terminal's: the geometry crosses and the raster does not, so
+    // the terminal never reads what these sever. That is I71's blind spot said
+    // as a row — an unmoved terminal baseline proves nothing was disturbed and
+    // not that the arms agree.
+    {
+      name: "THE ARM: a contour draws its painted field and none of its iso-lines",
+      file: FIGURE,
+      from: "      for (const [from, to] of contourSegments(block.series, contourLevels(block, extent))) {",
+      to: "      for (const [from, to] of []) {",
+      expect: "SB",
+    },
+    {
+      name: "THE ARM: the crossings are the cell corners, so every iso-line is a staircase",
+      file: FIGURE,
+      from: "  const d = b - a;\n  if (d === 0) return 0.5;",
+      to: "  const d = b - a;\n  if (true) return 0.5;",
+      expect: "SB",
+    },
+    {
+      name: "THE ARM: a still cell draws an arrow, which `atan2(0, 0)` points east",
+      file: FIGURE,
+      from: "      const mag = Math.hypot(u, v);\n      if (mag === 0) return;",
+      to: "      const mag = Math.hypot(u, v) || 1;",
+      expect: "SB",
+    },
+    {
+      name: "THE CHANNEL: every arrow is one colour, so the magnitude is drawn nowhere",
+      file: FIGURE,
+      from: "        : { value: (mag - colourBy.min) / (colourBy.max - colourBy.min) };",
+      to: "        : {};",
+      expect: "SB",
+    },
+    {
+      name: "THE RECORD: a matrix's identities go back on the x axis, naming nothing",
+      file: SVG,
+      from: "      if (valueOnX || axis === null) {",
+      to: "      if (valueOnX) {",
+      expect: "SB",
     },
   ],
 });

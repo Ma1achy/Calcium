@@ -30,9 +30,13 @@ import type { Colormap } from "../theme/colormap.js";
 import { ansi256Hex, nearestAnsi256 } from "../theme/colormap.js";
 import { DEFAULT_FLOOR, luminance, ratio } from "../theme/contrast.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
+// **The marching-squares core, the levels and the layer membership are
+// `figure.ts`'s now** (C12 I71, §3ak.29). The derivation is what both arms
+// share and this file is one arm's raster: `contourCellRows` resamples the
+// field onto the cells it is about to draw and marches there, because
+// `glyphForMask` wants a mask per cell that no set of segments can supply.
+import { crossing, layersOf, marchingMask, paintsField, saddleJoinsTopLeft } from "./figure.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille } from "./raster.js";
-import type { Range } from "./scale.js";
-import { niceAxis } from "./axes.js";
 
 /**
  * The field, resampled onto the cells actually drawn.
@@ -88,84 +92,6 @@ export function fieldSampler(series: readonly Series[]): FieldSample {
 }
 
 /**
- * The four corners of one cell, above or below the level, as an **edge** mask.
- *
- * An edge is crossed exactly when its two corners disagree, which is the whole
- * derivation. `glyphForMask` takes it from here.
- *
- * A corner that is `null` — a gap — makes the cell uncrossable rather than
- * counting as below: a field with a hole in it has no contour across the hole,
- * and treating absence as *below the level* draws one along the hole's rim.
- */
-export function marchingMask(
-  tl: number | null,
-  tr: number | null,
-  br: number | null,
-  bl: number | null,
-  level: number,
-): number {
-  if (tl === null || tr === null || br === null || bl === null) return 0;
-  const a = tl >= level;
-  const b = tr >= level;
-  const c = br >= level;
-  const d = bl >= level;
-  return (
-    (a !== b ? LINE_UP : 0) |
-    (b !== c ? LINE_RIGHT : 0) |
-    (c !== d ? LINE_DOWN : 0) |
-    (d !== a ? LINE_LEFT : 0)
-  );
-}
-
-/** The mask a saddle produces — all four edges. Both resolutions give it. */
-const SADDLE = LINE_UP | LINE_RIGHT | LINE_DOWN | LINE_LEFT;
-
-/**
- * Which way a saddle connects, by the cell's centre value — matplotlib's rule.
- *
- * `true` joins **top→left and bottom→right**; `false` joins top→right and
- * bottom→left. The centre is the bilinear average of the four corners, so the
- * pairing follows the surface rather than a convention.
- *
- * **This has no observable consequence on the `"line"` arm** — both pairings are
- * mask 15 and render `┼` — which is why `"auto"` picks braille (§3y). Stated
- * here as well as in the spec, because a reader meeting this function on the
- * cell path will otherwise take the ruling to be doing something.
- */
-export function saddleJoinsTopLeft(
-  tl: number,
-  tr: number,
-  br: number,
-  bl: number,
-  level: number,
-): boolean {
-  const centre = (tl + tr + br + bl) / 4;
-  return (centre >= level) === (tl >= level);
-}
-
-/** Where along an edge the level falls, as a fraction from the first corner. */
-function crossing(a: number, b: number, level: number): number {
-  const d = b - a;
-  if (d === 0) return 0.5;
-  const t = (level - a) / d;
-  return t < 0 ? 0 : t > 1 ? 1 : t;
-}
-
-/** The levels a contour draws, declared or derived. */
-export function contourLevels(block: Plot, range: Range): readonly number[] {
-  if (block.levels !== undefined) {
-    return block.levels.filter((v) => Number.isFinite(v));
-  }
-  // **The gutter's own function**, so a contour's levels and the y ticks are the
-  // same numbers rather than two nice-number runs that agree at most widths.
-  // The interior ticks only: a level at the field's minimum crosses nothing and
-  // a level at its maximum crosses nothing, so drawing them says *no contour*
-  // where the caller asked for one.
-  const axis = niceAxis(range, 6, block);
-  return axis.ticks.filter((v) => v > range.min && v < range.max);
-}
-
-/**
  * The cell arm — one glyph per cell, from `glyphForMask` (I49).
  *
  * Levels **union their masks** in a cell, which is the only way `┤ ├ ┴ ┬` can be
@@ -173,6 +99,8 @@ export function contourLevels(block: Plot, range: Range): readonly number[] {
  * *saddle* within one level and as *two levels crossing* across levels, and both
  * are true readings of the same mark.
  */
+const SADDLE_MASK = LINE_UP | LINE_RIGHT | LINE_DOWN | LINE_LEFT;
+
 export function contourCellRows(
   sample: FieldSample,
   span: Readonly<{ from: number; to: number; rows: number }>,
@@ -250,7 +178,7 @@ export function contourDotRows(
         const bottom: [number, number] = [ox + crossing(bl, br, level) * (dx - 1), oy + dy - 1];
         const left: [number, number] = [ox, oy + crossing(tl, bl, level) * (dy - 1)];
 
-        if (mask === SADDLE) {
+        if (mask === SADDLE_MASK) {
           // **The one place the centre value is read**, and the one arm where
           // the reading is visible.
           if (saddleJoinsTopLeft(tl, tr, br, bl, level)) {
@@ -517,24 +445,6 @@ export function overlayGlyphs(
     flush();
   }
   return out;
-}
-
-/**
- * What a field form draws, in draw order (I51).
- *
- * The default is the form's own — a contour over a painted field, which is the
- * classic presentation and the one the request asked for. `["contour"]` asks for
- * lines on an unpainted area, and that is what membership is for.
- */
-export function layersOf(block: Pick<Plot, "form" | "layers">): readonly ("field" | "contour" | "quiver")[] {
-  if (block.layers !== undefined) return block.layers;
-  if (block.form === "contour") return ["field", "contour"];
-  return block.form === "quiver" ? ["field", "quiver"] : ["field"];
-}
-
-/** Whether the field itself is painted — membership, never position. */
-export function paintsField(block: Pick<Plot, "form" | "layers">): boolean {
-  return layersOf(block).includes("field");
 }
 
 /** The depth at or above which the field is a background rather than a ramp. */

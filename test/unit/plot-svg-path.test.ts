@@ -375,6 +375,27 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
       ...PIN,
     };
   }
+  // **The field family wants a grid, and one row is the degenerate shape.**
+  // `contourSegments` needs two rows and two columns before a cell exists at
+  // all, so the one-series datum every other positional form takes would draw
+  // the painted field and no lines — a frame that passes *a claimed form draws
+  // something* while the layer this row is about is missing.
+  if (svgFamilyOf(form) === "field") {
+    const grid = Array.from({ length: 4 }, (_v, r) => ({
+      label: `r${String(r)}`,
+      values: Array.from({ length: 6 }, (_w, c) => Math.sin(r * 0.6) * Math.sin(c * 0.6) * 50 + 50),
+    }));
+    if (form !== "quiver") return { series: grid, ...PIN };
+    // A rotation, so the arrows are not all parallel and the barbs of one do
+    // not sit exactly where its neighbour's shaft is.
+    return {
+      series: [],
+      vectors: Array.from({ length: 4 }, (_v, r) => ({
+        values: Array.from({ length: 6 }, (_w, c) => [-(r - 1.5), c - 2.5] as const),
+      })),
+      ...PIN,
+    };
+  }
   if (svgFamilyOf(form) !== "distribution") return { series: [{ label: "s", values: SAMPLES }], ...PIN };
   if (form === "dumbbell") {
     return { series: [{ label: "a", values: [2, 5, 8] }, { label: "b", values: [8, 3, 4] }], ...PIN };
@@ -510,7 +531,14 @@ describe.each(supported)("G6 — %s", (form) => {
     // applied — the whole of what F317 found missing — so this fails the day
     // `drawnBlock` stops being called.
     const derived = drawnBlock(made);
-    if (derived !== made) {
+    // **The discriminator is the *readings*, not the object.** `drawnBlock`
+    // returns a new block for the field forms too, and what it derives there is
+    // captions: a contour's rows and columns caption a domain the renderer knows
+    // (F322). Its samples are still the caller's, so the premise below — *there
+    // is no sample outside the pin, because there are no samples* — is exactly
+    // false for it. A `quiver` does move its readings, and takes this arm.
+    const readings = (bl: typeof made): string => JSON.stringify(bl.series.map((sr) => sr.values));
+    if (readings(derived) !== readings(made)) {
       expect(derived.series.map((sr) => sr.values), `${form}: the samples are not the datum`)
         .not.toEqual(made.series.map((sr) => sr.values));
       expect((plotToSvg(made, THEME, layout) ?? "").length, `${form}: and the arm still draws`)
@@ -523,7 +551,7 @@ describe.each(supported)("G6 — %s", (form) => {
     // or not the arm ever asks it that question; for a matrix, a treemap and a
     // tree it never does. Measuring a helper instead of the output is how a row
     // reports coverage it does not have (§3ak.12).
-    if (family === "matrix" || family === "tiles" || family === "nodes") {
+    if (family === "matrix" || family === "tiles" || family === "nodes" || family === "field") {
       expect(HAS_VALUE_AXIS[form], `${form}: no value axis, so no bound to clamp against`).toBe(false);
       return;
     }
@@ -1239,9 +1267,17 @@ describe("G7 — the partition itself", () => {
     // refused form refuses rather than drawing a plausible wrong figure.
     const all = Object.keys(SVG_FAMILY) as PlotForm[];
     expect(all.length, "every form in the union is keyed").toBeGreaterThan(40);
-    expect(supported.length, "and the claimed set is not empty").toBeGreaterThan(15);
     const refused = all.filter((f) => SVG_FAMILY[f] === null);
-    expect(refused.length, "nor is the refused set").toBeGreaterThan(15);
+    // **The two sides are compared by equality against the union, not by a
+    // bound** (F310). `> 15` on each side was a number that had to be edited
+    // every time a form landed and said nothing when it was: a refusal can
+    // appear or vanish and a range still holds, which is exactly the shape SB4
+    // was repaired for. What the row can assert without a literal is that the
+    // partition covers the union with no overlap and neither side is empty.
+    expect([...supported, ...refused].sort(), "the two sides partition the union")
+      .toEqual([...all].sort());
+    expect(supported.length, "and the claimed set is not empty").toBeGreaterThan(0);
+    expect(refused.length, "nor is the refused set").toBeGreaterThan(0);
     // **Every one, not the first six.** A sample is the same blind spot one
     // level down from the one G8 is about: it tests the rule against the forms
     // you already had in mind.

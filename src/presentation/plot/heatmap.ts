@@ -26,11 +26,11 @@ import { labelColumnWidth, line, plotRow, rightGutterWidth, yAxisSides, type Lay
 import { IS_FIELD_FORM } from "../../data/viewmodel/index.js";
 import { calendarCaptions } from "./calendar.js";
 import { drawnBlock, fieldIsMagnitude, magnitudeSeries } from "./derive.js";
-import { rampOf } from "./figure.js";
+import { contourLevels, rampOf } from "./figure.js";
 import { slot } from "../blocks/paint.js";
 import { partSeparator, refOf } from "./marks.js";
 import {
-  contourCellRows, contourDotRows, contourLevels, dimColour, dimFactorFor, fieldSampler,
+  contourCellRows, contourDotRows, dimColour, dimFactorFor, fieldSampler,
   arrowsFor, fieldPaintsUnder, glyphLayerOrder, magnitudeAt, mergeFieldLayers,
   overlayGlyphs, quiverRows,
   type FieldLayer,

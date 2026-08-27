@@ -448,21 +448,26 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
   };
 }
 
-/** Every `<text>` element's body, paired with whether it is clipped to a shape. */
-function texts(svg: string): readonly Readonly<{ body: string; clipped: boolean }>[] {
-  const out: { body: string; clipped: boolean; y: number; x: number }[] = [];
+/** Every `<text>` element's body, in the order a reader meets it. */
+function texts(svg: string): readonly Readonly<{ body: string }>[] {
+  const out: { body: string; y: number; x: number }[] = [];
   for (const m of svg.matchAll(/<text\s([^>]*)>([^<]*)<\/text>/gu)) {
     const attrs = m[1] ?? "";
+    // **`clip-path` used to be read here and it is gone** (F326). *A clipped
+    // label names a thing; an unclipped one names a value* — a true observation
+    // about the tiles and nodes families, promoted to the rule that classified
+    // every label this arm draws, and the attribute exists to let a label stop
+    // itself without font metrics. It held until a form's row captions were
+    // **numbers**: `fieldAxes` captions a field's ordinate `0 1 2 3 4 5`, the
+    // gutter clips them like any name, and this reader filed six numerals under
+    // `identityLabels` while the terminal reader — which asks the shape — filed
+    // the same six under `numericLabels`. Both arms drew the same thing and the
+    // matrix reported 26 disagreements plus one on a tile whose label is a
+    // number. Removing it closed all 27 and opened none.
     out.push({
       x: Number(/\bx="([-\d.]+)"/u.exec(attrs)?.[1] ?? 0),
       y: Number(/\by="([-\d.]+)"/u.exec(attrs)?.[1] ?? 0),
       body: (m[2] ?? "").trim(),
-      // **A clipped label names a thing; an unclipped one names a value.** The
-      // tiles and nodes families clip every label to its own rectangle, which is
-      // what lets a label stop itself without font metrics — so the attribute
-      // that exists for hazard 4 also partitions the two kinds of text this arm
-      // draws.
-      clipped: attrs.includes("clip-path="),
     });
   }
   // **Reading order, because that is the question the other side answers**
@@ -502,8 +507,10 @@ function svgDecisions(svg: string | null): ArmDecisions {
     // entries as identities compared a gutter against a gutter *plus a legend* —
     // and `line.identityLabels` went **12/70 to 70/70** the moment this arm grew
     // one. The arm was right and the reader was asymmetric.
-    numericLabels: all.filter((t) => !legendNames.has(t.body) && !t.clipped && NUMERIC.test(t.body)).map((t) => t.body),
-    identityLabels: all.filter((t) => !legendNames.has(t.body) && (t.clipped || !NUMERIC.test(t.body))).map((t) => t.body),
+    // **The shape, on both sides** (F326). This asked `clip-path` first, which
+    // is where a label is drawn rather than what it says.
+    numericLabels: all.filter((t) => !legendNames.has(t.body) && NUMERIC.test(t.body)).map((t) => t.body),
+    identityLabels: all.filter((t) => !legendNames.has(t.body) && !NUMERIC.test(t.body)).map((t) => t.body),
     // **The ground is not a border.** `<rect width="100%">` paints the page; a
     // border would be a stroked rectangle round the plot area, and this arm
     // draws none.

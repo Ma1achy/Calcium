@@ -17,11 +17,13 @@ import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import {
-  arrowFor, arrowsFor, contourLevels, dimColour, dimFactorFor, fieldSampler, glyphLayerOrder,
-  marchingMask, saddleJoinsTopLeft,
+  arrowFor, arrowsFor, dimColour, dimFactorFor, fieldSampler, glyphLayerOrder,
 } from "../../src/presentation/plot/field.js";
 import { glyphForMask } from "../../src/presentation/plot/linedraw.js";
 import { magnitudeSeries } from "../../src/presentation/plot/derive.js";
+// The marching-squares core, the levels and the layer membership moved above
+// both rasterisers with C12 I71 — this file is one arm's raster.
+import { contourLevels, marchingMask, saddleJoinsTopLeft } from "../../src/presentation/plot/figure.js";
 import { COLORMAPS, ansi256Hex, continuousColour, nearestAnsi256 } from "../../src/presentation/theme/colormap.js";
 import { DEFAULT_FLOOR, ratio } from "../../src/presentation/theme/contrast.js";
 import { FULL_CAPS, measurable } from "../support/render.js";

@@ -1,13 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#141414"/>
-<text x="114.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row0</text>
-<text x="164" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row1</text>
-<text x="213.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row2</text>
-<text x="263.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row3</text>
-<text x="312.8" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row4</text>
-<text x="362.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row5</text>
-<text x="412" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row6</text>
-<text x="461.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">row7</text>
+<clipPath id="isvgb-0"><rect x="0" y="18" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="34" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">row0</text>
+<clipPath id="isvgb-1"><rect x="0" y="52.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="68.4" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">row1</text>
+<clipPath id="isvgb-2"><rect x="0" y="86.8" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="102.8" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">row2</text>
+<clipPath id="isvgb-3"><rect x="0" y="121.2" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="137.2" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#626262">row3</text>
+<clipPath id="isvgb-4"><rect x="0" y="155.6" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="171.6" text-anchor="end" clip-path="url(#isvgb-4)" font-size="12" font-family="monospace" fill="#626262">row4</text>
+<clipPath id="isvgb-5"><rect x="0" y="190" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="206" text-anchor="end" clip-path="url(#isvgb-5)" font-size="12" font-family="monospace" fill="#626262">row5</text>
+<clipPath id="isvgb-6"><rect x="0" y="224.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="240.4" text-anchor="end" clip-path="url(#isvgb-6)" font-size="12" font-family="monospace" fill="#626262">row6</text>
+<clipPath id="isvgb-7"><rect x="0" y="258.8" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="274.8" text-anchor="end" clip-path="url(#isvgb-7)" font-size="12" font-family="monospace" fill="#626262">row7</text>
 <rect x="89.6" y="12.8" width="19.84" height="34.4" fill="#21908d"/>
 <rect x="109.44" y="12.8" width="19.84" height="34.4" fill="#24aa83"/>
 <rect x="129.28" y="12.8" width="19.84" height="34.4" fill="#49c16d"/>

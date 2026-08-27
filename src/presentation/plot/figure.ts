@@ -12,13 +12,14 @@
  * nothing lands here without a consumer — an export nothing reads is what MG25
  * refuses, and a `Figure` member no renderer takes is F84's class one type along.
  */
-import type { ColormapName, Plot, PlotForm, QuartileSummary, ScaleType, Segment } from "../../data/viewmodel/index.js";
+import type { ColormapName, Plot, PlotForm, QuartileSummary, ScaleType, Segment, Series, VectorSeries } from "../../data/viewmodel/index.js";
 import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { ColourRef } from "../theme/types.js";
-import { axisFor, tickLabels, ticksFor, type Axis } from "./axes.js";
+import { axisFor, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
+import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
 import { plotAreaRows } from "./height.js";
 import { HAS_POSITION_AXIS, refOf } from "./marks.js";
@@ -98,9 +99,19 @@ export const HAS_VALUE_AXIS = {
   bar: true, histogram: true, lollipop: true, dotplot: true, waterfall: true,
   boxplot: true, violin: true, ridgeline: true, forest: true, dumbbell: true,
   autocorrelation: true, bullet: true, funnel: true, horizon: true,
-  // **A field is sampled over a domain**, so its columns are positions and its
-  // rows are a scale — `HAS_POSITION_AXIS`' own correction, one axis along.
-  contour: true, quiver: true,
+  // **A field's readings are colours, and the sentence that made these `true`
+  // was about the ordinate** (F325). *A field is sampled over a domain, so its
+  // columns are positions and its rows are a scale* — true, and about the
+  // **ordinate**, in a record whose own doc says it answers whether the
+  // **readings** sit on a value scale. Measured on the frame: a contour's y
+  // gutter reads `0 1 2 3 4 5`, which `fieldAxes` writes into `identity`, and
+  // its readings are on the **ramp legend** — `1.5  99 · 20 40 60 80`, a range
+  // and its levels — exactly where a heatmap's are. So this is the matrix
+  // family's answer, reached by the matrix family's argument.
+  //
+  // **Both arms were blind to the cell**: `fieldFigure` did not exist, and FV1
+  // skips every form marked `true`. A refusal is a place the instrument is not
+  // being checked, and a record cell is an instrument.
   // A date grid and a time span both read their cells against a scale, and the
   // calendar is the measured proof: 48 numeric gutter labels across the corpus.
   calendar: true, gantt: true, timeline: true,
@@ -108,6 +119,7 @@ export const HAS_VALUE_AXIS = {
   // A matrix reads its values as colour, tiles read them as area, nodes read
   // them as structure. Each furnished a false axis before this record existed.
   heatmap: false, correlation: false, confusion: false, spectrogram: false,
+  contour: false, quiver: false,
   latency: false, density2d: false, utilisation: false,
   flame: false, icicle: false, treemap: false,
   tree: false, graph: false,
@@ -226,7 +238,30 @@ export function estimateRole(q: Pick<QuartileSummary, "centre" | "median" | "poo
  * which is the SVG's own rasterisation — does not.
  */
 export type Mark =
-  | Readonly<{ kind: "polyline"; points: readonly Pt[]; closed?: boolean }>
+  | Readonly<{
+      kind: "polyline";
+      points: readonly Pt[];
+      closed?: boolean;
+      /**
+       * **The reading, where the *stroke's* appearance is the datum** — the
+       * same member `rect` carries, on the second kind that needs it (F323).
+       *
+       * `SVG_FAMILY`'s residue entry ruled that *an iso-line is a `polyline`
+       * and an arrow is a `polyline` plus a `closed` triangle, so nothing in
+       * `Mark` is missing.* True about **shapes**, and silent about channels:
+       * C12 I50 says an arrow's colour **is** its magnitude, and `Drawn` offers
+       * only `ref` and `seriesIndex`, both categorical slots. So an arrow
+       * crossed as the right shape with its only data channel dropped.
+       *
+       * **A member and not a ninth mark kind**, which is this type's own test:
+       * *does the form already have a coordinate*, never *is the type short of
+       * a case*. A quiver has one — the grid.
+       *
+       * Absent on an iso-line, whose reading is *which level it is* and which
+       * the legend names (I49).
+       */
+      value?: number;
+    }>
   | Readonly<{
       kind: "rect";
       x: number;
@@ -1174,6 +1209,364 @@ export function distributionFigure(block: Plot): Figure {
     positionAxis: positionAxisOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    marks,
+  };
+}
+
+// --- the field family's geometry (I49, I50, I71, §3ak.29) -------------------
+//
+// **Above the two rasterisers rather than inside one of them**, which is what
+// I71 asks for and what `SVG_FAMILY`'s deferral named as its condition: no
+// `areaWidth`, no `areaRows`, no `caps`, no string in the signature.
+// `contourCellRows` and `contourDotRows` keep all four, because a glyph per
+// cell is a raster and `glyphForMask` wants a mask per cell that no set of
+// segments can supply.
+
+/** What a field form draws, in draw order (I51). */
+export function layersOf(block: Pick<Plot, "form" | "layers">): readonly ("field" | "contour" | "quiver")[] {
+  if (block.layers !== undefined) return block.layers;
+  if (block.form === "contour") return ["field", "contour"];
+  return block.form === "quiver" ? ["field", "quiver"] : ["field"];
+}
+
+/** Whether the field itself is painted — membership, never position (I51). */
+export function paintsField(block: Pick<Plot, "form" | "layers">): boolean {
+  return layersOf(block).includes("field");
+}
+
+/** The mask a saddle produces — all four edges. Both resolutions give it. */
+const SADDLE = LINE_UP | LINE_RIGHT | LINE_DOWN | LINE_LEFT;
+
+/**
+ * The four corners of one cell, above or below the level, as an **edge** mask.
+ *
+ * An edge is crossed exactly when its two corners disagree, which is the whole
+ * derivation — there is no sixteen-case table here and that is deliberate.
+ * `glyphForMask` takes the mask from here and so does `contourSegments`, which
+ * is the point of it living above both: a second copy is how the pie came to be
+ * drawn in a vocabulary the line forms had left behind.
+ *
+ * A corner that is `null` — a gap — makes the cell uncrossable rather than
+ * counting as below: a field with a hole in it has no contour across the hole,
+ * and treating absence as *below the level* draws one along the hole's rim.
+ */
+export function marchingMask(
+  tl: number | null, tr: number | null, br: number | null, bl: number | null, level: number,
+): number {
+  if (tl === null || tr === null || br === null || bl === null) return 0;
+  const a = tl >= level;
+  const b = tr >= level;
+  const c = br >= level;
+  const d = bl >= level;
+  return (
+    (a !== b ? LINE_UP : 0) | (b !== c ? LINE_RIGHT : 0) |
+    (c !== d ? LINE_DOWN : 0) | (d !== a ? LINE_LEFT : 0)
+  );
+}
+
+/**
+ * Which way a saddle connects, by the cell's centre value — matplotlib's rule.
+ *
+ * `true` joins **top→left and bottom→right**; `false` joins top→right and
+ * bottom→left. The centre is the bilinear average of the four corners, so the
+ * pairing follows the surface rather than a convention.
+ *
+ * **This has no observable consequence on the terminal's `"line"` arm** — both
+ * pairings are mask 15 and render `┼` — which is why `"auto"` picks braille
+ * (§3y). It is visible here, where the two segments are drawn separately.
+ */
+export function saddleJoinsTopLeft(
+  tl: number, tr: number, br: number, bl: number, level: number,
+): boolean {
+  const centre = (tl + tr + br + bl) / 4;
+  return (centre >= level) === (tl >= level);
+}
+
+/** Where along an edge the level falls, as a fraction from the first corner. */
+export function crossing(a: number, b: number, level: number): number {
+  const d = b - a;
+  if (d === 0) return 0.5;
+  const t = (level - a) / d;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+
+/**
+ * The levels a contour draws, declared or derived (I49).
+ *
+ * **The gutter's own function**, so a contour's levels and the y ticks are the
+ * same numbers rather than two nice-number runs that agree at most widths. The
+ * interior ticks only: a level at the field's minimum crosses nothing and a
+ * level at its maximum crosses nothing, so drawing them says *no contour* where
+ * the caller asked for one.
+ */
+export function contourLevels(block: Plot, range: Range): readonly number[] {
+  if (block.levels !== undefined) return block.levels.filter((v) => Number.isFinite(v));
+  return niceAxis(range, 6, block).ticks.filter((v) => v > range.min && v < range.max);
+}
+
+/**
+ * The iso-line segments a field crosses, **on the data's own grid** (I49, I71).
+ *
+ * **The geometry, separated from the raster.** `contourCellRows` and
+ * `contourDotRows` resample the field onto the cells they are about to draw and
+ * march *there*, because a glyph arm has nothing finer than a cell. This marches
+ * the readings themselves, which is where the crossings are: a crossing is a
+ * linear interpolation between two adjacent readings and no resampling adds one.
+ * It is also what the reference implementation draws.
+ *
+ * **Normalised to `cornerReader`'s domain**, which had to be checked rather than
+ * chosen. The terminal's corner `i` of `w` reads data index `(i / w) · (cols −
+ * 1)`, so reading 0 is at the area's left edge and reading `cols − 1` at its
+ * right — one interval per gap between readings. This reproduces that, because
+ * an arm that chose the field paint's convention instead would be two arms
+ * drawing one block differently.
+ *
+ * A `null` corner drops its whole cell rather than interpolating across it,
+ * which is `cornerReader`'s rule: a gap is a position that produced no reading
+ * (C04 I46a) and averaging its neighbours invents one.
+ *
+ * **One polyline per segment and no chaining.** Adjacent cells share a crossing
+ * point exactly — the two masks cannot disagree, which is `CN6` — so abutting
+ * segments join with nothing joining them, and a chain would be a second
+ * structure to keep true.
+ */
+export function contourSegments(
+  series: readonly Series[],
+  levels: readonly number[],
+): readonly (readonly [Pt, Pt])[] {
+  const rows = series.length; // cells-ok — a row count
+  const cols = series.reduce((m, r) => Math.max(m, r.values.length), 0); // cells-ok — a column count
+  if (rows < 2 || cols < 2 || levels.length === 0) return []; // cells-ok — grid extents
+  const at = (i: number, j: number): number | null => {
+    const v = series[j]?.values[i];
+    return v === null || v === undefined || !Number.isFinite(v) ? null : v;
+  };
+  const px = (i: number): number => i / (cols - 1); // cells-ok — a column count
+  const py = (j: number): number => j / (rows - 1); // cells-ok — a row count
+  const out: (readonly [Pt, Pt])[] = [];
+
+  for (const level of levels) {
+    for (let j = 0; j < rows - 1; j += 1) { // cells-ok — a row index
+      for (let i = 0; i < cols - 1; i += 1) { // cells-ok — a column index
+        const tl = at(i, j);
+        const tr = at(i + 1, j);
+        const br = at(i + 1, j + 1);
+        const bl = at(i, j + 1);
+        if (tl === null || tr === null || br === null || bl === null) continue;
+        const mask = marchingMask(tl, tr, br, bl, level);
+        if (mask === 0) continue;
+        const top: Pt = [px(i + crossing(tl, tr, level)), py(j)];
+        const right: Pt = [px(i + 1), py(j + crossing(tr, br, level))];
+        const bottom: Pt = [px(i + crossing(bl, br, level)), py(j + 1)];
+        const left: Pt = [px(i), py(j + crossing(tl, bl, level))];
+
+        if (mask === SADDLE) {
+          // **The one place the centre value is read**, and the arm where the
+          // reading is visible: the terminal's cell arm collapses both pairings
+          // onto `┼`.
+          if (saddleJoinsTopLeft(tl, tr, br, bl, level)) out.push([top, left], [bottom, right]);
+          else out.push([top, right], [bottom, left]);
+          continue;
+        }
+        const ends: Pt[] = [];
+        if ((mask & LINE_UP) !== 0) ends.push(top);
+        if ((mask & LINE_RIGHT) !== 0) ends.push(right);
+        if ((mask & LINE_DOWN) !== 0) ends.push(bottom);
+        if ((mask & LINE_LEFT) !== 0) ends.push(left);
+        if (ends[0] !== undefined && ends[1] !== undefined) out.push([ends[0], ends[1]]);
+      }
+    }
+  }
+  return out;
+}
+
+/** How much of its own cell an arrow spans, and how long the barbs are. */
+const ARROW_SPAN = 0.45;
+const ARROW_BARB = 0.5;
+/** 150° either side of the shaft — a chevron, not a closed triangle. */
+const ARROW_ANGLE = (5 * Math.PI) / 6;
+
+/**
+ * A vector field's arrows, one per datum (I50).
+ *
+ * **One per datum and not one per cell**, which is the resolution difference the
+ * seam exists to allow: `quiverRows` resamples onto the cells it has and draws
+ * a vector two or three times over, and this draws each once.
+ *
+ * **A still cell draws nothing** — not an arrow of arbitrary direction, which is
+ * what `atan2(0, 0) === 0` gives and what would render a still field as a field
+ * of eastward flow with every magnitude assertion passing.
+ *
+ * **`v` is north-positive**, the data convention, and the figure's `y` runs down
+ * with the matrix facing; the flip is here so no arm has to know it.
+ *
+ * **The barbs are a chevron, and the record predicted a `closed` triangle.**
+ * Measured: `closed` on a polyline emits `Z` with `fill="none"`, so it strokes
+ * an outline rather than filling one — at this size a stroked triangle *is* a
+ * chevron with an extra edge, and the chevron is what a single-stroke arrow is.
+ *
+ * **The shaft is scaled in cell units on each axis separately**, so an arrow at
+ * 45° in index space points at its own cell's corner. Any choice distorts,
+ * because the figure's normalised space maps a non-square grid onto a unit
+ * square; this one distorts *with* the cells the arrows sit in rather than
+ * against them.
+ */
+function arrowMarks(
+  vectors: readonly VectorSeries[],
+  colourBy: Range | null,
+  out: Drawn[],
+): void {
+  const rows = Math.max(1, vectors.length); // cells-ok — a row count
+  const cols = Math.max(1, vectors.reduce((m, r) => Math.max(m, r.values.length), 0)); // cells-ok
+  vectors.forEach((row, r) => {
+    row.values.forEach((p, c) => {
+      if (p === null) return;
+      const [u, v] = p;
+      if (!Number.isFinite(u) || !Number.isFinite(v)) return;
+      const mag = Math.hypot(u, v);
+      if (mag === 0) return;
+      const ux = u / mag;
+      const uy = -v / mag;
+      const cx = (c + 0.5) / cols; // cells-ok — a column count
+      const cy = (r + 0.5) / rows; // cells-ok — a row count
+      const sx = (dx: number): number => (dx * ARROW_SPAN) / cols; // cells-ok — a column count
+      const sy = (dy: number): number => (dy * ARROW_SPAN) / rows; // cells-ok — a row count
+      const tip: Pt = [cx + sx(ux), cy + sy(uy)];
+      const barb = (a: number): Pt => [
+        tip[0] + sx((ux * Math.cos(a) - uy * Math.sin(a)) * ARROW_BARB),
+        tip[1] + sy((ux * Math.sin(a) + uy * Math.cos(a)) * ARROW_BARB),
+      ];
+      const span = colourBy === null || colourBy.max - colourBy.min <= 0
+        ? {}
+        : { value: (mag - colourBy.min) / (colourBy.max - colourBy.min) };
+      const tail: Pt = [cx - sx(ux), cy - sy(uy)];
+      out.push({ mark: { kind: "polyline", points: [tail, tip], ...span }, layer: "series", ref: refOf(0) });
+      out.push({
+        mark: { kind: "polyline", points: [barb(ARROW_ANGLE), tip, barb(-ARROW_ANGLE)], ...span },
+        layer: "series",
+        ref: refOf(0),
+      });
+    });
+  });
+}
+
+/**
+ * Whether an arrow's colour is its magnitude — **is the field something else**
+ * (I50).
+ *
+ * The terminal answers this by *provenance*: `drawnBlock` substitutes the
+ * magnitudes where the caller named no scalar, and the renderer asks whether the
+ * substitution fired. By the time a figure is built there is no provenance left,
+ * so this asks the question the terminal's own comment states — *magnitude is
+ * the arrow's colour where the field carries something else* — as a fact about
+ * the data.
+ *
+ * **They differ on one input and the corpus has none of it**: a caller who
+ * passes the magnitudes explicitly as `series`. The terminal would colour those
+ * arrows in exactly their own background — `38;2;33;145;141` on
+ * `48;2;33;145;141`, measured — and this returns `false` and does not.
+ */
+function fieldIsSomethingElse(series: readonly Series[], vectors: readonly VectorSeries[]): boolean {
+  if (series.length !== vectors.length) return true; // cells-ok — a row count
+  return !vectors.every((row, r) => {
+    const got = series[r]?.values ?? [];
+    return got.length === row.values.length // cells-ok — a reading count
+      && row.values.every((p, c) => {
+        const want = p === null ? null : Math.hypot(p[0], p[1]);
+        return got[c] === want;
+      });
+  });
+}
+
+/**
+ * The field family's figure — the grid, its iso-lines and its arrows (I49, I50,
+ * I51, I71, §3ak.29).
+ *
+ * **Its own family, and the record predicted the matrix's.** `SVG_FAMILY`'s
+ * deferral said *the day `contourFigure` exists these are `"matrix"`* — a
+ * statement about resemblance, where the member decides **which emitter**.
+ * `matrixFigure` emits cells and nothing else, so a contour routed through it
+ * draws a heatmap with the lines missing and reports as supported: the plausible
+ * wrong figure, which is what a `null` arm refuses and a wrong family would not.
+ *
+ * **Membership is the whole of what crosses** (I51). `paintsField` is a question
+ * about `layers`; `fieldPaintsUnder`'s other half is a **colour-depth** question
+ * and stays terminal, because a ramp glyph and a contour glyph competing for one
+ * alphabet is a contest only a glyph arm has.
+ *
+ * **And `fieldDim` and `glyphInk` do not cross at all.** Both are remedies for a
+ * glyph sharing a cell with its own background; a stroke sits *over* a fill and
+ * shares no quantum with it, and a polyline crosses many cells with many
+ * backgrounds so the per-cell remedy has no subject here. That is §3ak.26's
+ * class — a resolution limit, and a resolution is a thing only a grid has.
+ */
+export function fieldFigure(block: Plot): Figure {
+  const extent = seriesRange(block.series, block);
+  const rows = Math.max(1, block.series.length); // cells-ok — a row count
+  const cols = Math.max(1, block.series.reduce((m, r) => Math.max(m, r.values.length), 0)); // cells-ok
+  const marks: Drawn[] = [];
+
+  if (paintsField(block) && extent !== null) {
+    block.series.forEach((series, seriesIndex) => {
+      series.values.forEach((v, c) => {
+        if (v === null || !Number.isFinite(v)) return;
+        marks.push({
+          mark: {
+            kind: "rect",
+            x: c / cols, // cells-ok — a column count
+            y: seriesIndex / rows, // cells-ok — a row count on the field's grid
+            w: 1 / cols, // cells-ok — a column count
+            h: 1 / rows, // cells-ok — a row count
+            fill: true,
+            // The reading, spent on colour — a field cell has no length.
+            value: normalisedOf(v, extent, false),
+          },
+          layer: "series",
+          seriesIndex,
+        });
+      });
+    });
+  }
+
+  // **Draw order, not priority order.** `glyphLayerOrder` reverses into the
+  // terminal's priority — which glyph wins a contested *cell* — and a stroke
+  // over a fill has no contest, so this takes the author's order as written.
+  for (const layer of layersOf(block)) {
+    if (layer === "contour" && extent !== null) {
+      for (const [from, to] of contourSegments(block.series, contourLevels(block, extent))) {
+        marks.push({ mark: { kind: "polyline", points: [from, to] }, layer: "series", ref: refOf(0) });
+      }
+    }
+    if (layer === "quiver" && block.vectors !== undefined) {
+      const vectors = block.vectors;
+      arrowMarks(
+        vectors,
+        fieldIsSomethingElse(block.series, vectors)
+          ? seriesRange(vectors.map((row) => ({
+              values: row.values.map((p) => (p === null ? null : Math.hypot(p[0], p[1]))),
+            })), {})
+          : null,
+        marks,
+      );
+    }
+  }
+
+  return {
+    value: null,
+    extent,
+    // The ordinate's captions, which the second arm now draws (F325).
+    identity: block.series.map((sr) => sr.label ?? ""),
+    isotropic: false,
+    orientation: ORIENTATION_UNUSED,
+    // Rows run top to bottom, as a matrix's do.
+    facing: facingOf(block, FACING_MATRIX),
+    // A field's cells bound themselves, as a matrix's do (I67, §3ak.19, F296).
+    frame: "none",
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
+    ramp: rampOf(block),
     marks,
   };
 }

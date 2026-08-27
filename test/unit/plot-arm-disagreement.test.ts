@@ -141,13 +141,24 @@ const MEASURED = {
   "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "2/4", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "8/8", "notice": "4/8" },
-  "contour": "refused",
-  "quiver": "refused",
+  // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
+  // both readers ask the shape now — and `ramp` is F316's open column on the
+  // family that has always had one. `numericLabels` is the terminal reader's
+  // stated limit and not the arm's: its x-row scan is gated on a bottom rule, a
+  // field draws none, so its numeric set is the gutter's six where this arm's is
+  // the axis's three. Both arms draw both axes. Widening the boundary to *the
+  // last edge-bearing line* was measured and rejected: it moves cells in both
+  // directions across five other forms, which is a different reader rather than
+  // a repair.
+  "contour": { silent: "0/18", "numericLabels": "18/18", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "18/18", "notice": "agree" },
+  "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "12/12", "notice": "agree" },
   "bar": { silent: "2/14", "numericLabels": "10/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "6/12", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "2/12", "legend": "agree", "ramp": "agree", "notice": "6/12" },
   "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "6/10", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
+  //  closed with F326: its two categories are `1` and `2`,
+  // numerals that the clip-path rule filed as names on one side only.
+  "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "waffle": { silent: "0/6", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
@@ -293,8 +304,9 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **Every pair, on every one of them** — the terminal draws a key under each
     // matrix-family frame and the second arm draws none at all (0 of 181).
     const ramp = differing("ramp");
-    expect(ramp.sort(), "the matrix family, and nothing else")
-      .toEqual(["confusion", "correlation", "density2d", "heatmap", "latency", "spectrogram", "utilisation"]);
+    expect(ramp.sort(), "the matrix family and the field family, and nothing else")
+      .toEqual(["confusion", "contour", "correlation", "density2d", "heatmap", "latency",
+        "quiver", "spectrogram", "utilisation"]);
     for (const f of ramp) {
       const cell = ((MEASURED as globalThis.Record<string, Record_>)[f] as Claimed).ramp;
       const [differ, total] = String(cell).split("/");
@@ -328,6 +340,19 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // `EDGE` matches `├`, so an indented outline read as a figure whose right
     // edge is column 0 with text past it. Ten cells were the instrument's and
     // two are the arm's.
+    //
+    // **210 → 224 with the residue's two forms** (§3ak.29), and the split is
+    // what the drawing found. `contour` and `quiver` bring 14 cells: 4 open —
+    // each form's `ramp`, which is F316's column on a family that has always had
+    // a key, and each form's `numericLabels`, which is the terminal reader's
+    // stated limit rather than the arm's — 8 closed and 2 legitimate.
+    //
+    // **And one cell closed on a form that was already drawing** (F326). The
+    // second arm's reader classified a label by `clip-path` — *a clipped label
+    // names a thing* — a fitting mechanism read as a semantic partition. It held
+    // until a form's row captions were numbers, which is what `fieldAxes` makes;
+    // removing it closed 27 cells and opened none, one of them `dumbbell`'s,
+    // whose two categories are `1` and `2`.
     const claimed = (Object.values(MEASURED) as readonly Record_[]).filter((v): v is Claimed => v !== "refused");
     let open = 0;
     let closed = 0;
@@ -338,12 +363,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
         if (v[d] === "agree") closed += 1; else open += 1;
       }
     }
-    expect(claimed.length, "forms the SVG arm claims").toBe(30); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(16); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(210); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(30); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(53); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(127); // cells-ok — a cell count
+    expect(claimed.length, "forms the SVG arm claims").toBe(32); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(14); // cells-ok — a form count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(224); // cells-ok — a cell count
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(32); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(56); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(136); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
