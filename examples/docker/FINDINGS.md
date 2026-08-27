@@ -13642,6 +13642,148 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F347 — `axes: false` reaches one resolver of two, forty lines apart in the same file ★★★★★
+
+```ts
+export function positionAxisOf(block: Pick<Plot, "axes" | "form" | "xLabels">): boolean {
+  return block.xLabels !== undefined || (block.axes === true && HAS_POSITION_AXIS[block.form]);
+}
+export function valueLabelsOf(block: Pick<Plot, "yAxis">): "left" | "right" | "both" | null {
+  const y = block.yAxis ?? "left";
+  return y === false ? null : y;
+}
+```
+
+**One reads `axes` and the other does not.** `axes: false` means *no axes*; it silences the position
+axis and says nothing to the value labels, so the figure reports `valueLabels: "left"` and the second
+arm draws them. Measured over the corpus: **three variants declare `axes: false` and all three draw
+value labels in the SVG** — `line/minimal`, `scatter/minimal`, `step/minimal`, each `["0", "5"]`
+against a terminal frame with no furniture at all.
+
+**The arm is not what is wrong, which is why no reader could have found it.** `svg.ts` consumes
+`figure.valueLabels` exactly as written and the terminal honours `axes` directly. The defect is a
+resolver whose `Pick` names one field where the decision has two, and a `Pick` is what a reviewer
+reads as *the inputs this depends on*. It reads as deliberate.
+
+**Found by reading a frame** — `step/minimal` in the paired sheet, a step chart with `5` and `0` down
+its left side and a terminal beside it with none — and then by asking the corpus how many others.
+
+---
+
+## F346 — sixteen of a hundred and five `Plot` members are read by one arm ★★★★★
+
+The paired sheet gave up `layout`, `yCallout` and `axes` one at a time, over three families. Asking
+the question mechanically instead — *which members does a terminal renderer read, that neither the
+shared layer nor the second arm does* — answers for all 46 forms at once:
+
+```
+kind emptyMessage plotDetail fieldDim glyphInk plotFill plotBox plotCorners
+matrixAnchor yCallout width aspect align axisCross lower upper     … and layout
+```
+
+**Three dispositions, and only the third is owed work.** `plotDetail`, `fieldDim` and `glyphInk` are
+**ruled** — §3ak.26's class, per-cell remedies for a glyph sharing a quantum with its background, and
+a stroke over a fill shares none. `matrixAnchor` is **expressed as a refusal**, which is F259 working.
+The rest — `yCallout`, `aspect`, `align`, `axisCross`, `emptyMessage`, `layout` — are read by one arm
+with **no ruling anywhere**: `yCallout` has nine mentions in C12 and not one about whether it crosses.
+
+**`layout` is not in that list and should be**, which is the finding inside the finding. The first
+sweep matched `\.layout\b` and `svg.ts` has a *parameter* called `layout` — so the probe reported the
+field as consumed by an arm that has never read it. **MG24's name-exactness problem, arriving inside
+the instrument written to measure MG24's subject** (F105, F160). The second sweep asks for
+`block.layout` and finds it.
+
+---
+
+## F345 — a node's label is drawn at a fixed size inside a box that is a share of the height ★★★☆☆
+
+`graph/crowded` is a chain of 14 nodes in a block of `height: 7`. The terminal draws three and says
+`+11 more · service-14 · service-01 · …`. The second arm draws all fourteen, at `275.2 / 14 = 9.83 px`
+a rank, and writes each label at `SVG_FONT_SIZE = 12` — so **every glyph is taller than the box it
+names**, ascending above and descending below its own rect.
+
+**It qualifies F318's `legitimate` disposition without overturning it.** That row says the terminal
+withholds because a cell is a quantum and this arm *scales its box across whatever it is given and has
+nothing to drop*. True — and what it does instead, past a rank count, is draw something no reader can
+use. The arms still differ on `notice` and the disposition stands; the sentence's *reason* now has a
+measured limit beside it.
+
+---
+
+## F344 — the two ends of a dumbbell take a colour in one arm and a shape in the other ★★★★☆
+
+`dumbbell/default` is two series — `start` and `end` — over four categories.
+
+```
+terminal   4 series inks: 230;159;0 · 86;180;233 · 60;191;154 · 240;228;66   one per row
+svg        2:             #e69f00 ×4 · #56b4e9 ×4                            one per series
+                          connectors #626262 — the rule's grey
+```
+
+**The terminal spends colour on the row and shape on the end** — a filled dot and a hollow one — which
+is I29's *one datum, one channel*: the pair is the datum and the end is a shape. The second arm spends
+colour on the end and grey on the row, so nothing says which row is which and the shape channel says
+nothing.
+
+**It is not `rowSlot`.** `distributionFigure` emits `dot(x, at(va), "point", 0)` and
+`dot(x, at(vb), "point", 1)` — literal slots — and the connecting polyline carries **no**
+`seriesIndex` at all, which is why it falls to the rule colour. `rowSlot`'s `per > 1 → seriesIndex`
+branch would give the same answer here and is right for `bar/grouped`, where each drawn row *is* one
+series' datum; a dumbbell's row consumes both. **One instance, so it is recorded as one** — the
+remedy needs a hollow shape in `GLYPH_SHAPE`, which the role vocabulary has not got.
+
+---
+
+## F343 — a clipped gutter label is cut at the head, so it reads as a different name ★★★★☆
+
+`boxplot/default` names four rows. In the second arm:
+
+```
+sepal_length   text-anchor="end" x="83.6"  → starts at x ≈ −2.8, clipped at 0
+petal_length   the same, and it renders as `betal_length`
+```
+
+The clip exists so a long label stops itself without font metrics (§3aj hazard 4) and it works — but
+an `end`-anchored text grows **leftward**, so the rectangle cuts its **head**. A tail cut reads as
+truncation; a head cut reads as a **different word**, and nothing on the page says anything was
+removed.
+
+**The terminal's answer is in the same corpus, on the same sheet.** `heatmap/captions-left` draws
+`epoch…  epoch…  now` — it cuts the **tail** and marks the cut. So this is not a judgement call
+between two idioms; it is one arm doing what the other already does and one arm doing the opposite.
+
+**The remedy is a gutter sized to its longest label**, in the arm's own em estimate — `min(width ·
+0.25, max(width · 0.1, chars · SVG_FONT_SIZE · 0.6 + 12))` — which keeps the right alignment the
+terminal has and stops the clip firing at all. It moves `box.left` on every form that has a gutter, so
+it is a commit of its own with every moved frame read; **not landed here**.
+
+---
+
+## F342 — three bar figures, one SVG document, byte for byte ★★★★★
+
+```
+test/golden/svg-baseline/bar-stacked.svg      ef00e027b0d2c0eb6e638834180670c9
+test/golden/svg-baseline/bar-normalised.svg   ef00e027b0d2c0eb6e638834180670c9
+```
+
+`layout: "overlap" | "grouped" | "stacked" | "normalised"` is read at `definition.ts:2265` and
+**nowhere else in the renderer**. The terminal draws three distinct figures — bars side by side, bars
+cumulated, bars cumulated to a shared full width — and the second arm draws grouped for all three.
+`histogram/two-series-stacked` is the fourth instance, on a second form.
+
+**The shared layer carries the value and drops it**, which is the part that makes it a seam finding
+rather than a missing feature. `derive.ts:485` computes it for the derived histogram block —
+*`overlap` cannot mean draw the first one, so more than one counted series is grouped unless the author
+asked for a stack* — and then no `Figure` member holds it and no consumer asks. The care is spent on
+one arm.
+
+**Two byte-identical documents for two different figures is the signature**, and no column of the
+disagreement matrix can see it: both arms draw the same labels, the same legend, the same border, the
+same count of everything. **The sheet is the only instrument that reaches it**, which is the argument
+for the sheet.
+
+---
+
 ## F341 — a key drawn by a formula the figure does not use, showing half a colormap the figure never enters ★★★★★
 
 The second arm's `horizon` key drew one swatch per band at `i / (bands − 1)`. The figure draws
