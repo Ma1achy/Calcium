@@ -5920,6 +5920,112 @@ This is the sixth instance of a reader calibrated to an encoding nobody wrote, a
 terminal's side. Both readers get a fabricated violation in both directions before either is trusted:
 a frame with a ramp that must read `true`, and one without that must read `false`.
 
+### 3ak.29 — The residue's walk: what crosses when a derivation's output is geometry
+
+Three forms have been refused for the length of the pass, and `SVG_FAMILY` carries each refusal's
+condition **as a symbol** rather than as a mood:
+
+> **`contourFigure`, returning normalised marks with no `areaWidth`, no `areaRows`, no `caps` and no
+> string in the signature.** The day it exists these are `"matrix"`.
+
+> **`horizonFigure`, taking a block and returning normalised marks with no `areaWidth`, no
+> `areaRows` and no `caps`.** The day it exists this is `"bar"`.
+
+That is the deferral discipline working exactly as written — a condition stated as a symbol is one
+the next reader can grep, and both of these are correct. **The prose around them is not**, in three
+separate ways, and no two were found by the same instrument.
+
+#### 8a · The artefact is a table, because the residue's rule interactions are structural
+
+A trace finds rules that meet because something happened in between; these three forms have no
+events. What they have is **a form, a layer set and a channel**, all three holding at rest — so the
+artefact is a classification table, indexed by the pairs where two rules could claim the same mark.
+
+| form · condition | rule A | rule B | the cell |
+|---|---|---|---|
+| `contour` · `["field","contour"]` | a field cell is a `rect` carrying a `value` (I63) | an iso-line is a `polyline` | both, the line over the cells — draw order is the layer order |
+| `contour` · `["contour"]` | `paintsField` is membership, never position (I51) | the levels come from the field's range | **the cells are not drawn and the range is still the field's** — `contourLevels` reads a range, not the marks |
+| `contour` · `levels: [25,50,75,500]` | a declared level wins over a derived one | a level outside the range crosses nothing | named in the legend, drawn nowhere — and the legend is text, so it crosses |
+| `quiver` · no scalar series | the field under a quiver is the vectors' magnitude (I50) | an arrow's colour **is** its magnitude (I50) | **the same datum twice**, so the second yields — the zero-contrast measurement, already in the tree |
+| `quiver` · `["field","contour","quiver"]` | the field is `series` | the arrow's colour is the magnitude | **both channels live, and this is the only variant of six where they do** |
+| `contour`/`quiver` · `fieldDim` · `glyphInk` | a glyph and its ground share a cell (I51) | a stroke sits over a fill | **no shared quantum, so neither remedy has a subject** — §3ak.26's class, a resolution limit on a form that has no resolution |
+| `horizon` · `height > 1` | the rows below the top of a band are full (I52) | the top row carries the remainder | one quantity, and rows are how a raster spends it |
+| `horizon` · below `CONTINUOUS_FLOOR` | depth rides colour where colour can carry it | the glyph carries depth where it cannot (§3z ruling 4 arm A) | a colour-depth fork, so it stays terminal |
+
+**Four of the eight rows are cells no row of the suite could have held**, because a refused form has
+nothing to disagree about. That is F321's measurement arriving as a method rather than as a repair:
+a `silent` cell records nothing, so a refusal is a place the arm **and** the instrument both go
+unchecked.
+
+#### The list I70 closed at three was closed by a file
+
+I70's evidence reads *closed at three by a sweep of the ten sites in the dispatch that reshape a
+block*. The sweep ran, and its ten sites are real. **Its corpus was `definition.ts`**, and the class
+is a *shape* — `Plot → Plot`, no width, no capability — which `heatmapFormRows` holds three more of,
+one file along:
+
+| site | what it derives | who reads it |
+|---|---|---|
+| `fieldAxes` | row labels and a three-point `xLabels` from the grid's own domain | the terminal |
+| `calendarRows` | `calendarGrid(unit, start, values)` — a date grid from one series | the terminal |
+| the quiver's field | `magnitudeSeries(vectors)`, where the caller named no scalar | the terminal |
+
+**Two of the three are the reason two `SVG_FAMILY` entries are `null`.** `calendar`'s is filed under
+*its own domain: a date grid* — and a date grid **is** the derivation; once it has run, a calendar is
+a matrix at a different column count, which is what `IS_MATRIX` already says. `quiver`'s field does
+not exist at all until the substitution runs, so the arm was refusing a form for want of data the
+block does not carry and a pure function thirty lines away does.
+
+So a sweep bounded by a file left the second arm refusing two forms for a transform that was already
+written, already pure, and in the file next to the one that had just moved. **F322**, and it is the
+same shape as the rule it falsifies: *index by what the thing is, not by where it lives.*
+
+#### An arrow's colour is its magnitude, and no mark that can be an arrow carries one
+
+`SVG_FAMILY`'s own entry rules the residue's marks:
+
+> an iso-line is a `polyline` and an arrow is a `polyline` plus a `closed` triangle, **so nothing in
+> `Mark` is missing.**
+
+True about **shapes**, and silent about **channels** — MG24's class again, a correct sentence
+attached to a decision it does not constrain. I50 says an arrow's colour *is* its magnitude.
+`Mark.rect` carries `value`; `polyline` does not, and `Drawn` carries `ref` and `seriesIndex`, both
+categorical slots. So the arrow that crosses is the right shape with its only data channel dropped,
+and the sentence reads as coverage because it answers the question it asked.
+
+**The remedy is the member, not a mark kind** — which is the test `Mark`'s own doc states: *does the
+form already have a coordinate*, never *is the type short of a case*. A quiver has one, the grid;
+`value` is the established way a reading crosses where the mark's appearance is the datum, and it
+reaches a second kind rather than creating one. **F323**.
+
+**Measured: the channel is live on one variant of six.** Five quiver variants carry no scalar series,
+so the field *is* the magnitude and the terminal deliberately leaves the arrow uncoloured. A reader
+over the corpus would have found agreement on five frames and disagreement on the one nobody drew —
+which is the probe-at-the-extremes rule arriving on a colour channel.
+
+#### What crosses is the geometry, and what stays is the raster
+
+This is the residue's difference from I70's three, and it matters because **the same gate does not
+prove the same thing.**
+
+`ecdfSeries`, `densitySeries` and `binValues` return **series**, so the terminal reads back exactly
+what the second arm reads, and 1810 frames did not move. A contour's derivation returns **geometry**:
+crossings interpolated between adjacent readings, which exist on the data's own grid and nowhere
+else. A glyph-per-cell rasteriser cannot draw them — it resamples the field onto the cells it has and
+marches again, and `glyphForMask` wants a mask per cell that no set of segments can supply.
+
+So the terminal keeps its resampling, and that is rasterisation rather than a second derivation:
+marching squares over the data's grid is what the reference implementation draws, and the terminal's
+finer grid is the same iso-line at the resolution a cell affords. The same split runs through the
+other two — `horizonGrid`'s `within` is the geometry and its `eighths` is the raster, one line apart
+in the same function; `quiverRows`' vector is the geometry and its glyph is the raster.
+
+**The consequence for the gate inverts, and it is worth saying out loud.** For I70's three an unmoved
+terminal baseline *was* the proof the extraction was faithful. Here the terminal never reads the
+shared geometry back, so an unmoved baseline proves only that nothing was disturbed. **The frame is
+the only instrument that can say the two arms draw the same figure** — the fourth time this pass that
+has been the answer, and the first time it is true by construction rather than by accident.
+
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7170,7 +7276,8 @@ orientation — and belongs in the classification table as its own rows.
 - **I67** — **A decision the block splits, the figure resolves — and a decision that needs a capability stays out.** `axes` and `plotFrame` are two fields because an **author** has two questions; after resolution there is one border, so `frame` carries it with `"none"` and the renderers stop asking. `gutter`, `positionAxis` and `valueLabels` are separate members and not one, because `axes` gates three things and each carries a per-form override — a heatmap guts its rows whatever `axes` says, since its row labels *are* its ordinate. *Measured before the rule: five of the six block fields governing furniture reached no member, so `frame: "box"` came back for `axes: false` and `legendSlots` returned the same list for `legend: false` as for `legend: "right"` — an arm consuming them would have drawn furniture the author refused* (F295). **And the boundary is `caps`**: `legendPlacement` auto-enables through a clause reading `caps.colourDepth`, so `Figure.legend` carries the author's request and each arm resolves it. A figure that could answer differently at two rungs is not a figure.
 - **I68** — **A role is drawn distinguishably from every role it can share a figure with, and each arm holds a record keyed exhaustively by the role.** Not *seven roles, seven shapes*: the terminal draws `◆` for `mean` and for `target`, which is legitimate because `distributionFigure` cannot emit them together — and unfalsifiable stated the other way, so the claim is scoped to co-occurrence. Exhaustiveness is the compile-time half; the co-occurrence claim is the behavioural one, and neither alone holds the arms together. *Measured before the rule: `GlyphRole` was read in one file, the one declaring it; the terminal's own `GlyphChars` carried eleven slots of which **five were dead** and the dead five were exactly the role-named ones — `median`, `outlier`, `whiskerH`, `boxLeft`, `boxRight`; and the SVG's `switch` ended in a `default:` that would have drawn an eighth role as a circle. The arms agreed because the roles were extracted from the terminal's composition, which is agreement by history* (F289, F298, F300).
 - **I69** — **A figure whose two normalised axes carry one unit says so, and each arm fits a centred square inside its own box rather than filling it.** `isotropic` is a figure member because it is a property of the *figure* — a disc, a ring and a mosaic of squares are round or square in any renderer — and it is not the cell aspect, which stays a terminal fact under G2 and never crosses. *Measured before the rule: every pie and every radar in the catalogue is height-bound at every width, so `radiusFor`'s `byWidth` arm is dead across the corpus and its `min` reads as though it decided nothing; the second arm's plot area is 1.44× wider than tall with a right legend, so a unit square through `projected` is an ellipse and a waffle's hundred squares are 39.7 × 27.5 px. The plan's sentence — the aspect compensation disappears because an SVG square is square — is true about `CELL_ASPECT` and attached to a decision about the box* (F303).
-- **I70** — **A form whose figure is a derivation of its series computes that derivation above both renderers, and each arm draws the derived block.** I65 puts the derivation below both arms; this is the half that makes it observable, because a pure function in the right layer draws nothing until somebody applies it at an arm's entry. *Measured before the rule: `derive.ts` had existed since §3ak.7 ruled on it, holding `ecdfSeries` and `densitySeries`, and was imported by the terminal's dispatch table and by `kde.ts` — **by nothing on the second arm's side**. The row written for I65 builds the derived block itself and asserts the figure against it, so it passed while no caller did that; and a third form, `histogram`, was never named at all, because the walk that found the class was one family's. Three forms, closed at three by a sweep of the ten sites in the dispatch that reshape a block* (F268, F314, F317).
+- **I70** — **A form whose figure is a derivation of its series computes that derivation above both renderers, and each arm draws the derived block.** I65 puts the derivation below both arms; this is the half that makes it observable, because a pure function in the right layer draws nothing until somebody applies it at an arm's entry. *Measured before the rule: `derive.ts` had existed since §3ak.7 ruled on it, holding `ecdfSeries` and `densitySeries`, and was imported by the terminal's dispatch table and by `kde.ts` — **by nothing on the second arm's side**. The row written for I65 builds the derived block itself and asserts the figure against it, so it passed while no caller did that; and a third form, `histogram`, was never named at all, because the walk that found the class was one family's. Three forms, closed at three by a sweep of the ten sites in the dispatch that reshape a block — **and the sweep's corpus was a file**: `heatmapFormRows` holds three more of exactly that shape one file along, two of which are why two `SVG_FAMILY` entries are `null`* (F268, F314, F317, F322).
+- **I71** — **Where a derivation's output is geometry, the geometry crosses at the data's own resolution and each arm rasterises it at the resolution it has.** I70 says each arm draws the derived *block*, which is what a derivation returning series affords; a derivation returning a figure has no block to hand over. A contour's crossings are interpolations between adjacent readings, so they live on the data's grid — and a glyph-per-cell arm cannot draw them, because `glyphForMask` wants a mask per cell. The rule's observable form is a signature: `contourFigure` and `horizonFigure` take a block and return normalised marks with **no `areaWidth`, no `areaRows`, no `caps` and no string**, while `contourCellRows` and `horizonGrid` keep all four. *Stated blind spot: the terminal does not read the shared geometry back, so an unmoved terminal baseline is evidence that nothing was disturbed and **not** evidence that the arms agree — for I70's three the byte-identity was the proof, and here only the frame is* (F322, F323).
 
 
 ## 8. Commitments
@@ -7236,6 +7343,7 @@ orientation — and belongs in the classification table as its own rows.
 59. **The datum a form draws is derived once, above both renderers** (I65, §3ak.7). A derivation inside one arm's dispatch table is a figure the other arm cannot reach: `ecdf` and `density` drew their raw samples in SVG while the terminal drew a cumulative fraction and a kernel estimate — D14's shape found a second time, by walking a family rather than a form.
 60. **A form that is drawn is drawn from its data, and a sweep says so rather than a reader** (I66, §3ak.8). `G7b` asks whether a claimed form puts ink on the page; `ecdf` passes it and draws the same picture for every dataset. The rung above is the one a golden frame, a disagreement matrix and a mutation on dead code all structurally cannot reach.
 61. **A derivation is applied at each arm's entry, and the record has a column for every decision the arms make differently** (I70, §3ak.27, §3ak.28). A pure function in the shared layer is not a seam until a caller uses it: `derive.ts` sat one import away from the second arm for the length of the pass while `histogram`, `density` and `ecdf` drew a different quantity in each. And what caught it was a frame rather than a cell — the matrix had no column for a colour ramp or a drop notice, and a rule table is exhaustive over the rules you stated.
+62. **The residue's three forms draw in both arms, and what crosses is their geometry rather than their raster** (I71, §3ak.29). `contour`, `quiver` and `horizon` were refused for the length of the pass with the condition written down as a symbol, and checking the symbols found the prose around them wrong three times: a derivation sweep bounded by a file rather than by a shape, a ruling about mark *kinds* standing in for one about *channels*, and a gate whose meaning inverts when the derivation's output stops being a block.
 
 ---
 

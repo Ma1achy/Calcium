@@ -13642,6 +13642,95 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F323 — the residue's marks were ruled by kind, and the channel they needed lives on one kind ★★★★☆
+
+`SVG_FAMILY`'s `contour`/`quiver` entry rules the marks the residue would need:
+
+> an iso-line is a `polyline` and an arrow is a `polyline` plus a `closed` triangle, **so nothing in
+> `Mark` is missing.**
+
+Both clauses are true. The conclusion is about **shapes**, and an arrow needs a **channel**: C12 I50
+says an arrow's colour *is* its magnitude, and the terminal spends it —
+`continuousColour(map, (v − min) / (max − min))`, per cell, off the same resampling the direction
+comes from.
+
+```
+Mark.rect      { kind, x, y, w, h, fill?, depth?, value? }   ← value: the reading
+Mark.polyline  { kind, points, closed? }                     ← no value
+Drawn          { mark, layer, seriesIndex?, ref? }           ← both categorical slots
+```
+
+So an arrow crosses the seam as the right shape with its only data channel dropped, and every arrow
+in the document comes out one colour.
+
+**This is MG24's class rather than a mistake.** The sentence answers *is the type short of a case*,
+which is the right question to have asked — a new mark kind for a picture is exactly what `Mark`'s
+own doc warns against — and it does not constrain the decision it is attached to, because the arrow
+was never short of a case. Review checks whether a justification is **true**, and this one is.
+
+**The remedy is the member, and `Mark`'s doc supplies the test.** *Does the form already have a
+coordinate*, never *is the type short of a case*. A quiver has one — the grid — so `value` reaches a
+second mark kind rather than a ninth kind being invented. `rect`'s own wording already generalises:
+*the reading, where the mark's appearance is the datum*.
+
+### And it is live on one variant of six
+
+| variant | scalar series | the terminal's arrow |
+|---|---|---|
+| `default` · `arrows-only` · `still` · `ink-contrast` · `dim-floor` | none | **uncoloured** — the field *is* the magnitude, and colouring the arrow by it paints the glyph in exactly its own background (`38;2;33;145;141` on `48;2;33;145;141`) |
+| `with-contour` | `field(6, 24)` | **coloured by magnitude** |
+
+Five frames agree with a channel-less arrow and one does not, so a reader over the corpus reports
+83% agreement about a channel that is simply absent. **The convenient input shape is the degenerate
+one**, and here it is degenerate five times out of six.
+
+---
+
+## F322 — the derivation sweep's corpus was a file, and the class is a shape ★★★★★
+
+C12 I70's evidence closes its own subject:
+
+> Three forms, **closed at three** by a sweep of the ten sites in the dispatch that reshape a block.
+
+The sweep ran. Its ten sites are real, three of them were derivations, and the fourth it went looking
+for is genuinely not in `definition.ts`. **The corpus was `definition.ts`**, and the class it was
+sweeping for is `Plot → Plot`, no width, no capability — a *shape*, which does not care what file it
+is in. `heatmapFormRows` holds three more, one file along:
+
+```
+heatmap.ts:739   fieldAxes(block)        row labels + a three-point xLabels from the grid's domain
+heatmap.ts:769   calendarRows(raw)       calendarGrid(unit, start, values) — a date grid
+heatmap.ts:788   the quiver's field      magnitudeSeries(vectors), where no scalar was named
+```
+
+All three are pure, all three are read by the terminal alone, and all three are `drawnBlock`'s exact
+signature.
+
+### Two of the three are why two `SVG_FAMILY` entries are `null`
+
+| entry | its recorded reason | what the reason actually is |
+|---|---|---|
+| `calendar` | *its own domain: a date grid* | a date grid **is the derivation**. Once `calendarRows` has run, a calendar is a matrix at a different column count — which `IS_MATRIX` already says one component along |
+| `quiver` | *what is missing is a derivation above cells* | true of the arrows, and there is a **second** missing derivation underneath: without the substitution the block has no scalar series at all, so the field has nothing to paint |
+
+So the second arm was refusing two forms for want of a transform that was already written, already
+pure, and thirty lines from the one that had just moved. **The refusal reasons were not wrong about
+the geometry; they were silent about the data.**
+
+### Why no instrument reached it
+
+The sweep is the instrument, and it was indexed the way the finding it came from was found — by
+reading a dispatch table. Nothing else could have: `tsc` is happy with a pure function nobody calls,
+MG24 counts `fieldAxes` as consumed because `heatmapFormRows` consumes it, and the 181-frame SVG
+baseline compares clean because a refusal is a `null` and a `null` is stable.
+
+**The rule this falsifies is the rule it demonstrates.** *Index the artefact by rule interaction, not
+by input coverage* has a sibling that had not been written down: **index a sweep by the shape you are
+looking for, not by the place the last one turned up.** A sweep phrased over a corpus inherits that
+corpus's boundary, and a file is a boundary nobody chose for a reason.
+
+---
+
 ## F321 — a refusal hides the reader as well as the arm ★★★★★
 
 Drawing `treeLayout: "outline"` (F310) compared four pairs that had been `silent`, and comparing
