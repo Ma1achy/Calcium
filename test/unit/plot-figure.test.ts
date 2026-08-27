@@ -21,7 +21,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
 import { block } from "../../src/data/viewmodel/index.js";
-import { HAS_VALUE_AXIS, identityOf, valueAxisOf } from "../../src/presentation/plot/figure.js";
+import { HAS_VALUE_AXIS, RAMP_DEFAULT, identityOf, valueAxisOf } from "../../src/presentation/plot/figure.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { terminalDecisions } from "../support/arm-decisions.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
@@ -75,6 +75,33 @@ describe("FV — the shared axis, and a record with something to be wrong about"
     expect(checked, "form-variant-width triples with no value axis").toBeGreaterThan(30); // cells-ok — a frame count
     expect(exempted, "numeric labels the figure named itself").toBeGreaterThan(0); // cells-ok — a label count
     expect(offenders, "a form marked `false` drew a number on an axis").toEqual([]);
+  });
+
+  it("FV1c (C12 I60): a form whose readings are on a ramp has no value axis, with no exceptions", () => {
+    // **The cross-record row, and it is what would have caught three cells**
+    // (F327). `RAMP_DEFAULT` names the forms whose readings are spent on colour;
+    // `HAS_VALUE_AXIS` answers whether readings sit on a value scale. A form
+    // cannot do both, and the two records are written in different places by
+    // different arguments — which is how `contour`, `quiver`, `horizon` and
+    // `calendar` came to say it could.
+    //
+    // **Each of the four was wrong for the same shape of reason**: a sentence
+    // about the *gutter* or the *ordinate* answering a question about the
+    // *readings*. The calendar's is the one that reads most like evidence —
+    // *48 numeric gutter labels across the corpus* — and those 48 are the grid's
+    // identity, which `calendarGrid` writes.
+    //
+    // **Asserted with no exception list**, because it has none. A form that
+    // needs one is a form that draws a ramp *and* a labelled value axis, and the
+    // day one exists this row is where the case is argued.
+    const both = (Object.keys(RAMP_DEFAULT) as PlotForm[])
+      .filter((f) => RAMP_DEFAULT[f] !== null && HAS_VALUE_AXIS[f]);
+    expect(both, "a form cannot spend its readings on colour and on a scale").toEqual([]);
+    // **And the counter, because an empty record and a satisfied one print the
+    // same.** Eleven forms have a ramp; if that ever reaches zero the row above
+    // is vacuous and says so here first.
+    const ramped = (Object.keys(RAMP_DEFAULT) as PlotForm[]).filter((f) => RAMP_DEFAULT[f] !== null);
+    expect(ramped.length, "forms whose readings are a colour").toBe(11); // cells-ok — a form count
   });
 
   it("FV1b (C12 I60): the exemption is an identity, not a number that looks like one", () => {

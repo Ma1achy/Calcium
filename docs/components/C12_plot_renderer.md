@@ -6063,6 +6063,34 @@ the second arm's is the axis's three, and both arms draw both axes. Widening the
 last edge-bearing line* was measured and rejected: it moves cells in both directions across five
 other forms, which is a different reader rather than a repair.
 
+#### And the horizon, whose split is one line of one loop
+
+`horizonGrid` computed `within` — the fraction of a band — and then, on the next statement, spent it
+on `eighths`. **That statement is the line between the geometry and the raster**, and it is why this
+form had no coordinate to share rather than a hard one: nobody had drawn the line, so the whole loop
+read as rasterisation.
+
+```
+within      a fraction of a band, and of nothing else            the figure's
+eighths     how many of a cell's eight sub-rows that buys        the raster's
+```
+
+**The family it named was `"bar"` and it is its own**, on `contour`'s correction one form along. *A
+folded band is a `rect` with a `value`* is right about the mark and wrong about the emitter:
+`barFigure` reads `categoricalDecisions`, insets each rect into a categorical slot and anchors it on
+a niced value axis, and a horizon has none of the three.
+
+**The frame agrees to three figures.** The terminal's first column of `horizon/bands-3` draws one
+full row and four eighths of the next — 1.5 of 3, so `within` is 0.500 — and the second arm draws
+137.672 px of 275.2. And `signed` uses **six** fills where `bands-3` uses three, which is the mirror
+taking both halves of a diverging map (I52) shown rather than asserted.
+
+**One defect in the new arm, and a row found it rather than a frame.** `within` was unclamped, so a
+sample outside the caller's pin landed in the deepest band with `scaled − band > 1` — *how far into
+the band* exceeding the band, and a rect taller than its own plot area. The terminal never showed it
+because `horizonGrid` takes `min(h · 8, …)` a line later, which is the raster quietly repairing the
+geometry. `G6`'s clamp row is what asked.
+
 ### 3ak.30 — Which ramp, which is a figure decision two sentences agreed was not
 
 **A correlation matrix is drawn coolwarm by the terminal and viridis by the second arm** (F324), and

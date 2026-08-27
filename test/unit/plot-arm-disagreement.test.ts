@@ -211,7 +211,13 @@ const MEASURED = {
   // **Every cell agrees, including the value axis** — `radarCeiling` became
   // `valueAxisOf` and both arms normalise against the same ceiling (F304).
   "radar": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
-  "horizon": "refused",
+  // **The residue's third, drawn** (§3ak.29). Both open cells have **one** cause
+  // and it is F316's: the second arm draws no ramp key. `ramp` is that directly —
+  // 8 of 10, because `terminalRamp` wants three adjacent swatches and a two-band
+  // key has two, which is the reader's threshold answering correctly — and
+  // `identityLabels` is the same absence read through another column: the
+  // terminal's key is `0.0038  100  3 bands` and `bands` is a word.
+  "horizon": { silent: "0/10", "numericLabels": "agree", "identityLabels": "10/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "8/10", "notice": "agree" },
 } as const satisfies Readonly<globalThis.Record<PlotForm, Record_>>;
 
 /** One arm-pair for a spec, at a width. */
@@ -301,15 +307,24 @@ describe("AD — the two arms decide separately, and here is where", () => {
       .flatMap(([f, v]) => (v === "refused" ? [] : [[f, v as Claimed] as const]));
     const differing = (d: Decision): string[] => claimed.filter(([, v]) => v[d] !== "agree").map(([f]) => f);
 
-    // **Every pair, on every one of them** — the terminal draws a key under each
-    // matrix-family frame and the second arm draws none at all (0 of 181).
+    // **Every pair the terminal draws a key on** — and the second arm draws none
+    // at all (0 of 181). `horizon` is the exception and it is the reader's
+    // threshold rather than the arm's: `terminalRamp` wants three adjacent
+    // swatches of differing colour, and `bands-2`'s key has two, so both of its
+    // frames read `false` on both sides and agree. Stated rather than smoothed —
+    // an exception that is the instrument's limit is worth naming next to one
+    // that is a form's.
     const ramp = differing("ramp");
-    expect(ramp.sort(), "the matrix family and the field family, and nothing else")
-      .toEqual(["confusion", "contour", "correlation", "density2d", "heatmap", "latency",
+    expect(ramp.sort(), "every family whose readings are a colour, and nothing else")
+      .toEqual(["confusion", "contour", "correlation", "density2d", "heatmap", "horizon", "latency",
         "quiver", "spectrogram", "utilisation"]);
     for (const f of ramp) {
       const cell = ((MEASURED as globalThis.Record<string, Record_>)[f] as Claimed).ramp;
       const [differ, total] = String(cell).split("/");
+      if (f === "horizon") {
+        expect(cell, "a two-band key is two swatches, which is under the reader's floor").toBe("8/10");
+        continue;
+      }
       expect(differ, `${f}: every pair, not some`).toBe(total);
     }
 
@@ -353,6 +368,10 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // until a form's row captions were numbers, which is what `fieldAxes` makes;
     // removing it closed 27 cells and opened none, one of them `dumbbell`'s,
     // whose two categories are `1` and `2`.
+    //
+    // **224 → 231 with `horizon`**, whose 7 cells are 2 open, 4 closed and 1
+    // legitimate — and both open ones are F316's column, once directly and once
+    // as the key's own word landing in `identityLabels`.
     const claimed = (Object.values(MEASURED) as readonly Record_[]).filter((v): v is Claimed => v !== "refused");
     let open = 0;
     let closed = 0;
@@ -363,12 +382,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
         if (v[d] === "agree") closed += 1; else open += 1;
       }
     }
-    expect(claimed.length, "forms the SVG arm claims").toBe(32); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(14); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(224); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(32); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(56); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(136); // cells-ok — a cell count
+    expect(claimed.length, "forms the SVG arm claims").toBe(33); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(13); // cells-ok — a form count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(231); // cells-ok — a cell count
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(33); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(58); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(140); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

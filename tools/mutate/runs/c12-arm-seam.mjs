@@ -698,6 +698,27 @@ const results = runPass({
       to: "      if (valueOnX) {",
       expect: "SB",
     },
+    {
+      // **The residue's third form.** `within` is a fraction of a band and
+      // `eighths` is how many of a cell's eight sub-rows that buys; severing the
+      // first leaves both arms with a flat strip and the colour intact, which is
+      // the half of the form that was never the problem.
+      name: "THE ARM: a horizon's fold loses its within-band height",
+      file: FIGURE,
+      from: "    return { band, sign, within: size > 0 ? Math.min(1, scaled - band) : 0 };",
+      to: "    return { band, sign, within: 1 };",
+      expect: "baseline",
+    },
+    {
+      // **And the clamp `G6` found missing.** A sample past the caller's pin
+      // lands in the deepest band with `scaled − band > 1`; the terminal never
+      // showed it because `horizonGrid` takes `min(h · 8, …)` a line later.
+      name: "THE ARM: the fold is unclamped, so a pinned sample draws past the area",
+      file: FIGURE,
+      from: "within: size > 0 ? Math.min(1, scaled - band) : 0 };",
+      to: "within: size > 0 ? scaled - band : 0 };",
+      expect: "G6",
+    },
   ],
 });
 

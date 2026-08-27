@@ -42,6 +42,7 @@ import {
   barFigure,
   curveFigure,
   fieldFigure,
+  horizonFigure,
   distributionFigure,
   matrixFigure,
   nodesDecisions,
@@ -129,7 +130,7 @@ function escape(text: string): string {
  */
 export type SvgFamily =
   | "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion"
-  | "field";
+  | "field" | "horizon";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -220,7 +221,19 @@ export const SVG_FAMILY = {
   // normalised marks with no `areaWidth`, no `areaRows` and no `caps`** — and
   // the day it exists this is `"bar"`, because a folded band is a `rect` with a
   // `value`.
-  slope: null, dumbbell: "distribution", forest: "distribution", bullet: null, horizon: null,
+  slope: null, dumbbell: "distribution", forest: "distribution", bullet: null,
+  // **`horizon`'s condition was written as a symbol and it is met** (F294,
+  // §3ak.29): `horizonFigure`, a block in and normalised marks out, no
+  // `areaWidth`, no `areaRows`, no `caps`. `horizonGrid` computed `within` —
+  // the fraction of a band — one line before spending it on `eighths`, and
+  // that line is where the geometry ends and the raster begins.
+  //
+  // **The family it named was `"bar"` and it is its own.** *A folded band is a
+  // `rect` with a `value`* is right about the mark and wrong about the
+  // emitter: `barFigure` reads `categoricalDecisions`, insets each rect into a
+  // categorical slot and anchors it on a niced value axis, and a horizon has
+  // none of the three. Same correction as `contour`'s, one form along.
+  horizon: "horizon",
   // *A composition of other forms*, so it is whatever they are.
   smallmultiples: null, pairplot: null,
   // **A field with layers over it, and both halves of the deferral were right**
@@ -271,6 +284,7 @@ function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
     case "nodes": return nodesDecisions(block);
     case "proportion": return proportionFigure(block);
     case "field": return fieldFigure(block);
+    case "horizon": return horizonFigure(block);
     default: return null;
   }
 }
@@ -1008,7 +1022,7 @@ function marks(
   // the topology crosses and the placement does not.
   if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
     || family === "bar" || family === "distribution" || family === "proportion"
-    || family === "field") && "marks" in figure) {
+    || family === "field" || family === "horizon") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 

@@ -13642,6 +13642,48 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F327 — a form cannot spend its readings on colour and on a scale, and four said it could ★★★★★
+
+`HAS_VALUE_AXIS` answers whether a form's **readings** sit on a value scale, and its own doc rules
+out the reading that would make it easy:
+
+> *Not* whether the terminal draws a numeric gutter — that is a different question with a different
+> answer, and **conflating them is how this record would have been exhaustively wrong**.
+
+Four forms were `true` and each was justified by exactly that conflation.
+
+| form | the sentence | what the frame says |
+|---|---|---|
+| `contour` · `quiver` | *a field is sampled over a domain, so its columns are positions and its **rows are a scale*** | the **ordinate**. Its readings are on the key: `1.5  99 · 20 40 60 80` |
+| `horizon` | — | no gutter at all. Its readings are on the key: `0.0038  100  3 bands` |
+| `calendar` | *a date grid and a time span both read their cells against a scale, and the calendar is **the measured proof: 48 numeric gutter labels** across the corpus* | the **gutter**, and those 48 are the grid's identity — `calendarGrid` writes the dates |
+
+**The calendar's row is the one to read twice**, because it carries a measurement and the
+measurement is real. Forty-eight numeric gutter labels were counted, and counting them answers the
+question the doc says this record is not about. A figure with a number in its gutter and a colour
+ramp under its cells is precisely the case the two questions come apart on.
+
+### The cross-record rule, and it has no exceptions
+
+`RAMP_DEFAULT` names the eleven forms whose readings are spent on colour. After the four flips,
+**every one of them has `HAS_VALUE_AXIS === false`** — so the property is assertable directly rather
+than as a list of forms:
+
+```ts
+RAMP_DEFAULT[f] !== null && HAS_VALUE_AXIS[f]     // empty, and it is FV1c
+```
+
+Two records written in different files by different arguments, and nothing had ever compared them.
+That is what let the same conflation land four times: each cell was argued on its own, each argument
+was true about something, and no instrument asked the pair.
+
+**FV1 could not have caught any of the four** — it skips every form marked `true`, which is the
+refusal-hides-the-instrument shape arriving on a *record cell*. The exemption FV1 needed for the
+flips is the one F325 already gave it: a numeric label the figure named itself is an identity, not
+an axis, and all 48 of the calendar's are.
+
+---
+
 ## F326 — the second arm's reader classifies a label by whether it is clipped ★★★★☆
 
 `svgDecisions` split every `<text>` two ways:

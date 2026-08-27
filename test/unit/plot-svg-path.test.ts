@@ -28,7 +28,9 @@ import { rgbOf } from "../support/theme.js";
 import { tiles } from "../../src/presentation/plot/hierarchy.js";
 import { flatten } from "../../src/presentation/plot/tree.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
-import { barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS, proportionFigure } from "../../src/presentation/plot/figure.js";
+import {
+  barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS, horizonFigure, proportionFigure,
+} from "../../src/presentation/plot/figure.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { resolve } from "../../src/presentation/theme/index.js";
 import { DARK_THEME as THEME } from "../support/render.js";
@@ -607,6 +609,18 @@ describe.each(supported)("G6 — %s", (form) => {
       // is not on the floor — where for a curve the two coincide, which is why
       // one assertion stood for both families until the bar family crossed.
       expect(ts[1], `${form}: the pinned floor is not the bar's baseline`).toBeGreaterThan(0);
+      return;
+    }
+    if (family === "horizon") {
+      // **A horizon folds rather than positions, so the clamp is on depth.** A
+      // sample outside the pin lands in the deepest band, and `within` — *how
+      // far into the band* — is what must not exceed it. Unclamped it drew a
+      // rect taller than the plot area, which the terminal never showed because
+      // `horizonGrid` takes `min(h · 8, …)` one line after computing it.
+      const hs = horizonFigure(made).marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.h] : []));
+      expect(hs.length, "a rect per sample").toBeGreaterThan(0); // cells-ok — a sample count
+      expect(Math.max(...hs), "the deepest band is full and no fuller").toBeCloseTo(1, 6);
+      expect(hs.every((h) => h >= 0 && h <= 1), "and every fold is inside its own band").toBe(true);
       return;
     }
     const drawn = sampleYs(plotToSvg(made, THEME, layout) ?? "");

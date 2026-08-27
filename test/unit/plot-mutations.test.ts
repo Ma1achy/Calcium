@@ -43,7 +43,8 @@ import { formatReadout, readoutSet, xTickRow } from "../../src/presentation/plot
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
-import { horizonBandT, horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
+import { horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
+import { horizonBandT } from "../../src/presentation/plot/figure.js";
 import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
 import { validateBlock, HONOURS_AXIS_CROSS, ORIGIN_DEFAULT, type PlotForm } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";

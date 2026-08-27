@@ -17,6 +17,7 @@ import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribut
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
+import { COLORMAPS } from "../theme/colormap.js";
 import type { ColourRef } from "../theme/types.js";
 import { axisFor, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
 import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
@@ -98,7 +99,7 @@ export const HAS_VALUE_AXIS = {
   sparkline: true, slope: true, bubble: true, stackedarea: true, streamgraph: true,
   bar: true, histogram: true, lollipop: true, dotplot: true, waterfall: true,
   boxplot: true, violin: true, ridgeline: true, forest: true, dumbbell: true,
-  autocorrelation: true, bullet: true, funnel: true, horizon: true,
+  autocorrelation: true, bullet: true, funnel: true,
   // **A field's readings are colours, and the sentence that made these `true`
   // was about the ordinate** (F325). *A field is sampled over a domain, so its
   // columns are positions and its rows are a scale* — true, and about the
@@ -112,14 +113,22 @@ export const HAS_VALUE_AXIS = {
   // **Both arms were blind to the cell**: `fieldFigure` did not exist, and FV1
   // skips every form marked `true`. A refusal is a place the instrument is not
   // being checked, and a record cell is an instrument.
-  // A date grid and a time span both read their cells against a scale, and the
-  // calendar is the measured proof: 48 numeric gutter labels across the corpus.
-  calendar: true, gantt: true, timeline: true,
+  gantt: true, timeline: true,
   // **Readings that are not on an axis, and the three families are the point.**
   // A matrix reads its values as colour, tiles read them as area, nodes read
   // them as structure. Each furnished a false axis before this record existed.
   heatmap: false, correlation: false, confusion: false, spectrogram: false,
   contour: false, quiver: false,
+  // **And the three that close the class** (F327). Every form with an entry in
+  // `RAMP_DEFAULT` spends its readings on colour, so none of them has a value
+  // axis — and after `contour` and `quiver`, `horizon` and `calendar` were the
+  // last two saying otherwise. A horizon's readings are on its key,
+  // `0.0038  100  3 bands`; a calendar's are on `0  12`. **The calendar's row was
+  // measured from the gutter** — *48 numeric gutter labels across the corpus* —
+  // which is the one reading this record's own doc rules out, and those 48 are
+  // the grid's **identity**: `calendarGrid` writes the dates. `FV1c` is the
+  // cross-record row, and it has no exceptions.
+  horizon: false, calendar: false,
   latency: false, density2d: false, utilisation: false,
   flame: false, icicle: false, treemap: false,
   tree: false, graph: false,
@@ -1565,6 +1574,173 @@ export function fieldFigure(block: Plot): Figure {
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
     valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
+    ramp: rampOf(block),
+    marks,
+  };
+}
+
+// --- the horizon's bands (I52, I71, §3z, §3ak.29) ---------------------------
+
+/** One sample's place in the fold — **geometry, with no resolution in it**. */
+export type HorizonBand = Readonly<{
+  /** 0 nearest the baseline, `bands − 1` deepest. */
+  band: number;
+  /** `1` above the baseline, `-1` below it. */
+  sign: 1 | -1;
+  /** How far into the band, `0 … 1`. The raster spends this; the figure carries it. */
+  within: number;
+}>;
+
+/**
+ * What the fold is measured from (§3z, I52).
+ *
+ * **Zero where the range spans it, the minimum otherwise.** Folding about the
+ * data's minimum unconditionally is what shipped, and it is why the form only
+ * ever folded one way — a series that never crosses zero renders identically
+ * under both rules, so the defect is invisible on exactly the fixtures a
+ * catalogue carries.
+ */
+export function horizonBaseline(range: Range): number {
+  return range.min <= 0 && range.max >= 0 ? 0 : range.min;
+}
+
+/**
+ * The fold, one entry per **sample** (I52, I71, §3z).
+ *
+ * **`horizonGrid`'s arithmetic, above the raster.** That function took
+ * `areaWidth` and `areaRows`, resampled the series onto columns, and computed
+ * `within` one line before spending it on `eighths` — the geometry and the
+ * rasterisation in one loop, which is why this form had no coordinate to share.
+ * The split is the line between those two statements: `within` is a fraction of
+ * a band and `eighths` is how many of a cell's eight sub-rows that buys, and
+ * only a grid has sub-rows.
+ *
+ * A gap is `null` rather than a zero band: absence and the minimum are the two
+ * things this form must not conflate, since its whole subject is *how deep*.
+ */
+export function horizonBands(
+  series: Series,
+  range: Range,
+  bands: number,
+): readonly (HorizonBand | null)[] {
+  const n = Math.max(1, Math.floor(bands)); // cells-ok — a band count
+  const baseline = horizonBaseline(range);
+  // The deepest deviation either side, so the bands are the same size above and
+  // below — a mirror whose two halves had different scales would say a shallow
+  // trough is as deep as a tall peak.
+  const reach = Math.max(Math.abs(range.max - baseline), Math.abs(range.min - baseline));
+  const size = reach > 0 ? reach / n : 0;
+  return series.values.map((v) => {
+    if (v === null || !Number.isFinite(v)) return null;
+    const deviation = Math.abs(v - baseline);
+    const sign: 1 | -1 = v < baseline ? -1 : 1;
+    const scaled = size > 0 ? deviation / size : 0;
+    const band = Math.min(n - 1, Math.floor(scaled)); // cells-ok — a band index
+    // **Clamped, and `G6` is what found it missing.** `band` is already pinned at
+    // `n − 1`, so a sample beyond the caller's `yMin`/`yMax` lands in the last
+    // band with `scaled − band > 1` — *how far into the band* exceeding the band.
+    // The terminal never showed it because `horizonGrid` takes `min(h · 8, …)`
+    // one line later; this arm drew a rect taller than its own plot area.
+    return { band, sign, within: size > 0 ? Math.min(1, scaled - band) : 0 };
+  });
+}
+
+/**
+ * Where a band sits on the colormap, in `0…1` (I52, §3z).
+ *
+ * **A diverging map's two halves are the two directions**, deeper reading
+ * further from the centre. On a sequential map — which the gates only allow
+ * where nothing crosses the baseline — the whole ramp is one direction, so a
+ * band indexes it directly and no half is wasted on a sign that cannot occur.
+ */
+export function horizonBandT(
+  cell: Pick<HorizonBand, "band" | "sign">,
+  bands: number,
+  diverging: boolean,
+): number {
+  const n = Math.max(1, Math.floor(bands)); // cells-ok — a band count
+  const depth = (cell.band + 1) / n;
+  return diverging ? 0.5 + (cell.sign * depth) / 2 : depth;
+}
+
+/**
+ * The bands a horizon folds into, declared or defaulted (§3z).
+ *
+ * **Three, and the default was `definition.ts`'s** — a literal in the terminal's
+ * dispatch, which is the shape F322 is about: both arms need it and one held it.
+ */
+export const HORIZON_BANDS_DEFAULT = 3;
+
+export function horizonBandCount(block: Pick<Plot, "bands">): number {
+  return Math.max(1, Math.floor(block.bands ?? HORIZON_BANDS_DEFAULT));
+}
+
+/**
+ * A horizon's figure — one rect per sample, **height and colour both** (I52,
+ * I71, §3z, §3ak.29).
+ *
+ * **Its own family, and the record predicted `"bar"`.** *A folded band is a
+ * `rect` with a `value`* is right about the mark and wrong about the emitter:
+ * `barFigure` reads `categoricalDecisions`, insets each rect into a categorical
+ * slot and anchors it on a niced value axis, none of which a horizon has. The
+ * family names which emitter, which is the same correction `contour` and
+ * `quiver` needed one form along.
+ *
+ * **The columns are the terminal's mapping, in fractions.** `horizonGrid` maps
+ * column `c` of `w` to sample `round((c / (w − 1)) · (count − 1))` — endpoint to
+ * endpoint — so sample `i` owns a band of width `1 / (count − 1)` centred on
+ * `i / (count − 1)`, clipped at the two ends. Reproduced rather than tidied: a
+ * cell convention here would put the two arms half a sample apart.
+ *
+ * **`value: null`, and the frame is why.** A horizon draws no gutter at all; its
+ * readings are on its key — `0.0038  100  3 bands` — exactly where a field's and
+ * a matrix's are (F327).
+ */
+export function horizonFigure(block: Plot): Figure {
+  const series = block.series[0];
+  const extent = seriesRange(block.series, block);
+  const bands = horizonBandCount(block);
+  const marks: Drawn[] = [];
+  if (series !== undefined && extent !== null) {
+    const folded = horizonBands(series, extent, bands);
+    const count = folded.length; // cells-ok — a sample count
+    const step = count > 1 ? 1 / (count - 1) : 1; // cells-ok — a sample count
+    // **A diverging map is the signed case and the gates already decide it**
+    // (§3z H3). Read off the ramp's own name rather than re-derived, so the two
+    // arms cannot disagree about which half of the map a trough is on.
+    const name = rampOf(block);
+    const diverging = name !== null && COLORMAPS[name]?.kind === "diverging";
+    folded.forEach((cell, i) => {
+      if (cell === null) return;
+      const x = count > 1 ? Math.max(0, i * step - step / 2) : 0; // cells-ok — a sample index
+      const right = count > 1 ? Math.min(1, i * step + step / 2) : 1; // cells-ok — a sample index
+      marks.push({
+        mark: {
+          kind: "rect",
+          x,
+          y: 0,
+          w: right - x,
+          h: cell.within,
+          fill: true,
+          value: horizonBandT(cell, bands, diverging),
+        },
+        layer: "series",
+        seriesIndex: 0,
+      });
+    });
+  }
+  return {
+    value: null,
+    extent,
+    identity: [],
+    isotropic: false,
+    orientation: ORIENTATION_UNUSED,
+    facing: facingOf(block, FACING_DEFAULT),
+    frame: "none",
+    gutter: false,
+    positionAxis: positionAxisOf(block),
+    valueLabels: null,
     legend: legendOf(block),
     ramp: rampOf(block),
     marks,
