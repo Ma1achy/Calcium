@@ -72,15 +72,29 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
   });
 
   it("SB4 (F259): a refusal is a frame, so one cannot appear or vanish silently", () => {
-    // `plotToSvg` returns `null` for nineteen forms, for `ohlc`, and for a
-    // non-default origin — every one a decision. A corpus that skipped them
-    // would let a claimed form quietly stop drawing, which is the one thing a
-    // `null` arm must not do.
+    // `plotToSvg` returns `null` for a shrinking set of forms, for a non-default
+    // origin, and for an empty value list — every one a decision. A corpus that
+    // skipped them would let a claimed form quietly stop drawing, which is the
+    // one thing a `null` arm must not do.
+    //
+    // **The `> 50` floor is gone, and it is the third row this pass has taken it
+    // out of** (F310, F328). It was a number that had to be edited every time a
+    // form landed and that said nothing when it was — 77 refusals when it was
+    // written, 45 now, and F310's own finding names this row as *the one whose
+    // headline states the property its assertion cannot see*. That finding fixed
+    // the partition and left the bounds.
+    //
+    // **What the row can assert without a literal**: every refusal on disk is
+    // byte-identical to the placard, over **all** of them rather than the first
+    // three — a slice is the sampling blind spot one level down from the bound —
+    // and the two sides together are the corpus.
     const refusals = [...fresh.entries()].filter(([, v]) => v === refusal).map(([k]) => k);
-    expect(refusals.length, "refusals are recorded rather than absent").toBeGreaterThan(50);
+    expect(refusals.length, "refusals are recorded rather than absent").toBeGreaterThan(0);
     expect(refusals.length, "and they are not the whole corpus").toBeLessThan(fresh.size);
-    for (const name of refusals.slice(0, 3)) {
-      expect(readFileSync(join(DIR, name), "utf8")).toBe(refusal);
+    const drawn = [...fresh.entries()].filter(([, v]) => v !== refusal).map(([k]) => k);
+    expect(refusals.length + drawn.length, "refused and drawn are the whole corpus").toBe(fresh.size);
+    for (const name of refusals) {
+      expect(readFileSync(join(DIR, name), "utf8"), name).toBe(refusal);
     }
   });
 

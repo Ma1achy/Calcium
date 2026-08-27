@@ -13642,6 +13642,41 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F328 — three rows guard the refusal count with a magnitude, and every one had to be edited ★★★☆☆
+
+`SB4`, `G7` and `PR1` each bound the number of refusals from below:
+
+```
+SB4   expect(refusals.length, "refusals are recorded rather than absent").toBeGreaterThan(50)
+G7    expect(refused.length,  "nor is the refused set").toBeGreaterThan(15)
+PR1   expect(allRefused.length, "the corpus has refusals to partition").toBeGreaterThan(50)
+```
+
+**This pass moved that count from 77 to 45 in eight commits**, and each bound failed on the commit
+that crossed it — not with a finding, but with a number to edit. A gate that has to be edited every
+time its subject moves is a gate that reports *the subject moved*, which is what the diff already
+said.
+
+**F310 named `SB4` by this exact property** — *a row whose headline states the property its
+assertion cannot see*, asserting `> 50` and `< 178` while a refusal could appear or vanish inside
+both — and its fix was the partition next door. The bounds stayed, and the two siblings were never
+looked at.
+
+### What each row can assert without a literal
+
+| row | the literal | what replaced it |
+|---|---|---|
+| `SB4` | `> 50` | every refusal on disk is byte-identical to the placard, over **all** of them rather than the first three, and refused + drawn is the corpus |
+| `G7` | `> 15` on each side | the two sides partition `PlotForm` by equality, and neither is empty |
+| `PR1` | `> 50` | the floor is `> 0` — the partition rows above it already carry the claim |
+
+**And `SB4` had a second bound nobody named**: `refusals.slice(0, 3)`, a three-element sample of the
+byte-identity check. That is the corpus-bound blind spot one level down from the magnitude — it
+tests the placard against the three refusals whose names sort first, and any of the other 42 could
+have held anything.
+
+---
+
 ## F327 — a form cannot spend its readings on colour and on a scale, and four said it could ★★★★★
 
 `HAS_VALUE_AXIS` answers whether a form's **readings** sit on a value scale, and its own doc rules

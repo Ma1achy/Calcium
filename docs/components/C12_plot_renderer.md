@@ -6184,6 +6184,32 @@ with it**, and those two are the only record of what the wrong frame looked like
 rows were reported by name — which is what comparing a declaration list **by equality** buys, and
 what a subset check would have left sitting there (F310).
 
+### 3ak.32 — `calendar`: family 8's first form, and the derivation is the whole of it
+
+`SVG_FAMILY`'s reason was *its own domain: a date grid*, filed with `gantt`, `timeline` and `funnel`.
+**A date grid is not a domain this arm cannot reach; it is a `Plot → Plot` transform that lived in a
+terminal renderer** — `calendarRows`, moved by F322 — and once it has run the block is seven weekday
+rows of week columns with the dates in their labels. That is a matrix at a different column count,
+which `IS_MATRIX` has recorded all along.
+
+So the entry is `"matrix"` and the emitter is unchanged. **Six frames, and no new code**: the arm
+draws because the derivation crossed, which is F322's value landing two commits after its extraction.
+
+**Read on the frame.** `calendar/default` gives `Mon Tue Wed Thu Fri Sat Sun` down the gutter, one
+per band, which is the terminal's gutter exactly — and it is F325's placement fix that put them
+there rather than evenly along a fifty-four-column x axis.
+
+**Two open cells and one is F318's, on a third form.** `ramp` is F316's column. `notice` is
+*legitimate*: a calendar drops leading columns because a cell is a quantum and 365 days do not fit in
+62 of them, where this arm scales its 640 px across whatever it is given — and `identityLabels` 3/12
+is that same drop read through another column, because the terminal's notice names the dates it
+withheld.
+
+**And `PR1`'s floor came down with `G7`'s.** *The corpus has refusals to partition — `> 50`* was a
+number this pass has moved from 77 to 45 in eight commits, and a bound that has to be edited every
+time a form lands says nothing when it is. The floor is `> 0`, and the day it reaches zero the arm
+claims every frame and the row says so first (F310).
+
 ---
 ## 3q. One value axis across the bands, and the record it never had
 

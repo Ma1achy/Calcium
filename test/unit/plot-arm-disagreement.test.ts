@@ -183,7 +183,14 @@ const MEASURED = {
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "stackedarea": "refused",
   "streamgraph": "refused",
-  "calendar": "refused",
+  // **The matrix family's eighth, and the only one that needed a derivation to
+  // get here** (§3ak.32). `ramp` is F316's column; `notice` is F318's legitimate
+  // difference arriving on a third form — a calendar drops leading columns
+  // because a cell is a quantum and 365 days do not fit in 62 of them, and this
+  // arm scales its 640 px across whatever it is given. `identityLabels` 3/12 is
+  // the same drop read through another column: the terminal's notice names the
+  // dates it withheld.
+  "calendar": { silent: "0/12", "numericLabels": "agree", "identityLabels": "3/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "12/12", "notice": "3/12" },
   "correlation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "agree" },
   "confusion": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "2/2", "notice": "agree" },
   "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "4/4", "notice": "1/4" },
@@ -321,8 +328,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // that is a form's.
     const ramp = differing("ramp");
     expect(ramp.sort(), "every family whose readings are a colour, and nothing else")
-      .toEqual(["confusion", "contour", "correlation", "density2d", "heatmap", "horizon", "latency",
-        "quiver", "spectrogram", "utilisation"]);
+      .toEqual(["calendar", "confusion", "contour", "correlation", "density2d", "heatmap", "horizon",
+        "latency", "quiver", "spectrogram", "utilisation"]);
     for (const f of ramp) {
       const cell = ((MEASURED as globalThis.Record<string, Record_>)[f] as Claimed).ramp;
       const [differ, total] = String(cell).split("/");
@@ -387,12 +394,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
         if (v[d] === "agree") closed += 1; else open += 1;
       }
     }
-    expect(claimed.length, "forms the SVG arm claims").toBe(33); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(13); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(231); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(33); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(58); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(140); // cells-ok — a cell count
+    expect(claimed.length, "forms the SVG arm claims").toBe(34); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(12); // cells-ok — a form count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(238); // cells-ok — a cell count
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(34); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(60); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(144); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

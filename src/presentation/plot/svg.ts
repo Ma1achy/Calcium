@@ -191,7 +191,14 @@ export const SVG_FAMILY = {
   // slots and clips its labels, which is font-independent by construction.
   tree: "nodes", graph: "nodes",
   // *Its own domain*: a date grid, a time span.
-  calendar: null, gantt: null, timeline: null, funnel: null,
+  // **A calendar is a matrix at a different column count, and the derivation is
+  // what makes that true** (§3ak.32). Its old reason was *its own domain: a date
+  // grid* — and a date grid **is** `calendarRows`, a `Plot → Plot` transform
+  // that lived in a terminal renderer until F322 moved it. After `drawnBlock`
+  // the block is seven weekday rows of week columns with the dates in their
+  // labels, which is exactly what `matrixFigure` emits.
+  calendar: "matrix",
+  gantt: null, timeline: null, funnel: null,
   // **Proportion** — an angle, a polygon's radius, a count of squares, and the
   // three terminal compensations named as terminal (§3ak.26). What crosses is
   // the shares, the ceiling and the hundred-square assignment; what stays is
