@@ -135,7 +135,12 @@ const MEASURED = {
   // terminal's own — and this matrix, which compares five *decisions*, could
   // report only this. It is a decision gate; `test/golden/svg-baseline/` is the
   // picture gate, and the two answer different questions on purpose.
-  "line": { silent: "16/86", "numericLabels": "62/70", "identityLabels": "51/70", "border": "2/70", "interiorRules": "4/70", "legend": "8/70", "ramp": "agree", "notice": "agree" },
+  // **78 pairs where there were 70** (§3ak.31): the four candlestick variants
+  // drew on both sides, so eight cells that had been `silent` are compared —
+  // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
+  // The four that opened are the candles' own furniture, which no cell of this
+  // matrix had ever seen.
+  "line": { silent: "8/86", "numericLabels": "68/78", "identityLabels": "54/78", "border": "4/78", "interiorRules": "10/78", "legend": "14/78", "ramp": "agree", "notice": "agree" },
   "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "6/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "notice": "agree" },
   "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "2/4", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "notice": "agree" },

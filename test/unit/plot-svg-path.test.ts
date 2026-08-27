@@ -723,27 +723,69 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     { open: 11, high: 13, low: 9, close: 13 },
   ] as const;
 
-  it("G8a: candles are refused rather than drawn as an empty axis", () => {
-    // **Measured before it was fixed**: this returned a full frame with five
-    // gridlines labelled 0, 0.25, 0.5, 0.75, 1 — `seriesRange([])` is `null`
-    // and the fallback furnished an axis out of nothing — while the terminal
-    // drew three candles spanning 8 to 16.
+  /**
+   * **These two rows asserted the refusal and now assert what it protected**
+   * (§3ak.31). The refusal was right and narrow — *`ohlc` is the candles' own
+   * data and nothing here reads it* — and the remedy is to read it, so the
+   * measurement each row was written around is the thing to keep: the axis, not
+   * the `null`.
+   *
+   * Inverting rather than deleting is deliberate. A deleted row takes its
+   * measurement with it, and this one is the only record of what the wrong
+   * frame looked like.
+   */
+  it("G8a (§3ak.31): candles draw, on the candles' own range and not a furnished one", () => {
+    // **Measured before the refusal existed**: this returned a full frame with
+    // five gridlines labelled 0, 0.25, 0.5, 0.75, 1 — `seriesRange([])` is
+    // `null` and the fallback furnished an axis out of nothing — while the
+    // terminal drew three candles spanning 8 to 16.
     const candles = b.plot({
       id: "c", form: "line", height: 6, plotStyle: "candlestick", series: [], ohlc: [...OHLC],
     });
-    expect(plotToSvg(candles, THEME), "the datum is ohlc and nothing here reads it").toBeNull();
+    const svg = plotToSvg(candles, THEME);
+    expect(svg, "the datum is read now, so there is a picture").not.toBeNull();
+    const labels = [...(svg ?? "").matchAll(/<text[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1]);
+    expect(labels, "the axis is the candles', not `seriesRange([])`'s fallback")
+      .not.toEqual(expect.arrayContaining(["0.25"]));
+    // **Coverage rather than the exact ticks**, because the nicing rule is
+    // `niceAxis`'s business and this row is about *whose* range it niced: 8 to
+    // 16 nices to 5, 10, 15, 20, and asserting that list would fail the day the
+    // step changed while saying nothing more than these two bounds do.
+    const ticks = labels.filter((l) => l !== undefined && /^\d+$/u.test(l)).map(Number);
+    expect(ticks.length, "the gutter is labelled").toBeGreaterThan(1); // cells-ok — a tick count
+    expect(Math.min(...ticks), "the floor is at or below the candles' low").toBeLessThanOrEqual(8);
+    expect(Math.max(...ticks), "the ceiling at or above their high").toBeGreaterThanOrEqual(16);
+    // **One body per candle, counted on the figure** — the document's rects
+    // include the legend's two swatches, and a filter on the *document* would be
+    // this row guessing which rect is which. The figure is where *one body per
+    // candle* is a fact; the document is where the two inks are.
+    const bodies = curveFigure(candles).marks.filter((d) => d.mark.kind === "rect");
+    expect(bodies, "one body per candle").toHaveLength(3); // cells-ok — a candle count
+    expect(new Set(bodies.map((d) => d.ref)).size, "and both directions are drawn").toBe(2);
+    expect(new Set([...(svg ?? "").matchAll(/fill="(#[0-9a-f]{6})"/gu)].map((m) => m[1])).size,
+      "which reach the page as two inks and a ground").toBeGreaterThanOrEqual(3);
   });
 
-  it("G8b: a moving average over candles is refused too — the worse of the two", () => {
-    // **The range came from the average alone.** Ticks 11 to 12 against data
-    // spanning 8 to 16, with a line drawn confidently across them: not a blank
-    // a reader questions but a chart of the wrong thing. The empty-marks clause
-    // cannot reach this one, because the average draws a mark.
+  it("G8b (§3ak.31): a moving average over candles is on the candles' range, not its own", () => {
+    // **The range came from the average alone** before §3ak.7 C6 put the bars
+    // into `seriesRange`: ticks 11 to 12 against data spanning 8 to 16, with a
+    // line drawn confidently across them — not a blank a reader questions but a
+    // chart of the wrong thing, and the empty-marks clause cannot reach it
+    // because the average draws a mark. **This is the row that says the range is
+    // the union**, which is what makes drawing the two together honest.
     const withMa = b.plot({
       id: "m", form: "line", height: 6, plotStyle: "candlestick",
       series: [{ label: "ma", values: [11, 12, 12] }], ohlc: [...OHLC],
     });
-    expect(plotToSvg(withMa, THEME), "an average is not a picture of the candles").toBeNull();
+    const svg = plotToSvg(withMa, THEME);
+    expect(svg, "an average and its candles are one picture").not.toBeNull();
+    const labels = [...(svg ?? "").matchAll(/<text[^>]*>([^<]*)<\/text>/gu)]
+      .map((m) => m[1]).filter((l) => l !== undefined && /^\d+$/u.test(l)).map(Number);
+    expect(Math.min(...labels), "the floor is the candles' low, not the average's").toBeLessThanOrEqual(8);
+    expect(Math.max(...labels), "and the ceiling is their high").toBeGreaterThanOrEqual(16);
+    // The average is a polyline in a series slot; the candles are in tone slots.
+    const strokes = new Set([...(svg ?? "").matchAll(/stroke="(#[0-9a-f]{6})"/gu)].map((m) => m[1]));
+    expect(strokes.size, "three inks: rising, falling, and the overlay").toBeGreaterThanOrEqual(3);
   });
 
   it("G8c: furniture with no ink is a refusal, and that is a second clause", () => {

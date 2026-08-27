@@ -1124,20 +1124,22 @@ export function plotToSvg(
 ): string | null {
   if (svgFamilyOf(given.form) === null) return null;
 
-  // **A datum this path cannot see is a refusal, not a blank** (F259).
+  // **The `ohlc` refusal used to be here and it is gone** (F259, §3ak.31).
   //
-  // `ohlc` is the candles' own data and nothing here reads it. A `line` with
-  // `plotStyle: "candlestick"` therefore took the curve arm, found `series: []`
-  // — which is legal precisely because plain candles are the ordinary case
-  // (C04 I57) — and drew **a fully furnished plot with an axis running 0 to 1**
-  // while the terminal drew three candles over 8 to 16.
+  // It was right and it was narrow: *`ohlc` is the candles' own data and nothing
+  // here reads it*, so the curve arm found `series: []` — legal precisely
+  // because plain candles are the ordinary case (C04 I57) — and drew a fully
+  // furnished plot with an axis running 0 to 1 while the terminal drew three
+  // candles over 8 to 16. The moving-average case was worse than the empty one:
+  // a non-empty `series` beside `ohlc` is an average *over* the candles, so the
+  // range came from the average alone and the frame was a confident chart of the
+  // wrong thing rather than a blank a reader questions.
   //
-  // **And the moving-average case is worse than the empty one.** A non-empty
-  // `series` beside `ohlc` is an average *over* the candles, so the range came
-  // from the average alone: ticks 11 to 12 against data spanning 8 to 16. Not a
-  // blank frame a reader questions but **a confident chart of the wrong thing**,
-  // which is the plausible wrong figure the `null` arm exists to refuse.
-  if (given.ohlc !== undefined) return null;
+  // **That is a refusal for a figure whose data has not been read, and F259's
+  // subject is a figure that cannot be drawn.** `positionalDecisions` has ranged
+  // over `candlesOf(block)` since §3ak.7 C6 and `legendSlots` has earned the
+  // `rising`/`falling` pair for as long; what was missing is two marks, and
+  // `Mark` has both. §3ak.29's rule at a fourth case.
 
   // **A flipped ordinate is the same class, found by asking the same question**
   // (F259). `svgPoints` passes `invert: true` unconditionally — the comment

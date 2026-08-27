@@ -314,13 +314,13 @@ describe("U — the seam, asserted from both arms", () => {
       gutterFamilies += 1;
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
-    expect(drawn, "drawn SVG documents").toBe(118); // cells-ok — a document count
+    expect(drawn, "drawn SVG documents").toBe(122); // cells-ok — a document count
     // **D13 closed**: the legend is drawn where the author asked and where it is
     // load-bearing — `SHARES_CELLS` and more than one series — which is the form
     // half of the terminal's auto-enable. The rung half stays there, because one
     // of its clauses reads `caps.colourDepth`.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(54); // cells-ok — a document count
-    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(115); // cells-ok — a document count
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(58); // cells-ok — a document count
+    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(119); // cells-ok — a document count
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
     // rather than better: a curve's identity is its series, which belongs in the
@@ -331,7 +331,7 @@ describe("U — the seam, asserted from both arms", () => {
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(75); // cells-ok — a document count
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(77); // cells-ok — a document count
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {

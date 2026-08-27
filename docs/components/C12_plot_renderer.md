@@ -6141,6 +6141,49 @@ already a `Record<PlotForm, …>` answering a figure question, and `colormapFor`
 **Two SVG frames move and no terminal frame does**, which is the direction that says the table was
 right and the guess was wrong.
 
+### 3ak.31 — `candlestick`: a refusal for a datum nobody read, and the two are not the same thing
+
+**F259's refusal is for a figure that cannot be drawn; this was a figure whose data had not been
+read**, and §3ak.29 already names the difference. The record says so precisely and reads as though it
+does not:
+
+> `ohlc` is the candles' own data and **nothing here reads it**. A `line` with
+> `plotStyle: "candlestick"` therefore took the curve arm, found `series: []` — which is legal
+> precisely because plain candles are the ordinary case (C04 I57) — and drew **a fully furnished
+> plot with an axis running 0 to 1** while the terminal drew three candles over 8 to 16.
+
+Every clause is true and the remedy in it is *read the datum*, not *refuse the block*. The refusal
+was the right thing to do on the day it was written, when reading it meant work nobody had done —
+and by the time it was checked, **the work was done and the refusal was not**:
+
+| what the marks needed | where it already was |
+|---|---|
+| a range over the bars | `positionalDecisions` → `seriesRange(block.series, block, candlesOf(block))`, since §3ak.7 C6 |
+| a legend that names them | `legendSlots` → `{ role: "rising", ref: "tone.ok" }` and `falling`, since the same commit |
+| a body and a wick | `Mark.rect` and `Mark.polyline`, since the type existed |
+
+**Two marks, and the body takes the bar's device.** A rect with no `depth`, no `value` and
+`layer: "series"` is inset by `SLOT_SHARE` at each arm's own resolution — `candleWidth`'s `per − 1`
+in cells, three fifths of a slot in pixels — which is `boxplotColumn`'s argument one form along: two
+rising candles that touch draw one six-cell body and not two three-cell ones. The wick is not inset,
+so it runs through the body's centre at any width, and a doji is a body of no height that each arm
+floors at its own smallest unit.
+
+**Read on the frame.** `line/candlestick` gives 32 wicks — 20 in `tone.ok` and 12 in `tone.error` —
+against a gutter of 95 … 125, which is the terminal's gutter; the legend's two swatches carry the
+same two refs as the candles they name. `candlestick-overlay` adds a **third** ink, the moving
+average in slot 0, drawn over them.
+
+**The two rows that asserted the refusal now assert what it protected**, which is the point of
+inverting rather than deleting: `G8a` measured *an axis running 0 to 1* and now measures that the
+axis covers the candles' 8 … 16; `G8b` measured *ticks 11 to 12 against data spanning 8 to 16* and
+now measures that the average and its candles share one range. **A deleted row takes its measurement
+with it**, and those two are the only record of what the wrong frame looked like.
+
+**And the declarations came back as dead the moment the arm drew.** `pair-catalogue`'s four `ohlc`
+rows were reported by name — which is what comparing a declaration list **by equality** buys, and
+what a subset check would have left sitting there (F310).
+
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7460,6 +7503,7 @@ orientation — and belongs in the classification table as its own rows.
 60. **A form that is drawn is drawn from its data, and a sweep says so rather than a reader** (I66, §3ak.8). `G7b` asks whether a claimed form puts ink on the page; `ecdf` passes it and draws the same picture for every dataset. The rung above is the one a golden frame, a disagreement matrix and a mutation on dead code all structurally cannot reach.
 61. **A derivation is applied at each arm's entry, and the record has a column for every decision the arms make differently** (I70, §3ak.27, §3ak.28). A pure function in the shared layer is not a seam until a caller uses it: `derive.ts` sat one import away from the second arm for the length of the pass while `histogram`, `density` and `ecdf` drew a different quantity in each. And what caught it was a frame rather than a cell — the matrix had no column for a colour ramp or a drop notice, and a rule table is exhaustive over the rules you stated.
 62. **The residue's three forms draw in both arms, and what crosses is their geometry rather than their raster** (I71, §3ak.29). `contour`, `quiver` and `horizon` were refused for the length of the pass with the condition written down as a symbol, and checking the symbols found the prose around them wrong three times: a derivation sweep bounded by a file rather than by a shape, a ruling about mark *kinds* standing in for one about *channels*, and a gate whose meaning inverts when the derivation's output stops being a block.
+64. **A refusal is re-read against the tree before it is carried, never after** (I71, §3ak.31). `ohlc` was refused because *nothing here reads it*, which was true when it was written and false by the time it was checked: the range had crossed, the legend slots had been earned, and the two marks the candles need had been in `Mark` all along. F259's subject is a figure that **cannot be drawn**, and a figure whose data has not been read is a missing derivation wearing a refusal's clothes.
 63. **The ramp a reading is on is named by the figure and resolved by each arm** (I72, §3ak.30). A per-form default table in a terminal renderer is a figure decision the other arm cannot reach, which is F322's class on a lookup rather than on a transform — and the two sentences that licensed it were each the other's alibi, so a reader checking statements one at a time agreed with both.
 
 ---

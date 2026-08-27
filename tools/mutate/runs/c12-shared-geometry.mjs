@@ -267,10 +267,15 @@ const results = runPass({
       // furnished plot with an axis running 0 to 1 while the terminal draws
       // three candles over 8 to 16. **G7's partition cannot see this** — the
       // form *is* claimed — and neither can a corpus with one variant per form.
+      //
+      // **Re-anchored when the refusal became a drawing** (§3ak.31). It used to
+      // sever `if (given.ohlc !== undefined) return null;`; the emitter is what
+      // reads the datum now, so this severs that instead and the row it expects
+      // is the same one, still measuring the same axis.
       name: "a block whose datum is ohlc is drawn by the curve family",
-      file: SVG,
-      from: "  if (given.ohlc !== undefined) return null;",
-      to: "  if (false) return null;",
+      file: FIGURE,
+      from: "    if (bars !== undefined) marks.push(...candleMarks(bars, value.range));",
+      to: "    if (false) marks.push(...candleMarks(bars ?? [], value.range));",
       expect: "G8a",
     },
     {

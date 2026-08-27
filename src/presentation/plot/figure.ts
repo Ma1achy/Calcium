@@ -12,7 +12,9 @@
  * nothing lands here without a consumer — an export nothing reads is what MG25
  * refuses, and a `Figure` member no renderer takes is F84's class one type along.
  */
-import type { ColormapName, Plot, PlotForm, QuartileSummary, ScaleType, Segment, Series, VectorSeries } from "../../data/viewmodel/index.js";
+import type {
+  ColormapName, OHLC, Plot, PlotForm, QuartileSummary, ScaleType, Segment, Series, VectorSeries,
+} from "../../data/viewmodel/index.js";
 import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
@@ -2123,11 +2125,70 @@ export function scatterFigure(block: Plot): Figure {
  * so callers pass the derived block, and `derive.ts` is where the derivation
  * lives rather than inside one renderer's dispatch table.
  */
+/**
+ * A candle's two marks — **a body across its slot and a wick through it**
+ * (§3r, §6b B15, F259).
+ *
+ * **The refusal this removes was right and narrow.** `plotToSvg` returned `null`
+ * for any block carrying `ohlc` because *nothing here reads it*: the curve arm
+ * found `series: []`, which is legal precisely because plain candles are the
+ * ordinary case, and drew a fully furnished plot with an axis running 0 to 1
+ * against a terminal drawing 8 to 16. That is F259's subject exactly — a figure
+ * that **cannot be drawn** from what the path reads — and the remedy is to read
+ * it, which is what this does. `positionalDecisions` already ranges over
+ * `candlesOf(block)` and `legendSlots` already earns the `rising`/`falling`
+ * pair; the marks were the whole of the gap.
+ *
+ * **The body is a bar and takes the bar's device.** A rect with no `depth`, no
+ * `value` and `layer: "series"` is inset by `SLOT_SHARE` at each arm's own
+ * resolution — which is `candleWidth`'s `per − 1` in cells and a fraction of a
+ * slot in pixels, and it is the same argument `boxplotColumn` makes at three
+ * fifths: two rising candles that touch draw one six-cell body and not two
+ * three-cell ones.
+ *
+ * **The wick is a polyline and is not inset**, so it runs through the body's
+ * centre at any width. A doji — `open === close` — is a body of no height, which
+ * each arm floors at its own smallest unit: `─` in a cell, half a pixel here.
+ */
+function candleMarks(bars: readonly OHLC[], range: Range): readonly Drawn[] {
+  const n = Math.max(1, bars.length); // cells-ok — a candle count
+  const out: Drawn[] = [];
+  bars.forEach((bar, i) => {
+    const { open, high, low, close } = bar;
+    if (![open, high, low, close].every((v) => Number.isFinite(v))) return;
+    // **The slot's own colour, named rather than resolved** (I62) — and the two
+    // refs are the legend's, so a swatch and its candles cannot drift.
+    const ref: ColourRef = close >= open ? "tone.ok" : "tone.error";
+    const lo = normalisedOf(Math.min(open, close), range, false);
+    const hi = normalisedOf(Math.max(open, close), range, false);
+    const x = i / n; // cells-ok — a candle count
+    out.push({
+      mark: { kind: "polyline", points: [
+        [x + 0.5 / n, normalisedOf(low, range, false)], // cells-ok — a candle count
+        [x + 0.5 / n, normalisedOf(high, range, false)], // cells-ok — a candle count
+      ] },
+      layer: "series",
+      ref,
+    });
+    out.push({
+      mark: { kind: "rect", x, y: lo, w: 1 / n, h: hi - lo, fill: true }, // cells-ok — a candle count
+      layer: "series",
+      ref,
+    });
+  });
+  return out;
+}
+
 export function curveFigure(block: Plot): Figure {
   const decisions = positionalDecisions(block);
   const { value } = decisions;
   const marks: Drawn[] = [];
   if (value !== null) {
+    // **The candles first, so an overlay draws over them** — which is what the
+    // terminal does and what the legend's order says: the average is a claim
+    // *about* the candles (§6b B1, B4).
+    const bars = candlesOf(block);
+    if (bars !== undefined) marks.push(...candleMarks(bars, value.range));
     block.series.forEach((series, seriesIndex) => {
       for (const points of runsOf(series.values, value.range)) {
         marks.push({ mark: { kind: "polyline", points }, layer: "series", seriesIndex });

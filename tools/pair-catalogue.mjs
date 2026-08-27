@@ -122,10 +122,9 @@ export const VARIANT_REFUSALS = {
   heatmap: { empty: "the series carries an empty value list", origin: "a non-default origin" },
   icicle: { default: "the legacy categories+series datum, not a hierarchy" },
   line: {
-    candlestick: "ohlc",
-    "candlestick-dense": "ohlc",
-    "candlestick-overlay": "ohlc",
-    "cursor-candles": "ohlc",
+    // The four `ohlc` rows are gone: the candles draw (§3ak.31). They came back
+    // as `dead decls` the moment the arm did, which is what the equality check
+    // is for — a subset check would have left them.
     empty: "the series carries an empty value list",
     "origin-bottom-right": "a non-default origin",
     "origin-top-left": "a non-default origin",
