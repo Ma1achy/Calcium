@@ -6210,6 +6210,62 @@ number this pass has moved from 77 to 45 in eight commits, and a bound that has 
 time a form lands says nothing when it is. The floor is `> 0`, and the day it reaches zero the arm
 claims every frame and the row says so first (F310).
 
+### 3ak.33 — Family 8's aggregating three, and the fold needed no second implementation
+
+`SVG_FAMILY` filed `waterfall`, `streamgraph` and `stackedarea` together with one reason:
+
+> *Cumulative*: the coordinate is a running total, so **a sample's position is not a function of its
+> own value.**
+
+**True, and it is a statement about a sample where the test is about the block.** `drawnBlock`'s
+requirement — and I70's — is that the derivation be a function of *the block*, which a cumulative
+fold is by construction. The reason describes exactly the property that makes these three F314's
+subject, and files them as though it made them impossible.
+
+#### One function, two resolutions
+
+`stackBands(series, columns, centred)` takes a column count, and **passing the data's own length
+makes its resampler the identity** — so the fold crosses at native resolution with no second
+implementation, and the terminal keeps calling it with `areaWidth`. That is I71 arriving somewhere
+it costs nothing: the geometry and the raster are the same function at two arguments.
+
+**It also removes a hazard nothing was watching.** `stackBands` resamples *then* sums; a
+hand-written fold in the figure would sum *then* resample, and for series of unequal length those
+are different numbers. The two arms would have agreed on every fixture in the corpus, because every
+stacked fixture has series of one length.
+
+#### The axis is the fold's, and the pin still wins
+
+`seriesRange` over the inputs answers *how big is one band*; what a gutter must cover is *how big
+are they stacked*. So both emitters pin the block to their own fold's range before asking for
+decisions — `{ ...block, yMin: block.yMin ?? span.min, … }` — which keeps the caller's pin winning
+on the precedent every other family sets, and reuses the axis machinery rather than copying it.
+
+**`waterfall` zero-anchors and `stackedarea` does not**, because the first reaches
+`categoricalDecisions`: *a bar's length is its value, so signed data grows both ways from zero*
+(F272). Zero is where a running total starts, so the anchor is right here rather than tolerated —
+and `G6`'s arm asserts the two floors separately with that reason attached, which is the only thing
+that stops the difference reading as a defect later.
+
+#### `Mark.polyline` gains a `fill`, and it serves a second form already
+
+A stacked band is a **quantity** and the eye reads its thickness; an outline leaves the reader
+integrating two curves, which is `stack.ts`' own argument for filling in the terminal. `arc` and
+`rect` both carry an explicit `fill`, so this is the type's convention on a third kind rather than
+`closed` quietly meaning two things.
+
+**Measured while adding it: `line/confidence` draws one stroked path in this arm and a filled band
+in the terminal** — the same missing mechanism, on a variant of a form that has been claimed
+throughout. Recorded rather than fixed here, because a confidence band is the curve family's
+business and this section is family 8's.
+
+#### Read on the frame
+
+`waterfall/default`'s five bars land at `x = 89.6 w = 396.8`, `327.68 / 158.72`, `228.48 / 99.2`,
+`188.8 / 39.68`, `89.6 / 99.2` — full width, then a short bar at the right, then middle-right, then
+middle, then back to the left. That is the terminal's frame proportion for proportion, and it is the
+running baseline crossing rather than being recomputed.
+
 ---
 ## 3q. One value axis across the bands, and the record it never had
 

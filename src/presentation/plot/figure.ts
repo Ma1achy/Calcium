@@ -24,6 +24,7 @@ import type { ColourRef } from "../theme/types.js";
 import { axisFor, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
 import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
+import { stackBands, stackRange } from "./stack.js";
 import { plotAreaRows } from "./height.js";
 import { HAS_POSITION_AXIS, refOf } from "./marks.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
@@ -253,6 +254,18 @@ export type Mark =
       kind: "polyline";
       points: readonly Pt[];
       closed?: boolean;
+      /**
+       * **A closed polyline that is a region rather than an outline** (§3ak.33).
+       *
+       * A stacked band is a **quantity** and the eye reads its thickness; an
+       * outline leaves the reader integrating two curves to find it, which is
+       * `stack.ts`' own argument for filling in the terminal. `arc` and `rect`
+       * both carry an explicit `fill`, so this is the type's own convention on
+       * the third kind rather than `closed` quietly meaning two things.
+       *
+       * Absent on a curve, whose datum is the path.
+       */
+      fill?: boolean;
       /**
        * **The reading, where the *stroke's* appearance is the datum** — the
        * same member `rect` carries, on the second kind that needs it (F323).
@@ -2030,6 +2043,111 @@ export function barFigure(block: Plot): Figure {
       });
     }
     marks.push(...annotationMarks(block, value.range, lag));
+  }
+  return { ...decisions, marks };
+}
+
+// --- the aggregating forms (I70, I71, §3ak.33) ------------------------------
+//
+// **One fold, three consumers**, which is F314's rule at the family the plan
+// named for it. A cumulative coordinate is not a function of a sample's own
+// value — `SVG_FAMILY` filed these three under exactly that — and it *is* a
+// function of the block, which is the property `drawnBlock` requires and the one
+// the entry did not distinguish from it.
+
+/**
+ * A stacked area or a stream, as filled bands (I70, I71, §3ak.33).
+ *
+ * **`stackBands` at the data's own resolution**, which is I71's rule and needs
+ * no second implementation: the function takes a column count, and passing the
+ * longest series' length makes its resampler the identity. The terminal passes
+ * `areaWidth` and gets the same fold at the resolution it draws — one function,
+ * two resolutions, and the order of *resample* and *sum* is therefore the same
+ * on both sides rather than agreeing by luck.
+ *
+ * **The axis is the fold's and not the series'.** `seriesRange` over the inputs
+ * answers *how big is one band*, and what the gutter must cover is *how big are
+ * they stacked* — which is `stackRange`, and which is why this cannot reuse
+ * `positionalDecisions` unmodified. Pinned through the block so the caller's own
+ * `yMin`/`yMax` still win, on the precedent every other family sets.
+ *
+ * **Filled, and that is the whole of why `Mark.polyline` grew a `fill`.** A band
+ * is a quantity and the eye reads its thickness; an outline leaves the reader
+ * integrating two curves, which is `stack.ts`' argument for the glyph it uses.
+ */
+export function stackedFigure(block: Plot, centred: boolean): Figure {
+  const cols = block.series.reduce((m, r) => Math.max(m, r.values.length), 0); // cells-ok — a sample count
+  const bands = cols === 0 ? [] : stackBands(block.series, cols, centred); // cells-ok — a sample count
+  const span = stackRange(bands);
+  const pinned: Plot = { ...block, yMin: block.yMin ?? span.min, yMax: block.yMax ?? span.max };
+  const decisions = positionalDecisions(pinned);
+  const { value } = decisions;
+  const marks: Drawn[] = [];
+  if (value !== null && cols > 1) { // cells-ok — a sample count
+    const x = (i: number): number => i / (cols - 1); // cells-ok — a sample count
+    bands.forEach((band, seriesIndex) => {
+      const lower: Pt[] = band.lower.map((v, i) => [x(i), normalisedOf(v, value.range, false)]);
+      const upper: Pt[] = band.upper.map((v, i) => [x(i), normalisedOf(v, value.range, false)]);
+      // **Along the lower edge and back along the upper**, so the ring closes on
+      // itself and a band with a hole in it is impossible by construction.
+      marks.push({
+        mark: { kind: "polyline", points: [...lower, ...upper.reverse()], closed: true, fill: true },
+        layer: "series",
+        seriesIndex,
+      });
+    });
+  }
+  return { ...decisions, marks };
+}
+
+/**
+ * A waterfall's running baseline (I70, §3ak.33).
+ *
+ * **The cumulative coordinate is a function of the block and of nothing else**,
+ * which is the property that separates this from `violinColumn`'s estimate: no
+ * row count, no column count, no capability. `definition.ts` walked the series
+ * twice for it — once for the bounds and once for the bars — inside a renderer,
+ * and the second arm had neither walk.
+ *
+ * **`totals` restarts rather than adds**, which is the form's whole point: a
+ * total bar is drawn from zero to the running sum, and treating it as another
+ * step would draw the sum twice and end at double.
+ *
+ * **The axis is the cumulative range**, `min(0, …)` to `max(0, …)` over the
+ * running values — not `seriesRange` over the steps, which answers *how big is
+ * one change* where the gutter must cover *where the running total went*.
+ */
+export function waterfallFigure(block: Plot): Figure {
+  const series = block.series[0];
+  const totals = block.totals ?? [];
+  const values = series?.values ?? [];
+  let running = 0;
+  let lo = 0;
+  let hi = 0;
+  const bars = values.map((v, i) => {
+    const step = v ?? 0;
+    const from = running;
+    running = totals[i] === true ? step : running + step;
+    lo = Math.min(lo, running);
+    hi = Math.max(hi, running);
+    return { from: totals[i] === true ? 0 : from, to: running, drawn: v !== null };
+  });
+  const pinned: Plot = { ...block, yMin: block.yMin ?? lo, yMax: block.yMax ?? hi };
+  const decisions = categoricalDecisions(pinned);
+  const { value } = decisions;
+  const marks: Drawn[] = [];
+  if (value !== null) {
+    const n = Math.max(1, decisions.identity.length || bars.length); // cells-ok — a category count
+    bars.forEach((bar, i) => {
+      if (!bar.drawn || i >= n) return; // cells-ok — a category index
+      const a = normalisedOf(bar.from, value.range, false);
+      const b = normalisedOf(bar.to, value.range, false);
+      marks.push({
+        mark: { kind: "rect", x: i / n, y: Math.min(a, b), w: 1 / n, h: Math.abs(b - a), fill: true }, // cells-ok — a category count
+        layer: "series",
+        seriesIndex: 0,
+      });
+    });
   }
   return { ...decisions, marks };
 }

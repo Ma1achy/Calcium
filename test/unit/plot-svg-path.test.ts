@@ -30,6 +30,7 @@ import { flatten } from "../../src/presentation/plot/tree.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
 import {
   barFigure, curveFigure, distributionFigure, HAS_VALUE_AXIS, horizonFigure, proportionFigure,
+  stackedFigure, waterfallFigure,
 } from "../../src/presentation/plot/figure.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { resolve } from "../../src/presentation/theme/index.js";
@@ -609,6 +610,33 @@ describe.each(supported)("G6 — %s", (form) => {
       // is not on the floor — where for a curve the two coincide, which is why
       // one assertion stood for both families until the bar family crossed.
       expect(ts[1], `${form}: the pinned floor is not the bar's baseline`).toBeGreaterThan(0);
+      return;
+    }
+    if (family === "stacked" || family === "waterfall") {
+      // **A cumulative coordinate is not a sample's own position**, so *far below
+      // pins to the floor* has no subject here: the fold decides where a sample
+      // lands and the pin decides the axis it lands on. What the pin must still
+      // do is **win over the fold's own range** — that is the property the two
+      // emitters share and the one a copy of `seriesRange` would have lost, and
+      // `normalisedOf` is what clamps whatever falls outside it.
+      const fig = family === "stacked"
+        ? stackedFigure(made, form === "streamgraph")
+        : waterfallFigure(made);
+      expect(fig.value, `${form}: the fold has an axis`).not.toBeNull();
+      // **The ceiling is the pin's on both; the floor differs and the record
+      // says why.** A waterfall reaches `categoricalDecisions`, which
+      // zero-anchors — *a bar's length is its value, so signed data grows both
+      // ways from zero* (F272) — and zero is where a running total starts, so
+      // the anchor is right rather than tolerated. A stacked band is positional
+      // and keeps the pin as given.
+      expect(fig.value?.range.max, `${form}: the pin's ceiling wins over the fold`).toBe(PIN.yMax);
+      expect(fig.value?.range.min, `${form}: and its floor, zero-anchored where the family is`)
+        .toBe(family === "waterfall" ? Math.min(0, PIN.yMin) : PIN.yMin);
+      const ts = fig.marks.flatMap((d) => (d.mark.kind === "rect"
+        ? [d.mark.y, d.mark.y + d.mark.h]
+        : d.mark.kind === "polyline" ? d.mark.points.map((pt) => pt[1]) : []));
+      expect(ts.length, `${form}: the fold put something on the page`).toBeGreaterThan(0); // cells-ok — a mark count
+      expect(ts.every((t) => t >= 0 && t <= 1), `${form}: and every one is on the axis`).toBe(true);
       return;
     }
     if (family === "horizon") {

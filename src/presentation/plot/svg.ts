@@ -43,6 +43,8 @@ import {
   curveFigure,
   fieldFigure,
   horizonFigure,
+  stackedFigure,
+  waterfallFigure,
   distributionFigure,
   matrixFigure,
   nodesDecisions,
@@ -130,7 +132,7 @@ function escape(text: string): string {
  */
 export type SvgFamily =
   | "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion"
-  | "field" | "horizon";
+  | "field" | "horizon" | "stacked" | "waterfall";
 
 export const SVG_FAMILY = {
   // **Curve** — samples in order, joined. `step` differs only in the path
@@ -164,7 +166,13 @@ export const SVG_FAMILY = {
   //
   // *Cumulative*: the coordinate is a running total, so a sample's position is
   // not a function of its own value.
-  waterfall: null, streamgraph: null, stackedarea: null,
+  // **The cumulative three, and the reason was true of a *sample* and not of the
+  // *block*** (§3ak.33). *A sample's position is not a function of its own
+  // value* — right, and the fold is a function of the whole series, which is
+  // exactly what `drawnBlock` requires. `stackBands` already took a column count,
+  // so passing the data's own length makes its resampler the identity and the
+  // fold crosses at native resolution with no second implementation (I71).
+  waterfall: "waterfall", streamgraph: "stacked", stackedarea: "stacked",
   // **Distribution** — the datum is a set of positions derived from the
   // samples rather than the samples, so the shared piece is the *set*:
   // `normalisedSummary` and `quartileRange`, which the terminal arm reads
@@ -292,6 +300,8 @@ function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
     case "proportion": return proportionFigure(block);
     case "field": return fieldFigure(block);
     case "horizon": return horizonFigure(block);
+    case "stacked": return stackedFigure(block, block.form === "streamgraph");
+    case "waterfall": return waterfallFigure(block);
     default: return null;
   }
 }
@@ -554,8 +564,15 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // *about* the ordinate drawn beside the data, and a solid rule crossing
       // five series reads as a sixth. The terminal draws `┄` and the legend
       // swatch it already shares says the same thing (C04 I52).
+      // **A filled region reads as a quantity and a stroked one as a boundary**
+      // (§3ak.33). A stacked band is the first; every curve this arm drew before
+      // it is the second, and `fill` is what says which. The stroke stays on a
+      // filled band so its own edge is visible against its neighbour, which is
+      // the terminal's `markOf` glyph doing the same job one alphabet along.
       out.push(
-        `<path d="${path}${m.closed === true ? " Z" : ""}" fill="none" stroke="${stroke}" ` +
+        `<path d="${path}${m.closed === true ? " Z" : ""}" ` +
+          `fill="${m.fill === true ? stroke : "none"}"${m.fill === true ? ' fill-opacity="0.85"' : ""} ` +
+          `stroke="${stroke}" ` +
           `stroke-width="${annotation ? "1" : "2"}"${annotation ? ' stroke-dasharray="4 3"' : ""}/>`,
       );
       continue;
@@ -1029,7 +1046,8 @@ function marks(
   // the topology crosses and the placement does not.
   if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"
     || family === "bar" || family === "distribution" || family === "proportion"
-    || family === "field" || family === "horizon") && "marks" in figure) {
+    || family === "field" || family === "horizon" || family === "stacked"
+    || family === "waterfall") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 
