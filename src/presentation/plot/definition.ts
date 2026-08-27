@@ -60,7 +60,7 @@ import {
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
 import { FACING_DEFAULT, facingOf, rowOf, seriesRange, type Facing, type Range } from "./scale.js";
-import { bandRows, stackBands, stackRange } from "./stack.js";
+import { bandRows, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
@@ -2677,23 +2677,20 @@ const FORM_ROWS: Readonly<
     const s = block.series[0];
     const totals = block.totals ?? [];
     if (!s) return emptyRows(block, { gutter: 0, labelColumn: 0, areaWidth: width, areaRows: plotAreaRows(block), width }, ctx);
-    let cumulative = 0;
-    let lo = 0, hi = 0;
-    for (let i = 0; i < s.values.length; i++) { // cells-ok — a sample count
-      const v = s.values[i] ?? 0;
-      if (totals[i]) { cumulative = v; } else { cumulative += v; }
-      lo = Math.min(lo, cumulative);
-      hi = Math.max(hi, cumulative);
-    }
-    cumulative = 0;
+    // **Two walks became one, and they had disagreed** (F329, §3ak.34). The
+    // bounds walk read `?? 0`, so a total with no reading reset the running sum;
+    // the drawing walk guarded the advance, so the same total held it. Both are
+    // in this function and neither could see the other. `waterfallBars` is the
+    // drawing walk's convention — a null is no reading, and no reading moves no
+    // total, which is `stackBands`' answer one fold along.
+    const { bars, min: lo, max: hi } = waterfallBars(s.values, totals);
     let ri = 0;
     return categoricalForm(block, width, ctx, (_label, aw) => {
+      const bar = bars[ri];
       const v = s.values[ri] ?? null;
       const isTotal = totals[ri] ?? false;
       ri++;
-      const baseline = cumulative;
-      if (v !== null) { if (isTotal) { cumulative = v; } else { cumulative += v; } }
-      return waterfallRow(v, baseline, lo, hi, aw, ctx.capabilities, isTotal);
+      return waterfallRow(v, bar?.from ?? 0, lo, hi, aw, ctx.capabilities, isTotal);
     });
   },
   // **One fold, two origins** (C04 §8, the stacking fold). `streamgraph` was

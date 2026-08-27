@@ -24,7 +24,7 @@ import type { ColourRef } from "../theme/types.js";
 import { axisFor, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
 import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
-import { stackBands, stackRange } from "./stack.js";
+import { stackBands, stackRange, waterfallBars } from "./stack.js";
 import { plotAreaRows } from "./height.js";
 import { HAS_POSITION_AXIS, refOf } from "./marks.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
@@ -2119,19 +2119,11 @@ export function stackedFigure(block: Plot, centred: boolean): Figure {
  */
 export function waterfallFigure(block: Plot): Figure {
   const series = block.series[0];
-  const totals = block.totals ?? [];
-  const values = series?.values ?? [];
-  let running = 0;
-  let lo = 0;
-  let hi = 0;
-  const bars = values.map((v, i) => {
-    const step = v ?? 0;
-    const from = running;
-    running = totals[i] === true ? step : running + step;
-    lo = Math.min(lo, running);
-    hi = Math.max(hi, running);
-    return { from: totals[i] === true ? 0 : from, to: running, drawn: v !== null };
-  });
+  // **The fold is called rather than walked** (F329, §3ak.34). This function held
+  // its own copy, and the copy followed the terminal's *bounds* walk where the
+  // terminal *draws* from another — so a null total reset the running sum here
+  // and held it there, and no fixture has a null.
+  const { bars, min: lo, max: hi } = waterfallBars(series?.values ?? [], block.totals ?? []);
   const pinned: Plot = { ...block, yMin: block.yMin ?? lo, yMax: block.yMax ?? hi };
   const decisions = categoricalDecisions(pinned);
   const { value } = decisions;

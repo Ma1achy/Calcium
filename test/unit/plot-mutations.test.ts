@@ -50,7 +50,7 @@ import { validateBlock, HONOURS_AXIS_CROSS, ORIGIN_DEFAULT, type PlotForm } from
 import { b } from "../../src/shell/builders/index.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
-import { bandRows, stackBands } from "../../src/presentation/plot/stack.js";
+import { bandRows, stackBands, waterfallBars } from "../../src/presentation/plot/stack.js";
 import { strips, tiles } from "../../src/presentation/plot/hierarchy.js";
 import { categoryMarks, refOf as paletteRef } from "../../src/presentation/plot/marks.js";
 import { slot } from "../../src/presentation/blocks/paint.js";
@@ -997,6 +997,39 @@ describe("GROUP 6d: one fold, two origins", () => {
     // And the two are not each other: same fold, different origin.
     expect(kitFull.renderToLines(mk("stackedarea"), 40).join("\n"))
       .not.toBe(kitFull.renderToLines(mk("streamgraph"), 40).join("\n"));
+  });
+
+  it("T1.102 (C12 I73): a null total holds the running sum, and one walk is what makes the bounds agree", () => {
+    // **The row F329 did not have** (§3ak.34). `waterfall`'s fold existed three
+    // times — two walks in `definition.ts` and a copy in `waterfallFigure` — and
+    // the bounds walk read `values[i] ?? 0`, which lets a total with no reading
+    // reset the running sum to zero, while the drawing walk guarded the advance
+    // and let it hold. The copy followed the walk that does not draw.
+    //
+    // **No fixture has a null**, so the terminal baseline, the SVG baseline, the
+    // pair sheet and the matrix are all green either way. The state has to be
+    // constructed, which is the whole of why this row exists.
+    const { bars, min, max } = waterfallBars([50, null, 30], [false, true, false]);
+    expect(bars[1]!.drawn, "a null is no reading, so nothing is drawn").toBe(false);
+    // The third bar starts where the first ended: the null total moved nothing.
+    expect(bars[2], "the running total carried past the null").toEqual({ from: 50, to: 80, drawn: true });
+    // **And the bounds cover the bars, which three walks could not promise.**
+    // Under the bounds walk's convention this was `0 … 50` with a bar ending at
+    // 80 — an end outside its own axis, drawn as one clamped cell at the row's
+    // right edge.
+    expect({ min, max }, "the axis covers every bar").toEqual({ min: 0, max: 80 });
+    for (const bar of bars.filter((b) => b.drawn)) {
+      expect(Math.min(bar.from, bar.to), bar.from + " is inside the axis").toBeGreaterThanOrEqual(min);
+      expect(Math.max(bar.from, bar.to), bar.to + " is inside the axis").toBeLessThanOrEqual(max);
+    }
+  });
+
+  it("T1.103: a total restarts from zero rather than adding, so the sum is not drawn twice", () => {
+    const { bars, max } = waterfallBars([100, -40, -25, -10, 25], [false, false, false, false, true]);
+    expect(bars.map((b) => [b.from, b.to]), "four steps and a total").toEqual([
+      [0, 100], [100, 60], [60, 35], [35, 25], [0, 25],
+    ]);
+    expect(max, "the range is the running total's, not the steps'").toBe(100);
   });
 
   it("T1.48 (C12 I25): at one bit the bands differ by mark", () => {

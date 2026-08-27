@@ -64,6 +64,60 @@ export function stackBands(
   });
 }
 
+/** One bar of a waterfall: a span on the cumulative axis, drawn or not. */
+export type WaterfallBar = Readonly<{ from: number; to: number; drawn: boolean }>;
+
+/**
+ * A waterfall's running baseline — **the family's other cumulative fold** (I70,
+ * §3ak.34, F329).
+ *
+ * Here rather than in `derive.ts` because it returns bars and a range rather
+ * than a block, so I70's *each arm draws the derived block* has nothing to hand
+ * over. It is `stackBands`' shape, and this is `stackBands`' file.
+ *
+ * **It existed three times and two of the three disagreed.** `definition.ts`
+ * walked the series twice — once for the bounds and once for the bars — and the
+ * bounds walk read `values[i] ?? 0`, which lets a total with no reading reset the
+ * running sum to zero, while the drawing walk guarded the advance and let the
+ * same total hold it. `waterfallFigure` was a third walk following the first. On
+ * `[50, null, 30]` against `[false, true, false]` the terminal drew one cell at
+ * the right edge — a bar from 50 to 80 with both ends clamped to an axis of
+ * `0 … 50`, which is a bar outside its own axis — and the second arm drew three
+ * fifths of the row from the origin. **No fixture has a null**, so nothing could
+ * see it.
+ *
+ * **A null is no reading, and no reading moves no total** — which is the drawing
+ * walk's convention and `stackBands`' own, one fold along: *a null is a
+ * zero-width contribution, not a gap*. One walk also makes the bounds agree with
+ * the bars by construction, which is the property three walks could not have.
+ *
+ * **`totals` restarts rather than adds**: a total bar is drawn from zero to the
+ * running sum, and treating it as another step would draw the sum twice.
+ *
+ * The range is the **cumulative** one, anchored at zero — not `seriesRange` over
+ * the steps, which answers *how big is one change* where a gutter must cover
+ * *where the running total went*.
+ */
+export function waterfallBars(
+  values: readonly (number | null)[],
+  totals: readonly boolean[],
+): Readonly<{ bars: readonly WaterfallBar[]; min: number; max: number }> {
+  let running = 0;
+  let min = 0;
+  let max = 0;
+  const bars = values.map((v, i) => {
+    const isTotal = totals[i] === true;
+    const from = running;
+    if (v !== null && Number.isFinite(v)) {
+      running = isTotal ? v : running + v;
+      min = Math.min(min, running);
+      max = Math.max(max, running);
+    }
+    return { from: isTotal ? 0 : from, to: running, drawn: v !== null && Number.isFinite(v) };
+  });
+  return { bars, min, max };
+}
+
 /** The bounds every band spans together — what the axis must cover. */
 export function stackRange(bands: readonly Band[]): { min: number; max: number } {
   let min = 0, max = 0;

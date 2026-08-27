@@ -68,6 +68,7 @@ const SVG = "src/presentation/plot/svg.ts";
 const ROLES = "src/presentation/plot/roles.ts";
 const GLYPHROW = "src/presentation/plot/glyph-row.ts";
 const DERIVE = "src/presentation/plot/derive.ts";
+const STACK = "src/presentation/plot/stack.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -736,18 +737,42 @@ const results = runPass({
       to: "  const pinned: Plot = block;",
       expect: "SB",
     },
+    // **These three moved from `figure.ts` to `stack.ts`, and that is the fix
+    // rather than a rename** (F329, §3ak.34). Mutating the fold now moves both
+    // arms, which is what one implementation means; while there were two, the
+    // same mutation moved one and the row named the gate that watches it.
     {
       name: "THE BASELINE: a waterfall's bars all start at zero, so it is a bar chart",
-      file: FIGURE,
-      from: "    return { from: totals[i] === true ? 0 : from, to: running, drawn: v !== null };",
-      to: "    return { from: 0, to: running, drawn: v !== null };",
+      file: STACK,
+      from: "    return { from: isTotal ? 0 : from, to: running, drawn: v !== null && Number.isFinite(v) };",
+      to: "    return { from: 0, to: running, drawn: v !== null && Number.isFinite(v) };",
       expect: "SB",
     },
     {
       name: "THE TOTAL: a total bar adds instead of restarting, so the sum is drawn twice",
+      file: STACK,
+      from: "      running = isTotal ? v : running + v;",
+      to: "      running = running + v;",
+      expect: "SB",
+    },
+    {
+      // **The mutation no baseline can catch, which is why the row exists.** No
+      // fixture has a null, so this is the bounds walk's convention restored and
+      // every frame in the corpus is byte-identical either way. T1.102
+      // constructs the state.
+      name: "THE NULL: a reading that is absent moves the running total anyway",
+      file: STACK,
+      from: "    if (v !== null && Number.isFinite(v)) {",
+      to: "    if (true) {",
+      expect: "T1.102",
+    },
+    {
+      // **And the arm calls it rather than holding a copy** (F329). This is the
+      // structural half: sever the call and `waterfallFigure` has no fold at all.
+      name: "THE CALL: the second arm walks its own fold rather than calling the shared one",
       file: FIGURE,
-      from: "    running = totals[i] === true ? step : running + step;",
-      to: "    running = running + step;",
+      from: "  const { bars, min: lo, max: hi } = waterfallBars(series?.values ?? [], block.totals ?? []);",
+      to: "  const { bars, min: lo, max: hi } = { bars: [], min: 0, max: 0 };",
       expect: "SB",
     },
     {
