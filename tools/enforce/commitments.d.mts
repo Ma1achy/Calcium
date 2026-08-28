@@ -120,6 +120,13 @@ export declare function checkSectionReferences(
   exceptions?: Readonly<Record<string, string>>,
 ): { violations: Violation[]; resolved: number };
 
+export declare function checkInvariantCoverage(
+  specs: readonly string[],
+  testFiles: readonly string[],
+  readFile?: (file: string) => string,
+  exempt?: readonly string[],
+): { violations: Violation[]; uncited: number; declared: number };
+
 /** Files whose `§` references are deliberately unresolvable, each with why. */
 export declare const SECTION_EXCEPTIONS: Readonly<Record<string, string>>;
 

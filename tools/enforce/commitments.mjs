@@ -912,6 +912,132 @@ export function scanSections(file, src, options = {}) {
  * corpus it cannot read looks exactly like one reporting zero over a clean one,
  * and this rule's whole subject is a pointer that resolves to nothing.
  */
+/**
+ * The invariants no test row names today — **debt, listed so it can only shrink**
+ * (F361, SP9).
+ *
+ * **Compared by equality and not as a subset**, which is `anchors.mjs`' rule and
+ * this repository's own finding: a subset check lets a cleared entry outlive its
+ * reason unread. So citing one of these is a build failure until it is struck
+ * from here, and an invariant added tomorrow with no row fails immediately.
+ *
+ * **C12's three are absent on purpose.** I32, I35 and I69 were the ones F357's
+ * unsound matcher reported as covered, and they are cited from the rows that
+ * cover them rather than listed — a rule's first run should clear something.
+ *
+ * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
+ * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
+ * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
+ * `test/support/fixture.mjs` means **C06's** — it sits forty lines under a
+ * qualified `C06 I17` — so the wider corpus would clear `C01 I17` on a citation
+ * that is about a different component. The narrow corpus over-reports; the wide
+ * one would under-report, silently.
+ */
+const UNCITED_INVARIANTS = Object.freeze([
+  "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C04 I18", "C04 I20", "C04 I21", "C04 I22", "C04 I24",
+  "C04 I32", "C04 I33", "C04 I66", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
+  "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",
+  "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I19", "C14 I22",
+  "C16 I1", "C16 I16", "C16 I19", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
+  "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
+  "C22 I53", "C22 I57", "C22 I60a", "C23 I10", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
+  "C23 I41", "C24 I1", "C24 I10", "C24 I11", "C24 I13", "C24 I14", "C24 I16", "C24 I19",
+  "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
+  "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
+  "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
+]);
+
+/**
+ * A03 SP9 — **every invariant is named by at least one test row** (F357, F361).
+ *
+ * SP1 pairs a commitment to an invariant and nothing paired an invariant to a
+ * check, so *every invariant is cited by some test* was a convention held by
+ * hand. Measured with SP3's own reading: **86 of 768 are named by no test row**,
+ * worst at C24 (14 of 28) and C26 (8 of 20). C12 I75 states a rule over the
+ * corpus and reports five figures; nothing computed one of them.
+ *
+ * **Its blind spot, and it is the finding this does not close.** This checks an
+ * invariant is *named*, never that the row naming it *checks* it. I75's only
+ * citation was `FB7`, whose subject is `layout` and whose assertions are rect
+ * widths — SP9 would call that covered, and did before AD13 existed.
+ * `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues that half is not
+ * automatable: matching a citation against what a row asserts is the
+ * citation-resolves-against-the-wrong-thing class, which a resolver would get
+ * wrong silently.
+ *
+ * **The attribution is SP3's, and it took four attempts to get right** (F361). A
+ * bare `I59` belongs to whichever spec owns the file, and `ownerOf` reaches 6 of
+ * 2342 test files for C12 — so outside those a citation must be qualified, which
+ * SP3 already forces. `TOKENS` walks a line letting a spec id govern everything
+ * after it, because the corpus cites in run-on lists: `C04 I10, I11, I25`.
+ *
+ * **An equality-compared exemption list, not a subset one** — `anchors.mjs`'
+ * shape. A subset check lets a cleared entry outlive its reason unread, and the
+ * 86 are debt: the list may only shrink, and an eighty-seventh fails the day it
+ * is written. Two matchers agreed on the total and disagreed on the members, so
+ * the count is not the evidence and the list is.
+ */
+export function checkInvariantCoverage(
+  specs,
+  testFiles,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exempt = UNCITED_INVARIANTS,
+) {
+  const cited = new Set();
+  for (const f of testFiles) {
+    const fallback = ownerOf(f);
+    let text;
+    try { text = readFile(f); } catch { continue; }
+    for (const line of text.split("\n")) {
+      let current = null;
+      for (const m of line.matchAll(/\b(C\d{2})\b|\b(I\d+[a-z]?)\b/gu)) {
+        if (m[1] !== undefined) { current = m[1]; continue; }
+        const owner = current ?? fallback;
+        if (owner !== null) cited.add(`${owner} ${m[2]}`);
+      }
+    }
+  }
+
+  const uncited = [];
+  for (const file of specs) {
+    const id = (file.split("/").pop() ?? "").slice(0, 3);
+    for (const n of invariantsOf(file, readFile)) {
+      if (!cited.has(`${id} ${n}`)) uncited.push(`${id} ${n}`);
+    }
+  }
+
+  const found = uncited.slice().sort();
+  const listed = [...exempt].sort();
+  const violations = [];
+  const fresh = found.filter((x) => !listed.includes(x));
+  const cleared = listed.filter((x) => !found.includes(x));
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP9",
+      file: "docs/components",
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(fresh.length)} invariant(s) named by no test row and not on ` +
+        `the list — ${fresh.join(", ")}. An invariant nothing names is a claim ` +
+        `no row was written against, which reads exactly like one that is ` +
+        `satisfied. Cite it from the row that covers it, or add a row.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP9",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(cleared.length)} entr(y/ies) on the exemption list are now ` +
+        `cited — ${cleared.join(", ")}. The list is compared by equality so it ` +
+        `can only shrink; remove them. A subset check would let a cleared entry ` +
+        `outlive its reason unread.`,
+    });
+  }
+  return { violations, uncited: found.length, declared: specs.reduce((n, f) => n + invariantsOf(f, readFile).size, 0) };
+}
+
 export function checkSectionReferences(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
@@ -1309,4 +1435,4 @@ export function checkReferences(
 // was green throughout, because the rule *was* implemented and running; the only
 // thing that could see the gap was the suite, and the suite is not what was run.
 // That is A03 §2's own subject reaching the list that enforces it.
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8"];
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9"];

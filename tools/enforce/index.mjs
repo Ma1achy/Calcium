@@ -21,6 +21,7 @@ import {
   checkReferences,
   checkSectionReferences,
   checkSeamFour,
+  checkInvariantCoverage,
   referenceFiles,
   specFiles,
 } from "./commitments.mjs";
@@ -64,6 +65,10 @@ const sectionsUnowned = sectionRefs.violations.length - sectionsDangling.length;
 const sectionTargets = new Set(
   sectionsDangling.map((v) => /cites ([A-Z]\d\d §[\w.]+)/u.exec(v.message)?.[1] ?? v.file),
 ).size;
+// SP9's own numbers, computed once and reported beside the gate — the list is
+// the evidence and the count is what a reader watches move.
+const coverage = checkInvariantCoverage(specs, walk("test"));
+
 const violations = [
   ...checkModuleGraph(files),
   // MG23 — one store per component above L0. SS29 folded here: as a source
@@ -102,6 +107,11 @@ const violations = [
   // against a real, unrelated finding with enforce green.
   ...checkFindings(),
   ...checkTriageInventory(),
+  // SP9 — an invariant nothing names is a claim no row was written against, and
+  // it reads exactly like one that is satisfied. SP1 paired a commitment to an
+  // invariant and nothing paired an invariant to a check, so *every invariant is
+  // cited* was a convention held by hand — 86 of 768 were not (F357, F361).
+  ...coverage.violations,
   ...refViolations,
 ];
 
@@ -129,6 +139,9 @@ if (violations.length === 0) {
       // A02 Seam 4 describes a component one; this is the difference, printed so
       // the number is visible rather than buried in F94. It is a count and not a
       // verdict — most of it is legitimate — so what it is good for is movement.
+      `  ${DIM}invariant coverage · ${String(coverage.uncited)} of ` +
+      `${String(coverage.declared)} invariants named by no test row, all listed ` +
+      `(SP9, gated by equality)${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +

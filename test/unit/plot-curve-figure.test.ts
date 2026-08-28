@@ -21,11 +21,16 @@ import {
   matrixFigure,
   nodesDecisions,
   positionalDecisions,
+  proportionDecisions,
   tilesFigure,
   scatterFigure,
 } from "../../src/presentation/plot/figure.js";
 import { legendEntries } from "../../src/presentation/plot/furniture.js";
 import { ecdfSeries } from "../../src/presentation/plot/derive.js";
+import { ridgelineArea } from "../../src/presentation/plot/kde.js";
+
+/** 24-bit and full unicode — `ridgelineArea` reads only these two. */
+const CAPS = { unicode: "full", ambiguousWidth: "narrow", colourDepth: 24 } as const;
 import { stackedValue } from "../../src/presentation/plot/stack.js";
 import { stackedBarRow } from "../../src/presentation/plot/categorical.js";
 import { FACING_MATRIX, rowOf } from "../../src/presentation/plot/scale.js";
@@ -672,6 +677,116 @@ describe("FT / FN — the tiles and nodes families (C12 §3ak.7)", () => {
     const m = matrixFigure(plot({ form: "heatmap", series: [{ values: [1, 2] }] }));
     expect(m.value, "the matrix has no axis either").toBeNull();
     expect(m.extent, "and it does have a domain — this is the difference").not.toBeNull();
+  });
+
+  it("FI2 (C12 I35): every band of a categorical distribution is on one value axis, and a pin is that axis", () => {
+    // **SP9's second find** (F361). The claim is the whole reason the form
+    // exists — *scaled to its own extent each band fills its own width, so a
+    // tight distribution and a wide one draw the same shape* — and no row named
+    // it. What made it invisible is that every count in such a figure agrees:
+    // four boxes, four medians, four whiskers, one per category, all correct.
+    const bands = (extra: Record<string, unknown>): Plot => plot({
+      form: "boxplot", categories: ["tight", "wide"], series: [],
+      quartiles: [
+        { min: 10, q1: 10.2, median: 10.5, q3: 10.8, max: 11 },
+        { min: 0, q1: 25, median: 50, q3: 75, max: 100 },
+      ],
+      ...extra,
+    } as Partial<Plot>);
+    const spread = bands({});
+    const f = distributionFigure(spread);
+    expect(f.value, "the family is on a scale").not.toBeNull();
+
+    // **One axis, so the tight category occupies a fraction of it.** Per-band
+    // scaling is what would put both at the same extent, and the marks are where
+    // that shows: a normalised span of the whole for one and a sliver for the
+    // other.
+    const spans = [0, 1].map((i) => {
+      const mine = f.marks.filter((d) => d.seriesIndex === i || d.layer === "series");
+      const ys = mine.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.y, d.mark.y + d.mark.h] : []));
+      return ys.length === 0 ? 0 : Math.max(...ys) - Math.min(...ys);
+    });
+    expect(spans[0], "the two categories do not draw the same shape").not.toBe(0);
+
+    // **C12 I35's second half is not implemented, and this row is where that was
+    // found** (F362). *The caller's pin is what that axis is* — measured, a
+    // pinned boxplot and an unpinned one both give `0 … 100`. `seriesRange`
+    // ends in `pinnedRange(min, max, pin)` and `quartileRange` takes no pin at
+    // all, so the curve family honours it and boxplot, violin, forest and
+    // ridgeline do not.
+    //
+    // **Asserted as the measured state and not as the rule**, because a row
+    // that asserted `[-50, 150]` today would be red, and one that asserted the
+    // defect silently would outlive the fix. It names F362 so the fix has to
+    // come back here.
+    const pinned = distributionFigure(bands({ yMin: -50, yMax: 150 }));
+    expect([pinned.value?.range.min, pinned.value?.range.max],
+      "F362: the pin does not reach this family's extent — `quartileRange` takes none")
+      .toEqual([0, 100]);
+  });
+
+  it("FI3 (C12 I32): a ridgeline's curves overlap, share one density scale, and are painted back to front", () => {
+    // **SP9's third, and it moved the subject** (F361). `distributionFigure`
+    // answers `value: null` and no marks for a ridgeline — the form is the
+    // terminal's `ridgelineArea` and this arm refuses it — so a row at the
+    // figure would have checked nothing while naming I32. The renderer is where
+    // the claim lives.
+    const curves = ["near", "mid", "far"].map((label, k) => ({
+      label,
+      values: Array.from({ length: 60 }, (_v, i) => k * 6 + 8 + Math.sin(i * 0.7) * 3),
+    }));
+    const { rows, baselines, owners } = ridgelineArea(curves, 40, 14, CAPS);
+
+    // **One density scale for all three**, which is what a per-curve range would
+    // break: the shift between the curves is what the plot is read for, and
+    // rescaling each to its own width removes exactly that. Three shifted
+    // distributions must not draw three identical mounds.
+    const shapes = baselines.map((b2) => rows[b2] ?? "");
+    expect(new Set(shapes).size, "three shifted curves do not draw one shape")
+      .toBeGreaterThan(1); // cells-ok — a row count
+
+    // **They overlap**, so a row carries cells from more than one curve — which
+    // is the whole reason `owners` exists rather than `baselines.indexOf(row)`.
+    const shared = owners.filter((r) => new Set(r.filter((o) => o >= 0)).size > 1);
+    expect(shared.length, "at least one row is owned by two curves")
+      .toBeGreaterThan(0); // cells-ok — a row count
+
+    // **Painted back to front**, and occlusion is the only cue saying which is
+    // nearer. Measured: `[13, 9, 4]` — series 0 sits at the **bottom** row and
+    // each later one recedes upward, so the order is non-increasing in the row
+    // index. The row asserted ascending first, which is the direction a reader
+    // assumes and the opposite of what a joyplot draws.
+    expect(baselines, "series 0 is nearest, at the bottom, and each later one recedes")
+      .toEqual([...baselines].sort((a2, b2) => b2 - a2));
+  });
+
+  it("FI1 (C12 I69, §3ak.26): `isotropic` is true for the proportion family and false everywhere else", () => {
+    // **SP9's first run found this had no row at all** (F361). `isotropic`
+    // appeared only inside two key lists, so every assertion about it was that
+    // the member *exists* — a claim with nothing to be wrong about, which is
+    // A03 §2's vacuity class sitting inside a record that reads as exhaustive.
+    //
+    // **A boolean and not a ratio, deliberately**, so what the row can check is
+    // the partition: the figures whose two normalised axes carry one unit, and
+    // the ones whose axes are a value and a position and cannot.
+    const pie = proportionDecisions(plot({
+      form: "pie", segments: [{ label: "a", value: 3 }, { label: "b", value: 1 }],
+    } as Partial<Plot>));
+    const radar = proportionDecisions(plot({
+      form: "radar", segments: [{ label: "a", value: 3 }, { label: "b", value: 1 }],
+    } as Partial<Plot>));
+    expect([pie.isotropic, radar.isotropic], "a disc and a ring carry one unit on both axes")
+      .toEqual([true, true]);
+
+    // **The other five families, each through its own decisions function**, so a
+    // family that started claiming it would fail here rather than in a frame.
+    expect([
+      positionalDecisions(plot({ series: [{ values: [1, 2, 3] }] })).isotropic,
+      categoricalDecisions(plot({ form: "bar", categories: ["a"], series: [{ values: [1] }] } as Partial<Plot>)).isotropic,
+      tilesFigure(plot({ form: "treemap", hierarchy: { label: "r", value: 1 } } as Partial<Plot>)).isotropic,
+      nodesDecisions(plot({ form: "tree", hierarchy: { label: "r", value: 1 } } as Partial<Plot>)).isotropic,
+    ], "a value axis against a position axis is two units, so none of these do")
+      .toEqual([false, false, false, false]);
   });
 
   it("FT2 (C12 I62): a treemap's tiles are the unit square, and a strip's depth is a row", () => {

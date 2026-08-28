@@ -11,7 +11,7 @@
 // with nothing to be wrong about passes exactly like a rule that is satisfied,
 // and this one is especially exposed to that, because a document with no
 // Commitments section produces no findings and looks compliant.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { checkFindings, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
@@ -33,6 +33,7 @@ import {
   SEAM_OWNERS,
   seamRows,
   specFiles,
+  checkInvariantCoverage,
   tableColumn,
   testRowsOf,
 } from "../../tools/enforce/commitments.mjs";
@@ -323,6 +324,73 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
       "I2",
       "I2a",
     ]);
+  });
+});
+
+/** Every `.ts` test file — the corpus `enforce` walks, so the row runs on it. */
+function walkTests(dir = "test", out: string[] = []): string[] {
+  for (const e of readdirSync(dir)) {
+    const p2 = `${dir}/${e}`;
+    if (statSync(p2).isDirectory()) walkTests(p2, out);
+    else if (/\.tsx?$/u.test(e) && !/\.d\.ts$/u.test(e)) out.push(p2);
+  }
+  return out;
+}
+
+describe("A03 SP9 — every invariant is named by at least one test row", () => {
+  const SPEC = "docs/components/C99_x.md";
+  const TEST = "test/unit/plot.test.ts"; // `TOPICS.plot` attributes bare ids here
+
+  /** A spec and a test corpus, in the real form, parsed before it is judged. */
+  function run(invariants: readonly string[], testSource: string, exempt: readonly string[]) {
+    const spec = ["# C99 — fabricated", "", "## Invariants", "",
+      ...invariants.map((n) => `- **${n}** — text.`), ""].join("\n");
+    const read = (f: string): string => (f === SPEC ? spec : testSource);
+    return checkInvariantCoverage([SPEC], [TEST], read, exempt);
+  }
+
+  it("SP9: the real corpus, and it is a corpus", () => {
+    // **The vacuity half, and this rule needs it most** (F361, C12 §3ak.44's
+    // neighbourhood). The whole finding is that an unsound matcher reported
+    // full coverage — so a parser that stopped seeing invariants, or a walk
+    // that stopped seeing tests, reports every spec clean in the same green
+    // line the correct answer prints.
+    const files = specFiles();
+    expect(files.length).toBe(26);
+    const r = checkInvariantCoverage(files, walkTests());
+    expect(r.declared, "768 invariants at the last count; the parser must still see them")
+      .toBeGreaterThan(700); // cells-ok — an invariant count
+    expect(r.violations, "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP9: an invariant nobody names fails, and the message says which", () => {
+    const { violations } = run(["I1", "I2"], 'it("T1.1 (C99 I1): text", () => {});', []);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP9");
+    expect(violations[0]?.message).toContain("C99 I2");
+  });
+
+  it("SP9: a run-on citation counts, because that is how the corpus cites", () => {
+    // `C04 I10, I11, I25` — one spec id governing what follows, which is SP3's
+    // own reading. A resolver without it would call two of those three unowned
+    // and this rule would demand rows that already exist.
+    const { violations } = run(["I1", "I2"], 'it("T1.1 (C99 I1, I2): text", () => {});', []);
+    expect(violations).toEqual([]);
+  });
+
+  it("SP9: the exemption list is compared by equality, both ways", () => {
+    // **A subset check lets a cleared entry outlive its reason unread**, which
+    // is `anchors.mjs`' rule and this repository's own finding. So a listed
+    // invariant that has since been cited is a failure too — the list may only
+    // shrink, and shrinking it is a deliberate edit.
+    const cited = 'it("T1.1 (C99 I1, I2): text", () => {});';
+    const stale = run(["I1", "I2"], cited, ["C99 I2"]);
+    expect(stale.violations).toHaveLength(1);
+    expect(stale.violations[0]?.message).toContain("now cited");
+
+    const uncited = 'it("T1.1 (C99 I1): text", () => {});';
+    expect(run(["I1", "I2"], uncited, ["C99 I2"]).violations, "and a listed one that is still uncited passes")
+      .toEqual([]);
   });
 });
 

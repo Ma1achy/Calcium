@@ -13642,6 +13642,39 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F362 — the caller's pin reaches one family's extent and not the other's, and SP9's first run is what asked ★★★★
+
+C12 I35's second half is *the caller's pin is what that axis is*. Measured on a boxplot with
+`yMin: -50, yMax: 150`:
+
+```
+unpinned   { min: 0, max: 100 }
+pinned     { min: 0, max: 100 }     ← byte for byte
+```
+
+**`seriesRange` ends in `pinnedRange(min, max, pin)` and `quartileRange` takes no pin at all.** So the
+curve family honours a declared bound and `boxplot`, `violin`, `forest` and `ridgeline` do not —
+`dumbbell` escapes because it is the one distribution form routed through `seriesRange`.
+
+**F274's shape, on the other axis.** There a fix was scoped to the family it was noticed in by a clause
+nobody had to write; here a *capability* was added where it was needed and the second extent function
+was never asked the same question. Both are invisible to a reader checking statements one at a time,
+because each function is correct about what it computes.
+
+**Found because SP9 demanded a row and the row had to be written.** I35 had no citation — it was one of
+the three F357's unsound matcher reported as covered — and writing something that actually checks it
+took two assertions: the first held, the second did not. **That is the difference between a citation
+and a check, stated as a measurement rather than as an argument.**
+
+**Not fixed here, and the reason is the rule this arc has been following.** No catalogue variant pins a
+distribution form, so the one-line fix would move no frame, no document and no golden byte: it would be
+correct and unobservable, which is exactly what F350 says a fixture exists to prevent. **The fixture
+comes first** — a pinned boxplot in the corpus, shown to move the terminal frame — and then the fix,
+which then has something to be read against. `FI2` asserts the measured state and names this finding,
+so the fix has to come back through it.
+
+---
+
 ## F361 — F357's own figure was an unsound match, and the class it was arguing about is 86 of 768 ★★★★★
 
 F357 said *every C12 invariant is cited by some test file — 76 of 76, measured*, and used that to argue
