@@ -7289,6 +7289,47 @@ function of **height**. *Measure the case that would falsify your own falsificat
 direction; this is one step earlier, where the parameter itself is wrong and the answer comes back
 stable, plausible, and about nothing.
 
+
+### 3ak.47 — the strings cross, the rung does not, and the anchor is each arm's own
+
+`yCallout` writes a name or a reading at the line's end, and the terminal has done it since §3ag:
+
+```
+last   ┣ 99.12        and the legend stays — "last" names a value, not an identity
+name   ┣ beta         and the legend is REMOVED
+both   ┣ beta 99.12
+```
+
+**This arm drew `alpha` and `beta` in a legend for all three, byte for byte** — the collision group I75
+already reported and nobody had read.
+
+#### The legend clause was in one resolver and not the crossed one
+
+`legendPlacement` has carried *a name at the line's end **is** the legend* since §3ag; `legendOf` never
+did. So the second arm drew a legend the terminal deliberately removes, and would have drawn it **beside**
+the callouts once they landed — the identity three times.
+
+**I48's sentence selects rather than excludes**, which is what lets one clause serve both arms: *a
+callout names a value where a legend names an identity*. The arms that write the identity answer the
+legend's question; `"last"` still does not, and keeps its legend.
+
+#### Three things in one function, and only one of them crosses
+
+`calloutTextFor` chose the text, applied a capability rung, and was called at a cell row.
+
+- **The strings** — `calloutOf` on the figure. A series with no finite value has no *value* and still has
+  a name, so `"name"` answers where `"last"` does not.
+- **The rung stays.** Below the colour floor the family stacks into labelled strips and a name at the
+  line's end is a third copy of one, so the terminal writes nothing for `"name"` and degrades `"both"` to
+  the value. Applied **over** the strings rather than folded into them.
+- **The anchor is each arm's own.** *The row that series' ink ends on* is `lastInkRow` in cells; here it
+  is the last point of the last polyline the series drew. **The same question in two units** — which is
+  what I78 said about the tick budget one member earlier, and the second time this pass has had to say
+  it.
+
+**1840 terminal frames, 0 moved**, which is what makes it an extraction rather than a second derivation.
+
+---
 ---
 ---
 ---
@@ -8555,6 +8596,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I78** — **The position axis crosses as a domain — `{ range, scale, format }` — and each arm nices it with its own tick budget through one shared function.** `positionAxis` answers *is the row drawn* and says nothing about what is in it, which is why `xMin`, `xMax`, `xScale` and `xFormat` had no reader in the second arm at all. **A domain and not an axis, and the asymmetry with `value` is the budget**: a value axis nices against `ticksFor(plotAreaRows(block))`, a count derived from `height` and therefore a block fact, where an abscissa's comes from the width and stays in cells (§3aj hazard 3). So `positionAxisAt(pos, maxTicks)` is the single derivation and the budget is a parameter — `valueAxisOf`'s shape. **Ticks are placed by `at`**, which is `xPositionOf` above the seam: `normalisedOf` is not scale-aware, and an arm using it would put a log label at the linear position with the sample beneath it at the log one. *Measured before the rule: six blocks differing only in the abscissa drew six terminal frames and one 1225-byte document, and `plotFrame: "grid"` — a member that **does** cross — drew five horizontal rules and no verticals under a comment in its own file saying both ways* (F356, C12 §3ak.44). **Stated blind spot**: it says nothing about which *values* the domain should hold, so a slope chart's two positions still nice to `0.0 … 1.0` in both arms — consistent, and a question the seam does not ask.
 - **I79** — **A figure with nothing in it is drawn; a refusal is for a figure that cannot be drawn.** The second arm returned `null` when a figure emitted no marks, so a block with no data and a form the arm does not support produced one document and a consumer could not tell *not yet* from *not supported*. **An empty figure draws its ground and its message and no axis** — there is no range, so ticks, gridlines and a frame would each imply one, which is the false-axis defect the `null` was protecting against and is kept. `emptyMessage` is the message, defaulted to `No data.` in both arms. *Measured before the rule: `line/empty` and `violin/default` were byte-identical, in the corpus's 33-strong refusal group, while the terminal held the declared height and centred `No data.` in the muted tone* (F259, F363, C12 §3ak.45). **Stated blind spot**: it says nothing about a figure whose marks are empty because the *data* is degenerate rather than absent — a series of all-`null` reaches the same branch, and the two are one state here.
 - **I80** — **A member that resolves a competition for one cell is legitimate where both answers fit at once.** `plotBox` chooses how a **one-row** box spends its single row — on mass, or on a stroke heavier than the whisker — because at `plotDetail: "compact"` the box has no top or bottom edge to carry the range (I46). At the default detail it decides nothing, and in the second arm it decides nothing either: the IQR box there is `fill-opacity="0.35"` **and** `stroke-width="1.5"` in one rect, so it carries both. *Measured before the rule: `boxplot/compact-box-solid` and `boxplot/compact-box-line` draw `███` against `━━━` in the terminal and byte-identical documents here* (F365, C12 §3ak.46). **A second kind of `legitimate`**: F355's four are legitimate because each **is** a quantity in cells; this is a **choice forced by** cells, found by asking why a choice exists rather than what unit it is in. **Stated blind spot**: it says nothing about a member that is blocked rather than legitimate — `plotFill` chooses fill against outline for a density, which a pixel curve can also do, and it has nowhere to be read until `violin` draws. That is a dependency, and a remainder that mixes the two reports the wrong amount of work.
+- **I81** — **What a callout says crosses; the rung that degrades it and the row it lands on do not.** `yCallout` writes a name or a reading at each series' end, and the second arm read none of it — it drew a legend instead, the *same* legend for all three callout variants. **And the legend clause was in one resolver and not the crossed one**: `legendPlacement` has carried *a name at the line's end **is** the legend* since §3ag and `legendOf` had not, so this arm drew a legend the terminal removes and would have drawn it beside the callouts — the identity three times. I48's sentence **selects** rather than excludes, which is what lets one clause serve both. **Three things were in one function and one of them crosses**: the strings (`calloutOf`), the capability rung (below the colour floor the family stacks into labelled strips, so a name there is a third copy — applied *over* the strings), and the anchor (`lastInkRow` in cells, the last point of the last polyline here — the same question in two units, as I78 said one member earlier). *Measured before the rule: `line/callout-last`, `callout-name` and `callout-both` drew one document; the terminal draws three, and moving the strings moved 0 of 1840 terminal frames* (F349, F368, C12 §3ak.47). **Stated blind spot**: it says nothing about *where* a callout may go when two series end on the same row — the terminal has a collision rule and this arm stacks text at the same y, which no corpus variant exercises.
 
 
 ## 8. Commitments
@@ -8639,6 +8681,7 @@ orientation — and belongs in the classification table as its own rows.
 78. **A seam member that answers *whether* and not *what* leaves everything it gates on one side** (I67, I78, C12 §3ak.44). `Figure.positionAxis` is a boolean, so four block members — `xMin`, `xMax`, `xScale`, `xFormat` — had zero readers in the second arm and six blocks differing only in the abscissa drew one document. **The remedy is a domain rather than an axis, because the budget is a width**: `height` is a block field so `value` can carry niced ticks, and no block carries a width, so `positionAxisAt` takes the budget as a parameter and each arm brings its own. `xTickRow` packs what it used to derive, and 1840 terminal frames compared with 0 moved. **And a member that crosses can still be drawn wrongly for want of one that did not** — `plotFrame: "grid"` drew half a grid here until there were positions to hang the rest on (F356).
 79. **A remedy that removes a state is not a fix for a wrong value in it** (I79, C12 §3ak.45). The second arm's `return null` on an empty figure was written against a real defect — *five gridlines labelled 0 to 1 over an empty box, a plot of a range the block never had* — and it fixed the false axis by deleting the difference between *no data* and *not supported*, which F259 says are the two things a refusal must keep apart. `line/empty` and `violin/default` were byte-identical. **The half the comment earns is kept**: an empty figure draws no axis, because there is no range for one to be about. And `emptyMessage` could not have crossed first — a member with no corpus instance has nowhere to be read while the whole state is a `null` (F259, F355, F363).
 80. **A remainder that does not separate *undecided* from *blocked* reports the wrong amount of work** (I80, C12 §3ak.46). F355 owed eleven members and paired `plotFill` with `plotBox` under one note — *every variant is a `violin`, which this arm refuses*. `plotBox` is the **boxplot** form's, read at two sites inside `boxplot:`, so a fixture was buildable all along and the corpus placement was an accident; built, it is **legitimate**, because a one-row box spends its single row on mass or on a stroke and a pixel box carries both in one rect. `plotFill` is violin-only and *does* have a meaning here — a pixel density can be filled or stroked — so it is **blocked on a form**, which is a dependency and not a decision anybody owes (F355, F365).
+81. **A rule written into one resolver and not the crossed one draws the picture the other arm removes** (I48, I55, I81, C12 §3ak.47). `legendPlacement` has held *a name at the line's end **is** the legend* since §3ag; `legendOf` never did, so the second arm drew `alpha` and `beta` in a legend the terminal deliberately removes — identically for all three callout variants, which is what a member with no reader looks like from outside. **Only the strings cross**: the capability rung stays where the capability is, and the anchor is each arm's own, a cell row against a pixel y. 1840 terminal frames moved 0, which is what separates an extraction from a second derivation (F349, F368).
 
 ---
 

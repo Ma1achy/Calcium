@@ -898,6 +898,43 @@ const TERM_CAPS = {
   bracketedPaste: true, mouse: true, imageProtocol: "none", altScreen: true,
 } as const;
 
+describe("G11 — a callout is a name at the line's end", () => {
+  it("G11a (C12 I81, I48, §3ak.47, F368): the three callout modes draw three documents, and two remove the legend", () => {
+    // **The collision F349 reported and nobody read.** `line/callout-last`,
+    // `callout-name` and `callout-both` drew **one** document here while the
+    // terminal drew three — the member had no reader, which is the shape every
+    // one of F355's remaining eleven has.
+    const line = (mode: string): Plot => vmBlock({
+      kind: "plot", id: "c", form: "line", height: 8, axes: true, yAxis: "both",
+      yCallout: mode,
+      series: [{ label: "alpha", values: [10, 40, 90] }, { label: "beta", values: [90, 40, 10] }],
+    } as unknown as Plot);
+    const draw = (mode: string): string => plotToSvg(line(mode), THEME) ?? "";
+    const texts = (svg: string): readonly string[] =>
+      [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1] ?? "");
+
+    expect(new Set([draw("last"), draw("name"), draw("both")]).size,
+      "three modes, three documents").toBe(3); // cells-ok — a document count
+
+    // **`"last"` keeps its legend and the other two remove it** (C12 I48's
+    // sentence selects rather than excludes). `legendPlacement` has carried this
+    // since §3ag and `legendOf` had not, so this arm drew the legend the
+    // terminal removes — and would have drawn it beside the callouts.
+    expect(texts(draw("last")).filter((t) => t === "alpha").length,
+      "`last` names a value, so the legend still names the identity").toBe(1); // cells-ok — a label count
+    expect(texts(draw("name")).filter((t) => t === "alpha").length,
+      "and `name` writes the identity once, at the line's end").toBe(1); // cells-ok — a label count
+    expect(texts(draw("both")).some((t) => t === "alpha 90"),
+      "`both` is the name and the reading, in that order").toBe(true);
+
+    // **The strings are the figure's** — the same list the terminal writes, so
+    // there is one place left to get the text wrong.
+    expect(curveFigure(line("both")).callout, "one entry per series, in order")
+      .toEqual(["alpha 90", "beta 10"]);
+    expect(curveFigure(line("none")).callout, "and `null` where the field is off").toBeNull();
+  });
+});
+
 describe("G10 — a choice forced by cells", () => {
   it("G10b (C12 I80, §3ak.46, F366): `plotCorners` counts the grid's steps, and this arm has no grid", () => {
     // **I80's second instance, and the probe is the finding.** Corner cells

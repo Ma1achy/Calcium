@@ -13642,6 +13642,48 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F368 — the second arm drew the legend the terminal removes, and did it identically for all three callout variants ★★★★★
+
+`yCallout` writes a name or a reading at the line's end. The terminal has done it since §3ag:
+
+```
+last   │         █ beta        ← the legend stays; "last" names a value, not an identity
+       ┣ 99.12
+name   ┣ beta                  ← and the legend is REMOVED
+both   ┣ beta 99.12
+```
+
+**This arm drew `alpha` and `beta` in a legend for all three**, byte for byte — the collision group F349
+already reported and nobody had read.
+
+**Two halves, and the second is a wrong picture rather than an absence.** The member has no reader here,
+which is F356's shape and the whole remainder's. But `legendPlacement` has carried *a name at the line's
+end **is** the legend* since §3ag, and `legendOf` — the **crossed** resolver — never did. So this arm
+drew a legend the terminal deliberately removes, and would have drawn it beside the callouts once they
+landed: the identity three times.
+
+**C12 I48's sentence selects rather than excludes**, which is what makes one clause serve both: *a
+callout names a value where a legend names an identity*. The arms that write the identity answer the
+legend's question; `"last"` still does not, and its legend stays.
+
+### The split is the strings against the anchor
+
+`calloutTextFor` did three things: chose the text, applied a capability rung, and was called at a cell
+row. Only the first crosses.
+
+- **The strings** — `calloutOf` on the figure. A series with no finite value has no *value* and still
+  has a name, so `"name"` answers where `"last"` does not.
+- **The rung stays in the terminal.** Below the colour floor the family stacks into labelled strips and
+  a name at the line's end is a third copy of one, so `"name"` writes nothing there and `"both"` degrades
+  to the value. A capability decision, applied **over** the strings rather than folded into them.
+- **The anchor is each arm's own.** *The row that series' ink ends on* is `lastInkRow` in cells; here it
+  is the last point of the last polyline the series drew. The same question in two units, which is
+  exactly what I78 said about the tick budget one member ago.
+
+**1840 terminal frames, 0 moved** — the extraction rather than a re-derivation.
+
+---
+
 ## F367 — `matrixAnchor` is legitimate for a reason already ruled, `yCallout` is owed, and the cheap three were not the three I named ★★★★☆
 
 Three members were reported as *cheap because the collision sweep already reports them*. Checked, one of
