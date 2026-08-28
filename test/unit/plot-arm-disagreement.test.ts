@@ -60,7 +60,7 @@ import { describe, expect, it } from "vitest";
 
 import { block } from "../../src/data/viewmodel/index.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
-import { svgFamilyOf } from "../../src/presentation/plot/svg.js";
+import { plotToSvg, svgFamilyOf } from "../../src/presentation/plot/svg.js";
 import { RAMP_DEFAULT } from "../../src/presentation/plot/figure.js";
 import { terminalDecisions, svgArm, svgDecisions, terminalRamp, svgRamp, saysWithheld, type ArmDecisions } from "../support/arm-decisions.js";
 import { DARK_THEME } from "../support/render.js";
@@ -270,6 +270,59 @@ function pairAt(spec: Record<string, unknown>, width: number): Readonly<{ t: Arm
     t: terminalDecisions(frame(spec, FULL, width, "p")),
     s: svgArm(block({ kind: "plot", id: "p", ...rest } as never), DARK_THEME),
   };
+}
+
+/**
+ * **Every variant's two frames at 80 columns** — the collision sweep's corpus
+ * (C12 I75, F349, F357).
+ *
+ * **Not the committed baselines and not the catalogue.** The catalogue's frames
+ * open with a header naming the form and the variant, and a first measurement of
+ * this taken over them read *182 of 182 distinct* — a perfect score manufactured
+ * by the corpus's own labelling, which C12 I75 records as the instrument's near-miss.
+ * These are built in memory with a constant `id`, so nothing in a frame names
+ * which variant produced it.
+ *
+ * **A refusal is a frame** — `svg-baseline.mjs`' rule, for the same reason: a
+ * form that starts or stops drawing has to show up as a change rather than as a
+ * missing entry. It is also, correctly, a collision with every other refusal,
+ * which is why the counts below are reported inside and outside the largest
+ * group.
+ */
+function corpusFrames(): ReadonlyMap<string, Readonly<{ t: string; s: string }>> {
+  const out = new Map<string, Readonly<{ t: string; s: string }>>();
+  for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+    const vs = variants as globalThis.Record<string, Record<string, unknown>>;
+    for (const [variant, spec] of Object.entries(vs)) {
+      const { cursor, ...rest } = spec as { cursor?: unknown };
+      void cursor;
+      const svg = plotToSvg(block({ kind: "plot", id: "p", ...rest } as never), DARK_THEME);
+      out.set(`${form}/${variant}`, {
+        t: frame(spec, FULL, 80, "p").join("\n"),
+        s: svg ?? "REFUSED",
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * The variants that share a frame, grouped — **and the largest group dropped,
+ * because the empty document and the refusal both land in it and both are
+ * correct** (C12 I75).
+ *
+ * **The groups and not a count**, which is the difference between an instrument
+ * that says *something is dropped* and one that says *which*. A count moves when
+ * a field starts crossing and moves the same amount when a variant is deleted.
+ */
+function collisionsIn(
+  keyed: ReadonlyMap<string, string>,
+): Readonly<{ distinct: number; groups: readonly (readonly string[])[] }> {
+  const groups = new Map<string, string[]>();
+  for (const [name, f] of keyed) (groups.get(f) ?? groups.set(f, []).get(f)!).push(name);
+  const shared = [...groups.values()].filter((g) => g.length > 1)
+    .sort((a, b) => b.length - a.length || a[0]!.localeCompare(b[0]!));
+  return { distinct: groups.size, groups: shared.slice(1) };
 }
 
 const same = (a: readonly string[] | number | boolean, b: readonly string[] | number | boolean): boolean =>
@@ -653,6 +706,102 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // clauses answer and this must not have quietly taken over.
     expect(terminalDecisions(framed(["a ┤████        │"])).interiorRules,
       "the frame's own edges are not interior").toBe(0);
+  });
+
+  it("AD13 (C12 I75, F349, F357): the collision sweep is computed rather than quoted", () => {
+    // **C12 I75's subject is the corpus and its only citation was a row about
+    // `layout`** (F357). The invariant reported 182 variants, 175 distinct
+    // terminal frames and 125 documents, and nothing computed any of them — the
+    // probe that produced them was deleted before staging, per the rule, so the
+    // measurement was a count in prose with no route back to it. All 76 C12
+    // invariants are cited by some test file and no rule pairs an invariant to a
+    // check, so the convention held by hand and a citation satisfied it whatever
+    // the row asserted.
+    //
+    // **A collision is the strongest agreement the record cannot report.** Two
+    // blocks that are not equal drawing one document means a field reached one
+    // arm: same labels, same legend, same border, same count of everything, and
+    // no column of `ArmDecisions` can see it. A lower bound on the drop and an
+    // exact count of the pictures.
+    //
+    // **The number in C12 I75 was measured before the commit that carries it.** The
+    // rule says 125 documents and 25 shares past the largest group; computed
+    // now, 126 and 24. Nothing drifted — `layout` crossed (F342), which split
+    // `bar/stacked` from `bar/normalised`, and that pair is the first entry in
+    // C12 I75's own list of what this arm drops. **A figure quoted from a probe is a
+    // snapshot of a corpus the fix then changed**, and the probe was deleted
+    // before staging so there was no way to notice.
+    const corpus = corpusFrames();
+    const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
+    const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
+
+    expect(corpus.size, "variants in the corpus").toBe(182); // cells-ok — a variant count
+    expect(t.distinct, "distinct terminal frames").toBe(175); // cells-ok — a frame count
+    expect(s.distinct, "distinct documents").toBe(126); // cells-ok — a frame count
+
+    // **The terminal's four are F350's**, and asserting them keeps that finding
+    // alive: three are variants whose names state a claim their block does not
+    // make, and `slope`'s pair is legitimate — C12 I74's own proof, a form whose
+    // sixth reading changes nothing about the picture.
+    expect(t.groups, "terminal collisions past the empty document").toEqual([
+      ["heatmap/default", "heatmap/palette"],
+      ["histogram/default", "histogram/scott"],
+      ["line/legend-right", "line/multi-series"],
+      ["slope/default", "slope/six-readings"],
+    ]);
+
+    // **This arm's are the specification of what it drops.** Every group is a
+    // set of blocks that are not equal drawing one document, so each names a
+    // member — `align` and `width` on `line/size-*`, `plotCorners` on
+    // `corners-sharp`, `yCallout` on the callouts, `plotStyle` on the candles,
+    // `treeLayout`'s overflow pairs, `calendarUnit` on `day-stretch`. The four
+    // the terminal also has are fixture defects and stay in both lists.
+    expect(s.groups, "documents drawn from more than one block").toEqual([
+      ["line/default", "line/size-left", "line/size-centre", "line/size-right", "line/corners-sharp"],
+      ["contour/default", "contour/style-line", "contour/dim-floor", "contour/ink-contrast"],
+      ["line/callout-last", "line/callout-name", "line/callout-both"],
+      ["pie/solid", "pie/default-40", "pie/narrow-20"],
+      ["quiver/default", "quiver/ink-contrast", "quiver/dim-floor"],
+      ["calendar/day", "calendar/day-stretch"],
+      ["heatmap/default", "heatmap/palette"],
+      ["histogram/default", "histogram/scott"],
+      ["horizon/bands-3", "horizon/folded-1x3"],
+      ["line/candlestick-overlay", "line/cursor-candles"],
+      ["line/confidence", "line/confidence-unfilled"],
+      ["line/legend-right", "line/multi-series"],
+      ["slope/default", "slope/six-readings"],
+      ["tree/default", "tree/overflow-top-down"],
+      ["tree/left-right", "tree/overflow-left-right"],
+      ["tree/outline", "tree/overflow-outline"],
+    ]);
+  });
+
+  it("AD14 (C12 I75, F349, F350): the sweep responds to a field crossing, and to one that does not", () => {
+    // **A sweep certified only by its own corpus agrees with itself whatever it
+    // does** — AD5's rule, and the reason this is not a second count. The
+    // fabricated violation runs in **both** directions on one block, because a
+    // control that only shows a collision cannot tell a working sweep from one
+    // that returns `true`.
+    const base = { form: "line", height: 8, axes: true, legend: false,
+      xMin: 1, xMax: 1000,
+      series: [{ name: "s", values: Array.from({ length: 10 }, (_v, i) => 1000 ** (i / 9)) }] };
+    const draw = (extra: Record<string, unknown>): string =>
+      plotToSvg(block({ kind: "plot", id: "p", ...base, ...extra } as never), DARK_THEME) ?? "REFUSED";
+
+    // **A member this arm reads moves the document**, so the corpus can tell a
+    // dropped field from a sweep that reports everything as distinct.
+    expect(draw({}) === draw({ plotFrame: "grid" }), "`plotFrame` crosses, so it moves the document")
+      .toBe(false);
+
+    // **And `xScale` does not** (F356). The two blocks draw different terminal
+    // frames — `1 100 200 … 1000` against `1 5 10 20 … 1000` — and one document.
+    // This is the row that fails the day the position axis crosses, which is
+    // what makes it a fixture for the fix rather than a record of the defect.
+    expect(draw({}) === draw({ xScale: "log" }), "`xScale` does not, so two blocks draw one document")
+      .toBe(true);
+    expect(frame({ ...base, xScale: "log" }, FULL, 80, "p").join("\n")
+      === frame(base, FULL, 80, "p").join("\n"), "while the terminal draws two frames")
+      .toBe(false);
   });
 
   it("AD7 (F316, F318): the notice reader sees both vocabularies", () => {
