@@ -190,6 +190,11 @@ describe("U — the seam, asserted from both arms", () => {
     // **`yCallout` is a probe** and its three corpus variants are already a
     // collision group in AD13 — three blocks, one document (F349, F367).
     callout: { form: "line", variant: "callout-last", patch: { yCallout: "name" } },
+    // **The last two of F355's eleven**, each with a corpus pair added for it
+    // (F370): `x-title` against `x-captions`, `axis-cross` against
+    // `straddle-zero`.
+    title: { form: "line", variant: "x-captions", patch: { xTitle: "training step" } },
+    cross: { form: "line", variant: "straddle-zero", patch: { axisCross: "zero" } },
   } as const satisfies Readonly<Record<keyof Figure, unknown>>;
 
   /**
@@ -254,6 +259,11 @@ describe("U — the seam, asserted from both arms", () => {
     // a series ends at and this arm drew a legend — the same legend for all
     // three callout variants, which is what a member with no reader looks like.
     callout: { terminal: "moves", svg: "moves" },
+    // **Both arms since §3ak.48** (F369, F370), and they are the last two: the
+    // reader map said `svg=0` for eleven members and it was measuring which
+    // names the file writes, not which values reach it.
+    title: { terminal: "moves", svg: "moves" },
+    cross: { terminal: "moves", svg: "moves" },
   } as const satisfies Readonly<Record<keyof Figure, { terminal: string; svg: string }>>;
 
   function patched(base: Spec, how: unknown): Spec {
@@ -343,7 +353,7 @@ describe("U — the seam, asserted from both arms", () => {
       gutterFamilies += 1;
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
-    expect(drawn, "drawn SVG documents").toBe(150); // cells-ok — a document count
+    expect(drawn, "drawn SVG documents").toBe(152); // cells-ok — a document count
     // **D13 closed**: the legend is drawn where the author asked and where it is
     // load-bearing — `SHARES_CELLS` and more than one series — which is the form
     // half of the terminal's auto-enable. The rung half stays there, because one
@@ -367,7 +377,7 @@ describe("U — the seam, asserted from both arms", () => {
     // `arm-decisions.ts` already asks for by shape after F307, and asking it here
     // would re-derive the figure D13 closed against. Recorded, not narrowed.
     expect(legendDrawn, "documents drawing a legend label — D13").toBe(44); // cells-ok — a document count
-    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(147); // cells-ok — a document count
+    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(149); // cells-ok — a document count
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
     // rather than better: a curve's identity is its series, which belongs in the
@@ -507,7 +517,7 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(checked, "variants walking a figure").toBe(156); // cells-ok — a variant count
+    expect(checked, "variants walking a figure").toBe(158); // cells-ok — a variant count
     // The bucket that lies, pinned. If a second one appears, the emitter key is
     // the first thing to check — this is the count F290 rests on.
     expect(lying, "variants whose spec.form differs from their catalogue bucket").toBe(1); // cells-ok — a variant count
@@ -524,7 +534,7 @@ describe("U — the seam, asserted from both arms", () => {
       const json = JSON.stringify(EMITTER[family as WalkedFamily](blockOf(spec)));
       expect(json, `${bucket}/${variant} carries a resolved colour`).not.toMatch(/#[0-9a-f]{6}/iu);
     }
-    expect(checked, "figures checked for a resolved colour").toBe(156); // cells-ok — a variant count
+    expect(checked, "figures checked for a resolved colour").toBe(158); // cells-ok — a variant count
   });
 
   it("U5 (C12 I59, §3ak.17): the SVG arm cannot see a capability — structural, not measured", () => {
@@ -738,7 +748,7 @@ describe("U — the seam, asserted from both arms", () => {
     // drawable at this rung and `truncate` reserves both its cells since F292,
     // so its width is a cost and not a defect. `~` is the *repertoire* fallback,
     // which is a different question (§3ak.24).
-    expect(frames, "catalogue variants rendered at the wide rung").toBe(186); // cells-ok — a frame count
+    expect(frames, "catalogue variants rendered at the wide rung").toBe(188); // cells-ok — a frame count
     expect([...seen.keys()].sort(), "two-cell characters still emitted").toEqual(["…"]);
   });
 

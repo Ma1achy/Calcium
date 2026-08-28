@@ -1660,6 +1660,29 @@ export function plotToSvg(
     }
   }
 
+  // **The rules cross at zero where the block asks and the domain allows**
+  // (C12 I82, §3ak.48). `axisCross: "zero"` moved nothing here — all three of
+  // its values drew one document — and the member says *whether*: `zeroAt` on
+  // the abscissa and `normalisedOf(0)` on the ordinate are each arm's own
+  // arithmetic, and only a domain that **strictly** straddles zero has a
+  // crossing to draw, which is §3ad A4's rule and `positionAxisAt`'s `zeroAt`
+  // already answers it.
+  if (figure.cross && rule !== undefined) {
+    const pos = figure.position;
+    const zeroAt = pos === null ? null : positionAxisAt(pos, 2).zeroAt;
+    if (zeroAt !== null) {
+      const x = box.left + (box.right - box.left) * (figure.facing.x === "left" ? 1 - zeroAt : zeroAt);
+      parts.push(`<line x1="${n(x)}" y1="${n(box.top)}" x2="${n(x)}" y2="${n(box.bottom)}" ` +
+        `stroke="${rule}" stroke-width="1"/>`);
+    }
+    const vr = figure.value?.range;
+    if (vr !== undefined && vr.min < 0 && vr.max > 0) {
+      const y = box.top + (box.bottom - box.top) * normalisedOf(0, vr, true);
+      parts.push(`<line x1="${n(box.left)}" y1="${n(y)}" x2="${n(box.right)}" y2="${n(y)}" ` +
+        `stroke="${rule}" stroke-width="1"/>`);
+    }
+  }
+
   // **Interior rules are `"grid"` and nothing else** (C12 I67, §3ak.19, D6).
   // This arm drew one per tick unconditionally, which *is* the grid style
   // applied to every plot — so D6 was never a ruling about gridlines, it was
@@ -1778,6 +1801,18 @@ export function plotToSvg(
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
         `${escape(text)}</text>`);
     }
+  }
+
+  // **The caption under the abscissa** (C12 I82, §3ak.48, F370). The last of
+  // F355's eleven with no reader here: `line/x-title` and `line/x-captions` drew
+  // one document. **The words cross and the room does not** — the terminal
+  // spends a row and this arm spends pixels, so it sits a line below whatever
+  // wrote the position row, centred on the plot area rather than the viewBox.
+  if (figure.title !== null && label !== undefined) {
+    parts.push(`<text x="${n((box.left + box.right) / 2)}" ` +
+      `y="${n(box.bottom + SVG_FONT_SIZE * 2.4)}" text-anchor="middle" ` +
+      `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
+      `${escape(figure.title)}</text>`);
   }
 
   // **The colour key, which is the last cell that was open and not a refusal**

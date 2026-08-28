@@ -556,6 +556,24 @@ export type Figure = Readonly<{
   /** Placed, or `null` where the author refused one — never an empty list (I67). */
   legend: FigureLegend | null;
   /**
+   * **The caption under the abscissa, or `null`** (I82, §3ak.48).
+   *
+   * A string the caller chose, and the last of the eleven that had no reader in
+   * the second arm — `line/x-title` and `line/x-captions` drew one document.
+   * **Not a row**: the terminal spends one on it and this arm spends pixels, so
+   * what crosses is the words and each arm finds its own room.
+   */
+  title: string | null;
+  /**
+   * **Whether the rules cross at zero rather than sitting at the edge**
+   * (I82, §3ak.48).
+   *
+   * `axisCross: "zero"` and only where the domain *strictly* straddles it —
+   * which is `positionAxisAt`'s `zeroAt` on one axis and `rowOf(0)` on the
+   * other, so the member says *whether*, and where is each arm's arithmetic.
+   */
+  cross: boolean;
+  /**
    * **What is written at each series' end, in series order** (I81, §3ak.47).
    *
    * `null` where the field is off, and a `null` entry for a series with nothing
@@ -884,6 +902,23 @@ function lastFinite(values: readonly (number | null)[]): number | null {
   return null;
 }
 
+/** The caption under the abscissa, or `null` (I82, §3ak.48). */
+export function titleOf(block: Pick<Plot, "xTitle">): string | null {
+  return block.xTitle ?? null;
+}
+
+/**
+ * Whether the rules cross at zero (I82, §3ak.48).
+ *
+ * **`"zero"` and nothing else.** `"edge"` is the default and every other value
+ * is one, which is why this is a boolean rather than the member forwarded: the
+ * second arm would have to re-derive *which of these means cross* and that is
+ * the second copy §3ak exists to stop.
+ */
+export function crossOf(block: Pick<Plot, "axisCross">): boolean {
+  return block.axisCross === "zero";
+}
+
 export function calloutOf(block: Plot): readonly (string | null)[] | null {
   const mode = block.yCallout;
   if (mode !== "last" && mode !== "name" && mode !== "both") return null;
@@ -1096,6 +1131,8 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
   };
 }
 
@@ -1246,6 +1283,8 @@ export function tilesFigure(block: Plot): Figure {
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
     marks,
   };
 }
@@ -1305,6 +1344,8 @@ export function nodesDecisions(block: Plot): Omit<Figure, "marks"> {
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
   };
 }
 
@@ -1482,6 +1523,8 @@ export function distributionFigure(block: Plot): Figure {
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
     marks,
   };
 }
@@ -1879,6 +1922,8 @@ export function fieldFigure(block: Plot): Figure {
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
     ramp: rampOf(block),
     marks,
   };
@@ -2048,6 +2093,8 @@ export function horizonFigure(block: Plot): Figure {
     valueLabels: null,
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
     ramp: rampOf(block),
     marks,
   };
@@ -2135,6 +2182,8 @@ export function matrixFigure(block: Plot): Figure {
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
     marks,
   };
 }
@@ -2254,6 +2303,8 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
   };
 }
 
@@ -3050,6 +3101,8 @@ export function proportionDecisions(block: Plot): Omit<Figure, "marks"> {
     // computing a domain from a series this family does not read.
     position: null,
     callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
     // **A radar's readings are on a scale and the record now says so** (F304).
     // `valueAxisOf` is `radarCeiling` with the pin threaded, which is the half
     // the old expression could not have: it passed `{}`, so `yMin`, `yMax` and

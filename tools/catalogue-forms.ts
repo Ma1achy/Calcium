@@ -232,6 +232,15 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
     // C12 I56 §3ag — the abscissa named under its own scale, which is how the
     // two are read together: `epoch 0 … now` over `training step`.
+    // C12 §3ak.48, F370 — **the same block without the title**, so the pair
+    // differs in exactly `xTitle` and the collision sweep can name it. The name
+    // states what the block sets: three captions on the abscissa, and no title
+    // over them.
+    "x-captions": {
+      form: "line", height: 8, axes: true, legend: false,
+      xLabels: ["epoch 0", "epoch 20", "now"],
+      series: [s(sin50, "alpha")],
+    },
     "x-title": {
       form: "line", height: 8, axes: true, legend: false,
       xLabels: ["epoch 0", "epoch 20", "now"],
@@ -312,6 +321,14 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // `0 … n − 1`, and its zero is the area's first column.
     "axis-cross": {
       form: "line", height: 10, axes: true, axisCross: "zero",
+      xMin: -6, xMax: 6,
+      series: [s([-4, -1, 2, 6, 3, -2, -5, 1, 5, 2, -3, -1, 4], "obs")],
+    },
+    // C12 §3ak.48, F370 — **both axes straddle zero and the rules stay at the
+    // edge**, which is the pair `axis-cross` needs: one field between them, and
+    // a name saying what this block does rather than what it omits.
+    "straddle-zero": {
+      form: "line", height: 10, axes: true,
       xMin: -6, xMax: 6,
       series: [s([-4, -1, 2, 6, 3, -2, -5, 1, 5, 2, -3, -1, 4], "obs")],
     },

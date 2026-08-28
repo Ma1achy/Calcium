@@ -4,8 +4,6 @@
 <line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="288" y1="12.8" x2="288" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="89.6" y1="196.267" x2="486.4" y2="196.267" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">-5</text>
 <text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">5</text>
