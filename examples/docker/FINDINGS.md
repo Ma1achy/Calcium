@@ -13642,6 +13642,47 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F358 — the interior-rule reader and its subject are disjoint sets, and the control that certified it is written in a vocabulary the renderer does not use ★★★★★
+
+`ArmDecisions.interiorRules` asks *how many rules does this figure draw inside its frame*. Measured
+over the whole corpus at 24-bit, both widths, 364 frames:
+
+```
+reader says > 0        15
+frame holds ┄ or ┊     16
+BOTH                    0
+```
+
+**Not one frame is in both.** Every positive the reader gives is a *figure* glyph — a steep curve's
+`│`, a candle's body, a vertical boxplot's whiskers — and every real interior rule is missed. The
+corpus's own gridded variant, `line/frame-grid`, holds eight rows of `┄┊` and reports **zero**.
+
+**The cause is a character class.** `RULE_ONLY` is `[\s┌┐└┘├┤┬┴┼─│+|-]`, and the terminal draws its
+interior rules **dotted** — `┄` across, `┊` down — so a gridded row does not match the predicate at
+all, while a plot row holding two borders and one curve segment matches it with three rule glyphs and
+clears the `> 2` test F334 added.
+
+**F334's fix is why the count is `> 2`, and it is correct about what it fixed.** *A blank row inside a
+frame is not a rule*: `│` + spaces + `│` is two glyphs, so requiring more than two removed the phantom.
+It could not have found this, because the frames it was measured against had no third glyph — and the
+third glyph, when it arrives, is a figure's.
+
+**The control is the part worth keeping.** AD10 asserts `"  ├────────────┤"` counts 1 and
+`"  │    │    │ │"` counts 1, both hand-built strings, and both pass. **The renderer draws neither.**
+This is the third instance of one class — F321's *an edge glyph inside a figure is not a frame*, F334's
+*a blank row inside a frame is not a rule*, and now a figure glyph read as a rule — and the first two
+were each closed on the instance. A fabricated violation written in the same sitting as the rule
+inherits the rule's misreading, which is A03 §2's own note about SP1; here it inherits a **vocabulary**.
+
+**The correction moves 28 cells and leaves the total at 16.** Sixteen pairs disagreed before and
+sixteen after, and **the two sets are disjoint**: the old sixteen were curve glyphs against an SVG that
+draws nothing, the new sixteen are rules the terminal draws and this arm does not — `line/annotation-label`'s
+two, `line/axis-cross`'s nine, `line/cursor`'s crosshair, `forest`'s reference line,
+`autocorrelation`'s significance bands. **A total that does not move is not evidence that nothing did**,
+and comparing totals is what would have said this changed nothing.
+
+---
+
 ## F357 — I75's only citation is a row about something else, and a citation is what every mechanism counts ★★★★☆
 
 I75 says the collision sweep *"is checked over the corpus"*, and reports its numbers: 182 variants,
