@@ -973,6 +973,36 @@ const results = runPass({
       expect: "SB",
     },
     {
+      // **A clip contains and does not communicate** (F343). Reverted to the
+      // tenth, `petal_length` starts at x ≈ −2.8 and the rectangle removes its
+      // head — `betal_length`, a different word, with nothing to say so.
+      name: "THE ROOM: the gutter is a tenth of the width whatever its labels are",
+      file: SVG,
+      from: "  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM) + LABEL_GAP;",
+      to: "  return 0;",
+      expect: "G6c5",
+    },
+    {
+      // **Past the cap the arm still cuts, and the head is what a reader
+      // needs.** Cutting from the front keeps the label inside its room and
+      // loses the part that names it — the shipped defect with a marker on it.
+      name: "THE END: a label past the cap is cut at the head rather than the tail",
+      file: SVG,
+      from: "  return `${text.slice(0, chars - 1)}\\u2026`; // cells-ok — a character count",
+      to: "  return `\\u2026${text.slice(text.length - chars + 1)}`; // cells-ok — a character count",
+      expect: "G6c5",
+    },
+    {
+      // **A label taller than the box it names** (F345), which is the same rule
+      // across the text rather than along it. Reverted, fourteen ranks of 9.2 px
+      // each carry a 12 px glyph.
+      name: "THE RANK: a node's label is the figure's type size whatever its box is",
+      file: SVG,
+      from: "  return Math.min(SVG_FONT_SIZE, rankHeight * 0.8);",
+      to: "  return SVG_FONT_SIZE;",
+      expect: "G6e9",
+    },
+    {
       // **`layout` was read at one site in one renderer** (F342), so
       // `bar-stacked.svg` and `bar-normalised.svg` were byte-identical while the
       // terminal drew three figures. Reverted, this arm draws grouped for all

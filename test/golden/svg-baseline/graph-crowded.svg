@@ -15,44 +15,44 @@
 <path d="M352 258.514 L352 278.171" stroke="#2c2c2c" stroke-width="1" fill="none"/>
 <rect x="168.32" y="17.714" width="367.36" height="9.829" rx="2" fill="#e69f00" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-0"><rect x="168.32" y="17.714" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="26.629" clip-path="url(#nsvgb-0)" font-size="12" font-family="monospace" fill="#141414">service-01</text>
+<text x="171.32" y="25.25" clip-path="url(#nsvgb-0)" font-size="7.863" font-family="monospace" fill="#141414">service-01</text>
 <rect x="168.32" y="37.371" width="367.36" height="9.829" rx="2" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-1"><rect x="168.32" y="37.371" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="46.286" clip-path="url(#nsvgb-1)" font-size="12" font-family="monospace" fill="#141414">service-02</text>
+<text x="171.32" y="44.907" clip-path="url(#nsvgb-1)" font-size="7.863" font-family="monospace" fill="#141414">service-02</text>
 <rect x="168.32" y="57.029" width="367.36" height="9.829" rx="2" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-2"><rect x="168.32" y="57.029" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="65.943" clip-path="url(#nsvgb-2)" font-size="12" font-family="monospace" fill="#141414">service-03</text>
+<text x="171.32" y="64.564" clip-path="url(#nsvgb-2)" font-size="7.863" font-family="monospace" fill="#141414">service-03</text>
 <rect x="168.32" y="76.686" width="367.36" height="9.829" rx="2" fill="#f0e442" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-3"><rect x="168.32" y="76.686" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="85.6" clip-path="url(#nsvgb-3)" font-size="12" font-family="monospace" fill="#141414">service-04</text>
+<text x="171.32" y="84.221" clip-path="url(#nsvgb-3)" font-size="7.863" font-family="monospace" fill="#141414">service-04</text>
 <rect x="168.32" y="96.343" width="367.36" height="9.829" rx="2" fill="#8fa8ff" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-4"><rect x="168.32" y="96.343" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="105.257" clip-path="url(#nsvgb-4)" font-size="12" font-family="monospace" fill="#141414">service-05</text>
+<text x="171.32" y="103.878" clip-path="url(#nsvgb-4)" font-size="7.863" font-family="monospace" fill="#141414">service-05</text>
 <rect x="168.32" y="116" width="367.36" height="9.829" rx="2" fill="#f07a3c" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-5"><rect x="168.32" y="116" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="124.914" clip-path="url(#nsvgb-5)" font-size="12" font-family="monospace" fill="#141414">service-06</text>
+<text x="171.32" y="123.535" clip-path="url(#nsvgb-5)" font-size="7.863" font-family="monospace" fill="#141414">service-06</text>
 <rect x="168.32" y="135.657" width="367.36" height="9.829" rx="2" fill="#e4a3c4" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-6"><rect x="168.32" y="135.657" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="144.571" clip-path="url(#nsvgb-6)" font-size="12" font-family="monospace" fill="#141414">service-07</text>
+<text x="171.32" y="143.192" clip-path="url(#nsvgb-6)" font-size="7.863" font-family="monospace" fill="#141414">service-07</text>
 <rect x="168.32" y="155.314" width="367.36" height="9.829" rx="2" fill="#cfcfcf" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-7"><rect x="168.32" y="155.314" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="164.229" clip-path="url(#nsvgb-7)" font-size="12" font-family="monospace" fill="#141414">service-08</text>
+<text x="171.32" y="162.85" clip-path="url(#nsvgb-7)" font-size="7.863" font-family="monospace" fill="#141414">service-08</text>
 <rect x="168.32" y="174.971" width="367.36" height="9.829" rx="2" fill="#e69f00" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-8"><rect x="168.32" y="174.971" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="183.886" clip-path="url(#nsvgb-8)" font-size="12" font-family="monospace" fill="#141414">service-09</text>
+<text x="171.32" y="182.507" clip-path="url(#nsvgb-8)" font-size="7.863" font-family="monospace" fill="#141414">service-09</text>
 <rect x="168.32" y="194.629" width="367.36" height="9.829" rx="2" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-9"><rect x="168.32" y="194.629" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="203.543" clip-path="url(#nsvgb-9)" font-size="12" font-family="monospace" fill="#141414">service-10</text>
+<text x="171.32" y="202.164" clip-path="url(#nsvgb-9)" font-size="7.863" font-family="monospace" fill="#141414">service-10</text>
 <rect x="168.32" y="214.286" width="367.36" height="9.829" rx="2" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-10"><rect x="168.32" y="214.286" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="223.2" clip-path="url(#nsvgb-10)" font-size="12" font-family="monospace" fill="#141414">service-11</text>
+<text x="171.32" y="221.821" clip-path="url(#nsvgb-10)" font-size="7.863" font-family="monospace" fill="#141414">service-11</text>
 <rect x="168.32" y="233.943" width="367.36" height="9.829" rx="2" fill="#f0e442" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-11"><rect x="168.32" y="233.943" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="242.857" clip-path="url(#nsvgb-11)" font-size="12" font-family="monospace" fill="#141414">service-12</text>
+<text x="171.32" y="241.478" clip-path="url(#nsvgb-11)" font-size="7.863" font-family="monospace" fill="#141414">service-12</text>
 <rect x="168.32" y="253.6" width="367.36" height="9.829" rx="2" fill="#8fa8ff" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-12"><rect x="168.32" y="253.6" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="262.514" clip-path="url(#nsvgb-12)" font-size="12" font-family="monospace" fill="#141414">service-13</text>
+<text x="171.32" y="261.135" clip-path="url(#nsvgb-12)" font-size="7.863" font-family="monospace" fill="#141414">service-13</text>
 <rect x="168.32" y="273.257" width="367.36" height="9.829" rx="2" fill="#f07a3c" stroke="#141414" stroke-width="1"/>
 <clipPath id="nsvgb-13"><rect x="168.32" y="273.257" width="367.36" height="9.829"/></clipPath>
-<text x="171.32" y="282.171" clip-path="url(#nsvgb-13)" font-size="12" font-family="monospace" fill="#141414">service-14</text>
+<text x="171.32" y="280.792" clip-path="url(#nsvgb-13)" font-size="7.863" font-family="monospace" fill="#141414">service-14</text>
 </svg>

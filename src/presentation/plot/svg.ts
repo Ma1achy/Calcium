@@ -89,10 +89,39 @@ export type SvgLayout = Readonly<{
 /**
  * Type size in px — **a constant rather than a member**, because nothing outside
  * this file names it and a member nobody sets is an export nothing consumes.
- * It sizes nothing: the label places itself, so this is the glyph height and
- * never an input to a layout (§3aj hazard 4).
+ *
+ * **It used to say it sizes nothing**: *the label places itself, so this is the
+ * glyph height and never an input to a layout (§3aj hazard 4).* Both halves are
+ * true and the conclusion is not — **placement and containment are two
+ * questions** (F343). `text-anchor="end"` does place the label with no width,
+ * and it says nothing about whether the gutter is wide enough to hold what was
+ * placed; the answer shipped was a clip, and a clip on an `end`-anchored text
+ * cuts the head. So it sizes exactly one thing, `gutterRoom`, in the arm's own
+ * units and nowhere near the shared layout.
  */
 export const SVG_FONT_SIZE = 12;
+
+/**
+ * A monospace glyph's advance as a share of its size — **this arm's own
+ * estimate, and the only one it has** (F343, §3ak.41).
+ *
+ * §3ak.20 ruled that the gutter's *width* does not cross: `min(cells(widest),
+ * width / 3)` calls `cells()` and hazard 4 forbids that in a shared layout. It
+ * is still forbidden. This is not shared, does not call `cells()`, and is not a
+ * measurement of a string in the terminal's units — it is the arm sizing its own
+ * furniture in its own units, which that ruling says is each arm's business.
+ *
+ * **The premise it replaces named the trigger for its own replacement**: *a
+ * tenth of the width and not the widest label … it is affordable here because
+ * pixels overflow gracefully and cells do not.* They do not overflow gracefully.
+ * An `end`-anchored text grows **leftward**, so the clip that stops it cuts its
+ * **head** — `petal_length` renders as `betal_length`, a different word, with
+ * nothing on the page to say anything was removed.
+ */
+const SVG_EM = 0.6;
+
+/** The gap between a gutter label and the plot area, in px. */
+const LABEL_GAP = 6;
 
 export const SVG_DEFAULT_LAYOUT: SvgLayout = Object.freeze({
   width: 640,
@@ -372,9 +401,69 @@ function n(v: number): string {
 type Area = Readonly<{ left: number; right: number; top: number; bottom: number }>;
 
 /** The plot area in px, from the layout's fractions. Never a cell count. */
-function area(layout: SvgLayout, legend: FigureLegend | null = null): Area {
+/**
+ * The left margin the gutter's labels need, in px — **grown to fit, capped at a
+ * third** (F343, §3ak.41).
+ *
+ * `bandLayout`'s shape in this arm's units: `min(widest, width / 3)`, which is
+ * the terminal's rule and not a copy of its arithmetic. **Grown and never
+ * shrunk**, because the tenth was a deliberate choice and the only thing
+ * measured against it is the overflow — a rule that also narrowed would move
+ * every guttered frame in the corpus on the strength of a case that was fine.
+ *
+ * **Which labels own the gutter is `valueOnX || axis === null`**, the same
+ * condition the drawing walk uses, read from the figure rather than restated:
+ * values along x put the identity down the left, and a family with no value axis
+ * indexes its rows by identity (F325).
+ */
+function gutterRoom(
+  block: Plot,
+  figure: Figure | Omit<Figure, "marks">,
+  layout: SvgLayout,
+): number {
+  // **The drawing's own condition, read rather than restated.** The first
+  // version asked a weaker one — *the values run along x, or there is no value
+  // axis* — and reserved 92.4 px on five `histogram` frames that draw **no
+  // identity label at all**: `HAS_POSITION_AXIS` is true for that form, so its
+  // bins read along the bottom and `captionsRows` is false. Room reserved for a
+  // label nobody draws is the same defect one direction along, and the frame is
+  // what said so — the box moved and no text appeared in it.
+  const named = figure.identity.filter((i) => i !== "");
+  const captionsRows =
+    (ROW_IS_AN_IDENTITY[block.form] && !HAS_POSITION_AXIS[block.form]) || svgFamilyOf(block.form) === "field";
+  const valueOnX = figure.orientation === "horizontal" && figure.value !== null;
+  const holdsIdentity =
+    figure.gutter && named.length > 0 && captionsRows && (valueOnX || figure.value === null); // cells-ok — an identity slot count
+  const onLeft = figure.valueLabels === "left" || figure.valueLabels === "both";
+  const labels = holdsIdentity ? named : !valueOnX && onLeft ? figure.value?.labels ?? [] : [];
+  let widest = 0;
+  for (const l of labels) widest = Math.max(widest, l.length); // cells-ok — a character count
+  if (widest === 0) return 0; // cells-ok — a character count
+  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM) + LABEL_GAP;
+}
+
+/**
+ * A gutter label cut to the room it has, marked (F343, §3ak.41).
+ *
+ * **Past the cap the arm still has to cut, and it cuts the tail.** That is what
+ * `truncate` does in the other arm and what `heatmap/captions-left` draws —
+ * `epoch…` — and it is the half of this that has no instance in the corpus: the
+ * longest identity string is twelve characters and the cap is a third of 640.
+ * Written anyway, because the defect is *an unmarked cut at the head* and a
+ * forty-character label reaches it whatever the gutter is.
+ */
+function fitLabel(text: string, room: number): string {
+  const chars = Math.floor(Math.max(0, room) / (SVG_FONT_SIZE * SVG_EM)); // cells-ok — a character count
+  if (text.length <= chars) return text; // cells-ok — a character count
+  if (chars <= 1) return chars === 1 ? "\u2026" : ""; // cells-ok — a character count
+  return `${text.slice(0, chars - 1)}\u2026`; // cells-ok — a character count
+}
+
+function area(layout: SvgLayout, legend: FigureLegend | null = null, room = 0): Area {
   const box = {
-    left: layout.width * (layout.gutter + layout.pad),
+    // **A floor and not a fraction** (F343). The tenth stays the minimum; a
+    // gutter whose labels want more takes more, up to a third.
+    left: Math.max(layout.width * (layout.gutter + layout.pad), room),
     right: layout.width * (1 - layout.pad),
     top: layout.height * layout.pad,
     bottom: layout.height * (1 - layout.gutter),
@@ -1018,12 +1107,42 @@ function nodeMarks(
         `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" ` +
           `rx="2" fill="${slot}" stroke="${ground ?? slot}" stroke-width="1"/>`,
         `<clipPath id="n${id}-${String(node)}"><rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}"/></clipPath>`,
-        `<text x="${n(r.x + 3)}" y="${n(r.y + r.h / 2 + SVG_FONT_SIZE / 3)}" clip-path="url(#n${id}-${String(node)})" ` +
-          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ground ?? ink}">${escape(label)}</text>`,
+        // **A label sized to the box it names** (F345, §3ak.41). `graph/crowded`
+        // is 14 ranks in `height: 7`: the terminal draws three and says
+        // `+11 more`, and this arm drew all fourteen at `275.2 / 14 = 9.83 px` a
+        // rank with every glyph at 12 — ascending above its own rect and
+        // descending below it, into the two neighbours it does not name.
+        //
+        // **This does not overturn F318's `legitimate` row and it qualifies
+        // it.** *This arm scales its box across whatever it is given and has
+        // nothing to drop* is true, and what it did instead, past a rank count,
+        // was draw something no reader can use. Scaling is the answer the medium
+        // actually affords — a font size is not a measurement of a string, so
+        // hazard 4 is untouched — and it drops nothing, so `notice` stays a
+        // legitimate difference rather than becoming a disagreement.
+        `<text x="${n(r.x + 3)}" y="${n(r.y + r.h / 2 + nodeType(r.h) / 3)}" clip-path="url(#n${id}-${String(node)})" ` +
+          `font-size="${n(nodeType(r.h))}" font-family="monospace" fill="${ground ?? ink}">${escape(label)}</text>`,
       );
     }
   }
   return out;
+}
+
+/**
+ * A node label's type size — **the box's, where the box is smaller than the
+ * type** (F345).
+ *
+ * Four fifths of the rank, so the ascenders and descenders sit inside it, and
+ * never larger than the figure's own size: a tall rank does not get big text,
+ * because the type size is a property of the document and only the *shrinking*
+ * is a property of the box.
+ *
+ * **No floor.** A rank too short to read is a rank too short to read at any
+ * size, and the clip already stops the label leaving its box — a rule with no
+ * instance would be a policy invented for a case nobody has measured.
+ */
+function nodeType(rankHeight: number): number {
+  return Math.min(SVG_FONT_SIZE, rankHeight * 0.8);
 }
 
 /**
@@ -1106,7 +1225,7 @@ function marks(
   theme: ResolvedTheme,
 ): readonly string[] {
   const family = svgFamilyOf(block.form);
-  const box = area(layout, figure.legend);
+  const box = area(layout, figure.legend, gutterRoom(block, figure, layout));
   const out: string[] = [];
 
   // **The families that have crossed**, and the list is the diff (§3ak.10).
@@ -1355,7 +1474,7 @@ export function plotToSvg(
   if (figure === null) return null;
   const range = figure.value?.range ?? figure.extent ?? { min: 0, max: 1 };
   const axis = figure.value;
-  const box = area(layout, figure.legend);
+  const box = area(layout, figure.legend, gutterRoom(block, figure, layout));
 
   // **Furniture is not a picture**, and this is the second clause because it is
   // a second failure. `series: []` on a plain form, and a series that is all
@@ -1500,11 +1619,15 @@ export function plotToSvg(
         : figure.valueLabels === "both" ? ["left", "right"] as const
         : [figure.valueLabels];
       for (const side of sides) {
-        const at = side === "left" ? box.left - 6 : box.right + 6;
+        const at = side === "left" ? box.left - LABEL_GAP : box.right + LABEL_GAP;
+        // **The left side is `end`-anchored too and had no clip at all**, so a
+        // long value label ran off the viewBox rather than being cut inside a
+        // rectangle — the same head-first loss with nothing catching it (F343).
+        const shown = side === "left" ? fitLabel(text, box.left - LABEL_GAP) : text;
         parts.push(`<text x="${n(at)}" y="${n(y + SVG_FONT_SIZE / 3)}" ` +
           `text-anchor="${side === "left" ? "end" : "start"}" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
-          `${escape(text)}</text>`);
+          `${escape(shown)}</text>`);
       }
     }
   }
@@ -1704,11 +1827,15 @@ export function plotToSvg(
         // right-aligned against the plot area exactly as the terminal's is.
         const y = box.top + (box.bottom - box.top) * t;
         parts.push(
+          // **The clip stays**, and it is belt to `fitLabel`'s braces: the
+          // estimate decides where to cut and this guarantees nothing escapes
+          // the gutter whatever the estimate is wrong about (§3aj hazard 4).
           `<clipPath id="i${block.id}-${String(i)}"><rect x="0" y="${n(y - SVG_FONT_SIZE)}" ` +
-            `width="${n(box.left - 6)}" height="${n(SVG_FONT_SIZE * 2)}"/></clipPath>`,
-          `<text x="${n(box.left - 6)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
+            `width="${n(box.left - LABEL_GAP)}" height="${n(SVG_FONT_SIZE * 2)}"/></clipPath>`,
+          `<text x="${n(box.left - LABEL_GAP)}" y="${n(y + SVG_FONT_SIZE / 3)}" text-anchor="end" ` +
             `clip-path="url(#i${block.id}-${String(i)})" font-size="${n(SVG_FONT_SIZE)}" ` +
-            `font-family="monospace" fill="${label}">${escape(text)}</text>`,
+            `font-family="monospace" fill="${label}">` +
+            `${escape(fitLabel(text, box.left - LABEL_GAP))}</text>`,
         );
         continue;
       }

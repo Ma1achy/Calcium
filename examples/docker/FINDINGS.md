@@ -13937,6 +13937,17 @@ nothing to drop*. True — and what it does instead, past a rank count, is draw 
 use. The arms still differ on `notice` and the disposition stands; the sentence's *reason* now has a
 measured limit beside it.
 
+**Fixed** (§3ak.41, I76): the type is `min(SVG_FONT_SIZE, rank · 0.8)`. It drops nothing, so `notice`
+stays a legitimate difference rather than becoming a disagreement the record has to open; a font size
+is not a measurement of a string, so hazard 4 is untouched; and it is a **shrink and not a scale** — a
+tall rank does not get big text, because the size is a property of the document and only the shrinking
+belongs to the box.
+
+**No floor.** A rank too short to read is too short at any size, and the clip already stops a label
+leaving its box. A floor would be a policy invented for a case nobody has measured, which is the other
+half of *close the class, not the instance*: the class is the overflow and a legibility threshold is a
+different claim. **This is the same rule as F343's, across the text rather than along it.**
+
 ---
 
 ## F344 — the two ends of a dumbbell take a colour in one arm and a shape in the other ★★★★☆
@@ -13981,10 +13992,33 @@ removed.
 `epoch…  epoch…  now` — it cuts the **tail** and marks the cut. So this is not a judgement call
 between two idioms; it is one arm doing what the other already does and one arm doing the opposite.
 
-**The remedy is a gutter sized to its longest label**, in the arm's own em estimate — `min(width ·
-0.25, max(width · 0.1, chars · SVG_FONT_SIZE · 0.6 + 12))` — which keeps the right alignment the
-terminal has and stops the clip firing at all. It moves `box.left` on every form that has a gutter, so
-it is a commit of its own with every moved frame read; **not landed here**.
+**Fixed** (§3ak.41, I76), and the remedy is the terminal's own shape in this arm's units:
+`min(widest · SVG_FONT_SIZE · 0.6, width / 3)`, **grown and never shrunk** so the tenth stays the
+floor, with the cut at the tail and marked past the cap. `boxplot/default`'s `box.left` moves 89.6 →
+92.4 and all four labels are drawn whole, which is what the terminal draws.
+
+**What §3ak.20 forbids is untouched.** It forbids `cells()` in a *shared* layout — hazard 4, still
+true. An em estimate inside one arm is not shared, measures nothing in the other arm's units and adds
+no member. And the ruling **wrote down what would falsify it**: *a tenth of the width and not the
+widest label … it is affordable here because pixels overflow gracefully and cells do not … the one
+difference this leaves is legitimate and has no instance yet … the day one is, that is the argument to
+make.*
+
+**The sentence that licensed it is true and answers a different question.** `SVG_FONT_SIZE`'s doc says
+*it sizes nothing: the label places itself, so this is the glyph height and never an input to a
+layout*. Both halves hold — `text-anchor="end"` does place a right-aligned label with no width — and
+**placement and containment are two questions**. F84's class: review checks a justification for truth,
+and this one is true.
+
+**Two frames only, after the first attempt moved seven.** `gutterRoom` first asked a weaker condition
+than the drawing does, and reserved 92.4 px on five `histogram` frames that draw **no identity label
+at all** — `HAS_POSITION_AXIS` is true for that form, so its bins read along the bottom. Room reserved
+for a label nobody draws is the same defect one direction along, and the frame is what said so: the
+box moved and no text appeared in it.
+
+**And the value labels had no clip at all.** They are `end`-anchored on the left by the same code
+shape, so a long one left the viewBox entirely rather than being cut inside a rectangle. One rule,
+both.
 
 ---
 

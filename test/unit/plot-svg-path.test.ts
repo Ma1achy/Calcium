@@ -1110,6 +1110,64 @@ describe("G6c — the distribution family, where containment says nothing", () =
     expect([...both.matchAll(/<polygon /gu)].length, "two means").toBe(2);
   });
 
+  it("G6c5 (C12 I76, §3ak.41): the gutter grows to its labels, and what still does not fit is cut at the tail", () => {
+    // **A cut head is a different word** (F343). `petal_length` came out as
+    // `betal_length`: an `end`-anchored text grows leftward, so the clip that
+    // stops it without font metrics removes its **head**, and nothing on the
+    // page said anything was removed. The terminal names all four rows in full.
+    const gutterOf = (svg: string): number =>
+      Number(/<line x1="([\d.]+)" y1="[\d.]+" x2="\1"/u.exec(svg)?.[1] ?? "0");
+    const guttered = (svg: string): readonly string[] =>
+      [...svg.matchAll(/text-anchor="end" clip-path[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1] ?? "");
+
+    // **`axes: true` on every block here, and it is the fifth fixture in this
+    // arc that did not construct the state it claims** (C12 §3ak.40, F347).
+    // The describe's own `boxplot()` sets no `axes`, so after the resolver was
+    // repaired it draws no frame, no gutter and no labels at all — and a row
+    // asserting a gutter width against it would have been measuring zero.
+    const short = plotToSvg(boxplot({ axes: true }), THEME, layout) ?? "";
+    const long = plotToSvg(
+      boxplot({ axes: true, categories: ["petal_length", "sepal_width"] }), THEME, layout,
+    ) ?? "";
+
+    // **Grown and never shrunk.** The tenth stays the floor: a one-character
+    // label does not pull the plot area leftwards, because the only thing
+    // measured against §3ak.20's premise is the overflow.
+    expect(gutterOf(short), "a short label leaves the default alone")
+      .toBeCloseTo(layout.width * (layout.gutter + layout.pad), 6);
+    expect(gutterOf(long), "and a long one takes what it needs").toBeGreaterThan(gutterOf(short));
+    expect(guttered(long), "drawn whole, which is what the terminal draws")
+      .toEqual(["petal_length", "sepal_width"]);
+    // The room is the label's, so the anchor sits exactly at its width.
+    expect(gutterOf(long)).toBeCloseTo(12 * SVG_FONT_SIZE * 0.6 + 6, 6);
+
+    // **Past the cap the arm still has to cut, and it cuts the tail.** No corpus
+    // instance — the longest identity string is twelve characters and a third of
+    // 600 is 200 px — so the row constructs one, because the defect is *an
+    // unmarked cut at the head* and a long enough label reaches it whatever the
+    // gutter is.
+    const huge = "a".repeat(60);
+    const cut = plotToSvg(boxplot({ axes: true, categories: [huge, "b"] }), THEME, layout) ?? "";
+    expect(gutterOf(cut), "capped at a third of the width")
+      .toBeCloseTo(layout.width / 3 + 6, 6);
+    const [first] = guttered(cut);
+    expect(first?.length, "so it is shorter than what was asked for").toBeLessThan(huge.length);
+    expect(first?.endsWith("\u2026"), "cut at the tail and marked").toBe(true);
+    expect(first?.startsWith("a"), "and the head — the part that names it — survives").toBe(true);
+
+    // **The value labels are `end`-anchored on the left by the same code shape
+    // and had no clip at all**, so a long one left the viewBox entirely. One
+    // rule, both.
+    const wide = plotToSvg(
+      boxplot({ axes: true, orientation: "vertical", yFormat: "bytes" }), THEME, layout,
+    ) ?? "";
+    for (const m of wide.matchAll(/<text x="([-\d.]+)"[^>]*text-anchor="end"[^>]*>([^<]*)<\/text>/gu)) {
+      const right = Number(m[1]);
+      expect(right - (m[2]?.length ?? 0) * SVG_FONT_SIZE * 0.6,
+        `\`${m[2] ?? ""}\` starts inside the viewBox`).toBeGreaterThanOrEqual(-0.001);
+    }
+  });
+
   it("G6c4: a forest plot ranges over its interval, not its whiskers", () => {
     // The clip happens with `quartileRange` behaving correctly — the caller
     // chooses the arm, which is where a per-family renderer diverges.
@@ -1432,6 +1490,52 @@ describe("G6e — the nodes family, where the placement is per-arm", () => {
     // The elbows: one per node that has a parent.
     expect([...(svg ?? "").matchAll(/<path\b/gu)].length, "an elbow per edge")
       .toBe(flat.filter((f) => f.parent >= 0).length); // cells-ok — a node count
+  });
+
+  it("G6e9 (C12 I76, §3ak.41): a node's label is the box's size where the box is smaller than the type", () => {
+    // **Every glyph taller than the box it names** (F345). `graph/crowded` is 14
+    // ranks in `height: 7`: the terminal draws three and says `+11 more`, and
+    // this arm drew all fourteen at `275.2 / 14 = 9.83 px` a rank with the label
+    // at 12 — ascending into the rank above and descending into the one below,
+    // both of which it does not name. The same rule as the gutter's, across the
+    // text rather than along it.
+    const chain = (n: number): Record<string, unknown> => ({
+      nodes: Array.from({ length: n }, (_v, i) => ({ id: `s${String(i)}`, label: `service-${String(i)}` })),
+      edges: Array.from({ length: n - 1 }, (_v, i) => ({ from: `s${String(i)}`, to: `s${String(i + 1)}` })),
+    });
+    const sized = (n: number): readonly Readonly<{ h: number; size: number }>[] => {
+      const svg = plotToSvg(
+        b.plot({ id: "gn", form: "graph", height: 7, series: [], graph: chain(n) } as unknown as Parameters<typeof b.plot>[0]),
+        THEME, nl,
+      ) ?? "";
+      const heights = [...svg.matchAll(/<rect [^>]*height="([\d.]+)" rx="2"/gu)].map((m) => Number(m[1]));
+      const sizes = [...svg.matchAll(/<text [^>]*font-size="([\d.]+)"[^>]*>service-/gu)].map((m) => Number(m[1]));
+      return sizes.map((size, i) => ({ h: heights[i] ?? 0, size }));
+    };
+
+    const crowded = sized(14);
+    expect(crowded.length, "every node is still drawn — nothing is dropped").toBe(14); // cells-ok — a node count
+    for (const { h, size } of crowded) {
+      // Three decimals, because `n()` rounds the attribute and the assertion
+      // must not be tighter than the document it reads.
+      expect(size, "the type is four fifths of the rank").toBeCloseTo(h * 0.8, 3);
+      expect(size, "so it fits inside the box it names").toBeLessThan(h);
+    }
+
+    // **The control, and it is the half that says this is a shrink and not a
+    // scale.** A rank taller than the type does not get bigger text: the size is
+    // a property of the document and only the shrinking is the box's.
+    const roomy = sized(3);
+    expect(roomy.length).toBe(3); // cells-ok — a node count
+    for (const { h, size } of roomy) {
+      expect(h, "the fixture has to have room, or the control checks nothing")
+        .toBeGreaterThan(SVG_FONT_SIZE / 0.8);
+      expect(size, "and the type stays the figure's own").toBe(SVG_FONT_SIZE);
+    }
+
+    // **F318's `notice` row is untouched**: nothing was dropped, so the arms
+    // still differ on the notice and that difference is still legitimate.
+    expect(crowded.length, "fourteen boxes, no `+N more`").toBeGreaterThan(roomy.length);
   });
 
   it("G6e5: a graph's edges are diagonals, which the terminal cannot draw", () => {
