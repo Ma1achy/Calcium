@@ -909,20 +909,41 @@ describe("G9 — an empty figure is a state, not a refusal", () => {
     } as unknown as Parameters<typeof b.plot>[0]);
 
     expect(plotToSvg(unsupported, THEME), "the arm does not draw a violin").toBeNull();
-    expect(plotToSvg(empty, THEME),
-      "F363: a block with no data draws the same nothing, which is the defect this names")
-      .toBeNull();
+    // **Inverted when the fix landed** (C12 I79). It asserted `toBeNull()` — the
+    // measured defect — and the two states are apart now: a refusal is still a
+    // refusal and an empty block draws its message.
+    expect(plotToSvg(empty, THEME), "a block with no data draws, and says so").not.toBeNull();
+    expect(plotToSvg(empty, THEME) ?? "", "the default message").toContain("No data.");
+
+    // **The boundary is the block and not the figure** (F363's near-miss).
+    // Keyed on `marks.length === 0` alone, `flame/default` — six categories with
+    // values, whose tiles this arm cannot build from that shape — said `No
+    // data.` over data, which is the old defect one state along. And a category
+    // *name* is not a reading: `bar/empty` is one category and an empty value
+    // list, and the terminal draws `No data.` for it.
+    const shaped = b.plot({
+      id: "f", form: "flame", height: 6, axes: true,
+      categories: ["main", "parse"], series: [{ values: [100, 60] }],
+    } as unknown as Parameters<typeof b.plot>[0]);
+    expect(plotToSvg(shaped, THEME), "a datum this arm cannot draw is still a refusal").toBeNull();
 
     // **And `emptyMessage` cannot have a reader while that is true**, which is
     // why the corpus gained `line/empty-message` beside `line/empty`: a pair
     // differing in one field is what a collision needs to name a member (C12 I75).
-    const messaged = b.plot({
-      id: "m", form: "line", height: 5, axes: true, series: [{ values: [] }],
-      emptyMessage: "Waiting for the first epoch\u2026",
-    } as unknown as Parameters<typeof b.plot>[0]);
+    // **C12 I79's message, and `vmBlock` and not `b.plot`, which is F335 arriving in a row that needs
+    // it**: the published builder declares 48 of `Plot`'s 58 members and
+    // `emptyMessage` is one of the eight it does not, so a block built through
+    // it loses the field silently and this row would have compared two
+    // defaults.
+    const messaged = vmBlock({
+      kind: "plot", id: "m", form: "line", height: 5, axes: true, series: [{ values: [] }],
+      emptyMessage: "Waiting for the first epoch",
+    } as unknown as Plot);
     expect(plotToSvg(messaged, THEME) === plotToSvg(empty, THEME),
-      "F363: and the two draw one document, so the member is unreadable here")
-      .toBe(true);
+      "and the two draw different documents, so the member has a reader")
+      .toBe(false);
+    expect(plotToSvg(messaged, THEME) ?? "", "the caller's message, not the default")
+      .toContain("Waiting for the first epoch");
   });
 });
 
@@ -1006,15 +1027,30 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     expect(strokes.size, "three inks: rising, falling, and the overlay").toBeGreaterThanOrEqual(3);
   });
 
-  it("G8c: furniture with no ink is a refusal, and that is a second clause", () => {
-    // `series: []` on a plain form and an all-`null` series both reach the
-    // renderer with a range nobody declared. Two clauses because two failures:
-    // this one is caught by counting marks and G8b is not.
+  it("G8c (C12 I79, §3ak.45): furniture with no ink draws no axis — and is a state, not a refusal", () => {
+    // **Half of this row was overturned and half was not** (F363). `series: []`
+    // on a plain form and an all-`null` series both reach the renderer with a
+    // range nobody declared, and the defect it was written against — *five
+    // gridlines labelled 0 to 1 over an empty box* — is real. **Refusing was the
+    // wrong remedy**: it made a block with no data byte-identical to a form this
+    // arm does not draw at all, and a consumer could not tell *not yet* from
+    // *not supported*.
+    //
+    // So what it asserts now is the half that stands: **no axis**. No ticks, no
+    // gridlines, no frame — each would imply a range the block never had.
     const bare = b.plot({ id: "d", form: "line", height: 6, series: [] });
-    expect(plotToSvg(bare, THEME), "no series is no picture").toBeNull();
+    const drawn = plotToSvg(bare, THEME) ?? "";
+    expect(drawn, "no series is a state, and the state is drawn").not.toBe("");
+    expect(drawn, "and it says so").toContain("No data.");
+    expect(drawn.includes("<line"), "no rule, because there is no range for one to be about").toBe(false);
+    expect(drawn.includes("<path"), "and no figure").toBe(false);
 
     const nulls = b.plot({ id: "f", form: "line", height: 6, series: [{ label: "n", values: [null, null, null] }] });
-    expect(plotToSvg(nulls, THEME), "a series that draws nothing is no picture").toBeNull();
+    // **A series of all-`null` is C12 I79's stated blind spot** — the data is
+    // degenerate rather than absent, and `hasDatum` counts the values, so this
+    // stays a refusal where `series: []` does not. Asserted so the day the two
+    // are separated is a day this row moves.
+    expect(plotToSvg(nulls, THEME), "a series that draws nothing is still no picture").toBeNull();
   });
 
   it("G8e: a flipped ordinate is refused, and all four origins were identical", () => {

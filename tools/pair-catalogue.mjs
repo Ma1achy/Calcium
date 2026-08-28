@@ -116,23 +116,20 @@ export function pairLayout(leftH, rightH) {
  * one thing a `null` arm must not do (F259).
  */
 export const VARIANT_REFUSALS = {
-  bar: { empty: "the series carries an empty value list" },
-  ecdf: { empty: "the series carries an empty value list" },
   flame: { default: "the legacy categories+series datum, not a hierarchy" },
-  heatmap: { empty: "the series carries an empty value list", origin: "a non-default origin" },
+  heatmap: { origin: "a non-default origin" },
   icicle: { default: "the legacy categories+series datum, not a hierarchy" },
   line: {
     // The four `ohlc` rows are gone: the candles draw (§3ak.31). They came back
     // as `dead decls` the moment the arm did, which is what the equality check
-    // is for — a subset check would have left them.
-    empty: "the series carries an empty value list",
+    // is for — a subset check would have left them. **The seven `empty` rows
+    // went the same way** (F363, C12 I79): an empty figure is drawn now, so
+    // *the series carries an empty value list* stopped being a refusal and the
+    // counter said so on the first run.
     "origin-bottom-right": "a non-default origin",
     "origin-top-left": "a non-default origin",
     "origin-top-right": "a non-default origin",
   },
-  scatter: { empty: "the series carries an empty value list" },
-  sparkline: { empty: "the series carries an empty value list" },
-  step: { empty: "the series carries an empty value list" },
 };
 
 /** Every committed SVG frame, as `form → variant → refused?`. */

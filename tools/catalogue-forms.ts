@@ -282,6 +282,18 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     minimal: { form: "line", height: 3, axes: false, series: [s([1, 3, 2, 5, 4])] },
     dense: { form: "line", height: 8, axes: true, series: [s(sin500)] },
     empty: { form: "line", height: 5, axes: true, series: [{ values: [] }] },
+    // C12 I79, §3ak.45 — **`emptyMessage` has no other corpus instance**, and a
+    // member the corpus never sets is one no frame, no collision and no golden
+    // byte can reach (F355). Paired with `empty` above, which differs from it in
+    // exactly this field.
+    "empty-message": {
+      form: "line", height: 5, axes: true, series: [{ values: [] }],
+      // **ASCII on purpose** (F364). Caller text is not degraded at the ascii
+      // rung — measured on five members, all five leak — so an ellipsis here
+      // would make AA1 red for the renderer's defect rather than this
+      // variant's subject, which is `emptyMessage` having a reader at all.
+      emptyMessage: "Waiting for the first epoch",
+    },
     annotated: {
       form: "line", height: 8, axes: true, series: [s(sin50)],
       annotations: [{ kind: "line", value: 50 }, { kind: "band", from: 30, to: 70 }],

@@ -89,6 +89,37 @@ describe("plot-catalogue — the corpus renders", () => {
     expect(offenders.join("\n")).toBe("");
   });
 
+  it("AA1b (C12 I54, F364): caller text is not degraded, and AA1 is clean because the corpus has none", () => {
+    // **C12 I54 is vacuous over this corpus and AA1 inherits it** — *a gate
+    // phrased over a corpus inherits its blind spots*. Every frame at the ascii
+    // rung is ASCII because no fixture puts a non-ASCII character in a string
+    // the *caller* supplied; the renderer degrades its own glyph tables and
+    // passes the caller's words through.
+    //
+    // **Measured on five members, and all five leak**, so it is a class rather
+    // than one path. Asserted as the measured state, naming the finding, so the
+    // day caller text is degraded this row moves rather than quietly agreeing.
+    const base = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
+      synchronisedUpdate: true, bracketedPaste: true, mouse: true,
+      imageProtocol: "none", altScreen: true } as const;
+    const leaks = (spec: Record<string, unknown>): boolean =>
+      [...frame(spec, base, 60).map(strip).join("\n")].some((c) => (c.codePointAt(0) ?? 0) > 127);
+
+    const cases: readonly (readonly [string, Record<string, unknown>])[] = [
+      ["emptyMessage", { form: "line", height: 5, axes: true, series: [{ values: [] }], emptyMessage: "wait\u2026" }],
+      ["xTitle", { form: "line", height: 6, axes: true, series: [{ values: [1, 2, 3] }], xLabels: ["a", "b", "c"], xTitle: "sec\u2026" }],
+      ["xLabels", { form: "line", height: 6, axes: true, series: [{ values: [1, 2, 3] }], xLabels: ["a\u2026", "b", "c"] }],
+      ["series label", { form: "line", height: 6, axes: true, legend: "right", series: [{ label: "al\u2026", values: [1, 2, 3] }] }],
+      ["categories", { form: "bar", height: 5, axes: true, categories: ["c\u2026"], series: [{ values: [3] }] }],
+    ];
+    expect(cases.map(([name, spec]) => `${name} ${leaks(spec) ? "leaks" : "degraded"}`),
+      "F364: every caller-supplied string reaches the ascii frame unchanged")
+      .toEqual([
+        "emptyMessage leaks", "xTitle leaks", "xLabels leaks",
+        "series label leaks", "categories leaks",
+      ]);
+  });
+
   it("AA2 (C12 I54): a line at ASCII is still *connected*, in `+ - |`", () => {
     // **Falling back to the density ramp satisfies AA1 and loses the figure.**
     // `plotStyle: "line"` means *draw this as a connected line*, so the row

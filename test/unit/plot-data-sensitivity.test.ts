@@ -83,7 +83,7 @@ function sweep(): readonly Verdict[] {
  * is exempt from it: the same form's other variants are swept normally.
  */
 const NOTHING_TO_PERTURB: readonly string[] = [
-  "line/empty", "sparkline/empty", "scatter/empty", "step/empty", "ecdf/empty",
+  "line/empty", "line/empty-message", "sparkline/empty", "scatter/empty", "step/empty", "ecdf/empty",
   "heatmap/empty", "bar/empty",
   "graph/default", "graph/crowded",
   "tree/default", "tree/left-right", "tree/outline",

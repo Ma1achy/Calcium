@@ -13642,6 +13642,37 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F364 — every caller-supplied string reaches the ASCII frame unchanged, and I54 is clean because the corpus has none ★★★★☆
+
+C12 I54: *every frame at `unicode: "ascii"` is ASCII*. AA1 renders the whole corpus at that rung and
+finds nothing. Measured with one ellipsis in each of five caller-supplied members:
+
+```
+emptyMessage   LEAKS "…"
+xTitle         LEAKS "…"
+xLabels        LEAKS "…"
+series label   LEAKS "…"
+categories     LEAKS "…"
+```
+
+**Five for five.** The renderer degrades its own glyph tables — box-drawing, braille, the density ramp
+— and passes the caller's words through. I54 holds over 370 frames because **no fixture ever put a
+non-ASCII character in a string the caller supplied**.
+
+**A gate phrased over a corpus inherits its blind spots**, and AA1 is that gate. It was written against
+four mechanisms that each chose a glyph table wrongly, and it is exactly right about them; the class it
+cannot see is the one where no table is consulted at all.
+
+**Found by a fixture that was not looking for it.** `line/empty-message` was added so `emptyMessage`
+would have a corpus instance, and its message ended in `…` because that is how a waiting message reads.
+AA1 went red for the renderer's defect rather than the variant's subject.
+
+**The fixture is ASCII now and the reproduction is AA1b**, which asserts all five leak. Degrading caller
+text is a ruling with a reach — it changes what a consumer's own words look like at a rung they did not
+choose — and it is owed rather than taken here. AA1b inverts the day it lands.
+
+---
+
 ## F363 — an empty plot and a refused form draw the same document, so the arm cannot say *not yet* apart from *not supported* ★★★★★
 
 `plotToSvg` ends with `if (body.length === 0) return null`. So a `line` with `series: [{ values: [] }]`

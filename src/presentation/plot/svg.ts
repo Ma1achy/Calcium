@@ -43,6 +43,7 @@ import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
 import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf } from "./marks.js";
 import {
+  hasDatum,
   barFigure,
   curveFigure,
   fieldFigure,
@@ -1380,6 +1381,7 @@ function facetSvg(block: Plot, theme: ResolvedTheme, layout: SvgLayout): string 
   const ground = inkOf(GROUND, theme);
   if (ground !== undefined) parts.push(`<rect width="100%" height="100%" fill="${ground}"/>`);
 
+
   let x = 0;
   let drawn = 0; // cells-ok — a facet count
   for (const [i, facet] of facets.entries()) { // cells-ok — a facet index
@@ -1502,7 +1504,6 @@ export function plotToSvg(
   // of nothing. Drawn, that is five gridlines labelled 0 to 1 over an empty
   // box: a plot of a range the block never had.
   const body = marks(block, figure, layout, theme);
-  if (body.length === 0) return null; // cells-ok — a count of SVG elements
 
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(layout.width)} ${n(layout.height)}" ` +
@@ -1514,6 +1515,36 @@ export function plotToSvg(
   // terminal underneath it. So the surface resolves directly.
   const ground = inkOf(GROUND, theme);
   if (ground !== undefined) parts.push(`<rect width="100%" height="100%" fill="${ground}"/>`);
+  // **An empty figure is a state and not a refusal** (C12 I79, §3ak.45, F363).
+  // This returned `null` when nothing was emitted, so a block with no data drew
+  // the same nothing as a form this arm does not support — `line/empty` and
+  // `violin/default` byte for byte, in one collision group — and a consumer
+  // could not tell *not yet* from *not supported*. F259 puts a refusal on a
+  // figure that **cannot** be drawn; one with nothing in it can, and having
+  // nothing in it is what there is to say.
+  //
+  // **No axis, which is the half the old comment earns.** It was written
+  // against *five gridlines labelled 0 to 1 over an empty box* — `seriesRange`
+  // returns `null` and the fallback furnishes a range the block never had — so
+  // there are no ticks, no rules and no frame here, because each would imply
+  // one. The message and the ground, and that is the whole figure.
+  // **The block and not the figure** (I79). Keyed on the marks alone,
+  // `flame/default` — six categories with values, whose tiles this arm cannot
+  // build from that shape — said `No data.` over data. `hasDatum` is the
+  // boundary: no datum is a state to draw, and a datum this arm cannot draw is
+  // still a refusal.
+  if (body.length === 0 && !hasDatum(block)) { // cells-ok — a count of SVG elements
+    const text = block.emptyMessage ?? "No data.";
+    const muted = inkOf(LABEL, theme);
+    if (muted !== undefined) {
+      parts.push(`<text x="${n(layout.width / 2)}" y="${n(layout.height / 2)}" text-anchor="middle" ` +
+        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${muted}">` +
+        `${escape(text)}</text>`);
+    }
+    parts.push("</svg>");
+    return parts.join("");
+  }
+  if (body.length === 0) return null; // cells-ok — a count of SVG elements
 
   // **The labels place themselves.** `text-anchor="end"` at the gutter's right
   // edge, and nothing here knows or asks how wide the string is — which is the

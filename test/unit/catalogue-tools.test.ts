@@ -333,7 +333,15 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // **The control.** PR1–PR3 are three green assertions over one corpus, and
     // a classifier that returned empty arrays for everything would satisfy two
     // of them. Fabricated both violations rather than trusting the shape.
-    const form = Object.keys(declared)[0]!;
+    // **The first declared form is the degenerate pick.** It was `bar`, whose
+    // one declaration was `empty`; when the empty variants stopped being
+    // refusals (F363) the first became `flame`, which has two variants and one
+    // already refused — so flipping the other made every variant refused, the
+    // form slid to a *family* refusal, and `undeclared` was correctly empty
+    // while the control read as broken. A fabrication needs a subject that can
+    // carry it: a form with at least two variants still drawing.
+    const form = Object.keys(declared).find((f) =>
+      Object.values(map[f] ?? {}).filter((r) => !r).length > 1)!; // cells-ok — a variant count
     const variant = Object.keys(declared[form]!)[0]!;
 
     const appeared = structuredClone(map);

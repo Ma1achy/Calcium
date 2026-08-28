@@ -142,12 +142,12 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "8/90", "numericLabels": "56/82", "identityLabels": "8/82", "border": "4/82", "interiorRules": "12/82", "legend": "14/82", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "sparkline": { silent: "2/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "scatter": { silent: "2/12", "numericLabels": "5/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "step": { silent: "2/6", "numericLabels": "1/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/8" },
+  "line": { silent: "6/92", "numericLabels": "56/86", "identityLabels": "12/86", "border": "4/86", "interiorRules": "12/86", "legend": "14/86", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "sparkline": { silent: "0/8", "numericLabels": "agree", "identityLabels": "2/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "scatter": { silent: "0/12", "numericLabels": "5/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "step": { silent: "0/6", "numericLabels": "1/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "ecdf": { silent: "0/4", "numericLabels": "2/4", "identityLabels": "2/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "heatmap": { silent: "2/12", "numericLabels": "agree", "identityLabels": "8/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/10" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
   // both readers ask the shape now — and `ramp` is F316's open column on the
   // family that has always had one. `numericLabels` is the terminal reader's
@@ -159,7 +159,7 @@ const MEASURED = {
   // a repair.
   "contour": { silent: "0/18", "numericLabels": "18/18", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "bar": { silent: "2/14", "numericLabels": "10/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "bar": { silent: "0/14", "numericLabels": "10/14", "identityLabels": "4/14", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
   "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -442,8 +442,13 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // grow.** `horizon/bands-2` is the only pair where neither arm draws, and it
     // is the reader's floor rather than a missing key.
     expect(bothDrew, "pairs where both arms draw a key").toBe(36); // cells-ok — a pair count
-    expect(neither, "and the one where the reader's floor hides both").toBe(1); // cells-ok — a pair count
-    expect(refusedVariants, "and the variants this arm refuses outright").toBe(2); // cells-ok — a pair count
+    // **Two since the empty figure landed** (F363, C12 I79). `heatmap/empty` was
+    // a refusal here and is a document now, so it joins the comparison — and an
+    // empty matrix has no readings for a key to be about, in either arm.
+    expect(neither, "and the two where neither arm has a key to draw").toBe(2); // cells-ok — a pair count
+    // **One since `heatmap/empty` became a document** — the other side of the
+    // line above, and both move together or one of them is wrong.
+    expect(refusedVariants, "and the variant this arm refuses outright").toBe(1); // cells-ok — a pair count
 
     // **The legitimate one, asserted so it can fail.** It differs today; it will
     // read `agree` everywhere the day the SVG grows a drop rule, and that is a
@@ -511,6 +516,15 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // `line` went 13/78 to 8/82. Same class as F358 one predicate along: the
     // alphabet was right and the tokenisation was a guess.
     //
+    // **45 → 49 when the empty figure landed** (F363, C12 I79), and every one of
+    // the four is `identityLabels` on a form with an `empty` variant — `ecdf`,
+    // `scatter`, `sparkline`, `step`. **The arms agree and the readers do not**:
+    // both draw a centred `No data.`, and the terminal's frame has no border, so
+    // `terminalDecisions` finds no area and reports nothing where the second
+    // arm's reader finds a `<text>`. Recorded as open because the record's job
+    // is to say what it measured; the axis it belongs on is the reader's, and
+    // `silent` falling from 8 to 6 on `line` is the same event read correctly.
+    //
     // **45 and unmoved when the position axis crossed, over 21 pairs that
     // closed** (F356, C12 §3ak.44). `numericLabels` went 70/82 to 56/82 on
     // `line`, 8/10 to 5/10 on `scatter`, and one pair each on `bubble` and
@@ -537,8 +551,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
     expect(open + closed + legitimate, "cells over claimed forms").toBe(352); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(45); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(263); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(49); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(259); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
@@ -786,9 +800,9 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
     const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
 
-    expect(corpus.size, "variants in the corpus").toBe(184); // cells-ok — a variant count
-    expect(t.distinct, "distinct terminal frames").toBe(177); // cells-ok — a frame count
-    expect(s.distinct, "distinct documents").toBe(128); // cells-ok — a frame count
+    expect(corpus.size, "variants in the corpus").toBe(185); // cells-ok — a variant count
+    expect(t.distinct, "distinct terminal frames").toBe(178); // cells-ok — a frame count
+    expect(s.distinct, "distinct documents").toBe(130); // cells-ok — a frame count
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not
@@ -808,6 +822,13 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // `treeLayout`'s overflow pairs, `calendarUnit` on `day-stretch`. The four
     // the terminal also has are fixture defects and stay in both lists.
     expect(s.groups, "documents drawn from more than one block").toEqual([
+      // **A legitimate collision, and the first this list has held** (F363,
+      // C12 I79). Seven blocks with no data draw one empty document, and they
+      // should: the message is the same and there is nothing else to say.
+      // `line/empty-message` is **not** in it, which is the fixture proving the
+      // member has a reader — the pair differs in exactly that field.
+      ["line/empty", "sparkline/empty", "scatter/empty", "step/empty", "ecdf/empty",
+       "heatmap/empty", "bar/empty"],
       ["line/default", "line/size-left", "line/size-centre", "line/size-right", "line/corners-sharp"],
       ["contour/default", "contour/style-line", "contour/dim-floor", "contour/ink-contrast"],
       ["line/callout-last", "line/callout-name", "line/callout-both"],

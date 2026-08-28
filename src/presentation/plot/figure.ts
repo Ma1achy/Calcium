@@ -723,6 +723,42 @@ function sampleCount(block: Plot): number {
  * domain *is* the geometry and a bound that snapped outward would put the top
  * tick past the last sample.
  */
+/**
+ * **Does the block carry a datum at all** (I79, §3ak.45, F363)?
+ *
+ * The second arm draws an empty figure rather than refusing one, and this is
+ * what tells the two apart: an empty *figure* is *no data* only when the
+ * **block** has none. Otherwise a figure emitting nothing is the arm saying it
+ * cannot draw this shape, which is a refusal.
+ *
+ * **Found by reading the frame.** The first version keyed on `marks.length ===
+ * 0` alone, and `flame/default` — six categories with values, whose tiles this
+ * arm cannot build from that shape — came back saying `No data.` over data. The
+ * old `null` conflated *no data* with *not supported*; keying on the figure
+ * conflates *the figure emits nothing* with *no data*, which is the same defect
+ * one state along.
+ *
+ * **A different question from the terminal's, deliberately.** `definition.ts`
+ * asks per form — `cats.length === 0`, `series.length === 0`, `root ===
+ * undefined` — which is *this form has nothing to draw from*, finer and reached
+ * inside per-form code. This asks whether the block holds anything, which is the
+ * only question a shared refusal boundary can ask.
+ *
+ * **A category name is not a reading**, which `bar/empty` settled: one category
+ * and an empty value list, and the terminal draws `No data.` for it. Counting
+ * `categories` kept it a refusal while its sibling `line/empty` drew — a
+ * distinction between two blocks that hold the same nothing.
+ */
+export function hasDatum(block: Plot): boolean {
+  return block.series.some((sr) => sr.values.length > 0) // cells-ok — a sample count
+    || (block.quartiles?.length ?? 0) > 0 // cells-ok — a summary count
+    || (block.ohlc?.length ?? 0) > 0 // cells-ok — a bar count
+    || (block.segments?.length ?? 0) > 0 // cells-ok — a segment count
+    || (block.facets?.length ?? 0) > 0 // cells-ok — a facet count
+    || (block.vectors?.length ?? 0) > 0 // cells-ok — a series count
+    || block.hierarchy !== undefined;
+}
+
 export function positionDomainOf(block: Plot): PositionDomain | null {
   const declared = block.xMin !== undefined || block.xMax !== undefined;
   const n = sampleCount(block);
