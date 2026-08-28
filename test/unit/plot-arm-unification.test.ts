@@ -187,6 +187,9 @@ describe("U — the seam, asserted from both arms", () => {
     // the collision sweep needs and not what this table does. Counted rather
     // than excluded, per the row above.
     position: null,
+    // **`yCallout` is a probe** and its three corpus variants are already a
+    // collision group in AD13 — three blocks, one document (F349, F367).
+    callout: { form: "line", variant: "callout-last", patch: { yCallout: "name" } },
   } as const satisfies Readonly<Record<keyof Figure, unknown>>;
 
   /**
@@ -247,6 +250,10 @@ describe("U — the seam, asserted from both arms", () => {
     // here, so this row would have read `svg: "does not move"` — which is what
     // it means for a member to have no reader.
     position: { terminal: "moves", svg: "moves" },
+    // **Both arms since §3ak.47** (F368). The terminal wrote `█ beta` on the row
+    // a series ends at and this arm drew a legend — the same legend for all
+    // three callout variants, which is what a member with no reader looks like.
+    callout: { terminal: "moves", svg: "moves" },
   } as const satisfies Readonly<Record<keyof Figure, { terminal: string; svg: string }>>;
 
   function patched(base: Spec, how: unknown): Spec {
@@ -359,7 +366,7 @@ describe("U — the seam, asserted from both arms", () => {
     // count that reaches. **The artefact is a swatch beside the text**, which
     // `arm-decisions.ts` already asks for by shape after F307, and asking it here
     // would re-derive the figure D13 closed against. Recorded, not narrowed.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(46); // cells-ok — a document count
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(44); // cells-ok — a document count
     expect(gutterFamilies, "documents in the families the terminal gutters").toBe(147); // cells-ok — a document count
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
@@ -378,7 +385,7 @@ describe("U — the seam, asserted from both arms", () => {
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(61); // cells-ok — a document count
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(60); // cells-ok — a document count
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {

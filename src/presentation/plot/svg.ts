@@ -703,6 +703,13 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
         ? inkOf(refOf(d.seriesIndex), theme)
         : furniture;
 
+  // **Where each series' stroke ends, for the callout** (C12 I81, §3ak.47).
+  // The terminal writes its text on *the row that series' ink ends on*, which is
+  // `lastInkRow`'s question in cells; this arm asks the same question in its own
+  // units and the answer is the last point of the last polyline the series drew.
+  // What must not be asked twice is what the text says — that is `figure.callout`.
+  const ends = new Map<number, readonly [number, number]>();
+
   for (const d of figure.marks) {
     const ink = inkFor(d);
     if (ink === undefined) continue;
@@ -710,6 +717,10 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
 
     if (m.kind === "polyline") {
       const annotation = d.layer === "annotation";
+      const tail = m.points[m.points.length - 1]; // cells-ok — a point count
+      if (!annotation && tail !== undefined && d.seriesIndex !== undefined) {
+        ends.set(d.seriesIndex, at(tail[0], tail[1]));
+      }
       const path = curvePath(m.points.map((pt) => at(pt[0], pt[1])), square && !annotation);
       if (path === "") continue;
       // **A stroke carrying a `value` is coloured by the ramp rather than by its
@@ -1006,6 +1017,29 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       continue;
     }
   }
+  // **A name or a reading at the line's end** (C12 I48, I81, §3ak.47, F368).
+  // The terminal has drawn this since §3ag and this arm drew a legend instead —
+  // the *same* legend for all three callout variants, which is what a member
+  // with no reader looks like from outside. `legendOf` suppresses that legend
+  // now for `"name"` and `"both"`, because a name at the line's end answers the
+  // question a legend answers.
+  //
+  // **The strings are the figure's and the anchor is this arm's.** A cell row
+  // and a pixel y are the same question in two units, and asking a shared layer
+  // for either would be a width crossing the seam.
+  if (figure.callout !== null && furniture !== undefined) {
+    for (const [i, text] of figure.callout.entries()) {
+      if (text === null) continue;
+      const end = ends.get(i);
+      if (end === undefined) continue;
+      const ink = inkOf(refOf(i), theme) ?? furniture;
+      out.push(`<text x="${n(end[0] + LABEL_GAP)}" ` +
+        `y="${n(end[1] + SVG_FONT_SIZE / 3)}" text-anchor="start" ` +
+        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}">` +
+        `${escape(text)}</text>`);
+    }
+  }
+
   return out;
 }
 

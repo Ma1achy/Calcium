@@ -744,13 +744,12 @@ export function legendPlacement(
   const placed = legendOf(block);
   if (placed === null) return null;
   if (placed.placement !== null) return placed.placement;
-  // **A name at the line's end *is* the legend** (C12 I55, §3ag A2). C12 I48
-  // ruled that a callout does not replace one — *it names a value where a legend
-  // names an identity* — and that sentence selects rather than excludes: the
-  // arms that write the identity answer the question the legend answers, and
-  // `"last"` still does not. Same shape as the 1-bit strip suppression below,
-  // arriving for a second reason; an explicit `legend:` has already won above.
-  if (block.yCallout === "name" || block.yCallout === "both") return null;
+  // **The name-at-the-line's-end clause is `legendOf`'s now** (C12 I81,
+  // §3ak.47). It lived here and not in the crossed resolver, which is how the
+  // second arm came to draw a legend this one removes — and once `legendOf`
+  // carried it, the copy here was dead: `placed` is `null` before this line is
+  // reached. **The mutation pass is what said so**, by removing this clause and
+  // catching nothing.
   // **Labelled annotations count, or the field lands in the state its deferral
   // refused** (C04 I52, C12 §3g). The case I52 was written about is *one line,
   // one reference line*: counting series alone answers `null` there, so the

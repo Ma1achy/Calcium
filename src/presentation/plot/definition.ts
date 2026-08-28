@@ -28,6 +28,7 @@ import { SGR_RESET } from "../../terminal/escapes.js";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
 import {
+  calloutOf,
   baselineOf, categoricalDecisions, frameOf, gutterOf, positionalDecisions,
   proportionDecisions, sharesOf, valueAxisOf, WAFFLE_ROWS,
 } from "./figure.js";
@@ -934,7 +935,11 @@ function stacksAtOneBit(block: Plot, caps: Pick<TerminalCapabilities, "colourDep
  * `lastInkRow` rather than here.
  */
 function calloutTextFor(block: Plot, s: Series, index: number, stacked: boolean): string | null {
-  const name = s.label ?? `series ${String(index + 1)}`;
+  // **The strings are `calloutOf`'s and this applies the rung over them**
+  // (C12 I81, §3ak.47). What a callout says is a figure fact — the second arm
+  // asks it too — and *what happens below the colour floor* is not.
+  const text = calloutOf(block)?.[index] ?? null;
+  if (!stacked) return text;
   // **Where the form has already labelled its own rows, an identity at the
   // line's end is the third copy of it** — found by reading the frame, not by
   // the walk. Below the colour floor the positional family stacks into strips
@@ -946,14 +951,10 @@ function calloutTextFor(block: Plot, s: Series, index: number, stacked: boolean)
   // which is still the one thing the strips do not say. This is exactly the
   // rung `legendPlacement` already declines at, arriving for the same reason:
   // *not where the form has already labelled its own rows*.
-  if (block.yCallout === "name") return stacked ? null : name;
+  if (block.yCallout === "name") return null;
+  if (block.yCallout !== "both") return text;
   const v = lastFinite(s.values);
-  if (v === null) return null;
-  const value = formatReadout(v, block.yFormat);
-  // **The name first and the number last, and the number is what survives a
-  // cut** (§3ag A1): a live chart is read for the value, which is C12 I48's own
-  // argument for the field existing at all.
-  return block.yCallout === "both" && !stacked ? `${name} ${value}` : value;
+  return v === null ? null : formatReadout(v, block.yFormat);
 }
 
 /**

@@ -142,7 +142,7 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "6/92", "numericLabels": "56/86", "identityLabels": "12/86", "border": "4/86", "interiorRules": "12/86", "legend": "14/86", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "line": { silent: "6/92", "numericLabels": "56/86", "identityLabels": "16/86", "border": "4/86", "interiorRules": "12/86", "legend": "10/86", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "0/8", "numericLabels": "agree", "identityLabels": "2/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "scatter": { silent: "0/12", "numericLabels": "5/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "step": { silent: "0/6", "numericLabels": "1/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -802,7 +802,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
 
     expect(corpus.size, "variants in the corpus").toBe(186); // cells-ok — a variant count
     expect(t.distinct, "distinct terminal frames").toBe(179); // cells-ok — a frame count
-    expect(s.distinct, "distinct documents").toBe(130); // cells-ok — a frame count
+    expect(s.distinct, "distinct documents").toBe(132); // cells-ok — a frame count
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not
@@ -837,7 +837,6 @@ describe("AD — the two arms decide separately, and here is where", () => {
        "heatmap/empty", "bar/empty"],
       ["line/default", "line/size-left", "line/size-centre", "line/size-right", "line/corners-sharp"],
       ["contour/default", "contour/style-line", "contour/dim-floor", "contour/ink-contrast"],
-      ["line/callout-last", "line/callout-name", "line/callout-both"],
       ["pie/solid", "pie/default-40", "pie/narrow-20"],
       ["quiver/default", "quiver/ink-contrast", "quiver/dim-floor"],
       // **A legitimate collision with a measured reason** (C12 I80, §3ak.46). A

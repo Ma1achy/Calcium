@@ -22,7 +22,7 @@ import { flatten } from "./tree.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 import { COLORMAPS } from "../theme/colormap.js";
 import type { ColourRef } from "../theme/types.js";
-import { axisFor, formatValue, niceAxis, tickLabels, ticksFor, type Axis, type PositionDomain } from "./axes.js";
+import { axisFor, formatValue, niceAxis, tickLabels, ticksFor, type Axis, formatReadout, type PositionDomain } from "./axes.js";
 import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
 import { ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
@@ -556,6 +556,25 @@ export type Figure = Readonly<{
   /** Placed, or `null` where the author refused one — never an empty list (I67). */
   legend: FigureLegend | null;
   /**
+   * **What is written at each series' end, in series order** (I81, §3ak.47).
+   *
+   * `null` where the field is off, and a `null` entry for a series with nothing
+   * to say — a series with no finite value has no *value* and still has a name,
+   * which is why `"name"` answers where `"last"` does not.
+   *
+   * **The strings and not the placement.** *Which row a series' ink ends on* is
+   * `lastInkRow`'s and stays in cells; this arm ends a `<path>` at a point and
+   * asks the same question in its own units. What must not be asked twice is
+   * what the text says.
+   *
+   * **The rung's degradation is not here either.** Below the colour floor the
+   * positional family stacks into labelled strips and a name at the line's end
+   * becomes a third copy of it, so the terminal writes nothing for `"name"` and
+   * degrades `"both"` to the value. That is a capability decision and it is
+   * applied over this rather than inside it.
+   */
+  callout: readonly (string | null)[] | null;
+  /**
    * **Both normalised axes carry one unit, so each arm fits a centred square
    * inside its own box rather than filling it** (I69, §3ak.26 finding 1).
    *
@@ -826,7 +845,59 @@ export function valueLabelsOf(block: Pick<Plot, "axes" | "form" | "yAxis">): "le
  */
 export function legendOf(block: Plot): FigureLegend | null {
   if (block.legend === false) return null;
+  // **A name at the line's end *is* the legend** (C12 I48, I55, §3ag A2, I81).
+  // `legendPlacement` has held this clause since §3ag and this function did not,
+  // so the second arm drew `alpha` and `beta` in a legend the terminal removes —
+  // and drew them for all three callout variants alike, which is how the whole
+  // member came to have no reader there. C12 I48 ruled that a callout does not
+  // *replace* a legend — *it names a value where a legend names an identity* —
+  // and that sentence **selects**: the arms writing the identity answer the
+  // question a legend answers, and `"last"` still does not.
+  //
+  // **An explicit `legend:` has already won above**, which is the order the
+  // terminal's own clause sits in.
+  if (block.legend === undefined && (block.yCallout === "name" || block.yCallout === "both")) return null;
   return { slots: legendSlots(block), placement: block.legend ?? null };
+}
+
+/**
+ * What is written at each series' end (I81, §3ak.47).
+ *
+ * **`definition.ts`' `calloutTextFor`, moved, minus its rung.** The terminal
+ * degrades `"name"` to nothing and `"both"` to the value below the colour floor,
+ * where the family stacks into labelled strips and a name at the line's end is a
+ * third copy of one — a capability decision, applied over this rather than
+ * folded into it.
+ *
+ * **A series with no finite value has no *value* and still has a name**, so
+ * `"name"` answers where `"last"` does not.
+ */
+/**
+ * The last finite reading, or `null` — **`definition.ts`' own, moved with the
+ * text it feeds** (I81). A series can be all `null` and still have a name.
+ */
+function lastFinite(values: readonly (number | null)[]): number | null {
+  for (let i = values.length - 1; i >= 0; i -= 1) { // cells-ok — a sample index
+    const v = values[i];
+    if (v !== null && v !== undefined && Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+export function calloutOf(block: Plot): readonly (string | null)[] | null {
+  const mode = block.yCallout;
+  if (mode !== "last" && mode !== "name" && mode !== "both") return null;
+  return block.series.map((s, i) => {
+    const name = s.label ?? `series ${String(i + 1)}`;
+    if (mode === "name") return name;
+    const v = lastFinite(s.values);
+    if (v === null) return null;
+    // **The name first and the number last, and the number is what survives a
+    // cut** (§3ag A1): a live chart is read for the value, which is I48's own
+    // argument for the field existing at all.
+    const value = formatReadout(v, block.yFormat);
+    return mode === "both" ? `${name} ${value}` : value;
+  });
 }
 
 /**
@@ -1024,6 +1095,7 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    callout: calloutOf(block),
   };
 }
 
@@ -1173,6 +1245,7 @@ export function tilesFigure(block: Plot): Figure {
     position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    callout: calloutOf(block),
     marks,
   };
 }
@@ -1231,6 +1304,7 @@ export function nodesDecisions(block: Plot): Omit<Figure, "marks"> {
     position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    callout: calloutOf(block),
   };
 }
 
@@ -1407,6 +1481,7 @@ export function distributionFigure(block: Plot): Figure {
     position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    callout: calloutOf(block),
     marks,
   };
 }
@@ -1803,6 +1878,7 @@ export function fieldFigure(block: Plot): Figure {
     position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    callout: calloutOf(block),
     ramp: rampOf(block),
     marks,
   };
@@ -1971,6 +2047,7 @@ export function horizonFigure(block: Plot): Figure {
     position: positionDomainOf(block),
     valueLabels: null,
     legend: legendOf(block),
+    callout: calloutOf(block),
     ramp: rampOf(block),
     marks,
   };
@@ -2057,6 +2134,7 @@ export function matrixFigure(block: Plot): Figure {
     position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    callout: calloutOf(block),
     marks,
   };
 }
@@ -2175,6 +2253,7 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
+    callout: calloutOf(block),
   };
 }
 
@@ -2970,6 +3049,7 @@ export function proportionDecisions(block: Plot): Omit<Figure, "marks"> {
     // `positionAxis` is false here — so the member states it rather than
     // computing a domain from a series this family does not read.
     position: null,
+    callout: calloutOf(block),
     // **A radar's readings are on a scale and the record now says so** (F304).
     // `valueAxisOf` is `radarCeiling` with the pin threaded, which is the half
     // the old expression could not have: it passed `{}`, so `yMin`, `yMax` and
