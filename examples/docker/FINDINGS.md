@@ -13642,6 +13642,49 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F366 — `plotCorners` is the second kind of legitimate, and the first two probes said otherwise ★★★★☆
+
+I80's discriminator is *does the choice exist because of cells?* Asked of `plotCorners`, the answer took
+three measurements and the first two pointed the wrong way.
+
+**Probe 1 — corner cells against width.** 37 at 40, 60 and 80 columns, 38 at 120. Stable, which reads
+as *the corners track the data* and therefore cross.
+
+**Probe 2 — what the second arm draws.** A `<path>` of fifty `L` segments through the samples. Fifty
+joins, and `stroke-linejoin` is a corner vocabulary, which reads as *expressible here, so it is owed*.
+
+**Probe 3 — against height, and it settles it.**
+
+```
+data turning points                        3
+
+height  4    corners @60w  15   @120w  16
+height  8                  37             38
+height 16                  61             62
+height 24                  79             80
+```
+
+**The count scales with the row count and not with the data.** Those are not the curve's corners — they
+are **staircase steps**, where a sloped line quantised onto a character grid steps from one row to the
+next. A curve with three turns draws seventy-nine of them at height 24.
+
+**And the tree is the case with no ambiguity at all.** The terminal draws `╭──────────┴──┬────────╮`
+— an orthogonal connector, because a cell grid cannot draw a diagonal. This arm draws
+`M352 47.2 L220.8 116`: one straight segment, **no corner to round**.
+
+So `plotCorners` is I80's rule a second time: a choice that exists because of cells, with nothing to
+choose where the constraint is gone. The second arm's fifty joins are a *different* set from the
+terminal's seventy-nine steps, and honouring the member there would round joins the terminal does not
+have.
+
+**The reusable half is about the probe, not the member.** Both wrong readings came from varying the
+axis the artefact does not depend on. Width was the obvious parameter — a plot is wide — and the
+staircase is a function of **height**. *Measure the case that would falsify your own falsification*
+names the direction; this names the failure one step earlier, where the parameter itself is the wrong
+one and the answer is stable, plausible and about nothing.
+
+---
+
 ## F365 — the pair splits: `plotBox` is legitimate for a measured reason, `plotFill` is blocked on a form this arm refuses ★★★★☆
 
 F355 put both in the owed eleven with one note — *every `plotFill` and `plotBox` variant is a `violin`,

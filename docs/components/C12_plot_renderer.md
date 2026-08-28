@@ -7260,6 +7260,35 @@ meaning here. It has nowhere to be read until `violin` draws.
 blocker named as a form rather than as an owed ruling. A member blocked on a form is not the same
 remainder as a member nobody has decided, and a list that mixes them reports the wrong amount of work.
 
+#### `plotCorners` is the same rule again, and the probe is the part worth keeping
+
+Rounded against sharp is `╭╮╰╯` against `┌┐└┘` — same widths, a glyph choice — and the discriminator
+took three measurements, the first two pointing the wrong way.
+
+```
+data turning points                        3
+
+corners @ width  40 / 60 / 80 / 120       37 · 37 · 37 · 38      ← reads as: tracks the data
+the second arm's curve                    <path>, fifty L segments   ← reads as: expressible, so owed
+
+corners @ height  4 / 8 / 16 / 24         15 · 37 · 61 · 79      ← the grid's rows, not the data
+```
+
+**Seventy-nine corners from three turns.** They are **staircase steps** — a sloped line quantised onto a
+character grid, stepping row to row — and `plotCorners` chooses how a step looks. The fifty joins in the
+second arm's path are a *different set*: they sit at the samples, three of which turn. Honouring the
+member there would round joins the terminal does not have.
+
+**The tree is the case with no ambiguity.** `╭──────────┴──┬────────╮` against `M352 47.2 L220.8 116` —
+an orthogonal connector against one straight segment. The terminal's edge turns because a cell grid
+cannot draw a diagonal; remove the grid and there is no corner.
+
+**And the reusable half is about the probe.** Both wrong readings came from varying the axis the
+artefact does not depend on. Width is the obvious parameter — a plot is wide — and the staircase is a
+function of **height**. *Measure the case that would falsify your own falsification* names the
+direction; this is one step earlier, where the parameter itself is wrong and the answer comes back
+stable, plausible, and about nothing.
+
 ---
 ---
 ---

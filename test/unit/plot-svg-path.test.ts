@@ -39,6 +39,8 @@ import { b } from "../../src/shell/builders/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
 import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
 import { block as vmBlock } from "../../src/data/viewmodel/index.js";
+// @ts-expect-error — the catalogue tool is JS; `plot-arm-disagreement` casts it the same way.
+import { frameFor as catFrameRaw, stripSgr as stripSgrRaw } from "../../tools/plot-catalogue.mjs";
 
 /** A slot's hex at this arm's one depth — the same call the renderer makes. */
 const hexOf = (ref: string): string => {
@@ -887,7 +889,48 @@ describe("G6b — the two assertions containment could not make", () => {
  * never crosses. A `line` is claimed; a `line` **carrying candles** is a
  * different block that the same claim covers.
  */
+const catFrame = catFrameRaw as (s: unknown, c: unknown, w: number, id?: string) => readonly string[];
+const stripSgr = stripSgrRaw as (s: string) => string;
+
+/** The terminal arm at 24-bit, for the one row that reads a grid rather than a document. */
+const TERM_CAPS = {
+  colourDepth: 24, unicode: "full", ambiguousWidth: "narrow", synchronisedUpdate: true,
+  bracketedPaste: true, mouse: true, imageProtocol: "none", altScreen: true,
+} as const;
+
 describe("G10 — a choice forced by cells", () => {
+  it("G10b (C12 I80, §3ak.46, F366): `plotCorners` counts the grid's steps, and this arm has no grid", () => {
+    // **I80's second instance, and the probe is the finding.** Corner cells
+    // against *width* are stable — 37 at 40, 60 and 80 — which reads as *tracks
+    // the data*. Against **height** they are 15, 37, 61 and 79, for a curve with
+    // **three** turning points: they are staircase steps, where a sloped line
+    // quantised onto a character grid steps from one row to the next.
+    const sin50 = Array.from({ length: 50 }, (_v, i) => 50 + 45 * Math.sin(i / 6));
+    const turns = sin50.slice(1)
+      .map((v, i) => Math.sign(v - (sin50[i] ?? 0)))
+      .filter((sg, i, a2) => i > 0 && sg !== a2[i - 1]).length;
+    expect(turns, "the data turns three times").toBe(3); // cells-ok — a sample count
+
+    const corners = (h: number, w: number): number =>
+      [...(catFrame({ form: "line", height: h, axes: true, legend: false, series: [{ values: sin50 }] }, TERM_CAPS, w) as readonly string[])
+        .map((l) => stripSgr(l)).join("")].filter((c) => "\u256d\u256e\u256f\u2570".includes(c)).length;
+    expect([corners(4, 60), corners(8, 60), corners(16, 60), corners(24, 60)],
+      "the count is the grid's row count, not the data's turns").toEqual([15, 37, 61, 79]);
+    expect(corners(8, 120) - corners(8, 60), "and width barely moves it").toBe(1); // cells-ok — a glyph count
+
+    // **The tree is the case with no ambiguity.** The terminal draws an
+    // orthogonal connector because a cell grid cannot draw a diagonal; this arm
+    // draws one straight segment, so there is no corner to round.
+    const tree = b.plot({
+      id: "t", form: "tree", height: 6, axes: true, series: [],
+      hierarchy: { label: "r", value: 3, children: [{ label: "a", value: 1 }, { label: "b", value: 2 }] },
+    } as unknown as Parameters<typeof b.plot>[0]);
+    const drawn = plotToSvg(tree, THEME) ?? "";
+    expect(drawn, "the arm draws a tree").not.toBe("");
+    expect(/<path[^>]*d="M[\d.]+ [\d.]+ L[\d.]+ [\d.]+"/u.test(drawn),
+      "and its edge is one straight segment, with no corner in it").toBe(true);
+  });
+
   it("G10a (C12 I80, I46, §3ak.46, F365): `plotBox` decides a compact row and nothing here", () => {
     // **The pair F355 could not build.** Both `plotFill` and `plotBox` were owed
     // under one note — *every variant is a `violin`, which this arm refuses* —
