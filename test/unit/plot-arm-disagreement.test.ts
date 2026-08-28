@@ -819,8 +819,14 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // set of blocks that are not equal drawing one document, so each names a
     // member — `align` and `width` on `line/size-*`, `plotCorners` on
     // `corners-sharp`, `yCallout` on the callouts, `plotStyle` on the candles,
-    // `treeLayout`'s overflow pairs, `calendarUnit` on `day-stretch`. The four
-    // the terminal also has are fixture defects and stay in both lists.
+    // `treeLayout`'s overflow pairs, and **`matrixAnchor`** on `day-stretch`.
+    // The four the terminal also has are fixture defects and stay in both lists.
+    //
+    // **Not `calendarUnit`, which this note used to say** (F367). Both calendar
+    // variants set `calendarUnit: "day"` and differ in the anchor, so the member
+    // the sweep isolates here is `matrixAnchor` — and `calendarUnit`'s own four
+    // variants draw different grids and never collide, which puts it with the
+    // members no frame-based instrument reaches rather than with the cheap ones.
     expect(s.groups, "documents drawn from more than one block").toEqual([
       // **A legitimate collision, and the first this list has held** (F363,
       // C12 I79). Seven blocks with no data draw one empty document, and they

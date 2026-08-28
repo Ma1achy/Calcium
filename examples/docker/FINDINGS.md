@@ -13642,6 +13642,54 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F367 — `matrixAnchor` is legitimate for a reason already ruled, `yCallout` is owed, and the cheap three were not the three I named ★★★★☆
+
+Three members were reported as *cheap because the collision sweep already reports them*. Checked, one of
+the three was wrong, and it was wrong in my own comment inside AD13.
+
+**`calendar/day` and `calendar/day-stretch` differ in `matrixAnchor`, not `calendarUnit`.** Both set
+`calendarUnit: "day"`; the second adds `matrixAnchor: "stretch"`. So `calendarUnit` is *not* isolated by
+the sweep — its four variants (`day`, `hour`, `week`, `month`) draw different grids and do not collide —
+and `matrixAnchor` is. The note in AD13 said the opposite.
+
+### `matrixAnchor` — legitimate, and the reason was already ruled for its sibling
+
+Four anchors over `calendar/day`, at 80 columns:
+
+```
+stretch · window     one terminal frame
+uniform · left       another
+all four             one document, byte for byte — every cell 7.487 px wide
+```
+
+**Both of the member's jobs are cell quanta.** `stretch` against `uniform` distributes 53 columns over
+~74 cells and the type's own doc says what that means: *widths differing by one cell, imperceptible at a
+pitch of six and a **doubling** at a pitch of one*. In pixels 640/53 divides exactly; there is no
+remainder to anchor. `window` against `left` decides which readings survive when there is no room — and
+this arm draws all 365, because **F318 already ruled that half**: *the terminal drops columns because a
+cell is a quantum, the second arm scales 640px and has nothing to drop.*
+
+**I80's third instance, and it composes rather than repeats.** `plotBox` was a choice about spending one
+row, `plotCorners` about a staircase the grid creates, and this about a remainder and a drop — three
+different consequences of the same quantum.
+
+### `yCallout` — owed, and it is F356's shape again
+
+```
+terminal   │         █ beta          ← a swatch and the name, on the row the series ends at
+svg        "alpha", "beta"           ← a legend, and identical across all three callout variants
+```
+
+**Direct labelling is not a cell idiom.** A name at the end of a curve is expressible as a `<text>` at
+the path's last point, and this arm never reads the member: it draws `figure.legend`, which crosses, and
+`yCallout`, which does not. So the second arm does not *decide it differently* — it does not read it,
+which is the shape every one of the remaining members has.
+
+**Recorded, not built.** The crossing is a figure decision — *name the series at its last point rather
+than in a list* — and it is a build rather than a ruling.
+
+---
+
 ## F366 — `plotCorners` is the second kind of legitimate, and the first two probes said otherwise ★★★★☆
 
 I80's discriminator is *does the choice exist because of cells?* Asked of `plotCorners`, the answer took
