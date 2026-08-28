@@ -26,6 +26,8 @@ import {
 } from "../../src/presentation/plot/figure.js";
 import { legendEntries } from "../../src/presentation/plot/furniture.js";
 import { ecdfSeries } from "../../src/presentation/plot/derive.js";
+import { stackedValue } from "../../src/presentation/plot/stack.js";
+import { stackedBarRow } from "../../src/presentation/plot/categorical.js";
 import { FACING_MATRIX, rowOf } from "../../src/presentation/plot/scale.js";
 import { DARK_THEME, FULL_CAPS, MONO_CAPS } from "../support/render.js";
 import type { Plot } from "../../src/data/viewmodel/index.js";
@@ -372,6 +374,102 @@ describe("FB — the bar family's figure (C12 §3ak.7)", () => {
     // bar of 20 at `x=351` against a `20` gridline at `352` (F280).
     expect(barFigure(bars()).marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.depth] : [])))
       .toEqual([undefined, undefined, undefined]);
+  });
+
+  it("FB7 (C12 I73, I75, §3ak.39): `layout` selects the figure, and the fold is `stackBands`' fourth consumer", () => {
+    // **Two documents, one picture** (F342). `bar-stacked.svg` and
+    // `bar-normalised.svg` were byte-identical and the terminal draws three
+    // distinct figures — the strongest agreement the disagreement record can
+    // report, which here means the field reached one arm. **No column of that
+    // record can see it**: same labels, same legend, same border, same count of
+    // everything. So the row is here, on the marks.
+    const two = { categories: ["p", "q"], series: [{ values: [10, 20] }, { values: [5, 10] }] };
+    const rects = (layout?: string): readonly Readonly<{ x: number; w: number; s: number }>[] =>
+      barFigure(bars({ ...two, ...(layout === undefined ? {} : { layout }) } as unknown as Partial<Plot>))
+        .marks.filter((d) => d.layer === "series")
+        .map((d) => (d.mark.kind === "rect"
+          ? { x: d.mark.x, w: d.mark.w, s: d.seriesIndex ?? -1 }
+          : { x: -1, w: -1, s: -1 }));
+
+    // **Grouped splits the slot; stacked takes the whole of it and runs the
+    // layers end to end.** Two categories, so a slot is a half.
+    expect(rects("grouped").map((r) => r.w), "each series gets a quarter of the width")
+      .toEqual([0.25, 0.25, 0.25, 0.25]);
+    const stacked = rects("stacked");
+    expect(stacked.map((r) => r.w), "a stack fills its category's slot").toEqual([0.5, 0.5, 0.5, 0.5]);
+    expect(stacked.map((r) => r.x), "and both layers start at the slot's own edge")
+      .toEqual([0, 0.5, 0, 0.5]);
+
+    // **`overlap` with more than one series means grouped** (C12 I42, §3v) —
+    // two runs superimposed in one row of cells is one run, so the name
+    // describes a picture the vocabulary has not got. The terminal's dispatch
+    // rules it that way; this is the same sentence where the second arm reads it.
+    expect(rects("overlap"), "the terminal's ruling, on this side of the seam").toEqual(rects("grouped"));
+    expect(rects(), "and an unset field is `overlap`").toEqual(rects("grouped"));
+
+    // **Colour indexes the series and not the row** (C12 I38). `owners` is the
+    // terminal's answer and this is the same one: a four-quarter stack of two
+    // series drew four colours naming the quarters under a legend naming two.
+    expect(stacked.map((r) => r.s)).toEqual([0, 0, 1, 1]);
+
+    // **Bands never cross, by construction** — each layer's floor is the one
+    // below it, which is `stackBands`' own property rather than something the
+    // data could violate.
+    const yOf = (layout: string): readonly (readonly [number, number])[] =>
+      barFigure(bars({ ...two, layout } as unknown as Partial<Plot>))
+        .marks.filter((d) => d.layer === "series")
+        .flatMap((d) => (d.mark.kind === "rect" ? [[d.mark.y, d.mark.y + d.mark.h] as const] : []));
+    const st = yOf("stacked");
+    expect(st[2]?.[0], "p's second layer starts where its first ends").toBeCloseTo(st[0]?.[1] ?? -1, 9);
+    expect(st[3]?.[0], "and so does q's").toBeCloseTo(st[1]?.[1] ?? -1, 9);
+
+    // **The axis is the totals'** (C12 I73). `q` stacks to 30 against an extent
+    // `seriesRange` would put at 20, so a correctly stacked bar drawn on the old
+    // range runs past the end of its own scale.
+    expect(barFigure(bars({ ...two, layout: "stacked" } as unknown as Partial<Plot>)).extent,
+      "the fold's range, not the series'").toEqual({ min: 0, max: 30 });
+    expect(barFigure(bars({ ...two, layout: "grouped" } as unknown as Partial<Plot>)).extent,
+      "and the grouped figure keeps the series' own").toEqual({ min: 0, max: 20 });
+
+    // **Normalised is the same bands over each category's own total**, which is
+    // the last band's upper bound — so it needs no second walk and its axis is
+    // the fraction. Every row fills its slot; the split is the share.
+    const norm = yOf("normalised");
+    expect(norm[0]?.[1], "p is 10 of 15").toBeCloseTo(10 / 15, 9);
+    expect(norm[1]?.[1], "q is 20 of 30").toBeCloseTo(20 / 30, 9);
+    expect(norm[2]?.[1], "and both stacks reach the top").toBeCloseTo(1, 9);
+    expect(norm[3]?.[1]).toBeCloseTo(1, 9);
+    expect(barFigure(bars({ ...two, layout: "normalised" } as unknown as Partial<Plot>)).extent)
+      .toEqual({ min: 0, max: 1 });
+  });
+
+  it("FB8 (§3ak.39, F351): the fold's rule for a negative is one rule, and the bar row had half of it", () => {
+    // **`stackedBarRow` did `?? 0` and nothing else**, so a negative fill
+    // reached `String.prototype.repeat` with a negative count: `layout:
+    // "stacked"` with any negative reading threw `RangeError` and the registry
+    // drew an ERROR panel. Both layouts. F329's class arriving as a crash rather
+    // than as a disagreement, and no corpus variant has ever run the path.
+    expect(stackedValue(null), "a null is a zero-width contribution, not a gap").toBe(0);
+    expect(stackedValue(undefined), "and so is a missing index").toBe(0);
+    expect(stackedValue(Number.NaN)).toBe(0);
+    expect(stackedValue(Number.POSITIVE_INFINITY), "the one that reached `repeat` first").toBe(0);
+    expect(stackedValue(-4), "and a negative is zero-width too — the fold's own rule").toBe(0);
+    expect(stackedValue(4), "a reading is itself").toBe(4);
+
+    const caps = { unicode: "full", colourDepth: 24, ambiguousWidth: "narrow" } as const;
+    const series = [{ values: [10] }, { values: [-4] }];
+    // The failing call, verbatim: 20 cells, a total of 10, and a layer of −4.
+    expect(() => stackedBarRow(series, 0, 10, 20, caps, false), "stacked").not.toThrow();
+    expect(() => stackedBarRow(series, 0, 10, 20, caps, true), "and normalised").not.toThrow();
+    expect(stackedBarRow(series, 0, 10, 20, caps, false).owners.filter((o) => o === 1),
+      "the negative layer owns no cell").toEqual([]);
+
+    // **The rule is shared and the rounding is not**, which is the reason this
+    // is an extraction rather than a second call to `stackBands`: this arm rounds
+    // each series' own fill and the figure rounds cumulative bounds, and
+    // unifying those would move frames for no finding.
+    expect(stackedBarRow([{ values: [10] }, { values: [10] }], 0, 20, 20, caps, false).owners)
+      .toEqual([...Array.from({ length: 10 }, () => 0), ...Array.from({ length: 10 }, () => 1)]);
   });
 
   it("FB5 (C12 I64): a categorical refusal is empty, and the identity survives it", () => {

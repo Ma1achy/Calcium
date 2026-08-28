@@ -13642,6 +13642,33 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F354 — the anchor check reads a mutation run as text, so a run that cannot execute reports clean ★★★☆☆
+
+`tools/mutate/anchors.mjs` is the cheap proxy for the pass: it resolves every `from:` against the
+file it names and every `expect:` against the run's test paths, in seconds, where the pass itself
+takes half an hour. It reads the run as **text**.
+
+Produced by accident while adding three rows to `c12-arm-seam.mjs`: a `const STACK` declared twice —
+one pre-existing at line 88, one added at 84 without looking. The file cannot be parsed, so
+`node tools/mutate/runs/c12-arm-seam.mjs` dies before its first mutation. The anchor check reported
+
+```
+mutation anchors — 99 runs · 1005 anchors · 214 test paths · 937 expectations
+  23 known stale, and no run drifted from what the list says
+```
+
+**Every anchor did resolve, and the sentence is true.** What it does not say — what it has no way to
+say — is that the run naming them cannot start.
+
+**Caught, and by the gate that should catch it**: `make check`'s eslint gave
+`Parsing error: Identifier 'STACK' has already been declared`. So this is not an escape; it is the
+proxy's blind spot, and the reason to write it down is that **the anchor check is what you run
+*instead of* the pass** — a green from it is what licenses not spending the half hour. `node --check`
+per run file is one line and closes it. Recorded with the instance that produced it, because a blind
+spot with no instance is a caveat and one with an instance is a finding.
+
+---
+
 ## F353 — the counter that certifies D13 closed cannot tell a legend from a gutter, in 33 of its 46 ★★★★☆
 
 `U1a2` counts *documents drawing a legend label* by asking whether any legend slot's label appears

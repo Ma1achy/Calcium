@@ -973,6 +973,39 @@ const results = runPass({
       expect: "SB",
     },
     {
+      // **`layout` was read at one site in one renderer** (F342), so
+      // `bar-stacked.svg` and `bar-normalised.svg` were byte-identical while the
+      // terminal drew three figures. Reverted, this arm draws grouped for all
+      // four values of the field again — and **no column of the disagreement
+      // record moves**, which is why the row is on the marks.
+      name: "THE ARRANGEMENT: every bar layout draws the grouped figure",
+      file: FIGURE,
+      from: "  return layout === \"stacked\" || layout === \"normalised\" ? layout : \"grouped\";",
+      to: '  return "grouped";',
+      expect: "FB7",
+    },
+    {
+      // **A category's total is the last band's upper bound.** Dividing by the
+      // range instead makes `normalised` a second spelling of `stacked` — every
+      // row the length it already was, which is the picture the field exists to
+      // change.
+      name: "THE SHARE OF ONE: a normalised bar is a share of the range and not of its own column",
+      file: FIGURE,
+      from: "        const by = normalised ? 1 / total : 1;",
+      to: "        const by = 1;",
+      expect: "FB7",
+    },
+    {
+      // **The fold's rule for a negative, which the bar row did not have**
+      // (F351). Reverted here, `stackBands` stops clamping and both consumers
+      // lose it at once — which is what an extraction buys over a copy.
+      name: "THE CLAMP: a negative reading contributes its own sign to a stack",
+      file: STACK,
+      from: "  return v === null || v === undefined || !Number.isFinite(v) ? 0 : Math.max(0, v);",
+      to: "  return v === null || v === undefined || !Number.isFinite(v) ? 0 : v;",
+      expect: "FB8",
+    },
+    {
       // **I67 names three gated members and the third resolver could not see the
       // field** (F347, §3ak.40). Reverted, `axes: false` and — the reachable half
       // — a block that says nothing draw value labels this arm's terminal frame

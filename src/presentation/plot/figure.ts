@@ -2103,7 +2103,116 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
  * label for the fraction to disagree with, which is exactly how a third range
  * survived in one family.
  */
+/**
+ * Which arrangement a bar family block's marks take, resolved (I75, §3ak.39).
+ *
+ * **`overlap` with more than one series means grouped** (I42, §3v) — two runs
+ * superimposed in one row of cells is one run, so the name describes a picture
+ * the vocabulary has not got. The terminal's dispatch rules it that way and
+ * `drawnBlock` writes it into the derived histogram; this is the same sentence
+ * where the second arm can read it, which is the whole of why `layout` was
+ * dropped: it was read at one site in one renderer and nowhere else.
+ */
+function barLayoutOf(block: Pick<Plot, "layout">): "grouped" | "stacked" | "normalised" {
+  const layout = block.layout ?? "overlap";
+  return layout === "stacked" || layout === "normalised" ? layout : "grouped";
+}
+
+/**
+ * A stacked or normalised bar — **`stackBands`' fourth consumer** (I73, I75,
+ * §3ak.39).
+ *
+ * `bar/stacked` and `bar/normalised` drew byte-identical documents, and the
+ * terminal draws three distinct figures. **A stacked bar is not a normalised
+ * bar**, and a reader given one for the other is misinformed rather than shown
+ * a different idiom (F342).
+ *
+ * **No `Figure` member, because `layout` selects which marks exist.** It
+ * changes nothing about how a rect is inked, so it crosses as the marks —
+ * available only because they are in the figure's own normalised space, and a
+ * member would have been needed had the arms been handed rectangles in cells
+ * and pixels.
+ *
+ * **Padded to the category count before the fold.** `stackBands` resamples
+ * across the column count it is given, which is what lets `stackedarea` call it
+ * at a cell width; here the columns *are* the categories, so padding each
+ * series to `n` first makes the resampler the identity and turns a missing
+ * index into the fold's own null rather than a stretch. That is exactly the
+ * terminal's `values[i] ?? 0`, reached by construction rather than by copying
+ * the expression.
+ *
+ * **A category's total is the last band's upper bound**, so `normalised` needs
+ * no second walk: the same bands over `bands[n - 1].upper[i]`, on `0 … 1`.
+ *
+ * **The axis is the totals'** (I73). `bar/stacked` tops out at `25 + 12 = 37`
+ * against an axis `seriesRange` labels to 30, so a correctly stacked bar drawn
+ * on the old range runs past the end of its own scale. Pinned through the block
+ * on `stackedFigure`'s precedent, so an author's own bounds still win — and the
+ * terminal's unniced `w / totalMax` stays where it is, which is F272b's third
+ * range and `barFigure`'s own header already records why it is invisible rather
+ * than absent.
+ */
+function stackedBarFigure(block: Plot, normalised: boolean): Figure {
+  const cats = (block.categories ?? []).length; // cells-ok — a category count
+  const n = Math.max(1, cats === 0 ? block.series[0]?.values.length ?? 0 : cats); // cells-ok — a category count
+  const padded: readonly Series[] = block.series.map((sr) => ({
+    ...sr,
+    values: Array.from({ length: n }, (_v, i) => sr.values[i] ?? null), // cells-ok — a category index
+  }));
+  const bands = stackBands(padded, n, false); // cells-ok — a category count
+  const top = bands[bands.length - 1]; // cells-ok — a band count
+  const span = normalised ? { min: 0, max: 1 } : stackRange(bands);
+  const decisions = categoricalDecisions(block);
+  // **The extent is replaced and the block is not pinned**, which is the one
+  // place this departs from `stackedFigure`. Pinning through `yMin`/`yMax` is
+  // how that function gets `stackRange` into `positionalDecisions` at all, and
+  // it has a second effect: `axisFor` declines to nice a bound the author
+  // pinned, so the axis came back `0 20 37` — the totals' exact maximum as a
+  // tick. Read on the frame, the family's other three read `0 20 40` and
+  // `0 10 20 30`, and `barFigure`'s own header says the mark takes the **niced**
+  // range because that is the only one with a labelled axis behind it (F210,
+  // F272b). Handing the extent to `axisOver` keeps the nicing and keeps the
+  // author's pin, because `axisFor` still reads `block`.
+  const extent = normalised ? span : { min: baselineOf(span.min), max: span.max };
+  const value = decisions.extent === null ? null : axisOver(extent, block);
+  const marks: Drawn[] = [];
+  if (value !== null) {
+    bands.forEach((band, seriesIndex) => {
+      for (let i = 0; i < n; i += 1) { // cells-ok — a category index
+        // **The share is per category and the fold is not**, so a normalised
+        // block divides by its own column's total rather than by the range.
+        const total = top?.upper[i] ?? 0;
+        if (normalised && total <= 0) continue;
+        const by = normalised ? 1 / total : 1;
+        const lo = normalisedOf((band.lower[i] ?? 0) * by, value.range, false);
+        const hi = normalisedOf((band.upper[i] ?? 0) * by, value.range, false);
+        // A layer contributing nothing draws nothing, which is `repeat(0)` in
+        // the other arm: the remainder of a stack is the part nothing accounts
+        // for and shading it would make it look like a layer.
+        if (hi <= lo) continue;
+        // **Colour indexes the series** (I38), which is `owners` in the terminal
+        // — the whole row used to carry one ref keyed on the *category*, so a
+        // four-quarter stack of two series drew four colours naming the quarters
+        // under a legend naming `direct` and `referral`.
+        marks.push({
+          mark: { kind: "rect", x: i / n, y: lo, w: 1 / n, h: hi - lo, fill: true },
+          layer: "series",
+          seriesIndex,
+        });
+      }
+    });
+    marks.push(...annotationMarks(block, value.range, false));
+  }
+  return { ...decisions, ...(decisions.extent === null ? {} : { extent, value }), marks };
+}
+
 export function barFigure(block: Plot): Figure {
+  // **Three layouts, three figures** (F342, §3ak.39). This arm drew grouped for
+  // all four values of the field, so `bar-stacked.svg` and `bar-normalised.svg`
+  // were byte-identical — the strongest agreement the disagreement record can
+  // report, and here it means the field reached one arm.
+  const arrangement = barLayoutOf(block);
+  if (arrangement !== "grouped") return stackedBarFigure(block, arrangement === "normalised");
   const decisions = categoricalDecisions(block);
   const { value } = decisions;
   const marks: Drawn[] = [];

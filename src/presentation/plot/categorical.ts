@@ -15,6 +15,7 @@ import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
 import { markOf } from "./marks.js";
+import { stackedValue } from "./stack.js";
 import { formatReadout } from "./axes.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
@@ -182,7 +183,11 @@ export function stackedBarRow(
   const w = Math.max(1, Math.floor(width));
   const ext = extentFor(caps);
   let sum = 0;
-  for (const s of series) sum += (s.values[categoryIndex] ?? 0);
+  // **The fold's rule, called rather than restated** (F351, §3ak.39). This was
+  // `?? 0`, which is the null half and not the negative half — and a negative
+  // fill reaches `repeat` with a negative count, so the block renders as an
+  // ERROR panel rather than as a picture.
+  for (const s of series) sum += stackedValue(s.values[categoryIndex]);
   const empty = { text: " ".repeat(w), owners: new Array<number>(w).fill(-1) }; // cells-ok — a sentinel owner
   if (sum === 0) return empty;
 
@@ -191,7 +196,7 @@ export function stackedBarRow(
   let result = "";
   const owners: number[] = [];
   for (let i = 0; i < series.length; i += 1) { // cells-ok — a series count
-    const v = series[i]?.values[categoryIndex] ?? 0;
+    const v = stackedValue(series[i]?.values[categoryIndex]);
     const fill = Math.round(v * scale);
     const clamped = Math.min(fill, w - used);
     result += (markOf(i, caps) || ext.solid).repeat(clamped);

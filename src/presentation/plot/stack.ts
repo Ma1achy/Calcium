@@ -44,6 +44,25 @@ export type Band = Readonly<{ lower: readonly number[]; upper: readonly number[]
  * above it down by that column and put a notch in a shape that has none. The
  * value is unknown; the band's thickness there is not.
  */
+/**
+ * A reading's contribution to a stack — **a null is zero-width and so is a
+ * negative** (I70, §3ak.39).
+ *
+ * Extracted because it was the fold's rule in one of the fold's two
+ * implementations (F351). `stackedBarRow` read `values[i] ?? 0` and nothing
+ * else, so a negative reached `String.prototype.repeat` with a negative count
+ * and `layout: "stacked"` rendered an ERROR block for any block containing one.
+ * No corpus variant has a negative stacked reading, so the path had never run.
+ *
+ * **The rule is shared and the rounding is not.** This arm rounds each series'
+ * own fill and the figure rounds cumulative bounds; unifying those would move
+ * frames for no finding, and it is the *rule* that a second implementation was
+ * missing.
+ */
+export function stackedValue(v: number | null | undefined): number {
+  return v === null || v === undefined || !Number.isFinite(v) ? 0 : Math.max(0, v);
+}
+
 export function stackBands(
   series: readonly Series[],
   columns: number,
@@ -56,8 +75,7 @@ export function stackBands(
     const len = s.values.length; // cells-ok — a sample count
     if (len === 0 || n === 0) return 0; // cells-ok — a sample count
     const j = n === 1 ? 0 : Math.round((i / (n - 1)) * (len - 1)); // cells-ok — a sample index
-    const v = s.values[Math.max(0, Math.min(len - 1, j))]; // cells-ok — a sample index
-    return v === null || v === undefined || !Number.isFinite(v) ? 0 : Math.max(0, v);
+    return stackedValue(s.values[Math.max(0, Math.min(len - 1, j))]); // cells-ok — a sample index
   };
 
   const totals = Array.from({ length: n }, (_, i) => series.reduce((sum, s) => sum + at(s, i), 0));
