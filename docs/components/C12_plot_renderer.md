@@ -7008,6 +7008,67 @@ threshold is a different claim.
 **across** it: along, it is cut at the tail and marked; across, it is scaled to the box. Both are the
 arm containing what the shared layer declined to measure, which is I63's other half.
 
+---
+
+### 3ak.42 — `seriesIndex` is the colour slot, so it cannot also be the shape
+
+`dumbbell/default` is two series — `start` and `end` — over four categories.
+
+```
+terminal   4 inks, one per row: 230;159;0 · 86;180;233 · 60;191;154 · 240;228;66
+           shape: ● at the near end, ○ at the far one
+SVG        2 inks, one per series: #e69f00 ×4 · #56b4e9 ×4
+           shape: ● and ●; the connector #626262, the rule's grey
+```
+
+**The terminal spends colour on the row and shape on the end**, which is I29's *one datum, one
+channel*: the pair is the datum and the end is a shape. This arm spends colour on the end and grey on
+the row, so nothing says which row is which and the shape channel says nothing at all.
+
+#### The member says one thing and one arm read it as another
+
+`Drawn.seriesIndex` is documented as *the categorical slot, unresolved — `refOf`'s index, not a
+colour*. It is the **colour** channel. `roles.ts` refuses the far end a role of its own on the
+grounds that *the figure says `point` twice and distinguishes them by `seriesIndex`* — which spends
+that channel on the pair position and leaves the row with nothing.
+
+**The terminal never noticed, because it does not read the member here.** `categoricalForm`'s default
+`refFor` colours by row — `ROW_IS_AN_IDENTITY[dumbbell]` is `true` — and `dumbbellRow` takes its two
+shapes from `roles.pairedPoint`, which sits *beside* the record. So one arm has a private second
+channel and the other read the seam as written. **A member with two meanings is not a disagreement
+until an arm exists that has only the member.**
+
+#### The refusal counted roles rather than asking what the figure has to say
+
+> giving either a role of its own would make `GLYPH_SHAPE` describe eight things where the figure says
+> seven
+
+The figure says eight. A dumbbell's far end **is** drawn distinguishably from its near one, in both
+arms, today — which is I68's subject exactly: *a role is drawn distinguishably from every role it can
+share a figure with*. Counting the record's entries answers *how many roles are there*, and the
+question is *how many things does the figure distinguish*.
+
+**The other one beside the record stays, and the difference is the reusable part.** `meanOnMedian` is
+**one cell holding two marks** — a composition, not a shape — so it is an answer to *what happens when
+two roles land together* and not to *which role is this*. The far end is a role; the coincidence is
+not. The note refused both for one reason and only one of them earns it.
+
+#### What lands
+
+- `GlyphRole` gains **`paired`**, `GLYPH_SHAPE` calls it a `mark`, and `roleGlyphs` moves
+  `pairedPoint`'s `g.hollow` into `of.paired`. **No terminal frame moves**, which is what says this is
+  an extraction: the character is the same one.
+- `distributionFigure`'s dumbbell arm gives all three marks the **row**'s slot and the far end the
+  `paired` role.
+- **The connector had no slot at all**, which is why it fell to the rule's grey — measured, not
+  inferred, and it takes the row's with the ends.
+- This arm draws `paired` as a **hollow** circle: the same ink, stroked rather than filled, which is
+  the second arm's `g.hollow`.
+
+**And it is not `rowSlot`.** That helper's `per > 1 → seriesIndex` branch is right for `bar/grouped`,
+where each drawn row *is* one series' datum; a dumbbell's row consumes both, so the slot is the row
+index directly.
+
 
 ---
 ---
@@ -8345,6 +8406,7 @@ orientation — and belongs in the classification table as its own rows.
 72. **A block field that selects between figures crosses as the marks, and a corpus that draws one document from two blocks is where a dropped field is visible** (I73, I75, §3ak.39). `layout` changes which marks exist and nothing about how one is inked, so it needs no `Figure` member and the fold it selects had crossed for §3ak.33's cumulative three — a stacked bar is `stackBands`' **fourth consumer**, and the comment forty lines below `barFigure` says *three* while sitting in the same file as the form that makes it four. **A count of consumers goes stale in the file that holds it.** The axis moves with the marks because a stacked figure spans the totals: `bar/stacked` tops out at 37 against an axis labelled to 30. And the rule the second implementation of the fold did not have is the one that crashes — `stackBands` clamps a negative to zero and `stackedBarRow` hands it to `repeat`, so `layout: "stacked"` with any negative reading renders an ERROR block (F342, F349, F350, F351).
 73. **A rule whose subject is a set is checked against the member the reader looks at first** (I67, §3ak.40). I67 says `axes` gates three things and names them — `gutter`, `positionAxis`, `valueLabels` — and the third resolver's `Pick` never listed the field, so `axes: false` drew value labels on three variants whose terminal frames have no furniture at all. `yAxis`'s own doc had ruled it from the other side before either resolver existed: *`false` removes the labels and keeps the frame and the x axis, which is what `axes: false` cannot say on its own*. **The terminal is right by a second mechanism** — its labels come from a gutter width that `axes: false` already zeroes — and a decision enforced twice in one arm and once in the shared layer is not enforced in the shared layer (F347).
 74. **A correct sentence can justify the wrong decision, and the question that reaches it is whether it constrains the decision it is attached to** (I76, §3ak.41). `SVG_FONT_SIZE`'s doc said *it sizes nothing: the label places itself* — true, about **placement**, and attached to a decision about **containment**. So the gutter stayed a tenth of the width, the clip that made overflow safe cut the label's head instead of its tail, and `petal_length` shipped as `betal_length` under a justification review checks for truth and finds. F84's class, and the second half is that **§3ak.20 had written down what would falsify it** — *the day one is, that is the argument to make* — so the premise was refutable, dated, and refuted by the first instance to arrive (F343, F345).
+75. **A seam member with two meanings is not a disagreement until an arm exists that has only the member** (I29, I62, I68, §3ak.42). `Drawn.seriesIndex` is documented as the colour slot and `roles.ts` uses it as the shape channel — *the figure says `point` twice and distinguishes them by `seriesIndex`* — which leaves a dumbbell's row with no colour to be named by. The terminal never noticed because it does not read the member for this form: it colours by row through `ROW_IS_AN_IDENTITY` and takes its two shapes from `pairedPoint` *beside* the record. **And the refusal that put it there counted roles rather than asking what the figure distinguishes** — *eight things where the figure says seven*, when the figure says eight and has said so in both arms all along. `meanOnMedian` stays beside the record on a reason the far end never had: it is one cell holding two marks, a composition rather than a shape (F344).
 
 ---
 
