@@ -7184,6 +7184,39 @@ leave the collision list, which is the fixture that was added to make the defect
 that, and AD14's `xScale` row inverts — it asserted *two blocks draw one document* and now asserts they
 do not.
 
+
+### 3ak.45 — an empty figure is drawn, and a refusal is for one that cannot be
+
+`plotToSvg` ended with `if (body.length === 0) return null`, so a `line` holding `series: [{ values: [] }]`
+and a `violin` — a form this arm does not draw at all — produced **byte-identical output**. Both land in
+the corpus's 33-strong refusal group, and a consumer cannot tell *no data yet* from *not supported*.
+
+The terminal draws neither of those things. It holds the block's declared height and centres
+`emptyMessage ?? "No data."` in the muted tone.
+
+#### The comment that line carries is right about the defect and wrong about the remedy
+
+It records what it was written for: *`series: []` reaches here with a range nobody declared … five
+gridlines labelled 0 to 1 over an empty box — a plot of a range the block never had*. That is correct
+and it is a **false axis**. Drawing nothing at all fixes it by removing the state as well, which is a
+different thing from fixing it.
+
+**F259's distinction taken one step further.** A refusal is for a figure that **cannot be drawn** — an
+`ohlc` this path does not read, an `origin` it would draw upside down. A figure with nothing in it *can*
+be drawn; having nothing in it is what there is to say. `emptyRows`' own comment names the consumer: a
+`--watch` on a run that has not reported an epoch yet.
+
+**So the empty figure draws its ground and its message and no axis.** The half the old comment earns is
+kept: there is no range, so there are no ticks, no gridlines and no frame to imply one.
+
+#### `emptyMessage` rides on it, and could not have crossed first
+
+The member has **no corpus instance at all** — one of the two F355 named that no frame-based instrument
+reaches — and while the whole state is a `null` there is nowhere for a reader to be. The fixture is a
+**pair**, `line/empty` against `line/empty-message`, differing in exactly that field, which is what I75
+needs before a collision can name a member.
+
+---
 ---
 ---
 ---
@@ -8446,6 +8479,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I76** — **A label the shared layer declines to measure is contained by the arm that draws it, and a cut is at the tail and marked.** I63 puts the *room* above both arms and the outcome in each; this is the half that says the outcome is a **decision** and not a clipping rectangle. **A clip contains and does not communicate** — an `end`-anchored text grows leftward, so the rectangle that stops it removes the label's **head**, and a head cut is a different word where a tail cut is truncation. The rule has two axes and one shape: a label overflowing **along** its text direction is cut at the tail and marked; one overflowing **across** it is scaled to its box. *Measured before the rule: `boxplot/default` draws `petal_length` as `betal_length` in the second arm, beside a terminal frame naming all four rows in full — the gutter is a **tenth of the width** where the terminal's is `min(widest, width / 3)`, and the value labels on the same side had no clip at all, so a long one left the viewBox entirely. And `graph/crowded` writes fourteen labels at `SVG_FONT_SIZE` into ranks `275.2 / 14 = 9.83 px` tall, every glyph ascending into the rank above and descending into the one below* (F343, F345). **The premise this replaces named its own trigger**: §3ak.20 chose a tenth *because pixels overflow gracefully and cells do not*, and recorded that the day an instance appeared was the day to make the argument. What it forbids is untouched — `cells()` in a shared layout is still hazard 4, and an em estimate inside one arm is not shared, measures nothing in the other arm's units, and adds no member.
 - **I77** — **An output reader takes its alphabet from the renderer, and a control composed by hand cannot check that it did.** A reader over rendered text is an instrument whose subject is a vocabulary, so its fabricated violation has to be *rendered*: a hand-built fixture is written in the same sitting and under the same reading of the alphabet as the rule, which is A03 §2's note about SP1 arriving on a character class. *Measured before the rule, over 364 frames: `interiorRules` answered `> 0` on 15 and the frame held a `┄` or `┊` on 16, and **not one frame was in both** — every positive a figure glyph, every real rule missed, and `line/frame-grid` reporting zero over eight rows of gridlines. Its control asserted `├────────────┤` and `│    │    │ │`, neither of which this renderer draws* (F358, C12 §3ak.43). **Stated blind spot**: it says nothing about a reader whose alphabet is right and whose *predicate* is wrong, which is what F334 fixed and what this inherited. **And the check is a disposition count, not a total** — correcting this moved 28 of 328 pairs and left the disagreement count at 16, so a rule phrased over the total would have passed unchanged.
 - **I78** — **The position axis crosses as a domain — `{ range, scale, format }` — and each arm nices it with its own tick budget through one shared function.** `positionAxis` answers *is the row drawn* and says nothing about what is in it, which is why `xMin`, `xMax`, `xScale` and `xFormat` had no reader in the second arm at all. **A domain and not an axis, and the asymmetry with `value` is the budget**: a value axis nices against `ticksFor(plotAreaRows(block))`, a count derived from `height` and therefore a block fact, where an abscissa's comes from the width and stays in cells (§3aj hazard 3). So `positionAxisAt(pos, maxTicks)` is the single derivation and the budget is a parameter — `valueAxisOf`'s shape. **Ticks are placed by `at`**, which is `xPositionOf` above the seam: `normalisedOf` is not scale-aware, and an arm using it would put a log label at the linear position with the sample beneath it at the log one. *Measured before the rule: six blocks differing only in the abscissa drew six terminal frames and one 1225-byte document, and `plotFrame: "grid"` — a member that **does** cross — drew five horizontal rules and no verticals under a comment in its own file saying both ways* (F356, C12 §3ak.44). **Stated blind spot**: it says nothing about which *values* the domain should hold, so a slope chart's two positions still nice to `0.0 … 1.0` in both arms — consistent, and a question the seam does not ask.
+- **I79** — **A figure with nothing in it is drawn; a refusal is for a figure that cannot be drawn.** The second arm returned `null` when a figure emitted no marks, so a block with no data and a form the arm does not support produced one document and a consumer could not tell *not yet* from *not supported*. **An empty figure draws its ground and its message and no axis** — there is no range, so ticks, gridlines and a frame would each imply one, which is the false-axis defect the `null` was protecting against and is kept. `emptyMessage` is the message, defaulted to `No data.` in both arms. *Measured before the rule: `line/empty` and `violin/default` were byte-identical, in the corpus's 33-strong refusal group, while the terminal held the declared height and centred `No data.` in the muted tone* (F259, F363, C12 §3ak.45). **Stated blind spot**: it says nothing about a figure whose marks are empty because the *data* is degenerate rather than absent — a series of all-`null` reaches the same branch, and the two are one state here.
 
 
 ## 8. Commitments
@@ -8528,6 +8562,7 @@ orientation — and belongs in the classification table as its own rows.
 76. **An invariant whose subject is a corpus is not checked by a row that cites it** (I75, §3ak.39). A03 pairs a commitment to an invariant and nothing pairs an invariant to a check, so *every C12 invariant is cited by some test file* — 76 of 76, measured — is a convention held by hand. I75 says the collision sweep *is checked over the corpus* and reports 175 frames, 125 documents, 4 and 25; its citation was `FB7`, whose subject is `layout` selecting a figure and whose assertions are rect widths and x offsets, and **nothing computed any of the five numbers**. This is the class already written down about findings — *the test is never does this mention it, it is would landing this close it* — arriving on invariants, where there is no gate to fool because the reading is done by a person. **The figures were a probe's and the probe was deleted before staging**, so the measurement was a count in prose with no route back, which is what a ruling looks like from outside (F349, F357).
 77. **A reader over rendered output owes a rendered control** (I77, §3ak.43). `interiorRules` and its subject were disjoint sets across 364 frames — 15 positives, all figure glyphs; 16 frames holding a real rule, all missed — because `RULE_ONLY` never had the dotted vocabulary this renderer draws in, and AD10 certified it with `├────────────┤` and `│    │    │ │`, which nothing draws. **F334's `> 2` is correct and could not have found it**: a blank row is two glyphs, and the third glyph, when one came, was the curve's. The correction moved 28 of 328 pairs, closed `boxplot`, `density` and `smallmultiples`, opened `autocorrelation` and `forest`, and left the disagreement total at 16 (F321, F334, F358).
 78. **A seam member that answers *whether* and not *what* leaves everything it gates on one side** (I67, I78, C12 §3ak.44). `Figure.positionAxis` is a boolean, so four block members — `xMin`, `xMax`, `xScale`, `xFormat` — had zero readers in the second arm and six blocks differing only in the abscissa drew one document. **The remedy is a domain rather than an axis, because the budget is a width**: `height` is a block field so `value` can carry niced ticks, and no block carries a width, so `positionAxisAt` takes the budget as a parameter and each arm brings its own. `xTickRow` packs what it used to derive, and 1840 terminal frames compared with 0 moved. **And a member that crosses can still be drawn wrongly for want of one that did not** — `plotFrame: "grid"` drew half a grid here until there were positions to hang the rest on (F356).
+79. **A remedy that removes a state is not a fix for a wrong value in it** (I79, C12 §3ak.45). The second arm's `return null` on an empty figure was written against a real defect — *five gridlines labelled 0 to 1 over an empty box, a plot of a range the block never had* — and it fixed the false axis by deleting the difference between *no data* and *not supported*, which F259 says are the two things a refusal must keep apart. `line/empty` and `violin/default` were byte-identical. **The half the comment earns is kept**: an empty figure draws no axis, because there is no range for one to be about. And `emptyMessage` could not have crossed first — a member with no corpus instance has nowhere to be read while the whole state is a `null` (F259, F355, F363).
 
 ---
 

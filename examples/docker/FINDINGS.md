@@ -13642,6 +13642,42 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F363 — an empty plot and a refused form draw the same document, so the arm cannot say *not yet* apart from *not supported* ★★★★★
+
+`plotToSvg` ends with `if (body.length === 0) return null`. So a `line` with `series: [{ values: [] }]`
+and a `violin` — a form this arm does not draw at all — produce **byte-identical output**: the refusal
+sentinel, in the same 33-strong collision group.
+
+```
+terminal, line/empty                  svg, line/empty
+                                      (null)
+        No data.                      svg, violin/default
+                                      (null)
+```
+
+**The comment above that line is right about the defect and wrong about the remedy.** It records what
+it was written for: *`series: []` reaches here with a range nobody declared … five gridlines labelled 0
+to 1 over an empty box — a plot of a range the block never had*. True, and the fix for a **false axis**
+was to draw nothing at all, which collapses two states a reader needs apart.
+
+**F259's distinction, one step further than it has been taken.** A refusal is for a figure that
+**cannot be drawn**. A figure with nothing in it *can* be drawn — the terminal draws it, holds the
+block's declared height, and centres `No data.` in the muted tone. It neither invents an axis nor
+vanishes, and `emptyRows`' own comment names the case: *a `--watch` on a run that has not reported an
+epoch yet*. That consumer, on this arm, is shown the same nothing as a consumer who asked for a form
+the renderer does not support.
+
+**`emptyMessage` rides on it.** The member has **no corpus instance at all** — one of the two F355
+named that no frame-based instrument can reach — and it cannot have a reader while the whole state is a
+`null`. So the fixture is a pair: `line/empty` and `line/empty-message`, differing in exactly that
+field, which is what the collision sweep needs before it can name the member.
+
+**Not the frame, and that is the half the old comment earns.** An empty figure draws its ground and its
+message and **no axis**, because there is no range to label — which is the defect the `null` was
+protecting against, kept while the state it conflated is restored.
+
+---
+
 ## F362 — the caller's pin reaches one family's extent and not the other's, and SP9's first run is what asked ★★★★
 
 C12 I35's second half is *the caller's pin is what that axis is*. Measured on a boxplot with

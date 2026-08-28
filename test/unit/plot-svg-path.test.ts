@@ -887,6 +887,45 @@ describe("G6b — the two assertions containment could not make", () => {
  * never crosses. A `line` is claimed; a `line` **carrying candles** is a
  * different block that the same claim covers.
  */
+describe("G9 — an empty figure is a state, not a refusal", () => {
+  it("G9a (C12 I79, §3ak.45, F363): no data and no support draw the same document, and must not", () => {
+    // **The fixture before the fix** (F350's rule, and `x-linear`/`x-log`'s
+    // shape). `plotToSvg` ends `if (body.length === 0) return null`, so a block
+    // with nothing in it is indistinguishable from a form this arm does not
+    // draw at all — both are the corpus's refusal sentinel, in one 33-strong
+    // collision group.
+    //
+    // **The terminal draws neither**: it holds the declared height and centres
+    // `emptyMessage ?? "No data."` in the muted tone. F259 says a refusal is for
+    // a figure that *cannot* be drawn, and one with nothing in it can.
+    //
+    // **This row asserts the measured state and inverts when the fix lands.**
+    // Asserting the rule today would be red; asserting the defect without
+    // naming why would outlive it.
+    const empty = b.plot({ id: "e", form: "line", height: 5, axes: true, series: [{ values: [] }] });
+    const unsupported = b.plot({
+      id: "u", form: "violin", height: 8, axes: true,
+      series: [{ values: [1, 2, 3, 4, 5, 6, 7, 8] }],
+    } as unknown as Parameters<typeof b.plot>[0]);
+
+    expect(plotToSvg(unsupported, THEME), "the arm does not draw a violin").toBeNull();
+    expect(plotToSvg(empty, THEME),
+      "F363: a block with no data draws the same nothing, which is the defect this names")
+      .toBeNull();
+
+    // **And `emptyMessage` cannot have a reader while that is true**, which is
+    // why the corpus gained `line/empty-message` beside `line/empty`: a pair
+    // differing in one field is what a collision needs to name a member (C12 I75).
+    const messaged = b.plot({
+      id: "m", form: "line", height: 5, axes: true, series: [{ values: [] }],
+      emptyMessage: "Waiting for the first epoch\u2026",
+    } as unknown as Parameters<typeof b.plot>[0]);
+    expect(plotToSvg(messaged, THEME) === plotToSvg(empty, THEME),
+      "F363: and the two draw one document, so the member is unreadable here")
+      .toBe(true);
+  });
+});
+
 describe("G8 — a claimed form whose datum this path cannot read", () => {
   const OHLC = [
     { open: 10, high: 14, low: 8, close: 12 },
