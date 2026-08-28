@@ -7123,6 +7123,68 @@ closed, `autocorrelation` and `forest` opened, `line` went 8/78 to 12/78, and AD
 **A total that does not move is not evidence that nothing did**, which is the reusable half: comparing
 totals across an instrument change is the one comparison guaranteed to agree with itself.
 
+
+### 3ak.44 — the position axis crosses as a domain, because its budget is a width
+
+`Figure.positionAxis` is a boolean — *is the row drawn* — and it was the whole of what crossed. So the
+second arm's only abscissa was `block.xLabels`, three captions the caller supplied, and `xMin`, `xMax`,
+`xScale` and `xFormat` had **zero readers** in it. Six blocks differing only in those:
+
+```
+                 terminal                                    svg
+xScale unset     1  100  200  300 …  900 1000                1225 bytes
+xScale: "log"    1    5   10   20 …  500 1000                1225 bytes · IDENTICAL
+xFormat          1% 100% 200% 300% … 900%                    1225 bytes · IDENTICAL
+xMax: 500        1   50  100  150 …  450  500                1225 bytes · IDENTICAL
+```
+
+**Not drawn linearly — not drawn.** F355 said *logarithmically in the terminal and linearly here*, and
+the reason was wrong in the shape that keeps recurring: not wrong as stated, and concealing three more
+members than the one it named.
+
+#### A domain and not an axis, and the asymmetry with `value` is real
+
+`Figure.value` carries a niced `ValueAxis` because `axisOver` nices against `ticksFor(plotAreaRows(block))`
+— a count derived from `height`, which is a **block** field, so one call serves both arms. An abscissa's
+budget comes from the **width**, which no block carries and which §3aj hazard 3 keeps in cells.
+
+So what crosses is `{ range, scale, format }`, and each arm nices it with its own budget through
+`positionAxisAt(pos, maxTicks)` — **one derivation, the budget a parameter**, which is `valueAxisOf`'s
+own shape. The terminal passes `xTicksFor(areaWidth)` in cells; this arm passes a pixel span over its
+own pitch. A shared tick count would be a width crossing the seam.
+
+**`xTickRow` packs the axis and no longer derives it**, which is what makes byte-identity a property of
+the extraction: `axisFor`, `stepDecimals`, `formatValue` and `xPositionOf` moved out of it in one piece,
+and the terminal baseline compared 1840 frames with **0 moved**.
+
+#### Placed by `at`, because `normalisedOf` is not scale-aware
+
+`PositionAxis.at` is `xPositionOf` applied above the seam. An arm placing a log tick with `normalisedOf`
+would draw the label at the linear position and the sample beneath it at the log one — the half of F189
+the abscissa does *not* have, and the way to keep not having it is for the position to cross rather than
+the scale being applied twice.
+
+#### The grid's other half was never a decision
+
+`plotFrame: "grid"` crosses through `frameOf` and both arms draw it, and the pictures were not the same
+style: the terminal draws `┄` at every value tick **and `┊` at every position tick**, this arm drew five
+horizontal rules and no verticals. A comment in its own file said *both ways, and drawing one was half of
+what the style means*. The member was never missing — **the positions were**, so there was nothing to
+hang the other half on. It applies on the caption path too: `line/frame-grid` is three captions and a
+grid, and the terminal gives it three verticals.
+
+**A member can cross and still be drawn wrongly, because what it needs is a second member that did not**
+— and the member sweep is blind to that by construction, since it asks whether a member is read in both
+arms and `plotFrame` is.
+
+#### What moved
+
+55 documents gained an abscissa and **not one terminal frame moved**. `line/x-linear` and `line/x-log`
+leave the collision list, which is the fixture that was added to make the defect reportable doing exactly
+that, and AD14's `xScale` row inverts — it asserted *two blocks draw one document* and now asserts they
+do not.
+
+---
 ---
 ---
 ---
@@ -8383,6 +8445,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I75** — **Two blocks that draw different frames in one arm draw different documents in the other.** A block field the second arm does not read draws one picture for two figures, and that is the strongest agreement the disagreement record can report: same labels, same legend, same border, same count of everything. The observable form is a **collision** — byte-identical baselines whose blocks are not equal — and it is checked over the corpus with the catalogue's header line stripped, because the header names the variant and would make every terminal frame distinct by construction. *Measured before the rule, over 182 variants: the terminal draws 175 distinct frames and this arm draws 125. The empty document is 3 of the terminal's collisions and 32 of this arm's — a refused form and a form with no data both draw it, and both are correct. Past it, **4 and 25**, and the terminal's four are all also this arm's: a collision both arms have is a **fixture** defect, and three of those four are variants whose names state a claim their block does not make — `line/legend-right` sets no legend, `heatmap/palette` pins `colormap` to the heatmap's own default, `histogram/scott` bins identically to `sturges`. Twenty-one belong to this arm alone: `layout`, `yCallout`, `plotCorners`, `matrixAnchor`, `plotStyle` and a band's `fill`* (F342, F349, F350). **Stated blind spot**: a collision needs two variants differing in **one** field, so the sweep names a field only where the corpus isolates it — `aspect`, `axisCross`, `plotFill`, `plotBox`, `lower` and `upper` are each read by one arm and appear nowhere in it. A lower bound on the drop, an exact count of the pictures. **Checked at AD13, and the figures above are a probe's.** The invariant's subject is the corpus and its only citation was `FB7`, a row about `layout` whose assertions are rect widths — so 76 of 76 C12 invariants cited by a test file was a convention held by hand, and a citation satisfies it whatever the row does. Computed: **126 documents and 24 shares past the largest group**, not 125 and 25, and nothing drifted — `layout` crossed, which split `bar/stacked` from `bar/normalised`, the first pair in the list above. **A figure quoted from a probe is a snapshot of a corpus the fix then changed**, and the probe was deleted before staging, so there was no route back to it. **The check reads neither the catalogue nor the committed baselines**: `baselineFrames()` and `svgFrames()` are `name → bytes` in memory with no header, so the stripping clause above describes a hazard of a corpus the sweep does not read. **And it asserts the groups rather than the counts** — a count moves when a field starts crossing and moves the same amount when a variant is deleted, where a group names which member is dropped (F349, F357).
 - **I76** — **A label the shared layer declines to measure is contained by the arm that draws it, and a cut is at the tail and marked.** I63 puts the *room* above both arms and the outcome in each; this is the half that says the outcome is a **decision** and not a clipping rectangle. **A clip contains and does not communicate** — an `end`-anchored text grows leftward, so the rectangle that stops it removes the label's **head**, and a head cut is a different word where a tail cut is truncation. The rule has two axes and one shape: a label overflowing **along** its text direction is cut at the tail and marked; one overflowing **across** it is scaled to its box. *Measured before the rule: `boxplot/default` draws `petal_length` as `betal_length` in the second arm, beside a terminal frame naming all four rows in full — the gutter is a **tenth of the width** where the terminal's is `min(widest, width / 3)`, and the value labels on the same side had no clip at all, so a long one left the viewBox entirely. And `graph/crowded` writes fourteen labels at `SVG_FONT_SIZE` into ranks `275.2 / 14 = 9.83 px` tall, every glyph ascending into the rank above and descending into the one below* (F343, F345). **The premise this replaces named its own trigger**: §3ak.20 chose a tenth *because pixels overflow gracefully and cells do not*, and recorded that the day an instance appeared was the day to make the argument. What it forbids is untouched — `cells()` in a shared layout is still hazard 4, and an em estimate inside one arm is not shared, measures nothing in the other arm's units, and adds no member.
 - **I77** — **An output reader takes its alphabet from the renderer, and a control composed by hand cannot check that it did.** A reader over rendered text is an instrument whose subject is a vocabulary, so its fabricated violation has to be *rendered*: a hand-built fixture is written in the same sitting and under the same reading of the alphabet as the rule, which is A03 §2's note about SP1 arriving on a character class. *Measured before the rule, over 364 frames: `interiorRules` answered `> 0` on 15 and the frame held a `┄` or `┊` on 16, and **not one frame was in both** — every positive a figure glyph, every real rule missed, and `line/frame-grid` reporting zero over eight rows of gridlines. Its control asserted `├────────────┤` and `│    │    │ │`, neither of which this renderer draws* (F358, C12 §3ak.43). **Stated blind spot**: it says nothing about a reader whose alphabet is right and whose *predicate* is wrong, which is what F334 fixed and what this inherited. **And the check is a disposition count, not a total** — correcting this moved 28 of 328 pairs and left the disagreement count at 16, so a rule phrased over the total would have passed unchanged.
+- **I78** — **The position axis crosses as a domain — `{ range, scale, format }` — and each arm nices it with its own tick budget through one shared function.** `positionAxis` answers *is the row drawn* and says nothing about what is in it, which is why `xMin`, `xMax`, `xScale` and `xFormat` had no reader in the second arm at all. **A domain and not an axis, and the asymmetry with `value` is the budget**: a value axis nices against `ticksFor(plotAreaRows(block))`, a count derived from `height` and therefore a block fact, where an abscissa's comes from the width and stays in cells (§3aj hazard 3). So `positionAxisAt(pos, maxTicks)` is the single derivation and the budget is a parameter — `valueAxisOf`'s shape. **Ticks are placed by `at`**, which is `xPositionOf` above the seam: `normalisedOf` is not scale-aware, and an arm using it would put a log label at the linear position with the sample beneath it at the log one. *Measured before the rule: six blocks differing only in the abscissa drew six terminal frames and one 1225-byte document, and `plotFrame: "grid"` — a member that **does** cross — drew five horizontal rules and no verticals under a comment in its own file saying both ways* (F356, C12 §3ak.44). **Stated blind spot**: it says nothing about which *values* the domain should hold, so a slope chart's two positions still nice to `0.0 … 1.0` in both arms — consistent, and a question the seam does not ask.
 
 
 ## 8. Commitments
@@ -8464,6 +8527,7 @@ orientation — and belongs in the classification table as its own rows.
 75. **A seam member with two meanings is not a disagreement until an arm exists that has only the member** (I29, I62, I68, §3ak.42). `Drawn.seriesIndex` is documented as the colour slot and `roles.ts` uses it as the shape channel — *the figure says `point` twice and distinguishes them by `seriesIndex`* — which leaves a dumbbell's row with no colour to be named by. The terminal never noticed because it does not read the member for this form: it colours by row through `ROW_IS_AN_IDENTITY` and takes its two shapes from `pairedPoint` *beside* the record. **And the refusal that put it there counted roles rather than asking what the figure distinguishes** — *eight things where the figure says seven*, when the figure says eight and has said so in both arms all along. `meanOnMedian` stays beside the record on a reason the far end never had: it is one cell holding two marks, a composition rather than a shape (F344).
 76. **An invariant whose subject is a corpus is not checked by a row that cites it** (I75, §3ak.39). A03 pairs a commitment to an invariant and nothing pairs an invariant to a check, so *every C12 invariant is cited by some test file* — 76 of 76, measured — is a convention held by hand. I75 says the collision sweep *is checked over the corpus* and reports 175 frames, 125 documents, 4 and 25; its citation was `FB7`, whose subject is `layout` selecting a figure and whose assertions are rect widths and x offsets, and **nothing computed any of the five numbers**. This is the class already written down about findings — *the test is never does this mention it, it is would landing this close it* — arriving on invariants, where there is no gate to fool because the reading is done by a person. **The figures were a probe's and the probe was deleted before staging**, so the measurement was a count in prose with no route back, which is what a ruling looks like from outside (F349, F357).
 77. **A reader over rendered output owes a rendered control** (I77, §3ak.43). `interiorRules` and its subject were disjoint sets across 364 frames — 15 positives, all figure glyphs; 16 frames holding a real rule, all missed — because `RULE_ONLY` never had the dotted vocabulary this renderer draws in, and AD10 certified it with `├────────────┤` and `│    │    │ │`, which nothing draws. **F334's `> 2` is correct and could not have found it**: a blank row is two glyphs, and the third glyph, when one came, was the curve's. The correction moved 28 of 328 pairs, closed `boxplot`, `density` and `smallmultiples`, opened `autocorrelation` and `forest`, and left the disagreement total at 16 (F321, F334, F358).
+78. **A seam member that answers *whether* and not *what* leaves everything it gates on one side** (I67, I78, C12 §3ak.44). `Figure.positionAxis` is a boolean, so four block members — `xMin`, `xMax`, `xScale`, `xFormat` — had zero readers in the second arm and six blocks differing only in the abscissa drew one document. **The remedy is a domain rather than an axis, because the budget is a width**: `height` is a block field so `value` can carry niced ticks, and no block carries a width, so `positionAxisAt` takes the budget as a parameter and each arm brings its own. `xTickRow` packs what it used to derive, and 1840 terminal frames compared with 0 moved. **And a member that crosses can still be drawn wrongly for want of one that did not** — `plotFrame: "grid"` drew half a grid here until there were positions to hang the rest on (F356).
 
 ---
 
