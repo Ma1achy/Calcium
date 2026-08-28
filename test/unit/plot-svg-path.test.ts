@@ -887,6 +887,39 @@ describe("G6b — the two assertions containment could not make", () => {
  * never crosses. A `line` is claimed; a `line` **carrying candles** is a
  * different block that the same claim covers.
  */
+describe("G10 — a choice forced by cells", () => {
+  it("G10a (C12 I80, I46, §3ak.46, F365): `plotBox` decides a compact row and nothing here", () => {
+    // **The pair F355 could not build.** Both `plotFill` and `plotBox` were owed
+    // under one note — *every variant is a `violin`, which this arm refuses* —
+    // and `plotBox` is the **boxplot** form's: `definition.ts` reads it inside
+    // `boxplot:`, so a fixture was buildable all along and the corpus placement
+    // was an accident.
+    const box = (extra: Record<string, unknown>): Plot => vmBlock({
+      kind: "plot", id: "b", form: "boxplot", height: 4, axes: true,
+      categories: ["A", "B"], series: [],
+      quartiles: [
+        { min: 1, q1: 3, median: 5, q3: 7, max: 9 },
+        { min: 2, q1: 4, median: 6, q3: 8, max: 10 },
+      ],
+      ...extra,
+    } as unknown as Plot);
+
+    // **Byte-identical, and that is correct** (C12 I80). The terminal chooses
+    // because a one-row box has no top or bottom edge and its single row is
+    // spent on mass or on a stroke; the box here carries both — `fill-opacity`
+    // and `stroke-width` on one rect — so there is nothing to choose.
+    const solid = plotToSvg(box({ plotDetail: "compact", plotBox: "solid" }), THEME) ?? "";
+    const line = plotToSvg(box({ plotDetail: "compact", plotBox: "line" }), THEME) ?? "";
+    expect(solid, "the arm draws a compact boxplot").not.toBe("");
+    expect(solid === line, "and `plotBox` decides nothing here, which is legitimate").toBe(true);
+
+    // **The reason, asserted rather than stated**: one rect with mass *and*
+    // stroke. The day that stops being true the ruling is owed again.
+    expect(solid, "the IQR box carries a fill").toContain("fill-opacity=");
+    expect(solid, "and a stroke, in the same rect").toMatch(/fill-opacity="[^"]*" stroke="[^"]*" stroke-width=/u);
+  });
+});
+
 describe("G9 — an empty figure is a state, not a refusal", () => {
   it("G9a (C12 I79, §3ak.45, F363): no data and no support draw the same document, and must not", () => {
     // **The fixture before the fix** (F350's rule, and `x-linear`/`x-log`'s

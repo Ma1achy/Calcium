@@ -7216,6 +7216,51 @@ reaches — and while the whole state is a `null` there is nowhere for a reader 
 **pair**, `line/empty` against `line/empty-message`, differing in exactly that field, which is what I75
 needs before a collision can name a member.
 
+
+### 3ak.46 — a choice forced by cells has no counterpart where both answers fit
+
+F355 owed eleven members and paired two of them under one note — *every `plotFill` and `plotBox`
+variant is a `violin`, which this arm refuses*. True of the corpus, and it hid that the two are not
+alike.
+
+**`plotBox` is the `boxplot` form's.** `definition.ts` reads it at four sites, two inside `boxplot:` and
+two inside `violin:` where a violin whose rung has no density degrades to a box. A `boxplot` fixture was
+buildable all along; the corpus placement was an accident, not a dependency.
+
+```
+plotDetail: "compact"      solid   ├────────────┤███████████│████████████├───────────┤
+                           line    ├────────────┤━━━━━━━━━━━│━━━━━━━━━━━━├───────────┤
+default detail             identical
+```
+
+**Which is the whole of what it means.** At `compact` a box is **one row** and has no top or bottom
+edge, so its single row of cells is spent either on mass or on a stroke heavier than the whisker — I46,
+and the frames agree. At the default detail the box has edges and the member decides nothing.
+
+#### So it is `legitimate`, and the reason is in this arm's own output
+
+The IQR box here is `fill="#e69f00" fill-opacity="0.35" stroke="#e69f00" stroke-width="1.5"` — it
+carries **mass and stroke in the same rect**. The terminal chooses because one cell row can only be
+spent once; a pixel box has both, so there is nothing to choose, and the two documents being
+byte-identical is correct rather than a dropped field.
+
+**A second kind of `legitimate`, and worth naming apart from the first.** F355's four — `height`,
+`width`, `aspect`, `align` — are legitimate because each **is** a quantity in cells. This one is not a
+quantity at all: it is a **choice forced by** cells, and it disappears where the constraint does. The
+first kind is found by asking *what unit is this in*; the second only by asking *why does a choice exist
+here at all*.
+
+#### `plotFill` is a dependency, not a decision
+
+All four of its sites are inside the `violin:` entry, on the braille arm. It chooses whether a density
+outline is filled — and a pixel density curve can be filled or stroked too, so unlike `plotBox` it has a
+meaning here. It has nowhere to be read until `violin` draws.
+
+**Recorded as a stated dependency** — *this member cannot be measured until `violin` draws* — with the
+blocker named as a form rather than as an owed ruling. A member blocked on a form is not the same
+remainder as a member nobody has decided, and a list that mixes them reports the wrong amount of work.
+
+---
 ---
 ---
 ---
@@ -8480,6 +8525,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I77** — **An output reader takes its alphabet from the renderer, and a control composed by hand cannot check that it did.** A reader over rendered text is an instrument whose subject is a vocabulary, so its fabricated violation has to be *rendered*: a hand-built fixture is written in the same sitting and under the same reading of the alphabet as the rule, which is A03 §2's note about SP1 arriving on a character class. *Measured before the rule, over 364 frames: `interiorRules` answered `> 0` on 15 and the frame held a `┄` or `┊` on 16, and **not one frame was in both** — every positive a figure glyph, every real rule missed, and `line/frame-grid` reporting zero over eight rows of gridlines. Its control asserted `├────────────┤` and `│    │    │ │`, neither of which this renderer draws* (F358, C12 §3ak.43). **Stated blind spot**: it says nothing about a reader whose alphabet is right and whose *predicate* is wrong, which is what F334 fixed and what this inherited. **And the check is a disposition count, not a total** — correcting this moved 28 of 328 pairs and left the disagreement count at 16, so a rule phrased over the total would have passed unchanged.
 - **I78** — **The position axis crosses as a domain — `{ range, scale, format }` — and each arm nices it with its own tick budget through one shared function.** `positionAxis` answers *is the row drawn* and says nothing about what is in it, which is why `xMin`, `xMax`, `xScale` and `xFormat` had no reader in the second arm at all. **A domain and not an axis, and the asymmetry with `value` is the budget**: a value axis nices against `ticksFor(plotAreaRows(block))`, a count derived from `height` and therefore a block fact, where an abscissa's comes from the width and stays in cells (§3aj hazard 3). So `positionAxisAt(pos, maxTicks)` is the single derivation and the budget is a parameter — `valueAxisOf`'s shape. **Ticks are placed by `at`**, which is `xPositionOf` above the seam: `normalisedOf` is not scale-aware, and an arm using it would put a log label at the linear position with the sample beneath it at the log one. *Measured before the rule: six blocks differing only in the abscissa drew six terminal frames and one 1225-byte document, and `plotFrame: "grid"` — a member that **does** cross — drew five horizontal rules and no verticals under a comment in its own file saying both ways* (F356, C12 §3ak.44). **Stated blind spot**: it says nothing about which *values* the domain should hold, so a slope chart's two positions still nice to `0.0 … 1.0` in both arms — consistent, and a question the seam does not ask.
 - **I79** — **A figure with nothing in it is drawn; a refusal is for a figure that cannot be drawn.** The second arm returned `null` when a figure emitted no marks, so a block with no data and a form the arm does not support produced one document and a consumer could not tell *not yet* from *not supported*. **An empty figure draws its ground and its message and no axis** — there is no range, so ticks, gridlines and a frame would each imply one, which is the false-axis defect the `null` was protecting against and is kept. `emptyMessage` is the message, defaulted to `No data.` in both arms. *Measured before the rule: `line/empty` and `violin/default` were byte-identical, in the corpus's 33-strong refusal group, while the terminal held the declared height and centred `No data.` in the muted tone* (F259, F363, C12 §3ak.45). **Stated blind spot**: it says nothing about a figure whose marks are empty because the *data* is degenerate rather than absent — a series of all-`null` reaches the same branch, and the two are one state here.
+- **I80** — **A member that resolves a competition for one cell is legitimate where both answers fit at once.** `plotBox` chooses how a **one-row** box spends its single row — on mass, or on a stroke heavier than the whisker — because at `plotDetail: "compact"` the box has no top or bottom edge to carry the range (I46). At the default detail it decides nothing, and in the second arm it decides nothing either: the IQR box there is `fill-opacity="0.35"` **and** `stroke-width="1.5"` in one rect, so it carries both. *Measured before the rule: `boxplot/compact-box-solid` and `boxplot/compact-box-line` draw `███` against `━━━` in the terminal and byte-identical documents here* (F365, C12 §3ak.46). **A second kind of `legitimate`**: F355's four are legitimate because each **is** a quantity in cells; this is a **choice forced by** cells, found by asking why a choice exists rather than what unit it is in. **Stated blind spot**: it says nothing about a member that is blocked rather than legitimate — `plotFill` chooses fill against outline for a density, which a pixel curve can also do, and it has nowhere to be read until `violin` draws. That is a dependency, and a remainder that mixes the two reports the wrong amount of work.
 
 
 ## 8. Commitments
@@ -8563,6 +8609,7 @@ orientation — and belongs in the classification table as its own rows.
 77. **A reader over rendered output owes a rendered control** (I77, §3ak.43). `interiorRules` and its subject were disjoint sets across 364 frames — 15 positives, all figure glyphs; 16 frames holding a real rule, all missed — because `RULE_ONLY` never had the dotted vocabulary this renderer draws in, and AD10 certified it with `├────────────┤` and `│    │    │ │`, which nothing draws. **F334's `> 2` is correct and could not have found it**: a blank row is two glyphs, and the third glyph, when one came, was the curve's. The correction moved 28 of 328 pairs, closed `boxplot`, `density` and `smallmultiples`, opened `autocorrelation` and `forest`, and left the disagreement total at 16 (F321, F334, F358).
 78. **A seam member that answers *whether* and not *what* leaves everything it gates on one side** (I67, I78, C12 §3ak.44). `Figure.positionAxis` is a boolean, so four block members — `xMin`, `xMax`, `xScale`, `xFormat` — had zero readers in the second arm and six blocks differing only in the abscissa drew one document. **The remedy is a domain rather than an axis, because the budget is a width**: `height` is a block field so `value` can carry niced ticks, and no block carries a width, so `positionAxisAt` takes the budget as a parameter and each arm brings its own. `xTickRow` packs what it used to derive, and 1840 terminal frames compared with 0 moved. **And a member that crosses can still be drawn wrongly for want of one that did not** — `plotFrame: "grid"` drew half a grid here until there were positions to hang the rest on (F356).
 79. **A remedy that removes a state is not a fix for a wrong value in it** (I79, C12 §3ak.45). The second arm's `return null` on an empty figure was written against a real defect — *five gridlines labelled 0 to 1 over an empty box, a plot of a range the block never had* — and it fixed the false axis by deleting the difference between *no data* and *not supported*, which F259 says are the two things a refusal must keep apart. `line/empty` and `violin/default` were byte-identical. **The half the comment earns is kept**: an empty figure draws no axis, because there is no range for one to be about. And `emptyMessage` could not have crossed first — a member with no corpus instance has nowhere to be read while the whole state is a `null` (F259, F355, F363).
+80. **A remainder that does not separate *undecided* from *blocked* reports the wrong amount of work** (I80, C12 §3ak.46). F355 owed eleven members and paired `plotFill` with `plotBox` under one note — *every variant is a `violin`, which this arm refuses*. `plotBox` is the **boxplot** form's, read at two sites inside `boxplot:`, so a fixture was buildable all along and the corpus placement was an accident; built, it is **legitimate**, because a one-row box spends its single row on mass or on a stroke and a pixel box carries both in one rect. `plotFill` is violin-only and *does* have a meaning here — a pixel density can be filled or stroked — so it is **blocked on a form**, which is a dependency and not a decision anybody owes (F355, F365).
 
 ---
 

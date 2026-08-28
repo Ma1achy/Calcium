@@ -161,7 +161,7 @@ const MEASURED = {
   "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "bar": { silent: "0/14", "numericLabels": "10/14", "identityLabels": "4/14", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
-  "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "boxplot": { silent: "0/12", "numericLabels": "10/12", "identityLabels": "1/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   //  closed with F326: its two categories are `1` and `2`,
   // numerals that the clip-path rule filed as names on one side only.
@@ -800,8 +800,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
     const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
 
-    expect(corpus.size, "variants in the corpus").toBe(185); // cells-ok — a variant count
-    expect(t.distinct, "distinct terminal frames").toBe(178); // cells-ok — a frame count
+    expect(corpus.size, "variants in the corpus").toBe(186); // cells-ok — a variant count
+    expect(t.distinct, "distinct terminal frames").toBe(179); // cells-ok — a frame count
     expect(s.distinct, "distinct documents").toBe(130); // cells-ok — a frame count
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
@@ -834,6 +834,13 @@ describe("AD — the two arms decide separately, and here is where", () => {
       ["line/callout-last", "line/callout-name", "line/callout-both"],
       ["pie/solid", "pie/default-40", "pie/narrow-20"],
       ["quiver/default", "quiver/ink-contrast", "quiver/dim-floor"],
+      // **A legitimate collision with a measured reason** (C12 I80, §3ak.46). A
+      // one-row box spends its single row on mass or on a stroke; the box here
+      // is `fill-opacity` **and** `stroke-width` on one rect, so `plotBox` has
+      // nothing to choose. `compact-box-solid` is absent because it was one —
+      // `plotBox` defaults to `"solid"`, so it was byte-identical to `compact`
+      // in **both** arms, which is a fixture defect and not a dropped field.
+      ["boxplot/compact", "boxplot/compact-box-line"],
       ["calendar/day", "calendar/day-stretch"],
       ["heatmap/default", "heatmap/palette"],
       ["histogram/default", "histogram/scott"],

@@ -659,6 +659,31 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ],
       series: [],
     },
+    // C12 I46, I80, §3ak.46, F365 — **paired with `compact` above, whose box is
+    // solid by default.** A `compact-box-solid` variant was written first and
+    // the collision sweep named it: byte-identical to `compact` in **both**
+    // arms, which F350 says is a fixture defect and not a dropped field — a name
+    // stating a claim its block does not make, `heatmap/palette`'s class, caught
+    // by the instrument on a fixture written by the hand that had just recorded
+    // the rule.
+    //
+    // **The field is a *rung* decision.** At `plotDetail: "compact"` a box is one row
+    // and has no top or bottom edge, so its interior carries the range: `solid`
+    // gives it mass, `line` a stroke heavier than the whisker. At the default
+    // detail the box has edges and `plotBox` changes nothing. **`plotBox`'s only
+    // corpus instances were on `violin`**, which the second arm refuses, so a
+    // member the *boxplot* form reads was invisible for a reason that had
+    // nothing to do with the member (F355).
+    "compact-box-line": {
+      form: "boxplot", height: 4, axes: true, plotDetail: "compact", plotBox: "line", categories: ["A", "B", "C", "D"],
+      quartiles: [
+        { min: 1, q1: 3, median: 5, q3: 7, max: 9 },
+        { min: 2, q1: 4, median: 6, q3: 8, max: 10, outliers: [12] },
+        { min: 0, q1: 2, median: 4, q3: 6, max: 8 },
+        { min: 3, q1: 5, median: 7, q3: 9, max: 11 },
+      ],
+      series: [],
+    },
     // **A rung with room to spare, which no fixture had** (C12 I28, T1.90).
     // `compact` above is four categories in four rows and `default` is four in
     // twelve — one row per band and three per band, and in both the figure

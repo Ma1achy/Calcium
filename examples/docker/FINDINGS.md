@@ -13642,6 +13642,50 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F365 — the pair splits: `plotBox` is legitimate for a measured reason, `plotFill` is blocked on a form this arm refuses ★★★★☆
+
+F355 put both in the owed eleven with one note — *every `plotFill` and `plotBox` variant is a `violin`,
+which this arm refuses, so a member with four corpus variants is invisible for a reason that has nothing
+to do with the member.* True of the corpus, and it hid that the two members are not alike.
+
+### `plotBox` is the **boxplot** form's, and its corpus instances being on `violin` was an accident
+
+`definition.ts` reads it at four sites: two inside `boxplot:` (2398, 2405) and two inside `violin:`
+where a violin whose rung has no density degrades to a box. **A `boxplot` fixture was buildable all
+along**, and `boxplot` is a form this arm draws.
+
+Built — `boxplot/compact-box-solid` against `boxplot/compact-box-line`, differing in exactly that field:
+
+```
+solid   A ┤      ├────────────┤███████████│████████████├───────────┤
+line    A ┤      ├────────────┤━━━━━━━━━━━│━━━━━━━━━━━━├───────────┤
+```
+
+**And at the default detail it changes nothing**, which is the whole of what it means: at
+`plotDetail: "compact"` a box is **one row** and has no top or bottom edge, so its single row of cells
+is spent either on mass or on a stroke heavier than the whisker. C12 I46 says so and the frames agree.
+
+**So it is `legitimate`, and the reason is measured rather than asserted.** This arm's IQR box is
+`fill="#e69f00" fill-opacity="0.35" stroke="#e69f00" stroke-width="1.5"` — **it carries mass and stroke
+in the same rect**. The terminal chooses because one cell row can only be spent once; a pixel box has
+both, so there is nothing to choose. The two documents being byte-identical is correct.
+
+**A second kind of `legitimate`.** F355's four — `height`, `width`, `aspect`, `align` — are legitimate
+because each *is* a quantity in cells. This one is not a quantity at all: it is a **choice forced by**
+cells, and it disappears where the constraint does.
+
+### `plotFill` is violin-only, and that is a dependency rather than a decision
+
+All four sites are inside the `violin:` entry, on the braille arm — `brailleArm, block.plotFill ===
+"solid"`. It chooses whether a density outline is filled, and **a pixel density curve can be filled or
+stroked too**, so unlike `plotBox` it has a meaning here. It simply has nowhere to be read until
+`violin` draws.
+
+**Recorded as a stated dependency**: *this member cannot be measured until `violin` draws*. Not owed,
+not legitimate — blocked, with the blocker named as a form rather than as a decision.
+
+---
+
 ## F364 — every caller-supplied string reaches the ASCII frame unchanged, and I54 is clean because the corpus has none ★★★★☆
 
 C12 I54: *every frame at `unicode: "ascii"` is ASCII*. AA1 renders the whole corpus at that rung and
