@@ -898,6 +898,46 @@ const TERM_CAPS = {
   bracketedPaste: true, mouse: true, imageProtocol: "none", altScreen: true,
 } as const;
 
+describe("G12 — the last two of the eleven", () => {
+  const straddle = (extra: Record<string, unknown>): Plot => vmBlock({
+    kind: "plot", id: "x", form: "line", height: 10, axes: true, xMin: -6, xMax: 6,
+    series: [{ label: "obs", values: [-4, -1, 2, 6, 3, -2, -5, 1, 5, 2, -3, -1, 4] }],
+    ...extra,
+  } as unknown as Plot);
+
+  it("G12a (C12 I82, §3ak.48, F370): the caption's words cross and the room does not", () => {
+    const bare = plotToSvg(straddle({ xLabels: ["a", "b", "c"] }), THEME) ?? "";
+    const titled = plotToSvg(straddle({ xLabels: ["a", "b", "c"], xTitle: "seconds" }), THEME) ?? "";
+    expect(bare === titled, "`line/x-title` and `line/x-captions` drew one document").toBe(false);
+    expect(titled, "the caption is drawn").toContain(">seconds<");
+    expect(curveFigure(straddle({ xTitle: "seconds" })).title, "the words are the figure's").toBe("seconds");
+    expect(curveFigure(straddle({})).title, "and `null` where there is none").toBeNull();
+  });
+
+  it("G12b (C12 I82, §3ad, F370): `cross` says whether, and a domain that does not straddle has none", () => {
+    // **The member says *whether*** — `zeroAt` and `normalisedOf(0)` are each
+    // arm's own arithmetic — and only a domain that **strictly** straddles zero
+    // has a crossing to draw (§3ad A4).
+    const edge = plotToSvg(straddle({}), THEME) ?? "";
+    const zero = plotToSvg(straddle({ axisCross: "zero" }), THEME) ?? "";
+    expect(edge === zero, "all three `axisCross` values drew one document").toBe(false);
+    expect((zero.match(/<line /gu) ?? []).length - (edge.match(/<line /gu) ?? []).length,
+      "two rules arrive: one down the abscissa's zero and one across the ordinate's")
+      .toBe(2); // cells-ok — an element count
+
+    // **An index domain has no crossing**, which is the clause `zeroAt` carries:
+    // sample 0 is its own left edge, and a rule there abuts the gutter.
+    const indexed = vmBlock({
+      kind: "plot", id: "i", form: "line", height: 8, axes: true, axisCross: "zero",
+      series: [{ values: [1, 2, 3, 4] }],
+    } as unknown as Plot);
+    expect(curveFigure(indexed).cross, "the member is still set").toBe(true);
+    expect((plotToSvg(indexed, THEME) ?? "").match(/<line /gu)?.length ?? 0,
+      "and no crossing rule is drawn, because 0 … 3 does not straddle zero")
+      .toBe(4); // cells-ok — the box's four edges
+  });
+});
+
 describe("G11 — a callout is a name at the line's end", () => {
   it("G11a (C12 I81, I48, §3ak.47, F368): the three callout modes draw three documents, and two remove the legend", () => {
     // **The collision F349 reported and nobody read.** `line/callout-last`,

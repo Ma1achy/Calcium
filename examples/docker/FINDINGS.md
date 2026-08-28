@@ -13642,6 +13642,68 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F369 — `svg=0` measured which members `svg.ts` *names*, and two of the eleven had crossed a year ago ★★★★★
+
+Every ruling in this arc opened with the same reader map: how many times does each member appear in
+`svg.ts`, in `figure.ts`, in the terminal's files. Eleven members came back `svg=0` and the answer was
+read as *the second arm does not read it*.
+
+**It measures which members the file names.** A member that reaches the arm through a shared
+`Plot → Plot` transform is never written there — and `calendarUnit` and `startDate` are exactly that.
+`svg.ts` calls `drawnBlock`, `drawnBlock` routes `calendar` to `calendarRows`, and **F322 moved that
+transform out of a terminal renderer**. Measured directly rather than by grep, one series and five
+blocks:
+
+```
+no unit            9 811 b
+calendarUnit: day 11 621 b
+week              10 933 b
+hour              14 939 b
+day, startDate +4 11 609 b
+```
+
+**Five distinct documents.** Both members have crossed since F322, and the arc counted them as owed for
+six commits.
+
+**The same measurement, run on the other two, holds.** `axisCross` at `unset`, `"zero"` and `"edge"`
+draws one document; `xTitle` unset, `"seconds"` and `"minutes"` draws one. So the remainder is **two**,
+not four.
+
+**The lesson is about the instrument, not the members.** A file-level count answers *is this name
+written here*, and the question was *does this arm read it* — which only a rendered comparison answers.
+F355's member sweep has the same shape and the same blind spot: it reads the type against the files. **A
+grep over names cannot see a value that arrives through a transform**, and a transform is exactly what
+this pass has been building for eleven commits.
+
+---
+
+## F370 — the last two fixtures, and the sweep ran on them before either member was touched ★★★☆☆
+
+`xTitle` and `axisCross` are the two members of F355's eleven that are genuinely owed. Both have corpus
+instances and neither is isolated: `line/x-title` sets `xLabels` beside the title, `line/axis-cross`
+sets `xMin`/`xMax` beside the crossing.
+
+**Two variants, each named for what its block sets** — F350's rule, which the sweep has already caught
+this arc breaking once on `compact-box-solid`:
+
+| variant | its claim |
+|---|---|
+| `line/x-captions` | three captions on the abscissa, and no title over them |
+| `line/straddle-zero` | both axes straddle zero and the rules stay at the edge |
+
+**The sweep run before the members were touched, which is the whole point of the order:**
+
+```
+line/x-title      == line/x-captions      one document
+line/axis-cross   == line/straddle-zero   one document
+terminal                                  four distinct frames
+```
+
+Two collisions, reported by the instrument rather than by inspection, and they leave the list when the
+members cross.
+
+---
+
 ## F368 — the second arm drew the legend the terminal removes, and did it identically for all three callout variants ★★★★★
 
 `yCallout` writes a name or a reading at the line's end. The terminal has done it since §3ag:

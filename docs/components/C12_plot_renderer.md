@@ -7329,6 +7329,59 @@ legend's question; `"last"` still does not, and keeps its legend.
 
 **1840 terminal frames, 0 moved**, which is what makes it an extraction rather than a second derivation.
 
+
+### 3ak.48 — the reader map counted names, and two of the eleven had crossed already
+
+Every ruling in this pass opened with the same measure: how many times does a member appear in
+`svg.ts`. Eleven came back `svg=0` and it was read as *the second arm does not read it*.
+
+**It counts which members the file names.** A member reaching the arm through a shared `Plot → Plot`
+transform is never written there — and `calendarUnit` and `startDate` are exactly that. `svg.ts` calls
+`drawnBlock`, `drawnBlock` routes `calendar` to `calendarRows`, and **F322 moved that transform out of a
+terminal renderer**. Rendered rather than grepped, one series and five blocks:
+
+```
+no unit             9 811 b
+calendarUnit: day  11 621 b
+week               10 933 b
+hour               14 939 b
+day, startDate +4  11 609 b
+```
+
+Five distinct documents. Both crossed a year ago and this pass counted them owed for six commits.
+
+**Run on the other two it holds**: `axisCross` at `unset`/`"zero"`/`"edge"` draws one document, `xTitle`
+at `unset`/`"seconds"`/`"minutes"` draws one. So the remainder was **two**.
+
+#### What the last two carry, and what stays behind
+
+- **`title`** — the words and not the row. The terminal spends a row on the caption and this arm spends
+  pixels below the position row; the string is what must not be decided twice.
+- **`cross`** — *whether*, and not where. `positionAxisAt`'s `zeroAt` answers the abscissa and
+  `normalisedOf(0)` the ordinate, each in its own units, and only a domain that **strictly** straddles
+  zero has a crossing at all (§3ad A4). Forwarding `axisCross` itself would make the second arm
+  re-derive *which of these values means cross*, which is the second copy this section exists to stop.
+
+#### The fixtures ran through the sweep before either member was touched
+
+Neither was isolated by the corpus: `line/x-title` sets `xLabels` beside the title, `line/axis-cross`
+sets `xMin`/`xMax` beside the crossing. So `line/x-captions` and `line/straddle-zero`, each **named for
+what its block sets** — F350's rule, which this pass has already been caught breaking once on
+`compact-box-solid` — and the sweep run first:
+
+```
+before   line/x-title == line/x-captions       one document
+         line/axis-cross == line/straddle-zero one document
+         terminal                              four distinct frames
+after    both pairs distinct
+```
+
+**The lesson is the instrument's.** A file-level count answers *is this name written here* and the
+question was *does this arm read it*, which only a rendered comparison answers. F355's member sweep has
+the same shape and the same blind spot — it reads the type against the files — and **a grep over names
+cannot see a value that arrives through a transform**, which is what this whole pass has been building.
+
+---
 ---
 ---
 ---
@@ -8597,6 +8650,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I79** — **A figure with nothing in it is drawn; a refusal is for a figure that cannot be drawn.** The second arm returned `null` when a figure emitted no marks, so a block with no data and a form the arm does not support produced one document and a consumer could not tell *not yet* from *not supported*. **An empty figure draws its ground and its message and no axis** — there is no range, so ticks, gridlines and a frame would each imply one, which is the false-axis defect the `null` was protecting against and is kept. `emptyMessage` is the message, defaulted to `No data.` in both arms. *Measured before the rule: `line/empty` and `violin/default` were byte-identical, in the corpus's 33-strong refusal group, while the terminal held the declared height and centred `No data.` in the muted tone* (F259, F363, C12 §3ak.45). **Stated blind spot**: it says nothing about a figure whose marks are empty because the *data* is degenerate rather than absent — a series of all-`null` reaches the same branch, and the two are one state here.
 - **I80** — **A member that resolves a competition for one cell is legitimate where both answers fit at once.** `plotBox` chooses how a **one-row** box spends its single row — on mass, or on a stroke heavier than the whisker — because at `plotDetail: "compact"` the box has no top or bottom edge to carry the range (I46). At the default detail it decides nothing, and in the second arm it decides nothing either: the IQR box there is `fill-opacity="0.35"` **and** `stroke-width="1.5"` in one rect, so it carries both. *Measured before the rule: `boxplot/compact-box-solid` and `boxplot/compact-box-line` draw `███` against `━━━` in the terminal and byte-identical documents here* (F365, C12 §3ak.46). **A second kind of `legitimate`**: F355's four are legitimate because each **is** a quantity in cells; this is a **choice forced by** cells, found by asking why a choice exists rather than what unit it is in. **Stated blind spot**: it says nothing about a member that is blocked rather than legitimate — `plotFill` chooses fill against outline for a density, which a pixel curve can also do, and it has nowhere to be read until `violin` draws. That is a dependency, and a remainder that mixes the two reports the wrong amount of work.
 - **I81** — **What a callout says crosses; the rung that degrades it and the row it lands on do not.** `yCallout` writes a name or a reading at each series' end, and the second arm read none of it — it drew a legend instead, the *same* legend for all three callout variants. **And the legend clause was in one resolver and not the crossed one**: `legendPlacement` has carried *a name at the line's end **is** the legend* since §3ag and `legendOf` had not, so this arm drew a legend the terminal removes and would have drawn it beside the callouts — the identity three times. I48's sentence **selects** rather than excludes, which is what lets one clause serve both. **Three things were in one function and one of them crosses**: the strings (`calloutOf`), the capability rung (below the colour floor the family stacks into labelled strips, so a name there is a third copy — applied *over* the strings), and the anchor (`lastInkRow` in cells, the last point of the last polyline here — the same question in two units, as I78 said one member earlier). *Measured before the rule: `line/callout-last`, `callout-name` and `callout-both` drew one document; the terminal draws three, and moving the strings moved 0 of 1840 terminal frames* (F349, F368, C12 §3ak.47). **Stated blind spot**: it says nothing about *where* a callout may go when two series end on the same row — the terminal has a collision rule and this arm stacks text at the same y, which no corpus variant exercises.
+- **I82** — **A member crosses as what must not be decided twice, and each arm keeps the room and the arithmetic.** `xTitle` crosses as the *words* — the terminal spends a row on the caption and the second arm spends pixels — and `axisCross` as *whether the rules cross*, because `positionAxisAt`'s `zeroAt` and `normalisedOf(0)` are the same question in two units and only a domain **strictly** straddling zero has a crossing (§3ad A4). Forwarding `axisCross` itself would make the second arm re-derive which of its values means cross. *Measured before the rule: `line/x-title` and `line/x-captions` drew one document, and `axisCross` at `unset`, `"zero"` and `"edge"` drew one* (F369, F370, C12 §3ak.48). **Stated blind spot**: the reader map that found these counted **names in `svg.ts`**, not values reaching the arm — `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` and were counted owed for six commits, because a grep over names cannot see a value arriving through a transform.
 
 
 ## 8. Commitments
@@ -8682,6 +8736,7 @@ orientation — and belongs in the classification table as its own rows.
 79. **A remedy that removes a state is not a fix for a wrong value in it** (I79, C12 §3ak.45). The second arm's `return null` on an empty figure was written against a real defect — *five gridlines labelled 0 to 1 over an empty box, a plot of a range the block never had* — and it fixed the false axis by deleting the difference between *no data* and *not supported*, which F259 says are the two things a refusal must keep apart. `line/empty` and `violin/default` were byte-identical. **The half the comment earns is kept**: an empty figure draws no axis, because there is no range for one to be about. And `emptyMessage` could not have crossed first — a member with no corpus instance has nowhere to be read while the whole state is a `null` (F259, F355, F363).
 80. **A remainder that does not separate *undecided* from *blocked* reports the wrong amount of work** (I80, C12 §3ak.46). F355 owed eleven members and paired `plotFill` with `plotBox` under one note — *every variant is a `violin`, which this arm refuses*. `plotBox` is the **boxplot** form's, read at two sites inside `boxplot:`, so a fixture was buildable all along and the corpus placement was an accident; built, it is **legitimate**, because a one-row box spends its single row on mass or on a stroke and a pixel box carries both in one rect. `plotFill` is violin-only and *does* have a meaning here — a pixel density can be filled or stroked — so it is **blocked on a form**, which is a dependency and not a decision anybody owes (F355, F365).
 81. **A rule written into one resolver and not the crossed one draws the picture the other arm removes** (I48, I55, I81, C12 §3ak.47). `legendPlacement` has held *a name at the line's end **is** the legend* since §3ag; `legendOf` never did, so the second arm drew `alpha` and `beta` in a legend the terminal deliberately removes — identically for all three callout variants, which is what a member with no reader looks like from outside. **Only the strings cross**: the capability rung stays where the capability is, and the anchor is each arm's own, a cell row against a pixel y. 1840 terminal frames moved 0, which is what separates an extraction from a second derivation (F349, F368).
+82. **A reader map counts names and a rendered comparison counts readers** (I82, C12 §3ak.48). Eleven members came back `svg=0` and it was read as *the arm does not read it*; `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` → `calendarRows`, and five blocks differing only in them draw **five distinct documents**. F355's member sweep shares the blind spot, reading the type against the files. The genuinely owed two cross as **what must not be decided twice** — the caption's words, and *whether* the rules cross — with the room and the arithmetic staying in each arm, and their fixtures went through the collision sweep **before** either member was touched (F322, F369, F370).
 
 ---
 
