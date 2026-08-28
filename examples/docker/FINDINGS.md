@@ -13642,6 +13642,46 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F361 — F357's own figure was an unsound match, and the class it was arguing about is 86 of 768 ★★★★★
+
+F357 said *every C12 invariant is cited by some test file — 76 of 76, measured*, and used that to argue
+the convention was held by hand. **The measurement was `\bI75\b` against the test corpus**, which
+matches any of twenty-six specs' I75. Three C12 invariants had no citation at all when it was written —
+**I32, I35, I69** — and the matcher reported full coverage.
+
+**Fourth manufactured number in this arc, and the worst placed**: it is the figure a finding about
+unmeasured claims used to make its case.
+
+**Attribution is the whole difficulty, and it took four attempts.** A bare `I59` belongs to whichever
+spec owns the file it sits in, and `ownerOf` attributes **6 of 2342** test files to C12 — so in the
+other 2336 a citation must be qualified, which is what SP3 already enforces. The sound reading is the
+repo's own: SP3's `TOKENS` walks a line letting a spec id govern every invariant after it, because the
+corpus cites in run-on lists — `C04 I10, I11, I25`.
+
+**Two sound-enough matchers, one total, different members.** A per-invariant regex and SP3's run-on
+walk both answer **86 of 768**; C01 gains I15, C04 swaps I26 for I33, C15 empties, C12 drops from five
+to three. **The total is not the evidence — the list is**, which is F358's lesson arriving on the
+instrument built to measure F357.
+
+| | uncited | of |
+|---|---|---|
+| C24 | 14 | 28 |
+| C26 | 8 | 20 |
+| C04 | 8 | 74 |
+| C23 · C25 · C14 | 6 each | 52 · 21 · 22 |
+| C12 | 3 | 78 |
+
+**So it is a class: 11% of the invariants in the repository are named by no test row.** The rule is
+SP9, and it lands with an exemption list compared **by equality** — `anchors.mjs`' shape, so the 86 can
+only shrink and an eighty-seventh fails the build the day it is written.
+
+**What SP9 cannot do is F357's actual finding.** It checks an invariant is *named*, never that it is
+*checked* — I75's citation was `FB7`, a row about `layout` asserting rect widths, and SP9 would have
+called that covered. `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says why that half is not
+automatable, and the honest position is a gate on the half that is plus the blind spot written down.
+
+---
+
 ## F360 — the x row's tokenisation assumes a spacing the renderer does not guarantee, and nineteen groups were already in that state ★★★★
 
 The terminal reader splits the x-label row on **two or more spaces**, which is what tells a run of
