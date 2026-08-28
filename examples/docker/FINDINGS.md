@@ -13642,6 +13642,106 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F351 — the stacking fold's rule for a negative reading exists in one of its two implementations, and the other crashes ★★★★☆
+
+```
+plot "p": form "bar", layout "stacked", series [[10, 20], [-4, 5]]
+  → ▲ plot failed to render: Invalid count value: -8
+```
+
+`stackBands` states the rule — `v === null || !Number.isFinite(v) ? 0 : Math.max(0, v)`, a null is a
+zero-width contribution and not a gap — and `stackedBarRow`, the terminal's own stacking walk, does
+`?? 0` and nothing else. A negative `fill` reaches `String.prototype.repeat` with a negative count,
+which throws `RangeError`; the block registry catches it and draws an ERROR panel, so the reader is
+told the plot failed rather than shown a wrong picture. Both `stacked` and `normalised`.
+
+**F329's class arriving as a crash rather than as a disagreement.** *A derivation with two
+implementations is checked by nothing, since the corpus that separates them is the corpus neither arm
+has* — and no corpus variant has a negative stacked reading, so nothing has ever run this path. Found
+by asking what the shared fold's rule was while giving the second arm a stack, which is the only
+reason the two were read side by side at all.
+
+**The clamp is extracted rather than copied**, so the rule is in one place and the rounding stays each
+arm's: `stackedBarRow`'s per-series `Math.round(v * scale)` and the figure's cumulative bounds round
+differently on purpose, and unifying *those* would move frames for no finding.
+
+---
+
+## F350 — three corpus variants named for a field their block does not vary ★★★★★
+
+The collision sweep's sharpest result is the four collisions **both** arms have, because none of them
+is about a renderer:
+
+| variants | what the name claims | what the block says |
+|---|---|---|
+| `line/legend-right` ≡ `line/multi-series` | a legend on the right | `legend` is **undefined**, and the two blocks are byte-identical JSON |
+| `heatmap/palette` | a colormap chosen | `colormap: "viridis"` — which is `rampOf`'s answer for `heatmap` already |
+| `histogram/default` ≡ `histogram/scott` | two binning strategies | `sturges` and `scott` produce the same bins for this data |
+| `slope/default` ≡ `slope/six-readings` | — | **legitimate**, and it is I74's proof: six readings whose first and last are the other's two must draw the same figure |
+
+**Three of the four assert nothing and every gate agreed with them.** A golden frame records what a
+fixture produced; nothing asks whether the fixture varies what its name says, and `heatmap/palette` is
+the one that stings — it sits under I72, the invariant about *which ramp a reading is on*, pinned to
+the default it would have had.
+
+**This is the fabricated-violation discipline pointed at a fixture.** A variant exists to separate one
+value of one field from another; if it draws the same frame as the variant it is separating from, it
+has no subject. Recorded rather than repaired here, because widening `heatmap/palette` to a
+non-default map and `line/legend-right` to an actual placement moves frames in both arms and wants its
+own commit.
+
+**And the fourth is why the rule cannot be *no two variants collide*.** `slope`'s pair is byte-identical
+*because the derivation crossed*, which is the outcome F332 was written to produce. A sweep that
+flagged it would be asking the corpus to falsify a rule the corpus was built to demonstrate.
+
+---
+
+## F349 — the terminal draws 175 distinct frames from 182 blocks and the second arm draws 125 ★★★★★
+
+The instrument F342 asks for, run over the whole corpus. Two baselines that are byte-identical while
+their blocks are not is a field one arm read and the other did not — and it is the one thing **no
+column of the disagreement record can report**, because it is maximal agreement.
+
+| | distinct documents | collisions | past the empty document |
+|---|---|---|---|
+| terminal, 24-bit | 175 of 182 | 7 | **4** |
+| SVG | 125 of 182 | 57 | **25** |
+
+**The header line had to be stripped first, and that is the instrument's own near-miss.** Every
+catalogue frame opens `── bar · stacked · 24bit · 80w`, which names the variant — so the first
+measurement reported *182 of 182 distinct* for the terminal and would have made the control vacuous
+while reading as the strongest possible result. Manufactured evidence in the shape of a perfect score.
+
+**A collision both arms have is a fixture defect; a collision one arm has is a seam defect.** The
+terminal's four are all also the SVG's, and all four are F350. Twenty-one belong to the second arm
+alone:
+
+| field | variants | disposition |
+|---|---|---|
+| `layout` | `bar/stacked · bar/normalised` | F342, closed |
+| `yCallout` | `line/callout-{both,last,name}` | owed a ruling — F346's list |
+| `plotCorners` | `line/corners-sharp` vs `line/default` | owed a ruling — F346's list |
+| `matrixAnchor` | `calendar/day-stretch` vs `calendar/day` | owed a ruling, **and F346 was wrong to call it a refusal** |
+| `annotations`' `fill` | `line/confidence{,-unfilled}` | open, recorded |
+| `plotStyle` | `contour/style-line`, `pie/solid` | owed a ruling |
+| `fieldDim`, `glyphInk` | `contour/*`, `quiver/*` | **ruled** — §3ak.26, per-cell remedies for a glyph sharing a quantum with its background |
+| `height` | `tree/overflow-*`, `horizon/folded-1x3`, `pie/*` | **legitimate** — a row count, and F318's `notice` |
+| `width`, `align` | `line/size-{left,centre,right}` | **legitimate** — the block's place in the document, not the plot's figure |
+| `cursor` | `line/cursor-candles` | the candles' refusal, recorded |
+
+**F346's `matrixAnchor` row does not resolve against the tree.** It said the member is *expressed as a
+refusal, which is F259 working*; `svg.ts` refuses exactly one thing, `origin`, at line 1317, and
+`calendar/day-stretch` draws a full document. The claim was written one session ago from the shape of
+the sweep rather than from the file, which is the sixth blind spot on a finding a week old. F346's
+dispositions cover 10 of its 16 members and the remaining six were never assigned one.
+
+**Stated blind spot.** A collision needs two variants differing in exactly **one** field, so the sweep
+names a field only where the corpus isolates it. `aspect`, `axisCross`, `plotFill`, `plotBox`, `lower`
+and `upper` are each read by one arm and appear nowhere above — not because they cross. It is a lower
+bound on the drop and an exact count of the pictures.
+
+---
+
 ## F348 — an arm-seam mutation planted in the shared layer moves both arms, so the seam's own rows cannot see it ★★★★☆
 
 The mutation written against F338 reverted `levelCaption` to `return ""`, and the pass reported
@@ -13712,6 +13812,14 @@ matrixAnchor yCallout width aspect align axisCross lower upper     … and layou
 a stroke over a fill shares none. `matrixAnchor` is **expressed as a refusal**, which is F259 working.
 The rest — `yCallout`, `aspect`, `align`, `axisCross`, `emptyMessage`, `layout` — are read by one arm
 with **no ruling anywhere**: `yCallout` has nine mentions in C12 and not one about whether it crosses.
+
+**Corrected by F349, one session later.** `matrixAnchor` is **not** expressed as a refusal — `svg.ts`
+refuses exactly one thing, `origin`, at line 1317, and `calendar/day-stretch` draws a full document
+whose bytes equal `calendar/day`'s. The disposition was written from the shape of the sweep rather
+than from the file, which is the sixth blind spot on a finding a week old. And the arithmetic does not
+close either: three ruled and six unruled account for **10 of 16**, so `kind`, `plotFill`, `plotBox`,
+`plotCorners`, `lower` and `upper` were never given one. `kind` is always `"plot"` and is trivially
+fine; the other five are owed.
 
 **`layout` is not in that list and should be**, which is the finding inside the finding. The first
 sweep matched `\.layout\b` and `svg.ts` has a *parameter* called `layout` — so the probe reported the
@@ -13802,6 +13910,10 @@ rather than a missing feature. `derive.ts:485` computes it for the derived histo
 *`overlap` cannot mean draw the first one, so more than one counted series is grouped unless the author
 asked for a stack* — and then no `Figure` member holds it and no consumer asks. The care is spent on
 one arm.
+
+**The instrument this asks for is F349**, run over all 182: the terminal draws 175 distinct frames
+and this arm 125, and past the empty document the collisions are **4 and 25**. `layout` is the first
+of twenty-one that belong to this arm alone.
 
 **Two byte-identical documents for two different figures is the signature**, and no column of the
 disagreement matrix can see it: both arms draw the same labels, the same legend, the same border, the

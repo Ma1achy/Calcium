@@ -6725,6 +6725,188 @@ made for a different reason** — no column of the record measures a swatch's fi
 because a colour that matches is what `svg-baseline` is for.
 
 ---
+
+### 3ak.39 — Two forms drawing one picture, and the instrument that counts them
+
+`bar/stacked` and `bar/normalised` differ in one block field and produce **the same bytes**:
+
+```
+test/golden/svg-baseline/bar-stacked.svg      ef00e027b0d2c0eb6e638834180670c9
+test/golden/svg-baseline/bar-normalised.svg   ef00e027b0d2c0eb6e638834180670c9
+```
+
+`layout: "overlap" | "grouped" | "stacked" | "normalised"` is read at `definition.ts:2265` and nowhere
+else in the renderer. The terminal draws three figures — bars side by side, bars cumulated, bars
+cumulated to a shared full width — and this arm draws grouped for all three. **A stacked bar is not a
+normalised bar**, and a reader given one for the other is misinformed rather than shown a different
+idiom.
+
+#### `layout` selects a figure, so it crosses as the marks and needs no member
+
+The seam's rule is *decisions cross, ink is each arm's*, and the question a new field asks is which of
+the two it is. `layout` changes **which marks exist** — four rects per category stacked end to end, or
+eight side by side — and it changes nothing about how a rect is inked. So it crosses as `Figure.marks`
+and `Figure` grows nothing. That is the cheapest possible answer and it is available only because the
+marks are in the figure's own normalised space; a member would have been needed had the arms been
+handed rectangles in cells and pixels.
+
+**And the fold is already across the seam.** `stackBands` was extracted for §3ak.33's cumulative three
+and takes a column count precisely so each arm can call it at its own resolution — pass the category
+count and its resampler is the identity, which is what `stackedFigure` does with the sample count.
+A stacked bar is a **fourth consumer**, not a fourth implementation, and the doc comment forty lines
+below `barFigure` says *one fold, three consumers* while sitting in the same file as the form that
+makes it four. **A count of consumers goes stale in the file that holds it.**
+
+**A category's total is the last band's upper bound**, so `normalised` needs no second walk either: it
+is the same bands divided by `bands[n − 1].upper[i]`, and its axis is the fraction `0 … 1`.
+
+#### The axis is the one thing that had to move as well as the marks
+
+I73's rule — *a form has a value axis only where one range carries every mark* — decides this, and the
+stacked figure's marks span the **totals**. Today the axis reads `0 10 20 30` from `seriesRange` over
+the individual values while `bar/stacked`'s tallest column is `25 + 12 = 37`, so a correctly stacked
+bar drawn against the current axis runs past the end of its own scale. `stackedFigure`'s precedent is
+followed exactly: `stackRange` pinned through `yMin`/`yMax` so an author's own bounds still win.
+
+**The terminal's fraction is unniced and stays that way.** `stackedBarRow` scales `w / totalMax` on the
+raw 37 where the figure takes the niced 40, which is the third range this family has carried since
+F272b and which `barFigure`'s own header already records: the horizontal arm's value scale is
+*invisible rather than absent*, because its gutter holds categories and there is no label for the
+fraction to disagree with. Landing the figure on the niced range is F210 applied; correcting the
+terminal is a separate change with its own moved frames.
+
+#### The instrument: a collision is a dropped field, and the corpus counts them (I75)
+
+**No column of the disagreement record can see this.** Both arms draw the same labels, the same legend,
+the same border, the same count of everything — they draw *the same document*, which is the strongest
+possible agreement and here means a field reached one of them. The record is indexed by decision and
+this is a decision that was never made twice.
+
+What sees it is byte-identity between two baselines whose blocks are not equal. Measured over all 182,
+with the catalogue's header line — which names the variant — stripped, because it makes every terminal
+frame distinct by construction and would have made the control vacuous:
+
+| | distinct documents | collisions |
+|---|---|---|
+| terminal, 24-bit | 175 of 182 | 7 |
+| this arm | 125 of 182 | 57 |
+
+The empty document accounts for 32 of the second arm's and 3 of the terminal's: a refused form and a
+form with no data both draw it, and both are correct. **Past it: 25 for this arm and 4 for the
+terminal** — and the terminal's 4 are all *also* the second arm's, which is the sweep's sharpest
+result. **A collision both arms have is a fixture defect; a collision one arm has is a seam defect.**
+Twenty-one belong to this arm alone.
+
+| field | variants | disposition |
+|---|---|---|
+| `layout` | `bar/stacked · bar/normalised` | **closed here** |
+| `yCallout` | `line/callout-{both,last,name}` | owed a ruling |
+| `plotCorners` | `line/corners-sharp` | owed a ruling |
+| `matrixAnchor` | `calendar/day-stretch` | owed a ruling — **and not a refusal**, which F346 said it was |
+| `annotations.fill` | `line/confidence{,-unfilled}` | open, recorded |
+| `plotStyle` | `contour/style-line`, `pie/solid` | owed a ruling |
+| `fieldDim`, `glyphInk` | `contour/*`, `quiver/*` | **ruled** — §3ak.26's per-cell remedies |
+| `height` | `tree/overflow-*`, `horizon/folded-1x3`, `pie/*` | **legitimate** — a row count, and F318's `notice` |
+| `width`, `align` | `line/size-{left,centre,right}` | **legitimate** — the block's place in the document, not the plot's figure |
+| `cursor` | `line/cursor-candles` | the candles' refusal, recorded |
+
+**Its blind spot, stated because a corpus-shaped instrument has one.** A collision needs two variants
+differing in **one** field, so the sweep names a field only where the corpus happens to isolate it.
+`aspect`, `axisCross`, `plotFill`, `plotBox`, `lower` and `upper` are each read by one arm and appear
+nowhere above — not because they cross, but because nothing in the corpus varies them alone. The sweep
+is a lower bound on the drop and an exact count of the pictures.
+
+#### Two fixtures whose names state a claim their block does not make
+
+The four collisions **both** arms have are all of one kind, and none of them is about a renderer:
+
+- **`line/legend-right` is byte-identical to `line/multi-series`** — the same three series, the same
+  height, and `legend` **undefined**. A variant named for a placement declares none.
+- **`heatmap/palette` sets `colormap: "viridis"`**, which is `rampOf`'s answer for `heatmap` already.
+  A variant named for a field pins it to the value it already had.
+- **`histogram/default` and `histogram/scott`** draw the same bins, so `binning` is exercised by a
+  fixture that cannot separate two strategies. I66's own blind spot, one field along: *a fixture that
+  cannot answer reads exactly like one that answered well.*
+- **`slope/default` and `slope/six-readings` are the one legitimate case**, and it is legitimate
+  *because* of I74: six readings whose first and last are the two of `slope/default` must draw the
+  same figure, so the identity is the proof the derivation crossed. Recorded so a later sweep does not
+  read it as the other three.
+
+**Three of four are fixtures asserting nothing, and all three were invisible to every gate.** A golden
+frame records what a fixture produced; it cannot ask whether the fixture varies what its name says.
+
+#### A negative reading in a stacked bar takes the whole block down
+
+Found by asking what the shared fold's rule is for a value the bar row has no rule for at all.
+`stackBands` clamps — `v === null || !Number.isFinite(v) ? 0 : Math.max(0, v)` — and `stackedBarRow`
+does `?? 0` and nothing else, so a negative fill reaches `String.prototype.repeat` with a negative
+count:
+
+```
+plot "p": form "bar", layout "stacked", series [[10, 20], [-4, 5]]
+  → ▲ plot failed to render: Invalid count value: -8
+```
+
+Both layouts, and the registry catches it into an ERROR block — so the reader is told the plot failed
+rather than shown a wrong picture, which is the good half. **The rule exists and the second
+implementation of the fold does not have it**, which is F329's class arriving as a crash rather than a
+disagreement. The clamp is extracted so there is one rule and not two, and the rounding stays each
+arm's.
+
+---
+
+### 3ak.40 — `axes: false` reaches one resolver of two, and I67 already said it gates three
+
+```ts
+export function positionAxisOf(block: Pick<Plot, "axes" | "form" | "xLabels">): boolean {
+  return block.xLabels !== undefined || (block.axes === true && HAS_POSITION_AXIS[block.form]);
+}
+export function valueLabelsOf(block: Pick<Plot, "yAxis">): "left" | "right" | "both" | null {
+  const y = block.yAxis ?? "left";
+  return y === false ? null : y;
+}
+```
+
+Forty lines apart in this file. **One reads `axes` and the other does not**, so `axes: false` silences
+the position axis, the frame and the gutter, and says nothing to the value labels: the figure reports
+`valueLabels: "left"` and this arm draws them. Measured — `line/minimal`, `scatter/minimal` and
+`step/minimal` each draw `["0", "5"]` down the left of a figure whose terminal frame has no furniture
+at all.
+
+#### It is I67 unimplemented, and the type had already ruled it
+
+I67 says *`axes` gates three things and each carries a per-form override*. Three are named — `gutter`,
+`positionAxis`, `valueLabels` — and the third resolver cannot see the field. And `yAxis`'s own doc in
+`types.ts` states the ruling from the other side: **`false` removes the labels and keeps the frame and
+the x axis, which is what `axes: false` cannot say on its own.** That sentence is true only if
+`axes: false` removes all three; it is the reason `yAxis: false` exists as a separate field, and it was
+written before either resolver was.
+
+**So no new invariant, and that is the finding's shape.** A rule naming three subjects is checked
+against whichever one the reader looks at first, and two of the three obey it. This is the citation
+class one level up: not a reference mistaken for a disposition, but a rule whose *subject is a set*
+being confirmed by a member.
+
+#### Why no reader could have found it, and why the terminal looks right
+
+`svg.ts` consumes `figure.valueLabels` exactly as written — the arm is not what is wrong. And a `Pick`
+is what a reviewer reads as *the inputs this decision depends on*, so a resolver that lists one field
+where the decision has two reads as deliberate rather than as an omission.
+
+**The terminal is right by a second mechanism, which is what hid it.** It draws value labels from
+`layout.labelColumn`, and `bandLayout` gets no gutter at all when `axes: false` — so the labels are
+suppressed downstream of the decision rather than by it. **A decision enforced twice in one arm and
+once in the shared layer is not enforced in the shared layer**, and the arm holding the redundancy is
+the one that looks correct. The repair is in the resolver, so no terminal frame moves and three of this
+arm's do.
+
+**An explicit `yAxis` does not override it.** `positionAxisOf`'s `xLabels !== undefined` escape looks
+like the precedent for one, and it is not: `xLabels` is *content* — three captions the author wrote —
+where `yAxis` is a *placement* for labels the figure derives. `axes` says whether there is any
+furniture, so `axes: false, yAxis: "right"` asks for a side of an axis that is not drawn, which is
+exactly why `xTitle` is refused under `axes: false` rather than honoured.
+
+---
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -7980,6 +8162,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I72** — **Which ramp a reading is on is a figure decision; resolving that ramp to a colour is the arm's.** A `Figure` carries the colormap's **name** and never a colour, which is I62 one member along: a name resolves at each arm's own depth — `continuousColour` descends a capability ladder in one and does not in the other — while *which* map varies by **form**, and a form is not a resolution. *Measured before the rule: `DEFAULT_COLORMAP` lived in a terminal renderer and the second arm's whole ramp decision was `COLORMAPS[block.colormap ?? "viridis"]`, so `correlation` drew sequential where the terminal draws diverging and `utilisation` drew viridis where it draws inferno — the defect the table's own comment calls the single most common chart defect there is, on the form the row was written for. Two sentences licensed it and each was the other's alibi: the seam member's doc said **one ramp either way** and the walk's header called **which ramp a matrix reads** rasterisation* (F324).
 - **I73** — **A form has a value axis only where one range carries every mark.** A `Figure` holds one `value`, so a form whose rows each carry their own scale has no value axis, and neither has one whose readings are shares rather than positions. I60 asks whether a form's readings sit on a value scale *at all*; this is the half that asks whether they sit on **one**, and the two look identical until a form is drawn. *Measured before the rule, over the five that had never been drawn: `gantt`'s axis would have read `0 … 5` over bars spanning `0 … 11`, because the extent came from the durations rather than the spans; `funnel`'s `0 … 1000` labels a **width**, so neither end of a bar is its reading; `bullet`'s `0 … 100` sits over three rows scaled `0 … 100`, `0 … 60` and `0 … 40`, which is the one thing a bullet chart exists not to do — and the reason was already written in the renderer that draws it, in a different file from the record that contradicted it* (F329, F330).
 - **I74** — **A form's furniture and its marks describe the same block.** I70 puts a derivation above both arms; this is the half that says *above the decisions too*, because a renderer that derives inside its rasteriser labels one block and draws another and needs no second arm to disagree with itself. *Measured before the rule: `positionalForm` takes its decisions from the block it is handed and `slope` takes its two ends in the callback, so `slope/six-readings` drew a position axis reading `0.0 … 5.0` over a figure with two points on it — five intervals of labelled domain with no readings in any of them — and a value axis of `0 … 50` covering a 9 and a 41 that nothing draws. **It took a fixture to see**: every `slope` series in the corpus had exactly two values, where the derivation is the identity and the two readings of the rule are indistinguishable* (F332).
+- **I75** — **Two blocks that draw different frames in one arm draw different documents in the other.** A block field the second arm does not read draws one picture for two figures, and that is the strongest agreement the disagreement record can report: same labels, same legend, same border, same count of everything. The observable form is a **collision** — byte-identical baselines whose blocks are not equal — and it is checked over the corpus with the catalogue's header line stripped, because the header names the variant and would make every terminal frame distinct by construction. *Measured before the rule, over 182 variants: the terminal draws 175 distinct frames and this arm draws 125. The empty document is 3 of the terminal's collisions and 32 of this arm's — a refused form and a form with no data both draw it, and both are correct. Past it, **4 and 25**, and the terminal's four are all also this arm's: a collision both arms have is a **fixture** defect, and three of those four are variants whose names state a claim their block does not make — `line/legend-right` sets no legend, `heatmap/palette` pins `colormap` to the heatmap's own default, `histogram/scott` bins identically to `sturges`. Twenty-one belong to this arm alone: `layout`, `yCallout`, `plotCorners`, `matrixAnchor`, `plotStyle` and a band's `fill`* (F342, F349, F350). **Stated blind spot**: a collision needs two variants differing in **one** field, so the sweep names a field only where the corpus isolates it — `aspect`, `axisCross`, `plotFill`, `plotBox`, `lower` and `upper` are each read by one arm and appear nowhere in it. A lower bound on the drop, an exact count of the pictures.
 
 
 ## 8. Commitments
@@ -8055,6 +8238,8 @@ orientation — and belongs in the classification table as its own rows.
 69. **A composition refuses only when nothing in it draws, and a refused child keeps its column** (I8, I64, §3ak.36). The facets recurse, so they inherit `violin` and `ridgeline`'s refusal — and the terminal had already decided what that means, twice: a child with no renderer contributes `[]`, and a facet short of a row contributes blanks *so that a short facet must not pull the ones after it leftwards*. A column belongs to a facet by position. Read out of the arm that had the case rather than chosen by the arm that has it now.
 70. **A key crosses as a name and a range, and each arm draws it at its own resolution** (I71, I72, §3ak.37). The `ramp` column measured *0 of 181* for the length of the pass and the decision had crossed the whole time; what was missing was furniture. Continuous where the reading is and **discrete where the data is** — a horizon's key is one swatch per band, because `horizonBandT` quantises and a gradient would claim a continuity the figure has not got.
 71. **A key is drawn by what the figure is drawn by, and names every reading the figure is keyed to** (I49, I72, §3ak.38). I49 has said *levels are named in the legend and never on the line* since §3y and it reads as satisfied, because the arm that has a legend satisfies it and nothing asks the arm that does not. `contourLevels` is the shared function the terminal's key calls and `contourFigure` marches, and the third caller was missing. **A boolean `ramp` column cannot see it**: both arms drew a key, both reported `true`, and one named six readings against the other's two. And the second half is the same rule about colour rather than text — a `horizon` key computed `i / (bands − 1)` where the figure computes `horizonBandT`, so it showed the cold half of a diverging map that the figure never enters (F340, F341).
+72. **A block field that selects between figures crosses as the marks, and a corpus that draws one document from two blocks is where a dropped field is visible** (I73, I75, §3ak.39). `layout` changes which marks exist and nothing about how one is inked, so it needs no `Figure` member and the fold it selects had crossed for §3ak.33's cumulative three — a stacked bar is `stackBands`' **fourth consumer**, and the comment forty lines below `barFigure` says *three* while sitting in the same file as the form that makes it four. **A count of consumers goes stale in the file that holds it.** The axis moves with the marks because a stacked figure spans the totals: `bar/stacked` tops out at 37 against an axis labelled to 30. And the rule the second implementation of the fold did not have is the one that crashes — `stackBands` clamps a negative to zero and `stackedBarRow` hands it to `repeat`, so `layout: "stacked"` with any negative reading renders an ERROR block (F342, F349, F350, F351).
+73. **A rule whose subject is a set is checked against the member the reader looks at first** (I67, §3ak.40). I67 says `axes` gates three things and names them — `gutter`, `positionAxis`, `valueLabels` — and the third resolver's `Pick` never listed the field, so `axes: false` drew value labels on three variants whose terminal frames have no furniture at all. `yAxis`'s own doc had ruled it from the other side before either resolver existed: *`false` removes the labels and keeps the frame and the x axis, which is what `axes: false` cannot say on its own*. **The terminal is right by a second mechanism** — its labels come from a gutter width that `axes: false` already zeroes — and a decision enforced twice in one arm and once in the shared layer is not enforced in the shared layer (F347).
 
 ---
 
