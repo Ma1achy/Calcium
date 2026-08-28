@@ -9,6 +9,13 @@
 <text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="83.6" y="56.492" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">20</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">28</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="156.854" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="224.108" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="291.363" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<text x="358.617" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="425.871" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">59</text>
 <rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
 <text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">search</text>
 <rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>

@@ -181,6 +181,12 @@ describe("U — the seam, asserted from both arms", () => {
     // none. Counted below rather than excluded: an exemption dropped from a
     // corpus is a corpus that shrank without saying so.
     isotropic: null,
+    // **A probe for `position` and it is `null`** (F356, C12 §3ak.44). The
+    // member carries `xMin`, `xMax`, `xScale` and `xFormat`, and no catalogue
+    // variant patches one — `x-linear` and `x-log` are a *pair*, which is what
+    // the collision sweep needs and not what this table does. Counted rather
+    // than excluded, per the row above.
+    position: null,
   } as const satisfies Readonly<Record<keyof Figure, unknown>>;
 
   /**
@@ -236,6 +242,11 @@ describe("U — the seam, asserted from both arms", () => {
     // `"viridis"`, so a correlation matrix was diverging in one and sequential
     // in the other while every gate compared clean (F324).
     ramp: { terminal: "moves", svg: "moves" },
+    // **Both arms, and the second one only since §3ak.44** (F356). `xScale`,
+    // `xFormat` and the two bounds reached the terminal's `xTickRow` and nothing
+    // here, so this row would have read `svg: "does not move"` — which is what
+    // it means for a member to have no reader.
+    position: { terminal: "moves", svg: "moves" },
   } as const satisfies Readonly<Record<keyof Figure, { terminal: string; svg: string }>>;
 
   function patched(base: Spec, how: unknown): Spec {
@@ -285,7 +296,7 @@ describe("U — the seam, asserted from both arms", () => {
         svg: svgOf(spec) === svgOf(other) ? "still" : "moves",
       };
     }
-    expect(unperturbable, "members no block field can isolate — see `isotropic`").toBe(1); // cells-ok — a member count
+    expect(unperturbable, "members no block field can isolate — see `isotropic` and `position`").toBe(2); // cells-ok — a member count
     expect(measured).toEqual(CONSUMERS);
   });
 

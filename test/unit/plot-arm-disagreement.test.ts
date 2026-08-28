@@ -142,10 +142,10 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "8/90", "numericLabels": "70/82", "identityLabels": "8/82", "border": "4/82", "interiorRules": "12/82", "legend": "14/82", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "line": { silent: "8/90", "numericLabels": "56/82", "identityLabels": "8/82", "border": "4/82", "interiorRules": "12/82", "legend": "14/82", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "2/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "scatter": { silent: "2/12", "numericLabels": "8/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "step": { silent: "2/6", "numericLabels": "2/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "scatter": { silent: "2/12", "numericLabels": "5/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "step": { silent: "2/6", "numericLabels": "1/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/8" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
@@ -185,7 +185,7 @@ const MEASURED = {
   // because a slope's two columns are named by the caller and neither fixture
   // names them.
   "slope": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "bubble": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "bubble": { silent: "0/2", "numericLabels": "1/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "2/2", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The last two of family 8's residue** (§3ak.35). `timeline` is the one form
   // whose rows are series, pinned to its own range so the marks and the labels
@@ -510,6 +510,19 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // `smallmultiples`, `stackedarea` and `streamgraph` closed outright, and
     // `line` went 13/78 to 8/82. Same class as F358 one predicate along: the
     // alphabet was right and the tokenisation was a guess.
+    //
+    // **45 and unmoved when the position axis crossed, over 21 pairs that
+    // closed** (F356, C12 §3ak.44). `numericLabels` went 70/82 to 56/82 on
+    // `line`, 8/10 to 5/10 on `scatter`, and one pair each on `bubble` and
+    // `step` — every one of them an abscissa this arm had not been drawing. No
+    // *cell* changed disposition, because none of those forms reached zero.
+    //
+    // **What is left of that column is largely a budget difference.** The two
+    // arms nice the same domain against different tick counts — cells here,
+    // pixels there, and I78 says the count cannot cross — so a correct pair
+    // still reports two label lists of different lengths. That is the same kind
+    // of difference `notice` is, and the column cannot say so: it compares
+    // lists.
     const claimed = (Object.values(MEASURED) as readonly Record_[]).filter((v): v is Claimed => v !== "refused");
     let open = 0;
     let closed = 0;
@@ -775,7 +788,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
 
     expect(corpus.size, "variants in the corpus").toBe(184); // cells-ok — a variant count
     expect(t.distinct, "distinct terminal frames").toBe(177); // cells-ok — a frame count
-    expect(s.distinct, "distinct documents").toBe(127); // cells-ok — a frame count
+    expect(s.distinct, "distinct documents").toBe(128); // cells-ok — a frame count
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not
@@ -807,12 +820,6 @@ describe("AD — the two arms decide separately, and here is where", () => {
       ["line/candlestick-overlay", "line/cursor-candles"],
       ["line/confidence", "line/confidence-unfilled"],
       ["line/legend-right", "line/multi-series"],
-      // **The pair added for `xScale`, and it is the sweep reporting the defect
-      // before the fix** (F356). `x-linear` and `x-log` differ in exactly one
-      // field, the terminal draws `1 100 200 … 1000` against `1 5 10 20 … 1000`,
-      // and this arm draws one document for both — 1226 bytes, and no abscissa
-      // in either. **It leaves this list the day the position axis crosses.**
-      ["line/x-linear", "line/x-log"],
       ["slope/default", "slope/six-readings"],
       ["tree/default", "tree/overflow-top-down"],
       ["tree/left-right", "tree/overflow-left-right"],
@@ -837,14 +844,15 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(draw({}) === draw({ plotFrame: "grid" }), "`plotFrame` crosses, so it moves the document")
       .toBe(false);
 
-    // **And `xScale` does not** (F356). The two blocks draw different terminal
-    // frames — `1 100 200 … 1000` against `1 5 10 20 … 1000` — and one document.
-    // This is the row that fails the day the position axis crosses, which is
-    // what makes it a fixture for the fix rather than a record of the defect.
-    expect(draw({}) === draw({ xScale: "log" }), "`xScale` does not, so two blocks draw one document")
-      .toBe(true);
+    // **And `xScale` now does too** (F356, C12 §3ak.44, I78). This row was
+    // written asserting the opposite — *two blocks draw one document* — as the
+    // fixture for the fix rather than a record of the defect, and it inverted
+    // the day the position axis crossed. Kept in that direction because a
+    // member that stops crossing is exactly what it is here to catch.
+    expect(draw({}) === draw({ xScale: "log" }), "`xScale` crosses, so a log abscissa is a different document")
+      .toBe(false);
     expect(frame({ ...base, xScale: "log" }, FULL, 80, "p").join("\n")
-      === frame(base, FULL, 80, "p").join("\n"), "while the terminal draws two frames")
+      === frame(base, FULL, 80, "p").join("\n"), "and the terminal has always drawn two frames")
       .toBe(false);
   });
 

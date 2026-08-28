@@ -915,7 +915,15 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     });
     const svg = plotToSvg(candles, THEME);
     expect(svg, "the datum is read now, so there is a picture").not.toBeNull();
-    const labels = [...(svg ?? "").matchAll(/<text[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1]);
+    // **The gutter's labels and not every `<text>` in the document** (F190,
+    // C12 §3ak.44). This read all of them, which was true *about* the claim
+    // while the rest of the frame stayed quiet — and the frame gained a row:
+    // three candles are an index domain of 0 … 2, which nices to `0.00 0.25
+    // 0.50 …`, so the abscissa put a literal `0.25` in the document and the
+    // proxy fired on the axis it is not about. The value labels are the ones
+    // anchored at their right edge against the left of the box.
+    const labels = [...(svg ?? "").matchAll(/<text[^>]*text-anchor="end"[^>]*>([^<]*)<\/text>/gu)]
+      .map((m) => m[1]);
     expect(labels, "the axis is the candles', not `seriesRange([])`'s fallback")
       .not.toEqual(expect.arrayContaining(["0.25"]));
     // **Coverage rather than the exact ticks**, because the nicing rule is

@@ -8,6 +8,12 @@
 <text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">20</text>
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">30</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0.0</text>
+<text x="168.96" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0.2</text>
+<text x="248.32" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0.4</text>
+<text x="327.68" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0.6</text>
+<text x="407.04" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0.8</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">1.0</text>
 <rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
 <text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">north</text>
 <rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>

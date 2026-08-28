@@ -8,6 +8,13 @@
 <text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">80</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="161.745" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">2</text>
+<text x="233.891" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">4</text>
+<text x="306.036" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">6</text>
+<text x="378.182" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">8</text>
+<text x="450.327" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">11</text>
 <circle cx="89.6" cy="242.133" r="3" fill="#e69f00"/>
 <circle cx="125.673" cy="219.238" r="3" fill="#e69f00"/>
 <circle cx="161.745" cy="196.572" r="3" fill="#e69f00"/>

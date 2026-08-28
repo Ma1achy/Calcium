@@ -22,7 +22,7 @@ import { flatten } from "./tree.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 import { COLORMAPS } from "../theme/colormap.js";
 import type { ColourRef } from "../theme/types.js";
-import { axisFor, formatValue, niceAxis, tickLabels, ticksFor, type Axis } from "./axes.js";
+import { axisFor, formatValue, niceAxis, tickLabels, ticksFor, type Axis, type PositionDomain } from "./axes.js";
 import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
 import { ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
@@ -532,6 +532,25 @@ export type Figure = Readonly<{
   gutter: boolean;
   /** Is the position axis row drawn — `xLabels` short-circuits it (I67). */
   positionAxis: boolean;
+  /**
+   * **The abscissa's domain, scale and formatter, or `null` where the block has
+   * no numeric one** (I78, §3ak.44).
+   *
+   * The member above says whether the *row* exists; this says what is in it, and
+   * for a long time nothing did. `positionAxis` was the whole crossing, so the
+   * second arm's only position labels were `block.xLabels` — three captions the
+   * caller supplied — and `xMin`, `xMax`, `xScale` and `xFormat` had **zero
+   * readers** there. Six blocks differing only in those drew six terminal frames
+   * and one 1225-byte document (F356).
+   *
+   * **A domain and not an axis**, which is the asymmetry with `value` and it is
+   * real: a value axis nices against `ticksFor(plotAreaRows(block))`, a count
+   * derived from `height` and therefore the same in both arms. An abscissa's
+   * budget is the **width**, which stays in cells. So each arm calls
+   * `positionAxisAt` with its own budget — one derivation, the budget a
+   * parameter.
+   */
+  position: PositionDomain | null;
   /** Which side the value labels sit on, `null` where `yAxis: false` (I67). */
   valueLabels: "left" | "right" | "both" | null;
   /** Placed, or `null` where the author refused one — never an empty list (I67). */
@@ -677,6 +696,43 @@ export function gutterOf(block: Pick<Plot, "axes" | "form">): boolean {
  * the same shape as the heatmap's gutter and the reason this is a third answer
  * rather than a second reading of `frame`.
  */
+/**
+ * How many positions the abscissa has.
+ *
+ * **A candlestick's are in `ohlc` and its `series` is ordinarily empty** — the
+ * shape C12 §3r calls *plain candles*. Reading `series` alone gives zero, and a
+ * domain of nothing draws no axis at all: a silent gap under exactly the style
+ * whose frame a reader most wants numbered. `furniture.ts`' own function, moved
+ * with the domain it feeds (§3ak.44).
+ */
+function sampleCount(block: Plot): number {
+  const bars = candlesOf(block);
+  if (bars !== undefined) return bars.length; // cells-ok — a bar count
+  return block.series.reduce((most, sr) => Math.max(most, sr.values.length), 0); // cells-ok — a sample count
+}
+
+/**
+ * The abscissa a block declares, or `null` where it has none (I78, §3ak.44).
+ *
+ * `furniture.ts`' `xDomain`, moved above the seam with `xScale` and `xFormat`
+ * beside it — **the three were read by the terminal alone** and the second arm
+ * drew no numeric abscissa at all (F356).
+ *
+ * **A declared bound and an index domain are the same shape here**, which is
+ * §3d.1's rule: sample 0 is drawn at position 0 and sample n−1 at 1, so the
+ * domain *is* the geometry and a bound that snapped outward would put the top
+ * tick past the last sample.
+ */
+export function positionDomainOf(block: Plot): PositionDomain | null {
+  const declared = block.xMin !== undefined || block.xMax !== undefined;
+  const n = sampleCount(block);
+  if (!declared && n < 2) return null;
+  const min = block.xMin ?? 0;
+  const max = block.xMax ?? n - 1;
+  if (!(max > min)) return null;
+  return { range: { min, max }, scale: block.xScale, format: block.xFormat };
+}
+
 export function positionAxisOf(block: Pick<Plot, "axes" | "form" | "xLabels">): boolean {
   return block.xLabels !== undefined || (block.axes === true && HAS_POSITION_AXIS[block.form]);
 }
@@ -929,6 +985,7 @@ export function positionalDecisions(block: Plot): Omit<Figure, "marks"> {
     frame: frameOf(block),
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
   };
@@ -1077,6 +1134,7 @@ export function tilesFigure(block: Plot): Figure {
     frame: "none",
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     marks,
@@ -1134,6 +1192,7 @@ export function nodesDecisions(block: Plot): Omit<Figure, "marks"> {
     frame: "none",
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
   };
@@ -1309,6 +1368,7 @@ export function distributionFigure(block: Plot): Figure {
     frame: frameOf(block),
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     marks,
@@ -1704,6 +1764,7 @@ export function fieldFigure(block: Plot): Figure {
     frame: "none",
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     ramp: rampOf(block),
@@ -1871,6 +1932,7 @@ export function horizonFigure(block: Plot): Figure {
     frame: "none",
     gutter: false,
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: null,
     legend: legendOf(block),
     ramp: rampOf(block),
@@ -1956,6 +2018,7 @@ export function matrixFigure(block: Plot): Figure {
     frame: "none",
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
     marks,
@@ -2073,6 +2136,7 @@ export function categoricalDecisions(block: Plot): Omit<Figure, "marks"> {
     frame: frameOf(block),
     gutter: gutterOf(block),
     positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
     valueLabels: valueLabelsOf(block),
     legend: legendOf(block),
   };
@@ -2865,6 +2929,11 @@ export function proportionDecisions(block: Plot): Omit<Figure, "marks"> {
   const shares = sharesOf(block.segments ?? []);
   const base = legendOf(block);
   return {
+    // **`null`, and not `positionDomainOf`** (I78, §3ak.44). A pie's segments
+    // and a radar's spokes are not positions on a domain — the same reason
+    // `positionAxis` is false here — so the member states it rather than
+    // computing a domain from a series this family does not read.
+    position: null,
     // **A radar's readings are on a scale and the record now says so** (F304).
     // `valueAxisOf` is `radarCeiling` with the pin threaded, which is the half
     // the old expression could not have: it passed `{}`, so `yMin`, `yMax` and

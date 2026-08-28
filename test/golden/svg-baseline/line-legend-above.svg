@@ -7,6 +7,17 @@
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="83.6" y="183.2" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
 <text x="83.6" y="74.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="143.151" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
+<text x="196.702" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="250.253" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">15</text>
+<text x="303.804" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="357.355" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
+<text x="410.906" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<text x="464.457" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">35</text>
+<text x="518.008" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="571.559" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">45</text>
+<text x="614.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
 <rect x="89.6" y="3.2" width="9.6" height="9.6" fill="#e69f00"/>
 <text x="103.2" y="12.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">alpha</text>
 <rect x="185.6" y="3.2" width="9.6" height="9.6" fill="#56b4e9"/>

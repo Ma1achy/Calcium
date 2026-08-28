@@ -35,7 +35,7 @@ import { clampSpans, pad, padStart, paint, slot, tone, type Span } from "../bloc
 import { cells, truncate, type AmbiguousWidth } from "../text.js";
 import { xAxis, xTickRow } from "./axes.js";
 import type { XAxis } from "./axes.js";
-import { legendOf, positionAxisOf, valueLabelsOf } from "./figure.js";
+import { legendOf, positionAxisOf, positionDomainOf, valueLabelsOf } from "./figure.js";
 import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import { FACING_DEFAULT, facingOf } from "./scale.js";
@@ -576,15 +576,6 @@ export type Furniture = Readonly<{ top: string; bottom: readonly string[] }>;
  * `null` where there is nothing to span — no samples, or one, which has no
  * extent and would give a zero-width domain to divide by.
  */
-function xDomain(block: Plot): { min: number; max: number } | null {
-  const declared = block.xMin !== undefined || block.xMax !== undefined;
-  const n = sampleCount(block);
-  if (!declared && n < 2) return null; // cells-ok — a sample count
-  const min = block.xMin ?? 0;
-  const max = block.xMax ?? n - 1; // cells-ok — a sample count
-  return max > min ? { min, max } : null;
-}
-
 /**
  * How many positions the abscissa has.
  *
@@ -621,8 +612,15 @@ export function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAx
   if (!positionAxisOf(block)) {
     return xAxis(undefined, areaWidth, ctx.capabilities);
   }
-  const domain = xDomain(block);
-  if (domain === null) return xAxis(undefined, areaWidth, ctx.capabilities);
+  // **`positionDomainOf` and not a second copy** (C12 I78, §3ak.44). This held
+  // its own `xDomain`, and the seam's arrived beside it — two derivations of the
+  // same three block fields, which is the thing the ruling is written against.
+  // **The mutation pass is what said so**: `XA1` and `XA2` mutate the shared
+  // one, and both survived, because the terminal was still reading its own. A
+  // survivor here is not a finding about the test.
+  const pos = positionDomainOf(block);
+  if (pos === null) return xAxis(undefined, areaWidth, ctx.capabilities);
+  const domain = pos.range;
   // **The form owns which column a position lands in** (C12 I37, §3d.1). Every
   // other row of that table is a rule meeting a boundary; this one is two
   // correct mappings from the same index, and the frame would have looked right

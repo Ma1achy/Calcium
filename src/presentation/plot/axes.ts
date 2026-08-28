@@ -718,6 +718,64 @@ function xPositionOf(value: number, range: Range, scale?: ScaleType): number {
   return hi === lo ? 0 : (Math.log(Math.max(value, Number.MIN_VALUE)) - lo) / (hi - lo);
 }
 
+/**
+ * **The abscissa's domain, its scale and its formatter — the three block fields
+ * the position axis is made of** (C12 I78, §3ak.44, F356).
+ *
+ * `Figure.positionAxis` is a boolean — *is the row drawn* — and it was the whole
+ * of what crossed, so `xMin`, `xMax`, `xScale` and `xFormat` had **zero readers**
+ * in the second arm. Six blocks differing only in these drew six terminal frames
+ * and one document.
+ *
+ * **The ticks are not here and that is the asymmetry with `value`.** A value
+ * axis nices against `ticksFor(plotAreaRows(block))` — a count derived from
+ * `height`, which is a *block* field, so both arms get the same ticks from one
+ * call. An abscissa's budget comes from the **width**, which no block carries
+ * and which §3aj hazard 3 keeps in cells. So what crosses is the domain and each
+ * arm nices it with its own budget, through `positionAxisAt` — one derivation,
+ * the budget a parameter, which is `valueAxisOf`'s own shape.
+ */
+export type PositionDomain = Readonly<{
+  range: Range;
+  scale: ScaleType | undefined;
+  format: Plot["xFormat"];
+}>;
+
+/** The abscissa niced to a budget: its ticks, their labels, and where each sits (I78). */
+export type PositionAxis = Axis & Readonly<{
+  labels: readonly string[];
+  /**
+   * Where each tick sits, normalised and **unflipped** — `xPositionOf`, which is
+   * scale-aware where `normalisedOf` is not. An arm that placed a log tick with
+   * `normalisedOf` would draw the label at the linear position and the sample
+   * beneath it at the log one, which is the half of F189 the abscissa does not
+   * have.
+   */
+  at: readonly number[];
+  /** Where 0 sits, or `null` unless the domain *strictly* straddles it (§3ad A4). */
+  zeroAt: number | null;
+}>;
+
+/**
+ * The abscissa at a given tick budget — **one derivation, called by both arms**
+ * (I78, §3ak.44).
+ *
+ * **`stepDecimals` and not `placesFor`**, which is `xTickRow`'s own rule moved
+ * rather than re-chosen: one precision per axis, from the step. `tickLabels`
+ * answers the ordinate's question and would give an index axis `0.0 5.0 10.0`.
+ */
+export function positionAxisAt(pos: PositionDomain, maxTicks: number): PositionAxis {
+  const axis = axisFor(pos.range, maxTicks, { yMin: pos.range.min, yMax: pos.range.max }, pos.scale);
+  const decimals = axis.step > 0 ? stepDecimals(axis.step) : undefined;
+  const straddles = axis.range.min < 0 && axis.range.max > 0;
+  return {
+    ...axis,
+    labels: axis.ticks.map((v) => formatValue(v, pos.format, decimals)),
+    at: axis.ticks.map((v) => xPositionOf(v, axis.range, pos.scale)),
+    zeroAt: straddles ? xPositionOf(0, axis.range, pos.scale) : null,
+  };
+}
+
 export function xTicksFor(width: number): number {
   return Math.max(2, Math.min(9, Math.floor(Math.max(0, width) / X_LABEL_PITCH) + 1)); // cells-ok — a label count
 }
@@ -767,23 +825,29 @@ export function xTickRow(
   if (w === 0 || !Number.isFinite(range.min) || !Number.isFinite(range.max)) {
     return { text: "", tickColumns: [], zeroColumn: null };
   }
-  const axis = axisFor(range, xTicksFor(w), { yMin: range.min, yMax: range.max }, scale);
-  // **`stepDecimals` and not `decimalsFor`**, which is §3d's own rule — *one
-  // precision per axis, from the step, and it is the step's own decimals*.
-  // `decimalsFor` answers a different question (how many digits does a value at
-  // this magnitude want) and gives a step of 5 one decimal, so an index axis
-  // came out `0.0 5.0 10.0` where the reference draws `0 5 10`. The rule was
-  // already written and `yLabels` already followed it.
-  const decimals = axis.step > 0 ? stepDecimals(axis.step) : undefined;
+  // **The axis is `positionAxisAt`'s and this function packs it** (I78,
+  // §3ak.44). What was here — `axisFor`, `stepDecimals`, `formatValue`,
+  // `xPositionOf` — is the abscissa, and the second arm had no way to reach any
+  // of it, so `xScale` and `xFormat` drew nothing there (F356). Everything below
+  // is cells: which column a label starts in, what it may not overlap, where the
+  // row runs out.
+  //
+  // **`stepDecimals` and not `decimalsFor`** moved with it, which is §3d's own
+  // rule — *one precision per axis, from the step, and it is the step's own
+  // decimals*. `decimalsFor` answers a different question and gives a step of 5
+  // one decimal, so an index axis came out `0.0 5.0 10.0` where the reference
+  // draws `0 5 10`.
+  const axis = positionAxisAt({ range, scale, format }, xTicksFor(w));
 
   const row: string[] = Array.from({ length: w }, () => " ");
   const tickColumns: number[] = [];
   let free = 0; // the first cell no label has claimed
 
-  for (const value of axis.ticks) {
-    const text = formatValue(value, format, decimals);
+  for (const [i, value] of axis.ticks.entries()) {
+    void value;
+    const text = axis.labels[i] ?? "";
     const wide = cells(text, caps.ambiguousWidth); // cells-ok — a label width
-    const t = xPositionOf(value, axis.range, scale);
+    const t = axis.at[i] ?? 0;
     // **`columnAt` gets the unflipped position and flips inside** (§3ac B3).
     // It maps a position to a *bar*, and `candleColumn` already faces its own
     // placement — handing it `1 − t` as well would flip the axis twice and draw
@@ -810,11 +874,11 @@ export function xTickRow(
   // sample 0, and a degenerate one — and the column must be strictly inside the
   // area, because at the edge `"zero"` and `"edge"` name the same place and a
   // rule at column 0 abuts the gutter's border (§3ad A4, A10, A15).
-  const straddles = axis.range.min < 0 && axis.range.max > 0;
-  const zero = straddles
-    ? columnAt?.(xPositionOf(0, axis.range, scale))
-      ?? Math.round((facing.x === "left" ? 1 - xPositionOf(0, axis.range, scale) : xPositionOf(0, axis.range, scale)) * (w - 1)) // cells-ok — a column index
-    : null;
+  const zeroAt = axis.zeroAt;
+  const zero = zeroAt === null
+    ? null
+    : columnAt?.(zeroAt)
+      ?? Math.round((facing.x === "left" ? 1 - zeroAt : zeroAt) * (w - 1)); // cells-ok — a column index
   const zeroColumn = zero !== null && zero !== undefined && zero > 0 && zero < w - 1 ? zero : null; // cells-ok — a column index
 
   return { text: row.join("").replace(/\s+$/u, ""), tickColumns, zeroColumn };

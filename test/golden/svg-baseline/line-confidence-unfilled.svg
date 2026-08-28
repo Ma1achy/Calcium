@@ -8,5 +8,12 @@
 <text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
 <text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">80</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="161.745" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">2</text>
+<text x="233.891" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">4</text>
+<text x="306.036" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">6</text>
+<text x="378.182" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">8</text>
+<text x="450.327" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">11</text>
 <path d="M89.6 242.133 L125.673 219.238 L161.745 196.572 L197.818 174.361 L233.891 152.827 L269.964 132.185 L306.036 112.642 L342.109 94.393 L378.182 77.62 L414.255 62.49 L450.327 49.156 L486.4 37.75" fill="none" stroke="#e69f00" stroke-width="2"/>
 </svg>

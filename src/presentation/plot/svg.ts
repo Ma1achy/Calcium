@@ -30,7 +30,7 @@
  * second renderer.
  */
 import { flatten, type FlatNode } from "./tree.js";
-import { formatValue } from "./axes.js";
+import { formatValue, positionAxisAt } from "./axes.js";
 import { horizonBandCount, horizonBandT, horizonBaseline, levelCaption } from "./figure.js";
 import { horizonIsSigned } from "./horizon.js";
 import { drawnBlock } from "./derive.js";
@@ -122,6 +122,16 @@ const SVG_EM = 0.6;
 
 /** The gap between a gutter label and the plot area, in px. */
 const LABEL_GAP = 6;
+/**
+ * How many pixels an abscissa label wants — **this arm's budget, not the
+ * terminal's** (C12 I78, §3ak.44).
+ *
+ * `xTicksFor` divides a *cell* width by a label pitch and this divides a pixel
+ * width by one; the two are the same question in two units, which is exactly why
+ * the tick count is a parameter of `positionAxisAt` rather than a member of the
+ * figure. A shared count would be a width crossing the seam (§3aj hazard 3).
+ */
+const SVG_TICK_PITCH = 64;
 
 export const SVG_DEFAULT_LAYOUT: SvgLayout = Object.freeze({
   width: 640,
@@ -1652,6 +1662,53 @@ export function plotToSvg(
                    [box.right, last, "end"]] as const;
     for (const [x, text, anchor] of spots) {
       if (text === "") continue;
+      // **A caption is a position too** (F356). The terminal draws `┊` at every
+      // position tick whatever wrote the row, so `line/frame-grid` — three
+      // captions and `plotFrame: "grid"` — has three verticals there and had
+      // none here. The rule is the member's, not the numeric path's.
+      if (gridded) {
+        parts.push(`<line x1="${n(x)}" y1="${n(box.top)}" x2="${n(x)}" y2="${n(box.bottom)}" ` +
+          `stroke="${rule ?? label}" stroke-width="1"/>`);
+      }
+      parts.push(`<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="${anchor}" ` +
+        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
+        `${escape(text)}</text>`);
+    }
+  }
+
+  // **The numeric abscissa, which this arm had none of** (C12 I78, §3ak.44,
+  // F356). `positionAxis` says the row exists and `xLabels` is the caller's
+  // three captions; when there are none the row is a *scale*, and `xMin`,
+  // `xMax`, `xScale` and `xFormat` were read by the terminal alone. Six blocks
+  // differing only in those drew six terminal frames and one document here.
+  //
+  // **The budget is this arm's own and the derivation is not.** A tick every
+  // `SVG_TICK_PITCH` pixels, handed to `positionAxisAt` — the same function
+  // `xTickRow` packs, so a log axis picks log ticks in both and neither arm
+  // holds a second copy of the nicing.
+  //
+  // **Placed by `at` and not by `normalisedOf`**, which is what makes the label
+  // agree with the sample beneath it: `xPositionOf` is scale-aware, so a log
+  // tick lands where its value does rather than where a linear reading of it
+  // would put it.
+  if (figure.positionAxis && !valueOnX && label !== undefined
+      && block.xLabels === undefined && figure.position !== null) {
+    const span = box.right - box.left;
+    const budget = Math.max(2, Math.min(9, Math.floor(span / SVG_TICK_PITCH) + 1));
+    const axis = positionAxisAt(figure.position, budget);
+    for (const [i, at] of axis.at.entries()) {
+      const text = axis.labels[i] ?? "";
+      if (text === "") continue;
+      const x = box.left + span * (figure.facing.x === "left" ? 1 - at : at);
+      // **The grid's other half** (F356). `plotFrame: "grid"` crosses and this
+      // arm drew five horizontal rules and no verticals, under a comment above
+      // saying *both ways*; the reason was never the member, it was that there
+      // were no positions to hang a rule on.
+      if (gridded) {
+        parts.push(`<line x1="${n(x)}" y1="${n(box.top)}" x2="${n(x)}" y2="${n(box.bottom)}" ` +
+          `stroke="${rule ?? label}" stroke-width="1"/>`);
+      }
+      const anchor = i === 0 ? "start" : i === axis.at.length - 1 ? "end" : "middle"; // cells-ok — a tick count
       parts.push(`<text x="${n(x)}" y="${n(box.bottom + SVG_FONT_SIZE)}" text-anchor="${anchor}" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
         `${escape(text)}</text>`);
