@@ -6906,6 +6906,25 @@ where `yAxis` is a *placement* for labels the figure derives. `axes` says whethe
 furniture, so `axes: false, yAxis: "right"` asks for a side of an axis that is not drawn, which is
 exactly why `xTitle` is refused under `axes: false` rather than honoured.
 
+#### Two rulings the build made
+
+**The class is `axes !== true`, and the default is where it is reachable** (F347). The finding named
+`axes: false` and the corpus has three of those; a block that says nothing gets the same answer from
+`frameOf`, `gutterOf` and `positionAxisOf`, and it is the commonest call there is. Measured on a bare
+`b.plot({ form: "line", series })`: the terminal draws three rows of curve with no furniture and this
+arm drew `0 2 4 6` down its left. Six frames move rather than three — the three `minimal` variants and
+three `sparkline`s — and `sparkline` closes to `agree`.
+
+**And the override is the matrix family, which `gutterOf` had keyed on one form of it** (F352). Written
+without an override at all, the rule took `utilisation/default`'s row labels off the terminal — the one
+frame of 182 that moved, and I67's named exception arriving as a failure. `gutterOf` was where to copy
+the override from, and reading the two side by side is what showed that its copy says
+`block.form === "heatmap"` where the other says `IS_MATRIX`. `heatmap/default` sets `axes: true`, so
+the clause written for it is the one case that never needed it, and the second arm was drawing a matrix
+with **no row labels** while the terminal drew four. **C04 found the same narrowness on the same form**
+and repaired it with `IS_MATRIX`; the copy one file along kept the form name, because neither reads as
+wrong from where the other sits.
+
 ---
 ---
 ## 3q. One value axis across the bands, and the record it never had

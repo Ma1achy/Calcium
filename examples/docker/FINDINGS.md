@@ -13642,6 +13642,43 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F352 — one override, two functions, and the narrow copy outlived the fix by the width of a file ★★★★★
+
+```ts
+gutterOf(block)      → block.axes === true || block.form === "heatmap"
+valueLabelsOf(block) → block.axes === true || IS_MATRIX[block.form]        // after F347
+```
+
+Both carry I67's override — *a heatmap guts its rows whatever `axes` says, since its row labels **are**
+its ordinate* — and one is keyed on the family while the other is keyed on one form of it.
+
+**Measured on the page, which is the only place it shows:**
+
+```
+terminal   utilisation/default   node-1 ┤ … node-4 ┤
+SVG        utilisation-default   0.12  90                    ← no row labels at all
+SVG        heatmap-default       0.19  100  row0 row1 row2 row3 row4
+```
+
+`heatmap/default` sets `axes: true`, so the clause written for it is the one case that never needed
+it. `utilisation/default` is the only matrix in the corpus that leaves `axes` unset — C04 refuses
+`axes: false` on a matrix and says nothing about omitting it — and it is the frame that fails.
+
+**The same form found the same narrowness in C04, and the fix did not travel.** `checkHeatmap`'s own
+comment records it: *the refusal reached one form of eight … the family grew after the check was
+written. Found by `utilisation` accepting `axes: false` and rendering eighteen rows into a sixteen-row
+grid.* That was repaired with `IS_MATRIX`; a second copy of the same override, in a different file,
+kept the form name. **A rule reimplemented keeps its birthday clauses**, and neither copy reads as
+wrong from where the other one sits.
+
+**Found by writing the row for F347, not by the sweep.** `valueLabelsOf` needed the override, `gutterOf`
+was the place to copy it from, and the two were read side by side for the first time. That is the same
+mechanism as F351 — a second implementation is only ever checked when something makes you read both —
+and it is why the row asserts **all five matrix forms against both functions** rather than the one that
+moved.
+
+---
+
 ## F351 — the stacking fold's rule for a negative reading exists in one of its two implementations, and the other crashes ★★★★☆
 
 ```
