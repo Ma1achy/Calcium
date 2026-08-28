@@ -339,7 +339,16 @@ describe("U — the seam, asserted from both arms", () => {
     // matcher cannot tell which element drew a string, and removing the captions
     // is what made that visible — *assert the artefact, not a proxy*, on a
     // counter rather than on an assertion.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(45); // cells-ok — a document count
+    // **46, and 33 of them are ambiguous** (F353). Measured while `utilisation`
+    // gained its row labels and pushed this from 45: in 33 of the 46, *every*
+    // matching slot label is also a member of `fig.identity` — a row name or a
+    // series name the gutter draws — so the counter cannot tell a legend from a
+    // gutter that happens to say the same words. The comment above says the
+    // matcher cannot tell which element drew a string; this is how much of the
+    // count that reaches. **The artefact is a swatch beside the text**, which
+    // `arm-decisions.ts` already asks for by shape after F307, and asking it here
+    // would re-derive the figure D13 closed against. Recorded, not narrowed.
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(46); // cells-ok — a document count
     expect(gutterFamilies, "documents in the families the terminal gutters").toBe(136); // cells-ok — a document count
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
@@ -358,7 +367,7 @@ describe("U — the seam, asserted from both arms", () => {
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(59); // cells-ok — a document count
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(60); // cells-ok — a document count
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {

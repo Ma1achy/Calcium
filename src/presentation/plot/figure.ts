@@ -15,6 +15,7 @@
 import type {
   ColormapName, OHLC, Plot, PlotForm, QuartileSummary, ScaleType, Segment, Series, VectorSeries,
 } from "../../data/viewmodel/index.js";
+import { IS_MATRIX } from "../../data/viewmodel/index.js";
 import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
@@ -646,7 +647,18 @@ export function frameOf(block: Pick<Plot, "axes" | "plotFrame">): FigureFrame {
  * for one form and a single member would have to pick one.
  */
 export function gutterOf(block: Pick<Plot, "axes" | "form">): boolean {
-  return block.axes === true || block.form === "heatmap";
+  // **The override is the family and not `heatmap` alone** (F352). Keyed on the
+  // one form, `utilisation/default` — a matrix with no `axes`, which C04 permits
+  // and `checkHeatmap` refuses only `axes: false` for — came back `false`, so
+  // the second arm drew a matrix with **no row labels** where the terminal draws
+  // `node-1 … node-4`. `heatmap/default` was right by setting `axes: true`, so
+  // the clause it was written for is the one case that never needed it.
+  //
+  // **The same form found the same narrowness in C04** (C04 I50b): *the refusal
+  // reached one form of eight … found by `utilisation` accepting `axes: false`*.
+  // Two functions, one override, and the narrow copy outlived the fix by the
+  // width of a file.
+  return block.axes === true || IS_MATRIX[block.form];
 }
 
 /**
@@ -669,7 +681,37 @@ export function positionAxisOf(block: Pick<Plot, "axes" | "form" | "xLabels">): 
  * `gutter` must not, because a guttered figure with `yAxis: false` still spends
  * the column on something.
  */
-export function valueLabelsOf(block: Pick<Plot, "yAxis">): "left" | "right" | "both" | null {
+export function valueLabelsOf(block: Pick<Plot, "axes" | "form" | "yAxis">): "left" | "right" | "both" | null {
+  // **`axes` is read here because I67 says it gates three things and this is the
+  // third** (§3ak.40, F347). The `Pick` listed one field where the decision has
+  // two, which is what a reviewer reads as *the inputs this depends on* — so it
+  // read as deliberate, and `axes: false` drew `["0", "5"]` down three figures
+  // whose terminal frames have no furniture at all. `yAxis`'s own doc had ruled
+  // it from the other side before either resolver existed: *`false` removes the
+  // labels and keeps the frame and the x axis, **which is what `axes: false`
+  // cannot say on its own***.
+  //
+  // **The terminal was right by a second mechanism**, which is what hid it: its
+  // labels come from `layout.labelColumn`, and `bandLayout` gets no gutter when
+  // `axes` is not `true`. A decision enforced twice in one arm and once in the
+  // shared layer is not enforced in the shared layer, and the arm holding the
+  // redundancy is the one that looks correct.
+  //
+  // **An explicit `yAxis` does not override it.** `positionAxisOf`'s
+  // `xLabels !== undefined` escape looks like the precedent and is not: those
+  // are three captions the *author wrote*, where `yAxis` is a placement for
+  // labels the figure derives. `axes: false, yAxis: "right"` asks for a side of
+  // an axis that is not drawn — the reason `xTitle` is refused under
+  // `axes: false` rather than honoured.
+  // **The override is the matrix family, and it is I67's own** — *a heatmap
+  // guts its rows whatever `axes` says, since its row labels **are** its
+  // ordinate*. `gutterOf` carries the same override keyed on `heatmap` alone;
+  // written for the family here because C04's `checkHeatmap` already learned
+  // that lesson on this exact family and this exact form — `utilisation`
+  // accepting `axes: false` is what found it (C04 I50b) — and because
+  // `utilisation/default` is the one frame of 182 that moved when this rule was
+  // first written without an override at all.
+  if (block.axes !== true && !IS_MATRIX[block.form]) return null;
   const y = block.yAxis ?? "left";
   return y === false ? null : y;
 }

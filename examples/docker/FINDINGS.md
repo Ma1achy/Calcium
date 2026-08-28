@@ -13642,6 +13642,37 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F353 — the counter that certifies D13 closed cannot tell a legend from a gutter, in 33 of its 46 ★★★★☆
+
+`U1a2` counts *documents drawing a legend label* by asking whether any legend slot's label appears
+among the document's `<text>` bodies. Measured across the 139 drawn documents:
+
+```
+legendDrawn                                              46
+of which every matching label is also in fig.identity    33
+```
+
+A legend slot's label **is** the series name, and `identity` is what the gutter draws — so for a
+matrix, a multi-series line, a stacked area or a slope chart, the same string reaches the page from
+either. `utilisation/default` is the instance that surfaced it: F352 gave it four row labels and the
+counter went from 45 to 46, for a document that draws no legend at all.
+
+**The comment above the assertion already names the mechanism and not its size.** It records F333 —
+*the matcher cannot tell which element drew a string* — and the 67 single-series documents the arm
+rightly never draws a legend for. It does not say that 72% of what remains is ambiguous, and a number
+with a caveat beside it reads as a number that has been checked.
+
+**The artefact is a swatch beside the text**, which `arm-decisions.ts` asks for by shape after F307 —
+*the swatch cannot be a character class here … the tail asks the shape*. So the reader exists, one file
+along, and this counter rolls its own: a test that rolls its own reader carries the premise with it.
+
+**Recorded, not narrowed.** Asking for the swatch re-derives the figure D13 was closed against, which
+is a claim across the whole record and wants its own commit and its own reading. The number stands at
+46 with the measurement written beside it, which is the honest form of a proxy: *assert the artefact,
+not a proxy* — and where the proxy stays, say how far it is from the artefact.
+
+---
+
 ## F352 — one override, two functions, and the narrow copy outlived the fix by the width of a file ★★★★★
 
 ```ts

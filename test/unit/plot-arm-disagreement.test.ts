@@ -142,10 +142,10 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "8/86", "numericLabels": "68/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "8/78", "legend": "14/78", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "sparkline": { silent: "2/8", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "scatter": { silent: "2/12", "numericLabels": "10/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "step": { silent: "2/6", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "line": { silent: "8/86", "numericLabels": "66/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "8/78", "legend": "14/78", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "sparkline": { silent: "2/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "scatter": { silent: "2/12", "numericLabels": "8/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "step": { silent: "2/6", "numericLabels": "2/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "ecdf": { silent: "2/4", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "heatmap": { silent: "4/12", "numericLabels": "agree", "identityLabels": "6/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/8" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
@@ -193,7 +193,7 @@ const MEASURED = {
   // three quantities in three units (C12 I73).
   "timeline": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "bullet": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/4" },
   "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -450,8 +450,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
     expect(open + closed + legitimate, "cells over claimed forms").toBe(352); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(52); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(256); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(50); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(258); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {

@@ -19,7 +19,7 @@ import { normalisedOf, pinnedRange } from "../../src/data/viewmodel/range.js";
 import type { Facing } from "../../src/presentation/plot/scale.js";
 import { plotToSvg, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
 import { violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
-import { levelCaption } from "../../src/presentation/plot/figure.js";
+import { gutterOf, levelCaption, positionAxisOf, valueLabelsOf } from "../../src/presentation/plot/figure.js";
 import { FULL_CAPS } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { DARK_THEME } from "../support/render.js";
@@ -172,6 +172,50 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     // The mark is the arm's, and it descends (C12 I72).
     expect(levelCaption({ form: "contour", series: field } as never, full, { unicode: "ascii" } as never),
       "and which mark separates them is a capability").toBe(" - 20 40 60 80");
+  });
+
+  it("G1e (C12 I67, §3ak.40): `axes` reaches all three resolvers it gates, and the matrix is the override", () => {
+    // **I67 names three and one could not see the field** (F347). A rule whose
+    // subject is a set is checked against the member the reader looks at first,
+    // and two of the three obeyed it — so the row asks all three together, in
+    // one expression, rather than asserting the repaired one on its own.
+    const three = (block: Parameters<typeof valueLabelsOf>[0] & Parameters<typeof positionAxisOf>[0]) =>
+      [gutterOf(block), positionAxisOf(block), valueLabelsOf(block)];
+
+    expect(three({ form: "line", axes: true }), "with axes, all three answer").toEqual([true, true, "left"]);
+    expect(three({ form: "line", axes: false }), "`axes: false` silences all three").toEqual([false, false, null]);
+    // **The default is the one the finding did not name and the corpus reaches.**
+    // `bar/stacked` and every `axes: true` variant hid it; a bare `b.plot({form:
+    // "line", series})` — the commonest call there is — drew `0 2 4 6` in the
+    // SVG against a terminal frame with no furniture at all.
+    expect(three({ form: "line" }), "and so does saying nothing").toEqual([false, false, null]);
+
+    // **An explicit `yAxis` does not override it**, because `axes` says whether
+    // there is any furniture: a side of an axis that is not drawn.
+    expect(valueLabelsOf({ form: "line", axes: false, yAxis: "right" }),
+      "a placement for labels the figure does not derive").toBeNull();
+    expect(valueLabelsOf({ form: "line", axes: true, yAxis: "right" }), "and it is honoured when there is one")
+      .toBe("right");
+    expect(valueLabelsOf({ form: "line", axes: true, yAxis: false }), "`yAxis: false` still says its own thing")
+      .toBeNull();
+
+    // **The override is the matrix family and it is C12 I67's own** — *a heatmap
+    // guts its rows whatever `axes` says*. Written for the family rather than
+    // for `heatmap` alone: `utilisation/default` is the one frame of 182 that
+    // moved when the rule was first written with no override, and it is the same
+    // form that found C04's `checkHeatmap` reaching one form of eight.
+    for (const form of ["heatmap", "utilisation", "correlation", "calendar", "spectrogram"] as const) {
+      expect(valueLabelsOf({ form }), `${form}'s row labels are its ordinate`).toBe("left");
+    }
+    // **And `gutterOf` held the same override keyed on `heatmap` alone** (F352),
+    // so `utilisation/default` — the only matrix in the corpus that does not set
+    // `axes` — drew a matrix with no row labels in the second arm. Both are
+    // asserted here because a family override written twice is one rule, and the
+    // narrow copy is invisible from the wide one.
+    for (const form of ["heatmap", "utilisation", "correlation", "calendar", "spectrogram"] as const) {
+      expect(gutterOf({ form }), `${form} is guttered whatever \`axes\` says`).toBe(true);
+    }
+    expect(gutterOf({ form: "line" }), "and a form outside the family is not").toBe(false);
   });
 
   it("G1b (§3aj hazard 3): the layout ladder is cell-bound, and that is the ruling", () => {

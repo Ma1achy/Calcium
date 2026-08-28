@@ -99,7 +99,7 @@ const figureYs = (blk: Parameters<typeof plotToSvg>[0]): readonly number[] => {
 
 const VALUES = [1, 4, 2, 8, 5, 9, 3, 7];
 const RANGE = { min: 1, max: 9 };
-const block = b.plot({ id: "p", form: "line", height: 8, series: [{ label: "s", values: VALUES }] });
+const block = b.plot({ id: "p", form: "line", height: 8, axes: true, series: [{ label: "s", values: VALUES }] });
 
 /**
  * A source file with its comments removed.
@@ -911,7 +911,7 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     // `null` and the fallback furnished an axis out of nothing — while the
     // terminal drew three candles spanning 8 to 16.
     const candles = b.plot({
-      id: "c", form: "line", height: 6, plotStyle: "candlestick", series: [], ohlc: [...OHLC],
+      id: "c", form: "line", height: 6, axes: true, plotStyle: "candlestick", series: [], ohlc: [...OHLC],
     });
     const svg = plotToSvg(candles, THEME);
     expect(svg, "the datum is read now, so there is a picture").not.toBeNull();
@@ -945,7 +945,7 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     // because the average draws a mark. **This is the row that says the range is
     // the union**, which is what makes drawing the two together honest.
     const withMa = b.plot({
-      id: "m", form: "line", height: 6, plotStyle: "candlestick",
+      id: "m", form: "line", height: 6, axes: true, plotStyle: "candlestick",
       series: [{ label: "ma", values: [11, 12, 12] }], ohlc: [...OHLC],
     });
     const svg = plotToSvg(withMa, THEME);
@@ -1314,7 +1314,13 @@ describe("G6d — the tiles family, and every default checked against the termin
     }
     // The control: a form that does have one still draws it, so a zero above is
     // a decision rather than a renderer that stopped ticking.
-    const curve = b.plot({ id: "cv", form: "line", height: 6, series: [{ label: "s", values: [1, 4, 2] }] });
+    // **`axes: true`, and the control is why it is written here rather than
+    // assumed** (C12 §3ak.40, F347). This block had no `axes` at all and drew
+    // ticks anyway, because `valueLabelsOf` could not see the field — so the
+    // control passed *on the defect it was controlling for*, and asserting
+    // `> 0` against a renderer that had stopped ticking would have been the
+    // only thing it could still catch.
+    const curve = b.plot({ id: "cv", form: "line", height: 6, axes: true, series: [{ label: "s", values: [1, 4, 2] }] });
     expect([...(plotToSvg(curve, THEME, tl) ?? "").matchAll(/text-anchor="end"/gu)].length)
       .toBeGreaterThan(0);
   });

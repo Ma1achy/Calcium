@@ -65,13 +65,17 @@ const ROOT = process.cwd();
 // collapses `"…" + "…"` and a comment between the two halves stops it: putting
 // this note in the middle made the file it documents invisible to the check that
 // found it.
+// **`plot-shared-geometry.test.ts` joined for `G1e`** (F347), which is F336's
+// own remedy applied the moment the anchor check named it: a row expecting an
+// instrument this command cannot invoke reports `CAUGHT ELSEWHERE` at best and
+// `SURVIVED` at worst, and either reads as a fact about the code.
 const CMD =
   "npx vitest run test/unit/plot-curve-figure.test.ts test/unit/plot.test.ts " +
   "test/unit/plot-y-axis.test.ts test/unit/plot-bar-values.test.ts " +
   "test/unit/plot-arm-unification.test.ts test/unit/plot-svg-path.test.ts " +
   "test/golden/plot.test.ts test/golden/terminal-baseline.test.ts " +
   "test/unit/plot-mutations.test.ts test/unit/plot-arm-disagreement.test.ts " +
-  "test/golden/svg-baseline.test.ts";
+  "test/unit/plot-shared-geometry.test.ts test/golden/svg-baseline.test.ts";
 const FIGURE = "src/presentation/plot/figure.ts";
 const DEFINITION = "src/presentation/plot/definition.ts";
 const FURNITURE = "src/presentation/plot/furniture.ts";
@@ -967,6 +971,31 @@ const results = runPass({
       from: "              horizonBandT({ band: i, sign: 1 }, bands, map.kind === \"diverging\")),",
       to: "              bands === 1 ? 1 : i / (bands - 1)),",
       expect: "SB",
+    },
+    {
+      // **I67 names three gated members and the third resolver could not see the
+      // field** (F347, §3ak.40). Reverted, `axes: false` and — the reachable half
+      // — a block that says nothing draw value labels this arm's terminal frame
+      // has no furniture for. `G1e` asks all three resolvers in one expression,
+      // which is what a rule whose subject is a **set** needs: asserting the
+      // repaired one alone is how two of three came to obey it.
+      name: "THE FIELD: `axes` reaches two resolvers of the three it gates",
+      file: FIGURE,
+      from: "  if (block.axes !== true && !IS_MATRIX[block.form]) return null;",
+      to: "  if (block.axes === false && !IS_MATRIX[block.form]) return null;",
+      expect: "G1e",
+    },
+    {
+      // **The same override, narrowed to the form it was written for** (F352).
+      // `heatmap/default` sets `axes: true`, so the one variant this clause was
+      // written for is the one that never needed it — and `utilisation/default`
+      // loses its four row labels in this arm alone. `AD1` is the row, because
+      // the cell is `identityLabels` and the terminal does not move.
+      name: "THE FAMILY: a matrix's gutter override is keyed on one form of five",
+      file: FIGURE,
+      from: "  return block.axes === true || IS_MATRIX[block.form];",
+      to: '  return block.axes === true || block.form === "heatmap";',
+      expect: "AD1",
     },
     {
       name: "THE FILL: a stacked band is an outline, so the reader integrates two curves",

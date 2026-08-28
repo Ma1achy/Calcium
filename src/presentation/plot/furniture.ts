@@ -249,7 +249,7 @@ export function rightGutterWidth(rightColumn: number): number {
 }
 
 /** Which sides of the plot area carry y labels (I47). */
-export function yAxisSides(block: Pick<Plot, "yAxis">): { left: boolean; right: boolean } {
+export function yAxisSides(block: Pick<Plot, "axes" | "form" | "yAxis">): { left: boolean; right: boolean } {
   // **Read back** (C12 I67, §3ak.19): `false` is *no labels, keep the frame*,
   // which `frame` cannot say and `gutter` must not.
   const y = valueLabelsOf(block) ?? false;
