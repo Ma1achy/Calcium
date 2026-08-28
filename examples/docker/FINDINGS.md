@@ -13642,6 +13642,52 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F355 — the sweep re-run: 58 members and not 105, 18 one-armed and not 16, and the two instruments are complementary ★★★★★
+
+F346 asked *which members does a terminal renderer read that neither the shared layer nor the second
+arm does*, and answered **sixteen of a hundred and five**. Both numbers are wrong and the method is
+right.
+
+**The denominator ran past its own type.** The slice took `export type Plot = Readonly<{` to the
+first `\n}>;`, which is not where the type ends — so the member list picked up `PlotForm`'s keys
+(`line`, `heatmap`, `violin`, …) and `QuartileSummary`'s (`min`, `q1`, `median`, `mean`, `pooled`).
+Walking the braces gives **58** top-level members. `105` is 58 members plus 47 things that are not
+members of it, and it read as a measurement because it is a count.
+
+**The numerator moved in both directions.** Of F346's sixteen, `kind` is the discriminant and is read
+as a literal rather than off a block; `lower` and `upper` are `QuartileSummary`'s, not `Plot`'s; and
+`layout` has since crossed (F342). Five it never named: `height`, `xTitle`, `calendarUnit`,
+`startDate`, `xScale`. **Eighteen.**
+
+| | members | |
+|---|---|---|
+| **ruled** | `plotDetail` `fieldDim` `glyphInk` | §3ak.26 — per-cell remedies for a glyph sharing a quantum with its background, and a stroke over a fill shares none |
+| **legitimate** | `height` `width` `aspect` `align` | every one is **cells**: a row count, a block's width in the document, a cell-aspect column count, an alignment within it. The viewBox is fixed and none of them has a meaning here |
+| **owed** | `xTitle` `emptyMessage` `calendarUnit` `startDate` `xScale` `plotFill` `plotBox` `plotCorners` `matrixAnchor` `yCallout` `axisCross` | eleven decisions nobody has made in either arm |
+
+**And the two sweeps see disjoint halves of the eleven**, which is the reusable half:
+
+| how it could be found | members |
+|---|---|
+| a **collision** — two variants differing in one field, one document (F349) | `plotCorners` `matrixAnchor` `yCallout` |
+| corpus instances exist and the corpus never isolates them | `xTitle` `calendarUnit` `startDate` `axisCross` |
+| corpus instances exist **only on a refused form** — every `plotFill` and `plotBox` variant is a `violin` | `plotFill` `plotBox` |
+| **no corpus instance at all** | `emptyMessage` `xScale` |
+
+**`xScale` is the one worth naming.** `yScale` crosses — it is an argument to `valueAxisOf` and both
+arms nice the same ticks — and its abscissa twin does not: `svg.ts` mentions neither, and only the
+ordinate's reaches it through the shared layer. A log x-axis is drawn logarithmically in the terminal
+and linearly here, and **nothing in the corpus sets it**, so no frame, no collision and no golden byte
+can report it. The member sweep is the only instrument that reaches a field the corpus never exercises,
+and the collision sweep is the only one that reaches a field the *record* has no column for. Neither
+subsumes the other.
+
+**And `plotBox`'s instances are all on `violin`**, which this arm refuses — so a member with four
+corpus variants is invisible to every frame-based instrument for a reason that has nothing to do with
+the member. A refusal hides more than the form it names.
+
+---
+
 ## F354 — the anchor check reads a mutation run as text, so a run that cannot execute reports clean ★★★☆☆
 
 `tools/mutate/anchors.mjs` is the cheap proxy for the pass: it resolves every `from:` against the
@@ -13907,6 +13953,8 @@ matrixAnchor yCallout width aspect align axisCross lower upper     … and layou
 a stroke over a fill shares none. `matrixAnchor` is **expressed as a refusal**, which is F259 working.
 The rest — `yCallout`, `aspect`, `align`, `axisCross`, `emptyMessage`, `layout` — are read by one arm
 with **no ruling anywhere**: `yCallout` has nine mentions in C12 and not one about whether it crosses.
+
+**Re-run as F355, which corrects both numbers**: 58 top-level members and not 105 — the slice ran past the type and counted `PlotForm`'s keys and `QuartileSummary`'s — and 18 one-armed and not 16.
 
 **Corrected by F349, one session later.** `matrixAnchor` is **not** expressed as a refusal — `svg.ts`
 refuses exactly one thing, `origin`, at line 1317, and `calendar/day-stretch` draws a full document
