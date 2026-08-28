@@ -152,6 +152,18 @@ const sparse = (rows: readonly VectorSeries[], nth: number): VectorSeries[] =>
     values: r.values.map((p, ci) => ((ri + ci) % nth === 0 ? p : [0, 0] as const)),
   }));
 
+/**
+ * Ten samples spread logarithmically over the declared domain `1 … 1000`.
+ *
+ * **F189's construction, and it is why a log abscissa is a label decision.** An
+ * x sample is placed by its *index*, evenly, and the domain declares which value
+ * that index carries: sample *i* of *n* holds `1000 ** (i / (n − 1))` and already
+ * sits at `i / (n − 1)` of the width, so the tick belongs at
+ * `log(v) / log(max/min)` and the data does not move. The ordinate's transform is
+ * the one that is missing, which is F189 and not this.
+ */
+const DECADE_10 = Array.from({ length: 10 }, (_v, i) => 1000 ** (i / 9));
+
 const PIE_SEGMENTS = [
   { label: "Chrome", value: 65 },
   { label: "Firefox", value: 15 },
@@ -225,6 +237,21 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       xLabels: ["epoch 0", "epoch 20", "now"],
       xTitle: "training step",
       series: [s(sin50, "alpha")],
+    },
+    // C12 I75, §3ak.39 — **a pair differing in exactly one field**, which is
+    // what the collision sweep needs before it can name a member. `xScale` has
+    // no corpus instance at all, so nothing frame-based could reach it: the
+    // member sweep found it by reading the type, and a member the corpus never
+    // exercises is the one thing that sweep alone can see (F355, F356).
+    "x-linear": {
+      form: "line", height: 9, axes: true, legend: false,
+      xMin: 1, xMax: 1000, xScale: "linear",
+      series: [s(DECADE_10, "obs")],
+    },
+    "x-log": {
+      form: "line", height: 9, axes: true, legend: false,
+      xMin: 1, xMax: 1000, xScale: "log",
+      series: [s(DECADE_10, "obs")],
     },
     "callout-last": {
       form: "line", height: 8, axes: true, yAxis: "both", yCallout: "last",
