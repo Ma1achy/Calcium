@@ -13642,6 +13642,44 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F360 — the x row's tokenisation assumes a spacing the renderer does not guarantee, and nineteen groups were already in that state ★★★★
+
+The terminal reader splits the x-label row on **two or more spaces**, which is what tells a run of
+captions from a numeric axis: `first  mid  last` is three identities, `1      250     500` is three
+readings. The renderer does not guarantee that gap.
+
+`line/x-log` at 40 columns:
+
+```
+     └┬────────────────────┬───┬───┬───┘
+      1                   100 200 500
+
+numeric   ["1000","750","500","250","0","1"]
+identity  ["100 200 500"]
+```
+
+**A crowded tick row packs its labels to one space, so three numbers arrive as one caption** — and the
+caption is not numeric, so it lands in `identityLabels`, where the second arm has none. One cell of
+disagreement, manufactured.
+
+**Nineteen groups across the corpus were already like this**, before the pair that found it existed:
+`line/aspect-square`, `line/legend-left`, `line/annotation-label`, `line/axis-cross-corners`,
+`line/candlestick-overlay`, `stackedarea/default`, `streamgraph/default`, `streamgraph/three-band`, and
+four facets each of `smallmultiples/default` and `pairplot/default`. So this is the reader's defect and
+not the fixture's; the fixture is the twentieth instance and the first anyone looked at.
+
+**Corrected — a group of numbers separated by one space is still numbers** — `pairplot`,
+`smallmultiples`, `stackedarea` and `streamgraph` close outright, `line` goes 13/78 to 8/78, and AD4's
+open count moves 49 → 45.
+
+**Same class as F358 one predicate along.** There the reader's *alphabet* was not the renderer's; here
+the alphabet is right and the **tokenisation** is a guess about layout. I77's stated blind spot names
+exactly this — *it says nothing about a reader whose alphabet is right and whose predicate is wrong* —
+which is the blind spot being written down and then walked into within the hour, and the argument for
+writing them down.
+
+---
+
 ## F359 — a bare section reference binds to the nearest preceding document name, so citing another spec re-homes every later one in the same entry ★★★
 
 Writing I77 moved SP8's counter by one: **135 of 6037 across 84 targets**, where it had been 134

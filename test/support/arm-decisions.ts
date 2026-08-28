@@ -478,7 +478,19 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
   for (const l of below) if (isLegendRun(l)) legend = true;
   const xRow = below.find((l) => !RULE_ONLY.test(l) && l.trim() !== "" && !isLegendRun(l));
   for (const x of xRow === undefined ? [] : xRow.trim().split(/\s{2,}/u)) {
-    if (x !== "") (NUMERIC.test(x) ? numeric : identity).push(x);
+    if (x === "") continue;
+    if (NUMERIC.test(x)) { numeric.push(x); continue; }
+    // **A group of numbers separated by one space is still numbers** (F360,
+    // C12 §3ak.43, I77). The split on two-or-more spaces is what tells a run of
+    // captions — `first  mid  last` — from a numeric axis, and it assumes a
+    // spacing the renderer does not guarantee: a crowded tick row packs its
+    // labels to a single gap, so `100 200 500` arrived as one caption. **Nineteen
+    // groups across the corpus were already in that state** — `line/aspect-square`,
+    // `stackedarea`, `streamgraph`, four facets each of `smallmultiples` and
+    // `pairplot` — so this is the reader's, not the fixture's that found it.
+    const parts = x.split(/\s+/u);
+    if (parts.length > 1 && parts.every((t) => NUMERIC.test(t))) { numeric.push(...parts); continue; }
+    identity.push(x);
   }
 
   return {

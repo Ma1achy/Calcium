@@ -142,7 +142,7 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "8/86", "numericLabels": "66/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "12/78", "legend": "14/78", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "line": { silent: "8/86", "numericLabels": "66/78", "identityLabels": "8/78", "border": "4/78", "interiorRules": "12/78", "legend": "14/78", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "2/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "scatter": { silent: "2/12", "numericLabels": "8/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "step": { silent: "2/6", "numericLabels": "2/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -197,8 +197,8 @@ const MEASURED = {
   "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/4" },
   "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "stackedarea": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "streamgraph": { silent: "0/6", "numericLabels": "6/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "stackedarea": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "streamgraph": { silent: "0/6", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The matrix family's eighth, and the only one that needed a derivation to
   // get here** (§3ak.32). `ramp` is F316's column; `notice` is F318's legitimate
   // difference arriving on a third form — a calendar drops leading columns
@@ -227,8 +227,8 @@ const MEASURED = {
   // recurse into `plotToSvg`, so a facet holding a refused form leaves its column
   // empty and its siblings draw — the terminal's own answer, read out of
   // `smallMultiplesRows` rather than chosen.
-  "smallmultiples": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "pairplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "smallmultiples": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "pairplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The proportion family, and eighteen of its twenty cells agree on the day
   // it lands** (§3ak.26). The three renderers were the terminal's own
   // computations moved, so agreement here is the extraction's property
@@ -500,6 +500,16 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // that barely moves is not evidence that nothing did**: 28 of the corpus's
     // 328 pairs changed disposition, and the old and new disagreeing sets are
     // disjoint.
+    //
+    // **49 → 45 with the x row's tokenisation corrected** (F360). The reader
+    // split that row on two-or-more spaces, which is what tells `first  mid
+    // last` from a numeric axis and assumes a spacing the renderer does not
+    // guarantee: a crowded tick row packs to one gap, so `100 200 500` arrived
+    // as a caption. **Nineteen groups across the corpus were already in that
+    // state** before the pair that found it existed — `pairplot`,
+    // `smallmultiples`, `stackedarea` and `streamgraph` closed outright, and
+    // `line` went 13/78 to 8/82. Same class as F358 one predicate along: the
+    // alphabet was right and the tokenisation was a guess.
     const claimed = (Object.values(MEASURED) as readonly Record_[]).filter((v): v is Claimed => v !== "refused");
     let open = 0;
     let closed = 0;
@@ -514,8 +524,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
     expect(open + closed + legitimate, "cells over claimed forms").toBe(352); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(49); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(259); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(45); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(263); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
