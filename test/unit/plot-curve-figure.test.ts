@@ -630,7 +630,22 @@ describe("FD — the distribution family's figure (C12 §3ak.7)", () => {
     // **The connector is emitted before its ends**, which is `mergedRow`'s order
     // and the order a reader resolves an overlap in.
     expect(f.marks[0]!.mark.kind).toBe("polyline");
-    expect(ends.map((d) => d.seriesIndex), "and each end keeps its own slot").toEqual([0, 1, 0, 1]);
+    // **The row's slot, not the pair position** (C12 I29, I68, §3ak.42, F344).
+    // This row asserted `[0, 1, 0, 1]` and was recording the defect: the ends
+    // carried *which end* in the member documented as *the categorical slot,
+    // unresolved — `refOf`'s index, not a colour*, so the second arm drew two
+    // inks over four rows where the terminal draws four and nothing said which
+    // row was which. The connector had no slot at all and fell to the rule's
+    // grey; it takes the row's now with the ends.
+    expect(ends.map((d) => d.seriesIndex), "the row's slot, on both ends").toEqual([0, 0, 1, 1]);
+    expect(lines.map((d) => d.seriesIndex), "and on the connector, which had none").toEqual([0, 1]);
+    // **The end is a shape** — one datum, one channel, and the pair is the
+    // datum. `roles.ts` kept this beside its record on the grounds that the
+    // figure distinguishes the two by `seriesIndex`; that member is the colour,
+    // so honouring it cost the row its ink.
+    expect(ends.map((d) => (d.mark.kind === "point" ? d.mark.role : "")),
+      "near end filled, far end paired — told apart by shape at every rung")
+      .toEqual(["point", "paired", "point", "paired"]);
   });
 
   it("FD5 (C12 I64): a refusal is empty, and the identity survives it", () => {

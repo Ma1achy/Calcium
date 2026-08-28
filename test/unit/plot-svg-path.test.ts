@@ -1168,6 +1168,36 @@ describe("G6c — the distribution family, where containment says nothing", () =
     }
   });
 
+  it("G6c6 (C12 I29, I68, §3ak.42): a dumbbell's row takes the colour and its ends take the shape", () => {
+    // **One datum, one channel** (F344). The terminal spends colour on the row —
+    // four inks for four rows — and shape on the end: `●` near, `○` far. This arm
+    // spent colour on the *end* and grey on the row, so nothing said which row
+    // was which and the shape channel said nothing at all. Read off the paired
+    // sheet; no column of the disagreement record measures a fill.
+    const dumb = b.plot({
+      id: "db", form: "dumbbell", height: 8, axes: true,
+      categories: ["w", "x", "y", "z"],
+      series: [{ values: [1, 3, 5, 4], label: "start" }, { values: [6, 4, 9, 7], label: "end" }],
+    } as Parameters<typeof b.plot>[0]);
+    const svg = plotToSvg(dumb, THEME, layout) ?? "";
+
+    const filled = [...svg.matchAll(/<circle [^>]*fill="(#[0-9a-f]{6})"[^>]*\/>/gu)].map((m) => m[1]);
+    const hollow = [...svg.matchAll(/<circle [^>]*fill="none" stroke="(#[0-9a-f]{6})"[^>]*\/>/gu)].map((m) => m[1]);
+    const rules = [...svg.matchAll(/<path [^>]*stroke="(#[0-9a-f]{6})"[^>]*\/>/gu)].map((m) => m[1]);
+
+    // **Four rows, four inks** — one per row, which is what the terminal draws.
+    expect(new Set(filled).size, "one ink per row and not one per series").toBe(4); // cells-ok — a row count
+    expect(filled, "and the far end is the same ink as the near one").toEqual(hollow);
+    expect(rules, "the connector too, which had no slot at all and fell to the rule's grey")
+      .toEqual(filled);
+
+    // **The ends are told apart by shape**, which is what survives the colour
+    // floor — the argument `candleHollow` makes one form along, and the reason
+    // `paired` is a role rather than a second tone.
+    expect(hollow.length, "a hollow end per pair").toBe(4); // cells-ok — a pair count
+    expect(filled.length, "and a filled one").toBe(4); // cells-ok — a pair count
+  });
+
   it("G6c4: a forest plot ranges over its interval, not its whiskers", () => {
     // The clip happens with `quartileRange` behaving correctly — the caller
     // chooses the arm, which is where a per-family renderer diverges.

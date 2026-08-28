@@ -815,6 +815,15 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
           out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(Math.max(1.5, r * 0.6))}" fill="${ink}"/>`);
         },
         point: () => { out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="${ink}"/>`); },
+        // **The same ink, stroked rather than filled** — `g.hollow` in this
+        // arm's medium (§3ak.42, F344). A dumbbell's two ends are one datum's
+        // two readings, so they share the row's colour and differ in shape;
+        // spending a second ink on them is I29's *one datum, one channel* broken
+        // in the direction that reads as deliberate.
+        paired: () => {
+          out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(r)}" fill="none" ` +
+            `stroke="${ink}" stroke-width="2"/>`);
+        },
         // Unreached — `GLYPH_SHAPE` skipped it above. Present because the record
         // is keyed by the role and not by the shape, so the two cannot drift.
         absent: () => {},

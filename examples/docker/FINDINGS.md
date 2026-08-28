@@ -14017,8 +14017,34 @@ nothing.
 `dot(x, at(vb), "point", 1)` — literal slots — and the connecting polyline carries **no**
 `seriesIndex` at all, which is why it falls to the rule colour. `rowSlot`'s `per > 1 → seriesIndex`
 branch would give the same answer here and is right for `bar/grouped`, where each drawn row *is* one
-series' datum; a dumbbell's row consumes both. **One instance, so it is recorded as one** — the
-remedy needs a hollow shape in `GLYPH_SHAPE`, which the role vocabulary has not got.
+series' datum; a dumbbell's row consumes both.
+
+**Fixed** (§3ak.42, commitment 75), and the remedy this finding first proposed — *a hollow shape in
+`GLYPH_SHAPE`, which the role vocabulary has not got* — was **already refused in `roles.ts`, with its
+reason**, which is the sixth blind spot arriving on a remedy rather than on a claim:
+
+> The two beside the record are **not roles** … a dumbbell's far end is the same role told apart by
+> shape rather than by colour … giving either a role of its own would make `GLYPH_SHAPE` describe
+> eight things where the figure says seven.
+
+**The refusal's alternative is the colour slot.** `Drawn.seriesIndex` is documented as *the
+categorical slot, unresolved — `refOf`'s index, not a colour*, so *distinguish them by `seriesIndex`*
+spends the colour channel on the pair position and leaves the row with nothing. **The terminal never
+noticed because it does not read the member here**: `categoricalForm`'s default `refFor` colours by
+row through `ROW_IS_AN_IDENTITY` and `dumbbellRow` takes its shapes from `pairedPoint`, *beside* the
+record. A member with two meanings is not a disagreement until an arm exists that has only the member.
+
+**And the refusal counted roles rather than asking what the figure has to say.** The figure says
+eight: the far end is drawn distinguishably from the near one, in both arms, today — which is I68's
+subject. `meanOnMedian` stays beside the record on a reason the far end never had, and the difference
+is the reusable part: it is **one cell holding two marks**, a composition rather than a shape, so it
+answers *what happens when two roles land together* and not *which role is this*.
+
+**No terminal frame moves**, which is what says this is an extraction: `of.paired` is the `g.hollow`
+that `pairedPoint` was. One SVG frame moves, and it now reads four inks over four rows with a filled
+end and a hollow one — the terminal's picture.
+
+---
 
 ---
 

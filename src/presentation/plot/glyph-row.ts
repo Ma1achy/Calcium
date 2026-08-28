@@ -192,11 +192,12 @@ export function dumbbellRow(
   const lo = Math.min(x1, x2);
   const hi = Math.max(x1, x2);
   for (let i = lo; i <= hi; i++) row[i] = ch.line;
-  // **One role at both ends, told apart by shape rather than by tone** — which
-  // is why `pairedPoint` sits beside the record instead of in it: the figure
-  // says `point` twice and distinguishes them by `seriesIndex` (I68).
+  // **Two roles, told apart by shape rather than by tone** (C12 I68, §3ak.42).
+  // This read *one role at both ends, distinguished by `seriesIndex`* — and that
+  // member is the **colour** slot, so honouring it cost the row its ink. The
+  // character is unchanged, which is why no frame moves.
   row[x1] = roles.of.point;
-  row[x2] = roles.pairedPoint;
+  row[x2] = roles.of.paired;
 
   return row.join("");
 }

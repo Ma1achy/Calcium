@@ -15,16 +15,16 @@
 <text x="83.6" y="188.8" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">2022</text>
 <clipPath id="isvgb-3"><rect x="0" y="241.6" width="83.6" height="24"/></clipPath>
 <text x="83.6" y="257.6" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#626262">2023</text>
-<path d="M168.96 47.2 L327.68 47.2" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M168.96 47.2 L327.68 47.2" fill="none" stroke="#e69f00" stroke-width="2"/>
 <circle cx="168.96" cy="47.2" r="3" fill="#e69f00"/>
-<circle cx="327.68" cy="47.2" r="3" fill="#56b4e9"/>
-<path d="M248.32 116 L288 116" fill="none" stroke="#626262" stroke-width="2"/>
-<circle cx="248.32" cy="116" r="3" fill="#e69f00"/>
-<circle cx="288" cy="116" r="3" fill="#56b4e9"/>
-<path d="M327.68 184.8 L407.04 184.8" fill="none" stroke="#626262" stroke-width="2"/>
-<circle cx="327.68" cy="184.8" r="3" fill="#e69f00"/>
-<circle cx="407.04" cy="184.8" r="3" fill="#56b4e9"/>
-<path d="M288 253.6 L367.36 253.6" fill="none" stroke="#626262" stroke-width="2"/>
-<circle cx="288" cy="253.6" r="3" fill="#e69f00"/>
-<circle cx="367.36" cy="253.6" r="3" fill="#56b4e9"/>
+<circle cx="327.68" cy="47.2" r="3" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M248.32 116 L288 116" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<circle cx="248.32" cy="116" r="3" fill="#56b4e9"/>
+<circle cx="288" cy="116" r="3" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<path d="M327.68 184.8 L407.04 184.8" fill="none" stroke="#3cbf9a" stroke-width="2"/>
+<circle cx="327.68" cy="184.8" r="3" fill="#3cbf9a"/>
+<circle cx="407.04" cy="184.8" r="3" fill="none" stroke="#3cbf9a" stroke-width="2"/>
+<path d="M288 253.6 L367.36 253.6" fill="none" stroke="#f0e442" stroke-width="2"/>
+<circle cx="288" cy="253.6" r="3" fill="#f0e442"/>
+<circle cx="367.36" cy="253.6" r="3" fill="none" stroke="#f0e442" stroke-width="2"/>
 </svg>

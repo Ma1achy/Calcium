@@ -200,7 +200,7 @@ export type TextAnchor = "start" | "middle" | "end";
  * mark — a forest plot's row with no estimate — and it is a role because the
  * terminal draws something there and the SVG must not draw a point at zero.
  */
-export type GlyphRole = "point" | "median" | "mean" | "outlier" | "cap" | "target" | "absent";
+export type GlyphRole = "point" | "paired" | "median" | "mean" | "outlier" | "cap" | "target" | "absent";
 
 /**
  * **Whether a role is a mark at a point, a run across the slot, or nothing**
@@ -224,6 +224,14 @@ export type GlyphShape = "mark" | "span" | "none";
 /** @see GlyphShape — exhaustive, so an eighth role is a compile error here first. */
 export const GLYPH_SHAPE = Object.freeze({
   point: "mark",
+  // **The far end of a pair, and it is a role because the figure distinguishes
+  // it** (§3ak.42, F344). `roles.ts` kept it beside the record on the grounds
+  // that *the figure says `point` twice and distinguishes them by
+  // `seriesIndex`* — which spends the **colour** slot on the pair position and
+  // leaves a dumbbell's row with nothing to be named by. That refusal counted
+  // the record's entries, and the question is how many things the figure
+  // distinguishes: it distinguishes eight, and has in both arms all along.
+  paired: "mark",
   median: "span",
   mean: "mark",
   outlier: "mark",
@@ -1203,8 +1211,20 @@ export function distributionFigure(block: Plot): Figure {
         const x = (i + 0.5) / n;
         // The connector first, so the two ends read over it — `mergedRow`'s own
         // order, which is the order a reader resolves an overlap in.
-        marks.push({ mark: { kind: "polyline", points: [[x, at(va)], [x, at(vb)]] }, layer: "series" });
-        marks.push(dot(x, at(va), "point", 0), dot(x, at(vb), "point", 1));
+        // **The row's slot on all three, which is I29's *one datum, one channel***
+        // (§3ak.42, F344). These were `0` and `1` — the *pair position* in the
+        // member documented as the colour slot — so this arm drew two inks for
+        // four rows and the terminal drew four, and nothing here said which row
+        // was which. **The connector had no slot at all**, measured rather than
+        // inferred, so it fell to the rule's grey; it takes the row's with the
+        // ends. `ROW_IS_AN_IDENTITY[dumbbell]` is what the terminal reads, and
+        // this is the same answer where the second arm can see it.
+        //
+        // **Not `rowSlot`.** Its `per > 1 → seriesIndex` branch is right for
+        // `bar/grouped`, where each drawn row *is* one series' datum; a
+        // dumbbell's row consumes both, so the slot is the row index directly.
+        marks.push({ mark: { kind: "polyline", points: [[x, at(va)], [x, at(vb)]] }, layer: "series", seriesIndex: i });
+        marks.push(dot(x, at(va), "point", i), dot(x, at(vb), "paired", i));
       }
     } else {
       qs.forEach((q, i) => {

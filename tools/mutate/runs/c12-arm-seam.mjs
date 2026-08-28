@@ -200,8 +200,8 @@ const results = runPass({
       // `mergedRow`'s order and the order a reader resolves an overlap in.
       name: "a dumbbell's connector is drawn over its own ends",
       file: FIGURE,
-      from: "        marks.push({ mark: { kind: \"polyline\", points: [[x, at(va)], [x, at(vb)]] }, layer: \"series\" });\n        marks.push(dot(x, at(va), \"point\", 0), dot(x, at(vb), \"point\", 1));",
-      to: "        marks.push(dot(x, at(va), \"point\", 0), dot(x, at(vb), \"point\", 1));\n        marks.push({ mark: { kind: \"polyline\", points: [[x, at(va)], [x, at(vb)]] }, layer: \"series\" });",
+      from: "        marks.push({ mark: { kind: \"polyline\", points: [[x, at(va)], [x, at(vb)]] }, layer: \"series\", seriesIndex: i });\n        marks.push(dot(x, at(va), \"point\", i), dot(x, at(vb), \"paired\", i));",
+      to: "        marks.push(dot(x, at(va), \"point\", i), dot(x, at(vb), \"paired\", i));\n        marks.push({ mark: { kind: \"polyline\", points: [[x, at(va)], [x, at(vb)]] }, layer: \"series\", seriesIndex: i });",
       expect: "FD4",
     },
     {
@@ -529,8 +529,8 @@ const results = runPass({
       // frame agrees with.
       name: "THE RUNG: a dumbbell's far end takes the near end's mark",
       file: ROLES,
-      from: "    pairedPoint: g.hollow,",
-      to: "    pairedPoint: g.filled,",
+      from: "      paired: g.hollow,",
+      to: "      paired: g.filled,",
       expect: "baseline",
     },
     {
@@ -971,6 +971,20 @@ const results = runPass({
       from: "              horizonBandT({ band: i, sign: 1 }, bands, map.kind === \"diverging\")),",
       to: "              bands === 1 ? 1 : i / (bands - 1)),",
       expect: "SB",
+    },
+    {
+      // **`seriesIndex` is the colour slot and cannot also be the shape**
+      // (§3ak.42, F344). Reverted, the ends carry the *pair position* in the
+      // member documented as `refOf`'s index, so four rows draw two inks and
+      // nothing says which row is which — the terminal draws four.
+      // Named THE PAIR and not THE CHANNEL: the quiver row already has that
+      // name, and two rows one report cannot tell apart is a legibility defect in
+      // the instrument rather than in the code (F354's neighbour).
+      name: "THE PAIR: a dumbbell's ends take the colour slot, so its rows take none",
+      file: FIGURE,
+      from: "        marks.push(dot(x, at(va), \"point\", i), dot(x, at(vb), \"paired\", i));",
+      to: "        marks.push(dot(x, at(va), \"point\", 0), dot(x, at(vb), \"paired\", 1));",
+      expect: "FD4",
     },
     {
       // **A clip contains and does not communicate** (F343). Reverted to the

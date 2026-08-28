@@ -784,12 +784,15 @@ describe("U — the seam, asserted from both arms", () => {
     // committed to. `cells()` and not `.length`, or the measurement drifts from
     // the measurer's.
     for (const c of caps) {
-      const { of, meanOnMedian, pairedPoint } = roleGlyphs(c.caps as unknown as TCaps);
+      // **`paired` moved into the record** (C12 §3ak.42, F344), so the loop below
+      // covers a dumbbell's far end now and there is one fewer thing beside it.
+      const { of, meanOnMedian } = roleGlyphs(c.caps as unknown as TCaps);
       for (const [role, glyph] of Object.entries(of)) {
         expect(cells(glyph, c.caps["ambiguousWidth"] as AmbiguousWidth), `${c.name}: ${role} is one cell`).toBe(1); // cells-ok — the subject
       }
       expect(cells(meanOnMedian, c.caps["ambiguousWidth"] as AmbiguousWidth), `${c.name}: the coincident mean`).toBe(1); // cells-ok — the subject
-      expect(cells(pairedPoint, c.caps["ambiguousWidth"] as AmbiguousWidth), `${c.name}: a dumbbell's far end`).toBe(1); // cells-ok — the subject
+      expect(Object.keys(of), `${c.name}: and the record is the figure's roles, not a subset`)
+        .toContain("paired");
     }
   });
 

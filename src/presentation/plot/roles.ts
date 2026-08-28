@@ -39,12 +39,18 @@ type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
  * character here and a `span` there would be drawn twice, once as a run and once
  * as a cell; here it is a missing or an excess key.
  *
- * The two beside the record are **not roles**, which is why they are not in it:
- * a mean landing on the median is the same role in a cell that already holds
- * another mark, and a dumbbell's far end is the same role told apart by shape
- * rather than by colour — both are answers to *which of this role*, and giving
- * either a role of its own would make `GLYPH_SHAPE` describe eight things where
- * the figure says seven.
+ * **`meanOnMedian` is beside the record and is not a role**: a mean landing on
+ * the median is **one cell holding two marks**, so it answers *what happens when
+ * two roles land together* rather than *which role is this*.
+ *
+ * **A dumbbell's far end used to sit beside it and is now in it** (§3ak.42,
+ * F344). The note refused both for one reason — *giving either a role of its own
+ * would make `GLYPH_SHAPE` describe eight things where the figure says seven* —
+ * and only one of them earns it. The figure says **eight**, and has in both arms
+ * all along: the far end is drawn distinguishably from the near one, which is
+ * I68's subject. The refusal's alternative was `seriesIndex`, which is the
+ * **colour** slot, so honouring it left a dumbbell's row with no ink of its own
+ * and the second arm spending colour on the pair position.
  */
 export type RoleGlyphs = Readonly<{
   /** One character per role that marks a cell — **keyed by `MarkRole`, which is derived**. */
@@ -55,12 +61,6 @@ export type RoleGlyphs = Readonly<{
    * one, so *they coincide* read as *it is missing*.
    */
   meanOnMedian: string;
-  /**
-   * A dumbbell's far end. **A shape rather than a tone**, so the pairing
-   * survives the colour floor — which is the same argument `candleHollow` makes
-   * one form along.
-   */
-  pairedPoint: string;
 }>;
 
 /** @see RoleGlyphs */
@@ -77,9 +77,14 @@ export function roleGlyphs(caps: Caps): RoleGlyphs {
       mean: g.diamond,
       outlier: g.dotted,
       target: g.diamond,
+      // **A dumbbell's far end. A shape rather than a tone**, so the pairing
+      // survives the colour floor — the same argument `candleHollow` makes one
+      // form along. It moved into the record when the figure gained the role
+      // (§3ak.42, F344); the character is the one it always was, which is what
+      // makes this an extraction rather than a change of picture.
+      paired: g.hollow,
     },
     meanOnMedian: g.diamondTee,
-    pairedPoint: g.hollow,
   };
 }
 
