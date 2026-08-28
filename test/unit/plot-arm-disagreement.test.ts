@@ -142,7 +142,7 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "8/86", "numericLabels": "66/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "8/78", "legend": "14/78", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "line": { silent: "8/86", "numericLabels": "66/78", "identityLabels": "13/78", "border": "4/78", "interiorRules": "12/78", "legend": "14/78", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "2/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "scatter": { silent: "2/12", "numericLabels": "8/10", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "step": { silent: "2/6", "numericLabels": "2/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -161,8 +161,8 @@ const MEASURED = {
   "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "bar": { silent: "2/14", "numericLabels": "10/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
-  "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "2/10", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "boxplot": { silent: "0/10", "numericLabels": "8/10", "identityLabels": "1/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   //  closed with F326: its two categories are `1` and `2`,
   // numerals that the clip-path rule filed as names on one side only.
   "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -186,7 +186,7 @@ const MEASURED = {
   // names them.
   "slope": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "bubble": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "autocorrelation": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "2/2", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The last two of family 8's residue** (§3ak.35). `timeline` is the one form
   // whose rows are series, pinned to its own range so the marks and the labels
   // come from one axis; `bullet` has no axis at all, because its three rows are
@@ -220,14 +220,14 @@ const MEASURED = {
   "spectrogram": { silent: "0/4", "numericLabels": "agree", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "1/4" },
   "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/2" },
   "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "1/2" },
-  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "1/4", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "violin": "refused",
   "ridgeline": "refused",
   // **The compositions, which are whatever their children are** (§3ak.36). Both
   // recurse into `plotToSvg`, so a facet holding a refused form leaves its column
   // empty and its siblings draw — the terminal's own answer, read out of
   // `smallMultiplesRows` rather than chosen.
-  "smallmultiples": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "1/2", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "smallmultiples": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "pairplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The proportion family, and eighteen of its twenty cells agree on the day
   // it lands** (§3ak.26). The three renderers were the terminal's own
@@ -489,6 +489,17 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **224 → 231 with `horizon`**, whose 7 cells are 2 open, 4 closed and 1
     // legitimate — and both open ones are F316's column, once directly and once
     // as the key's own word landing in `identityLabels`.
+    //
+    // **50 → 49 with the interior-rule reader corrected, and six forms moved to
+    // get there** (F358). The net is one cell and it is the least interesting
+    // thing about it: `boxplot`, `density` and `smallmultiples` closed because
+    // their disagreement was a *figure* glyph the reader counted as a rule, and
+    // `autocorrelation` and `forest` opened because the terminal draws a real one
+    // — significance bands, a reference line — that this arm does not. `line`
+    // stayed open and went 8 to 12 for the same reason twice over. **A total
+    // that barely moves is not evidence that nothing did**: 28 of the corpus's
+    // 328 pairs changed disposition, and the old and new disagreeing sets are
+    // disjoint.
     const claimed = (Object.values(MEASURED) as readonly Record_[]).filter((v): v is Claimed => v !== "refused");
     let open = 0;
     let closed = 0;
@@ -503,8 +514,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
     expect(open + closed + legitimate, "cells over claimed forms").toBe(352); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(50); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(258); // cells-ok — a cell count
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(49); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(259); // cells-ok — a cell count
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
@@ -680,31 +691,48 @@ describe("AD — the two arms decide separately, and here is where", () => {
       "and a node's own connectors do not become one").toBe(false);
   });
 
-  it("AD10 (F334): a blank row inside a frame is not a rule, and a rule still is", () => {
-    // **The reader owes a fabricated violation in both directions**, and this one
-    // was reporting a rule where neither arm draws a line. `RULE_ONLY` admits
-    // whitespace, so a row of spaces between two borders matched it — which is
-    // every form whose categories do not fill its declared height, and it read as
-    // the arms disagreeing about a line that is not there. Nine forms carried the
-    // phantom, `bar` at 6 of 12 pairs.
-    const framed = (body: readonly string[]): readonly string[] =>
-      ["  ┌────────────┐", ...body, "  └────────────┘"];
+  it("AD10 (F334, F358): a rule is dotted, and everything else in that alphabet is a figure", () => {
+    // **The reader owes a fabricated violation in both directions**, and F334's
+    // was written in hand-built strings using `├───┤` and `│  │  │` — a
+    // vocabulary the renderer does not draw. Both rows passed while the reader
+    // saw **no** real rule anywhere in the corpus: measured over 364 frames, it
+    // answered `> 0` on 15 and the frame held a `┄` or `┊` on 16, and the two
+    // sets did not intersect (F358).
+    //
+    // **So the positives are rendered rather than composed.** A control the
+    // renderer cannot produce certifies a reader against a picture nobody draws,
+    // and that is the only reason this one is not two more strings.
+    const curve = Array.from({ length: 20 }, (_v, i) => 50 + 40 * Math.sin(i / 3));
+    const drawn = (extra: Record<string, unknown>): readonly string[] =>
+      frame({ form: "line", height: 8, axes: true, legend: false, series: [{ values: curve }], ...extra },
+        FULL, 60, "p");
 
-    // **The direction that was wrong**: a blank row has exactly the two borders.
-    expect(terminalDecisions(framed(["a ┤████        │", "  │            │"])).interiorRules,
+    // **The direction that must survive, and it is the corpus's own variant**:
+    // `plotFrame: "grid"` draws `┄` across at every value tick and `┊` down at
+    // every position tick, so every interior row carries one.
+    expect(terminalDecisions(drawn({ plotFrame: "grid" })).interiorRules,
+      "a gridded figure draws rules the reader can see").toBeGreaterThan(0);
+
+    // **The direction that was wrong** (F358): the same figure without the grid
+    // draws none, and a steep one draws its own `│` down the area. `1000 ** (i/9)`
+    // is `x-log`'s series, which is where this was found.
+    expect(terminalDecisions(drawn({})).interiorRules,
+      "and the same figure without one draws none").toBe(0);
+    expect(terminalDecisions(drawn({
+      xMin: 1, xMax: 1000, series: [{ values: Array.from({ length: 10 }, (_v, i) => 1000 ** (i / 9)) }],
+    })).interiorRules, "a curve's own vertical is not a rule").toBe(0);
+
+    // **F334's case, which is still a case**: a blank row inside a frame is two
+    // border glyphs and nothing else, and it must not read as a line.
+    const framed = (body: readonly string[]): readonly string[] =>
+      ["  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510", ...body,
+       "  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518"];
+    expect(terminalDecisions(framed(["a \u2524\u2588\u2588\u2588\u2588        \u2502", "  \u2502            \u2502"])).interiorRules,
       "a blank row is not a rule").toBe(0);
 
-    // **The direction that must survive**, and it is why this counts glyphs
-    // rather than testing for `─`: a horizontal rule is a run, and a column of
-    // gridlines is one glyph per column with no horizontal in the row at all.
-    expect(terminalDecisions(framed(["a ┤████        │", "  ├────────────┤"])).interiorRules,
-      "a horizontal rule across the area is one").toBe(1);
-    expect(terminalDecisions(framed(["a ┤████        │", "  │    │    │ │"])).interiorRules,
-      "and so is a row of vertical gridlines").toBe(1);
-
     // **A border row is still not an interior rule**, which the `TOP`/`BOTTOM`
-    // clauses answer and this must not have quietly taken over.
-    expect(terminalDecisions(framed(["a ┤████        │"])).interiorRules,
+    // clauses answer and the new alphabet must not have quietly taken over.
+    expect(terminalDecisions(framed(["a \u2524\u2588\u2588\u2588\u2588        \u2502"])).interiorRules,
       "the frame's own edges are not interior").toBe(0);
   });
 

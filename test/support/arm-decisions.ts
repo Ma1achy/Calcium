@@ -50,10 +50,8 @@ const TOP = /^\s*[┌+]/u;
 const BOTTOM = /^\s*[└+]/u;
 /** A row that is *only* frame — the border itself, rather than a row with edges. */
 const RULE_ONLY = /^[\s┌┐└┘├┤┬┴┼─│+|-]+$/u;
-/** How many of a row's characters are rule glyphs — a blank row inside a frame has two. */
-function ruleGlyphs(line: string): number {
-  return [...line].filter((c) => "┌┐└┘├┤┬┴┼─│+|-".includes(c)).length; // cells-ok — a glyph count
-}
+/** The glyphs an interior rule is drawn in — **dotted, and only dotted** (F358). */
+const DOTTED_RULE = /[\u2504\u2505\u2506\u2507\u250a\u250b\u2508\u2509\u254c\u254d\u254e\u254f]/u;
 /** A label shaped like a name rather than a reading. */
 const WORD = /[A-Za-z][A-Za-z0-9_.-]*/gu;
 const NUMERIC = /^-?[\d.,]+\s*[%a-zA-Z]{0,3}$/u;
@@ -501,21 +499,36 @@ export function terminalDecisions(raw: readonly string[]): ArmDecisions {
     numericLabels: numeric,
     identityLabels: identity,
     border,
-    // **Interior rules only, and the terminal draws none.** Its ticks are stubs
-    // *on* the border — `┬` and `┴`, or `+` in ASCII — where the SVG's are lines
-    // spanning the area. Counting the border's stubs here would report the arms
-    // agreeing about a thing neither does the same way, and in ASCII it would
-    // count the corners too.
-    // **And a blank row inside a frame is not a rule** (F334, §3ak.35).
-    // `RULE_ONLY` admits whitespace, so `│` + spaces + `│` matched it — every
-    // form whose categories do not fill its declared height reported a phantom
-    // rule, and the arms read as disagreeing about a line neither draws.
-    // **More than the two borders** is what separates them: a blank row has
-    // exactly two rule glyphs, a horizontal rule has a run of them, and a column
-    // of gridlines has one per column — so this stays able to see a vertical
-    // rule, which a `[─-]` test would not.
-    interiorRules: area.filter((l) =>
-      RULE_ONLY.test(l) && !TOP.test(l) && !BOTTOM.test(l) && ruleGlyphs(l) > 2).length, // cells-ok — a glyph count
+    // **Interior rules only, and the terminal draws none of the border's.** Its
+    // ticks are stubs *on* the border — `┬` and `┴`, or `+` in ASCII — where the
+    // SVG's are lines spanning the area. Counting the border's stubs here would
+    // report the arms agreeing about a thing neither does the same way, and in
+    // ASCII it would count the corners too.
+    //
+    // **The vocabulary is the whole of it, and the previous one was a different
+    // vocabulary** (F358, §3ak.43). This read `RULE_ONLY` —
+    // `[\s┌┐└┘├┤┬┴┼─│+|-]` — with F334's `> 2` on top, and the terminal draws an
+    // interior rule **dotted**: `┄` across, `┊` down. So a gridded row failed the
+    // predicate outright and a plot row holding two borders plus one `│` of the
+    // *curve* cleared the count. Measured over 364 frames: the old reader
+    // answered `> 0` on 15, the frame held a dotted glyph on 16, and **not one
+    // frame was in both** — `line/frame-grid` holds eight rows of gridlines and
+    // reported zero.
+    //
+    // **F334 is right about what it fixed and could not have found this.** *A
+    // blank row inside a frame is not a rule* — `│` + spaces + `│` is two glyphs,
+    // so `> 2` removed the phantom. The frames it was measured against had no
+    // third glyph, and the third glyph, when it came, was a figure's. Third
+    // instance of one class after F321's edge glyph and F334's blank row, both
+    // closed on the instance.
+    //
+    // **A row and not a glyph count**, which is what the SVG's own reader
+    // measures once the frame's four edges are dropped: one horizontal rule is
+    // one row, and a column of verticals puts a `┊` in every interior row, so a
+    // gridded figure counts its rows in one arm and its `<line>` elements in the
+    // other. The two are not the same quantity and the record says so — every
+    // gridded pair disagrees, in both readers, before and after.
+    interiorRules: area.filter((l) => DOTTED_RULE.test(l) && !TOP.test(l) && !BOTTOM.test(l)).length, // cells-ok — a row count
     legend,
   };
 }
