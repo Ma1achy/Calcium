@@ -13642,6 +13642,87 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F357 — I75's only citation is a row about something else, and a citation is what every mechanism counts ★★★★☆
+
+I75 says the collision sweep *"is checked over the corpus"*, and reports its numbers: 182 variants,
+**175** distinct terminal frames and **125** documents, 4 collisions and 25 past the empty one, 21 of
+them this arm's alone. **Nothing computes any of them.**
+
+Every C12 invariant is cited by some test file — 76 of 76, measured. I75's is `FB7` in
+`plot-curve-figure.test.ts`, whose subject is `layout` selecting a figure and whose assertions are
+rect widths and x offsets. It cites I75 because F342 was *found* by a collision, and it computes none.
+**The invariant's subject is the corpus; its citing row's subject is one block field.**
+
+**And no rule requires an invariant to have a check.** SP1 pairs a commitment to an invariant and
+nothing pairs an invariant to a test, so 76 of 76 is a convention held by hand — and a citation
+satisfies a convention whatever the row does. This is the class already written down one artefact
+along, arriving on a different subject: *the test is never "does this mention the finding", it is
+"would landing this close it"*. Here it is a citation reading as coverage of an **invariant** rather
+than of a finding, and the reading is done by a person because there is no gate to fool.
+
+**The figures cannot be re-derived.** They came from a probe written in one session and deleted in
+it, under the rule that probes are deleted before staging. So I75's measurement is a number in prose
+with no route back — F58's shape one layer up: not four documents citing each other, but one
+statement with a count in it, which is what a ruling looks like from outside.
+
+**The instrument's own near-miss is the reason it must not read the catalogue.** I75 records it: the
+catalogue's frames open with a header naming the variant, so a first measurement read *182 of 182
+distinct* — a perfect score manufactured by the corpus's own labelling. `baselineFrames()` and
+`svgFrames()` are in-memory maps of `name → bytes` with no header at all, so the sweep built here
+takes those and the header clause describes a hazard of a corpus it does not read.
+
+---
+
+## F356 — the position axis crosses as a boolean, so four members ride below it and the grid is drawn half ★★★★★
+
+F355 named `xScale` the sharp one of the eleven owed and gave the reason: *a log x-axis is drawn
+logarithmically in the terminal and linearly here*. **Measured, it is wrong, and wrong in the shape
+this instrument keeps producing** — not wrong for the reason given, and concealing a larger defect
+nobody had stated.
+
+Six blocks differing only in the abscissa, one `line`, 80 columns:
+
+```
+                 terminal                                    svg
+xScale unset     1  100  200  300 …  900 1000                1225 bytes
+xScale: "log"    1    5   10   20 …  500 1000                1225 bytes · IDENTICAL
+xFormat          1% 100% 200% 300% … 900%                    1225 bytes · IDENTICAL
+xMax: 500        1   50  100  150 …  450  500                1225 bytes · IDENTICAL
+xTitle           the row, and `seconds` centred below it     1225 bytes · IDENTICAL
+```
+
+**Six terminal frames, one document.** Not linear — **absent**. `Figure.positionAxis` is a
+**boolean**, and the only thing it gates in this arm is `block.xLabels`, three captions the caller
+supplied; the five `<text>` elements every one of those documents holds are the *value* labels down
+the left.
+
+So it is not one member. `xMin`, `xMax`, `xScale` and `xFormat` have **zero readers in `svg.ts` and
+zero in `figure.ts`** — they are read by `furniture.ts`, which only `definition.ts` and `heatmap.ts`
+import. `xTitle` is a fifth by the same route. F355 counted the first four as crossed because they
+reach `axes.ts` and `axes.ts` is shared; the only thing `svg.ts` imports from it is `formatValue`.
+
+**And the misinforming half is a member that *does* cross.** `plotFrame: "grid"` reaches `frameOf`,
+both arms draw it, and the two styles are not the same picture:
+
+```
+terminal   ┊ at every position tick and ┄ at every value tick — 10 verticals, 5 horizontals
+svg        5 <line> elements, every one horizontal
+```
+
+`svg.ts`' own comment, written when D6 closed, says *"The terminal draws `┄` at every value tick and
+`┊` at every position tick; **both ways**, and drawing one was half of what the style means."* The
+sentence is in the file and the file does one way — because there is no position geometry to hang the
+other on. **A member can cross and still be drawn wrongly, because what it needs is a second member
+that did not**, and the member sweep is blind to that by construction: it asks *is this member read in
+both arms*, and `plotFrame` is.
+
+**The remedy is the value axis's own shape rather than four per-member fixes.** `Figure.value` carries
+a niced `ValueAxis` and each arm draws from it; the position axis carries a boolean. The four members
+are not four decisions — they are four inputs to one computation that has not moved, and `xTickRow`
+is that computation with the cell-packing wrapped around it.
+
+---
+
 ## F355 — the sweep re-run: 58 members and not 105, 18 one-armed and not 16, and the two instruments are complementary ★★★★★
 
 F346 asked *which members does a terminal renderer read that neither the shared layer nor the second
