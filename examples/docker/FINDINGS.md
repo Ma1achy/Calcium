@@ -13642,6 +13642,27 @@ gate**, and this one had survived every frame read of every other family.
 
 ---
 
+## F359 — a bare section reference binds to the nearest preceding document name, so citing another spec re-homes every later one in the same entry ★★★
+
+Writing I77 moved SP8's counter by one: **135 of 6037 across 84 targets**, where it had been 134
+across 83. The new dangling target was `A03 §3ak.43` — a section of A03 that does not exist and that
+nothing had written.
+
+The entry says *…which is A03 §2's note about SP1…* and, two sentences later, *(F358, §3ak.43)*. The
+resolver binds a bare `§x` to the **nearest preceding document name**, and this entry supplies one. So
+a citation of another spec silently re-homes every bare reference after it, inside the same entry, and
+the reference that dangles is the one about **this** document.
+
+**It fails in the direction that reads as correct.** A bare `§3ak.43` inside C12 is the ordinary way to
+name your own section, and it resolves everywhere except after a sentence that mentions a neighbour.
+Qualifying it as `C12 §3ak.43` returned the counter to 134 across 83.
+
+**Found by reading a not-gated counter.** SP8 is reported and never fails a build, so the only thing
+that catches this is noticing a number moved — and the number moving by one, in the direction of *more
+dangling*, is what a correct new citation looks like if nobody checks.
+
+---
+
 ## F358 — the interior-rule reader and its subject are disjoint sets, and the control that certified it is written in a vocabulary the renderer does not use ★★★★★
 
 `ArmDecisions.interiorRules` asks *how many rules does this figure draw inside its frame*. Measured
