@@ -6926,6 +6926,90 @@ and repaired it with `IS_MATRIX`; the copy one file along kept the form name, be
 wrong from where the other sits.
 
 ---
+
+### 3ak.41 — A clip contains and does not communicate, and the premise it was chosen under named its own trigger
+
+```
+terminal   boxplot/default    sepal_length ┤ …   petal_length ┤ …      all four, in full
+SVG        boxplot-default    text-anchor="end" x="83.6"  →  starts at x ≈ −2.8, clipped at 0
+                              petal_length renders as `betal_length`
+```
+
+**A cut head is a different word.** A tail cut reads as truncation and a head cut reads as a name,
+and nothing on the page says anything was removed — so the reader is not shown less, they are shown
+something else.
+
+#### The sentence that licensed it is true and is about a different question
+
+`SVG_FONT_SIZE`'s own doc: *it sizes nothing: the label places itself, so this is the glyph height and
+never an input to a layout (§3aj hazard 4).* Both halves hold. `text-anchor="end"` really does place a
+right-aligned label with no width, which is the whole of what hazard 4 asked for.
+
+**Placement and containment are two questions**, and the sentence answers the first while sitting
+above a decision about the second. That is F84's class — *a correct sentence justifying the wrong
+decision survives being read carefully* — and it is why review agreed: the justification is checked
+for truth, and this one is true.
+
+#### §3ak.20's premise, and it wrote down what would falsify it
+
+> This arm sizes its gutter to **a tenth of the width and not to its content**, deliberately … sizing
+> to content is what drags metrics back in, and **it is affordable here because pixels overflow
+> gracefully and cells do not**.
+>
+> The one difference this leaves is legitimate and has no instance yet … **The day one is, that is the
+> argument to make.**
+
+They do not overflow gracefully. The instance is `boxplot/default` and the argument is this section.
+
+**What that ruling forbids is untouched.** It forbids `min(cells(widest), width / 3)` in a *shared*
+layout, because `cells()` cannot serve the image path — hazard 4, and still true. `SVG_EM` is not
+shared, does not call `cells()`, and measures nothing in the terminal's units: it is the arm sizing
+its own furniture in its own units, which §3ak.20 says in as many words is each arm's business. **No
+new member and no shared metric** — the strings are `identity`, the side is `orientation`, and the
+width is still each arm's own.
+
+#### Grown, capped, and cut at the tail past the cap
+
+`bandLayout`'s shape in pixels — `min(widest · em, width / 3)` — with two decisions of its own:
+
+- **Grown and never shrunk.** The tenth stays the floor. It was chosen deliberately and the only
+  thing measured against it is the overflow; a rule that also narrowed would move every guttered
+  frame in the corpus on the strength of a case that was fine.
+- **The cut is at the tail and marked**, which is `truncate` in the other arm. It has **no instance
+  in the corpus** — the longest identity string is twelve characters and a third of 640 is 213 px —
+  and it is written because the defect is *an unmarked cut at the head*, which a forty-character
+  label reaches whatever the gutter is. Close the class, not the instance.
+
+**The clip stays**, as belt to the estimate's braces: the estimate decides where to cut, the
+rectangle guarantees nothing escapes the gutter if the estimate is wrong about a font.
+
+**And the value labels had no clip at all.** They are `end`-anchored on the left by the same code
+shape, so a long one ran off the viewBox — the same head-first loss with nothing catching it. One
+rule, both.
+
+#### A label taller than the box it names, which is the same rule across the text rather than along it
+
+`graph/crowded` is 14 ranks in `height: 7`. The terminal draws three and says `+11 more · service-14 ·
+service-01 · …`; this arm draws all fourteen at `275.2 / 14 = 9.83 px` a rank and writes every label at
+`SVG_FONT_SIZE = 12` — **every glyph taller than the box it names**, ascending into the rank above and
+descending into the one below, both of which it does not name.
+
+**It qualifies F318's `legitimate` row rather than overturning it.** *This arm scales its box across
+whatever it is given and has nothing to drop* is true; what it did instead, past a rank count, was draw
+something no reader can use. Scaling is what the medium affords, it drops nothing, and `notice` stays a
+legitimate difference rather than becoming a disagreement the record has to open.
+
+**No floor on the size.** A rank too short to read is too short at any size, and the clip already stops
+a label leaving its box — a floor would be a policy invented for a case nobody has measured, which is
+the other half of *close the class, not the instance*: the class is the overflow, and a legibility
+threshold is a different claim.
+
+**So the rule has two axes and one shape.** A label overflows **along** its text direction or
+**across** it: along, it is cut at the tail and marked; across, it is scaled to the box. Both are the
+arm containing what the shared layer declined to measure, which is I63's other half.
+
+
+---
 ---
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -8182,6 +8266,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I73** — **A form has a value axis only where one range carries every mark.** A `Figure` holds one `value`, so a form whose rows each carry their own scale has no value axis, and neither has one whose readings are shares rather than positions. I60 asks whether a form's readings sit on a value scale *at all*; this is the half that asks whether they sit on **one**, and the two look identical until a form is drawn. *Measured before the rule, over the five that had never been drawn: `gantt`'s axis would have read `0 … 5` over bars spanning `0 … 11`, because the extent came from the durations rather than the spans; `funnel`'s `0 … 1000` labels a **width**, so neither end of a bar is its reading; `bullet`'s `0 … 100` sits over three rows scaled `0 … 100`, `0 … 60` and `0 … 40`, which is the one thing a bullet chart exists not to do — and the reason was already written in the renderer that draws it, in a different file from the record that contradicted it* (F329, F330).
 - **I74** — **A form's furniture and its marks describe the same block.** I70 puts a derivation above both arms; this is the half that says *above the decisions too*, because a renderer that derives inside its rasteriser labels one block and draws another and needs no second arm to disagree with itself. *Measured before the rule: `positionalForm` takes its decisions from the block it is handed and `slope` takes its two ends in the callback, so `slope/six-readings` drew a position axis reading `0.0 … 5.0` over a figure with two points on it — five intervals of labelled domain with no readings in any of them — and a value axis of `0 … 50` covering a 9 and a 41 that nothing draws. **It took a fixture to see**: every `slope` series in the corpus had exactly two values, where the derivation is the identity and the two readings of the rule are indistinguishable* (F332).
 - **I75** — **Two blocks that draw different frames in one arm draw different documents in the other.** A block field the second arm does not read draws one picture for two figures, and that is the strongest agreement the disagreement record can report: same labels, same legend, same border, same count of everything. The observable form is a **collision** — byte-identical baselines whose blocks are not equal — and it is checked over the corpus with the catalogue's header line stripped, because the header names the variant and would make every terminal frame distinct by construction. *Measured before the rule, over 182 variants: the terminal draws 175 distinct frames and this arm draws 125. The empty document is 3 of the terminal's collisions and 32 of this arm's — a refused form and a form with no data both draw it, and both are correct. Past it, **4 and 25**, and the terminal's four are all also this arm's: a collision both arms have is a **fixture** defect, and three of those four are variants whose names state a claim their block does not make — `line/legend-right` sets no legend, `heatmap/palette` pins `colormap` to the heatmap's own default, `histogram/scott` bins identically to `sturges`. Twenty-one belong to this arm alone: `layout`, `yCallout`, `plotCorners`, `matrixAnchor`, `plotStyle` and a band's `fill`* (F342, F349, F350). **Stated blind spot**: a collision needs two variants differing in **one** field, so the sweep names a field only where the corpus isolates it — `aspect`, `axisCross`, `plotFill`, `plotBox`, `lower` and `upper` are each read by one arm and appear nowhere in it. A lower bound on the drop, an exact count of the pictures.
+- **I76** — **A label the shared layer declines to measure is contained by the arm that draws it, and a cut is at the tail and marked.** I63 puts the *room* above both arms and the outcome in each; this is the half that says the outcome is a **decision** and not a clipping rectangle. **A clip contains and does not communicate** — an `end`-anchored text grows leftward, so the rectangle that stops it removes the label's **head**, and a head cut is a different word where a tail cut is truncation. The rule has two axes and one shape: a label overflowing **along** its text direction is cut at the tail and marked; one overflowing **across** it is scaled to its box. *Measured before the rule: `boxplot/default` draws `petal_length` as `betal_length` in the second arm, beside a terminal frame naming all four rows in full — the gutter is a **tenth of the width** where the terminal's is `min(widest, width / 3)`, and the value labels on the same side had no clip at all, so a long one left the viewBox entirely. And `graph/crowded` writes fourteen labels at `SVG_FONT_SIZE` into ranks `275.2 / 14 = 9.83 px` tall, every glyph ascending into the rank above and descending into the one below* (F343, F345). **The premise this replaces named its own trigger**: §3ak.20 chose a tenth *because pixels overflow gracefully and cells do not*, and recorded that the day an instance appeared was the day to make the argument. What it forbids is untouched — `cells()` in a shared layout is still hazard 4, and an em estimate inside one arm is not shared, measures nothing in the other arm's units, and adds no member.
 
 
 ## 8. Commitments
@@ -8259,6 +8344,7 @@ orientation — and belongs in the classification table as its own rows.
 71. **A key is drawn by what the figure is drawn by, and names every reading the figure is keyed to** (I49, I72, §3ak.38). I49 has said *levels are named in the legend and never on the line* since §3y and it reads as satisfied, because the arm that has a legend satisfies it and nothing asks the arm that does not. `contourLevels` is the shared function the terminal's key calls and `contourFigure` marches, and the third caller was missing. **A boolean `ramp` column cannot see it**: both arms drew a key, both reported `true`, and one named six readings against the other's two. And the second half is the same rule about colour rather than text — a `horizon` key computed `i / (bands − 1)` where the figure computes `horizonBandT`, so it showed the cold half of a diverging map that the figure never enters (F340, F341).
 72. **A block field that selects between figures crosses as the marks, and a corpus that draws one document from two blocks is where a dropped field is visible** (I73, I75, §3ak.39). `layout` changes which marks exist and nothing about how one is inked, so it needs no `Figure` member and the fold it selects had crossed for §3ak.33's cumulative three — a stacked bar is `stackBands`' **fourth consumer**, and the comment forty lines below `barFigure` says *three* while sitting in the same file as the form that makes it four. **A count of consumers goes stale in the file that holds it.** The axis moves with the marks because a stacked figure spans the totals: `bar/stacked` tops out at 37 against an axis labelled to 30. And the rule the second implementation of the fold did not have is the one that crashes — `stackBands` clamps a negative to zero and `stackedBarRow` hands it to `repeat`, so `layout: "stacked"` with any negative reading renders an ERROR block (F342, F349, F350, F351).
 73. **A rule whose subject is a set is checked against the member the reader looks at first** (I67, §3ak.40). I67 says `axes` gates three things and names them — `gutter`, `positionAxis`, `valueLabels` — and the third resolver's `Pick` never listed the field, so `axes: false` drew value labels on three variants whose terminal frames have no furniture at all. `yAxis`'s own doc had ruled it from the other side before either resolver existed: *`false` removes the labels and keeps the frame and the x axis, which is what `axes: false` cannot say on its own*. **The terminal is right by a second mechanism** — its labels come from a gutter width that `axes: false` already zeroes — and a decision enforced twice in one arm and once in the shared layer is not enforced in the shared layer (F347).
+74. **A correct sentence can justify the wrong decision, and the question that reaches it is whether it constrains the decision it is attached to** (I76, §3ak.41). `SVG_FONT_SIZE`'s doc said *it sizes nothing: the label places itself* — true, about **placement**, and attached to a decision about **containment**. So the gutter stayed a tenth of the width, the clip that made overflow safe cut the label's head instead of its tail, and `petal_length` shipped as `betal_length` under a justification review checks for truth and finds. F84's class, and the second half is that **§3ak.20 had written down what would falsify it** — *the day one is, that is the argument to make* — so the premise was refutable, dated, and refuted by the first instance to arrive (F343, F345).
 
 ---
 
