@@ -58,9 +58,30 @@ const caption = (text: string): Block => b.notice("muted", text);
  * A screenshot of a real kitty, with each panel's ink bounding box found from
  * the image itself:
  *
- *     asked            terminal panel     svg panel      match
- *     64 x 17          690 x 388          489 x 311      71% / 80%
- *     80 x 28          679 x 398          585 x 356      86% / 89%
+ *     asked      terminal panel        svg panel             match
+ *     64 x 17    690 x 388  (1.78)     489 x 311  (1.57)    71% / 80%
+ *     80 x 28    679 x 398  (1.71)     585 x 356  (1.64)    86% / 89%
+ *     80 x 23    690 x 398  (1.73)     585 x 350  (1.67)    85% / 88%
+ *     80 x 20    690 x 388  (1.78)     618 x 337  (1.83)    90% / 87%
+ *
+ * **The aspect is what a reader sees, not the absolute size**, and 28 rows made
+ * the figure read *too tall* — its viewBox is `cols / (2 * rows)`, so 80x28 is
+ * 1.43 against the terminal block's 1.78 and the interior comes out squarer even
+ * where the outer box is close.
+ *
+ * **And asking for more columns than the group has cuts the bottom off**, which
+ * is the thing to get right before any of the above. `imageCells` scales to the
+ * available width and *recomputes the rows* — so `80 x 20` in a 65-cell column
+ * becomes `65 x 16`, and the fifth of the picture that goes missing is the
+ * x-axis: its labels are emitted at `y = 537` of a 560-unit viewBox, inside the
+ * document and outside the placement. A figure with no abscissa, from asking for
+ * a box that does not fit.
+ *
+ * So the rule is **ask within the column and let the aspect follow**:
+ *
+ *     asked      returns    intact
+ *     80 x 20    65 x 16    no — the bottom fifth is cut
+ *     65 x 18    65 x 18    yes
  *
  * **They cannot be made identical in this layout, and the reason is worth
  * stating rather than tuning against.** The two panels are a `flex: [1, 1]` row,
@@ -79,9 +100,9 @@ const caption = (text: string): Block => b.notice("muted", text);
  * is handed a `LocalContext`, which has no measurer, so the number that would
  * make this exact is not reachable from here.
  */
-const COMPARE_COLS = 80;
+const COMPARE_COLS = 65;
 const COMPARE_PLOT_ROWS = 14;
-const COMPARE_ROWS = COMPARE_PLOT_ROWS + 14;
+const COMPARE_ROWS = COMPARE_PLOT_ROWS + 4;
 
 /** A form name from argv, defaulting to one that draws. */
 function formIn(argv: readonly string[], fallback: PlotForm = "line"): PlotForm | null {
