@@ -13677,6 +13677,46 @@ this pass has been building for eleven commits.
 
 ---
 
+## F394 — the demo labelled a braille dither `pixels`, so a working ladder read as a broken renderer ★★★★☆
+
+`/compare` captions its right-hand pane `svg · pixels` unconditionally. `b.image` descends a ladder
+— kitty's graphics protocol, then an **ordered braille dither**, then `alt` — and only the first is
+pixels. `detectImageProtocol` answers `kitty` only for `TERM=xterm-kitty` and `iterm2` for iTerm, so
+**VS Code, Cursor, Terminal.app and every `TERM=xterm-256color` shell take the dither.**
+
+A reader in Cursor saw a sparse field of braille dots under a label claiming pixels, beside a
+correct terminal figure, and read it the only way it can be read: *the SVG rendering does not work*.
+It works. The ladder did exactly what C09 I36 says it should.
+
+**The demo could always have known.** `LocalContext = ProducerContext & {…}` and `ProducerContext`
+carries `capabilities: TerminalCapabilities`, so `ctx.capabilities.imageProtocol` was one field away
+in the handler that builds the pane. The caption now names the rung, and the footnote says why:
+*this terminal cannot show the pixels, so the right pane is an ordered braille dither of them*.
+
+Measured on both arms under a real PTY rather than reasoned: at `TERM=xterm-256color` the pane says
+`braille dither — this terminal has no graphics protocol (none)`; at `TERM=xterm-kitty` it says
+`pixels` and **six APC graphics escapes** are on the wire.
+
+**The type is named from the published surface** — `TerminalCapabilities["imageProtocol"]` rather
+than a re-spelled union — so a rung added to the ladder is a compile error in the consumer rather
+than a string it silently stops covering. MG29's question, answered from the far side.
+
+---
+
+**And the same function carried a deferral whose condition was already met.** The comment beside
+`COMPARE_COLS` read *a local handler is not handed one — the parallel fact for a handler is not on
+`LocalContext`*. `ProducerContext.width` is `number`, non-optional, on the very `ctx` the caption fix
+now reads for `capabilities`. The blocker was written where the deferral is and the thing satisfying
+it in a type two packages away, so neither half was wrong and nobody holding either was looking at
+the other — the class CLAUDE.md records, found here by reaching for a *different* member of the same
+object.
+
+The constant stays, for the real reason rather than the false one: the three compare dimensions were
+tuned against a measured screenshot, so deriving them from `ctx.width` means re-running that
+measurement rather than substituting an expression. The plumbing exists; the arithmetic is owed.
+
+---
+
 ## F393 — the correction to F392's usage block was wrong in the same way, one command later ★★★☆☆
 
 F392 fixed a stale command list and left a **build step that is unnecessary in the common case and

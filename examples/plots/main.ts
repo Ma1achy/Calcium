@@ -18,7 +18,15 @@
  *     node main.ts
  */
 import { b, createTui, defaultTheme } from "@fmx/calcium";
-import type { Adapter, Block, LocalHandler } from "@fmx/calcium";
+import type { Adapter, Block, LocalHandler, TerminalCapabilities } from "@fmx/calcium";
+
+/**
+ * **Named from the published type rather than re-spelled** (MG29's question,
+ * answered in a consumer). `TerminalCapabilities` is exported; the member is
+ * reached through it, so a rung added to the ladder is a compile error here
+ * rather than a string this file no longer covers.
+ */
+type ImageProtocol = TerminalCapabilities["imageProtocol"];
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { CATALOGUE, FORMS, refusals } from "./src/catalogue.ts";
@@ -51,6 +59,25 @@ const doc = (command: string, blocks: readonly Block[]): ReturnType<LocalHandler
 });
 
 const caption = (text: string): Block => b.notice("muted", text);
+
+/**
+ * **What the right-hand pane actually is**, which is not always pixels (F394).
+ *
+ * `b.image` descends a ladder — kitty's graphics protocol, then an ordered
+ * braille dither, then `alt` — and only the first is pixels. Captioned `svg ·
+ * pixels` unconditionally, a terminal with no graphics protocol shows a field of
+ * braille dots under a label claiming otherwise, and the honest reading of that
+ * is *the SVG renderer is broken*. It is not: **VS Code, Cursor, Terminal.app
+ * and every `TERM=xterm-256color` shell take the dither**, because
+ * `detectImageProtocol` answers `kitty` only for `TERM=xterm-kitty` and
+ * `iterm2` for iTerm.
+ *
+ * The dither being the **first** arm rather than the last is C09 I36's ruling
+ * and the reason this is worth looking at anywhere — but the label has to say
+ * which arm, or the ladder reads as a fault.
+ */
+const rungSays = (protocol: ImageProtocol): string =>
+  protocol === "kitty" ? "pixels" : `braille dither — this terminal has no graphics protocol (${protocol})`;
 
 /**
  * The SVG image's cell box, **tuned against a measurement rather than reasoned**.
@@ -169,7 +196,7 @@ function everyForm(phase: number): Block {
  * The SVG arm refuses six families outright, and a refusal is said rather than
  * left as an empty column.
  */
-async function compare(form: PlotForm, phase: number): Promise<readonly Block[]> {
+async function compare(form: PlotForm, phase: number, protocol: ImageProtocol): Promise<readonly Block[]> {
   const entry = CATALOGUE[form];
   const drawn = entry.at(phase, COMPARE_PLOT_ROWS);
   if ("refused" in drawn) {
@@ -182,12 +209,23 @@ async function compare(form: PlotForm, phase: number): Promise<readonly Block[]>
   // takes the viewBox from the `SvgLayout` (measured: asked 644x392, emitted
   // 644x392), and `imageCells` returns the box back unchanged at every width.
   //
-  // **The residue, stated because it is the honest half**: this is a constant
-  // where it should be the frame's width. A local handler is not handed one —
-  // `ProducerContext` carries `measure` for producers, and the parallel fact for
-  // a handler is not on `LocalContext` — so at a terminal much wider or narrower
-  // than 140 the two panels stop corresponding again. The plumbing is a C24
-  // question rather than a demo one.
+  // **The residue, and the reason given for it was false** (F394). This is a
+  // constant where it should be the frame's width, and the comment here said *a
+  // local handler is not handed one — the parallel fact for a handler is not on
+  // `LocalContext`*. It is: `LocalContext = ProducerContext & {…}` and
+  // `ProducerContext.width` is `number`, non-optional, on the same `ctx` this
+  // function's caller already holds and already reads for `capabilities`.
+  //
+  // **A deferral naming a condition that was already met** — the class CLAUDE.md
+  // records, and another instance of it. The blocker was written where the
+  // deferral is and the thing satisfying it in a type two packages away, so
+  // neither half was wrong and nobody holding either was looking at the other.
+  //
+  // **Still a constant, and now for the real reason**: `COMPARE_COLS`,
+  // `COMPARE_PLOT_ROWS` and `COMPARE_ROWS` were tuned against a *measured*
+  // screenshot — asked 644x392, emitted 644x392, ink boxes compared panel to
+  // panel — so deriving them from `ctx.width` means re-running that measurement,
+  // not substituting an expression. The plumbing exists; the arithmetic is owed.
   const image = await imageOf(
     drawn,
     COMPARE_COLS,
@@ -207,13 +245,16 @@ async function compare(form: PlotForm, phase: number): Promise<readonly Block[]>
     caption(`${form} · ${entry.says}`),
     b.group("row", [
       b.group("column", [caption("terminal · cells"), drawn], { id: "left" }),
-      b.group("column", [caption("svg · pixels"), right], { id: "right" }),
+      b.group("column", [caption(`svg · ${rungSays(protocol)}`), right], { id: "right" }),
     ], { flex: [1, 1], id: "compare" }),
     b.notice(
       "muted",
       svgOf(drawn, COMPARE_COLS, COMPARE_ROWS) === null
         ? "the second renderer has no arm for this family"
-        : "the same block, two renderers — one measured in cells, one in pixels",
+        : protocol === "kitty"
+          ? "the same block, two renderers — one measured in cells, one in pixels"
+          : "the same block, two renderers — and this terminal cannot show the pixels, "
+            + "so the right pane is an ordered braille dither of them (C09 I36)",
     ),
   ];
 }
@@ -400,7 +441,7 @@ const tui = createTui({
     compare: (async (argv, ctx) => {
       const form = formIn(argv);
       if (form === null) return doc(ctx.command, [unknown(argv[0] ?? "")]);
-      return doc(ctx.command, await compare(form, 0));
+      return doc(ctx.command, await compare(form, 0, ctx.capabilities.imageProtocol));
     }) satisfies LocalHandler,
 
     faults: ((_argv, ctx) => doc(ctx.command, [faults()])) satisfies LocalHandler,
