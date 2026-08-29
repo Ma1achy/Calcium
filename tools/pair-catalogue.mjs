@@ -116,20 +116,21 @@ export function pairLayout(leftH, rightH) {
  * one thing a `null` arm must not do (F259).
  */
 export const VARIANT_REFUSALS = {
-  flame: { default: "the legacy categories+series datum, not a hierarchy" },
-  heatmap: { origin: "a non-default origin" },
-  icicle: { default: "the legacy categories+series datum, not a hierarchy" },
-  line: {
-    // The four `ohlc` rows are gone: the candles draw (§3ak.31). They came back
-    // as `dead decls` the moment the arm did, which is what the equality check
-    // is for — a subset check would have left them. **The seven `empty` rows
-    // went the same way** (F363, C12 I79): an empty figure is drawn now, so
-    // *the series carries an empty value list* stopped being a refusal and the
-    // counter said so on the first run.
-    "origin-bottom-right": "a non-default origin",
-    "origin-top-left": "a non-default origin",
-    "origin-top-right": "a non-default origin",
-  },
+  // **Empty, and the list emptied itself** (F383). Every entry that was here
+  // came back as a *dead decl* on the run after its refusal lifted, which is
+  // precisely what the paragraph above says the equality arm is for — and it is
+  // the fourth time, so the mechanism is now measured rather than argued.
+  //
+  //   `ohlc` ×4          §3ak.31   the candles draw
+  //   `empty` ×7         F363      an empty figure is drawn, not refused
+  //   `treeLayout: outline`  F310  the layout with the least geometry above cells
+  //   `origin` ×4        F383      `projected` reads `figure.facing`; the guard had expired
+  //   `flame`/`icicle` default ×2  F383  categories with no hierarchy are bars
+  //
+  // **Nothing in the corpus is refused now** — 188 variants, 46 forms, zero
+  // `null`s from `plotToSvg`. So this list has no members and PR2's equality is
+  // what keeps that honest: a new refusal with no declaration fails on the run
+  // that introduces it, and a declaration for a frame that draws fails too.
 };
 
 /** Every committed SVG frame, as `form → variant → refused?`. */
@@ -155,7 +156,15 @@ export function refusalMap(dir = SVG_BASELINE_DIR) {
  * frame is attributable to a named cause, and the causes are enumerated*, the
  * same counter finds the nine frames the record does not cover.
  */
-export function partition(map = refusalMap()) {
+export function partition(map = refusalMap(), decls = VARIANT_REFUSALS) {
+  // **`decls` is a parameter because the control needs one and the list is now
+  // empty** (F383). PR4 fabricates both violations — a refusal nothing declares,
+  // and a declaration whose frame draws — and it built the second by reaching
+  // for a real entry. With every entry retired there was nothing to reach for,
+  // so the control's second half stopped running and threw rather than passing
+  // quietly, which is the one good outcome of a control losing its subject.
+  // Injecting the declarations is what lets it keep testing the arm that has no
+  // live instance.
   const family = [];
   const variant = [];
   const undeclared = [];
@@ -167,7 +176,7 @@ export function partition(map = refusalMap()) {
       for (const v of refused) family.push(`${form}/${v}`);
       continue;
     }
-    const declared = VARIANT_REFUSALS[form] ?? {};
+    const declared = decls[form] ?? {};
     for (const v of refused) {
       if (Object.hasOwn(declared, v)) variant.push(`${form}/${v}`);
       else undeclared.push(`${form}/${v}`);
@@ -179,11 +188,11 @@ export function partition(map = refusalMap()) {
   // **A form declared here that refuses every variant is a family refusal now**,
   // and its declaration is dead — the equality check has to see that too, or a
   // form sliding from variant-refused to family-refused reads as unchanged.
-  for (const form of Object.keys(VARIANT_REFUSALS)) {
+  for (const form of Object.keys(decls)) {
     const variants = map[form];
     if (variants === undefined) { declaredUnused.push(`${form}/*`); continue; }
     if (Object.keys(variants).every((v) => variants[v])) {
-      for (const v of Object.keys(VARIANT_REFUSALS[form])) declaredUnused.push(`${form}/${v}`);
+      for (const v of Object.keys(decls[form])) declaredUnused.push(`${form}/${v}`);
     }
   }
   const dedupe = (xs) => [...new Set(xs)].sort();

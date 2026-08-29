@@ -77,6 +77,7 @@ import { colormapFor, heatmapFormRows } from "./heatmap.js";
 import { flatAlphabet, glyphs } from "../blocks/glyphs.js";
 import { candleColumn, candleReadout, candleRows, candlesOf, hasBars } from "./candles.js";
 import { brailleOutline, densityRows, rainColumns, rainRows, ridgelineArea, violinColumn, violinRows } from "./kde.js";
+import { summariseSeries } from "../../data/viewmodel/distribution.js";
 import { drawnBlock } from "./derive.js";
 import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
@@ -362,21 +363,13 @@ function finiteCount(series: Series | undefined): number {
 }
 
 /**
- * A five-number summary derived from a series, for a violin with no explicit
- * quartiles. A violin *is* a box plot that also shows the distribution, so the
- * box is not optional — the numbers are, and they are computable.
+ * A five-number summary derived from a series — **L0's, since F384** (C12 §3l).
+ *
+ * It was written here, private, beside the terminal's rasteriser, and the SVG
+ * arm's density figure could not reach it: a violin crossed the seam as an
+ * outline and nothing else. `distribution.ts` is where both arms can read it.
  */
-function summaryOf(series: Series): QuartileSummary | undefined {
-  const v = series.values.filter((x): x is number => x !== null && Number.isFinite(x));
-  if (v.length === 0) return undefined; // cells-ok — a sample count
-  const sorted = [...v].sort((a, b) => a - b);
-  const at = (f: number): number => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))]!; // cells-ok — a sample count
-  return {
-    min: sorted[0]!, q1: at(0.25), median: at(0.5), q3: at(0.75),
-    max: sorted[sorted.length - 1]!, // cells-ok — a sample count
-    mean: v.reduce((a, b) => a + b, 0) / v.length, // cells-ok — a sample count
-  };
-}
+const summaryOf = summariseSeries;
 
 /** A summary with nothing in it — what a band with no samples falls back to. */
 const EMPTY_SUMMARY: QuartileSummary = Object.freeze({ min: 0, q1: 0, median: 0, q3: 0, max: 0 });

@@ -132,30 +132,99 @@ export function kde(
  * Series whose values are the density estimates, suitable for rendering as a
  * line/curve.
  */
+/**
+ * How far past the extreme samples a density is drawn — **seaborn's `cut`, and
+ * the same 2** (F388).
+ *
+ * A Gaussian kernel has infinite support, so an estimate evaluated over a wide
+ * grid returns a vanishing but non-zero density everywhere. Drawn, that is a
+ * flat line running to the frame's edge in both directions, and it is what made
+ * the second arm's violins unreadable: three lines the width of the plot with a
+ * lump somewhere on each. Every library cuts it — seaborn at two bandwidths,
+ * which is where this number comes from.
+ */
+export const DENSITY_CUT = 2;
+
+/**
+ * The index range of a sample grid a density should actually be drawn over.
+ *
+ * **`kde.ts` had this privately and the figure had no way to reach it**, which
+ * is the same shape as `summariseSeries`: the terminal's rasteriser owned a
+ * piece of the *estimate* rather than a piece of the *drawing*, so the second
+ * arm could only reproduce it or go without. It went without.
+ *
+ * The whole grid where nothing is in support, because a curve cut to nothing is
+ * a blank where a flat line is at least honest about having no shape.
+ */
+export function supportedRange(
+  points: readonly number[],
+  sorted: readonly number[],
+  bandwidth: number,
+): { first: number; last: number } {
+  const lo = sorted[0]! - DENSITY_CUT * bandwidth;
+  const hi = sorted[sorted.length - 1]! + DENSITY_CUT * bandwidth; // cells-ok — a sample count
+  let first = -1; // cells-ok — a sentinel index
+  let last = -1; // cells-ok — a sentinel index
+  for (let i = 0; i < points.length; i += 1) { // cells-ok — a sample count
+    if (points[i]! < lo || points[i]! > hi) continue;
+    if (first < 0) first = i;
+    last = i;
+  }
+  return first < 0 ? { first: 0, last: points.length - 1 } : { first, last }; // cells-ok — a sample count
+}
+
 export function densitySeries(
   series: Series,
   resolution = 100,
   adjust?: number,
-): { series: Series; range: Range } {
+  /**
+   * **The values the estimate is evaluated at, where the caller has more than
+   * one curve to compare** (F387).
+   *
+   * Without it each series is estimated over its **own** padded support, which
+   * is right for the `density` form — one series, and the grid *is* the axis —
+   * and wrong the moment two curves share a frame: sample `j` then means a
+   * different value in every row, and a caller laying the samples out along a
+   * shared axis stretches each distribution to fill it. A tight cluster and a
+   * broad one draw the same width, which is the comparison the form exists to
+   * make, inverted.
+   *
+   * `violinColumn` and `ridgelineArea` both take the shared extent for exactly
+   * this reason and compute the grid themselves; this is that parameter on the
+   * derivation the second arm reads.
+   */
+  domain?: Range,
+): { series: Series; range: Range; domain: Range; support: { first: number; last: number } } {
   const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
-  if (finite.length === 0) return { series: { ...series, values: [] }, range: { min: 0, max: 1 } }; // cells-ok — a sample count
+  const empty = domain ?? { min: 0, max: 1 };
+  if (finite.length === 0) return { series: { ...series, values: [] }, range: { min: 0, max: 1 }, domain: empty, support: { first: 0, last: 0 } }; // cells-ok — a sample count
 
   const sorted = [...finite].sort((a, b) => a - b);
   const lo = sorted[0]!;
   const hi = sorted[sorted.length - 1]!; // cells-ok — a sample count
   const pad = (hi - lo) * 0.1 || 1;
+  // **The padded support, named** — the same `±10%` both terminal renderers
+  // take, and returned rather than recomputed so a caller placing the samples
+  // on an axis cannot disagree with the estimator about where they are.
+  const over: Range = domain ?? { min: lo - pad, max: hi + pad };
 
   const points: number[] = [];
   for (let i = 0; i < resolution; i++) {
-    points.push(lo - pad + ((hi - lo + 2 * pad) * i) / (resolution - 1));
+    points.push(over.min + ((over.max - over.min) * i) / (resolution - 1));
   }
 
-  const densities = kde(finite, points, scaledBandwidth(finite, adjust));
+  const bw = scaledBandwidth(finite, adjust);
+  const densities = kde(finite, points, bw);
   const maxD = Math.max(...densities);
 
   return {
     series: { ...series, values: densities },
     range: { min: 0, max: maxD > 0 ? maxD : 1 },
+    domain: over,
+    // **`bw` is undefined unless the caller asked for an adjustment**, in which
+    // case `kde` computes Silverman's itself — so the cut has to ask for the
+    // same one. `violinColumn` carries this exact sentence.
+    support: supportedRange(points, sorted, bw ?? silvermanBandwidth(finite)),
   };
 }
 

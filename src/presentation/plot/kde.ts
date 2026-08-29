@@ -16,7 +16,7 @@ import { glyphs } from "../blocks/glyphs.js";
 import { roleGlyphs } from "./roles.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, setDot } from "./raster.js";
 import type { Facing, Range } from "./scale.js";
-import { kde, scaledBandwidth, silvermanBandwidth } from "./derive.js";
+import { kde, scaledBandwidth, silvermanBandwidth, supportedRange } from "./derive.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
@@ -77,24 +77,13 @@ export function densityRows(
  * spine still runs the full width — it is the axis, and the marks sit on it —
  * but the outline stops where the data stops having anything to say.
  */
-const CUT = 2;
-
-function supported(
-  points: readonly number[],
-  sorted: readonly number[],
-  bandwidth: number,
-): { first: number; last: number } {
-  const lo = sorted[0]! - CUT * bandwidth;
-  const hi = sorted[sorted.length - 1]! + CUT * bandwidth; // cells-ok — a sample count
-  let first = -1; // cells-ok — a sentinel index
-  let last = -1; // cells-ok — a sentinel index
-  for (let i = 0; i < points.length; i += 1) { // cells-ok — a sample count
-    if (points[i]! < lo || points[i]! > hi) continue;
-    if (first < 0) first = i;
-    last = i;
-  }
-  return first < 0 ? { first: 0, last: points.length - 1 } : { first, last }; // cells-ok — a sample count
-}
+/**
+ * **`derive.ts`'s, since F388**, and the constant went with it. It was private
+ * here, and the figure the second arm reads had no way to reach it — so a violin
+ * crossed the seam with its zero-density tails still on it and drew them as
+ * lines the width of the frame, which is the picture this comment describes.
+ */
+const supported = supportedRange;
 
 /**
  * The raincloud — a one-sided cloud over the compact box (C12 §3i, I34).

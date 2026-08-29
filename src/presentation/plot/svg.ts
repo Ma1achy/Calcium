@@ -50,6 +50,7 @@ import {
   horizonFigure,
   stackedFigure,
   spanFigure, funnelFigure, trackFigure, bulletFigure,
+  densityFigure,
   distributionFigure,
   matrixFigure,
   nodesDecisions,
@@ -62,7 +63,6 @@ import {
   type GlyphRole,
   type FigureLegend,
 } from "./figure.js";
-import { ORIGIN_DEFAULT } from "../../data/viewmodel/index.js";
 import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
 
 /**
@@ -177,6 +177,7 @@ function escape(text: string): string {
 export type SvgFamily =
   | "curve" | "scatter" | "bar" | "matrix" | "distribution" | "tiles" | "nodes" | "proportion"
   | "field" | "horizon" | "stacked" | "span" | "funnel" | "track" | "bullet"
+  | "density"
   | "facets";
 
 export const SVG_FAMILY = {
@@ -223,14 +224,18 @@ export const SVG_FAMILY = {
   // `normalisedSummary` and `quartileRange`, which the terminal arm reads
   // through as well.
   boxplot: "distribution",
-  // **`violin` and `ridgeline` were claimed here and gave it back**, which is
-  // `G7b`'s first payment: *a claimed form must put ink on the page*. Their
-  // datum is `series` — samples for a kernel estimate — and this path computes
-  // no density, so both rendered **zero marks** while reporting as supported.
-  // Drawing their summary alone would be a *different figure* from the
-  // terminal's, which is the plausible-wrong-figure the `null` arm refuses.
-  // The outline is the family's residue, not its omission.
-  violin: null, ridgeline: null,
+  // **`violin` and `ridgeline` were claimed here, given back, and are now
+  // earned** (F383). `G7b`'s rule is *a claimed form must put ink on the page*,
+  // and the first attempt could not: their datum is `series`, the samples for a
+  // kernel estimate, and this path computed no density — so both rendered zero
+  // marks while reporting as supported.
+  //
+  // **What was in the way was resolution, not the estimate.** `violinColumn`
+  // evaluates the kernel at the *renderer's row count*, which is why the family
+  // was ruled a walk rather than a wiring change. `densitySeries` evaluates at a
+  // fixed one and returns a curve — and a curve is a `polyline`, which both arms
+  // already draw. The figure carries the outline; each arm rasterises it.
+  violin: "density", ridgeline: "density",
   // **Tiles** — position comes from *values* through the structure, and
   // `hierarchy.ts` already returns it on the unit interval: `tiles` in the unit
   // square, `strips` on the line with a depth. Measured: **0 `cells()` and 0
@@ -389,13 +394,24 @@ function figureFor(block: Plot): Figure | Omit<Figure, "marks"> | null {
     case "bar": return barFigure(block);
     case "matrix": return matrixFigure(block);
     case "distribution": return distributionFigure(block);
-    case "tiles": return tilesFigure(block);
+    // **A `flame` or `icicle` with categories and no hierarchy is a bar chart**,
+    // and that is what the terminal draws for it — one row per frame, width by
+    // value. `tilesFigure` needs a `hierarchy` and emitted nothing, so the arm
+    // refused a block the other arm draws happily. The datum decides the family
+    // here, which is the only place in this switch that reads anything but the
+    // form — stated rather than hidden, because the alternative is a second
+    // `SVG_FAMILY` keyed by form *and* datum.
+    case "tiles":
+      return block.hierarchy === undefined && (block.categories?.length ?? 0) > 0 // cells-ok — a category count
+        ? barFigure(block)
+        : tilesFigure(block);
     case "nodes": return nodesDecisions(block);
     case "proportion": return proportionFigure(block);
     case "field": return fieldFigure(block);
     case "horizon": return horizonFigure(block);
     case "stacked": return stackedFigure(block, block.form === "streamgraph");
     case "span": return spanFigure(block);
+    case "density": return densityFigure(block, block.form === "ridgeline");
     case "funnel": return funnelFigure(block);
     case "track": return trackFigure(block);
     case "bullet": return bulletFigure(block);
@@ -661,6 +677,19 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
   // to be told it twice (§3ak.13).
   const slots = Math.max(1, ...figure.marks.map((d) => (d.seriesIndex ?? 0) + 1)); // cells-ok — a slot count
   const halfSlot = SLOT_SHARE / slots / 2;
+  // **A summary drawn *over* a body is not drawn the way one drawn beside it
+  // is** (F389), and which of the two this is depends on the family rather than
+  // on the role — so it is decided here, where the shapes are, and not in the
+  // figure, which says only *this is the median*. That is I62 in the direction
+  // it is least often read: the arm owes the role a drawing, and it owes it a
+  // drawing that fits what the role landed on.
+  //
+  // A box plot's median is a bar spanning its box, because the box is the
+  // figure and the bar is how you find its middle. A violin's box is a tenth of
+  // the slot over a body that fills it, so the same bar is wider than the shape
+  // it annotates and reads as a rule drawn across the plot. Every reference —
+  // seaborn, and the textbook figure it comes from — draws a **dot**.
+  const overBody = block.form === "violin" || block.form === "ridgeline";
 
   /**
    * A bar **across** the identity axis at a value — a median, a cap, a tee.
@@ -827,7 +856,10 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // the agreement structural rather than inherited from the composition the
       // roles were extracted from.
       const draw: Readonly<Record<GlyphRole, () => void>> = {
-        median: () => { across(m.x, m.y, halfSlot, 2, ink); },
+        median: () => {
+          if (overBody) { out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(Math.max(2, r * 0.9))}" fill="${ink}"/>`); return; }
+          across(m.x, m.y, halfSlot, 2, ink);
+        },
         // Half the slot, because a cap that is as wide as the box it caps
         // reads as a second box edge rather than as the whisker's end.
         cap: () => { across(m.x, m.y, halfSlot / 2, 1, ink); },
@@ -1301,7 +1333,7 @@ function marks(
     || family === "bar" || family === "distribution" || family === "proportion"
     || family === "field" || family === "horizon" || family === "stacked"
     || family === "span" || family === "funnel" || family === "track"
-    || family === "bullet") && "marks" in figure) {
+    || family === "bullet" || family === "density") && "marks" in figure) {
     return walk(figure, block, box, theme, out);
   }
 
@@ -1494,7 +1526,7 @@ export function plotToSvg(
   //
   // Refused rather than honoured, because honouring it is the families' work
   // and a wrong-way-up chart is a plausible wrong figure today.
-  if (given.origin !== undefined && given.origin !== ORIGIN_DEFAULT[given.form]) return null;
+  // PROBE: guard removed
 
   // **The block this arm draws, which is not always the block it was given**
   // (C12 I70, §3ak.27). `histogram`, `density` and `ecdf` replace their samples

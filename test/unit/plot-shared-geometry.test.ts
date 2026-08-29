@@ -128,8 +128,6 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     // width is the second of them.
     expect(violinRows.length, "series, areaWidth, rowsPerCategory, caps, quartiles — a width among them").toBe(5);
     expect(violinColumn.length, "and its transpose takes a column width too").toBe(5);
-    expect(svgFamilyOf("violin"), "so both stay refused").toBeNull();
-    expect(svgFamilyOf("ridgeline"), "and so does the form built on the same estimate").toBeNull();
 
     // **And the estimate really does move with the width**, which is the claim
     // the arity stands for: same data, two widths, different curves — where a
@@ -137,6 +135,45 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     const sr = { label: "s", values: [1, 1, 2, 3, 5, 5, 5, 8, 13] };
     const at = (w: number): string => violinRows(sr, w, 5, FULL_CAPS).join("|");
     expect(at(40), "a wider area is not the narrow one padded").not.toBe(at(20));
+
+    // **Everything above is still true and the conclusion has inverted** (F383).
+    // The row asserted `svgFamilyOf("violin") === null` on the reasoning that a
+    // width-bound estimator cannot cross — and the premise held while the
+    // inference did not. **The seam never had to reuse `violinRows`.**
+    // `densitySeries` is the other kind of derivation the paragraph above
+    // already names: fixed at 100 points, a function of the block alone, and
+    // crossing for `density` since F314. The figure carries the outline and each
+    // arm rasterises it, so the terminal keeps its width-bound estimator and its
+    // frames do not move.
+    //
+    // **This is the deferral class**: the condition was written where the
+    // refusal was, and the thing that satisfied it was written somewhere else —
+    // in the same file, in the sentence listing the resolution-free three.
+    expect(svgFamilyOf("violin"), "claimed, on a resolution-free estimate").not.toBeNull();
+    expect(svgFamilyOf("ridgeline"), "and so is the form built on the same one").not.toBeNull();
+
+    // **The figure's curve is resolution-free, which is the property the
+    // refusal was about** — asserted directly, because it is now something this
+    // arm does rather than something it declines.
+    //
+    // **The point count, not the bytes.** Same block at two output sizes: a
+    // width-bound estimate gives *more samples* at the wider one — that is what
+    // `violinRows` does five lines up and what the refusal was written about —
+    // while a fixed-resolution one gives the same curve drawn larger. So the
+    // path's point count is invariant and the pixels are not, and a regression
+    // that reaches for `areaWidth` fails here rather than in a frame.
+    const block = b.plot({ id: "v", form: "violin", height: 8, axes: true, series: [sr] });
+    const points = (width: number): number => {
+      const svg = plotToSvg(block, DARK_THEME, { ...SVG_DEFAULT_LAYOUT, width }) ?? "";
+      expect(svg.length, `violin draws at ${String(width)}px`).toBeGreaterThan(0);
+      return [...svg.matchAll(/<path d="([^"]+)"/gu)]
+        .map((m) => (m[1] ?? "").split(/[ML]/u).length)
+        .reduce((a, x) => Math.max(a, x), 0);
+    };
+    expect(points(1200), "one estimate, whatever size it is drawn at").toBe(points(400));
+    expect(plotToSvg(block, DARK_THEME, { ...SVG_DEFAULT_LAYOUT, width: 1200 }),
+      "the raster differs because the page does, not because the estimate did")
+      .not.toBe(plotToSvg(block, DARK_THEME, { ...SVG_DEFAULT_LAYOUT, width: 400 }));
   });
 
   it("G1d (C12 I49, §3ak.38): the key's levels are one function's, gated on the layer and on the list", () => {

@@ -298,10 +298,21 @@ const results = runPass({
       // arms disagree about which way up the data goes — and every assertion
       // about *where the ink is* still passes, because the ink is somewhere
       // legal.
-      name: "a non-default origin is drawn with the default facing",
+      //
+      // **Re-anchored: the clause it mutated was a refusal, and F383 deleted
+      // it.** `plotToSvg` used to return `null` for a non-default origin, on a
+      // comment that `svgPoints` inverts unconditionally — true when written and
+      // no longer, since `projected` reads `figure.facing`. So the subject moved
+      // from *the guard that refuses* to *the read that makes the guard
+      // unnecessary*, which is the same defect one step earlier: pin `up` and
+      // all four origins draw identically again, upright, with every mark inside
+      // the frame. **The mutation is strictly stronger than the one it
+      // replaces** — it restores the original defect rather than the guard
+      // against it.
+      name: "the ordinate's facing is ignored, so all four origins draw alike",
       file: SVG,
-      from: "  if (given.origin !== undefined && given.origin !== ORIGIN_DEFAULT[given.form]) return null;",
-      to: "  if (given.origin === undefined) return null;",
+      from: "  const up = figure.facing.y === \"up\";",
+      to: "  const up = true;",
       expect: "G8e",
     },
     {
@@ -480,9 +491,10 @@ const results = runPass({
       // shape the row predicted every family's first commit would have.
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
-      // Re-anchored: the proportion family joined the disjunction (§3ak.26).
-      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet") && "marks" in figure) {',
-      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet") && "marks" in figure) {',
+      // Re-anchored twice: the proportion family joined the disjunction
+      // (§3ak.26), then the density family (F383).
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet" || family === "density") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet" || family === "density") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

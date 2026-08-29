@@ -88,10 +88,23 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
     // byte-identical to the placard, over **all** of them rather than the first
     // three — a slice is the sampling blind spot one level down from the bound —
     // and the two sides together are the corpus.
+    // **And the set is now empty, which the bound this row already removed once
+    // could not have said** (F383, F390). The paragraph above took out a `> 50`
+    // floor because *a number that had to be edited every time a form landed
+    // said nothing when it was*; `> 0` is the same shape at the other end, and
+    // it fails the day the set empties rather than the day a refusal returns —
+    // which is backwards, because an empty set is the good news and a returning
+    // refusal is the thing this row exists to catch.
+    //
+    // Every form draws: 46 of 46, and no degenerate block refuses either. So the
+    // whole corpus is the drawn side, asserted by equality. **The placard check
+    // below still runs over the refusals** — over none of them today, which is
+    // vacuous by success rather than by oversight, and the equality is what
+    // stops that being silent.
     const refusals = [...fresh.entries()].filter(([, v]) => v === refusal).map(([k]) => k);
-    expect(refusals.length, "refusals are recorded rather than absent").toBeGreaterThan(0);
-    expect(refusals.length, "and they are not the whole corpus").toBeLessThan(fresh.size);
+    expect(refusals, "no frame in the corpus is a refusal").toEqual([]);
     const drawn = [...fresh.entries()].filter(([, v]) => v !== refusal).map(([k]) => k);
+    expect(drawn.length, "so the drawn side is the whole corpus").toBe(fresh.size);
     expect(refusals.length + drawn.length, "refused and drawn are the whole corpus").toBe(fresh.size);
     for (const name of refusals) {
       expect(readFileSync(join(DIR, name), "utf8"), name).toBe(refusal);

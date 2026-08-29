@@ -144,12 +144,17 @@ const MEASURED = {
   // and `silent` fell 16 to 8 without a renderer moving on the terminal side.
   // The four that opened are the candles' own furniture, which no cell of this
   // matrix had ever seen.
-  "line": { silent: "6/96", "numericLabels": "57/90", "identityLabels": "18/90", "border": "4/90", "interiorRules": "12/90", "legend": "10/90", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **The three `origin` variants draw now** (F383), so the denominator moves
+  // from 90 to 96 and the arm has no refused variant left anywhere.
+  "line": { silent: "0/96", "numericLabels": "61/96", "identityLabels": "22/96", "border": "4/96", "interiorRules": "12/96", "legend": "10/96", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "0/8", "numericLabels": "agree", "identityLabels": "2/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "scatter": { silent: "0/12", "numericLabels": "5/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "step": { silent: "0/6", "numericLabels": "1/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "ecdf": { silent: "0/4", "numericLabels": "2/4", "identityLabels": "2/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "heatmap": { silent: "2/12", "numericLabels": "agree", "identityLabels": "8/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/10" },
+  // **The `origin` variant draws now** (F383): `projected` already read
+  // `figure.facing`, so the refusal guard above it was stale — all four origins
+  // come out as four distinct documents, correctly flipped.
+  "heatmap": { silent: "0/12", "numericLabels": "agree", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/12" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
   // both readers ask the shape now — and `ramp` is F316's open column on the
   // family that has always had one. `numericLabels` is the terminal reader's
@@ -171,8 +176,13 @@ const MEASURED = {
   "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "waffle": { silent: "0/6", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "flame": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "icicle": { silent: "2/4", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **`flame` and `icicle` stop being silent** (F383). Their `default` variants
+  // are `categories + series` with no `hierarchy`, and `tilesFigure` needs one —
+  // so this arm drew nothing for a block the terminal draws as plain bars. The
+  // datum now picks the family, and what is left is the bar family's own
+  // disagreement about the value axis.
+  "flame": { silent: "0/4", "numericLabels": "2/4", "identityLabels": "1/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "icicle": { silent: "0/4", "numericLabels": "2/4", "identityLabels": "3/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "funnel": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "gantt": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **Family 8's aggregating three, and one fold serves them** (§3ak.33).
@@ -223,8 +233,21 @@ const MEASURED = {
   "latency": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/2" },
   "density2d": { silent: "0/2", "numericLabels": "agree", "identityLabels": "1/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "1/2" },
   "density": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "violin": "refused",
-  "ridgeline": "refused",
+  // **The density family, now that it draws** (F383). Both were `"refused"`
+  // here for as long as `SVG_FAMILY` said `null`, and the disagreement they
+  // arrive with is the family's own: the terminal labels its value gutter from
+  // the summary and this arm from the samples' own extent, so `numericLabels`
+  // differs on every variant. Recorded rather than resolved — the arms draw the
+  // same outline and disagree about the axis they hang it on.
+  "violin": { silent: "0/38", "numericLabels": "38/38", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **`identityLabels` `2/2` → `agree`** (F386). Both arms drew both row names
+  // and disagreed about *which row each named*: `ridgeline` stacks from the
+  // floor in the terminal — `baselines[0]` on the bottom row — and this arm laid
+  // the same curves out from the top. Two confident, opposite pictures. The
+  // figure reverses `identity` for the form now, which is the only lever it has:
+  // `walk` places `identity[i]` at `(i + 0.5) / n` and that placement is shared
+  // by every row-identity family.
+  "ridgeline": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The compositions, which are whatever their children are** (§3ak.36). Both
   // recurse into `plotToSvg`, so a facet holding a refused form leaves its column
   // empty and its siblings draw — the terminal's own answer, read out of
@@ -260,7 +283,12 @@ const MEASURED = {
   // `identityLabels` is the same absence read through another column: the
   // terminal's key is `0.0038  100  3 bands` and `bands` is a word.
   "horizon": { silent: "0/10", "numericLabels": "agree", "identityLabels": "10/10", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-} as const satisfies Readonly<globalThis.Record<PlotForm, Record_>>;
+// **Annotated rather than `as const satisfies`** (F383). With no form refused
+// any more, `as const` narrowed the union to the cell objects and TypeScript
+// then called `=== "refused"` an impossible comparison — a *correct* report that
+// would have been silenced by deleting the two checks, and they are what makes
+// a form going dark visible again.
+} satisfies Readonly<globalThis.Record<PlotForm, Record_>> as Readonly<globalThis.Record<PlotForm, Record_>>;
 
 /** One arm-pair for a spec, at a width. */
 function pairAt(spec: Record<string, unknown>, width: number): Readonly<{ t: ArmDecisions; s: ArmDecisions }> {
@@ -443,14 +471,16 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **Both counters, because the second is the exception and it must not
     // grow.** `horizon/bands-2` is the only pair where neither arm draws, and it
     // is the reader's floor rather than a missing key.
-    expect(bothDrew, "pairs where both arms draw a key").toBe(36); // cells-ok — a pair count
+    expect(bothDrew, "pairs where both arms draw a key").toBe(37); // cells-ok — a pair count
     // **Two since the empty figure landed** (F363, C12 I79). `heatmap/empty` was
     // a refusal here and is a document now, so it joins the comparison — and an
     // empty matrix has no readings for a key to be about, in either arm.
     expect(neither, "and the two where neither arm has a key to draw").toBe(2); // cells-ok — a pair count
     // **One since `heatmap/empty` became a document** — the other side of the
     // line above, and both move together or one of them is wrong.
-    expect(refusedVariants, "and the variant this arm refuses outright").toBe(1); // cells-ok — a pair count
+    // **Zero, and it was one** (F383). The `origin` guard was stale — `projected`
+    // already reads `figure.facing` — and the density family now draws.
+    expect(refusedVariants, "and the variant this arm refuses outright").toBe(0); // cells-ok — a pair count
 
     // **The legitimate one, asserted so it can fail.** It differs today; it will
     // read `agree` everywhere the day the SVG grows a drop rule, and that is a
@@ -549,12 +579,24 @@ describe("AD — the two arms decide separately, and here is where", () => {
         if (v[d] === "agree") closed += 1; else open += 1;
       }
     }
-    expect(claimed.length, "forms the SVG arm claims").toBe(44); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(2); // cells-ok — a form count
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(352); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(44); // cells-ok — a cell count
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(49); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(259); // cells-ok — a cell count
+    // **46, and the last two are the density family** (F383). This was 44 for as
+    // long as `violin` and `ridgeline` were `null` in `SVG_FAMILY`.
+    expect(claimed.length, "forms the SVG arm claims").toBe(46); // cells-ok — a form count
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(0); // cells-ok — a form count
+    // 46 forms x 8 columns; two more forms claimed is sixteen more cells (F383).
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(368); // cells-ok — a cell count
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(46); // cells-ok — a cell count
+    // **49 -> 52**: the density family brings three open cells of its own —
+    // both arms draw the outline and label the value axis from different ranges.
+    // **54 → 53, and the cell that closed is `ridgeline.identityLabels`**
+    // (F386). It was `2/2` — both arms drawing both row names and disagreeing
+    // about which named which, because one stacks from the floor and the other
+    // laid the same curves out from the top. One reversed list, one closed cell.
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(53); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(269); // cells-ok — a cell count
+    // 268 → 269, the other side of the same cell (F386): one disagreement
+    // became one agreement, so the two counters move opposite by one and the
+    // total is unchanged. That relation is what AD4 is for.
   });
 
   it("AD5 (step 1): the instrument responds to a decision moving", () => {
@@ -804,7 +846,9 @@ describe("AD — the two arms decide separately, and here is where", () => {
 
     expect(corpus.size, "variants in the corpus").toBe(188); // cells-ok — a variant count
     expect(t.distinct, "distinct terminal frames").toBe(181); // cells-ok — a frame count
-    expect(s.distinct, "distinct documents").toBe(134); // cells-ok — a frame count
+    // **134 -> 148**: the density family draws, so nineteen violin variants and
+    // one ridgeline stop colliding in the single refusal group (F383).
+    expect(s.distinct, "distinct documents").toBe(149); // cells-ok — a frame count
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not
@@ -830,25 +874,31 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // variants draw different grids and never collide, which puts it with the
     // members no frame-based instrument reaches rather than with the cheap ones.
     expect(s.groups, "documents drawn from more than one block").toEqual([
-      // **A legitimate collision, and the first this list has held** (F363,
-      // C12 I79). Seven blocks with no data draw one empty document, and they
-      // should: the message is the same and there is nothing else to say.
-      // `line/empty-message` is **not** in it, which is the fixture proving the
-      // member has a reader — the pair differs in exactly that field.
-      ["line/empty", "sparkline/empty", "scatter/empty", "step/empty", "ecdf/empty",
-       "heatmap/empty", "bar/empty"],
+      // **Ordered by size then by first member, with the largest dropped** —
+      // `collisionsIn`'s own rule. The dropped one is the seven empty documents,
+      // which is the legitimate collision C12 I79 records: seven blocks with no
+      // data draw one message and there is nothing else to say.
+      //
+      // **The density family brings four groups and every one is legitimate**
+      // (F383, C12 I80). `braille`, `braille-filled`, `line-box` and the
+      // `compact` rungs are all the *terminal's* choices about how to spend a
+      // cell — which glyph carries an outline, whether the interior fills, how
+      // few rows the figure collapses into. This arm draws one polyline for all
+      // of them, so the collision reports a resolution fact rather than a
+      // dropped field.
+      //
+      // **`flame/default` and `icicle/default` are one bar chart**, and the
+      // terminal draws them identically too: the forms differ in the direction
+      // tiles grow, which is not a question a flat categorical block asks.
+      ["violin/vertical-braille", "violin/vertical-braille-filled", "violin/vertical", "violin/compact-vertical-line-box", "violin/compact-vertical-braille", "violin/compact-vertical-braille-filled", "violin/compact-vertical"],
       ["line/default", "line/size-left", "line/size-centre", "line/size-right", "line/corners-sharp"],
       ["contour/default", "contour/style-line", "contour/dim-floor", "contour/ink-contrast"],
       ["pie/solid", "pie/default-40", "pie/narrow-20"],
       ["quiver/default", "quiver/ink-contrast", "quiver/dim-floor"],
-      // **A legitimate collision with a measured reason** (C12 I80, §3ak.46). A
-      // one-row box spends its single row on mass or on a stroke; the box here
-      // is `fill-opacity` **and** `stroke-width` on one rect, so `plotBox` has
-      // nothing to choose. `compact-box-solid` is absent because it was one —
-      // `plotBox` defaults to `"solid"`, so it was byte-identical to `compact`
-      // in **both** arms, which is a fixture defect and not a dropped field.
+      ["violin/compact-braille", "violin/compact-braille-filled", "violin/compact-line-box"],
       ["boxplot/compact", "boxplot/compact-box-line"],
       ["calendar/day", "calendar/day-stretch"],
+      ["flame/default", "icicle/default"],
       ["heatmap/default", "heatmap/palette"],
       ["histogram/default", "histogram/scott"],
       ["horizon/bands-3", "horizon/folded-1x3"],
@@ -859,6 +909,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
       ["tree/default", "tree/overflow-top-down"],
       ["tree/left-right", "tree/overflow-left-right"],
       ["tree/outline", "tree/overflow-outline"],
+      ["violin/braille", "violin/braille-filled"],
     ]);
   });
 

@@ -247,7 +247,15 @@ describe("PC — the phase catalogue's two claims", () => {
     const claimed = forms.filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] !== null);
     expect(refused.length + claimed.length, "every form is on exactly one side").toBe(forms.length);
     expect(forms.length, "and the union is 46").toBe(46);
-    expect(refused.length, "some are still refused").toBeGreaterThan(0);
+    // **The refused set is empty, and the sentence above is why that is asserted
+    // by equality** (F383). *A number here would be a row that fails on every
+    // commit that works* was right about a **count**; it stopped being right the
+    // day the count reached its floor, because `> 0` cannot say *this side is
+    // now empty* and a returning refusal would pass it. The partition is still
+    // the claim — exhaustive and disjoint, above — and this is the one value the
+    // shrinking set can no longer shrink past.
+    expect(refused, "nothing is refused: F383 claimed the last two forms").toEqual([]);
+    expect(claimed.length, "so the claimed side is the whole union").toBe(forms.length);
   });
 
   it("PC2: the ordering hazard is real — the sweeper would delete these frames", () => {
@@ -276,14 +284,22 @@ describe("PC — the phase catalogue's two claims", () => {
 
 describe("PR — the pair catalogue's partition, which is the counter restated (F309)", () => {
   const refused = refusalMap as (dir?: string) => Record<string, Record<string, boolean>>;
-  const split = partition as (map?: Record<string, Record<string, boolean>>) => {
+  const split = partition as (
+    map?: Record<string, Record<string, boolean>>,
+    decls?: Record<string, Record<string, string>>,
+  ) => {
     family: string[]; variant: string[]; undeclared: string[]; declaredUnused: string[];
   };
   const pick = drawablePick as (form: string, map?: Record<string, Record<string, boolean>>) => string;
   const layout = pairLayout as (l: number, r: number) => {
     width: number; height: number; left: { x: number; y: number }; right: { x: number; y: number };
   };
+  // **`VARIANT_REFUSALS` is empty and PR4 fabricates its own** (F383), so this
+  // is read for its *shape* rather than its members: the rows below still have
+  // to typecheck against the declaration format, and an empty object with the
+  // wrong type would say nothing.
   const declared = VARIANT_REFUSALS as Record<string, Record<string, string>>;
+  expect(Object.keys(declared), "every declaration retired as its refusal lifted").toEqual([]);
 
   const map = refused();
   const part = split(map);
@@ -299,13 +315,19 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     expect([...part.family, ...part.variant].sort()).toEqual(allRefused);
     expect(part.family.length + part.variant.length, "and nothing is counted twice")
       .toBe(allRefused.length);
+    // **The corpus has no refusals left, and that is asserted rather than
+    // implied** (F383). It was `> 0` — *the corpus has refusals to partition* —
+    // which is a premise the row needed and could not state once the count
+    // reached zero. The partition above still holds over an empty set, so the
+    // row keeps its shape and gains the one fact the bound cannot carry: a
+    // refusal reappearing fails here, named.
+    expect(allRefused, "no frame in the corpus is refused").toEqual([]);
     // **Not a magnitude** (F310). `> 50` was a number that had to be edited every
     // time a form landed and said nothing when it did — and this pass has moved
     // it from 77 to 45 in eight commits. What the row needs is that the partition
     // has something to partition, which is what the two assertions above are
     // about; the floor is `> 0`, and the day it reaches zero the arm claims every
     // frame and this row says so first.
-    expect(allRefused.length, "the corpus has refusals to partition").toBeGreaterThan(0);
   });
 
   it("PR2 (F309): the declared variant refusals match the corpus, both directions", () => {
@@ -340,19 +362,28 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // form slid to a *family* refusal, and `undeclared` was correctly empty
     // while the control read as broken. A fabrication needs a subject that can
     // carry it: a form with at least two variants still drawing.
-    const form = Object.keys(declared).find((f) =>
+    //
+    // **And now `declared` is empty, so the subject has to be fabricated too**
+    // (F383). Every entry retired, so `Object.keys(declared)[…]` was `undefined`
+    // and the control threw — which is the good failure for a control losing its
+    // subject, and it is why `partition` takes its declarations. The *arm* being
+    // tested is unchanged; what changed is that its live instances are gone, and
+    // a control that only runs while a defect exists is not a control.
+    const form = Object.keys(map).find((f) =>
       Object.values(map[f] ?? {}).filter((r) => !r).length > 1)!; // cells-ok — a variant count
-    const variant = Object.keys(declared[form]!)[0]!;
+    const variant = Object.keys(map[form]!)[0]!;
+    const decls = { [form]: { [variant]: "fabricated, so the arm has a subject" } };
 
     const appeared = structuredClone(map);
-    const victim = Object.keys(appeared[form]!).find((v) => !appeared[form]![v])!;
+    const victim = Object.keys(appeared[form]!).find((v) => !appeared[form]![v] && v !== variant)!;
     appeared[form]![victim] = true;
-    expect(split(appeared).undeclared, "a refusal nothing declares is named")
+    expect(split(appeared, decls).undeclared, "a refusal nothing declares is named")
       .toEqual([`${form}/${victim}`]);
 
-    const vanished = structuredClone(map);
-    vanished[form]![variant] = false;
-    expect(split(vanished).declaredUnused, "a declaration whose frame now draws is named")
+    // The declared frame draws — which is what a dead declaration *is*, and in
+    // the live corpus is now true of every frame, so this is the whole of the
+    // arm's coverage rather than a supplement to it.
+    expect(split(map, decls).declaredUnused, "a declaration whose frame now draws is named")
       .toEqual([`${form}/${variant}`]);
   });
 
@@ -362,14 +393,21 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // `default` is the one this arm refuses. A sheet keyed on the name shows
     // two claimed forms as refused and reads as an arm working for fewer forms
     // than it does.
+    // **The rule survives its own reason** (F383). `flame` and `icicle` still
+    // carry two datum shapes, and their `default` — categories with no
+    // hierarchy — is no longer refused: it routes to the bar family, because
+    // that is what the terminal draws for it. So `pick` must still return a
+    // drawable variant, and now every variant is one.
     for (const form of ["flame", "icicle"]) {
-      expect(map[form]?.default, `${form}'s default is the refused datum shape`).toBe(true);
+      expect(map[form]?.default, `${form}'s default draws now`).toBe(false);
       expect(map[form]?.[pick(form)], `so ${form} is shown by a drawable variant`).toBe(false);
     }
-    // And a form with nothing drawable still resolves rather than throwing —
-    // it lands on the refusal placard, which is the honest answer.
-    const allDead = Object.keys(map).find((f) => Object.values(map[f]!).every(Boolean))!;
-    expect(Object.keys(map[allDead]!)).toContain(pick(allDead));
+    // **And `pick` is still exercised against a form with nothing drawable** —
+    // except no such form exists any more, so the fallback has no witness in the
+    // corpus. Asserted by equality so the row wakes up if one returns; `pick`'s
+    // own placard arm keeps its unit coverage in PR6.
+    const allDead = Object.keys(map).filter((f) => Object.values(map[f]!).every(Boolean));
+    expect(allDead, "no form is refused in every variant").toEqual([]);
   });
 
   it("PR7 (F315): the terminal scale is constant, so tiles compare with each other too", () => {

@@ -35,10 +35,10 @@
 import { describe, expect, it } from "vitest";
 
 import { block, type Plot, type PlotForm } from "../../src/data/viewmodel/index.js";
-import { plotToSvg, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import { plotToSvg, SVG_FAMILY, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import {
-  barFigure, curveFigure, distributionFigure, fieldFigure, horizonFigure, matrixFigure,
+  barFigure, curveFigure, densityFigure, distributionFigure, fieldFigure, horizonFigure, matrixFigure,
   proportionFigure, scatterFigure, stackedFigure, tilesFigure, spanFigure, funnelFigure,
   trackFigure, bulletFigure,
   type Figure,
@@ -101,6 +101,13 @@ const EMITTER = {
   proportion: proportionFigure, field: fieldFigure, horizon: horizonFigure,
   stacked: (b: Plot) => stackedFigure(b, b.form === "streamgraph"), span: spanFigure, funnel: funnelFigure,
   track: trackFigure, bullet: bulletFigure,
+  // **`density` is the fourteenth, and its absence was a `TypeError` rather
+  // than a skip** (F383). `EMITTER` is how these rows reach a figure without a
+  // renderer, and four of them index it by the family `svgFamilyOf` returns —
+  // so the day a new family was claimed, they called `undefined`. A table keyed
+  // by hand beside one derived from the source: the pair only agrees while
+  // somebody keeps it agreeing, which is what U-2 below now asserts.
+  density: (b: Plot) => densityFigure(b, b.form === "ridgeline"),
 } as const;
 type WalkedFamily = keyof typeof EMITTER;
 
@@ -353,7 +360,14 @@ describe("U — the seam, asserted from both arms", () => {
       gutterFamilies += 1;
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
-    expect(drawn, "drawn SVG documents").toBe(152); // cells-ok — a document count
+    expect(drawn, "drawn SVG documents").toBe(178); // cells-ok — a document count
+    // **152 → 178, and both halves are attributable** (F383). The corpus has
+    // **19 violin and 1 ridgeline** variants — the 20 the density family
+    // brought — and F383 recovered a further **6** variants of four other
+    // forms whose data this arm was refusing rather than reading. 152 + 20 +
+    // 6 = 178, which is also what U3 and U4 now count: **every variant that
+    // walks a figure draws a document.** The two numbers were 152 and 158 and
+    // the gap between them *was* those six.
     // **D13 closed**: the legend is drawn where the author asked and where it is
     // load-bearing — `SHARES_CELLS` and more than one series — which is the form
     // half of the terminal's auto-enable. The rung half stays there, because one
@@ -376,8 +390,17 @@ describe("U — the seam, asserted from both arms", () => {
     // count that reaches. **The artefact is a swatch beside the text**, which
     // `arm-decisions.ts` already asks for by shape after F307, and asking it here
     // would re-derive the figure D13 closed against. Recorded, not narrowed.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(44); // cells-ok — a document count
-    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(149); // cells-ok — a document count
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(46); // cells-ok — a document count
+    // 44 → 46: two of the twenty density variants carry more than one series
+    // into shared cells, which is what `SHARES_CELLS` auto-enables a legend for.
+    // The other eighteen are single-series and gain none (F383).
+    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(173); // cells-ok — a document count
+    // **149 → 173, which is +24 and not +20** (F383). The 20 density variants,
+    // plus **four** of the six variants F383 recovered: those four are `origin`
+    // values on `line`, a guttered family, while the other two are `flame` and
+    // `icicle` with categories — `tiles`, which the terminal does not gutter. The
+    // drawn-document counter above moved by 26 for the same reason and counts all
+    // six, so the two numbers differ by exactly the two tiles variants.
     // **D10 closed**, gated on `ROW_IS_AN_IDENTITY` — one row, column or band per
     // name the caller supplied. Drawing it for every family made the cell worse
     // rather than better: a curve's identity is its series, which belongs in the
@@ -395,7 +418,13 @@ describe("U — the seam, asserted from both arms", () => {
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(60); // cells-ok — a document count
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(81); // cells-ok — a document count
+    // **60 → 81, and 20 of the 21 are the density family** — 19 violin and 1
+    // ridgeline, counted per form rather than inferred from the total (F383).
+    // Both forms are `ROW_IS_AN_IDENTITY` without a position axis, so each band
+    // is captioned by name, which is what the terminal draws down the left.
+    // The remaining one is F383's other half: `flame` and `icicle` with
+    // categories and no hierarchy now route to the bar family and caption them.
   });
 
   it("U1a3 (C12 I59, §3ak.16): the tick count is the block's height, and 5 is right at one height", () => {
@@ -500,7 +529,8 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(seen.size, "distinct forms walking a figure").toBe(40); // cells-ok — a form count
+    expect(seen.size, "distinct forms walking a figure").toBe(42); // cells-ok — a form count
+    // 40 → 42: `violin` and `ridgeline`, the density family (F383).
   });
 
   it("U3 (C12 I59, §3ak.17): and over every variant, including both data shapes", () => {
@@ -517,7 +547,8 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(checked, "variants walking a figure").toBe(158); // cells-ok — a variant count
+    expect(checked, "variants walking a figure").toBe(178); // cells-ok — a variant count
+    // 158 → 178: the 20 density variants — 19 violin, 1 ridgeline (F383).
     // The bucket that lies, pinned. If a second one appears, the emitter key is
     // the first thing to check — this is the count F290 rests on.
     expect(lying, "variants whose spec.form differs from their catalogue bucket").toBe(1); // cells-ok — a variant count
@@ -534,7 +565,10 @@ describe("U — the seam, asserted from both arms", () => {
       const json = JSON.stringify(EMITTER[family as WalkedFamily](blockOf(spec)));
       expect(json, `${bucket}/${variant} carries a resolved colour`).not.toMatch(/#[0-9a-f]{6}/iu);
     }
-    expect(checked, "figures checked for a resolved colour").toBe(158); // cells-ok — a variant count
+    expect(checked, "figures checked for a resolved colour").toBe(178); // cells-ok — a variant count
+    // 158 → 178: the same 20, and the density figure names `surface.bgDeep`
+    // and `tone.default` as **refs** rather than resolving them, which is what
+    // this row is for — a second arm that wrote a hex here would fail it (F389).
   });
 
   it("U5 (C12 I59, §3ak.17): the SVG arm cannot see a capability — structural, not measured", () => {
@@ -860,7 +894,12 @@ describe("U — the seam, asserted from both arms", () => {
     // **The corpus this was measured over**, so a green run says how much it
     // swept — and so the day a variant stops emitting a point mark, the row that
     // licenses a shared character notices.
-    expect(withPoints, "catalogue variants emitting a point mark").toBe(19); // cells-ok — a variant count
+    expect(withPoints, "catalogue variants emitting a point mark").toBe(38); // cells-ok — a variant count
+    // **19 → 38, and the added 19 are exactly the violins** (F384). A violin
+    // emits a `median` point and a `mean` point over its body; the single
+    // `ridgeline` variant emits neither, because overlapping curves put each
+    // box on its neighbour and the terminal takes no summary there either. So
+    // the move is 19 and not 20, and that asymmetry is the design.
   });
 
   it("U7d (C12 I68, §3ak.22): `absent` draws nothing in both arms, and by decision in both", () => {
@@ -1134,10 +1173,18 @@ describe("U — the seam, asserted from both arms", () => {
       ...(form === "violin" ? { categories: ["a"] } : {}),
     } as Plot);
 
-    // `violin` and `ridgeline` are refused on measured grounds — this path
-    // computes no density — so a facet holding one inherits that.
-    expect(svgFamilyOf("violin"), "the child this row is about is refused").toBeNull();
-    expect(plotToSvg(kid("violin", "v"), DARK_THEME), "and refused on its own").toBeNull();
+    // **This row's original subject no longer exists, and that is asserted
+    // rather than assumed** (F383). `violin` was the refused child it was built
+    // around — *this path computes no density* — and F383 gave both density
+    // forms an emitter. Measured over the whole union, **nothing is refused**.
+    //
+    // So the interaction *does a composition refuse when a child does* has no
+    // constructible witness here. The equality below is what wakes the row up
+    // the day one returns; until then the positional half is what it can test,
+    // and that half was always the part a frame could get wrong.
+    const refused = (Object.keys(SVG_FAMILY) as PlotForm[]).filter((f) => SVG_FAMILY[f] === null);
+    expect(refused, "no form is refused, so this row's child cannot be built").toEqual([]);
+    expect(plotToSvg(kid("violin", "v"), DARK_THEME), "the old subject draws now").not.toBeNull();
 
     const mixed = block({
       kind: "plot", id: "mix", form: "smallmultiples", height: 10, axes: true, series: [],
@@ -1146,19 +1193,29 @@ describe("U — the seam, asserted from both arms", () => {
     const svg = plotToSvg(mixed, DARK_THEME);
     expect(svg, "the composition draws").not.toBeNull();
 
-    // **Two children drew and the third's column is empty**, which is countable:
-    // a nested `<svg>` per drawn child, each at the x its position gives it.
+    // **A nested document per child, each at the x its position gives it** —
+    // three now rather than two, and the positional claim is unchanged: a column
+    // belongs to a facet by position, so the third child sits at the third
+    // offset whatever its neighbours did.
     const kids = [...(svg ?? "").matchAll(/<svg x="([-\d.]+)"/gu)].map((m) => Number(m[1]));
-    expect(kids.length, "one nested document per child that drew").toBe(2); // cells-ok — a facet count
-    // **And the gap is where the refused one is** — the third child is still at
-    // the third column's own offset, so its neighbour's absence did not slide it
-    // left. Asserted against `facetWidths` rather than against `width / 3`,
-    // because the divider **distributes the remainder**: 640 over three is
-    // `214, 213, 213` and not three of `213.33`, and that is the terminal's own
-    // arithmetic being called rather than approximated.
+    expect(kids.length, "one nested document per child that drew").toBe(3); // cells-ok — a facet count
+    // **A column belongs to a facet by position**, which is what this row is
+    // really for and the half that survived the refusal going away. Asserted
+    // against `facetWidths` rather than against `width / 3`, because the divider
+    // **distributes the remainder**: 640 over three is `214, 213, 213` and not
+    // three of `213.33`, and that is the terminal's own arithmetic being called
+    // rather than approximated.
+    //
+    // **The index moved with the count** (F383): the third child used to be the
+    // *second* drawn document, because the middle one was refused. It is now the
+    // third, and leaving the assertion on `kids[1]` is how that would have gone
+    // unnoticed — the row would have compared the middle child's position to the
+    // right-hand column's and failed for a reason that reads like a layout
+    // defect. It did: `expected 214 to be close to 427`.
     const widths = facetWidths(SVG_DEFAULT_LAYOUT.width, 3);
     expect(kids[0], "the first child is at the left edge").toBeCloseTo(0, 6);
-    expect(kids[1], "and the third is still in the third column")
+    expect(kids[1], "the second is one column in").toBeCloseTo(widths[0] ?? 0, 6);
+    expect(kids[2], "and the third is in the third column")
       .toBeCloseTo((widths[0] ?? 0) + (widths[1] ?? 0), 6);
 
     // **Two children sharing an id share a clip path**, and the corpus cannot
@@ -1180,13 +1237,24 @@ describe("U — the seam, asserted from both arms", () => {
     expect(ids.length, "the children clip, so there is something to collide").toBeGreaterThan(0); // cells-ok — a clip count
     expect(new Set(ids).size, "and no two clip paths share a name").toBe(ids.length); // cells-ok — a clip count
 
-    // **The parent refuses only when no child draws**, which is C12 I64 rather than a
-    // new rule: a document with nothing on it is refused wherever it comes from.
-    const allRefused = block({
+    // **The parent refuses only when no child draws** — C12 I64, and it is the
+    // second claim here with no witness left: its fixture was two refused
+    // children, and both draw. **A facet list that is empty is the one state
+    // that still produces nothing**, so that is what stands in, and it tests the
+    // same rule at the same seam: a document with nothing on it is refused
+    // wherever it came from.
+    const nothing = block({
       kind: "plot", id: "none", form: "pairplot", height: 10, axes: true, series: [],
+      facets: [],
+    } as Plot);
+    expect(plotToSvg(nothing, DARK_THEME), "nothing on the page is refused").toBeNull();
+    // And two drawable children are not — the other side, so the row above is
+    // not passing because compositions always refuse.
+    const two = block({
+      kind: "plot", id: "two", form: "pairplot", height: 10, axes: true, series: [],
       facets: [kid("violin", "x"), kid("ridgeline", "y")],
     } as Plot);
-    expect(plotToSvg(allRefused, DARK_THEME), "nothing on the page is refused").toBeNull();
+    expect(plotToSvg(two, DARK_THEME), "and a pair that both draw is not").not.toBeNull();
   });
 
   it("U8b (C12 I70, §3ak.29): each of the three is idempotent, because two callers now apply it", () => {

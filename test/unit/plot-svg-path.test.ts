@@ -576,6 +576,43 @@ describe.each(supported)("G6 — %s", (form) => {
       void top; void bottom;
       return;
     }
+    // **The density family derives its coordinates, so there is no sample to
+    // clamp — and this is an exemption with a claim in it**, on the two
+    // precedents above (F384, F387, F388). A violin's marks are a kernel
+    // estimate: `-40` and `40` are *inputs to a derivation*, not readings placed
+    // on the axis this row measures, exactly as `ecdf`'s and `histogram`'s are.
+    //
+    // **It cannot take the `derived` arm below**, which is the reason this is
+    // written out rather than folded in: that arm asks `drawnBlock` whether the
+    // readings moved, and `drawnBlock` does not transform `violin` or
+    // `ridgeline` — `densityFigure` does, at figure time. The premise is the
+    // same and the witness is a different function, so a row keyed on
+    // `drawnBlock` would have fallen through to the general arm and asserted the
+    // page ordinate of a curve that has none. It did, which is how this row
+    // failed: `237.017` against a floor of `288`.
+    //
+    // The equivalent assertion is that the derivation **is** applied — three
+    // ways, so no one of them can pass by coincidence.
+    if (svgFamilyOf(form) === "density") {
+      const svg = plotToSvg(made, THEME, SVG_DEFAULT_LAYOUT) ?? "";
+      expect(svg.length, `${form}: the arm draws`).toBeGreaterThan(0);
+      // A hundred-point estimate, not five samples joined up. Counted off the
+      // longest path, which is the outline.
+      const longest = [...svg.matchAll(/<path d="([^"]+)"/gu)]
+        .map((m) => (m[1] ?? "").split(/[ML]/u).length) // cells-ok — a point count
+        .reduce((a, x) => Math.max(a, x), 0);
+      expect(longest, `${form}: the marks are an estimate, not the samples`)
+        .toBeGreaterThan(SAMPLES.length * 2);
+      // **And the estimate reads the data.** Without this the row above passes
+      // for any fixed-resolution shape, including a constant one — which is what
+      // a resolution-free curve looks like when the samples stop reaching it.
+      const moved = plotToSvg(
+        { ...made, series: made.series.map((sr) => ({ ...sr, values: sr.values.map((v) => (v === null ? v : v * 3 + 11)) })) },
+        THEME, SVG_DEFAULT_LAYOUT,
+      ) ?? "";
+      expect(moved, `${form}: and it moves when the samples do`).not.toBe(svg);
+      return;
+    }
     const layout = SVG_DEFAULT_LAYOUT;
     const top = layout.height * layout.pad;
     const bottom = layout.height * (1 - layout.gutter);
@@ -1061,7 +1098,22 @@ describe("G9 — an empty figure is a state, not a refusal", () => {
       series: [{ values: [1, 2, 3, 4, 5, 6, 7, 8] }],
     } as unknown as Parameters<typeof b.plot>[0]);
 
-    expect(plotToSvg(unsupported, THEME), "the arm does not draw a violin").toBeNull();
+    // **The refusal half of this row is gone, and its absence is the assertion**
+    // (F383, F384). The pair was *a block with nothing in it* against *a form
+    // this arm does not draw*, both collapsing to `null` — one 33-strong
+    // collision group. `violin` was the second half's example and it draws now.
+    //
+    // **Measured rather than assumed: nothing refuses.** Over all 46 forms
+    // through `ONE_PER_FORM`, and over five degenerate blocks — no series, an
+    // empty series, a `flame` with categories and no hierarchy, a `tree` with no
+    // hierarchy — `plotToSvg` returns `null` **zero** times. So the collision
+    // cannot recur while that holds, and what this row now guards is the half
+    // that still has two states: a block with no data draws its message.
+    //
+    // That `plotToSvg` still declares `string | null` with no reachable `null`
+    // is **F390**, recorded and not fixed here: narrowing a published return is
+    // a C24 change and wants its own ruling, on F335's precedent.
+    expect(plotToSvg(unsupported, THEME), "a violin draws now — F383").not.toBeNull();
     // **Inverted when the fix landed** (C12 I79). It asserted `toBeNull()` — the
     // measured defect — and the two states are apart now: a refusal is still a
     // refusal and an empty block draws its message.
@@ -1078,7 +1130,15 @@ describe("G9 — an empty figure is a state, not a refusal", () => {
       id: "f", form: "flame", height: 6, axes: true,
       categories: ["main", "parse"], series: [{ values: [100, 60] }],
     } as unknown as Parameters<typeof b.plot>[0]);
-    expect(plotToSvg(shaped, THEME), "a datum this arm cannot draw is still a refusal").toBeNull();
+    // **And this one too**: `flame` with categories and no hierarchy is the
+    // shape F383 re-routed to `barFigure`, because the terminal draws it as
+    // plain horizontal bars. It was the *near-miss* example — keyed on
+    // `marks.length === 0` alone it said `No data.` over data — and the boundary
+    // it was guarding still matters, so the assertion inverts rather than going:
+    // the datum is drawable and is drawn, and `No data.` is what must not appear.
+    const shapedSvg = plotToSvg(shaped, THEME) ?? "";
+    expect(shapedSvg, "a datum this arm can now draw is drawn").not.toBe("");
+    expect(shapedSvg, "and is not reported as empty").not.toContain("No data.");
 
     // **And `emptyMessage` cannot have a reader while that is true**, which is
     // why the corpus gained `line/empty-message` beside `line/empty`: a pair
@@ -1206,25 +1266,37 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     expect(plotToSvg(nulls, THEME), "a series that draws nothing is still no picture").toBeNull();
   });
 
-  it("G8e: a flipped ordinate is refused, and all four origins were identical", () => {
-    // **Measured**: `svgPoints` passes `invert: true` unconditionally, so
-    // `top-left`, `bottom-left`, `top-right` and `bottom-right` produced
-    // byte-identical output — the first sample's y was 288 in every one. The
-    // terminal honours `origin`; this arm did not, so the same block drew the
-    // right way up in one and upside down in the other.
-    const flipped = b.plot({
-      id: "o", form: "line", height: 6, origin: "top-left",
-      series: [{ label: "s", values: [1, 9] }],
-    });
-    expect(plotToSvg(flipped, THEME), "an ordinate this path cannot flip").toBeNull();
+  it("G8e (F383): all four origins draw, and the four documents differ", () => {
+    // **This row asserted a refusal and the refusal has expired.** `svgPoints`
+    // passed `invert: true` unconditionally, so `top-left`, `bottom-left`,
+    // `top-right` and `bottom-right` produced byte-identical output — the first
+    // sample's y was 288 in every one — and `plotToSvg` refused the three
+    // non-default values rather than draw the wrong way up.
+    //
+    // `projected` reads `figure.facing` now, both `up` and `mirrored`, so the
+    // guard was refusing something the arm could do. **Four distinct documents**
+    // is the assertion the old one becomes: a partition by equality, so a
+    // regression that re-collapses them fails here rather than in a frame.
+    const at = (origin: "top-left" | "bottom-left" | "top-right" | "bottom-right"): string => {
+      const svg = plotToSvg(b.plot({
+        id: "o", form: "line", height: 6, origin,
+        series: [{ label: "s", values: [1, 9] }],
+      }), THEME);
+      expect(svg, `${origin}: draws`).not.toBeNull();
+      return svg ?? "";
+    };
+    const drawn = ["top-left", "bottom-left", "top-right", "bottom-right"].map((o) =>
+      at(o as "top-left"));
+    expect(new Set(drawn).size, "four origins, four documents — not one repeated").toBe(4);
 
-    // And the default is not refused, which is what makes the clause a clause
-    // rather than a ban on the field.
-    const upright = b.plot({
-      id: "u", form: "line", height: 6, origin: "bottom-left",
-      series: [{ label: "s", values: [1, 9] }],
-    });
-    expect(plotToSvg(upright, THEME), "the default origin still renders").not.toBeNull();
+    // **And they differ the right way**, which four-distinct alone does not say:
+    // flipping the ordinate must move the *sample*, so the first point's `y`
+    // under `top-*` is the mirror of its `y` under `bottom-*`. Measured against
+    // the plot box the frame itself declares, not against recomputed layout
+    // arithmetic — a test that rolls its own reader carries the premise with it.
+    const firstY = (svg: string): number =>
+      Number(/<path d="M ?([-\d.]+)[, ]+([-\d.]+)/u.exec(svg)?.[2] ?? NaN);
+    expect(firstY(drawn[1] ?? ""), "bottom-left puts the low sample low").toBeGreaterThan(firstY(drawn[0] ?? ""));
   });
 
   it("G8f: an annotation is DROPPED, and that is recorded rather than refused", () => {
@@ -1880,7 +1952,19 @@ describe("G7 — the partition itself", () => {
     expect([...supported, ...refused].sort(), "the two sides partition the union")
       .toEqual([...all].sort());
     expect(supported.length, "and the claimed set is not empty").toBeGreaterThan(0);
-    expect(refused.length, "nor is the refused set").toBeGreaterThan(0);
+    // **The refused set is empty, and that is asserted by equality** (F383).
+    // It was `> 0` — a bound, which is what F310 repaired elsewhere in this very
+    // row — and a bound cannot say *this side is now empty*. `toEqual([])` is
+    // the same statement a returning refusal fails, and it names which form
+    // came back rather than reporting a count.
+    //
+    // **The loop below is now over the empty set**, which is A03 §2's vacuity
+    // class arriving here by success rather than by mistake: it asserts nothing
+    // and passes. It is kept because it is the thing that will run the day a
+    // refusal returns, and the equality above is what stops that day being
+    // silent. G7b carries the positive half — a claimed form puts ink on the
+    // page — over all 46.
+    expect(refused, "no form is refused: F383 closed the last two").toEqual([]);
     // **Every one, not the first six.** A sample is the same blind spot one
     // level down from the one G8 is about: it tests the rule against the forms
     // you already had in mind.

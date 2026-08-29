@@ -13677,6 +13677,267 @@ this pass has been building for eleven commits.
 
 ---
 
+## F391 — the density figure dropped `bandwidth`, and the collision sweep is what said so ★★★★★
+
+`violin/bimodal-sharp` and `violin/bimodal-default` are **the same fifty samples at two
+bandwidths**. The pair exists precisely because the estimate differs — Silverman's rule of thumb
+widens the kernel until it fills the gap between two separated modes, and `bandwidth: 0.4` shows
+both. The corpus comment says so.
+
+**They drew byte-identical documents.** `densityFigure` called `densitySeries(sr)` with no
+`adjust`, so `block.bandwidth` reached the terminal's estimator and never the figure's. The two
+arms then disagreed about the shape of a distribution while every column of `ArmDecisions` — the
+labels, the legend, the border, the counts — reported `agree`.
+
+**This is I75's mechanism doing exactly what it is for.** *Two blocks that are not equal drawing
+one document means a field reached one arm*, and no per-property comparison can see it: the
+properties are all equal, because the picture is. The instrument found a dropped input that
+nothing else in the suite could.
+
+**And the record had already classified it wrongly.** The disagreement note said the density family
+*brings four groups and every one is legitimate* — the braille and compact rungs, which really are
+the terminal spending a cell and this arm drawing one polyline. The fourth was not that. **A
+collision reads as a resolution fact or as a dropped input and the two look identical**, which is
+why I75 asks each group to name the member it isolates; naming it is what separated them. Three
+groups now, and each names its member.
+
+---
+
+## F390 — `plotToSvg` declares a `null` it can no longer return ★★★☆☆
+
+Measured over the whole union after F383: **46 forms through `ONE_PER_FORM`, plus five degenerate
+blocks** — no series, an empty series, a `flame` with categories and no hierarchy, a `tree` with no
+hierarchy — and `plotToSvg` returns `null` **zero** times. `SVG_FAMILY` has no null entries, and the
+`body.length === 0` arm is unreachable because an empty figure draws its message (C12 I79).
+
+So a published function's return type offers a case its callers can no longer meet, and every
+consumer still writes `?? ""`.
+
+**Recorded rather than fixed, on F335's precedent**: narrowing a published return is a
+public-contract change and wants its own ruling — which has to answer whether the `null` is
+*unreachable* or merely *unreached*, and those are different claims. The corpus says unreached; the
+`body.length === 0` guard says the author intended reachable. Until that is settled the type stays
+and the tests assert the measurement, which is what makes the day it changes visible.
+
+**The rows this touched are the ones that were asserting the opposite** — G7's `refused.length > 0`,
+G9a's *the arm does not draw a violin*, PC1's *some are still refused*, PR1's *the corpus has
+refusals to partition*, and U11's whole subject. Each was a **bound** where the fact is now an
+**equality**, and a bound cannot say *this side is empty*: `> 0` passes for one refusal and for
+forty. All five now assert `toEqual([])`, which is the statement a returning refusal fails.
+
+---
+
+## F389 — the violin's summary was drawn in the body's own ink, and composed against the wrong reference ★★★★☆
+
+The box landed (F384) and still **read as missing**, for two reasons that a reader checking the
+mark list one at a time would agree with twice.
+
+**The ink.** Every other member of the distribution family draws its marks over the *ground*, where
+the series colour is what separates one category from the next — so `distributionFigure` gives each
+mark its slot's ink and that is right. **A violin fills its slot.** The median went into the frame
+in the same colour as the field it sits on: present in the document, invisible in the picture, and
+`AD` could not see it because both arms emit a median.
+
+Two inks fix it, and they come from opposite ends of seaborn's one. `surface.bgDeep` for the
+whisker and the box, which never leave the body — that is seaborn's black, reached from the other
+side of the same contrast. `tone.default` for the median and the mean, which sit on the box.
+
+**The composition.** The first version used `distributionFigure`'s set unchanged — whiskers, caps,
+a slot-wide box, a slot-wide median bar — on the argument that *a violin is a box plot that also
+shows the distribution*. That sentence is true about the **data** and was taken as a statement about
+the **drawing**. Over a density body the caps and the median bar are wider than the shape they
+annotate and stick out either side.
+
+Every reference draws four things: a thin dark whisker `min … max`, a narrow near-black box over
+`q1 … q3`, a **dot** at the median, and **nothing at the extremes** — the whisker's own ends *are*
+the minimum and the maximum. The box is a **tenth of the slot**, not the 0.6 `SLOT_SHARE` gives a
+figure that owns its slot.
+
+**And `layer: "annotation"` draws a polyline dashed**, for `annotate.ts`'s reason — a reference line
+is a claim *about* the ordinate. A whisker is not one, so it is `layer: "series"` with an explicit
+`ref`; the box keeps `annotation`, which is also what buys it an exact width.
+
+**The role's drawing is the arm's, and this is I62 in the direction it is least often read.** The
+figure says *median*; how to draw it is the arm's, and the arm owed it a drawing that fits what it
+landed on. A box plot's median is a bar spanning its box. A violin's is a dot, in both references
+and in the textbook figure they come from — so `walk` keys the shape on the family. **No new role,
+no new mark kind.**
+
+---
+
+## F388 — seaborn's `cut` was private to the terminal's rasteriser, so the second arm drew infinite tails ★★★★☆
+
+A Gaussian kernel is defined everywhere. Evaluated over a shared value axis, a curve returns a
+vanishing but non-zero density far outside its own samples — and drawn, that is **a flat line
+running the whole width of the frame with a lump somewhere on it**. Three of those stacked is what
+"unreadable" was.
+
+`kde.ts` has always cut it: `supported()`, private, `CUT = 2` — seaborn's `cut` and its default. The
+comment above the constant describes the exact picture the second arm was drawing, four lines from
+the code that prevents it.
+
+**The terminal's rasteriser owned a piece of the *estimate* rather than a piece of the *drawing*,**
+which is `summariseSeries` one function along and the same repair: the rule moves to `derive.ts`,
+`kde.ts` takes it back as a one-line alias, and `densitySeries` returns the support it evaluated
+over so the figure cannot disagree with the estimator about where the curve stops.
+
+**The ridgeline gained it too**, unasked — its curves now stop where their data does, which is what
+`ggridges` draws.
+
+---
+
+## F387 — every curve was estimated over its own support and then laid out on a shared axis ★★★★★
+
+`densitySeries` evaluates over the series' **own** padded range and returns only the densities — it
+computes the sample grid and throws it away. The figure then placed sample `j` at `lo + (hi − lo)·j
+/ (n − 1)` on the **shared** extent, so **every distribution was stretched to fill the whole axis**.
+
+A cluster of sd 2.2 and one of sd 7 drew the same width and landed in the same place. That is the
+comparison a violin exists to make, inverted — and `violinColumn` and `ridgelineArea` both take the
+shared extent for exactly this reason, in comments that say so.
+
+**Nothing could see it and the box is what made it visible.** Alpha's quartiles sat at 29–32 with
+its body spanning 25–57: the outline and its own summary disagreeing on the same row, in one
+picture. No assertion compared them, because until F384 there was nothing to compare — the arm drew
+no summary. **A defect made findable by fixing a different one.**
+
+`density` never showed it: `drawnBlock` passes a **single** series, so the grid *is* the axis and
+there is no second curve to disagree with. The optional `domain` leaves that path byte-identical.
+
+---
+
+## F386 — the ridgeline left the plot area, and its rows were in the opposite order from the terminal's ★★★★☆
+
+Two defects in one expression, and the first is conditional in a way that hid it.
+
+**It escaped the frame.** Baselines sit one slot apart and the top row has exactly **one** slot of
+frame above it; the reach was `1.25`. This arm has nothing to clip against — the terminal's raster
+clamps at the grid — so the curve was drawn straight out through the border and off the canvas,
+peak cut off by the image edge rather than by the figure.
+
+**Only the globally tallest curve reaches the full height**, since the estimates share one density
+scale. In every fixture built so far the tightest distribution was at the *bottom*, with the whole
+area above it. Putting it in the **top** row is what produced the frame. `1` exactly, so the tallest
+peak lands on the top edge and nothing escapes.
+
+**And the rows were inverted.** `ridgelineArea` puts `baselines[0]` on the floor and stacks upward,
+so the terminal draws series 0 in front at the bottom. This arm laid them out from the top. **Both
+arms drew the same three curves in opposite orders and both labelled them confidently** — the kind
+of disagreement `AD` exists for, invisible to it because every column it records was equal.
+
+`walk` places `identity[i]` at `(i + 0.5) / n` from the top and that placement is shared by every
+row-identity family, so the figure cannot move a label — only say which name belongs to which slot.
+Reversing the names is what makes the arms agree. **Residual, recorded rather than fixed**: the
+terminal's label sits *on* the baseline and this one half a slot above it. Putting it on the
+baseline costs half the reach, and at half the reach the curves no longer overlap — which is the
+form's whole point, in §3l's own words.
+
+---
+
+## F385 — the density figure numbered the survivors, so one empty series shifted every slot after it ★★★☆☆
+
+`densityFigure` filtered the series to those with a finite sample and then numbered the survivors,
+using that index for both the colour slot and the row's position. A leading empty series moves
+everything: row 1 draws in slot 0's ink, and `identity[0]` — which is `block.categories`, unfiltered
+— names a curve one place down.
+
+The terminal lays out over the categories and leaves an empty band blank. **Every series holds a
+slot now**, drawn or not.
+
+Found by reading the function while fixing something else, not by a frame: no fixture in the corpus
+has an empty series beside a non-empty one.
+
+---
+
+## F384 — a violin is a box plot that also shows the distribution, and the second arm drew no box ★★★★★
+
+`definition.ts` says it in its own words — *a violin **is** a box plot that also shows the
+distribution, so the box is not optional — the numbers are, and they are computable* — above
+`summaryOf`, which computes them. The terminal has always drawn q1, q3, the median and the mean on
+the violin's spine.
+
+**The second arm drew the outline and nothing else.** The same block rendered twice said two
+different things about where the middle of the data was, and every gate agreed: `AD`'s columns are
+`silent · numericLabels · identityLabels · border · interiorRules · legend · ramp · keyReadings ·
+notice`, and *does this arm draw the summary its own data carries* is not among them.
+
+**The cause is placement, not omission.** `summaryOf` was private in `definition.ts`, beside the
+terminal's rasteriser — and `distribution.ts`'s own header says why that is the wrong home: *the SVG
+arm needs the computing half without the drawing. L0 is where the two arms can both reach.* The
+figure could not import it (`definition.ts` imports `figure.ts`; the reverse is a cycle), so the arm
+could only reproduce it or go without. **It went without.**
+
+Moved to `distribution.ts` as `summariseSeries`; `definition.ts` keeps its name as an alias. Second
+instance of that shape in one sitting — see F388, which is the same repair on the same file's other
+private half.
+
+---
+
+## F383 — every form the type declares now draws in both arms, and two of the three gaps were stale ★★★★☆
+
+The second renderer refused **2 forms outright and 6 variants of 4 others**. Measured over all 46
+forms and 188 variants, the three causes were different in kind and only one was real work.
+
+**`origin` — a guard that outlived its cause.** `plotToSvg` refused any non-default origin, on a
+comment saying `svgPoints` *passes `invert: true` unconditionally* so all four values produce
+byte-identical output. True when written. `projected` now reads `figure.facing` — `up` and
+`mirrored` both applied — and removing the guard gives **four distinct documents**, each correctly
+oriented:
+
+```
+bottom-left    50 ABOVE 10, right of 10      top-left     50 below 10, right of 10
+bottom-right   50 ABOVE 10, LEFT of 10       top-right    50 below 10, LEFT of 10
+```
+
+Four variants recovered by deleting a line. **The refusal was correct and its reason had expired**,
+which is the deferral class: the condition was written where the refusal is and the thing that
+satisfied it was written somewhere else.
+
+**`flame`/`icicle` with categories — the wrong family, not a gap.** Their `default` variants are
+`categories + series` with no `hierarchy`; `tilesFigure` needs one and emitted nothing, so the arm
+refused a block the terminal draws as **plain horizontal bars**. The datum picks the family now.
+Confirmed by construction: the same form with a hierarchy draws, with categories refuses.
+
+**`violin`/`ridgeline` — the one that was real, and the blocker was resolution rather than the
+estimate.** `SVG_FAMILY` carried `violin: null, ridgeline: null` under a recorded reason — both
+were claimed once and given back on `G7b`'s rule that *a claimed form must put ink on the page*,
+because the path computes no density and they rendered **zero marks while reporting as supported**.
+
+The earlier pass ruled the family a walk rather than a wiring change because `violinColumn`
+evaluates the kernel at the **renderer's row count**. But `densitySeries` — already shared, already
+crossing for the `density` form — evaluates at a **fixed** resolution and returns a curve, and a
+curve is a `polyline` both arms already draw. So the figure carries the outline and each arm
+rasterises it: no second density implementation and no resolution in the seam.
+
+**The ridgeline came out upside down and only the picture said so.** The first draft rose from
+`i * slot` in the direction the identity axis runs, which drew each curve down into the row below
+and out through the frame — the right data, inverted, with the correct number of marks. Found by
+rendering it to a PNG and looking; no count could have.
+
+**What the gates then reported, all of it correct:**
+
+```
+terminal baseline    unmoved — no terminal change
+forms claimed        44 -> 46
+refused variants     1 -> 0
+distinct documents   134 -> 148
+cells over forms     352 -> 368   (46 x 8)
+collision groups     17 -> 21
+```
+
+**The four new collision groups are legitimate and are the seam working.** `violin`'s `braille`,
+`braille-filled`, `line-box` and `compact` rungs are the *terminal's* choices about how to spend a
+cell; this arm draws one polyline for all of them, so byte-identical documents from unequal blocks
+report a **resolution fact** rather than a dropped field — C12 I80's second kind. `flame/default` ≡
+`icicle/default` for the same reason one level up: the forms differ in the direction tiles grow,
+which a flat categorical block does not ask.
+
+**The residue, stated.** `numericLabels` disagrees on every density variant: the terminal labels its
+value gutter from the summary and this arm from the samples' own extent. Both draw the same outline
+and hang it on a different axis. Recorded in the matrix as open work rather than resolved here.
+
+---
+
 ## F382 — a series' declared tone reached the line and not the swatch, because `refOf` existed twice under one name ★★★★★
 
 A series with `tone: "ok"` is **drawn green and named orange**. Measured on the terminal's own

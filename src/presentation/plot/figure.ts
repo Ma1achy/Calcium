@@ -16,7 +16,7 @@ import type {
   ColormapName, OHLC, Plot, PlotForm, QuartileSummary, ScaleType, Segment, Series, VectorSeries,
 } from "../../data/viewmodel/index.js";
 import { IS_MATRIX } from "../../data/viewmodel/index.js";
-import { normalisedSummary, quartileRange } from "../../data/viewmodel/distribution.js";
+import { normalisedSummary, quartileRange, summariseSeries } from "../../data/viewmodel/distribution.js";
 import { strips, tiles } from "./hierarchy.js";
 import { flatten } from "./tree.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
@@ -30,6 +30,7 @@ import { plotAreaRows } from "./height.js";
 import { partSeparator } from "./marks.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, refOf, seriesRefOf } from "./marks.js";
+import { densitySeries } from "./derive.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
 
 /**
@@ -2570,6 +2571,242 @@ export function barFigure(block: Plot): Figure {
  * is a quantity and the eye reads its thickness; an outline leaves the reader
  * integrating two curves, which is `stack.ts`' argument for the glyph it uses.
  */
+/**
+ * The density family — `violin` and `ridgeline` (C12 §3l, F383).
+ *
+ * **Both forms were claimed by the SVG arm once and given back**, on `G7b`'s
+ * rule that *a claimed form must put ink on the page*: their datum is `series`,
+ * the samples for a kernel estimate, and that arm computed no density, so both
+ * rendered zero marks while reporting as supported. The table has carried
+ * `violin: null, ridgeline: null` since, with the outline named as *the family's
+ * residue, not its omission*.
+ *
+ * **What unblocked it is that the estimate does not have to be resolution-bound.**
+ * `kde.ts`'s `violinColumn` evaluates at the renderer's **row count**, which is
+ * why the earlier pass ruled the family a walk rather than a wiring change. But
+ * `densitySeries` — already shared, already crossing for the `density` form —
+ * evaluates at a **fixed** resolution and hands back a curve. A curve is a
+ * `polyline`, and both arms already draw those.
+ *
+ * So the figure carries the outline and each arm rasterises it: the terminal
+ * into cells, this into pixels. No second density implementation, and no
+ * resolution in the seam.
+ *
+ * **The two forms differ only in where the curve is anchored**, which is why
+ * they share a function rather than getting one each:
+ *
+ *   - a **violin** is *mirrored* about its category's centre line, so the
+ *     polyline runs out along `+d` and back along `-d` and closes;
+ *   - a **ridgeline** *rises* from its own baseline, so it runs along `+d` and
+ *     back along the baseline — a whole slot of rise, so it reaches its
+ *     neighbour's baseline and the curves overlap as §3l asks, and no further,
+ *     because the top row has exactly one slot of frame above it (F386).
+ */
+export function densityFigure(block: Plot, ridge: boolean): Figure {
+  const marks: Drawn[] = [];
+  // **Every series holds a slot, including the ones with no samples** (F385).
+  // This filtered first and numbered the survivors, so a leading empty series
+  // shifted every one after it: row 1 drew in slot 0's ink and `identity[0]`
+  // named a curve one place down. The terminal lays out over the categories and
+  // leaves an empty band blank — `identity` is `block.categories`, so filtering
+  // here made the labels and the marks disagree about which row is which.
+  const all = block.series;
+  const n = Math.max(1, all.length); // cells-ok — a row count
+
+  // **The axis is over the samples, not over the density.** A violin's gutter is
+  // labelled in the units the data is in; the estimate only decides thickness.
+  const extent = seriesRange(all, block);
+  const value = axisOver(extent, block);
+  const named = block.categories ?? identityOf(block);
+  const decisions = {
+    value,
+    extent,
+    // **A ridgeline's identity runs the other way, because its first series is
+    // at the *bottom*** (F386). `walk` places `identity[i]` at `(i + 0.5) / n`
+    // from the top and that placement is shared by every row-identity family, so
+    // the figure cannot move a label — it can only say which name belongs to
+    // which slot. The terminal's `ridgelineArea` puts `baselines[0]` on the
+    // floor and stacks upward, so the two arms drew the same three curves in
+    // opposite orders and both labelled them confidently. Reversing the names
+    // here is what makes the second arm agree, and it is the figure's decision
+    // rather than the walk's precisely because only this family stacks.
+    identity: ridge ? [...named].reverse() : named,
+    isotropic: false,
+    ramp: rampOf(block),
+    orientation: orientationOf(block),
+    facing: facingOf(block, FACING_DEFAULT),
+    frame: frameOf(block),
+    gutter: gutterOf(block),
+    positionAxis: positionAxisOf(block),
+    position: positionDomainOf(block),
+    valueLabels: valueLabelsOf(block),
+    legend: legendOf(block),
+    callout: calloutOf(block),
+    title: titleOf(block),
+    cross: crossOf(block),
+    marks: [] as Drawn[],
+  };
+
+  // **One estimate per row, at a fixed resolution**, and the sample positions it
+  // was evaluated at span the same range for every row — otherwise the curves
+  // are drawn against different scales and a reader compares two pictures.
+  // **Every curve over the *shared* padded support** (F387). Estimated over its
+  // own, sample `j` means a different value in each row — and laying the samples
+  // along one axis then stretches every distribution to fill it, so a cluster of
+  // sd 2 and one of sd 7 draw the same width and land in the same place. The box
+  // is what made it visible: alpha's quartiles sat at 29–32 with its body
+  // spanning 25–57, the outline and its own summary disagreeing on the same row.
+  // Both terminal renderers take the shared extent for this reason.
+  const pad = ((extent?.max ?? 1) - (extent?.min ?? 0)) * 0.1 || 1;
+  const support: Range = { min: (extent?.min ?? 0) - pad, max: (extent?.max ?? 1) + pad };
+  const curves = all.map((sr) => densitySeries(sr, 100, block.bandwidth, support));
+  const lo = support.min;
+  const hi = support.max;
+
+  if (value !== null && curves.length > 0) { // cells-ok — a curve count
+    const peak = Math.max(
+      ...curves.map((c) => Math.max(0, ...c.series.values.map((v) => (v === null ? 0 : v)))),
+    );
+    // The slot a row owns, and how far a curve may reach out of it.
+    const slot = 1 / n;
+    // **A violin fills half its slot and a ridgeline fills a whole one**, which
+    // is the one number that separates the two drawings — and for the ridgeline
+    // it is a *constraint* rather than a taste (F386).
+    //
+    // It was `1.25`, chosen for how much overlap reads as a ridge. The top
+    // curve's baseline sits one slot below the frame's top edge, so a reach past
+    // `1` leaves the plot area — and this arm has nothing to clip against, where
+    // the terminal's raster clamps at the grid. The measured frame was a curve
+    // drawn straight out through the border and off the canvas, peak cut off by
+    // the image edge rather than by the figure. **A slot exactly**, so the
+    // tallest curve's peak lands on the top edge and nothing escapes.
+    //
+    // **Only the globally tallest curve reaches it**, since `peak` is the
+    // maximum across every row — which is what makes the estimates comparable,
+    // and also why this was invisible until the tightest distribution was put in
+    // the *top* row. In the first three fixtures the tightest was at the bottom,
+    // with the whole area above it.
+    const reach = (ridge ? 1 : 0.45) * slot;
+
+    curves.forEach((curve, i) => {
+      const ds = curve.series.values;
+      const count = ds.length; // cells-ok — a sample count
+      if (count < 2 || peak <= 0) return; // cells-ok — a sample count
+      // **Cut two bandwidths past the data and stop** — seaborn's `cut`, the
+      // rule the terminal's outline has always used, now reachable (F388).
+      //
+      // A Gaussian kernel is defined everywhere, so a curve evaluated over the
+      // *shared* support returns a vanishing density far outside its own
+      // samples. Drawn, that is a flat line running the whole width of the
+      // frame with a lump somewhere on it — three of them stacked, which is
+      // what "unreadable" was. The estimate is unchanged; what changes is where
+      // the polyline starts and stops.
+      const { first, last } = curve.support;
+      if (last <= first) return; // cells-ok — a sample index
+      // The sample positions the density was evaluated at, normalised onto the
+      // value axis the gutter is labelled from.
+      const along = (j: number): number =>
+        normalisedOf(lo + ((hi - lo) * j) / (count - 1), value.range, false); // cells-ok — a sample index
+      const thickness = (j: number): number => (reach * ((ds[j] ?? 0) as number)) / peak;
+      // **A ridgeline's baseline is the row's *far* edge and it rises back over
+      // its neighbour**, which is the direction the identity axis runs and the
+      // first thing this got wrong: rising the other way drew each curve down
+      // into the row below and out through the frame — a picture of the right
+      // data upside down, which is exactly the plausible-wrong-figure the `null`
+      // arm used to refuse. Caught by rendering it, not by a count of marks.
+      //
+      // **Counted from the floor, so series 0 is in front** — `ridgelineArea`'s
+      // `baseline(i) = h - 1 - i·step` in this arm's units, and the reason
+      // `identity` is reversed above.
+      const base = ridge ? (n - i) * slot : (i + 0.5) * slot;
+      const rise = ridge ? -1 : 1;
+
+      const out: Pt[] = [];
+      for (let j = first; j <= last; j += 1) out.push([base + rise * thickness(j), along(j)]); // cells-ok — a sample index
+      const back: Pt[] = ridge
+        ? [[base, along(last)], [base, along(first)]] // cells-ok — a sample index
+        : Array.from({ length: last - first + 1 }, (_v, k) => { // cells-ok — a sample count
+            const j = last - k; // cells-ok — a sample index
+            return [base - thickness(j), along(j)] as Pt;
+          });
+
+      marks.push({
+        mark: { kind: "polyline", points: [...out, ...back], closed: true, fill: true },
+        layer: "series",
+        seriesIndex: i,
+      });
+
+      // **A violin is a box plot that also shows the distribution, so the box is
+      // not optional** (F384) — `definition.ts`'s own sentence, and the terminal
+      // has always drawn q1, q3, the median and the mean on the spine. This arm
+      // drew the outline and nothing else, so the same block rendered twice said
+      // two different things about where the middle of the data was.
+      //
+      // **Composed against the references rather than against the boxplot
+      // family** (F389). `distributionFigure`'s set — whiskers, caps, a slot-wide
+      // box, a slot-wide median bar — is right where the summary *is* the figure
+      // and has the slot to itself. Over a density body it is the wrong picture:
+      // the caps and the median bar are wider than the body they annotate and
+      // stick out either side, which is what "unreadable" was.
+      //
+      // seaborn and every textbook violin draw **four** things and no more: a
+      // thin dark whisker from min to max, a narrow near-black box over q1…q3,
+      // a **white dot** at the median, and nothing at the extremes — the
+      // whisker's own ends are the minimum and the maximum, which is what the
+      // annotated reference labels them as. The mean is the one addition, kept
+      // because the terminal draws it and a band with no mean beside two that
+      // have one reads as missing rather than as coincident (F301).
+      //
+      // A ridgeline gets none of it: the curves overlap by construction, so a
+      // box on each baseline lands on its neighbour's body, and the terminal's
+      // `ridgelineArea` takes no summary either.
+      if (ridge) return;
+      const q = block.quartiles?.[i] ?? summariseSeries(all[i] ?? { values: [] });
+      if (q === undefined) return;
+      const sm = normalisedSummary(q, value.range);
+      // **Two inks, and neither is the series'** (F389). Every other member of
+      // the distribution family draws its marks over the *ground*, where the
+      // series colour is what separates one category from the next. A violin
+      // fills its slot, so a median in the series colour is a coloured mark on a
+      // field of the same colour — in the document, invisible in the frame, and
+      // the reason the box read as missing even after it was emitted.
+      //
+      // The **ground** for the whisker and the box, which never leave the body:
+      // that is seaborn's black, arrived at from the other end of the same
+      // contrast. **`tone.default`** for the median and the mean, which sit on
+      // the box and must read against it: seaborn's white dot.
+      const boxRef: ColourRef = "surface.bgDeep";
+      const markRef: ColourRef = "tone.default";
+      const dot = (y: number, role: GlyphRole): Drawn =>
+        ({ mark: { kind: "point", x: base, y, role }, layer: "series", seriesIndex: i, ref: markRef });
+      // **One line and `layer: "series"`, because an annotation is dashed here**
+      // and a whisker is not a reference line. `min … max` unbroken: the box is
+      // filled and drawn over it, so the two-segment form the boxplot needs
+      // buys nothing and the join showed as a gap.
+      marks.push({
+        mark: { kind: "polyline", points: [[base, sm.min], [base, sm.max]] },
+        layer: "series",
+        seriesIndex: i,
+        ref: boxRef,
+      });
+      // **A tenth of the slot, and `annotation` is what buys the exact width.**
+      // The walk takes `SLOT_SHARE` off a `series` rect — right for a box plot,
+      // whose box is the measurement — so the box arrived at 0.6 of the slot and
+      // came out taller than the density it annotates.
+      const box = 0.09 * slot;
+      marks.push({
+        mark: { kind: "rect", x: base - box / 2, y: Math.min(sm.q1, sm.q3), w: box, h: Math.abs(sm.q3 - sm.q1), fill: true },
+        layer: "annotation",
+        seriesIndex: i,
+        ref: boxRef,
+      });
+      marks.push(dot(sm.median, "median"));
+      if (sm.mean !== undefined) marks.push(dot(sm.mean, "mean"));
+    });
+  }
+  return { ...decisions, marks };
+}
+
 export function stackedFigure(block: Plot, centred: boolean): Figure {
   const cols = block.series.reduce((m, r) => Math.max(m, r.values.length), 0); // cells-ok — a sample count
   const bands = cols === 0 ? [] : stackBands(block.series, cols, centred); // cells-ok — a sample count
