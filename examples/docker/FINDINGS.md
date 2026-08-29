@@ -13677,6 +13677,33 @@ this pass has been building for eleven commits.
 
 ---
 
+## F392 — two of three examples could not start on the engine they declare, and only a host could see it ★★★★★
+
+`examples/docker` runs `node --experimental-strip-types src/main.ts`. `examples/minimal` and
+`examples/plots` ran `node main.ts`. **Node executes a `.ts` entry point without the flag only from
+22.18**, and all three declare `engines: { node: ">=22" }` — so on 22.0–22.17 a clean clone ran one
+example and the other two died with `ERR_UNKNOWN_FILE_EXTENSION` before drawing anything.
+
+**The devcontainer cannot see this defect, and that is the finding rather than the flag.** CLAUDE.md
+sends every command through a container running 22.23, where type stripping is on by default and all
+three examples work. R01 R4.4 commits that a clean clone plus `npm install` gives a working shell
+with **no container**. So the one claim the container cannot test is the one the container hides —
+and the gate that would have caught it does not exist, because every gate runs inside.
+
+Found by a reader on a host at 22.14, running the command the README gives.
+
+**And the README gave the wrong commands too.** It listed `/curve /bars /heat /dist /tree` — the
+five from the original plan, never built. The demo declares `/sample /all /form /live /compare
+/faults`. A usage block is the one part of an example nothing typechecks, and it had been stale
+since the commands were designed.
+
+**EX1 closes the class rather than the instance.** It discovers `examples/*/package.json` rather
+than listing three, and asserts a **relation**: a `.ts` entry needs either the flag or an engine
+floor that makes it unnecessary. Fabricated — reverting `plots` to a bare `node main.ts` fails with
+`` `node main.ts` runs a .ts entry, and `engines` is `>=22` ``.
+
+---
+
 ## F391 — the density figure dropped `bandwidth`, and the collision sweep is what said so ★★★★★
 
 `violin/bimodal-sharp` and `violin/bimodal-default` are **the same fifty samples at two

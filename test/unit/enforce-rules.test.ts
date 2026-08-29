@@ -21,7 +21,8 @@
 // about. The fabricated violation catches the first, the scope check the
 // second, the existence check the third; no one of them catches the others,
 // which is why all three are here (A03 §2, commitment 14).
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   checkModuleGraph,
@@ -2148,5 +2149,51 @@ describe("SS52 — a NUL makes a file invisible to every search", () => {
     expect(tree.some((f) => f.startsWith("test/")), "the list reaches test/").toBe(true);
     expect(tree.some((f) => f.startsWith("tools/")), "and tools/").toBe(true);
     expect(checkControlBytes(tree)).toEqual([]);
+  });
+
+  it("EX1 (F392, A04 §2): every example starts on the engine it declares", () => {
+    // **Three siblings, one of them runnable** — the divergence nobody checked.
+    // `examples/docker` has passed `--experimental-strip-types` since it was
+    // written; `minimal` and `plots` ran `node main.ts` bare. Node executes a
+    // `.ts` entry point without the flag only from **22.18**, and all three
+    // declare `engines: >=22`, so on 22.0–22.17 a clean clone ran one example
+    // and the other two died with `ERR_UNKNOWN_FILE_EXTENSION` before drawing
+    // anything. Measured on a host at 22.14, which is how it was found — not by
+    // a gate, and not in the container, where 22.23 strips types by default and
+    // every example works.
+    //
+    // **That is the point: the devcontainer cannot see this defect.** CLAUDE.md
+    // sends every command through it, and R01 R4.4 commits that a clean clone
+    // plus `npm install` gives a working shell with **no** container. The one
+    // claim the container cannot test is the one the container hides.
+    //
+    // Asserted as a **relation** rather than a flag list: a `.ts` entry needs
+    // either the flag or an engine floor that makes it unnecessary. A future
+    // example bumping `engines` to `>=22.18` and dropping the flag passes, and
+    // one adding a bare `.ts` start fails.
+    const names = readdirSync("examples", { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .filter((n) => existsSync(join("examples", n, "package.json")))
+      .sort();
+    expect(names.length, "the examples are discovered, not listed").toBeGreaterThan(2); // cells-ok — an example count
+
+    const STRIPS_BY_DEFAULT = 18; // node 22.18
+    for (const name of names) {
+      const pkg = JSON.parse(readFileSync(join("examples", name, "package.json"), "utf8")) as {
+        scripts?: Record<string, string>; engines?: Record<string, string>;
+      };
+      const start = pkg.scripts?.["start"];
+      expect(start, `${name} declares a start script`).toBeDefined();
+      if (start === undefined || !/\.ts(\s|$)/u.test(start)) continue;
+      const floor = /(\d+)\.(\d+)/u.exec(pkg.engines?.["node"] ?? "");
+      const guaranteed = floor !== undefined && floor !== null
+        && Number(floor[1]) >= 22 && Number(floor[2]) >= STRIPS_BY_DEFAULT;
+      expect(
+        start.includes("--experimental-strip-types") || guaranteed,
+        `${name}: \`${start}\` runs a .ts entry, and \`engines\` is ` +
+          `\`${pkg.engines?.["node"] ?? "unset"}\` — so it needs --experimental-strip-types`,
+      ).toBe(true);
+    }
   });
 });

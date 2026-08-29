@@ -5,13 +5,33 @@
 ![the gallery: a latency curve with its two series named at the lines they end on, a grouped bar of the frame budget at four widths, a viridis matrix of per-core load, four box plots of stage timings, a treemap of the budget nested, and a live queue-depth walk redrawing every 120 ms](frame.png)
 
 ```
-npm install
-npm start            # then /curve  /bars  /heat  /dist  /tree
-npm test
+npm install          # from the repository root — this is a workspace member
+npm run build        # the example imports the built package, not src/
+cd examples/plots && npm start
 ```
 
-Five forms and one of them live, built through **`b.plot`** — the published builder, not the
-viewmodel constructor every fixture in this repository uses.
+**In a real terminal.** `plots-tui` draws on the alternate screen, so it refuses a pipe or a
+redirect and says so; `npm start 2>&1 | head` gets the refusal rather than a figure.
+
+Then, at the prompt:
+
+```
+/sample     the gallery — six figures, one of them live
+/all        every form the type declares, at a glance
+/form  <f>  one form, full size          e.g. /form violin
+/live  <f>  one form, advancing
+/compare <f>  the terminal beside the SVG, as pixels
+/faults     a failing source, and the way back
+```
+
+**`--experimental-strip-types` is in the `start` script and it is not decoration** (F392).
+Node runs a `.ts` entry point without a flag only from **22.18**; `engines` says `>=22`, and on
+22.0–22.17 the demo died with `ERR_UNKNOWN_FILE_EXTENSION` before drawing anything.
+`examples/docker` had carried the flag since it was written and the other two had not, so the
+same clean clone ran one example and not the others.
+
+Every form the type declares, six of them in the gallery and one live, built through **`b.plot`** —
+the published builder, not the viewmodel constructor every fixture in this repository uses.
 
 ---
 
