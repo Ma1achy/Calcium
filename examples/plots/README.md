@@ -39,13 +39,21 @@ redirect and says so; `npm start 2>&1 | head` gets the refusal rather than a fig
 Then, at the prompt:
 
 ```
-/sample     the gallery — six figures, one of them live
-/all        every form the type declares, at a glance
-/form  <f>  one form, full size          e.g. /form violin
-/live  <f>  one form, advancing
+/sample       the gallery — six figures, one of them live
+/all          every form, and every rung — 95 figures, and the four that refuse
+/form  <f>    one form full size, with its rungs beneath it   e.g. /form violin
+/live  <f>    one form, advancing
 /compare <f>  the terminal beside the SVG, as pixels
-/faults     a failing source, and the way back
+/faults       a failing source, and the way back
+/monitor      this machine, live — cores, memory, load, heap
 ```
+
+**`main.ts` is the wiring; `src/commands.ts` is what it draws** (F400). `main.ts` calls
+`tui.start()` at module scope, so importing it starts a session — while the document builders
+lived there, nothing could construct a command's document and check it. The suite tested the
+pieces instead: it counted 46 forms and 53 rungs, built each one on its own, and passed while
+`/all` and `/form` drew **nothing at all**, because every figure of a form carried the same
+`f-<form>` id and a document holding twenty of them is refused entire by C04 I14.
 
 **`--experimental-strip-types` is in the `start` script and it is not decoration** (F392).
 Node runs a `.ts` entry point without a flag only from **22.18**; `engines` says `>=22`, and on

@@ -19,7 +19,14 @@ import { execFile } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { completeLocal } from "@fmx/calcium";
+import { expectDocument, liveParts, producerContext } from "@fmx/calcium/testing";
+import type { Block, ViewDocument } from "@fmx/calcium";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
+import {
+  adaptSample, compare, everyForm, faults, formFull, greetingDocument, liveFor, monitor, unknown,
+} from "../src/commands.ts";
+import { manifest } from "../src/manifest.ts";
 
 const run = promisify(execFile);
 const here = (p: string): string => new URL(p, import.meta.url).pathname;
@@ -226,4 +233,176 @@ describe("the plot demo", () => {
     expect(everyVariant().length, "rungs beyond the defaults").toBe(53);
     expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(95);
   });
+});
+
+/**
+ * **Every command, as a whole document** (F400).
+ *
+ * The rows above test the *pieces*: 46 entries, 53 rungs, each built on its own
+ * and counted. They were green while `/all` and `/form` drew **nothing at all**,
+ * because every figure of a form carried the same `f-<form>` id and a document
+ * holding twenty of them is refused entire by C04 I14. `transcript.append`
+ * rejects the document, so there is no frame in which any of the 95 correct
+ * figures could appear, and no assertion about a figure could have seen it.
+ *
+ * **This is the fourth duplicate-id defect in this one example**, which is what
+ * makes it a class rather than a bug: F372/F373 (a live part's child carrying
+ * the panel's id), the monitor's rendered frame carrying its container's id, and
+ * now `/all` and `/form`. Three of the four were found by looking at a terminal.
+ *
+ * So the check is over the *kind*: build what each handler serves, and put it
+ * through the framework's own validator rather than a re-implementation of the
+ * id rule — a second copy would keep its birthday clauses and drift from the one
+ * the transcript actually runs.
+ */
+describe("every command composes a document the transcript would accept", () => {
+  /**
+   * A handler's blocks, as the **shell** would complete them.
+   *
+   * `completeLocal` is the framework's own — published at `src/index.ts:154` and
+   * called by `runLocal` — so the document under test carries the `meta` the
+   * transcript will actually see rather than one this file invented. A
+   * hand-written `meta` here would be a fixture agreeing with itself, and the
+   * first version of this row was exactly that: every document failed on
+   * `meta: must be an object`, which is the fixture reporting on the fixture.
+   */
+  const as = (command: string, blocks: readonly Block[]): ViewDocument => {
+    const [verb = "", ...argv] = command.split(" ").filter((w) => w.length > 0);
+    return completeLocal(
+      { schema: "tui.view/1", command, status: "ok", blocks },
+      { command, verb: verb === "" ? null : verb, argv, durationMs: 0 },
+    );
+  };
+
+  /**
+   * What each declared command serves, keyed by its manifest name.
+   *
+   * `sample` is the spawned route: its adapter's whole body is `gallery(phase)`,
+   * which is also the greeting's, so one entry covers both.
+   */
+  const DOCUMENTS: Readonly<Record<string, () => readonly ViewDocument[]>> = {
+    // **The real two, not a re-spelling of them** — the adapter's own body and
+    // the greeting's own document. The adapter returns an `AdapterDocument`,
+    // whose `meta` the registry completes on the way through (F58b), so its
+    // blocks are completed here the same way a handler's are; the greeting
+    // already carries a full document and goes in as it stands.
+    sample: () => [
+      as("sample", adaptSample(JSON.stringify({ phase: 3 }), "sample").blocks),
+      greetingDocument(),
+    ],
+    all: () => [as("all", [everyForm(0)])],
+    form: () => FORMS.map((f) => as(`form ${f}`, formFull(f))),
+    live: () => FORMS.map((f) => as(`live ${f}`, liveFor(f))),
+    // The image arm is exercised in its own row — it is async and rasterises.
+    compare: () => [],
+    faults: () => [as("faults", [faults()])],
+    monitor: () => [as("monitor", [monitor()])],
+  };
+
+  it("T-doc1: the coverage table names every command the manifest declares", () => {
+    // **A command added to the manifest and to no row here is the hole this
+    // closes.** Asserted by equality rather than containment, so a stale entry
+    // cannot outlive its command either.
+    expect(Object.keys(DOCUMENTS).sort()).toEqual(manifest.tools.map((t) => t.name).sort());
+  });
+
+  it("T-doc2 (C04 I14, C13 I10): every document validates", () => {
+    const bad: string[] = [];
+    let checked = 0;
+    for (const [name, build] of Object.entries(DOCUMENTS)) {
+      for (const d of build()) {
+        checked += 1;
+        try {
+          expectDocument(d).isValid();
+        } catch (err) {
+          bad.push(`${name}: ${d.command} — ${err instanceof Error ? err.message.split("\n")[1] ?? err.message : String(err)}`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+    // 46 forms twice, plus /all, /faults, /monitor, and sample's two.
+    expect(checked, "documents built").toBe(FORMS.length * 2 + 5);
+  });
+
+  it("T-doc3: an unknown form is a document too", () => {
+    expectDocument(as("form nope", [unknown("nope")])).isValid();
+  });
+
+  it("T-doc4 (F398, F399): every live part's own frame validates", async () => {
+    // **The rendered frame is checked *in the document it lands in*, and the
+    // first version of this row was not.** It validated `[render(...)]` on its
+    // own, and the fabricated F399 — the monitor's frame carrying the live
+    // panel's own id — **passed**, because a child alone collides with nothing.
+    // The shell patches the child in by the panel's id, so the document that
+    // has to be legal is the host's *plus* the child; C04 I14's uniqueness is
+    // document-wide, not sibling-scoped, which is why appending is faithful to
+    // it without needing the panel's internals. This is F372/F373's defect and
+    // F399's, and neither is visible from a child held on its own.
+    //
+    // A part's frame is only reachable through `liveParts`, which is exactly
+    // what that surface is for (C24 §7, I24).
+    const ctx = producerContext();
+    const bad: string[] = [];
+    let rendered = 0;
+    const docs = Object.values(DOCUMENTS).flatMap((build) => build());
+    for (const d of docs) {
+      for (const part of liveParts(d)) {
+        let value: unknown;
+        try {
+          value = await part.spec.fetch();
+        } catch {
+          // The always-failing source is deliberate; its error arm is a block too.
+          if (part.spec.renderError === undefined) { bad.push(`${part.spec.id}: fails and has no renderError`); continue; }
+          try { expectDocument(as(d.command, [...d.blocks, part.spec.renderError(new Error("x"), 1000, 1)])).isValid(); }
+          catch (err) { bad.push(`${part.spec.id} error arm: ${String(err)}`); }
+          rendered += 1;
+          continue;
+        }
+        const data = part.spec.derive === undefined ? value : part.spec.derive.compute(value, undefined);
+        try {
+          expectDocument(as(d.command, [...d.blocks, part.spec.render(data, ctx)])).isValid();
+          rendered += 1;
+        } catch (err) {
+          bad.push(`${part.spec.id}: ${err instanceof Error ? err.message.split("\n")[1] ?? err.message : String(err)}`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+    // The gallery's walk (twice — sample and greeting), one per buildable
+    // `/live`, the monitor, and the three faults.
+    expect(rendered, "live frames rendered").toBe(2 + (FORMS.length - refusals().length) + 1 + 3);
+  });
+
+  it("T-doc6: and every one of them paints, at two widths", () => {
+    // **Valid is not the same as drawn.** C04 I14 refuses a document before a
+    // frame exists, which is the defect above; a document that passes the
+    // validator can still throw in a renderer or lay a row wider than the
+    // terminal, and the reader's complaint was *nothing happens*, not *the
+    // document is illegal*. `rendersAt` runs the real registry and fails on a
+    // row that overruns — the wrap that scrolls the alternate screen.
+    const bad: string[] = [];
+    for (const [name, build] of Object.entries(DOCUMENTS)) {
+      for (const d of build()) {
+        try {
+          expectDocument(d).rendersAt([80, 120]);
+        } catch (err) {
+          bad.push(`${name}: ${d.command} — ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  }, 120_000);
+
+  it("T-doc5: /compare validates for every form, on both arms", async () => {
+    const bad: string[] = [];
+    for (const form of FORMS) {
+      const blocks = await compare(form, 0, "kitty");
+      try {
+        expectDocument(as(`compare ${form}`, blocks)).isValid();
+      } catch (err) {
+        bad.push(`${form}: ${err instanceof Error ? err.message.split("\n")[1] ?? err.message : String(err)}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  }, 120_000);
 });

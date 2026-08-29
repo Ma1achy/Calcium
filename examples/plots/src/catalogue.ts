@@ -55,8 +55,16 @@ export type Entry = Readonly<{
    * **`x` is the variant's override and it is spread last**, so a rung can
    * replace a field the default set — `orientation`, `plotStyle`, `plotBox` —
    * rather than only adding to it.
+   *
+   * **It carries the id, and that is the whole of `AtOverride`** (F400). A
+   * document holding a form's default beside its rungs holds one form many
+   * times, and every one of them was `f-<form>`: `/all` put twenty `f-line`
+   * blocks in one document and `/form violin` twelve `f-violin`, so C04 I14
+   * refused both and neither command drew anything at all. The id is the
+   * caller's to mint because only the caller knows how many of a form its
+   * document holds; the *table* still cannot name one.
    */
-  at: (phase: number, height: number, x?: PlotOverride) => Block | Refusal;
+  at: (phase: number, height: number, x?: AtOverride) => Block | Refusal;
   /** The rungs this form has beyond its default, each named. */
   variants?: Readonly<Record<string, Variant>>;
 }>;
@@ -95,11 +103,45 @@ export type PlotSpec = Parameters<typeof b.plot>[0];
  * the variant count cannot be inflated by rungs the published builder could
  * never build. Fabricated: adding `layout: "stacked"` to a variant fails to
  * typecheck, which is the same check the `plot` helper carries.
+ *
+ * **`id` is omitted here and allowed on `AtOverride`, and the split is the
+ * point** (F400). A rung is a *presentation* — `plotStyle`, `orientation`,
+ * `plotBox` — and a table naming block ids would be naming something it cannot
+ * know: whether the document it lands in holds one of the form or twenty. So
+ * the table may not set an id, and the composer must.
  */
 export type PlotOverride = Partial<Omit<PlotSpec, "form" | "height" | "id">>;
 
-const plot = (form: PlotForm, height: number, rest: Omit<PlotSpec, "form" | "height" | "id">): Block =>
+/**
+ * What a **caller** may set: everything a rung may, and the id (F400).
+ *
+ * **The guard is unchanged**, and it never came from omitting `id`: it comes
+ * from `PlotSpec` being `Parameters<typeof b.plot>[0]`, so `layout`, `offsets`,
+ * `totals` and `facets` are still compile errors here and the refusals below
+ * stay facts rather than choices. The `id` omission read as though it were part
+ * of that guard — a correct sentence justifying the wrong scope — and the two
+ * commands that compose more than one figure per form were refused for it.
+ */
+export type AtOverride = PlotOverride & Readonly<{ id?: string }>;
+
+/**
+ * **`rest` is spread last, so a caller's id wins over the default.** `f-<form>`
+ * is right for a document holding one figure per form and wrong for every
+ * document holding more; the composer supplies the distinguishing name.
+ */
+const plot = (form: PlotForm, height: number, rest: Omit<PlotSpec, "form" | "height">): Block =>
   b.plot({ id: `f-${form}`, form, height, ...rest });
+
+/**
+ * A rung's block id — **minted here, beside the default it must differ from**
+ * (F400).
+ *
+ * The two namings are four lines apart on purpose. `f-<form>` was written for a
+ * document holding one figure per form, and stayed correct until `/all` and
+ * `/form` began drawing a form's rungs beside its default; the composer then
+ * needed a second name and there was nowhere that both were visible at once.
+ */
+export const rungId = (form: PlotForm, name: string): string => `f-${form}-${name}`;
 
 const refuse = (needs: string, what: string): Refusal => ({
   refused: `\`${needs}\` is not declared on \`b.plot\` — ${what}`,

@@ -13771,6 +13771,66 @@ reason, and the fix for the second is what made the first legible.
 
 ---
 
+## F400 — `/all` and `/form` drew nothing for a session, and 53 green assertions were about the pieces ★★★★★
+
+Typed `/all`. Nothing appeared. Typed `/form violin`. Nothing appeared. Both were reported by the
+reader, not by a gate, and the suite covering them was green with thirteen rows including one that
+counts **95 figures by equality**.
+
+The transcript said why, in a message no assertion could have reached:
+
+> `transcript.append`: invalid document (C13 I10) — blocks: id `f-line` appears **20** times (C04
+> I14); `f-violin` appears **12**; `f-boxplot` **6**; `f-density`, `f-ridgeline`, `f-heatmap`,
+> `f-calendar`, `f-contour`, `f-quiver`, `f-tree` **3** each…
+
+The catalogue mints one id per form — `` `f-${form}` `` — which was right for the document it was
+written for: `/all` drew **one figure per form**. F396 then gave every form its rungs, so `/all`
+holds a form up to twenty times and `/form <name>` up to twelve, and every one of them kept the same
+id. **A refusal at `append` rejects the whole document**, so there is no frame in which any of the 95
+correct figures could appear.
+
+**The interesting half is why the suite agreed.** `T-rungs` builds all 53 rungs, compares each
+against its own form's default byte-for-byte, and asserts the count by equality. Every one of those
+assertions is true. Not one of them **composed a document** — the defect is in the composition, and
+the composition lived in `main.ts`, which calls `tui.start()` at module scope: a test importing it
+starts a terminal session. So the one artefact that could have failed was the one artefact no test
+could construct. *A test that calls the mechanism misses the wiring*, with the wiring physically out
+of reach.
+
+**Fourth instance of one class in this example**, which is what makes it a class:
+
+| # | where | the two blocks sharing a name |
+|---|---|---|
+| F372/F373 | the gallery's live part | the panel `walk`, and the child it renders |
+| F399 | the monitor's frame | the panel `monitor`, and the group `render` returned |
+| F400 | `/all` | a form's default, and each of its rungs |
+| F400 | `/form <name>` | the same, on one form's page |
+
+**Fixed, and the fix is a seam rather than a rename.** `AtOverride = PlotOverride & { id?: string }`:
+the **table** still cannot name an id — a rung is a presentation and does not know how many of its
+form a document holds — and the **composer** must, because it is the only thing that does. `rungId`
+sits four lines from the default naming so both are visible at once.
+
+**The gate is over the kind, not the instance.** `main.ts` is now wiring only; every document it
+serves is built in `src/commands.ts`, including the greeting's and the adapter's, which were object
+literals with hand-written `meta`. `T-doc2` builds what each of the seven commands serves — 97
+documents, 46 forms twice — and runs each through `expectDocument().isValid()`, the framework's own
+validator rather than a second copy of the id rule. `T-doc1` asserts the coverage table equals the
+manifest's tool list **by equality**, so a command added and left uncovered fails.
+
+**Two things the fabricated violations changed.** The fixture was wrong first: every document failed
+on `meta: must be an object`, because the harness invented a `meta` a handler never writes — the
+shell does, in `completeLocal`, which is **published**. A fixture agreeing with itself reports on
+itself. And `T-doc4`'s first form validated a live part's rendered child **on its own**, so
+re-fabricating F399 **passed**: a child alone collides with nothing. The shell patches it in by the
+panel's id, so the document that must be legal is the host's blocks *plus* the child. Widened, all
+three historical defects in the class fail the row — F372/F373, F399 and F400.
+
+**Found by a reader typing two commands.** Every instrument in the repository compares bytes, and
+this document never became bytes.
+
+---
+
 ## F397 — `Object.freeze` made the guard vacuous, in the file whose header records catching it once ★★★★★
 
 The variant table was `const VARIANTS: Partial<…> = Object.freeze({…})`, under a doc claiming an
