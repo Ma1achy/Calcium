@@ -126,14 +126,14 @@ describe("IO — the overlay, per arm", () => {
     expect(imageKey(plain), "and an image with no overlay is keyed by its data").toBe(plain.digest);
 
     const sent = new Set<string>();
-    const bytes = transmitImage([over, flipped], KITTY, sent);
+    const bytes = transmitImage([over, flipped], KITTY, sent, 80);
     expect([...bytes.matchAll(new RegExp(`${ESC}_G[^;]*a=T`, "gu"))], "two pictures, two transmissions").toHaveLength(2);
     expect(sent.size).toBe(2);
-    expect(transmitImage([over, flipped], KITTY, sent), "and a redraw owes nothing").toBe("");
+    expect(transmitImage([over, flipped], KITTY, sent, 80), "and a redraw owes nothing").toBe("");
   });
 
   it("IO6 (C04 §3h.2): the composited arm sends raw pixels, chunked, with the overlay in them", () => {
-    const bytes = transmitImage([over], KITTY, new Set<string>());
+    const bytes = transmitImage([over], KITTY, new Set<string>(), 80);
     expect(bytes, "raw RGBA rather than a re-encoded PNG").toContain("f=32");
     expect(bytes, "with the source dimensions, which f=32 requires").toContain("s=64,v=32");
     expect(bytes, "deflated through the codec's own zlib").toContain("o=z");
@@ -147,7 +147,7 @@ describe("IO — the overlay, per arm", () => {
       expect(esc.length + 2, "no escape exceeds the limit").toBeLessThanOrEqual(4096);
     }
     // An image with no overlay still goes as PNG, which is the cheaper path.
-    expect(transmitImage([plain], KITTY, new Set<string>()), "unchanged where there is nothing to blend").toContain("f=100");
+    expect(transmitImage([plain], KITTY, new Set<string>(), 80), "unchanged where there is nothing to blend").toContain("f=100");
   });
 
   it("IO7 (C04 §3h.2): the composite blends toward the map and leaves the buffer alone", () => {

@@ -1,7 +1,7 @@
 {
   "name": "plots-tui",
   "version": "0.0.0",
-  "description": "The plot system in a real terminal — five forms at a glance and one of them live, built through the published builder.",
+  "description": "The plot system in a real terminal \u2014 five forms at a glance and one of them live, built through the published builder.",
   "private": true,
   "type": "module",
   "engines": {
@@ -16,7 +16,8 @@
     "test": "vitest run --dir test"
   },
   "dependencies": {
-    "@fmx/calcium": "file:../.."
+    "@fmx/calcium": "file:../..",
+    "sharp": "0.35.3"
   },
   "devDependencies": {
     "@types/node": "26.1.2",

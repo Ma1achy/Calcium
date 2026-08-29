@@ -13677,6 +13677,152 @@ this pass has been building for eleven commits.
 
 ---
 
+## F381 — the chunked transmission was misaligned by two bytes, so any image needing a second escape drew nothing ★★★★★
+
+With F379 and F380 fixed the arm draws — **a small image**. Raising the raster from 56 to 392
+pixels tall put the picture back to nothing, and bisecting isolated it exactly:
+
+```
+PIXELS_PER_ROW=4   1 chunk    draws        (measured: panel mean luminance 3.8, max 140)
+PIXELS_PER_ROW=8   2 chunks   NOTHING      (panel mean 20.0 — the terminal's own #141414)
+PIXELS_PER_ROW=28  9 chunks   NOTHING
+```
+
+**The escape was well-formed under every reading available in this repository**: nine chunks,
+options on the first only, `m=1` through a final `m=0`, nine terminators, the right `c` and `r`.
+
+`chunked()` reserves `CHUNK - opts.length - 9` bytes of payload per escape — **4042, which is not
+a multiple of four.** kitty decodes the base64 **per chunk** rather than concatenating first, so
+every continuation after the first is misaligned and the image is corrupt. A payload that fits one
+escape is unaffected, which is why it drew at all.
+
+**The header had already reasoned its way to the right doubt and stopped one step short.** It says
+the 4096 cap *"is a protocol claim, in the plane-16 class — not measurable here, and the first
+real-terminal test is where it is checked"*, and it says the chunked form *"is correct under both
+readings"*. Correct about the cap; the **alignment** is a second protocol claim in the same class,
+and nothing named it.
+
+**Fixed**: `Math.floor(room / 4) * 4`.
+
+**And it was masking a second defect in the same six lines.** With the alignment corrected the
+first escape measured **4097 bytes** — one over the cap. The reserve is `CHUNK - opts.length - 9`,
+and the comment above it counts the overhead as *`ESC_G` (2) + `,m=1` (4) + `;` (1) + `ESC\\` (2)*.
+**`ESC_G` is three characters** — escape, underscore, G — so the count that carries the arithmetic
+dropped the escape itself.
+
+The sentence beside it names the failure exactly: *"Counted rather than rounded: a reserve one byte
+short puts every first chunk at 4097, which is over a limit written down four lines above it."*
+**It is right about the consequence and wrong about the count, and it reads as care** — the same
+shape as F379's justification and F380's *advisory*, three times in one arm. Invisible until the
+alignment was fixed, because a transmission that never decoded drew nothing for another reason.
+
+Reserve is now 10.
+
+**Three defects in one arm, each of which hid the next.** F379's bound meant the arm never ran, so
+F380's `c=1` could not be seen; fixing the box meant the arm ran, so F381's misalignment could be
+seen — and only at a raster large enough to need two escapes. The 8×8 corpus fixture crosses none
+of these thresholds, which is F252's lesson arriving twice in the same file.
+
+---
+
+## F380 — the kitty transmission declared a one-cell-wide image, under a comment saying the field is advisory ★★★★★
+
+With F379's table completed the placement is accepted, the arm is taken, and **nothing is drawn**.
+
+Measured on the byte stream, `TERM=xterm-kitty`:
+
+```
+APC _G sequences:        1
+placeholder code points: 784          (56 columns x 14 rows)
+first escape head:       _Ga=T,f=100,t=d,i=13927688,U=1,c=1,r=14,q=2,m=0;iVBORw0…
+```
+
+**`c=1`.** The transmission declares the image is one cell wide while the placement addresses
+fifty-six, so every placeholder past the first column refers to a part of the image that does not
+exist. `transmit-image.ts` passed a literal `1` at all three call sites.
+
+**The comment above them is the finding.** *"The declared cell box is the placement's, and the
+renderer derives the same numbers from the same block — so a mismatch here would be two
+computations of one figure. `c` and `r` are advisory to kitty; the placeholders are what address
+the cells."*
+
+Both halves are wrong and each reads as care:
+
+- **The renderer does not derive them from the block.** It derives them from the block *and the
+  width*, through `imageCells` — and here there was no second computation to disagree with, there
+  was one computation and one constant.
+- **`c` is not advisory.** It sizes the virtual placement. A claim carried with no record, in the
+  file whose header already warns that *placement without transmission draws nothing at all* — the
+  same failure, arriving through a parameter instead.
+
+**Fixed**: the frame's width is threaded into `transmitImage` and the box comes from `imageCells`,
+the renderer's own function. One computation, two callers.
+
+**Only a real terminal could say this.** Every assertion in `image-kitty.test.ts` passes on the old
+code: IK2 checks the escape's *form* and the diacritic pairs, and `c=1` is a well-formed escape.
+
+---
+
+## F379 — the kitty arm was bounded at forty cells, and every real image is wider ★★★★★
+
+`MAX_PLACEHOLDER_SPAN = DIACRITICS.length`, and the table shipped as a **40-entry prefix** of
+kitty's 297. `placementRows` refuses anything wider and the renderer falls back to the dither —
+deliberately, correctly, and **on everything**, because the first image anyone places is wider than
+forty cells.
+
+**So the arm had never drawn a pixel**, after a walk, an invariant, a validator arm, a renderer,
+three probes and IK2's assertions.
+
+**The sentence that justified the bound is true, and it is about the wrong axis** — MG24's shape
+(F84), the class where review fails because the justification *is* correct:
+
+> Forty entries cover forty rows and forty columns, **which is past any height a transcript block
+> declares**; beyond it `placementRows` refuses rather than wrapping.
+
+Right about **height** — a block declares one and it is small. The bound also governs **width**,
+and a block's width is the terminal's: sixty, eighty, a hundred and thirty columns. The clause
+checks the axis it is right about and says nothing about the other, so a reader verifying the
+justification agrees with it.
+
+**Measured in a real kitty**, which is the only thing that could have said so: `imageProtocol`
+detected as `kitty`, transmission wired, placement refused at 56×14, frame showed braille. Three
+prior probes measured this repository's write path rather than a terminal's response to it — and
+C09 §4c *names* the first real-terminal test as where its blind spots are checked. Nothing had run
+it.
+
+**The table is not derivable and was not guessed.** Combining class 230 gives 510 code points in a
+different order; kitty's list excludes nineteen common accents and records its own derivation in
+`gen/rowcolumn-diacritics.txt`. The forty already present are that file's exact prefix, which is
+what confirms the truncation was a truncation rather than a different curation.
+
+**Fixed**: all 297, from kitty's own table.
+
+---
+
+## F378 — the dither renders the SVG's painted ground as texture, and the figure disappears into it ★★★☆☆
+
+Putting `plotToSvg`'s output through `b.image` at `imageProtocol: "none"` gives an ordered braille
+dither. Measured on one line plot at 14 rows: **511 of 784 cells inked**, and the curve is not
+findable in them.
+
+**The cause is a pairing rather than a defect in either part.** The SVG paints its own `#141414`
+ground — right for a browser and matching the terminal theme — so the PNG's mean luminance is **22
+of 255**. An ordered dither maps luminance to dot density, so a flat 8% ground becomes a regular
+8%-dense texture across most cells, and the figure is drawn inside noise of its own brightness.
+
+**A photograph has no flat ground**, which is what C09 I36's dither is built for; a rendered figure
+is nearly all ground.
+
+**The consumer-side remedy, measured**: `sharp().linear()` mapping 20 → 0 before the dither takes
+it from **511 inked cells to 42**, and the curve becomes legible. Recorded in `examples/plots`
+rather than in `src/` — the framework is right to dither what it is given, and normalising a
+figure's ground is the caller's knowledge about their own picture.
+
+**Found by looking**, and only after two wrong guesses at the cause — first the downsample ratio,
+then the raster size — both of which changed the arithmetic and not the frame.
+
+---
+
 ## F377 — four of forty-six forms cannot be drawn from the published builder at all ★★★★☆
 
 F335 measured `b.plot` at 48 of `Plot`'s 58 members and F371 confirmed it at HEAD. Both state the

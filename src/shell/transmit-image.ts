@@ -27,6 +27,7 @@
 import { imageId, imageKey, payload, transmit, transmitRgba } from "../presentation/image/kitty.js";
 import { compositeOverlay } from "../presentation/image/overlay.js";
 import { decodePng } from "../presentation/image/index.js";
+import { imageCells } from "../presentation/blocks/kinds/image.js";
 import type { Block, Image } from "../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
@@ -66,6 +67,17 @@ export function transmitImage(
   blocks: readonly Block[],
   capabilities: TerminalCapabilities,
   sent: SentImages,
+  /**
+   * The frame's width, because the declared cell box is a **render-time** fact
+   * (F380).
+   *
+   * The three call sites below passed a literal `1` for the columns, under a
+   * comment saying *the renderer derives the same numbers from the same block*.
+   * It does not: the renderer derives them from the block **and the width**, via
+   * `imageCells`, and there is no second computation to disagree with — there
+   * was one computation and one constant.
+   */
+  width: number,
 ): string {
   if (capabilities.imageProtocol !== "kitty") return "";
   const found: Image[] = [];
@@ -80,12 +92,22 @@ export function transmitImage(
     if (sent.has(key)) continue;
     sent.add(key);
     const bytes = Uint8Array.from(Buffer.from(image.data, "base64"));
-    // The declared cell box is the placement's, and the renderer derives the
-    // same numbers from the same block — so a mismatch here would be two
-    // computations of one figure. `c` and `r` are advisory to kitty; the
-    // placeholders are what address the cells.
+    // **The declared cell box is the placement's, and now it is computed the
+    // same way** (F380). `imageCells` is the renderer's own function, called
+    // with the frame's width, so the transmission and the placement cannot
+    // disagree about the box.
+    //
+    // **The comment here used to say `c` and `r` are advisory to kitty; the
+    // placeholders are what address the cells.** That is a claim with no
+    // record, and it is false: `c` sizes the virtual placement, so a placeholder
+    // addressing column 40 of an image declared one column wide falls outside
+    // it. Measured in a real kitty — one APC emitted with `c=1,r=14`, 784
+    // placeholders spanning 56 columns, and **nothing drawn**, which is the
+    // failure this file's own header warns about arriving through the box
+    // rather than through a missing transmission.
+    const box = imageCells(image, width);
     if (image.overlay === undefined) {
-      out += transmit(imageId(key), payload(bytes), 1, image.height);
+      out += transmit(imageId(key), payload(bytes), box.cols, box.rows);
       continue;
     }
     // **The composited arm** (C04 §3h.2). The decode is here rather than in the
@@ -98,8 +120,8 @@ export function transmitImage(
     // image. The overlay is lost and the picture is not.
     const decoded = decodePng(bytes);
     out += decoded.ok
-      ? transmitRgba(imageId(key), compositeOverlay(decoded.pixels, image.overlay), 1, image.height)
-      : transmit(imageId(key), payload(bytes), 1, image.height);
+      ? transmitRgba(imageId(key), compositeOverlay(decoded.pixels, image.overlay), box.cols, box.rows)
+      : transmit(imageId(key), payload(bytes), box.cols, box.rows);
   }
   return out;
 }

@@ -584,6 +584,9 @@ class Session implements TuiInstance {
         graph.transcript.entries.flatMap((e) => e.doc.blocks),
         graph.capabilities,
         this.#sentImages,
+        // The frame's width — the declared cell box is a render-time fact and
+        // was a hardcoded `1` (F380).
+        graph.lifecycle.size().columns,
       ) + result.write,
     );
     this.#lastFrame = result.lines;

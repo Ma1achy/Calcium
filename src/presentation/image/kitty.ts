@@ -27,19 +27,67 @@ import type { Pixels } from "./codec.js";
 export const PLACEHOLDER = String.fromCodePoint(0x10eeee);
 
 /**
- * kitty's row/column encoding, as combining characters.
+ * kitty's row/column encoding, as combining characters — **all 297 of them.**
  *
- * **A prefix of the standard table, and the bound is stated rather than left to
- * overflow.** Forty entries cover forty rows and forty columns, which is past any
- * height a transcript block declares; beyond it `placementRows` refuses rather
- * than wrapping, because a wrapped diacritic addresses the *wrong part of the
- * image* and draws a plausible wrong picture instead of an error.
+ * **It shipped as a 40-entry prefix, and the sentence justifying that is true
+ * about the axis it names and silent about the other one** (F379). It read:
+ * *forty entries cover forty rows and forty columns, which is past any height a
+ * transcript block declares.* Correct about **height** — a block declares one,
+ * and it is small. The bound also governs **width**, and a block's width is the
+ * terminal's: sixty, eighty, a hundred and thirty columns.
+ *
+ * So `placementRows` refused every image wider than forty cells and the renderer
+ * fell back to the dither, silently and by design — the fallback is deliberate
+ * and correct, and it fired on everything. **The arm was built, specified,
+ * asserted by IK2 and had never drawn a pixel**, because the first image anyone
+ * would place is wider than forty cells. MG24's shape (F84): a correct sentence
+ * attached to a decision it does not constrain, and review checks whether a
+ * justification is true.
+ *
+ * **Measured in a real kitty**, which is the only thing that could have said so:
+ * `imageProtocol` detected as `kitty`, the transmission wired, the placement
+ * refused at 60×14, and the frame showed braille. Every probe before it measured
+ * this repository's write path rather than a terminal's response to it.
+ *
+ * **The table is kitty's own**, from `gen/rowcolumn-diacritics.txt`, which
+ * records its own derivation: `UnicodeData.txt` for Unicode 6.0.0, combining
+ * class 230, less the nineteen common accents. **Not derivable** — combining
+ * class 230 alone gives 510 code points and a different order, so the exclusions
+ * are a curation and guessing them would place a diacritic that addresses the
+ * wrong part of the image. The forty already here are this list's exact prefix,
+ * which is what confirms the truncation was a truncation.
  */
 const DIACRITICS: readonly number[] = Object.freeze([
   0x0305, 0x030d, 0x030e, 0x0310, 0x0312, 0x033d, 0x033e, 0x033f, 0x0346, 0x034a,
   0x034b, 0x034c, 0x0350, 0x0351, 0x0352, 0x0357, 0x035b, 0x0363, 0x0364, 0x0365,
   0x0366, 0x0367, 0x0368, 0x0369, 0x036a, 0x036b, 0x036c, 0x036d, 0x036e, 0x036f,
   0x0483, 0x0484, 0x0485, 0x0486, 0x0487, 0x0592, 0x0593, 0x0594, 0x0595, 0x0597,
+  0x0598, 0x0599, 0x059c, 0x059d, 0x059e, 0x059f, 0x05a0, 0x05a1, 0x05a8, 0x05a9,
+  0x05ab, 0x05ac, 0x05af, 0x05c4, 0x0610, 0x0611, 0x0612, 0x0613, 0x0614, 0x0615,
+  0x0616, 0x0617, 0x0657, 0x0658, 0x0659, 0x065a, 0x065b, 0x065d, 0x065e, 0x06d6,
+  0x06d7, 0x06d8, 0x06d9, 0x06da, 0x06db, 0x06dc, 0x06df, 0x06e0, 0x06e1, 0x06e2,
+  0x06e4, 0x06e7, 0x06e8, 0x06eb, 0x06ec, 0x0730, 0x0732, 0x0733, 0x0735, 0x0736,
+  0x073a, 0x073d, 0x073f, 0x0740, 0x0741, 0x0743, 0x0745, 0x0747, 0x0749, 0x074a,
+  0x07eb, 0x07ec, 0x07ed, 0x07ee, 0x07ef, 0x07f0, 0x07f1, 0x07f3, 0x0816, 0x0817,
+  0x0818, 0x0819, 0x081b, 0x081c, 0x081d, 0x081e, 0x081f, 0x0820, 0x0821, 0x0822,
+  0x0823, 0x0825, 0x0826, 0x0827, 0x0829, 0x082a, 0x082b, 0x082c, 0x082d, 0x0951,
+  0x0953, 0x0954, 0x0f82, 0x0f83, 0x0f86, 0x0f87, 0x135d, 0x135e, 0x135f, 0x17dd,
+  0x193a, 0x1a17, 0x1a75, 0x1a76, 0x1a77, 0x1a78, 0x1a79, 0x1a7a, 0x1a7b, 0x1a7c,
+  0x1b6b, 0x1b6d, 0x1b6e, 0x1b6f, 0x1b70, 0x1b71, 0x1b72, 0x1b73, 0x1cd0, 0x1cd1,
+  0x1cd2, 0x1cda, 0x1cdb, 0x1ce0, 0x1dc0, 0x1dc1, 0x1dc3, 0x1dc4, 0x1dc5, 0x1dc6,
+  0x1dc7, 0x1dc8, 0x1dc9, 0x1dcb, 0x1dcc, 0x1dd1, 0x1dd2, 0x1dd3, 0x1dd4, 0x1dd5,
+  0x1dd6, 0x1dd7, 0x1dd8, 0x1dd9, 0x1dda, 0x1ddb, 0x1ddc, 0x1ddd, 0x1dde, 0x1ddf,
+  0x1de0, 0x1de1, 0x1de2, 0x1de3, 0x1de4, 0x1de5, 0x1de6, 0x1dfe, 0x20d0, 0x20d1,
+  0x20d4, 0x20d5, 0x20d6, 0x20d7, 0x20db, 0x20dc, 0x20e1, 0x20e7, 0x20e9, 0x20f0,
+  0x2cef, 0x2cf0, 0x2cf1, 0x2de0, 0x2de1, 0x2de2, 0x2de3, 0x2de4, 0x2de5, 0x2de6,
+  0x2de7, 0x2de8, 0x2de9, 0x2dea, 0x2deb, 0x2dec, 0x2ded, 0x2dee, 0x2def, 0x2df0,
+  0x2df1, 0x2df2, 0x2df3, 0x2df4, 0x2df5, 0x2df6, 0x2df7, 0x2df8, 0x2df9, 0x2dfa,
+  0x2dfb, 0x2dfc, 0x2dfd, 0x2dfe, 0x2dff, 0xa66f, 0xa67c, 0xa67d, 0xa6f0, 0xa6f1,
+  0xa8e0, 0xa8e1, 0xa8e2, 0xa8e3, 0xa8e4, 0xa8e5, 0xa8e6, 0xa8e7, 0xa8e8, 0xa8e9,
+  0xa8ea, 0xa8eb, 0xa8ec, 0xa8ed, 0xa8ee, 0xa8ef, 0xa8f0, 0xa8f1, 0xaab0, 0xaab2,
+  0xaab3, 0xaab7, 0xaab8, 0xaabe, 0xaabf, 0xaac1, 0xfe20, 0xfe21, 0xfe22, 0xfe23,
+  0xfe24, 0xfe25, 0xfe26, 0x10a0f, 0x10a38, 0x1d185, 0x1d186, 0x1d187, 0x1d188, 0x1d189,
+  0x1d1aa, 0x1d1ab, 0x1d1ac, 0x1d1ad, 0x1d242, 0x1d243, 0x1d244
 ]);
 
 export const MAX_PLACEHOLDER_SPAN = DIACRITICS.length; // cells-ok — a diacritic count
@@ -111,10 +159,30 @@ function chunked(opts: string, body: string): string {
   // The options ride on the first escape only; continuations carry `m` alone,
   // which is the format's rule and the reason `m=1` cannot be folded into
   // `opts` for the single-chunk case.
-  // `ESC_G` (2) + `,m=1` (4) + `;` (1) + `ESC\\` (2). Counted rather than
-  // rounded: a reserve one byte short puts every first chunk at 4097, which is
-  // over a limit written down four lines above it.
-  const room = Math.max(1, CHUNK - opts.length - 9); // cells-ok — a byte count
+  // `ESC_G` (**3**) + `,m=1` (4) + `;` (1) + `ESC\\` (2) = 10.
+  //
+  // **This said `ESC_G` (2) and reserved 9, and the sentence beside it named the
+  // exact failure that causes** (F381): *a reserve one byte short puts every
+  // first chunk at 4097, which is over a limit written down four lines above
+  // it.* Measured: 4097. `ESC_G` is three characters — escape, underscore, G —
+  // and the count that carries the arithmetic dropped the escape itself.
+  //
+  // **It was invisible until the alignment below was fixed**, because a
+  // transmission that never decoded drew nothing for a different reason. Two
+  // defects in six lines, the second masking the first.
+  //
+  // **Rounded down to a multiple of four, and this is what made the arm draw**
+  // (F381). kitty decodes the base64 **per chunk** rather than concatenating
+  // first, so a chunk whose length is not a multiple of 4 corrupts everything
+  // after it. The reserve above gives 4042 bytes, which is not — so a payload
+  // that fitted one escape drew, and a payload needing two drew **nothing**.
+  //
+  // Measured in a real kitty by bisecting the raster: one chunk drew, two chunks
+  // drew nothing, and the escape was well-formed under every reading available
+  // in this repository — 9 chunks, `m=1` through `m=0`, the right box. No
+  // assertion here can see it, because the corruption is inside a base64 body
+  // the terminal is the only reader of.
+  const room = Math.max(4, Math.floor((CHUNK - opts.length - 10) / 4) * 4); // cells-ok — a byte count
   const parts: string[] = [];
   for (let i = 0; i < body.length; i += room) parts.push(body.slice(i, i + room)); // cells-ok — a byte index
   if (parts.length === 0) parts.push(""); // cells-ok — a chunk count
