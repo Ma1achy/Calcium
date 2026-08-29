@@ -13677,6 +13677,57 @@ this pass has been building for eleven commits.
 
 ---
 
+## F395 — Calcium cannot be profiled from the surface it publishes, and only half of that is deferrable ★★★★☆
+
+Asked for a live dashboard profiling the framework's own frame time. Measured what an application can
+actually see, before designing anything.
+
+**What is reachable.** `TuiConfig.chrome` takes two `ChromeFn`s and `ChromeFn` is published. A chrome
+function is called **once per frame** and handed `ChromeContext`, whose four members are
+`session · now · columns · copyMode`. `now` is the injected clock, and its own doc says why it is
+there rather than on the snapshot: *it ticks per frame while every other field changes on an event*.
+
+So **frame cadence is observable**: successive `now` values are inter-frame intervals, and a chrome
+function can accumulate them into a live rate, a jitter series and a p95 — drawn by the very thing
+being measured. That half needs no framework change and a probe typechecks today.
+
+**What is not.** Nothing records how long a frame took to *compose*. `src/` contains no
+`performance.now` and no `hrtime` anywhere — the clock is injected as `() => number` and C01's rule
+is that only `shell/session.ts` may read one, which is correct and is also why no duration exists to
+expose. `FrameScheduler` carries commit **windows** and **budgets** but measures no elapsed time.
+`SessionSnapshot` carries `cwd · env · lastUuid · identity · cluster · health · version · retained ·
+stopping` and no timing at all. `ProducerContext.measure` is called per block and is uninstrumented.
+
+**Three things are missing, and they are different sizes:**
+
+| | |
+|---|---|
+| **render cost per frame** | nobody times compose/measure/paint; needs a recorded duration and somewhere to put it |
+| **which `CommitReason` drove a frame** | the scheduler knows — `input · completion · resize · stream · spinner` — and hands it to nothing |
+| **per-block measure cost** | `measure` is the hot path and the one number a plot author would want |
+
+**The tell that this is a real gap rather than an omission nobody needed**: tier 5's `T5.2` asserts
+*input-to-frame latency stays under 16 ms at p95*, and it measures that **from outside, through a
+PTY**, byte-stamping the terminal. The suite has to go around the framework to ask the framework's
+own central question. A test reaching outside for a number the subject holds is the same shape as
+F384's `summaryOf` — the value exists at the point of use and has no path to the reader.
+
+**Deferred deliberately, with its condition stated as a symbol**: the cadence dashboard can be built
+now; the cost dashboard is blocked on *a recorded frame duration on `ChromeContext`* and wants its own
+ruling, because adding a member to a per-frame context is a C24 public-contract change and because
+*what* to time (compose? measure? paint? all three, separately?) is a design question C03 and C22
+should answer rather than a demo. **Picking this entry up begins by grepping `ChromeContext` for a
+duration member** — the habit CLAUDE.md prescribes, since the last three deferrals in this repository
+had conditions that were already met.
+
+**And `ChromeContext` itself is not exported** — `ChromeFn` is, so `const f: ChromeFn = (ctx) => …`
+infers correctly and an app can write one, but it cannot *name* the parameter type. MG29's question
+again, one context along from F394's `TerminalCapabilities`, and the reason it is minor here is
+exactly the reason it was not there: inference covers the common case and breaks the moment a
+consumer wants a named helper.
+
+---
+
 ## F394 — the demo labelled a braille dither `pixels`, so a working ladder read as a broken renderer ★★★★☆
 
 `/compare` captions its right-hand pane `svg · pixels` unconditionally. `b.image` descends a ladder
