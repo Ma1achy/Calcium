@@ -28,6 +28,7 @@ import {
   checkOneStorePerComponent,
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
+  checkExportedArguments,
   checkFunctionConsumers,
   checkBuilderCoverage,
   checkSeamConsumers,
@@ -659,6 +660,12 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // union's members come from `types.ts` and the builder's literals from
       // `builders/index.ts`, and neither alone is the subject.
       "MG28",
+      // MG29 the same way, and for a sharper version of the reason: its subject
+      // is `src/index.ts`'s export list read against every other module's
+      // signatures, so the one-file `FABRICATED` shape has nothing to hold. Its
+      // own row drives both arms through `readFile` — un-publishing a type
+      // rather than editing one.
+      "MG29",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -1364,6 +1371,51 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // **And the control, which is the half that matters here.** A rule that
     // reports on a patched tree and on the real one is reporting on neither.
     expect(checkBuilderCoverage(files).filter((v) => v.rule === "MG28")).toEqual([]);
+  });
+
+  it("MG29 (C24 I29): an exported function whose parameter type is interior", () => {
+    // **The rule that found three instances none of which prompted it.**
+    // `plotToSvg` is why it exists — published as *the second renderer* with
+    // `ResolvedTheme` interior, uncallable — and MG29 **cannot see that one**,
+    // because `RenderContext.theme` is a published route to the type. The route
+    // leads into a synchronous `render`, which is the one place an SVG cannot be
+    // rasterised, and reachability cannot ask where a route arrives. That limit
+    // is in the rule's header and is asserted here rather than left as prose.
+    const files = srcFiles();
+
+    // The tree as it stands: the four types published, nothing owed.
+    expect(checkExportedArguments(files)).toEqual([]);
+
+    // **Fabricated violation.** Un-publish `AmbiguousWidth` and the two
+    // functions C24 commitment 12 publishes *because a custom block kind cannot
+    // be written without them* go uncallable in their second parameter.
+    const hidden = (f: string): string => {
+      const src = readFileSync(f, "utf8");
+      return f.endsWith("src/index.ts")
+        ? src.replace('export type { AmbiguousWidth } from "./presentation/text.js";', "")
+        : src;
+    };
+    const fired = checkExportedArguments(files, hidden);
+    expect(fired.map((v) => v.message.match(/`(\w+)` is exported/)?.[1]).sort()).toEqual([
+      "cells",
+      "truncate",
+    ]);
+    expect(fired[0]?.rule).toBe("MG29");
+    expect(fired[0]?.message).toContain("AmbiguousWidth");
+
+    // **The other direction, and it is the one a reachability rule gets wrong.**
+    // A type reached through a published member counts as constructible. Hiding
+    // `ResolvedTheme`'s own export leaves `RenderContext.theme` naming it, so
+    // the rule stays silent — the exact blind spot that let `plotToSvg` ship
+    // uncallable, asserted so that a future tightening has to face it.
+    const noTheme = (f: string): string => {
+      const src = readFileSync(f, "utf8");
+      return f.endsWith("src/index.ts") ? src.replace(/^\s*ResolvedTheme,$/mu, "") : src;
+    };
+    expect(
+      checkExportedArguments(files, noTheme).filter((v) => v.message.includes("ResolvedTheme")),
+      "reachability via RenderContext.theme clears it — the stated limit",
+    ).toEqual([]);
   });
 
   it("MG28 examines a population, and the number is small on purpose", () => {

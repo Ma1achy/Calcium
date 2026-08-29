@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -2320,6 +2320,116 @@ export function publicSurfaceUseSignal(
     .map(([owner, n]) => `${owner} (${String(n)})`);
 
   return { members: seen.size, candidates, cleared, ambiguous, testOnly, concentrated };
+}
+
+
+// --- MG29: an exported function whose argument cannot be built ---------------
+
+/**
+ * MG29 — a published function whose parameter type is interior (C24 I29, §8c).
+ *
+ * **A parameter whose type is not published makes the function itself
+ * unusable, whatever the export list says**, and the failure is silent in the
+ * direction that matters: the export *is* there and the signature *does*
+ * resolve, right up to the moment a consumer has to supply the argument.
+ *
+ * `plotToSvg(given: Plot, theme: ResolvedTheme)` is the measured instance —
+ * exported by name, described at the entry point as *the second renderer*, and
+ * uncallable for a year because neither `ResolvedTheme` nor `loadTheme` was
+ * published. It is the third of its class: `CompletionContext` came with
+ * `completionContext` (C24 §8b) and `ProducerContext` with `producerContext`
+ * (I26), each found by a consumer trying to use the thing.
+ *
+ * ## What it cannot see, stated because an unrecorded limit reads as strength
+ *
+ * - **Reachability, not usability, and this is the limit that hid the
+ *   instance.** `ResolvedTheme` *was* reachable — `RenderContext.theme`, and
+ *   `RenderContext` is published — so this rule would have cleared it. The route
+ *   led into a synchronous `render`, which is the one place an SVG cannot be
+ *   rasterised. **A route that exists and does not reach the caller who needs it
+ *   is indistinguishable from a working one at this resolution**, and finding
+ *   that needs a human writing the consumer, which is what §8c records.
+ * - **Named types only.** Inline object literals, unions of literals and
+ *   primitives are constructible by writing them out.
+ * - **One level of reachability.** A type published as a member of a published
+ *   type counts; a member of a member does not, which under-reports rather than
+ *   over-reports.
+ */
+export function checkExportedArguments(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+  const strip = (t) =>
+    t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  const entry = files.find((f) => f === "src/index.ts" || f.endsWith("/src/index.ts"));
+  if (entry === undefined) return violations;
+  const src = strip(readFile(entry));
+
+  // The published type names, and the runtime names beside them.
+  const published = new Set();
+  for (const m of src.matchAll(/export\s+(?:type\s*)?\{([^}]*)\}/g)) {
+    for (const part of m[1].split(",")) {
+      const n = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop()?.trim();
+      if (n !== undefined && n !== "") published.add(n);
+    }
+  }
+
+  // One level out: a type named as a member of a published type is constructible
+  // by holding the owner. Under-reports rather than over-reports, deliberately.
+  const sources = new Map(files.map((f) => [f, strip(readFile(f))]));
+  const reachable = new Set(published);
+  for (const text of sources.values()) {
+    for (const m of text.matchAll(/export\s+(?:type|interface)\s+(\w+)/g)) {
+      if (!published.has(m[1])) continue;
+      const at = m.index ?? 0;
+      const body = text.slice(at, at + 4000);
+      for (const f of body.matchAll(/^\s+(?:readonly\s+)?\w+\??:\s*([A-Z]\w+)/gmu)) {
+        reachable.add(f[1]);
+      }
+    }
+  }
+
+  // Every exported function's parameter types, from the module that declares it.
+  const exportedFns = new Set();
+  for (const m of src.matchAll(/export\s*\{([^}]*)\}\s*from/g)) {
+    for (const part of m[1].split(",")) {
+      const t = part.trim();
+      if (t.startsWith("type ")) continue;
+      const n = t.split(/\s+as\s+/).pop()?.trim();
+      if (n !== undefined && /^[a-z]/.test(n)) exportedFns.add(n);
+    }
+  }
+
+  const BUILTIN = /^(string|number|boolean|void|unknown|never|any|Promise|Array|Readonly|Partial|Record|Map|Set|URL|Error|Date|RegExp|NodeJS|Buffer|Uint8Array)$/;
+  for (const [file, text] of sources) {
+    if (file === entry) continue;
+    for (const m of text.matchAll(/export\s+function\s+(\w+)\s*\(([^)]*)\)/g)) {
+      const [, name, params] = m;
+      if (!exportedFns.has(name)) continue;
+      for (const p of params.split(",")) {
+        // **The default value is not the parameter's type**, and taking it was
+        // this rule's first defect: `layout: SvgLayout = SVG_DEFAULT_LAYOUT`
+        // reported the constant. Caught on the first run, by reading what it
+        // named rather than counting how many it found.
+        const t = p.split(":").slice(1).join(":").split("=")[0];
+        if (t.trim() === "") continue;
+        for (const named of t.matchAll(/\b([A-Z]\w+)\b/g)) {
+          const ty = named[1];
+          if (BUILTIN.test(ty) || reachable.has(ty)) continue;
+          violations.push({
+            rule: "MG29",
+            file,
+            message:
+              `\`${name}\` is exported and its parameter type \`${ty}\` is not — so the ` +
+              `function resolves, and a consumer cannot supply the argument. Publish the ` +
+              `type and whatever builds one, as \`completionContext\` and \`producerContext\` ` +
+              `already are (C24 I29, §8c)`,
+            spec: "A03 §3, MG29",
+          });
+        }
+      }
+    }
+  }
+  return violations;
 }
 
 // --- MG25 — a free function with no consumer --------------------------------

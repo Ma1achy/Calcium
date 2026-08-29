@@ -69,6 +69,18 @@ export declare const UNCONSUMED_FUNCTIONS: Readonly<Record<string, string>>;
  * than as an interface. The allow-list is compared by equality, so an entry that
  * no longer excuses anything is itself a violation.
  */
+/**
+ * MG29 — an exported function whose parameter type is not published (C24 I29).
+ *
+ * `readFile` is a parameter so the fabricated violation can un-publish a type
+ * without touching the tree, which is the only way to drive a rule whose subject
+ * is the entry point's own export list.
+ */
+export declare function checkExportedArguments(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): Violation[];
+
 export declare function checkFunctionConsumers(
   files: readonly string[],
   readFile?: (f: string) => string,

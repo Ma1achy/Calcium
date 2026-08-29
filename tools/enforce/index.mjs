@@ -4,6 +4,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { checkFindings, checkTriageInventory } from "./findings.mjs";
 import {
+  checkExportedArguments,
   checkFunctionConsumers,
   checkModuleGraph,
   checkOneStorePerComponent,
@@ -90,6 +91,8 @@ const violations = [
   ...checkOneStorePerComponent(files),
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
+  // MG29 — a published function whose parameter type is interior (C24 I29, §8c).
+  ...checkExportedArguments(files),
   ...checkSourceScans(files),
   // SS52 — the control-character class over the tree the *tools* read, which is
   // wider than the one `SCANS` walks. `files` is `walk("src")`, so widening

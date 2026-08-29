@@ -206,10 +206,25 @@ export type {
 
 // --- theming ----------------------------------------------------------------
 
-export { defaultTheme } from "./presentation/theme/index.js";
+/**
+ * The theme, and **the loader that makes `plotToSvg` callable** (C24 I29, §8c).
+ *
+ * `loadTheme(defaultTheme, "dark").value.current` is a `ResolvedTheme`, which is
+ * `plotToSvg`'s second parameter — published by name for a year with its
+ * argument type interior, so the function resolved and could not be called.
+ * Third instance of I19's class after `CompletionContext` and `ProducerContext`,
+ * and the one that produced a rule (MG29).
+ *
+ * **`loadTheme` rather than a pre-resolved constant.** A consumer supplying
+ * `TuiConfig.theme` has *their* theme resolved by the session; a constant would
+ * resolve the shipped one, so the second renderer would disagree with the first
+ * for exactly the consumers who customised anything.
+ */
+export { defaultTheme, loadTheme } from "./presentation/theme/index.js";
 export type {
   ColourRef,
   PaletteSpec,
+  ResolvedTheme,
   Style,
   ThemeSet,
   ThemeTokens,
@@ -274,6 +289,16 @@ export type { BlockDefinition, RenderContext } from "./presentation/blocks/index
  * has to be readable or the fallback is indistinguishable from a mistake.
  */
 export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.js";
+/**
+ * `registerGrammar`'s argument, re-exported from `highlight.js` (C24 I29, MG29).
+ *
+ * **A transitive dependency's type is not a published surface.** `highlight.js`
+ * is a runtime dependency, so the type is *resolvable* from a consumer's tree —
+ * and reaching it means naming a package Calcium happens to depend on, which is
+ * the coupling `exports` exists to prevent. Re-exported so the argument comes
+ * with the function, as I29 requires.
+ */
+export type { LanguageFn } from "highlight.js";
 
 /**
  * A Mermaid diagram as a `code` block (roadmap 9).
@@ -351,5 +376,11 @@ export type { WorldDriver } from "./data/fixtures/index.js";
  * content jumps. `planColumns` is the same argument for a table-like kind, and
  * all three are pure.
  */
+// **`AmbiguousWidth` comes with them** (C24 I29, MG29). Commitment 12 publishes
+// these two because *a custom block kind cannot be written without them*, and
+// the second parameter's type was interior — so `cells(s)` was callable and
+// `cells(s, w)` was not, on the surface whose whole reason is that a consumer
+// measures the way the framework measures.
 export { cells, truncate } from "./presentation/text.js";
+export type { AmbiguousWidth } from "./presentation/text.js";
 export { planColumns } from "./presentation/table/index.js";
