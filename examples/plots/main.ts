@@ -29,7 +29,7 @@ import type { Adapter, Block, LocalHandler, TerminalCapabilities } from "@fmx/ca
 type ImageProtocol = TerminalCapabilities["imageProtocol"];
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { CATALOGUE, FORMS, refusals } from "./src/catalogue.ts";
+import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "./src/catalogue.ts";
 import type { PlotForm } from "./src/catalogue.ts";
 import { bars, barsFull, curve, distribution, heat, hierarchy, walk } from "./src/figures.ts";
 import { imageOf, svgOf } from "./src/svg.ts";
@@ -152,14 +152,27 @@ const unknown = (name: string): Block =>
  * count on screen is 46 and the gap is visible rather than inferred.
  */
 function everyForm(phase: number): Block {
-  const tiles = FORMS.map((form) => {
+  // **Every form *and every rung*, which is what `/all` used to only claim**
+  // (F396). It drew one figure per form under the caption *every form the type
+  // declares* — true about forms, and read as a claim about plots. A violin has
+  // nineteen presentations in the corpus and this showed one of them.
+  const tiles: Block[] = [];
+  for (const form of FORMS) {
     const entry = CATALOGUE[form];
     const drawn = entry.at(phase, 6);
-    return b.group("column", [
+    tiles.push(b.group("column", [
       caption(`${form} · ${entry.says}`),
       "refused" in drawn ? b.notice("warn", drawn.refused) : drawn,
-    ], { id: `tile-${form}` });
-  });
+    ], { id: `tile-${form}` }));
+    for (const [name, v] of Object.entries(variantsOf(form))) {
+      const rung = entry.at(phase, v.height ?? 6, v.spec);
+      if ("refused" in rung) continue;
+      tiles.push(b.group("column", [
+        caption(`${form}/${name} · ${v.says}`),
+        rung,
+      ], { id: `tile-${form}-${name}` }));
+    }
+  }
   const pairs: Block[] = [];
   for (let i = 0; i < tiles.length; i += 2) {
     const left = tiles[i];
@@ -172,12 +185,15 @@ function everyForm(phase: number): Block {
     );
   }
   const missing = refusals();
+  const rungs = everyVariant().length;
   return b.group("column", [
     b.notice(
       "info",
       `${String(FORMS.length)} forms · ${String(FORMS.length - missing.length)} drawn · ` +
+        `${String(rungs)} further rungs · ${String(FORMS.length - missing.length + rungs)} figures · ` +
         `${String(missing.length)} refused by the published builder — ${missing.join(", ")} (F377)`,
     ),
+    b.notice("muted", "/form <name> draws one full size with its rungs · /live <name> advances it"),
     ...pairs,
   ]);
 }
@@ -403,10 +419,21 @@ const tui = createTui({
       const form = formIn(argv);
       if (form === null) return doc(ctx.command, [unknown(argv[0] ?? "")]);
       if (form === "bar") return doc(ctx.command, [caption("bar · all four stages"), barsFull(0, 14)]);
-      const drawn = CATALOGUE[form].at(0, 16);
+      const entry = CATALOGUE[form];
+      const drawn = entry.at(0, 16);
+      const rungs = Object.entries(variantsOf(form));
       return doc(ctx.command, [
-        caption(`${form} · ${CATALOGUE[form].says}`),
+        caption(`${form} · ${entry.says}`),
         "refused" in drawn ? b.notice("warn", drawn.refused) : drawn,
+        // **Each rung full size beneath the default** (F396), so the thing that
+        // changed is visible rather than inferred from a six-row tile.
+        ...(rungs.length === 0
+          ? [b.notice("muted", `${form} has no further rungs`)]
+          : [b.notice("muted", `${String(rungs.length)} further rung${rungs.length === 1 ? "" : "s"}`)]),
+        ...rungs.flatMap(([name, v]) => {
+          const rung = entry.at(0, v.height ?? 16, v.spec);
+          return "refused" in rung ? [] : [caption(`${form}/${name} · ${v.says}`), rung];
+        }),
       ]);
     }) satisfies LocalHandler,
 

@@ -19,7 +19,7 @@ import { execFile } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { CATALOGUE, FORMS, refusals } from "../src/catalogue.ts";
+import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
 
 const run = promisify(execFile);
 const here = (p: string): string => new URL(p, import.meta.url).pathname;
@@ -181,4 +181,49 @@ describe("the plot demo", () => {
       "no curve was redrawn three seconds in — the live part has stopped",
     ).toBe(true);
   }, 120_000);
+
+  /**
+   * **A rung that draws its default is not a rung** (F396).
+   *
+   * `/all` drew one figure per form and captioned itself *every form the type
+   * declares* — true about forms, and read as a claim about plots. A reader
+   * counted: the corpus carries 188 variants and a violin alone has 19.
+   *
+   * Adding rungs makes the count bigger, and a bigger count is only worth
+   * anything if each entry shows something. **Eight of the first sixty-four
+   * drew byte-identical output to their own default** — `plotCorners: "sharp"`
+   * is a no-op on five forms, `bar`'s base already sets `orientation:
+   * "vertical"`, and one override was empty. This row is what found them and
+   * what stops them coming back.
+   *
+   * **A height-only rung is compared against the gallery default**, not against
+   * the default at its own height: the second is trivially identical, because
+   * *the same spec at a different size* is exactly what the rung is. What the
+   * reader sees is the rung beside the six-row default, so that is the
+   * comparison.
+   */
+  it("T-rungs: every variant builds, and draws something its default does not", () => {
+    const rendered = (form: (typeof FORMS)[number], height: number, spec?: object): string => {
+      const bl = CATALOGUE[form].at(0, height, spec as never);
+      expect("refused" in bl, `${form}: the base form builds`).toBe(false);
+      return JSON.stringify(bl);
+    };
+    const identical: string[] = [];
+    let checked = 0;
+    for (const form of FORMS) {
+      if ("refused" in CATALOGUE[form].at(0, 6)) continue;
+      for (const [name, v] of Object.entries(variantsOf(form))) {
+        checked += 1;
+        const rung = rendered(form, v.height ?? 6, v.spec);
+        // The gallery default is what it sits beside.
+        if (rung === rendered(form, 6)) identical.push(`${form}/${name}`);
+      }
+    }
+    expect(identical, "a rung that draws its default is a caption with no figure").toEqual([]);
+    expect(checked, "and every declared rung was checked").toBe(everyVariant().length);
+    // **The count, by equality** — so a rung appearing or vanishing is a failure
+    // that names itself rather than a number nobody reads.
+    expect(everyVariant().length, "rungs beyond the defaults").toBe(53);
+    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(95);
+  });
 });

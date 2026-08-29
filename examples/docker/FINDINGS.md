@@ -13677,6 +13677,76 @@ this pass has been building for eleven commits.
 
 ---
 
+## F396 — `/all` drew one figure per form and called that every plot ★★★★☆
+
+The caption said *Every form the type declares* and the count said **46 forms · 42 drawn · 4
+refused**. Both true, and both about **forms**. A reader counted the pictures and asked where the
+rest were.
+
+The corpus carries **188 variants over 46 forms**: `line` has 47, **`violin` has 19** — braille,
+filled, vertical, line-box, compact, raincloud, two bandwidths — and `boxplot` 6. `/all` showed one
+of each. **42 of 188**, under a caption that reads as completeness.
+
+**A rung is a presentation, and `b.plot` declares all the fields one needs** — `plotStyle`,
+`plotFill`, `plotBox`, `plotCorners`, `orientation`, `bandwidth`, `legend`, `plotFrame`, `yAxis`,
+`yCallout`, `origin`, `aspect`, `align`, `colormap`, `treeLayout`, `calendarUnit`, `layers`,
+`levels`. So the demo's premise survives: **53 rungs added, every one through the published
+builder**, and the override type is `Partial<Omit<PlotSpec, …>>` so a rung needing an undeclared
+member is a compile error rather than a silent omission.
+
+**Now 46 forms · 42 drawn · 53 rungs · 95 figures.**
+
+**What the build refused, and it was right eleven times.** Writing the table from memory produced
+eleven rungs the framework rejected outright: `plotDetail: "full"` on `scatter`, `bar` and
+`histogram` (C12 I34 — those forms have one figure and no ladder); four violin compact rungs at
+heights 2 and 3 (C04 I56 — *3 bands in 3 rows is 1 per band and a violin needs 2*, so the raincloud
+rung is unreachable at three categories **at any height the validator accepts**, and the rung needs
+a single band); three `yCallout` rungs without `yAxis: "right"` (C04 I60 — a callout is written
+where the left gutter's labels go); `matrixAnchor: "start"`, `yAxis: "none"`, `aspect: "square"` and
+`plotGrid: true`, none of which are values those fields take. **Every one was a value written from
+memory and corrected against the type or the validator.**
+
+**And eight more drew their own default.** Compared byte-for-byte, `plotCorners: "sharp"` is a
+**no-op on `scatter`, `boxplot`, `violin`, `treemap` and `pie`** at every height tried, `bar`'s base
+already sets `orientation: "vertical"` so the override changed nothing, and one entry was `spec:
+{}`. Removed rather than kept for the count — **a caption promising a different picture over an
+identical one is C12 I75's subject arriving in a demo.** `graph/sharp` survived because it differs
+at fourteen rows and not at six, which only measuring both said.
+
+**`T-rungs` is the row that found them and stops them returning**, asserting the two counts by
+equality and comparing every rung against the default it sits beside. Fabricated: making
+`bar/horizontal` a no-op fails the row **by name**.
+
+**A height-only rung is compared against the *gallery* default**, never against the default at its
+own height — the second is trivially identical, because *the same spec at a different size* is
+exactly what the rung is. The comparison has to be the one the reader makes.
+
+---
+
+## F397 — `Object.freeze` made the guard vacuous, in the file whose header records catching it once ★★★★★
+
+The variant table was `const VARIANTS: Partial<…> = Object.freeze({…})`, under a doc claiming an
+override naming an undeclared member could not typecheck. **It could.** `Object.freeze` returns a
+*value*, not a fresh object literal, so TypeScript's excess property checking never runs — and
+`layout: "stacked"` sat inside a variant without complaint.
+
+**This is the same hole `catalogue.ts`'s own header records catching, one table along.** That
+paragraph is about the `plot` helper: *its first form took `Record<string, unknown>` and cast — and
+`layout: "stacked"` then typechecked, which would have made this example's central claim false while
+every gate stayed green.* The new table reproduced it by a different mechanism, ten lines below the
+warning.
+
+`satisfies` checks the literal in place and keeps the inferred keys, and the lookup widens by a
+**checked assignment** rather than `as` — which would undo the whole point.
+
+**The first control was vacuous and that is the reusable part.** Fabricating `layout: "stacked"`
+reported no error, and the conclusion *the guard holds* would have been wrong: the file was already
+failing to compile for an unrelated reason, so `tsc` never reached the fabrication. **A fabricated
+violation run against a red tree proves nothing** — the control needs a green baseline, which is the
+same discipline as reading a gate's counters rather than its exit status.
+
+---
+
 ## F395 — Calcium cannot be profiled from the surface it publishes, and only half of that is deferrable ★★★★☆
 
 Asked for a live dashboard profiling the framework's own frame time. Measured what an application can
