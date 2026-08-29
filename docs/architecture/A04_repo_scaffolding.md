@@ -15,7 +15,28 @@
 |---|---|---|---|
 | Calcium | `Calcium/` | C01–C25, the framework | A package to GitHub Packages, private |
 | `docker-tui` | `Calcium/examples/docker/` | R01, the reference app | Nothing — proof, plus an import manifest |
+| `plots-tui` | `Calcium/examples/plots/` | C12's forms in a terminal, built through `b.plot` | Nothing — the one gate that reads a frame rather than comparing bytes |
 | `prism-tui` | its own repository | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
+
+**`plots-tui` is a third consumer and it exists for what the gates cannot see.** Every instrument
+this repository has compares bytes — golden frames, the collision sweep, the pair sheet, the arm
+disagreement record, the terminal baseline — so none of them can report a flicker, a jump, or a
+colour that reads badly on a real emulator. That is the whole of its subject, and it is why it is
+an application rather than a fixture: a document built and asserted against never calls
+`createTui`, which is the surface F7 was about.
+
+**It builds through `b.plot` deliberately.** The catalogue, every fixture and every golden frame
+use `block({ … })`, the viewmodel constructor, which is transparent to any field — so the
+published builder is the one surface no artefact exercises for these forms, and F335's eight
+missing members were invisible from inside by construction. A row in its own suite asserts that no
+figure reaches past the builder, because the day one does, the example stops being able to find
+this class.
+
+**The examples are discovered rather than listed**, in `make check`, `make test` and `enforce`'s
+by-use population. All three named the two by hand, and two of them carry comments recording that
+they were added *because an example's declared script was invoked by nothing* — so a third example
+arriving unlisted is the same defect one turn later. The population is `examples/*/package.json`
+and the exception is named.
 
 Separate rather than a monorepo because R01 §8's argument generalises: **a workspace path alias proves nothing about the package being a package.** Missing files in `files`, a wrong `exports` map, unresolvable type declarations, a peer dependency that is really a hard one — all invisible from inside a workspace, all immediately visible from outside.
 
