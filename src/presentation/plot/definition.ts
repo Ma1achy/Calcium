@@ -62,7 +62,7 @@ import {
 import { annotationRows } from "./annotate.js";
 import { FACING_DEFAULT, facingOf, rowOf, seriesRange, type Facing, type Range } from "./scale.js";
 import { bandRows, ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
-import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf } from "./marks.js";
+import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf, seriesRefOf } from "./marks.js";
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows } from "./scatter.js";
@@ -402,10 +402,10 @@ function labelAllowance(
   return widest;
 }
 
-function refOf(series: Series, index: number): ColourRef {
-  if (series.tone !== undefined) return `tone.${series.tone}`;
-  return slotOf(index);
-}
+// **`refOf` lived here and in `marks.ts` under one name, disagreeing** (F382).
+// The shared one is `seriesRefOf`, which both arms and the legend now read; a
+// second definition of a rule is free to drift from the first, and this pair had.
+const refOf = seriesRefOf;
 
 /**
  * A segment's palette slot, by position.

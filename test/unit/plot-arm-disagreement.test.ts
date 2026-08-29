@@ -61,7 +61,9 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 import { plotToSvg, svgFamilyOf } from "../../src/presentation/plot/svg.js";
-import { RAMP_DEFAULT } from "../../src/presentation/plot/figure.js";
+import { RAMP_DEFAULT, legendSlots } from "../../src/presentation/plot/figure.js";
+import { refOf, seriesRefOf } from "../../src/presentation/plot/marks.js";
+import type { Plot } from "../../src/data/viewmodel/index.js";
 import { terminalDecisions, svgArm, svgDecisions, terminalRamp, svgRamp, saysWithheld, type ArmDecisions } from "../support/arm-decisions.js";
 import { DARK_THEME } from "../support/render.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
@@ -898,5 +900,62 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(saysWithheld("\u001b[38;2;98;98;98m+4 more\u001b[39m"), "through its colours").toBe(true);
     expect(saysWithheld("0.19  100"), "and a frame that withheld nothing says nothing").toBe(false);
     expect(saysWithheld("more"), "the count is what makes it a notice").toBe(false);
+  });
+});
+
+describe("C12 §3g — a series' colour, in both arms and the legend (F382)", () => {
+  it("AD15 (I25): a declared tone reaches the line, the swatch and the second arm", () => {
+    // **Three call sites resolved a series' colour and two of them read only
+    // the slot.** `definition.ts` had a private tone-aware `refOf(series, i)`;
+    // `marks.ts` exports `refOf(i)`, the slot. The terminal's curve renderer
+    // imported the first and the legend the second, so a series with a `tone`
+    // was **drawn green and named orange** — and `legendEntries`' own comment
+    // says a swatch a different colour from the thing it names is worse than
+    // none, four lines from the call that made it one.
+    //
+    // **Zero of the corpus's 188 variants declare a `Series.tone`**, which is
+    // why every golden frame, every pair and the whole catalogue agreed. The
+    // reference app declares one. So this row carries its own fixture.
+    const toned = block({
+      kind: "plot", id: "p", form: "line", height: 8, axes: true, legend: "right",
+      series: [
+        { values: [20, 25, 30, 28, 33], label: "toned", tone: "ok" },
+        { values: [50, 55, 60, 58, 63], label: "plain" },
+      ],
+    } as never) as Plot;
+
+    // The shared resolver is the subject: a tone wins, absence falls to the slot.
+    expect(seriesRefOf(toned.series[0], 0)).toBe("tone.ok");
+    expect(seriesRefOf(toned.series[1], 1)).toBe(refOf(1));
+
+    // **The legend crosses**, so its slot is the same answer for both arms.
+    const slots = legendSlots(toned);
+    expect(slots[0]?.ref, "the swatch names the colour the line is drawn in").toBe("tone.ok");
+    expect(slots[1]?.ref).toBe(refOf(1));
+
+    // **And the second arm strokes it — asserted differentially**, because
+    // `inkOf` is private to the arm and hard-coding a hex would assert the
+    // theme rather than the rule. The same block with the tone removed must
+    // stroke differently, and the tone's colour must appear in both the line
+    // and the swatch.
+    const plain = block({
+      kind: "plot", id: "p", form: "line", height: 8, axes: true, legend: "right",
+      series: [
+        { values: [20, 25, 30, 28, 33], label: "toned" },
+        { values: [50, 55, 60, 58, 63], label: "plain" },
+      ],
+    } as never) as Plot;
+
+    const inks = (svg: string, attr: string): string[] =>
+      [...svg.matchAll(new RegExp(`${attr}="(#[0-9a-fA-F]{6})"`, "gu"))].map((m) => m[1] ?? "");
+
+    const withTone = plotToSvg(toned, DARK_THEME) ?? "";
+    const without = plotToSvg(plain, DARK_THEME) ?? "";
+    const introduced = inks(withTone, "stroke").find((c) => !inks(without, "stroke").includes(c));
+    expect(introduced, "the tone must change the second arm's stroke").toBeDefined();
+    expect(
+      inks(withTone, "fill"),
+      "and the swatch is drawn in the same colour as the line",
+    ).toContain(introduced);
   });
 });

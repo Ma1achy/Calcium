@@ -41,7 +41,7 @@ import { normalisedOf } from "../../data/viewmodel/range.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
-import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf } from "./marks.js";
+import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf, seriesRefOf } from "./marks.js";
 import {
   hasDatum,
   barFigure,
@@ -696,11 +696,15 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
   // joint is this arm's and the polyline is shared (§3aj hazard 1).
   const square = block.form === "step" || block.form === "ecdf";
 
+  // **A mark's `seriesIndex` resolves to the *series'* colour** (F382). This
+  // read `refOf(d.seriesIndex)` — the slot — so a series declaring a `tone` was
+  // stroked in its slot here and in its tone by the terminal, and once the
+  // legend was corrected this arm's swatch and its own line disagreed.
   const inkFor = (d: Drawn): string | undefined =>
     d.ref !== undefined
       ? inkOf(d.ref, theme)
       : d.seriesIndex !== undefined
-        ? inkOf(refOf(d.seriesIndex), theme)
+        ? inkOf(seriesRefOf(block.series[d.seriesIndex], d.seriesIndex), theme)
         : furniture;
 
   // **Where each series' stroke ends, for the callout** (C12 I81, §3ak.47).
@@ -1032,7 +1036,9 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       if (text === null) continue;
       const end = ends.get(i);
       if (end === undefined) continue;
-      const ink = inkOf(refOf(i), theme) ?? furniture;
+      // The series' colour, so the second arm draws the tone the first does
+      // and both agree with the legend (F382).
+      const ink = inkOf(seriesRefOf(block.series[i], i), theme) ?? furniture;
       out.push(`<text x="${n(end[0] + LABEL_GAP)}" ` +
         `y="${n(end[1] + SVG_FONT_SIZE / 3)}" text-anchor="start" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}">` +

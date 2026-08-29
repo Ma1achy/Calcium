@@ -52,8 +52,36 @@ const doc = (command: string, blocks: readonly Block[]): ReturnType<LocalHandler
 
 const caption = (text: string): Block => b.notice("muted", text);
 
-/** Half of the demo's 140-column default, less the group's furniture. */
-const COMPARE_COLS = 64;
+/**
+ * The SVG image's cell box, **tuned against a measurement rather than reasoned**.
+ *
+ * A screenshot of a real kitty, with each panel's ink bounding box found from
+ * the image itself:
+ *
+ *     asked            terminal panel     svg panel      match
+ *     64 x 17          690 x 388          489 x 311      71% / 80%
+ *     80 x 28          679 x 398          585 x 356      86% / 89%
+ *
+ * **They cannot be made identical in this layout, and the reason is worth
+ * stating rather than tuning against.** The two panels are a `flex: [1, 1]` row,
+ * and the columns do not come out the same width: the left is 690px and the
+ * right caps at 644px, because the group spends furniture between them. Asking
+ * for more columns than that clamps — `imageCells` scales to the width and
+ * recomputes the rows, so the figure gets *shorter* as it is asked to be wider.
+ * At `cols: 100` the width caps at 644 and the height falls from 347 to 331.
+ *
+ * So this pair is the best fit available side by side. **An exact overlay wants
+ * a different layout** — the two stacked, where they share one width — and that
+ * is a demo decision rather than a framework one.
+ *
+ * **And the deeper residue is the same one the height had**: these are constants
+ * where they should be `measure`'s answer for the sibling block. A local handler
+ * is handed a `LocalContext`, which has no measurer, so the number that would
+ * make this exact is not reachable from here.
+ */
+const COMPARE_COLS = 80;
+const COMPARE_PLOT_ROWS = 14;
+const COMPARE_ROWS = COMPARE_PLOT_ROWS + 14;
 
 /** A form name from argv, defaulting to one that draws. */
 function formIn(argv: readonly string[], fallback: PlotForm = "line"): PlotForm | null {
@@ -122,7 +150,7 @@ function everyForm(phase: number): Block {
  */
 async function compare(form: PlotForm, phase: number): Promise<readonly Block[]> {
   const entry = CATALOGUE[form];
-  const drawn = entry.at(phase, 14);
+  const drawn = entry.at(phase, COMPARE_PLOT_ROWS);
   if ("refused" in drawn) {
     return [b.notice("warn", `${form}: ${drawn.refused}`)];
   }
@@ -139,7 +167,18 @@ async function compare(form: PlotForm, phase: number): Promise<readonly Block[]>
   // a handler is not on `LocalContext` — so at a terminal much wider or narrower
   // than 140 the two panels stop corresponding again. The plumbing is a C24
   // question rather than a demo one.
-  const image = await imageOf(drawn, COMPARE_COLS, 14, `${form}, drawn by the SVG renderer`);
+  const image = await imageOf(
+    drawn,
+    COMPARE_COLS,
+    // **The terminal figure's *total* height, not its plot area's** — measured:
+    // at `height: 14` the terminal block's ink is 402px tall and a 14-row image
+    // is 279px, because the block spends 14 rows on the area and further rows on
+    // the x-labels and title beneath it. The image's `height` is the whole box,
+    // so it has to carry the furniture too or the two bottom edges do not line
+    // up. `COMPARE_ROWS` is that total.
+    COMPARE_ROWS,
+    `${form}, drawn by the SVG renderer`,
+  );
   const right =
     image ??
     b.notice("warn", `the SVG arm refuses ${form} — its family has no emitter (C12 §3aj)`);
@@ -151,7 +190,7 @@ async function compare(form: PlotForm, phase: number): Promise<readonly Block[]>
     ], { flex: [1, 1], id: "compare" }),
     b.notice(
       "muted",
-      svgOf(drawn, COMPARE_COLS, 14) === null
+      svgOf(drawn, COMPARE_COLS, COMPARE_ROWS) === null
         ? "the second renderer has no arm for this family"
         : "the same block, two renderers — one measured in cells, one in pixels",
     ),

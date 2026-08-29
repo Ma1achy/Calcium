@@ -29,7 +29,7 @@ import { ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { plotAreaRows } from "./height.js";
 import { partSeparator } from "./marks.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, refOf } from "./marks.js";
+import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, refOf, seriesRefOf } from "./marks.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
 
 /**
@@ -978,7 +978,10 @@ export function legendSlots(block: Plot): readonly LegendSlot[] {
     ...identityOf(block).map((label, i) => ({
       role: "series" as const,
       label,
-      ref: refOf(i),
+      // **The series', not the slot's** (F382). This called `refOf(i)` and the
+      // terminal's curve renderer called a tone-aware namesake, so a series
+      // with a `tone` was drawn in it and named in its slot colour.
+      ref: seriesRefOf(block.series[i], i),
       seriesIndex: i,
     })),
     ...annotations,

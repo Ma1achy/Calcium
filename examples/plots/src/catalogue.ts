@@ -62,8 +62,13 @@ const refuse = (needs: string, what: string): Refusal => ({
 
 export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
   // --- curves: a reading at a position -------------------------------------
+  // **No `tone` here, and that is a taste rather than a rule.** A declared tone
+  // now reaches the line *and* the swatch in both arms (F382) — it was `ok`/`warn`
+  // while that was being measured. The categorical palette's orange and cyan read
+  // better on a dark ground than green and amber, and `tone` is for *severity*:
+  // a latency percentile is not a health state.
   line: { says: "a value over an index", at: (p, h) => plot("line", h, {
-    axes: true, series: [s(wave(24, p, 1, 8, 20), "p50", "ok"), s(wave(24, p, 2, 14, 42), "p99", "warn")] }) },
+    axes: true, series: [s(wave(24, p, 1, 8, 20), "p50"), s(wave(24, p, 2, 14, 42), "p99")] }) },
   step: { says: "a value that changes at instants", at: (p, h) => plot("step", h, {
     axes: true, series: [s(wave(18, p, 3, 6, 14), "depth")] }) },
   scatter: { says: "two readings per point", at: (p, h) => plot("scatter", h, {

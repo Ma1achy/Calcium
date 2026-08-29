@@ -23,7 +23,7 @@
  * rung that has now produced four defects in this component.
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import type { PlotForm } from "../../data/viewmodel/index.js";
+import type { PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
@@ -74,6 +74,31 @@ export const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
  */
 export function refOf(index: number): ColourRef {
   return CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size
+}
+
+/**
+ * A **series'** colour: its declared `tone` if it has one, else its slot (F382).
+ *
+ * **This existed twice under one name, and the copies disagreed.** `refOf(index)`
+ * above is the slot and knows nothing about a series; `definition.ts` had a
+ * private `refOf(series, index)` that read `series.tone` first. The terminal's
+ * curve renderer imported the second and the legend the first, so a series
+ * declaring a tone was **drawn in that tone and named in its slot colour** —
+ * `tone.ok` green on the line, `categorical.c1` orange in the swatch.
+ *
+ * `legendEntries`' own comment says *a legend whose swatch is a different colour
+ * from the thing it names is worse than none*, four lines from the call that
+ * makes it one. Both functions read as correct; which one a call site got
+ * depended on which module it imported from.
+ *
+ * **Shared rather than fixed in place**, because the SVG arm had the third
+ * answer — it used the slot for both, so it agreed with itself and ignored
+ * `tone` altogether. One resolver is what makes three call sites unable to
+ * disagree.
+ */
+export function seriesRefOf(series: Pick<Series, "tone"> | undefined, index: number): ColourRef {
+  const tone = series?.tone;
+  return tone === undefined ? refOf(index) : `tone.${tone}`;
 }
 
 /** The depth at or above which the categorical palette separates its entries. */

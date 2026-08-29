@@ -232,10 +232,14 @@ const results = runPass({
       // *write a test* when the answer is *the subject moved* — F219's
       // misrouting arriving from the opposite direction, from an anchor that is
       // unique and present rather than duplicated.
+      // **Re-anchored when the resolver became the series'** (F382). This read
+      // `refOf(d.seriesIndex)` — the slot — and a series' `tone` reached the
+      // line here and the swatch nowhere. The mutation's subject is unchanged:
+      // the index still decides the slot when no tone is declared.
       name: "the slot index wraps at five rather than at the palette's size",
       file: SVG,
-      from: "        ? inkOf(refOf(d.seriesIndex), theme)",
-      to: "        ? inkOf(refOf(d.seriesIndex % 5), theme)",
+      from: "        ? inkOf(seriesRefOf(block.series[d.seriesIndex], d.seriesIndex), theme)",
+      to: "        ? inkOf(seriesRefOf(block.series[d.seriesIndex], d.seriesIndex % 5), theme)",
       expect: "TC2",
     },
     {

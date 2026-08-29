@@ -13677,6 +13677,48 @@ this pass has been building for eleven commits.
 
 ---
 
+## F382 — a series' declared tone reached the line and not the swatch, because `refOf` existed twice under one name ★★★★★
+
+A series with `tone: "ok"` is **drawn green and named orange**. Measured on the terminal's own
+frame, foreground SGR counts:
+
+```
+38;2;135;184;108   x3    tone.ok         — the line
+38;2;230;159;0     x1    categorical.c1  — its legend swatch
+38;2;86;180;233    x6    categorical.c2  — the untoned series, line and swatch
+```
+
+**Two functions, one name, one component.** `definition.ts` had a private
+`refOf(series, index)` that reads `series.tone` first; `marks.ts` exports `refOf(index)`, which is
+the palette slot and knows nothing about a series. The curve renderer imported the second file's
+namesake through the first's local one, and `legendSlots` — **the crossed resolver, so this is both
+arms' answer** — called the slot.
+
+Both read as correct. Which one a call site got depended on which module it imported from, which is
+the reimplemented-rule class with the copies in one component rather than two files apart.
+
+**`legendEntries`' own comment names the defect four lines from the call that causes it**: *a legend
+whose swatch is a different colour from the thing it names is worse than none.*
+
+**And the second arm had a third answer.** `svg.ts`'s `inkFor` resolved a mark's `seriesIndex` with
+the slot too, so the SVG agreed with itself and ignored `tone` entirely — line and swatch both in
+the palette. Correcting only the legend would have made *that* arm inconsistent, which is what the
+first attempt did and what the measurement caught.
+
+**Zero of the corpus's 188 variants declare a `Series.tone`.** So every golden frame, every pair,
+the collision sweep and the arm-disagreement matrix agreed, and fixing it moves nothing. **The
+reference app declares one** — `examples/docker`'s CPU series is `tone: "ok"` — so docker-tui has
+been shipping a legend that contradicts its own line.
+
+**Fixed** by making the rule shared: `seriesRefOf(series, index)` in `marks.ts`, read by the
+terminal renderer, the crossed `legendSlots`, and the SVG's `inkFor`. Three call sites that can no
+longer disagree, and `definition.ts`'s duplicate is gone.
+
+**Found by a human looking at a frame and asking why a line was green** — no assertion in the tree
+could, because the corpus has no subject for it. AD15 carries its own fixture for that reason.
+
+---
+
 ## F381 — the chunked transmission was misaligned by two bytes, so any image needing a second escape drew nothing ★★★★★
 
 With F379 and F380 fixed the arm draws — **a small image**. Raising the raster from 56 to 392
