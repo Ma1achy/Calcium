@@ -13723,6 +13723,54 @@ exactly what the rung is. The comparison has to be the one the reader makes.
 
 ---
 
+## F398 — one rule in two copies, and only one of them had the exemption ★★★★★
+
+`b.plot` refused an eleven-row heatmap: *11 series and the categorical palette distinguishes 8 (C04
+I50a) — a ninth would repeat a colour.* **The terminal renders it perfectly well** — measured, twelve
+non-blank lines — and the validator accepts it.
+
+The builder's check sits under a comment reading *the same refusal the validator makes. Two
+expressions of one rule.* They were not one rule. The validator carries an exemption the constructor
+never got, and states its reason in full:
+
+> C04 I50a is a rule about colour, so it binds where colour is drawn. A heatmap carries magnitude in
+> the ramp at every depth and never reads the categorical palette, so a cap at the palette's size
+> would refuse a document about something else — and eight rows is not a matrix.
+
+**Correct, and applied to one form.** `IS_MATRIX` names ten — `heatmap`, `calendar`, `correlation`,
+`confusion`, `spectrogram`, `latency`, `density2d`, `utilisation`, `contour`, `quiver` — and every
+one spends its rows on a ramp. So the *validator* was refusing nine of them past eight series for a
+palette none of them reads, and the *builder* was refusing all ten. Both now read `IS_MATRIX`, which
+is the exemption's own rationale applied where it reaches.
+
+**A reimplemented rule keeps its birthday clauses**, and this is the measured case: the copy was made
+before the exemption existed and nothing re-derived it, while the comment asserting equivalence made
+the drift read as deliberate. Verified in both directions after the fix — `heatmap`, `correlation`
+and `spectrogram` build at eleven rows; `line` and `bar` still refuse at nine.
+
+**Found by writing a consumer**, not by a gate: a resource monitor with a row per core, on a machine
+with eleven. No fixture in the corpus has a matrix past eight rows, so nothing in the suite could
+have asked.
+
+---
+
+## F399 — a live part with no `renderError` fails silently, and that is how the monitor hid ★★★☆☆
+
+The monitor's wrapper notice drew and its live part drew **nothing** — no error, no empty state, no
+text anywhere saying why. Underneath, `b.plot` was throwing F398's refusal inside the part's
+`render`, once a second, invisibly.
+
+`b.live` hands the app the error, the retry countdown and the attempt number, and an app that
+declines to render them is declining to be told. `/faults` has always had a `renderError`; the
+monitor was written without one because its source is `os` and *reading a local file cannot fail* —
+which is true about the **fetch** and says nothing about the **render**.
+
+**A second duplicate-id refusal in the same example** was found on the way: `b.live({ id: "monitor" })`
+wrapping a frame whose group was also `id: "monitor"` (C04 I14). Both were invisible for the same
+reason, and the fix for the second is what made the first legible.
+
+---
+
 ## F397 — `Object.freeze` made the guard vacuous, in the file whose header records catching it once ★★★★★
 
 The variant table was `const VARIANTS: Partial<…> = Object.freeze({…})`, under a doc claiming an

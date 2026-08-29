@@ -479,7 +479,20 @@ function plot(
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
   // author finds out and the validator is where an untrusted document does.
-  if (series.length > 8) {
+  //
+  // **And for a long time they were not the same rule** (F398). The validator
+  // carries an exemption this copy never got — *C04 I50a is a rule about colour, so
+  // it binds where colour is drawn; a heatmap carries magnitude in the ramp and
+  // never reads the categorical palette* — so an eleven-row heatmap validated
+  // and rendered correctly while `b.plot` refused to construct it. Two copies of
+  // one rule under a comment asserting they are one.
+  //
+  // **`IS_MATRIX`, not `form !== "heatmap"`**, which is the exemption's own
+  // rationale applied where it reaches: `correlation`, `confusion`,
+  // `spectrogram`, `latency`, `density2d`, `calendar`, `utilisation`, `contour`
+  // and `quiver` all spend their rows on a ramp too, and the validator was
+  // refusing every one of them past eight for a palette they never read.
+  if (!IS_MATRIX[form ?? "line"] && series.length > 8) {
     throw new TypeError(
       `b.plot: ${String(series.length)} series and the categorical palette distinguishes 8 ` +
         `(C04 I50a) — a ninth would repeat a colour, which reads as two series being one`,

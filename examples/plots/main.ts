@@ -28,6 +28,7 @@ import type { Adapter, Block, LocalHandler, TerminalCapabilities } from "@fmx/ca
  */
 type ImageProtocol = TerminalCapabilities["imageProtocol"];
 import { execFile } from "node:child_process";
+import os from "node:os";
 import { promisify } from "node:util";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "./src/catalogue.ts";
 import type { PlotForm } from "./src/catalogue.ts";
@@ -48,6 +49,7 @@ const manifest = {
     { name: "live", local: true, summary: "One form, advancing", args: [{ name: "form", type: "string", required: false, summary: "which form" }], flags: [] },
     { name: "compare", local: true, summary: "Terminal beside SVG, as pixels", args: [{ name: "form", type: "string", required: false, summary: "which form" }], flags: [] },
     { name: "faults", local: true, summary: "A failing source, and the way back", args: [], flags: [] },
+    { name: "monitor", local: true, summary: "This machine, live", args: [], flags: [] },
   ],
 } as const;
 
@@ -196,6 +198,143 @@ function everyForm(phase: number): Block {
     b.notice("muted", "/form <name> draws one full size with its rungs · /live <name> advances it"),
     ...pairs,
   ]);
+}
+
+// --- /monitor ---------------------------------------------------------------
+
+/**
+ * A resource monitor, live — **the machine this is running on** (F398).
+ *
+ * The other commands draw generated data at a phase, which is right for a
+ * catalogue and says nothing about whether the plots hold up against readings
+ * nobody chose. This samples `os` every second and draws four forms from it.
+ *
+ * **`fetch` reads the machine rather than the far side, and that is idiomatic
+ * rather than a shortcut.** A `b.live` part's `fetch` is the *application's* —
+ * docker-tui's polls the daemon — and `bin/plots` prints one static object by
+ * design, because the demo's subject is the drawing. A monitor needs a reading
+ * per tick, which is what `fetch` is for.
+ *
+ * **CPU is a delta, not a level.** `os.cpus()` returns cumulative jiffies since
+ * boot, so a single sample is *utilisation since the machine started* — a flat
+ * line at whatever the long-run average is, which looks plausible and is not
+ * what a monitor shows. The busy fraction is `Δbusy / Δtotal` between ticks, so
+ * the first tick has nothing to compare against and reports zeros.
+ */
+type Sample = Readonly<{ perCore: readonly number[]; usedGiB: number; load: readonly number[]; heapMiB: number }>;
+
+let previous: readonly os.CpuInfo[] | null = null;
+
+function sample(): Sample {
+  const now = os.cpus();
+  const perCore = now.map((c, i) => {
+    const was = previous?.[i];
+    if (was === undefined) return 0;
+    const busy = (n: os.CpuInfo): number => n.times.user + n.times.nice + n.times.sys + n.times.irq;
+    const all = (n: os.CpuInfo): number => busy(n) + n.times.idle;
+    const dBusy = busy(c) - busy(was);
+    const dAll = all(c) - all(was);
+    return dAll <= 0 ? 0 : Math.max(0, Math.min(1, dBusy / dAll));
+  });
+  previous = now;
+  const total = os.totalmem();
+  return {
+    perCore,
+    usedGiB: (total - os.freemem()) / 1024 ** 3,
+    load: os.loadavg(),
+    heapMiB: process.memoryUsage().heapUsed / 1024 ** 2,
+  };
+}
+
+/** The window each series keeps — one minute at a tick a second. */
+const MONITOR_WINDOW = 60;
+
+type History = Readonly<{ cores: readonly (readonly number[])[]; used: readonly number[]; heap: readonly number[]; last: Sample }>;
+
+function advance(prev: unknown, next: Sample): History {
+  const before = prev as History | undefined;
+  const keep = <T>(xs: readonly T[], x: T): readonly T[] => [...xs, x].slice(-MONITOR_WINDOW);
+  return {
+    // **A row per core, each its own history** — a heatmap wants the matrix, and
+    // building it here rather than in `render` keeps the accumulation in one
+    // place where the window is applied once.
+    cores: next.perCore.map((v, i) => keep(before?.cores[i] ?? [], v)),
+    used: keep(before?.used ?? [], next.usedGiB),
+    heap: keep(before?.heap ?? [], next.heapMiB),
+    last: next,
+  };
+}
+
+function monitorFrame(h: History): Block {
+  const cores = h.cores.length;
+  const total = os.totalmem() / 1024 ** 3;
+  return b.group("column", [
+    caption(`${os.type()} ${os.release()} · ${String(cores)} cores · ${total.toFixed(1)} GiB · up ${(os.uptime() / 3600).toFixed(1)}h`),
+    b.group("row", [
+      b.group("column", [
+        caption("per-core utilisation · a minute, newest right"),
+        b.plot({
+          id: "mon-cores", form: "heatmap", height: Math.min(cores, 8), axes: true,
+          colormap: "inferno", yMin: 0, yMax: 1,
+          categories: h.cores.map((_c, i) => `core ${String(i)}`),
+          series: h.cores.map((row) => ({ values: [...row] })),
+        }),
+      ], { id: "mon-left" }),
+      b.group("column", [
+        caption("memory · GiB resident"),
+        b.plot({
+          id: "mon-mem", form: "line", height: 8, axes: true, yAxis: "right", yCallout: "last",
+          yMin: 0, yMax: Math.max(1, total),
+          series: [{ values: [...h.used], label: "used" }],
+        }),
+      ], { id: "mon-right" }),
+    ], { flex: [1, 1], id: "mon-top" }),
+    b.group("row", [
+      b.group("column", [
+        caption("load average"),
+        b.plot({
+          id: "mon-load", form: "bar", height: 5, axes: true, orientation: "horizontal",
+          categories: ["1 min", "5 min", "15 min"],
+          series: [{ values: h.last.load.map((v) => Number(v.toFixed(2))), label: "load" }],
+        }),
+      ], { id: "mon-load-col" }),
+      b.group("column", [
+        caption("this process · heap MiB"),
+        b.plot({
+          id: "mon-heap", form: "sparkline", height: 1,
+          series: [{ values: [...h.heap], label: "heap" }],
+        }),
+        caption(`${h.last.heapMiB.toFixed(1)} MiB · ${h.used.length < MONITOR_WINDOW ? `filling (${String(h.used.length)}/${String(MONITOR_WINDOW)})` : "full window"}`),
+      ], { id: "mon-heap-col" }),
+    ], { flex: [1, 1], id: "mon-bottom" }),
+  // **`mon-frame`, not `monitor`** — the live part owns that id, and a rendered
+  // frame carrying its container's id is two blocks with one name, which C04 I14
+  // refuses. The whole command drew nothing and said nothing: the document was
+  // rejected before a frame existed. Second instance in this example.
+  ], { id: "mon-frame" });
+}
+
+function monitor(): Block {
+  previous = null;
+  return b.group("column", [
+    b.notice("info", "sampling os every second — the first tick has no delta to report, so the cores start at zero"),
+    b.live({
+      id: "monitor",
+      title: "resources",
+      every: 1000,
+      fetch: () => Promise.resolve(sample()),
+      derive: { key: "history", compute: (d, prev) => advance(prev, d as Sample) },
+      // **A live part with no `renderError` fails silently**, which is how this
+      // one hid: the wrapper notice drew, the part drew nothing, and there was
+      // no text anywhere saying why. The framework hands the error, the retry
+      // countdown and the attempt number to the app; declining to render them
+      // is declining to be told.
+      renderError: (err, retryInMs, attempt) =>
+        b.notice("error", `${err.message} · attempt ${String(attempt)}` +
+          (retryInMs === null ? " · not retrying" : ` · retrying in ${String(Math.round(retryInMs / 100) / 10)}s`)),
+      render: (v) => monitorFrame(v as History),
+    }),
+  ], { id: "monitor-wrap" });
 }
 
 // --- /compare ---------------------------------------------------------------
@@ -472,6 +611,8 @@ const tui = createTui({
     }) satisfies LocalHandler,
 
     faults: ((_argv, ctx) => doc(ctx.command, [faults()])) satisfies LocalHandler,
+
+    monitor: ((_argv, ctx) => doc(ctx.command, [monitor()])) satisfies LocalHandler,
   },
   greeting: () => ({
     schema: "tui.view/1",

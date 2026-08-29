@@ -810,7 +810,15 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       // never reads the categorical palette, so a cap at the palette's size
       // would refuse a document about something else — and eight rows is not a
       // matrix.
-      if (b["form"] !== "heatmap" && b["series"].length > CATEGORY_LIMIT) {
+      // **`IS_MATRIX`, not `heatmap` alone** (F398). C04 I50a's exemption above is
+      // stated as *a rule about colour binds where colour is drawn*, and that
+      // reaches every form whose rows are a ramp — `correlation`, `confusion`,
+      // `spectrogram`, `latency`, `density2d`, `calendar`, `utilisation`,
+      // `contour`, `quiver`. Named one form, it refused the other nine for a
+      // palette none of them reads. The record that answers *is this a matrix*
+      // already existed.
+      const matrix = typeof b["form"] === "string" && IS_MATRIX[b["form"] as PlotForm] === true;
+      if (!matrix && b["series"].length > CATEGORY_LIMIT) {
         e.push(
           `${at}: "series" has ${String(b["series"].length)} entries and the categorical ` +
             `palette distinguishes ${String(CATEGORY_LIMIT)} (C04 I50a) — a ninth series ` +
