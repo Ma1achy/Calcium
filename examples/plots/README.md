@@ -5,10 +5,33 @@
 ![the gallery: a latency curve with its two series named at the lines they end on, a grouped bar of the frame budget at four widths, a viridis matrix of per-core load, four box plots of stage timings, a treemap of the budget nested, and a live queue-depth walk redrawing every 120 ms](frame.png)
 
 ```
-npm install          # from the repository root — this is a workspace member
-npm run build        # the example imports the built package, not src/
-cd examples/plots && npm start
+cd examples/plots
+npm start                   # then /sample
 ```
+
+**That is usually all of it**, because the example imports `@fmx/calcium`'s
+**built** output and `dist/` is normally already there — anyone who has run
+`make check`, `make test` or the container's build has it. Try `npm start`
+first; if it cannot resolve the package, build it:
+
+```
+npm run build               # from the REPOSITORY ROOT — there is no build here
+```
+
+**`build` is the root package's script.** Running it in this directory gets
+`Missing script: "build"`, which is the honest answer to the wrong question.
+
+**And if that build fails with `Unable to resolve @typescript/typescript-<your
+platform>`**, `node_modules` was installed inside the devcontainer and holds
+only *its* platform's TypeScript binary — CLAUDE.md sends every command through
+the container and `node_modules` is bind-mounted, so the host sees Linux
+binaries. Build in the container, or reinstall on the host. `dist/` itself is
+plain JavaScript and runs anywhere, which is why the first block usually works
+regardless.
+
+**A consumer installing a published `@fmx/calcium` gets it built and skips all
+of this** — that is R01 R4.4, and the reason the build step belongs in a note
+rather than in the instructions.
 
 **In a real terminal.** `plots-tui` draws on the alternate screen, so it refuses a pipe or a
 redirect and says so; `npm start 2>&1 | head` gets the refusal rather than a figure.

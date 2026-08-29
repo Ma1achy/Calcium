@@ -13677,6 +13677,39 @@ this pass has been building for eleven commits.
 
 ---
 
+## F393 — the correction to F392's usage block was wrong in the same way, one command later ★★★☆☆
+
+F392 fixed a stale command list and left a **build step that is unnecessary in the common case and
+impossible in this repository's own prescribed setup.** Written as
+
+```
+npm install
+npm run build
+cd examples/plots && npm start
+```
+
+it fails twice for a reader who does the obvious thing. Run from `examples/plots` — where the reader
+already is, because the previous line said `cd` — `npm run build` gives `Missing script: "build"`;
+`build` belongs to the root package. Run from the root it gives `Unable to resolve
+@typescript/typescript-darwin-arm64`, because CLAUDE.md sends every command through the devcontainer
+and `node_modules` is bind-mounted, so the host sees only the **Linux** TypeScript binary.
+
+**And the step was not needed.** `dist/` is plain JavaScript, already present in any checkout that
+has run a build, and portable across platforms — the demo drew on the host with the existing `dist/`
+while `npm run build` on the same host could not run at all. **The instruction was measured against
+what I believed the state was rather than against the state**, which is the finding: `npm start` was
+never tried on its own before the build was put in front of it.
+
+**Same class as F392, one iteration later, which is the reason to record it separately.** A usage
+block is the one artefact nothing executes, so a *correction* to one has exactly the same standing as
+the error it replaces — none — until it is run verbatim. Both instances were found by a reader, not
+by a gate, and the second was found within a minute of the first being committed.
+
+The block now says `cd examples/plots && npm start`, with the build as a **fallback** naming both
+failure modes, and it was run verbatim from a clean shell before being written down.
+
+---
+
 ## F392 — two of three examples could not start on the engine they declare, and only a host could see it ★★★★★
 
 `examples/docker` runs `node --experimental-strip-types src/main.ts`. `examples/minimal` and
