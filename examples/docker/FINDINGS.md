@@ -13677,6 +13677,84 @@ this pass has been building for eleven commits.
 
 ---
 
+## F377 — four of forty-six forms cannot be drawn from the published builder at all ★★★★☆
+
+F335 measured `b.plot` at 48 of `Plot`'s 58 members and F371 confirmed it at HEAD. Both state the
+gap in **members**, which understates it: the question a consumer asks is *can I draw this chart*.
+
+Measured over the catalogue's own 46 forms, against the builder's declared field set:
+
+| | forms | |
+|---|---|---|
+| **buildable in full** | **39** | every field their fixtures use is declared |
+| **buildable, reduced** | **3** | `bar` (no `layout`), `histogram` (no `layout`, `binning`), `line` (no `xScale`, `emptyMessage`) |
+| **not buildable at all** | **4** | `gantt` needs `offsets` · `waterfall` needs `totals` · `pairplot` and `smallmultiples` need `facets` |
+
+**The four are the ones F335 called *a form's only datum*, and that phrase is exact**: a gantt
+without `offsets` is a bar chart, a waterfall without `totals` is a bar chart, and a delegating
+form without `facets` has nothing to delegate. They do not degrade — they are a different chart.
+
+**So the published union names six forms a consumer can pick and four they cannot construct.**
+`PlotForm` is a closed union in a published type; MG28 exists precisely to catch a union arm
+nothing public can reach, and it reads the *builder's literals* for a field it threads — `form` is
+threaded, so all 46 arms are reachable as far as that rule can see. The arm is reachable and the
+**form** is not, because reaching it requires a second field the builder does not declare.
+
+**A rule could ask this**, and the shape is `SVG_FAMILY`'s: a record from form to the fields it
+cannot draw without. Not built here — the finding is the measurement, and the remedy is the C24
+widening F335 already rules is owed its own decision.
+
+---
+
+## F376 — `plotToSvg` is published, and its second argument cannot be constructed ★★★★★
+
+```ts
+export function plotToSvg(given: Plot, theme: ResolvedTheme, layout?: SvgLayout): string | null
+```
+
+Exported by name from `src/index.ts`, described there as **the second renderer**. `ResolvedTheme`
+is not exported. Neither is `loadTheme`. So the function resolves, type-checks at the call site,
+and cannot be called.
+
+**The one published route does not reach the callers who want it.** `RenderContext.theme` is a
+`ResolvedTheme` and `RenderContext` is published — so a consumer registering a custom block
+definition holds one **inside `render`**, which is synchronous and returns a `Block`. Every use of
+an SVG is asynchronous: rasterise, write, transmit. An adapter, a local handler and a `b.live`
+renderer are where a plot's SVG is wanted, and none of the three is handed a theme.
+
+**The claim was already written down as though a consumer could do it.** `tools/svg-baseline.mjs`:
+
+```js
+// **The shipped theme, loaded the way a consumer loads it** — not the raw
+// tokens, because a corpus rendered against something no application holds is
+// a corpus of a theme nobody sees.
+const loaded = loadTheme(defaultTheme, "dark");
+```
+
+Right about what it wants, false about what it describes: no consumer loads a theme this way. **A
+comment asserting a consumer path, inside a tool that reaches past the boundary it is asserting
+about**, is the sixth blind spot at its cheapest — and the file's whole job is to model the
+consumer.
+
+**Third instance of C24 I19's class**, after `CompletionContext` (§8b) and `ProducerContext`
+(I26), and the first where the function was already published rather than the argument being
+merely awkward. Three is what made it a rule: **C24 I29**, checked by **MG29**.
+
+**MG29 cannot see this instance and says so.** `ResolvedTheme` *is* reachable — through
+`RenderContext` — so a reachability rule clears it. Its first run found three others instead:
+`registerGrammar(name, grammar: LanguageFn)` and `cells`/`truncate` taking an unexported
+`AmbiguousWidth` — **the pair C24 commitment 12 publishes because *a custom block kind cannot be
+written without them***, callable in one parameter and not the second.
+
+**Fixed**, because this is not a widening: `loadTheme`, `ResolvedTheme`, `AmbiguousWidth` and
+`LanguageFn` are now exported, which makes already-published functions callable rather than adding
+capability. `loadTheme` rather than a pre-resolved constant, because a consumer supplying
+`TuiConfig.theme` has *their* theme resolved by the session — a constant would resolve the shipped
+one and the second renderer would disagree with the first for exactly the consumers who customised
+anything.
+
+---
+
 ## F375 — the bar's value labels abut, while the category labels in the same renderer refuse to ★★★☆☆
 
 A grouped bar at the density a dashboard uses writes its per-bar readouts with **no separating

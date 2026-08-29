@@ -831,6 +831,61 @@ carries the state — and §7 records what that changed.
 
 ---
 
+## 8c. What the third consumer needed — a theme it could not build
+
+`examples/plots` draws C12's forms through `b.plot` and puts each one beside its SVG. It found
+the same thing §8a found in the builders and §8b in the completion context, by the same means —
+**using the thing** — and this instance is the sharpest of the three, because the function is
+already published.
+
+```ts
+export function plotToSvg(given: Plot, theme: ResolvedTheme, layout?: SvgLayout): string | null
+```
+
+`plotToSvg` is exported by name and described at the entry point as *the second renderer*.
+**`ResolvedTheme` is not exported, and neither is `loadTheme`**, so a consumer can neither name
+the second parameter nor construct one.
+
+**The one route that exists does not reach the callers who want it.** `RenderContext.theme` is a
+`ResolvedTheme` and `RenderContext` is published — so a consumer registering a custom block
+definition holds one inside `render`. `render` is synchronous and returns a `Block`, and every
+use of an SVG is asynchronous: rasterise it, write it, transmit it. An adapter, a local handler
+and a `b.live` renderer are where a plot's SVG is actually wanted, and none of the three is
+handed a theme.
+
+**The claim was already written down as though a consumer could.** `tools/svg-baseline.mjs`:
+
+```js
+// **The shipped theme, loaded the way a consumer loads it** — not the raw
+// tokens, because a corpus rendered against something no application holds is
+// a corpus of a theme nobody sees.
+const loaded = loadTheme(defaultTheme, "dark");
+```
+
+The sentence is right about what it wants and false about what it describes: no consumer loads a
+theme this way, because the function is interior. **A comment asserting a consumer path, in a
+file that reaches past the boundary it is asserting about**, is the sixth blind spot in its
+cheapest form — a claim carried without a record, in the tool whose whole job is to model the
+consumer.
+
+**This is I19's rule and I26's remedy, third time.** `CompletionContext` came with
+`completionContext`; `ProducerContext` came with `producerContext`; a resolved theme comes with
+`loadTheme` and the type beside it. The pattern is stable enough to be an invariant rather than
+three findings: **a published function's arguments are constructible from the published
+surface**, and the check is mechanical — every parameter type of every exported function is
+either exported or reachable from an exported one.
+
+**Why `loadTheme` rather than a resolved constant.** Exporting a pre-resolved `defaultTheme`
+would answer the demo and not the rule: a consumer supplying `TuiConfig.theme` has *their* theme
+resolved by the session, and a constant resolves the shipped one. `loadTheme` is what the
+session calls, so a consumer rasterising a plot outside a frame gets the same tokens the frame
+would have used — which is the whole point of the second renderer agreeing with the first.
+
+**The residue, stated.** `loadTheme` returns a `Validity`, so the consumer handles a theme that
+does not load; that is the same contract `parseManifest` already publishes and not a new shape.
+
+---
+
 ## 9. Invariants
 
 - **I1** — Every export is used by **the union of** `prism-tui` and the reference app. Neither alone exercises the whole surface — docker touches no `spectrum`, no `WorldDriver` and only part of the manifest schema. An export used by neither is removed.
@@ -863,6 +918,7 @@ carries the state — and §7 records what that changed.
 - **I27** — **`LiveSpec.source` declares sameness and `LiveSpec.derive` is what makes it usable.** Two parts naming one key share one `fetch` and one fold, so two panels of one document cannot show two samples of one instant (C23 I44). The pairing is not a convenience: a part accumulating inside its `fetch` cannot share one, which is what the reference app did, so `source` without `derive` has no consumer. A conflicting `every` on one key is **refused, in the losing part's panel, naming both parts** — thrown, it is swallowed by the append's deliberate bare catch and the author sees two loading panels for ever — and conflicting `fetch` closures are **not checked** — the key is the claim that they are the same and the framework takes it, which is the standing of a string key at all (C23 I42, C23 I43, C23 I47).
 - **I28** — **A live part does not poll while nothing is looking at it, and this is not configurable** (I6, C23 I46). It reaches every part rather than only those declaring a `source`, because a part accumulating inside `fetch` is already broken by I27's rule and pausing surfaces that rather than causing it; the alternative would make off-screen behaviour depend on an unrelated declaration. **Nothing is released** — the part stays declared and C23 I33's five triggers remain the only teardown — and a pushed view is visible while its layer exists, so the pause reaches transcript-hosted parts and not a drill-in. It is a stated behaviour change for declarations that predate it, which is why it is an invariant here and not only in C23.
 
+- **I29** — **A published function's arguments are constructible from the published surface.** A parameter whose type is interior makes the function itself interior, whatever the export list says — and the failure is silent in exactly the direction that matters, because the export *is* there and the signature *does* resolve until a consumer tries to supply the argument. **Three instances and the third is why this is a rule** (§8a, §8b, §8c): `CompletionContext` shipped with `completionContext`, `ProducerContext` with `producerContext`, and `plotToSvg` was published for a year with `ResolvedTheme` and `loadTheme` both interior. **`RenderContext.theme` is why it survived** — one published route to the type existed, inside a synchronous `render`, which is the one place an SVG cannot be used. A route that exists and does not reach the callers is indistinguishable from a route that works, from the export list. **Checked rather than promised**: MG29 reads every exported function's parameter types and asks whether each is exported or reachable from an exported type, which is the same question §3's refusal list already answers by hand for the exports it removes. **Its stated blind spot is the one that hid this**: a type reachable through *some* published route counts as constructible, and `ResolvedTheme` was — through `RenderContext`, into a synchronous `render`. The rule reports reachability and cannot ask whether the route reaches the caller who needs it, so it would have found this only once `RenderContext` did not exist.
 ---
 
 ## 10. Commitments
@@ -894,6 +950,7 @@ carries the state — and §7 records what that changed.
 25. A consumer can build the context its own producer receives, measurer included — the grant is testable from the side that consumes it (I26).
 26. Parts sharing a declared key share one poll and one fold, so two views of one source cannot disagree; a conflicting cadence is refused **where the author can see it** and conflicting fetches are taken on the key's word (I27).
 27. A live part does not poll while nothing is looking at it, for every part and not only the sharing ones — a stated behaviour change, unconditional, and releasing nothing (I28).
+28. A published function's arguments are constructible from the published surface, checked mechanically rather than found by a consumer for the third time (I29, §8c, MG29).
 
 ---
 
