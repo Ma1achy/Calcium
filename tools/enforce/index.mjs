@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
-import { readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { checkFindings, checkTriageInventory } from "./findings.mjs";
 import {
   checkFunctionConsumers,
@@ -39,11 +39,25 @@ function walk(dir, out = []) {
 }
 
 const files = walk("src");
-// The two consumers written from the public surface, for the by-use signal
-// alone — nothing here gates on them, and `enforce` still governs `src/`.
-// Skipped by the walk above and not by a separate one, because a second walk is
-// where the two would drift.
-const examples = [...walk("examples/minimal"), ...walk("examples/docker")];
+// The consumers written from the public surface, for the by-use signal alone —
+// nothing here gates on them, and `enforce` still governs `src/`. Skipped by the
+// walk above and not by a separate one, because a second walk is where they
+// would drift.
+//
+// **This sentence said *the two* and the change below made it three.** Caught by
+// reading the diff rather than by any assertion: a mechanical rewrite's tests
+// verify the transformation, never whether the prose above it is still true.
+// **Discovered, not listed** — and this is the third site that named the two by
+// hand. `Makefile`'s `check` and `test` were the other two, and both carry
+// comments recording that they exist *because an example's declared script was
+// invoked by nothing* (F150). A third example arriving and being invisible here
+// is the same defect one turn later, so the population is the directory and the
+// exception is named: anything under `examples/` with a `package.json` is a
+// consumer, and a directory without one is not yet a package.
+const examples = readdirSync("examples", { withFileTypes: true })
+  .filter((e) => e.isDirectory() && existsSync(`examples/${e.name}/package.json`))
+  .flatMap((e) => walk(`examples/${e.name}`))
+  .sort();
 const specs = specFiles();
 const references = referenceFiles();
 const { violations: refViolations, resolved } = checkReferences(references);

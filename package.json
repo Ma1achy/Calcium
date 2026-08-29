@@ -4,7 +4,8 @@
   "description": "A framework for building terminal user interfaces over JSON-emitting CLIs.",
   "type": "module",
   "workspaces": [
-    "examples/docker"
+    "examples/docker",
+    "examples/plots"
   ],
   "engines": {
     "node": ">=22"

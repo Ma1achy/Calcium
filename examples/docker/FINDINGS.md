@@ -13677,6 +13677,207 @@ this pass has been building for eleven commits.
 
 ---
 
+## F375 — the bar's value labels abut, while the category labels in the same renderer refuse to ★★★☆☆
+
+A grouped bar at the density a dashboard uses writes its per-bar readouts with **no separating
+cell**:
+
+```
+10 ┤   4.17.4      5.2▆▆▆4.34.16.8███5.15.6▅▅▅███6.4│
+   │2.9▁▁▁███3.83.4▃▃▃███▁▁▁▁▁▁▇▇▇███▃▃▃▄▄▄██████▆▆▆│
+```
+
+`4.17.4` is `4.1` and `7.4`. `3.83.4` is two numbers. `4.34.16.8` is three. A reader does not
+see a crowded row — they see **one number that is not any of the values**, which is worse than
+the row being dropped.
+
+**The same renderer has the rule one label row away.** `columnLabels` places the *category*
+names under the same figure and guards them: `start >= cells(row)` — a name that would begin
+before the row already ends is dropped rather than run into its neighbour. The value labels
+have no such clause and are simply concatenated. **One placer in `definition.ts` knows the
+rule and its sibling does not**, which is the reimplemented-rule class with the copies in one
+file rather than two.
+
+**A minimum of one cell is the whole fix**, and the choice it forces — drop or abut — is
+already made for the other row, so this is a missing clause rather than an open question.
+
+**Found by looking at the demo**, at the width its own layout gives a bar: 53 cells, four
+categories, four series. No golden frame covers that cell because the catalogue's bar fixtures
+are one and two series.
+
+---
+
+## F374 — the vertical bar reserves a legend's width and draws nothing in it, and drops a category label in silence ★★★★☆
+
+Two defects in one arm, and they are one finding because **the horizontal arm of the same form
+gets both right** — so neither is a hard problem, and each is a clause that reached one of two
+transposed renderers.
+
+**The legend.** `legend: "right"` on a vertical `bar` narrows the plot area by about eleven
+cells and renders no legend. Measured at 53, 100 and 120 columns, and with `"below"` as well:
+
+```
+-- vertical, legend right (100 cells)   area 84, nothing to the right of the frame
+-- horizontal, legend right (100 cells) area 72, and:   █ measure  █ layout  █ paint  █ compose
+```
+
+`legendPlacement` returns the caller's placement — that is why the width is reserved — and the
+vertical arm never draws the rows. So the declaration **costs area and yields nothing**, which
+is F207's class exactly: *an arm accepted where there is none tells the caller nothing and the
+reader nothing.* C04 I60 refuses `yAxis` and `yCallout` on forms with no gutter for them, in
+the validator, with the fix named; the neighbouring member on the neighbouring arm is accepted
+and silently discarded.
+
+**The category label.** `columnLabels` drops a name — and its tick — when it would overlap its
+predecessor, with nothing said. Measured over series counts at 80 columns with five-cell names:
+
+| series | ticks | labels drawn |
+|---|---|---|
+| 1 | 4 | `1280w 1600w 1920w 2560w` |
+| 2 | 4 | all four |
+| 3 | 4 | all four |
+| **4** | **3** | `1280w 1600w 1920w` — **and the tallest bar is the unlabelled one** |
+
+C12 **I8** is the rule and it is written about *rows*: *a datum that cannot be given a row is
+named in the area, never dropped silently — and a category past the last row is named the same
+way.* The horizontal arm obeys it, visibly — the demo's `/bars` frame ends `+3 more · 2560w ·
+layout · 2560w · paint · 2560w · compose`. The column arm has no equivalent and no notice.
+
+**Both appear at the density a real surface uses and neither is in the catalogue**, whose bar
+fixtures are one and two series at 60 and 80 columns. The demo hit both on its first frame.
+
+---
+
+## F373 — `applyPatch` can commit a document `validateDocument` refuses, because I14 is not re-established after a patch ★★★★☆
+
+C04 I14 — block ids are unique within a document — is established at `append` and `settle`, and
+`validate.ts` says so: *I2, I3, I14 and I27 are established here and nowhere else.* The
+transcript's `patch` calls `applyPatch` and commits the result **without revalidating**.
+
+Measured directly:
+
+```
+document with distinct child ids valid: true
+patch #1 (child takes the panel's id): ok
+  resulting document valid: false
+    blocks: id "walk" appears 2 times (C04 I14) — ViewPatch addresses blocks by id,
+    so a duplicate has no correct target
+patch #2 against that document: rejected
+    id "walk" appears more than once in the document (C04 I14) — there is no correct block to act on
+```
+
+So the invariant's own message describes the state the patch path just created. **The defect is
+detected one tick late**, at a point where nothing can attribute it: the patch that *made* the
+document invalid succeeded, and the one that merely *encountered* it failed.
+
+**Reachable from the published builder with nothing warning.** `b.live({ id: "walk" })` renders
+a child, and a child built `b.plot({ id: "walk" })` is the obvious thing to write — the same
+name for the same thing. See F372 for what the failure then looks like.
+
+**Not a call to revalidate on every patch**, which would put a whole-document walk on the
+stream path. The narrow form is that `applyPatch`'s `replace` already resolves ids and can
+refuse to *introduce* a duplicate, at the one place that is already looking.
+
+---
+
+## F372 — a live part is torn down in silence when the shell's own patch is refused ★★★★★
+
+`renderPart` (`refresh.ts`):
+
+```ts
+if (put(part.host, part, child)) return true;
+release(part.host);
+return false;
+```
+
+and `put` returns `outcome.ok`. **`PatchOutcome` has a `reason`, and this is where it is
+discarded.** Its three values are not one thing:
+
+| reason | what happened | what release does |
+|---|---|---|
+| `unknown` | the entry was evicted | right — the host is gone |
+| `settled` | the entry was finalised | right — the host is gone |
+| **`patch`** | **the shell built a patch this document cannot take** | **wrong — it hides a defect** |
+
+`put`'s comment justifies the collapse and names **two** of the three: *`unknown` and `settled`
+are not failures (C23 I21, §5). The host was evicted or finalised between arming and firing, so
+the part is over.* Correct, about those two, and it does not constrain the branch it is
+attached to — **MG24's shape, in the comment that records the reasoning**.
+
+**What a consumer sees.** The demo gave a live panel and its rendered child the same id (F373).
+First tick: the child is patched in, the document becomes invalid, the panel draws. Second tick:
+`applyPatch` refuses with an exact diagnosis, `put` returns false, `release` runs, the part is
+gone. **The panel keeps drawing its last child for the rest of the session** — a correct-looking
+figure that is frozen, with the last value right, no notice, no stall, nothing in the frame.
+
+Measured, `every: 120`, six seconds:
+
+```
+child id = panel id      2 fetches, 2 derives     the walk never leaves 2 samples
+child id distinct        24 fetches, 24 derives
+render returns a notice  24 fetches, 24 derives
+```
+
+**The message that would have explained it exists** — `applyPatch` returns it in
+`r.error.message` — and is dropped at the only place that could report it. C23 I21's *contained
+to its declared part* is satisfied; nothing says the containment must be observable, which is
+the *who sees the refusal* class one component along.
+
+---
+
+## F371 — the demo refuses on `layout`, and eleven of `Plot`'s datum types cannot be named ★★★★☆
+
+F335 measured `b.plot` at 48 of `Plot`'s 58 members and is exact at HEAD. Writing a consumer
+that draws five forms hits **three** refusals, and they are of two kinds.
+
+**The hard one, which is F335's:**
+
+```
+src/figures.ts(75,5): error TS2353: Object literal may only specify known properties,
+  and 'layout' does not exist in type ... 46 more ...
+```
+
+**And the correction the collision instrument made to this finding's own plan.** The figure was
+first written `layout: "grouped"` — the reading a bar chart is for. Rendering the block with the
+member absent, with `"overlap"` and with `"grouped"` gives **one byte-identical frame for all
+three**:
+
+```
+707c475c4c4b  (absent) = overlap = grouped
+4db7f2736d66  stacked
+3605f4e9be04  normalised
+```
+
+C12 §3ak already rules why — *there is no overlapping picture a bar can draw*, so `overlap` with
+more than one series means grouped — so the variant would have **stated a claim its block does
+not make**, which is F350's rule, on the figure chosen to demonstrate the gap. `stacked` and
+`normalised` are the two values that draw, and the demo wants `stacked`: four stages of one
+budget are parts of a whole.
+
+**The soft one, and it is new.** Eleven of `Plot`'s datum types are declared on `b.plot` — as
+`Plot["quartiles"]`, `Plot["hierarchy"]` and so on — and **not published**:
+
+```
+HierarchyNode  QuartileSummary  Segment  OHLC  VectorSeries  Annotation
+ColormapName   Graph            ScaleType Origin AxisCross
+```
+
+```ts
+import type { HierarchyNode, QuartileSummary } from "@fmx/calcium";
+// TS2305: Module '"@fmx/calcium"' has no exported member 'HierarchyNode'.
+```
+
+A literal still passes, so this refuses **only the consumer who factors** — anyone writing
+`function stagesOf(raw): QuartileSummary[]` between their data and the builder. The workaround
+is `NonNullable<Plot["quartiles"]>[number]`, which is what `b.plot`'s own signature does, and
+that is why nothing inside the package could notice: **every internal declaration already
+indexes off the type it also publishes.**
+
+**Both go to C24 and neither is fixed here**, per F335's own ruling: widening a published
+signature is a public-contract change and wants its own ruling.
+
+---
+
 ## F370 — the last two fixtures, and the sweep ran on them before either member was touched ★★★☆☆
 
 `xTitle` and `axisCross` are the two members of F355's eleven that are genuinely owed. Both have corpus

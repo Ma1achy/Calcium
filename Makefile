@@ -46,8 +46,15 @@ check:              ## type-check and lint, including the examples
 	@# It is the example R01 R4.4's reuse claim rests on and the one the README
 	@# quotes, so a check it declares and nobody invokes is F144's class arriving
 	@# at the surface a stranger meets first.
-	cd examples/minimal && npm run check
-	cd examples/docker && npm run check
+	@# **Discovered, not listed** (F150 again, third site). Naming the two by hand
+	@# is what left `enforce`'s by-use population blind to a third example while
+	@# both Makefile rows were green — so the population is the directory and the
+	@# exception is named: a directory under `examples/` with a `package.json` is
+	@# a consumer. The loop fails on the first non-zero, which a `for` in `sh`
+	@# does not do by default.
+	@set -e; for d in examples/*/package.json; do \
+	  cd "$$(dirname $$d)" && npm run check && cd - >/dev/null; \
+	done
 
 enforce:            ## A03 — module graph, source scans, supply chain
 	npm run enforce
@@ -78,8 +85,9 @@ test:               ## tiers 1-4, and the examples' own suites
 	@# reported clean. It is F150's finding one level out — an example's `check`
 	@# script that nothing invoked — arriving on the script beside it, which is
 	@# the argument for wiring the *pair* rather than the one that bit.
-	cd examples/docker && npm test
-	cd examples/minimal && npm test --if-present
+	@set -e; for d in examples/*/package.json; do \
+	  cd "$$(dirname $$d)" && npm test --if-present && cd - >/dev/null; \
+	done
 
 golden:             ## golden frames, 4 widths x 2 themes x 2 unicode modes
 	npm run golden
