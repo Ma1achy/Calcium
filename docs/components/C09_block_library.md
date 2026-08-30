@@ -789,13 +789,25 @@ mark it actually wanted — and `… n more` becomes ASCII. **A vocabulary that 
 character its callers reach for stops being a vocabulary**, and the refusal is what keeps
 the 1:1 rule true.
 
-## 4c. `image` — two arms, and the dither is the first one
+## 4c. `image` — four rungs on two axes, and the dither is the one every terminal reaches
 
 **Two capability arms, not four**, and that is what this simplifies:
 
 ```
 imageProtocol: "kitty"                    the protocol arm
 "none" | "iterm2" | "sixel"               the DITHER arm
+```
+
+**The protocol axis is two arms; the glyph axis below it is three rungs**, and keeping them
+apart is what stops the ladder reading as four protocols. The protocol axis asks *can the
+terminal draw pixels*; the glyph axis asks *what can a cell be spent on* — and the answers are
+independent, which is the same two-ladders-on-two-axes shape the `status` block arrived at (§3a).
+
+```
+                        kitty            real pixels, placed by digest
+    glyph axis   ┌─     half blocks      two colours a cell — the picture is COLOUR
+                 │      braille 2x4      eight dots a cell — the picture is SHAPE
+                 └─     ascii ramp       `.:-=+*#@`, where the alphabet is nine glyphs
 ```
 
 ### iTerm2 and sixel are refused for composition, and the reason is not the obvious one
@@ -876,6 +888,7 @@ conclusion is about a mechanism nobody had run.
 | arm | what it draws |
 |---|---|
 | `kitty` | the protocol — transmit once by digest, place with placeholders |
+| half block | `▀`, the top pixel in the foreground and the bottom in the background |
 | dither, unicode | braille 2x4, monochrome, nine intensity levels per cell |
 | dither, `ascii` | `.:-=+*#@`, ordered by the same matrix |
 | 1-bit | the same dither — **colour was never the carrier here** |
@@ -883,6 +896,51 @@ conclusion is about a mechanism nobody had run.
 **The 1-bit row is not a further degradation.** Every other kind loses colour at 1-bit and keeps
 its shape; a dither *is* shape, so it is unchanged. Worth stating because C10 I8 vanishes surfaces
 at 1-bit and a reader would expect this to vanish with them.
+
+### The half block, and the three gates that decide it
+
+**Braille spends a cell on shape and half blocks spend it on colour**, and for a photograph
+that is not a close trade. A braille cell carries eight dots at one bit; `▀` carries **two
+pixels at twenty-four**. Against braille the half block loses three quarters of the vertical
+resolution and one half of the horizontal, and buys 2^48 against 2^8 — so a gradient that
+braille can only stipple arrives as a gradient, and a photograph stops being a texture.
+
+**It is the wrong trade for a line drawing**, and that is not a defect to fix. A diagram is
+shape, and braille's eight dots resolve a one-pixel rule that a half block averages away.
+Both are correct about different pictures and neither is chosen per image: the ladder is a
+*capability* ladder, so it takes the richest rung the terminal can honour and the content
+never votes.
+
+**Three gates, and each excludes the rung for its own reason.**
+
+**Ambiguous width, which is the one that would have shipped.** `▀` is
+`East_Asian_Width=Ambiguous` — measured by `cells()` itself, `narrow=1` and `wide=2` — so a
+terminal declaring `ambiguousWidth: "wide"` draws every cell of the picture at double width
+and the image is twice as wide as `imageCells` measured it. **Braille is not ambiguous**
+(`⣿` measures 1 at both), which is exactly why the existing arm never met this and why the
+new one must. `art.ts`'s `eligible` and `mermaid.ts`'s `useAscii` are the same switch, and
+this is the **third** consumer to need it (C02 I9, A03 SS50).
+
+**Colour depth, because the rung's whole claim is two colours a cell.** At `colourDepth: 4`
+there are sixteen and at 1 there are none, so below 8 the arm has nothing the dither lacks
+and has paid three quarters of the resolution for it. **`>= 8`**, and at 8 both channels go
+through `nearestAnsi256` — the same funnel C10's colormap already uses, so the 8-bit picture
+is the 24-bit one quantised rather than a second rendering.
+
+**The overlay, and this is the structural interaction.** A dithered image with an overlay
+puts the picture in the *glyph* and the field in the *foreground*, which works because the
+two channels are independent. A half block has **already spent both colour channels on the
+picture**, so there is nowhere for the field to go. Unlike 1-bit — where C10 I31's honest
+answer is to draw the picture plain, because the cell has nothing left at all — here there
+is a rung that can carry it. **So a block with an `overlay` skips the half block and takes
+braille**, and it is the field rather than the terminal that decides.
+
+**Neither of the two artefacts this component's walks use would have found that gate**, and
+the reason is worth recording. *Has an overlay* and *the terminal is 24-bit* both hold at
+rest with no event between them, so a sequence trace has no row for it however long it runs;
+it is the **classification table**'s shape, and the table is what was drawn (CLAUDE.md,
+*rule interactions come in two kinds*). The trace would have agreed with the code and been
+right about every sequence in it.
 
 ### The matrix, designed here because it is designed nowhere
 
@@ -1137,6 +1195,8 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I34** — **The contained box asks for the height its message needs at the width it was given, capped at four message lines, and marks a cut.** Height fits and width does not: a block does not choose its width, the region does, and a block wider than its region is I1's over-draw in the other axis (§3a-bis). The request wraps at the **top rung's** content width — `width − 4`, the narrowest any rung offers — which dissolves the fixed point between the rung, its padding and the wrap by erring in the safe direction: every lower rung is wider, wraps to fewer lines, and still shows all of them, at a cost of at most one row of slack that the render centres. `rows = n + 2 + tagRows + lineRows`, and **the vertical blanks are not summed** — they are slack, appearing when the message is short and giving way as it grows, which is what the ladder already does with them; counting them would make a two-line failure seven rows rather than five. **The cap is measured rather than chosen** (F238): four lines holds a three-frame stack trace at 80 columns and a path and nothing else at 40, so it binds where the room is least — and it is not width-scaled, because how much a reader takes in before going to the sink is a property of the reader. **It is also a containment bound** (F239): a bounded container draws an over-tall child whole and C25 I1 is knowingly false there (C04 §3c trace 1, T2.28b), so seven rows bounds that divergence by a number rather than by the length of an exception. **A cut carries its mark** through `truncate`, so `…` at unicode and `~` at `ascii` (I22) — and **a message of exactly the cap carries none**, because a truncation that did not happen sends the reader to the sink for text already on screen. **One layout function serves `render` and the request**, on `cells()`'s argument: a second walk over the same arithmetic rounds differently at the boundary.
 - **I35** — **A mosaic's cell bounds its own child, and the two properties that do it are not interchangeable.** The cell is `overflow: "hidden"` **and** its content carries `flexShrink: 0`, in that pairing: a relative child in a cell shorter than itself is **squashed by flex before it can overflow**, so the clip alone changes nothing and the child draws rows from the *middle* of itself — measured at `row2, row5` out of six, the same mechanism F244 §5 found under `scroll`'s bottom-anchored precedent. **The row count agrees in all three arms**, so the frame is the only instrument that separates them, and the failure is at its worst on the block that most needs reading: a bare cell drew an error box's fragment and its bottom border, which looks like a complete box. **So C04 §3c trace 1's divergence does not transfer** — F239 is `scroll`'s, whose need is a windowed slice at an arbitrary offset and whose seam genuinely does not exist; a mosaic needs a clip at the child's own row 0, which is exactly what Ink offers. `measure` equals the rendered count through an over-tall child and through a throwing one, and C25 I1 holds rather than being knowingly false. **The width axis is the geometry's guarantee and not the clip's, and the build is what said so.** F244 §4 measured an absolutely positioned child running past its parent's width — 60 cells at width 40, every count agreeing — and the remedy looked like `overflowX: "hidden"` on the container, which is what the group renderer already carries. **It does not compose.** Ink keeps a stack of clipping regions and applies `clips.at(-1)`, the *innermost*, so a cell that clips its own child **shadows** the container's clip instead of intersecting with it: three 1-wide cells in a container of 1 draw `"A"` when only the container clips and `"ABC"` once the cells clip too. Since every cell must clip — the first half of this invariant — the container's clip is shadowed everywhere it matters. **So `mosaicRects` clamps** and a cell with no room is zero-wide and not drawn, which is the only one of three answers keeping both axes of I1; the container's clip stays as the cheap arm of a rule enforced by the arithmetic. **The ruling named an operation that does not do what it appears to** — C23 §8a A4's class arriving from the implementation rather than the walk, and the reachable case is the floor of 1 per grid line, which asks a three-column grid for three cells at any width including one.
 - **I36** — **An image has two arms and the dither is the first of them.** `imageProtocol: "kitty"` takes the protocol; `"none"`, `"iterm2"` and `"sixel"` take an ordered dither. **Two arms rather than four, and the refusals are for composition rather than effort.** Sixel draws at a cursor and does not participate in the grid. **iTerm2 does participate** — declared cell size, occupies cells, scrolls — and what it lacks is **per-cell addressability**: a kitty placeholder is ordinary text so any row is independently re-emittable and text can sit inside the rectangle, while an iTerm2 image is one escape at one cursor position that a row-level rewrite destroys. **That settles F248's diff measurement by construction**, since a full-frame rewrite is safe for placeholders and fatal for one blob. **The transmission does not travel in the frame**: Ink strips APC escapes — an `ESC _G` in a `Text` node renders to nothing — so the escape is written by **`transmitImage`**, prefixed to the frame's bytes at the composition root, and only the placeholders go through Ink as text. **Three measured properties make that safe**: Ink is not in the byte path, the diff baseline is `lines` rather than the write, and every frame reaches an *absolute* address before any row content — so a cursor the escape might have moved is corrected by the next byte. It **leads** the frame rather than following it, because placeholders for an unsent image draw nothing; it transmits on entry into the **document** rather than the viewport, keyed by digest so one image sends once; and `session.ts` is the only path that writes block rows, which is what makes one seam sufficient (§4c). **The dither is built first because most terminals are `"none"`** and a feature that shows nothing there is one most readers never see; **1-bit is not a further degradation**, because a dither is shape and colour was never its carrier. **The matrix is designed here because it is designed nowhere** — the note citing *the 3D renderer's ordered dither* cites a renderer the roadmap refuses — and it is an **8x8** Bayer threshold indexed in **dot** space over the 2x4 subcell grid, nine levels per cell, **varying with position so a gradient reads as texture rather than banding**. **8x8 rather than the 4x4 the note implies, and the frame chose it**: a 4x4's y-period equals a braille cell's height, so a flat region resolves identically in every cell row — and while the two are frame-identical at quarter levels, at 0.28 the 4x4 draws one glyph where the 8x8 resolves two. `plot/raster.ts` is reused rather than reimplemented. **The ramp is a third ladder axis**, and widening the `Serves` record is the check that a dither ramp cannot be indexed as a density ramp: one encodes a magnitude at a position, the other a threshold against a position-varying offset, and the type tells them apart because the eye does not (§4c).
+- **I37** — **The glyph axis is three rungs and a half block is the top one, gated on three things rather than on the terminal alone.** Below `kitty`, a cell is spent on colour or on shape: `▀` carries **two pixels at full colour**, braille carries **eight dots at one bit**, and the ASCII ramp carries nine glyphs. The half block is taken when `unicode` is not `ascii`, `ambiguousWidth` is not `wide`, `colourDepth` is at least **8**, and the block has **no `overlay`** — otherwise the dither. **Each gate has its own reason and none is a proxy for another.** `▀` is `East_Asian_Width=Ambiguous`, measured by `cells()` at `narrow=1` and `wide=2`, so a `wide` terminal draws the picture at double the width `imageCells` measured — the third consumer of `art.ts`'s switch and the first where braille's non-ambiguity is why the hazard is new (C02 I9, A03 SS50). Below `colourDepth: 8` the rung's whole claim is unfunded, and at 8 both channels go through `nearestAnsi256` so the picture is the 24-bit one quantised rather than a second rendering. **The overlay gate is the structural one**: the dither puts the picture in the glyph and the field in the foreground, and a half block has spent both colour channels on the picture — so unlike 1-bit, where C10 I31 draws the picture plain because nothing is left, there is a rung that can still carry the field and the block takes it. **A sequence trace cannot reach that gate** — *has an overlay* and *is 24-bit* both hold at rest with no event between them — which is why the artefact drawn for it was a classification table (§4c, → C04 I73, C10 I31).
+- **I38** — **A refusal to decode is drawn as the refusal, with the reason the decoder computed.** `decodePng` returns a `fault` for every rejection it makes — *not a PNG*, *interlaced PNG (Adam7)*, *bit depth 16*, *IDAT does not inflate* — and the block drew `alt` for all of them, so a reader was told the same nothing about a corrupt file and about a format this phase names as unbuilt. The image draws a **`status` at `error`** carrying the fault, `alt` beneath it as the caption it always was, at the height the block committed and no more. `error` is the state and not `retrying`, because no attempt is coming: this is the widened gloss doing its work — *an operation failed and nothing more is coming* (§3a) — and the box the shell returns from twelve sites is the same box here. **The fault is not a verdict about the picture, only about this decoder**: at the protocol arm the terminal decodes, so the transmission stays unguarded and §8b's G7 records what the first real-terminal test is expected to settle (→ C04 I73, C09 §8b).
 
 ---
 
@@ -1177,7 +1237,44 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 33. **A mosaic's cell bounds its child with two properties rather than one, and the frame is what says so** (I35). `flexShrink: 0` before `overflow: "hidden"`, because a squashed child never overflows and draws its own middle; the container clips the width separately, because I1 is rows only. `measure` equals the rendered count through an over-tall child and a throwing one, so C25 I1 holds here where §3c's trace leaves it knowingly false (→ C04 I71, FINDINGS F244).
 34. **An image degrades to an ordered dither before it degrades to nothing, and both refusals are stated with reasons that survive checking** (I36). The dither is the first arm because most terminals are not kitty; iTerm2 is refused for per-cell addressability rather than for a participation it actually has; and the dither ramp is a third ladder axis so the type refuses what the eye would accept (→ C04 I73, FINDINGS F248).
 
+35. **The glyph axis is a ladder of three and its top rung is gated on the block as well as the terminal** (I37). A half block spends a cell on two full colours where braille spends it on eight dots, so a photograph arrives as a photograph and a diagram is better served one rung down — and the ladder takes the richest rung the terminal honours rather than asking the content. `▀` is ambiguous-width where braille is not, which is why the hazard is new at exactly this rung; and a block carrying an `overlay` skips it, because both colour channels are already the picture (→ C02 I9, C10 I31, A03 SS50).
+36. **An image that cannot be decoded says which refusal it is** (I38). The decoder computes a reason for every rejection and the block discarded all of them, so *a corrupt file* and *a format phase 1 does not read* arrived as the same `alt`. It draws the `status` box the rest of the framework draws, at `error`, with `alt` kept beneath as the caption — and the fault is scoped to **this** decoder, not to the picture (→ C04 I73, C09 §8b G7).
+
 ---
+
+## 8b. The glyph axis — a classification table, and why it is not a trace
+
+**Every gate on this ladder holds at rest.** *The block has an overlay*, *the terminal declares
+`wide`*, *the depth is 4* — none of them is reached by anything happening, so a sequence trace has
+no row for any of them however long it runs and would have agreed with the code on every sequence
+in it. The artefact is a **classification table**, and it is indexed by the cells where **two**
+rules could both claim the answer (CLAUDE.md, *rule interactions come in two kinds*).
+
+| # | the two rules that meet | must draw | the answer a reader would give, and why it is wrong |
+|---|---|---|---|
+| G1 | protocol arm × `ambiguousWidth: "wide"` | **protocol** | *gate the ladder on `wide`* demotes a terminal that draws real pixels. **Resolved by measurement**: the placeholder is a plane-16 private-use code point carrying combining diacritics, and `cells()` measures it **1 at both conventions** — the gate has no subject on this rung |
+| G2 | protocol arm × `overlay` | **protocol**, the field composited into the pixels before transmission | already ruled (C04 §3h.2); recorded here so the row is not re-opened |
+| G3 | **placement refused** × half block eligible | **half block** | *fall back to the dither* — which is what the code did, and it is **two rungs** rather than one. A kitty terminal is non-`ascii` and at least 8-bit **by construction**, so the refusal path lands on the rung the terminal least needs. FINDINGS **F409** |
+| G4 | `unicode: "ascii"` × `colourDepth: 24` | **ASCII ramp** | *colour outbids the alphabet*. It does not: `▀` is not ASCII, so the unicode gate is a question of what can be **drawn** and depth is a question of what can be **spent** |
+| G5 | `overlay` × 24-bit, narrow, full unicode | **braille** | *the richest rung the terminal honours* — the terminal honours it and the **block** cannot use it, because both colour channels are already the picture and the field has nowhere to go |
+| G6 | `overlay` × `unicode: "ascii"` | **ASCII ramp**, field in the foreground | unchanged, and it is the row that shows G5 is about channels rather than about rungs: a ramp glyph has a free foreground exactly as braille does |
+| G7 | **bytes do not decode** × protocol arm | **the fault, through `status`** — and the bytes still transmit | *`alt`, silently*, which is what shipped: the decoder computes a **reason** for every refusal and no consumer could ever see it. FINDINGS **F410**. The transmission is deliberately **not** guarded on our decoder's opinion — see below |
+| G8 | `ambiguousWidth: "wide"` × 24-bit, no overlay | **braille** | nothing better is available, and the loss is worth naming: colour is present and unusable, which is the only rung where the terminal has more than the ladder can take |
+| G9 | a **1-pixel-tall** image × half block eligible | **half block**, the lower sample clamped to the last row | *index `y*2+1`*, which is off the end of the image — a cell is two pixels and an image need not be an even number of them |
+
+### G7's other half, which is a claim this repository cannot settle
+
+**Our decoder refuses interlaced and 16-bit PNGs by name** — *phase 1 reads progressive only*,
+*phase 1 reads 8-bit only* — and those refusals are about **our** decoder. At the protocol arm the
+picture is decoded by the **terminal**, and kitty's is libpng, which reads both. So a PNG this
+repository cannot dither may be one a real kitty draws perfectly.
+
+**The render path returns `alt` before it reaches the protocol branch**, so today we substitute
+text for an image the terminal could draw. Whether that is a loss is **not measurable here** — it
+is the same class as §4c's plane-16 blind spot, and the same instrument answers it: the first
+real-terminal test. Until it is run, the transmission stays unguarded (a guard on our decoder's
+verdict is what would make the loss permanent), and the refusal is drawn through `status` so a
+reader is told *which* refusal rather than being handed the `alt` for both.
 
 ## 8a. The fitted height — a table and a trace
 

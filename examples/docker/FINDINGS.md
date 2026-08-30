@@ -13850,6 +13850,63 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F409 — the kitty fallback lands two rungs down, and only a table could see it ★★★☆☆
+
+Found by C09 §8b's classification table before any half-block code existed — the cell where
+*the placement was refused* meets *the terminal qualifies for the richest glyph rung*.
+
+`placementRows` refuses a placement wider or taller than the diacritic encoding carries, with the
+reason written out: *a wrapped diacritic addresses the wrong part of the image*. The renderer then
+does
+
+```ts
+const dithered =
+  ctx.capabilities.unicode === "ascii" ? ditherAscii(px, cols, rows) : ditherBraille(px, cols, rows);
+```
+
+**A kitty terminal is non-`ascii` and at least 8-bit by construction**, so the one terminal that
+reaches this path is the one that qualifies for every rung of the glyph ladder — and the fallback
+skips straight past the top of it. Before the half block existed the ladder had one rung below
+kitty and the code was correct; the rung is what made the jump a defect, and the fallback was
+never re-read when it landed.
+
+**No frame shows this.** Both arms draw a picture and both are the right size; the refusal path
+needs an image over the encoding's span, and the difference between the two is *quality*. It is
+the shape §8b was drawn to find: two rules that both hold at rest, with no event between them.
+
+**Fixed** — the placement refusal re-enters the ladder at the top rather than at the bottom.
+
+---
+
+## F410 — the decoder computes a reason for every refusal and no consumer could see one ★★★★☆
+
+`decodePng` returns `{ ok: false, fault }` and names each refusal precisely:
+
+```
+not a PNG — the eight-byte signature does not match
+interlaced PNG (Adam7) — phase 1 reads progressive only
+bit depth 16 — phase 1 reads 8-bit only
+IDAT does not inflate — the image data is corrupt
+```
+
+`pixelsOf` collapses every one of them to `null`, and the block draws its `alt`. **So a corrupt
+file and a format this phase names as deliberately unbuilt are the same picture to a reader**, and
+the sentence that would have told them apart is computed and dropped one function below.
+
+The `alt` ruling itself was right and stays: *the registry's containment would draw an error box
+of the committed height, which is right for a renderer that gave way and wrong for an image that
+simply is not one.* What was missing is that there is now a **third** thing it could be — the
+`status` box, whose `error` gloss was widened this arc to *an operation failed and nothing more is
+coming*, which is exactly what a refused decode is. The box carries the fault; `alt` stays beneath
+it as the caption it always was.
+
+**And the fault is about this decoder, not about the picture.** At the protocol arm kitty decodes
+with libpng, which reads Adam7 and 16-bit both — so a PNG we refuse may be one a real terminal
+draws. The transmission is deliberately left unguarded on our verdict, and §8b G7 records the
+question for the first real-terminal test rather than settling it from the container.
+
+---
+
 ## F406 — the failure box the framework draws, and the two places it never reached ★★★★★
 
 Reported by a reader looking at two screenshots side by side: the containment box with ` ERROR `
