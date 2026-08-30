@@ -129,8 +129,13 @@ const results = runPass({
       // The attempt count, which had no writer anywhere in `src/` before this.
       name: "the attempt count never reaches the box",
       file: REFRESH,
-      from: "            if (put(part.host, part, part.spec.renderError(shown, retryIn, src.failures))) any = true;",
-      to: "            if (put(part.host, part, part.spec.renderError(shown, retryIn, 0))) any = true;",
+      // **`errorArm(part)`, because the default moved into this file** (F407).
+      // `partOf` resolved it at declaration, which spent the bit the countdown
+      // sweep needs — whose block is in the panel — so the driver resolves it at
+      // the call now and the anchor follows. Re-run before re-anchoring, which is
+      // this repository's rule.
+      from: "            if (put(part.host, part, errorArm(part)(shown, retryIn, src.failures))) any = true;",
+      to: "            if (put(part.host, part, errorArm(part)(shown, retryIn, 0))) any = true;",
       expect: "T1.40",
     },
   ],

@@ -28,6 +28,10 @@ const raw = (id: string, text: string): Block => block({ kind: "raw", id, text }
 const panel = (id: string, title: string, child: Block): Block =>
   block({ kind: "panel", id, title, children: [child] } as never);
 
+/** A column, because a real surface nests its live parts and the harness did not. */
+const column = (id: string, children: readonly Block[]): Block =>
+  block({ kind: "group", id, direction: "column", children } as never);
+
 const docWith = (blocks: readonly Block[]): ViewDocument => ({
   schema: "tui.view/1",
   command: "/dash",
@@ -115,6 +119,20 @@ function harness() {
       await Promise.resolve();
     },
     at: () => now,
+    /**
+     * When the next armed timer will fire — **the arming, not the write**.
+     *
+     * A row that advances the clock and sees a new value has proved the sweep's
+     * arithmetic and nothing about `armParts`: the harness fires every live timer
+     * whose time has come, so a timer armed for eight seconds away is fired by a
+     * `tick(8_000)` and by the accumulation of eight `tick(1_000)`s alike. In
+     * production the timer is a real `setTimeout` and a sweep that is not armed
+     * for a second from now does not happen a second from now (F227's class).
+     */
+    nextTimer: (): number | null => {
+      const live = timers.filter((t) => t.live).map((t) => t.at);
+      return live.length === 0 ? null : Math.min(...live);
+    },
   };
 }
 
@@ -1206,6 +1224,139 @@ describe("C23 I52 — the elapsed counter, and every rule the walk put on it", (
     const { h, id } = waiting({ renderLoading: mine });
     await h.tick(4_000);
     expect(elapsedOf(h, id), "the block is the consumer's").toBe(undefined);
+  });
+
+  it("T3.55c (I35, I52, F408): a part nested in a group is reachable by the sweep", async () => {
+    // **Every row in this file put its panel at the top level of the document,
+    // and no real surface does.** `liveDeclarations` recurses, and says why in
+    // its own comment — *S13's dashboard is five panels inside a `group`, so a
+    // walk over top-level blocks alone finds none of them.* The **read** back
+    // never got the same treatment: `currentPanel` did
+    // `doc.blocks.find(b => b.id === part.spec.id)`, top level only.
+    //
+    // So a nested part declared, rendered, fetched and patched — writes address
+    // a block by id and the transcript resolves those through the tree — and
+    // every sweep that has to *read* the block in place found nothing: the
+    // elapsed counter, the staleness re-title, and the retry countdown.
+    //
+    // **Measured in a real terminal before it was measured here**: 22 seconds of
+    // `/faults`, the spinner advancing every frame and `retrying in 12s` never
+    // moving, and zero `loading (Ns)` anywhere in the capture.
+    const h = harness();
+    const id = h.transcript.append(
+      docWith([column("wrap", [panel("a", "containers", loadingBox())])]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", fetch: () => new Promise<never>(() => undefined) }),
+    ]);
+
+    await h.tick(4_000);
+
+    const nested = (): Block | null => {
+      const e = h.transcript.entries.find((x) => x.id === id);
+      const wrap = e?.doc.blocks.find((b) => b.id === "wrap");
+      const p = wrap?.kind === "group" ? wrap.children.find((b) => b.id === "a") : undefined;
+      return (p?.kind === "panel" ? p.children[0] : undefined) ?? null;
+    };
+    const c = nested();
+    expect(c?.kind, "the placeholder is still in place").toBe("status");
+    expect(c?.kind === "status" ? c.elapsedMs : undefined, "and the counter reached it").toBe(4_000);
+  });
+
+  it("T3.60 (I52, F407): the retry countdown ticks down, and does not sit at its opening value", async () => {
+    // **Reported by a reader watching it**, and confirmed over 26 seconds of a
+    // real `/faults`: `retrying in 12s` for a dozen frames and then `24s`.
+    // `retryInMs` was written once, at the failure, and nothing rewrote it — so
+    // the number named the *whole backoff* rather than the time left in it.
+    //
+    // **Every ingredient was already here.** The driver knows `dueAt`, the sweep
+    // runs once a second, the field is a field, and the only arm asked for
+    // `loading`. What was missing was the bit that says whose block it is:
+    // `renderError`'s default was resolved at declaration, so a part that
+    // supplied nothing and a part that supplied the framework's own shape were
+    // identical from here.
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "containers", loadingBox())]), {
+      streaming: true,
+    });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 4_000,
+        // **`null` is the whole subject** — the framework's box, which it may
+        // rewrite. T3.60b is the other arm.
+        renderError: null,
+        fetch: () => Promise.reject(new Error("ECONNREFUSED")),
+      }),
+    ]);
+
+    const retryOf = (): number | undefined => {
+      const c = loadingIn(h, id);
+      return c?.kind === "status" ? c.retryInMs : undefined;
+    };
+
+    // The fetch fires and fails; the backoff opens at twice the interval.
+    await h.tick(4_000);
+    const opened = retryOf();
+    expect(opened, "the failure sets a countdown").toBeGreaterThan(0);
+
+    // **The sweep is armed a second out, not at `dueAt`** — and this is the
+    // assertion the first draft of this row did not have. `armParts` walks
+    // sources and arms against `dueAt`, which for a box eight seconds into a
+    // backoff is eight seconds away; without a heartbeat the countdown would be
+    // rewritten once, when the retry fired, which is the defect exactly. The
+    // harness fires every timer whose time has come, so advancing the clock
+    // proves the arithmetic and says nothing about the arming.
+    expect(h.nextTimer(), "a heartbeat, not the retry").toBe(h.at() + 1_000);
+
+    // **A second later it is a second less**, which is the whole assertion — and
+    // it is on the *figure* rather than on the field, because a write that draws
+    // the same second is a `rev` bump for nothing.
+    await h.tick(1_000);
+    expect(retryOf(), "one second on, one second less").toBe((opened ?? 0) - 1_000);
+    await h.tick(1_000);
+    expect(retryOf(), "and again").toBe((opened ?? 0) - 2_000);
+
+    // And it never goes negative: a source overdue is waiting on the fetch.
+    await h.tick(10_000);
+    expect(retryOf() ?? 1, "clamped at zero").toBeGreaterThanOrEqual(0);
+  });
+
+  it("T3.60b (I52, C24 §5, F407): a declarer's own failure block is never written into", async () => {
+    // T3.58's argument on the other state. **A `status` at `retrying` is not a
+    // sufficient test for whose block it is**, so this row returns exactly the
+    // shape the framework builds — a guard that inspected the block would pass
+    // every other row and fail only here.
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "containers", loadingBox())]), {
+      streaming: true,
+    });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 4_000,
+        renderError: (err, retryInMs) =>
+          block({
+            kind: "status",
+            id: "a-c",
+            state: "retrying",
+            message: err.message,
+            height: 3,
+            retryInMs: retryInMs ?? 0,
+          } as Block),
+        fetch: () => Promise.reject(new Error("ECONNREFUSED")),
+      }),
+    ]);
+
+    await h.tick(4_000);
+    const c0 = loadingIn(h, id);
+    const held = c0?.kind === "status" ? c0.retryInMs : undefined;
+    await h.tick(2_000);
+    const c1 = loadingIn(h, id);
+    expect(c1?.kind === "status" ? c1.retryInMs : undefined, "the block is the consumer's").toBe(
+      held,
+    );
   });
 
   it("T3.59 (I52, I46, F234): nobody looking, nothing written — and it resumes on being heard", async () => {

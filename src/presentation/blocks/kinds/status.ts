@@ -162,6 +162,26 @@ export function widthRung(width: number, frame: Frame): Readonly<{ frame: Frame;
 }
 
 /**
+ * The seconds the retry line draws — **exported for the same reason `elapsed` is**
+ * (C23 I52, F407).
+ *
+ * The driver rewrites a backing-off box once a second, and a write that changes
+ * nothing observable is still a `rev` bump: it invalidates C14's height cache and
+ * tells the transcript a document changed when it did not. So the guard compares
+ * *what would be drawn*, and `Math.round` is why that is a different question
+ * from *did the clock move* — 11 600 ms and 11 400 ms are two clocks and one
+ * figure.
+ *
+ * **Rounding, not flooring, and it is `elapsed`'s opposite on purpose.** A
+ * counter that has run for 4.9 s has run for four whole seconds and says `4s`; a
+ * retry 4.9 s away is about to be five and says `5s`, because the number a reader
+ * is waiting on should not sit at zero for a second before firing.
+ */
+export function countdown(ms: number): number {
+  return Math.round(ms / SECOND); // cells-ok — a second count
+}
+
+/**
  * `4s`, `47s`, `2m 14s` — minutes past 99, because three digits read worse.
  *
  * **Exported so the writer can ask whether the figure moved**, not so anyone
@@ -198,7 +218,13 @@ export function activityLine(block: Status, frames: readonly string[], tick: num
     // digits are one cell under both width conventions and need no arm at all,
     // which is cheaper than adding a `GlyphSet` member for one separator.
     const attempt = block.attempt === undefined ? "" : ` (attempt ${String(block.attempt)})`;
-    return `${mark} retrying in ${String(Math.round(block.retryInMs / SECOND))}s${attempt}`;
+    // **Through `countdown`, which the driver also calls** (C23 I52, F407). The
+    // countdown was written once at the failure and never again, so it stood at
+    // its opening value for the whole backoff and then jumped — measured over
+    // 26 seconds: `12` for a dozen frames, then `24`. The driver rewrites it now,
+    // and it has to ask *would the figure change* rather than *did the clock
+    // move*, which only the function that draws the number can answer.
+    return `${mark} retrying in ${String(countdown(block.retryInMs))}s${attempt}`;
   }
   if (block.state === "loading") {
     const since = block.elapsedMs === undefined ? "" : elapsed(block.elapsedMs);

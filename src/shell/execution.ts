@@ -36,7 +36,6 @@ import { DOCUMENT_VIEW_ID } from "./document-view.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { isViewInvocation } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
-import { framedStatus } from "./builders/index.js";
 import { liveDeclarations } from "./builders/live.js";
 import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
@@ -1742,20 +1741,18 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * did not override this, and found by inducing a stall and looking at the
      * frame (F29).
      */
-    renderError:
-      spec.renderError ??
-      // **`b.status`, which is this literal's own shape given a name** (C24 I30,
-      // §4b). It stood here as one of three constructions of one kind, and the
-      // consumer had none — so an override told *rendering is overridable* could
-      // only reach for a `notice` and render worse. The builder derives `state`
-      // and `height` exactly as the two arms below did, so the default and the
-      // consumer's override are the same code and cannot drift.
-      // **`framedStatus`, because this box lands inside the part's own panel**
-      // (C09 §3a, F406). `b.status` is the consumer's door and takes no `framed`
-      // — a `renderError` override composing its own group is not a container
-      // that draws a border — so the one caller that knows says so here.
-      ((err, retryInMs, attempt) =>
-        framedStatus(err, retryInMs, attempt, true, { id: `${spec.id}-error` })),
+    // **`null` when the declarer supplied none, and the driver resolves it**
+    // (C23 I51, I52, F407). This used to write the default in, which is the
+    // resolution `renderLoading` beside it deliberately avoids — and it spent the
+    // one bit the countdown sweep needs: *whose block is in the panel.* With the
+    // default here, a part that declared nothing and a part that declared exactly
+    // the framework's shape were identical from the driver, so it could not
+    // rewrite `retryInMs` into one without risking the other.
+    //
+    // **The fallback moved to `refresh.ts`**, which C24 §5 already named as the
+    // tidier shape and did not take: the two framework defaults lived one in
+    // `builders/index.ts` and one here.
+    renderError: spec.renderError ?? null,
   });
 
   /**

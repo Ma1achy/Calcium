@@ -13771,6 +13771,85 @@ reason, and the fix for the second is what made the first legible.
 
 ---
 
+## F407 — the retry countdown never counted down ★★★★☆
+
+Reported by a reader watching the box: *the whole timer in "retrying in 12s" doesn't count down
+every second?* Measured over 22 seconds of `/faults`, reading one panel per frame:
+
+```
+⠴ retrying in 12s (attempt 3)     ⠋ retrying in 12s (attempt 3)
+⠇ retrying in 12s (attempt 3)     ⠸ retrying in 12s (attempt 3)     … seventeen frames …
+⠹ retrying in 24s (attempt 4)
+```
+
+**The spinner advances every frame and the number never moves**, then jumps to the next backoff. So
+the figure named the *whole* backoff rather than the time left in it.
+
+**Every ingredient was already there.** The driver knows `dueAt`, the sweep runs once a second, the
+field is a field rather than a derivation — C09 I32 is explicit that `retryInMs` is *supplied, never
+derived* — and nothing joined them, because the sweep's only arm asked for `state === "loading"`.
+`elapsedNeeded` has a sibling now, and `countdown` is exported for the reason `elapsed` already was:
+the guard compares **what would be drawn**, so 11 600 ms and 11 400 ms are two clocks and one
+figure, and only a changed figure justifies a `rev` bump.
+
+**The bit that made it possible to do safely was being spent.** `partOf` wrote `renderError:
+spec.renderError ?? (default)`, which is exactly the resolution `renderLoading` beside it
+deliberately avoids — and it consumed *whose block is in the panel*. A part that declared nothing
+and a part that declared the framework's own shape were identical from the driver, so it could not
+rewrite one without risking the other. `renderError` is `| null` on the driver now and the fallback
+moved to `refresh.ts`, **which C24 §5 already named as the tidier shape and did not take**: the two
+framework defaults lived one in `builders/index.ts` and one in `execution.ts`. The countdown asked
+for it.
+
+**The attempt counter was correct and is worth saying so.** Measured across the same run: attempt 1
+→ 3s, 2 → 6s, 3 → 12s, 4 → 24s, against `every: 1500`. Doubling exactly, and `src.failures` is
+consecutive and shared by every part behind one source, which is what §8d D6 says it should be.
+
+**And the first row written for it did not test the thing that was broken.** It advanced the clock
+and watched the value change — which the harness satisfies by firing *any* timer whose time has
+come, so a sweep armed eight seconds out passes a `tick(1_000)` all the same. `armParts` is the
+half that had to change, so the row asserts `nextTimer() === now + 1_000`: **a heartbeat, not the
+retry.**
+
+---
+
+## F408 — the sweep could not see a live part inside a group ★★★★★
+
+Fixing F407 did not fix the frame. The countdown still stood still, and the same capture had **zero**
+`loading (Ns)` in 26 seconds — so the elapsed counter, C23 I52's whole subject, landed in F227 and
+has not run in a real session since.
+
+`currentPanel` read the block back with `entry.doc.blocks.find(b => b.id === part.spec.id)`. **Top
+level only.** `/faults` returns `b.group("column", […])`, so `doc.blocks` is one group and every
+live panel is a child of it — invisible to every read.
+
+**Writes were fine, which is why nothing noticed.** A patch addresses a block by id and the
+transcript resolves that through the tree, so a nested part declares, renders, fetches and patches
+correctly. What fails is every sweep that must **read the block in place**: the elapsed counter, the
+staleness re-title (C23 I35), and now the countdown.
+
+**The declaration walk had already been fixed for exactly this**, and says so:
+
+> `liveDeclarations` … **Recursive, because a live part is a block and blocks nest.** S13's
+> dashboard is five panels inside a `group`, so a walk over top-level blocks alone finds none of
+> them — which would be a dashboard that renders its placeholders and never ticks.
+
+**One question, a step apart, and the recursion was added on one side.** The comment even names the
+symptom the other side then had. `currentPanel` walks the tree now, on C04's `hasChildren` rather
+than a list of kinds — the declaration walk's own argument, because a live panel inside a `scroll`
+is reachable too.
+
+**Why no row caught it**: every row in `refresh.test.ts` puts its panel at the top level of the
+document, and no real surface does. The harness was not wrong, it was **unrepresentative in the one
+dimension the production reader depends on** — and a fake narrower than the interface cannot fail on
+the difference, which is F22's lesson in this same file. `T3.55c` nests a part in a group and asserts
+the counter reaches it; it failed before the fix with `expected undefined to be 4000`.
+
+**Found by measuring the frame after a fix that should have worked.** The row for F407 passed, the
+terminal did not change, and the gap between those two is the whole finding.
+
+---
+
 ## F406 — the failure box the framework draws, and the two places it never reached ★★★★★
 
 Reported by a reader looking at two screenshots side by side: the containment box with ` ERROR `
