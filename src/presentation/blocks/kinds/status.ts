@@ -86,7 +86,23 @@ type Frame = Readonly<{ border: boolean; pad: boolean; tag: boolean }>;
 /** The height the full figure needs — two borders, two blanks and the tag row. */
 export const FULL_FIGURE_ROWS = 6;
 
-export function heightRung(height: number, tagged: boolean): Frame {
+export function heightRung(height: number, tagged: boolean, framed = false): Frame {
+  // **A second ladder on the same axis, not a rung on this one** (C09 §3a, F406).
+  // The ladder below couples the tag to the border — the tag first appears at the
+  // rung where the border already has — so a box whose container draws one had
+  // three options and no figure: read as a red line, draw a second border with no
+  // tag, or draw the tag at two nested borders. C23 I51 chose the first, and its
+  // reason was right about the other two.
+  //
+  // Framed, the border is never this box's to draw, so the rows go to the tag and
+  // the content: **two are tag and message**, and a third buys `retrying` its
+  // activity line. The ordering below is unchanged and so is `loading`, which has
+  // no tag to gain under either ladder.
+  //
+  // **`H ≤ 1` has no border and therefore no evidence the height was honoured** —
+  // the same clause the free-standing ladder carries at `H ≤ 2`, one rung lower
+  // because the border was never this box's.
+  if (framed) return { border: false, pad: false, tag: tagged && height >= 2 };
   if (height >= FULL_FIGURE_ROWS) return { border: true, pad: true, tag: tagged };
   if (height >= 4) return { border: true, pad: false, tag: tagged };
   if (height === 3) return { border: true, pad: false, tag: false };
@@ -316,7 +332,14 @@ export function statusRowsFor(
   // The **top** rung deliberately, not the rung this block currently has: the
   // question is how tall the good figure needs to be, and the answer is read
   // from the furniture that figure draws.
-  const rung = widthRung(w, heightRung(FULL_FIGURE_ROWS, block.state !== "loading"));
+  const rung = widthRung(
+    w,
+    // **The block's own ladder, because the two allocate rows differently.** A
+    // framed box spends none on a border, so the width left for the message is
+    // not the free-standing figure's — asking the wrong ladder here would size a
+    // box against furniture it does not draw.
+    heightRung(FULL_FIGURE_ROWS, block.state !== "loading", block.framed === true),
+  );
   const rowWidth = rung.frame.border ? Math.max(1, w - 2) : w; // cells-ok — a cell count
   const textWidth = Math.max(1, rowWidth - 2 * (rung.frame.pad ? PAD : 0)); // cells-ok — a cell count
 
@@ -353,7 +376,7 @@ export const statusDefinition: BlockDefinition<Status> = {
     const width = normaliseWidth(ctx.width);
     const g = glyphs(ctx.capabilities);
     const height = Math.max(1, Math.floor(block.height)); // cells-ok — a row count
-    const rung = widthRung(width, heightRung(height, block.state !== "loading"));
+    const rung = widthRung(width, heightRung(height, block.state !== "loading", block.framed === true));
     const frame = rung.frame;
     const tagFit = rung.tag;
     // **The error tone belongs to the states that failed, and `loading` did

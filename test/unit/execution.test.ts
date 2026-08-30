@@ -2149,7 +2149,13 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // countdown is `error`, and T1.40b is that half — mapping both to
     // `retrying` draws a blank row where the spinner goes.
     expect(child?.kind, "the failure is rendered rather than thrown").toBe("status");
-    expect(child).toMatchObject({ state: "retrying", height: 2, attempt: 1 });
+    // **Three rows and `framed`, where it was two and unframed** (F406). The old
+    // pair were the rungs *below* C09's first border, so the box read as a red
+    // line of text inside the panel and was indistinguishable from the `notice`
+    // it replaced — reported by a reader with two screenshots. Framed, the box
+    // draws no border of its own (the panel has one) and spends the rows on the
+    // tag and the content: tag, message, activity line.
+    expect(child).toMatchObject({ state: "retrying", height: 3, framed: true, attempt: 1 });
     expect((child as { retryInMs?: number }).retryInMs, "the countdown is the driver's").toBeGreaterThan(0);
     expect((child as { message: string }).message).toContain("the far side is gone");
   });
@@ -2190,12 +2196,21 @@ describe("C23 §4 — the submit row's two other steps", () => {
     const child = panel?.kind === "panel" ? panel.children[0] : undefined;
 
     expect(child?.kind).toBe("status");
-    // **The height is the assertion, not a detail.** At 2 this draws the message
-    // and an empty row under it, because `error` has no activity line at all —
-    // and an empty row is exactly what the reader would read as *still working*.
-    expect(child, "no retry is coming, so no countdown and no second row").toMatchObject({
+    // **The height is the assertion, not a detail**, and both numbers it has had
+    // were chosen from a frame. At 2 *unframed* it drew the message and an empty
+    // row under it, because `error` has no activity line at all — and an empty
+    // row reads as *still working*. At 2 **framed** the second row is the tag,
+    // which is the thing that says which kind of box this is (F406, C09 §3a):
+    // the box draws no border of its own, so the row the border would have cost
+    // buys the tag instead.
+    //
+    // **A row asserting only the count could not tell those two apart**, which is
+    // how the unframed pair looked right for an arc. `framed` is asserted beside
+    // the height for that reason.
+    expect(child, "no retry is coming, so no countdown — the second row is the tag").toMatchObject({
       state: "error",
-      height: 1,
+      height: 2,
+      framed: true,
     });
     expect(child).not.toHaveProperty("retryInMs");
     expect((child as { message: string }).message).toContain("nothing there");

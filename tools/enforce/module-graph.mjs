@@ -825,8 +825,15 @@ export function checkBuilderCoverage(
 
   // Every builder returns through `finish`, which is where `gapBefore` is set,
   // so its body is part of each builder's reachable surface.
+  //
+  // **`export function` and `const … =` are collected too, and were not** (F406).
+  // The walk matched `^function` alone, so an exported helper's body was sliced
+  // into the function *above* it and its writes were attributed there. That is
+  // silent in both directions — a field the helper sets reads as set by its
+  // neighbour, and a neighbour that stopped setting one reads as still setting it.
   const bodies = new Map();
-  const starts = [...builders.matchAll(/^function (\w+)/gmu)].map((m) => [m.index, m[1]]);
+  const starts = [...builders.matchAll(/^(?:export )?(?:function|const) (\w+)/gmu)]
+    .map((m) => [m.index, m[1]]);
   for (const [i, [pos, name]] of starts.entries()) {
     const end = i + 1 < starts.length ? starts[i + 1][0] : builders.length;
     bodies.set(name, builders.slice(pos, end));

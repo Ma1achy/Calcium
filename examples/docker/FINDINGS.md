@@ -13814,6 +13814,22 @@ it is a ladder whose rungs are ordered but whose *dimensions* are coupled. Nothi
 artefact reaches it: a rule-interaction table indexes rules that both apply, and here one rule
 (*the tag needs a border*) was silently deciding for another (*the container already has one*).
 
+### An aside the fix produced: MG27's walk merged two bodies
+
+`framedStatus` is an `export function`, and MG27's body walk matched `^function` alone — so its
+slice was appended to the function **above** it and everything it wrote was attributed there. Silent
+in both directions: a field the helper sets reads as set by its neighbour, and a neighbour that
+stopped setting one reads as still setting it. Widened to `^(export )?(function|const)`; the control
+is a builder that stops writing `colormap`, which still fails.
+
+**And `status.framed` gets no exemption entry, which is the honest disposition.** MG27 asks *does
+this file set the field* and the answer is yes — `framedStatus` does, for the one caller that puts
+the box inside `b.live`'s panel. It cannot ask *which door*, which is the whole of the member, so
+the guarantee that `b.status` never frames is a **row** (`T1.6`) rather than a table entry.
+Narrowing the rule's corpus to what `b` reaches was tried first and abandoned: `b.status` is
+`Object.assign(statusBlock, …)` and `statusBlock` delegates, so reachability needs two levels of
+indirection, and a rule that walks arbitrarily far stops being checkable by reading it.
+
 ### Two · every framework-level failure was a `notice`
 
 `errorDoc` builds `kind: "notice", tone: "error"`, and it has **twelve call sites** — spawn,

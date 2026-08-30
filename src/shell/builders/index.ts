@@ -1345,6 +1345,26 @@ function statusBlock(
   attempt: number,
   opts?: BlockOpts,
 ): Status {
+  return framedStatus(err, retryInMs, attempt, false, opts);
+}
+
+/**
+ * The same box, told whether something already frames it (C09 §3a, F406).
+ *
+ * **Not a parameter on `b.status`**, and MG27 holds the reason: whoever puts the
+ * box inside a bordered container knows, and a consumer holding one does not — a
+ * `renderError` override composing its own `group` is *not* a container that
+ * draws a border, so a consumer answering this would be guessing about furniture
+ * it cannot see. The one caller that knows is `b.live`'s own defaults, which put
+ * the box inside the part's panel.
+ */
+export function framedStatus(
+  err: ErrorLike,
+  retryInMs: number | null,
+  attempt: number,
+  framed: boolean,
+  opts?: BlockOpts,
+): Status {
   // **The decision is named before the block, and SS45 is the reason it reads
   // better as well as passing.** Written inline, `state: "error",` is a tone
   // literal *as an object-literal value* — which is SS45's subject exactly, and
@@ -1360,7 +1380,12 @@ function statusBlock(
   // **parameterised**, which is what it is — all three states are reachable from
   // the published surface, two through here and `loading` through the door below.
   const state = retryInMs === null ? "error" : "retrying";
-  const height = retryInMs === null ? 1 : 2;
+  // **Framed heights are one row taller, and the row buys the tag** (F406, C09
+  // I31). Free-standing the numbers are 1 and 2 — the rungs below the ladder's
+  // first border — and inside `b.live`'s panel they read as a red line of text,
+  // which is what a reader with two screenshots reported. Framed, two rows are
+  // *tag and message* and three buy `retrying` its activity line.
+  const height = framed ? (retryInMs === null ? 2 : 3) : retryInMs === null ? 1 : 2;
   return finish<Status>(
     block({
       kind: "status",
@@ -1368,6 +1393,7 @@ function statusBlock(
       message: err.message,
       state,
       height,
+      ...(framed ? { framed } : {}),
       ...(retryInMs === null ? {} : { retryInMs, attempt }),
     }) as Status,
     opts,
@@ -1383,7 +1409,7 @@ function statusBlock(
  * gives `loading` the line that *moves* rather than the label the panel above
  * already carries.
  */
-function statusLoading(opts?: BlockOpts): Status {
+function statusLoading(opts?: BlockOpts, framed = false): Status {
   return finish<Status>(
     block({
       kind: "status",
@@ -1391,6 +1417,11 @@ function statusLoading(opts?: BlockOpts): Status {
       state: "loading",
       message: "loading",
       height: 1,
+      // **`loading` is unchanged under either ladder** and carries the flag
+      // anyway: it has no tag to gain, and a box that says it is framed while
+      // its neighbours in the same panel do not would be two answers to one
+      // question about one container.
+      ...(framed ? { framed } : {}),
     }) as Status,
     opts,
     false,
@@ -1495,7 +1526,7 @@ function live(spec: LiveSpec): Panel {
     //
     // `message` is still what a taller one would say — the registry can size
     // this box from a committed measure, and a consumer can read it.
-    statusLoading({ id: `${spec.id}-loading` });
+    statusLoading({ id: `${spec.id}-loading` }, true);
   const panel = finish<Panel>(
     { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
     spec,

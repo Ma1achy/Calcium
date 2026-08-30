@@ -662,6 +662,19 @@ describe("C24 §5 — b.live", () => {
     for (const bl of [failed, backing, waiting]) {
       expect("elapsedMs" in bl, "the clock is the driver's").toBe(false);
       expect("spinner" in bl, "the frame set is the renderer's, per capability set").toBe(false);
+      // **`framed` is the container's answer and this door never gives it**
+      // (C09 §3a, F406). It is asserted here rather than in `BUILDER_OMISSIONS`
+      // because a builder *in the same file* does set it — `framedStatus`, for
+      // the one caller that puts the box inside `b.live`'s panel — so MG27 reads
+      // the field as reachable and cannot see which door reaches it. A rule that
+      // asks *does the file set this* cannot answer *can a consumer*, and the
+      // difference is the whole of the member.
+      //
+      // What a consumer would be guessing about is furniture it cannot see: a
+      // `renderError` override composing its own `group` is not a container that
+      // draws a border, so an app answering this would be answering for the
+      // panel above it.
+      expect("framed" in bl, "the container's answer, never the consumer's").toBe(false);
       expect(validateBlock(bl).ok, "and each is a valid block").toBe(true);
     }
   });

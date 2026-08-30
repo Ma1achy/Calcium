@@ -36,7 +36,7 @@ import { DOCUMENT_VIEW_ID } from "./document-view.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { isViewInvocation } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
-import { b } from "./builders/index.js";
+import { framedStatus } from "./builders/index.js";
 import { liveDeclarations } from "./builders/live.js";
 import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
@@ -1750,7 +1750,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // only reach for a `notice` and render worse. The builder derives `state`
       // and `height` exactly as the two arms below did, so the default and the
       // consumer's override are the same code and cannot drift.
-      ((err, retryInMs, attempt) => b.status(err, retryInMs, attempt, { id: `${spec.id}-error` })),
+      // **`framedStatus`, because this box lands inside the part's own panel**
+      // (C09 §3a, F406). `b.status` is the consumer's door and takes no `framed`
+      // — a `renderError` override composing its own group is not a container
+      // that draws a border — so the one caller that knows says so here.
+      ((err, retryInMs, attempt) =>
+        framedStatus(err, retryInMs, attempt, true, { id: `${spec.id}-error` })),
   });
 
   /**

@@ -92,6 +92,58 @@ describe("C09 §3a — the box occupies what measure committed", () => {
     expect(padded(at(1))).toBe(false);
   });
 
+  it("T3.39b (C09 I31, §3a, F406): the framed ladder draws no border and buys the tag with the row", () => {
+    // **The rung that was missing, and the assertion is about the *frame* rather
+    // than the height.** A box inside `b.live`'s panel is framed already, and the
+    // free-standing ladder couples the tag to the border — so the three options
+    // were a red line (2), a second border with no tag (3), or the tag at two
+    // nested borders (4). A row counting rows cannot tell any of those apart from
+    // any other, which is how the unframed pair looked right for an arc.
+    const bordered = (rows: readonly string[]): boolean =>
+      rows[0]?.startsWith("┌") === true && rows[rows.length - 1]?.startsWith("└") === true;
+    const tagged = (rows: readonly string[]): boolean => rows.some((r) => r.includes(" ERROR "));
+    const at = (h: number, over: Over = {}): readonly string[] =>
+      draw({ height: h, framed: true, ...over }, 50);
+
+    // **No border at any height**, including the ones where the free-standing
+    // ladder draws one. The container's is the only border in the figure.
+    for (const h of [1, 2, 3, 4, 6, 14]) {
+      expect(bordered(at(h)), `framed ${String(h)} draws no border of its own`).toBe(false);
+      expect(at(h), `framed ${String(h)} occupies what measure committed`).toHaveLength(h);
+    }
+
+    // **The tag arrives at two**, which is *tag and message* — the row the border
+    // would have cost, spent on the thing that says which kind of box this is.
+    expect(tagged(at(2)), "2 is tag and message").toBe(true);
+    expect(at(2)[0]?.includes(" ERROR "), "and the tag is the first row").toBe(true);
+    expect(at(2)[1]?.includes("connection refused"), "the message is the second").toBe(true);
+
+    // **One row keeps the message and drops the tag** — a box that says only
+    // `ERROR` has dropped the one thing a reader can act on, which is the same
+    // precedence the free-standing ladder's one-row rung has.
+    expect(tagged(at(1)), "1 drops the tag").toBe(false);
+    expect(at(1)[0]?.includes("connection refused"), "1 keeps the message").toBe(true);
+
+    // **Three buys `retrying` its activity line**, and that is the whole reason
+    // the framework's default asks for three rather than two.
+    const retry = at(3, { state: "retrying", retryInMs: 6000, attempt: 2 });
+    expect(retry.some((r) => r.includes(" ERROR ")), "the tag").toBe(true);
+    expect(retry.some((r) => r.includes("connection refused")), "the message").toBe(true);
+    expect(retry.some((r) => r.includes("retrying in 6s (attempt 2)")), "the countdown").toBe(true);
+
+    // **`loading` is unchanged under either ladder** — no tag to gain, and its
+    // whole content is the line that moves.
+    const load = at(3, { state: "loading", message: "loading" });
+    expect(load.some((r) => r.includes(" ERROR ")), "loading has no tag, framed or not").toBe(false);
+    expect(load.some((r) => r.includes("loading")), "and keeps the line").toBe(true);
+
+    // **The width ladder still applies**, and with no border of its own the box
+    // has two more cells to spend: at a width where the free-standing figure
+    // shows a bare tag, this one still fits the rule.
+    expect(draw({ height: 3, framed: true }, 11).some((r) => r.includes(" ERROR ")), "11 keeps the tag").toBe(true);
+    expect(draw({ height: 3, framed: true }, 6).some((r) => r.includes(" ERROR ")), "6 has no room").toBe(false);
+  });
+
   it("T3.40 (C09 I31): the width ladder's rungs, and the row count moves through none of them", () => {
     // **The row count is the half a width assertion does not reach on its own.**
     // Dropping the padding removes two rows and dropping the border two more, so

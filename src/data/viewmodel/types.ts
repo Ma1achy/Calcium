@@ -2351,6 +2351,26 @@ export type Status = Readonly<{
   elapsedMs?: number;
   /** A `SPINNER_SETS` name. Unknown resolves to the default rather than throwing. */
   spinner?: string;
+  /**
+   * **The container already draws a border, so this box draws none** (C09 §3a,
+   * I31, F406).
+   *
+   * A second ladder on the height axis rather than a rung on it. The free-standing
+   * ladder couples the tag to the border — the tag first appears where the border
+   * already has — so a box inside `b.live`'s panel could read as a red line, draw
+   * a second border with no tag, or draw the tag at **two nested borders**, and
+   * nothing else. C23 I51 chose the first and its reason was right about the
+   * other two; the figure is none of them.
+   *
+   * Framed, the rows go to the tag and the content: two are *tag and message*,
+   * three buy `retrying` its activity line. `loading` is unchanged under either
+   * ladder — it has no tag to gain.
+   *
+   * **The framework's, like `height`.** Whoever puts the box inside a bordered
+   * container knows and a consumer holding one does not, so `b.status` does not
+   * take it and MG27 holds that with a reason.
+   */
+  framed?: boolean;
 }> & Gap & Floor;
 
 export type Block =
