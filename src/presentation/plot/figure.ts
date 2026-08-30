@@ -2730,8 +2730,35 @@ export function densityFigure(block: Plot, ridge: boolean): Figure {
             return [base - thickness(j), along(j)] as Pt;
           });
 
+      // **`plotFill` decides the body, and until now it decided nothing here**
+      // (C12 I80, I75). I80's stated blind spot reads *`plotFill` chooses fill
+      // against outline for a density, which a pixel curve can also do, and it
+      // has nowhere to be read until `violin` draws.* The family draws (F383,
+      // §3ak.37), and this arm went on filling unconditionally — so a member
+      // read by one arm on a form both arms render, which is a **collision**
+      // rather than a dependency.
+      //
+      // **`=== "solid"`, which is the terminal's own test at all four of its
+      // sites, and it makes the two arms agree on every value including
+      // absent.** C04 I59 refuses `plotFill: "solid"` beside `plotStyle: "line"`
+      // — a box-drawing outline has no interior vocabulary — so a terminal
+      // violin is filled *only* on the braille arm, and its default is a stroked
+      // outline. This arm filled unconditionally, so the default disagreed and
+      // the member decided nothing.
+      //
+      // **The pair the corpus already has is what says so.** `violin/braille`
+      // and `violin/braille-filled` differ in exactly this field and drew
+      // byte-identical documents here — I75's collision, and the reason its
+      // blind-spot list names `plotFill`. Filling on `!== "none"` would have
+      // read the member and left the pair colliding, which is the shape that
+      // reads as a fix and is not one.
       marks.push({
-        mark: { kind: "polyline", points: [...out, ...back], closed: true, fill: true },
+        mark: {
+          kind: "polyline",
+          points: [...out, ...back],
+          closed: true,
+          fill: block.plotFill === "solid",
+        },
         layer: "series",
         seriesIndex: i,
       });

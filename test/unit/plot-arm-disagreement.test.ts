@@ -848,7 +848,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(t.distinct, "distinct terminal frames").toBe(181); // cells-ok — a frame count
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
-    expect(s.distinct, "distinct documents").toBe(149); // cells-ok — a frame count
+    expect(s.distinct, "distinct documents").toBe(152); // cells-ok — a frame count
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not
@@ -879,23 +879,38 @@ describe("AD — the two arms decide separately, and here is where", () => {
       // which is the legitimate collision C12 I79 records: seven blocks with no
       // data draw one message and there is nothing else to say.
       //
-      // **The density family brings four groups and every one is legitimate**
-      // (F383, C12 I80). `braille`, `braille-filled`, `line-box` and the
-      // `compact` rungs are all the *terminal's* choices about how to spend a
-      // cell — which glyph carries an outline, whether the interior fills, how
-      // few rows the figure collapses into. This arm draws one polyline for all
-      // of them, so the collision reports a resolution fact rather than a
-      // dropped field.
+      // **The density family's groups were called legitimate, and one member in
+      // them was dropped** (F383, C12 I80, F404). The note here read: *`braille`,
+      // `braille-filled`, `line-box` and the `compact` rungs are all the
+      // terminal's choices about how to spend a cell … so the collision reports
+      // a resolution fact rather than a dropped field.* **Three of those four
+      // are cell-spending choices. `plotFill` is not** — a pixel curve fills or
+      // strokes at any resolution — and this arm filled unconditionally, so
+      // `violin/braille` and `violin/braille-filled` drew one document under an
+      // explanation that covered the other three.
+      //
+      // **An explanation that fits most of a set absorbs the member it does
+      // not.** The sweep was right to group them and the prose was wrong about
+      // why, which is the direction that survives review: the reader checks
+      // whether the sentence is true of the examples in front of it. I80's own
+      // blind-spot line had said `plotFill` *has nowhere to be read until
+      // `violin` draws*, and the family had been drawing since F383.
+      //
+      // `densityFigure` reads `plotFill === "solid"` now — the terminal's own
+      // test at all four of its sites, and C04 I59 refuses `solid` beside
+      // `plotStyle: "line"`, so the arms agree on the absent case too. Both
+      // `braille` variants are distinct documents; what remains is
+      // `compact-braille` beside `compact-line-box`, both unfilled, which *is*
+      // a resolution fact.
       //
       // **`flame/default` and `icicle/default` are one bar chart**, and the
       // terminal draws them identically too: the forms differ in the direction
       // tiles grow, which is not a question a flat categorical block asks.
-      ["violin/vertical-braille", "violin/vertical-braille-filled", "violin/vertical", "violin/compact-vertical-line-box", "violin/compact-vertical-braille", "violin/compact-vertical-braille-filled", "violin/compact-vertical"],
       ["line/default", "line/size-left", "line/size-centre", "line/size-right", "line/corners-sharp"],
+      ["violin/vertical-braille", "violin/vertical", "violin/compact-vertical-line-box", "violin/compact-vertical-braille", "violin/compact-vertical"],
       ["contour/default", "contour/style-line", "contour/dim-floor", "contour/ink-contrast"],
       ["pie/solid", "pie/default-40", "pie/narrow-20"],
       ["quiver/default", "quiver/ink-contrast", "quiver/dim-floor"],
-      ["violin/compact-braille", "violin/compact-braille-filled", "violin/compact-line-box"],
       ["boxplot/compact", "boxplot/compact-box-line"],
       ["calendar/day", "calendar/day-stretch"],
       ["flame/default", "icicle/default"],
@@ -909,7 +924,14 @@ describe("AD — the two arms decide separately, and here is where", () => {
       ["tree/default", "tree/overflow-top-down"],
       ["tree/left-right", "tree/overflow-left-right"],
       ["tree/outline", "tree/overflow-outline"],
-      ["violin/braille", "violin/braille-filled"],
+      ["violin/compact-braille", "violin/compact-line-box"],
+      // **The pair `violin/braille` · `violin/braille-filled` is gone from this
+      // list**, which is what the fix was for: they differ in exactly `plotFill`
+      // and now draw different documents. What arrives in its place is a
+      // collision between two *filled* variants at different rungs — the
+      // terminal draws them differently and this arm does not, which is the
+      // resolution fact the old explanation claimed for all four.
+      ["violin/vertical-braille-filled", "violin/compact-vertical-braille-filled"],
     ]);
   });
 

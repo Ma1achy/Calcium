@@ -13771,6 +13771,72 @@ reason, and the fix for the second is what made the first legible.
 
 ---
 
+## F403 — a guard called stale on the strength of its doc comment ★★★☆☆
+
+C12 §3ak.37 records the violin's SVG refusal and says the blocker is where the resolution comes
+from: *`violinRows` takes `areaWidth` and evaluates at one point per cell … `G1c` states it as a
+signature, by arity, so the day `violinRows` stops taking a width the row fails and the refusal is
+re-read.*
+
+Measured: the refusal is gone — `SVG_FAMILY` reads `violin: "density"` since F383 — and
+`violinRows` still takes its width, because the *terminal* arm is still per-cell. **So the expiry
+could not fire, and the spec commit for this arc said `G1c` was therefore a stale guard standing
+for nothing.**
+
+**It is not.** Reading the row rather than the paragraph about it: `G1c` was inverted **with** the
+fix. It keeps the arity assertion as a **control** — a regression reaching for `areaWidth` in the
+shared layer must fail — and adds the two claims that matter: the family is claimed, and the
+figure's path has the **same point count at two output widths**, which is the property the refusal
+was actually about.
+
+**The claim came from a doc comment and was carried into a ruling.** The paragraph in §3ak.37 is
+the record of a pass and was true when it ran; the row moved and the record did not, which is
+ordinary. What is not ordinary is asserting *the guard is stale* without opening the guard — the
+sixth blind spot pointed at a test instead of a plan, and the answer was forty lines below the
+sentence that raised the question. Corrected in the same arc, one commit late.
+
+**The reusable part is the shape of the mistake.** A test's doc comment describes the row **as it
+was written**, and a row that has since been inverted keeps the paragraph that motivated it —
+because deleting the motivation would delete the reason the control exists. So *the comment says
+arity* and *the row asserts arity* are both true of a row whose subject is now something else.
+**Read the assertions, not the prose above them.**
+
+---
+
+## F404 — a collision explained as legitimate, with one dropped member inside it ★★★★☆
+
+C12 I75's sweep reports byte-identical documents from unequal blocks. The density family produced
+four groups, and the note beside them read: *`braille`, `braille-filled`, `line-box` and the
+`compact` rungs are all the terminal's choices about how to spend a cell — which glyph carries an
+outline, whether the interior fills, how few rows the figure collapses into. This arm draws one
+polyline for all of them, so the collision reports a **resolution fact** rather than a dropped
+field.*
+
+**Three of those four are cell-spending choices. `plotFill` is not** — a pixel curve fills or
+strokes at any resolution — and `densityFigure` emitted `fill: true` unconditionally. So
+`violin/braille` and `violin/braille-filled`, which differ in **exactly** that field, drew one
+document, and the sweep grouped them correctly under an explanation that covered the other three.
+
+**An explanation that fits most of a set absorbs the member it does not fit**, and it survives
+review in the direction that matters: a reader checks whether the sentence is true of the examples
+in front of them, and it is true of three. I80's own blind-spot line had said `plotFill` *has
+nowhere to be read until `violin` draws*, and the family had been drawing since F383 — so the
+member was on two lists, one saying blocked and one saying legitimate, and neither said *owed*.
+
+**Fixed** — `densityFigure` fills on `plotFill === "solid"`, which is the terminal's own test at
+all four of its sites. **The arms now agree on every value including absent**: C04 I59 refuses
+`solid` beside `plotStyle: "line"`, so a terminal violin's default is a stroked outline and this
+arm's was a filled body. Filling on `!== "none"` would have read the member and left the pair
+colliding — the shape that reads as a fix and is not one.
+
+**16 SVG frames moved and the diff is one attribute**: `fill="#e69f00" fill-opacity="0.85"` →
+`fill="none"`, stroke unchanged. **The terminal baseline did not move**, which is the check that
+says this is a second-arm agreement rather than a renderer change. Distinct documents 149 → **152**;
+`plotFill` leaves I75's blind-spot list, which had named six members the corpus does not isolate —
+and it had isolated this one all along.
+
+---
+
 ## F402 — seven exemptions carrying one sentence, and a plan had owed it since F335 ★★★★☆
 
 `b.plot` declared 48 of `Plot`'s 58 members plus `id`/`kind`. The eight absent were
