@@ -29,8 +29,9 @@ import { createTui, defaultTheme } from "@fmx/calcium";
 import type { Adapter, Block, LocalHandler } from "@fmx/calcium";
 import {
   adaptSample, compare, everyForm, faults, formFull, formIn, greetingDocument, liveFor,
-  monitor, unknown,
+  monitor, mosaics, rungs, unknown,
 } from "./src/commands.ts";
+import { faultyDefinition } from "./src/faulty.ts";
 import { manifest } from "./src/manifest.ts";
 
 const BINARY = new URL("bin/plots", import.meta.url).pathname;
@@ -54,6 +55,13 @@ const tui = createTui({
   theme: defaultTheme,
   env: process.env,
   adapters: { sample: draw },
+  // **A kind the app registers, and the extension mechanism is the point.**
+  // `table`, `plot` and `patch` register through this same public route rather
+  // than being privileged (C09 §3), so an app-defined kind is not a special case.
+  // This one throws on purpose: the containment boundary draws the `status` box
+  // at the height the block committed, which is the only way to see the ladder
+  // above two rows.
+  blocks: [faultyDefinition],
   // **Each handler names `LocalHandler`**, which is C24 §8b's finding applied
   // rather than restated: a handler written with inferred parameters is legal
   // TypeScript that compiles, registers, runs, and can never see a field the
@@ -81,6 +89,10 @@ const tui = createTui({
     faults: ((_argv, ctx) => doc(ctx.command, [faults()])) satisfies LocalHandler,
 
     monitor: ((_argv, ctx) => doc(ctx.command, [monitor()])) satisfies LocalHandler,
+
+    rungs: ((_argv, ctx) => doc(ctx.command, [rungs()])) satisfies LocalHandler,
+
+    mosaic: ((_argv, ctx) => doc(ctx.command, [mosaics(0)])) satisfies LocalHandler,
   },
   greeting: greetingDocument,
 });

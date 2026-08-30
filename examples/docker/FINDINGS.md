@@ -13771,6 +13771,39 @@ reason, and the fix for the second is what made the first legible.
 
 ---
 
+## F405 — the block union is open at runtime and closed in the types ★★★★☆
+
+`validateDocument` says it in its own words:
+
+> An unknown kind is not an error: the union is open and an app registers kinds through C09 (F1).
+
+`TuiConfig.blocks` takes the definitions, and `createBlockRegistry`'s own comment argues that
+`table`, `plot` and `patch` registering *through the same public `register`* is what proves the
+mechanism rather than privileging it. **All of that is true and none of it typechecks.**
+`BlockDefinition<B extends Block = Block>` bounds a definition by the closed union, and an app's
+block is not in it — so the block cannot enter a document and the definition cannot be
+parameterised by it. Writing the kind `/rungs` needs took **two `as unknown as` casts**, one on
+each side of the seam.
+
+**The same shape as the rest of this arc**, and found the same way: by writing the consumer. A
+capability the runtime has, the specs argue for, and the published types cannot express.
+
+**A second half, and it is the sharper one.** `expectDocument` holds `fullRegistry()` internally
+with no way to add a definition — so a consumer who registers a kind **cannot test it with the
+published assertion helper**. Measured while trying: every height of the failing block rendered as
+one row through `expectDocument().lines()`, because the registry fell back to `raw`. The frame was
+correct and the instrument could not see it, which is F149's class one surface along — *a reader
+that guesses is measuring the guess.*
+
+**Recorded rather than fixed**, and the reason is not schedule. Widening `Block` decides how
+`childBlocksOf` walks an app's kind, whether measurement conformance binds it, and what
+`validateBlock` does with a shape it has no checks for. That is a ruling with three components in
+it, and this arc's ruling — *a published builder constructs what the published types declare* — is
+about members of kinds that exist. **The `/rungs` command is the fabricated violation kept in the
+tree**: the casts are visible, commented, and fail the moment the union gains an arm.
+
+---
+
 ## F403 — a guard called stale on the strength of its doc comment ★★★☆☆
 
 C12 §3ak.37 records the violin's SVG refusal and says the blocker is where the resolution comes

@@ -19,5 +19,7 @@ export const manifest = {
     { name: "compare", local: true, summary: "Terminal beside SVG, as pixels", args: [{ name: "form", type: "string", required: false, summary: "which form" }], flags: [] },
     { name: "faults", local: true, summary: "A failing source, and the way back", args: [], flags: [] },
     { name: "monitor", local: true, summary: "This machine, live", args: [], flags: [] },
+    { name: "rungs", local: true, summary: "The failure box at every height and width rung", args: [], flags: [] },
+    { name: "mosaic", local: true, summary: "Layouts named as a picture", args: [], flags: [] },
   ],
 } as const;

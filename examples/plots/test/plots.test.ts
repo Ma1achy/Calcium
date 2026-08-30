@@ -19,13 +19,14 @@ import { execFile } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { completeLocal } from "@fmx/calcium";
+import { b, completeLocal } from "@fmx/calcium";
 import { expectDocument, liveParts, producerContext } from "@fmx/calcium/testing";
 import type { Block, ViewDocument } from "@fmx/calcium";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
-  adaptSample, compare, everyForm, faults, formFull, greetingDocument, liveFor, monitor, unknown,
+  adaptSample, compare, everyForm, faults, formFull, greetingDocument, liveFor, monitor,
+  mosaics, rungs, unknown,
 } from "../src/commands.ts";
 import { manifest } from "../src/manifest.ts";
 
@@ -328,6 +329,12 @@ describe("every command composes a document the transcript would accept", () => 
     compare: () => [],
     faults: () => [as("faults", [faults()])],
     monitor: () => [as("monitor", [monitor()])],
+    // **`rungs` holds blocks of a kind the app registered**, which `expectDocument`
+    // validates because C04's union is open — *an unknown kind is not an error: the
+    // union is open and an app registers kinds through C09.* Its renderer throws by
+    // design, so `T-doc6` is where it is exercised as a *frame*.
+    rungs: () => [as("rungs", [rungs()])],
+    mosaic: () => [as("mosaic", [mosaics(0)])],
   };
 
   it("T-doc1: the coverage table names every command the manifest declares", () => {
@@ -351,8 +358,9 @@ describe("every command composes a document the transcript would accept", () => 
       }
     }
     expect(bad).toEqual([]);
-    // 46 forms twice, plus /all, /faults, /monitor, and sample's two.
-    expect(checked, "documents built").toBe(FORMS.length * 2 + 5);
+    // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, and
+    // sample's two.
+    expect(checked, "documents built").toBe(FORMS.length * 2 + 7);
   });
 
   it("T-doc3: an unknown form is a document too", () => {
@@ -383,8 +391,15 @@ describe("every command composes a document the transcript would accept", () => 
           value = await part.spec.fetch();
         } catch {
           // The always-failing source is deliberate; its error arm is a block too.
-          if (part.spec.renderError === undefined) { bad.push(`${part.spec.id}: fails and has no renderError`); continue; }
-          try { expectDocument(as(d.command, [...d.blocks, part.spec.renderError(new Error("x"), 1000, 1)])).isValid(); }
+          // **The default is the framework's and it is now `b.status`** (C24 I30).
+          // This row used to require the *app* to supply a `renderError`, which was
+          // right when a notice was the only thing an override could return and is
+          // wrong now: declining to override is how a part gets the real box. So
+          // the arm under test is the declarer's where there is one and the
+          // framework's where there is not — the same construction either way,
+          // which is the anti-drift claim T1.6b makes on the other side.
+          const arm = part.spec.renderError ?? ((e, r, a) => b.status(e, r, a));
+          try { expectDocument(as(d.command, [...d.blocks, arm(new Error("x"), 1000, 1)])).isValid(); }
           catch (err) { bad.push(`${part.spec.id} error arm: ${String(err)}`); }
           rendered += 1;
           continue;
@@ -399,9 +414,9 @@ describe("every command composes a document the transcript would accept", () => 
       }
     }
     expect(bad).toEqual([]);
-    // The gallery's walk (twice — sample and greeting), one per buildable
-    // `/live`, the monitor, and the three faults.
-    expect(rendered, "live frames rendered").toBe(2 + (FORMS.length - refusals().length) + 1 + 3);
+    // The gallery's walk (twice — sample and greeting), one per `/live`, the
+    // monitor, and the six faults.
+    expect(rendered, "live frames rendered").toBe(2 + (FORMS.length - refusals().length) + 1 + 6);
   });
 
   it("T-doc6: and every one of them paints, at two widths", () => {

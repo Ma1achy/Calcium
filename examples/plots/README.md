@@ -46,7 +46,16 @@ Then, at the prompt:
 /compare <f>  the terminal beside the SVG, as pixels
 /faults       a failing source, and the way back
 /monitor      this machine, live — cores, memory, load, heap
+/rungs        the failure box at every height and width rung it has
+/mosaic       layouts named as a picture — `b.mosaic`'s area grammar
 ```
+
+**`/rungs` needs a block that fails, and registers one.** The framework draws its `status` box
+from three places and two of them are `b.live`'s defaults at height 1 and 2 — a frame read, because
+both sit inside the part's own panel. So the border, the padding and the ` ERROR ` tag are drawn
+only by the registry's containment boundary, at exactly the height the failed block committed. The
+demo registers a kind through `TuiConfig.blocks` whose renderer throws on purpose, which is the
+same public route `table`, `plot` and `patch` take.
 
 **`main.ts` is the wiring; `src/commands.ts` is what it draws** (F400). `main.ts` calls
 `tui.start()` at module scope, so importing it starts a session — while the document builders

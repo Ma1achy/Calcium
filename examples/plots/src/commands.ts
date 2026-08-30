@@ -19,6 +19,7 @@ import os from "node:os";
 import { CATALOGUE, everyVariant, FORMS, refusals, rungId, variantsOf } from "./catalogue.ts";
 import type { PlotForm } from "./catalogue.ts";
 import { bars, barsFull, curve, distribution, heat, hierarchy, walk } from "./figures.ts";
+import { faulty } from "./faulty.ts";
 import { imageOf, svgOf } from "./svg.ts";
 
 
@@ -377,14 +378,16 @@ export function monitor(): Block {
       every: 1000,
       fetch: () => Promise.resolve(sample()),
       derive: { key: "history", compute: (d, prev) => advance(prev, d as Sample) },
-      // **A live part with no `renderError` fails silently**, which is how this
-      // one hid: the wrapper notice drew, the part drew nothing, and there was
-      // no text anywhere saying why. The framework hands the error, the retry
-      // countdown and the attempt number to the app; declining to render them
-      // is declining to be told.
-      renderError: (err, retryInMs, attempt) =>
-        b.notice("error", `${err.message} · attempt ${String(attempt)}` +
-          (retryInMs === null ? " · not retrying" : ` · retrying in ${String(Math.round(retryInMs / 100) / 10)}s`)),
+      // **No `renderError`, and the reason the old one existed was half true**
+      // (F399, F401). It was written because *the source is `os` and reading a
+      // local file cannot fail* — true about the **fetch**, silent about the
+      // **render**, which is how this part drew nothing once a second while
+      // `b.plot` threw F398's refusal inside it.
+      //
+      // What it drew instead was a `notice`, because that was the whole of what
+      // an override could reach for. The framework's default is a `status` and
+      // draws the box, the countdown and the attempt, so declining to override
+      // is now the way to be told rather than the way to be silent.
       render: (v) => monitorFrame(v as History),
     }),
   ], { id: "monitor-wrap" });
@@ -485,9 +488,15 @@ export async function compare(form: PlotForm, phase: number, protocol: ImageProt
  */
 let attempts = 0;
 
+/** The accumulating part's readings — what the override keeps and the default drops. */
+let kept: readonly number[] = [];
+
 export function faults(): Block {
   return b.group("column", [
-    b.notice("info", "three live parts — one steady, one always failing, one that recovers"),
+    b.notice(
+      "info",
+      "six live parts — the framework's own failure box on five of them, and one override that keeps its history",
+    ),
 
     b.live({
       id: "fault-ok",
@@ -501,19 +510,17 @@ export function faults(): Block {
       render: (v) => walk(Array.isArray(v) ? (v as number[]) : [], 6),
     }),
 
+    // **No `renderError`, which is the change** (F401). This drew the failure as
+    // `b.notice("error", …)` — a red line of text — and the reading that the demo
+    // was hand-rolling a shipped kind was wrong: `b` had no `status`, so a notice
+    // was the whole of what an override could reach for. The default draws the
+    // real box: ` ERROR ` in a gap in the rule, the message wrapped to it, a
+    // spinner, the countdown and `(attempt N)`.
     b.live({
       id: "fault-always",
-      title: "always failing",
+      title: "always failing · the framework's box",
       every: 1500,
       fetch: () => Promise.reject(new Error("ECONNREFUSED 127.0.0.1:9999")),
-      // **The app draws it, the framework decides when.** `retryInMs` is null
-      // for a one-shot and a countdown otherwise; `attempt` is the source's.
-      renderError: (err, retryInMs, attempt) =>
-        b.notice(
-          "error",
-          `${err.message} · attempt ${String(attempt)}` +
-            (retryInMs === null ? " · not retrying" : ` · retrying in ${String(Math.round(retryInMs / 100) / 10)}s`),
-        ),
       render: () => b.notice("ok", "unreachable — this source never resolves"),
     }),
 
@@ -527,16 +534,190 @@ export function faults(): Block {
           ? Promise.reject(new Error(`the far side is starting up (${String(attempts)}/2)`))
           : Promise.resolve(attempts);
       },
-      renderError: (err, retryInMs, attempt) =>
-        b.notice(
-          "warn",
-          `${err.message} · attempt ${String(attempt)}` +
-            (retryInMs === null ? "" : ` · retrying in ${String(Math.round(retryInMs / 100) / 10)}s`),
-        ),
       render: (v) =>
         b.notice("ok", `recovered after ${String(attempts - 1)} failures — tick ${String(Number(v))}`),
     }),
+
+    // **A one-shot, and the arm the two above cannot reach** (C23 I51, F234).
+    // `retryInMs` is `null` for every part with no `every` and for every
+    // deterministic `render` throw, so the box is `error` rather than `retrying`
+    // — no countdown, and therefore no activity line. Mapping both arms to
+    // `retrying` ships a blank row where the spinner goes, which a classification
+    // table found before any of it was written.
+    b.live({
+      id: "fault-once",
+      title: "one-shot · no retry is coming",
+      fetch: () => Promise.reject(new Error("read the record: no such container")),
+      render: () => b.notice("ok", "unreachable — this source never resolves"),
+    }),
+
+    // **The waiting state, given long enough to read.** `b.live`'s placeholder is
+    // a `status` at `loading` and it carries the **elapsed** counter — the number
+    // that says *this is wrong* at 47s. `elapsed()` shows nothing below one
+    // second, deliberately: a fast load must not flash a counter.
+    b.live({
+      id: "fault-slow",
+      title: "slow source · the counter is the point",
+      // **Four seconds, not twenty-five.** `elapsed()` is silent below one, so
+      // the counter needs a fetch measured in seconds to say anything at all —
+      // and a demo that makes a reader wait half a minute to see one number is
+      // a worse demonstration, not a better one. Four ticks the counter three
+      // times and costs the suite four seconds rather than twenty-five.
+      every: 30_000,
+      fetch: () => new Promise((resolve) => { setTimeout(() => { resolve(1); }, 4_000); }),
+      render: () => b.notice("ok", "it arrived — four seconds is long enough to watch a counter"),
+    }),
+
+    // **The override, doing what an override is for** (C24 §4b, F401).
+    //
+    // The framework's default **replaces** the part's block, which is right for a
+    // part whose block *is* its latest fetch and wrong for one accumulating across
+    // ticks: the history is what made the failure interesting, and the default
+    // takes it with it. docker's `renderError` has drawn the failure *beside* its
+    // ring since S3, and until `b.status` existed the only thing it could put
+    // there was a notice.
+    //
+    // So this is the useful override rather than a restyling: the walk survives,
+    // and the framework's own box sits under it.
+    b.live({
+      id: "fault-keeps",
+      title: "an override that keeps its history",
+      every: 900,
+      fetch: () => {
+        kept = [...kept, Math.random() * 10 + 20].slice(-40);
+        return kept.length < 12
+          ? Promise.resolve(kept)
+          : Promise.reject(new Error("the source went away, and the last twelve readings did not"));
+      },
+      renderError: (err, retryInMs, attempt) =>
+        b.group("column", [
+          walk(kept, 6),
+          b.status(err, retryInMs, attempt, { id: "fault-keeps-status" }),
+        ], { id: "fault-keeps-body" }),
+      render: (v) => walk(Array.isArray(v) ? (v as number[]) : [], 6),
+    }),
   ], { id: "faults" });
+}
+
+// --- /rungs and /mosaic ------------------------------------------------------
+
+/**
+ * The `status` box at every height it has a rung for, and at four widths.
+ *
+ * **No `b.live` failure can show this.** The framework's two live defaults are
+ * height 1 and 2 — a frame read, because both sit inside `b.live`'s own panel
+ * (F234, F235) — so the border, the padding and the ` ERROR ` tag are drawn only
+ * by the registry's containment boundary, at **exactly the height the failed
+ * block committed** (C09 I11, I31). A block whose renderer throws is how a reader
+ * gets there, and `TuiConfig.blocks` is how a consumer supplies one.
+ *
+ * The height rungs are four: **≥6** the full figure — two borders, two blanks and
+ * the tag row; **≥4** border, no padding; **=3** border only, because below three
+ * a reader cannot tell a contained failure from a block that happens to say
+ * something red; **<3** bare, and no evidence the height was honoured.
+ */
+const RUNGS: readonly (readonly [number, string])[] = [
+  [1, "one row — the message, and nothing to say the height was honoured"],
+  [2, "two — still bare, and this is `retrying`'s rung"],
+  [3, "three — a border, and no tag: the least that says *something failed here*"],
+  [4, "four — the tag arrives, the padding does not"],
+  [6, "six — the full figure: two borders, two blanks, the tag row"],
+  // **Not *the message wrapped*, which is what this caption first said** — at
+  // ninety-six cells it does not wrap, and the frame is what said so. What a
+  // plot-sized box shows is the padding growing to fill the height it committed,
+  // with the tag row and the message held in the middle of it.
+  [14, "fourteen — the box a failed plot leaves, at the height it committed"],
+];
+
+export function rungs(): Block {
+  return b.group("column", [
+    b.notice(
+      "info",
+      "the containment box at each of its height rungs — a block whose renderer throws, " +
+        "drawn at the height it committed (C09 I11, I31)",
+    ),
+    ...RUNGS.flatMap(([h, says]) => [
+      caption(`${String(h)} row${h === 1 ? "" : "s"} · ${says}`),
+      faulty(`rung-${String(h)}`, h, "the renderer for this block threw on purpose"),
+    ]),
+    // **The width ladder, which a figure indexed on height cannot reach** — two
+    // rules both holding at rest, no event between them (C09 I31). ` ERROR ` is
+    // seven cells and a rule needs nine, against a `row` group that hands out
+    // `floor((w − gaps) / n)`: so the same box loses its rule, then its tag, then
+    // its padding and its border, across one row.
+    caption(
+      "the same box at six rows, across four columns — the width ladder: " +
+        "a rule around the tag, then a bare tag, then no tag at all",
+    ),
+    // **`[8, 4, 2, 1]`, tuned against the frame rather than reasoned.** At
+    // `[4, 2, 1, 1]` the narrowest column came out at fourteen cells and kept its
+    // tag: ` ERROR ` is seven, so padding is dropped to save it and six cells of
+    // furniture still leave eight. The rung that *drops* the tag needs content
+    // under seven, which is about eight cells of column — so the spread has to be
+    // steeper than it looks. Measured, not derived.
+    b.group("row", [1, 2, 3, 4].map((i) =>
+      faulty(`wide-${String(i)}`, 6, "the renderer threw, and this box is getting narrower")),
+      { flex: [8, 4, 2, 1], id: "rung-widths" }),
+  ], { id: "rungs" });
+}
+
+/**
+ * `b.mosaic` — **a layout named as a picture** (C04 I71).
+ *
+ * A `group` nests: a row of columns of rows, and the shape lives in the nesting.
+ * A mosaic states the shape *as a string* — one character a cell, `/` between
+ * rows, `.` for a hole — and hands the regions their children positionally. The
+ * grammar is the thing to show, so each panel is captioned with the template that
+ * produced it.
+ *
+ * **`columns` and `rows` take `Share`**, which is `number | { cells: n }`: a
+ * fraction of what is left, or an exact count. The pinwheel below spends an exact
+ * gutter on its left column and shares the rest.
+ */
+export function mosaics(phase: number): Block {
+  const tile = (form: PlotForm, id: string, h: number): Block => {
+    const drawn = CATALOGUE[form].at(phase, h, { id });
+    return "refused" in drawn ? b.notice("warn", drawn.refused) : drawn;
+  };
+  return b.group("column", [
+    b.notice("info", "four layouts, each named as a string — one character a cell, `/` a row, `.` a hole"),
+
+    caption('"AAB/AAB/CDB" · a wide panel, a rail, and two below it'),
+    b.mosaic({
+      id: "mosaic-dash", height: 14, areas: "AAB/AAB/CDB",
+      children: [
+        tile("line", "mo-a", 9),
+        tile("sparkline", "mo-b", 1),
+        tile("bar", "mo-c", 4),
+        tile("boxplot", "mo-d", 4),
+      ],
+    }),
+
+    caption('"AAB/DEB/DCC" · the pinwheel, with an exact 24-cell first column'),
+    b.mosaic({
+      id: "mosaic-pin", height: 15, areas: "AAB/DEB/DCC",
+      columns: [{ cells: 24 }, 1, 1],
+      children: [
+        tile("heatmap", "mo-pa", 5),
+        tile("ecdf", "mo-pb", 10),
+        tile("histogram", "mo-pc", 5),
+        tile("treemap", "mo-pd", 10),
+        tile("density", "mo-pe", 5),
+      ],
+    }),
+
+    caption('".A./BBB/.C." · holes, which a `group` has no way to say'),
+    b.mosaic({
+      id: "mosaic-holes", height: 12, areas: ".A./BBB/.C.",
+      children: [tile("radar", "mo-ha", 4), tile("ridgeline", "mo-hb", 4), tile("funnel", "mo-hc", 4)],
+    }),
+
+    caption('"AB" · two cells, and `rows` unused — the degenerate case still holds'),
+    b.mosaic({
+      id: "mosaic-pair", height: 8, areas: "AB", columns: [2, 1],
+      children: [tile("violin", "mo-2a", 8), tile("pie", "mo-2b", 8)],
+    }),
+  ], { id: "mosaics" });
 }
 
 // --- the glance and the far side -------------------------------------------
