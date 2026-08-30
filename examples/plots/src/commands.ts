@@ -117,12 +117,17 @@ export const unknown = (name: string): Block =>
 // --- /all -------------------------------------------------------------------
 
 /**
- * Every form, small, in two columns — **including the four that refuse.**
+ * Every form, small, in two columns — **all 46 of them, and every rung.**
  *
  * A catalogue that silently omits what it cannot construct reports 42 of 42 and
  * reads as complete, which is F313's shape in the contact sheet and F350's in
- * the corpus. The refusals are drawn as notices naming the missing field, so the
- * count on screen is 46 and the gap is visible rather than inferred.
+ * the corpus. So four forms were **entries naming the field `b.plot` did not
+ * declare**, drawn as notices, counted in the total — and the surface has those
+ * eight members now (C24 I30, §4b), so the four build and the count is 46 · 99.
+ *
+ * **The refusal branch stays**, because `CATALOGUE` is keyed by `PlotForm`: a
+ * form added to the union is a compile error until it has an entry, and the next
+ * one may land before its builder does. `T-refuse` exercises it.
  */
 export function everyForm(phase: number): Block {
   // **Every form *and every rung*, which is what `/all` used to only claim**
@@ -169,7 +174,14 @@ export function everyForm(phase: number): Block {
       "info",
       `${String(FORMS.length)} forms · ${String(FORMS.length - missing.length)} drawn · ` +
         `${String(rungs)} further rungs · ${String(FORMS.length - missing.length + rungs)} figures · ` +
-        `${String(missing.length)} refused by the published builder — ${missing.join(", ")} (F377)`,
+        // **Nothing refuses now, and the sentence says which of two things that
+        // is** (C24 I30). Four forms were unbuildable because `b.plot` omitted
+        // the member that is their only datum, and a caption reading `0 refused`
+        // would be true of a surface that gained the members and true of a
+        // catalogue that quietly stopped listing them.
+        (missing.length === 0
+          ? "every form the union declares builds through `b.plot` (F335 closed)"
+          : `${String(missing.length)} refused by the published builder — ${missing.join(", ")} (F377)`),
     ),
     b.notice("muted", "/form <name> draws one full size with its rungs · /live <name> advances it"),
     ...pairs,

@@ -631,30 +631,31 @@ export const BUILDER_OMISSIONS = Object.freeze({
   "status.elapsedMs": "C09 I32, C23 I52 — supplied by whoever holds the clock, which is the refresh driver and never a builder",
   "status.spinner": "C09 I32 — the frame set is the renderer's, chosen per capability set; a consumer owning a `status` (C24 I30) is handed no frames to name",
 
-  "plot.emptyMessage":
-    "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
   "patch.numberWidth":
     "C25 I21a — not the producer's to set. It is what a *window* carries so its gutter " +
     "describes the block it came from rather than the slice it shows, and a hand-built patch " +
     "that set it would be asserting a gutter its own lines do not justify. `windowPatch` is " +
     "the one writer, and a builder exposing it would offer a consumer the drift (F134)",
 
-  // --- plot forms: fields with no plot-builder shorthand --------------------
+  // --- plot forms: the eight that are gone, and why the reason outlived itself
   //
-  // **The step these named has arrived and took exactly one of them.**
-  // `plot.startDate` said *builder shorthand lands in step 11* and its shorthand
-  // did, with `calendarUnit` beside it — the entry is gone rather than reworded.
-  // The eleven below were never that step's subject and their shared sentence
-  // now points at a step that has passed, which is a justification the next
-  // reader checks and cannot reproduce (CLAUDE.md). Kept, with the schedule
-  // struck: each is a builder that has not been written, and no plan owes it.
-  "plot.layout": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.binning": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.offsets": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.totals": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.facets": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.xScale": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
-  "plot.yScale": "step 0 scaffolding — no plot-builder shorthand yet, and no plan owes one",
+  // **Seven entries carried one sentence — *no plan owes one* — and a plan had
+  // owed it since F335.** The reason was reworded once, when the step it named
+  // arrived and took `startDate` and `calendarUnit`: the schedule was struck and
+  // the clause replacing it asserted, of the rest, that nothing was owed. That is
+  // a deferral naming a condition with nothing watching it, and the thing that
+  // satisfied the condition was written somewhere else — F335 measured the gap,
+  // the roadmap cited it, and four forms were unconstructible for as long as both
+  // were true (C24 I30, §4b).
+  //
+  // **`emptyMessage`'s was the sharper one**, because it was not a schedule at
+  // all: *no surface has an empty plot*. That is a claim about the surfaces that
+  // existed when it was written, offered as a reason a member cannot be set — and
+  // it makes every app that meets an empty plot hand-compose the state instead,
+  // which is §8d's defect one kind along.
+  //
+  // All eight are set now. The list is shorter rather than reworded, which is
+  // what MG27's bidirectional arm is for.
 });
 
 /** `Kind.field` for every block field, and whether a builder mentions it. */

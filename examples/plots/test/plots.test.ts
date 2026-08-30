@@ -23,6 +23,7 @@ import { completeLocal } from "@fmx/calcium";
 import { expectDocument, liveParts, producerContext } from "@fmx/calcium/testing";
 import type { Block, ViewDocument } from "@fmx/calcium";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
+import type { Entry } from "../src/catalogue.ts";
 import {
   adaptSample, compare, everyForm, faults, formFull, greetingDocument, liveFor, monitor, unknown,
 } from "../src/commands.ts";
@@ -79,13 +80,14 @@ describe("the plot demo", () => {
     );
   });
 
-  it("every form the type declares has an entry, and four of them refuse (F377)", () => {
+  it("every form the type declares has an entry, and all 46 now build (C24 I30)", () => {
     // **The count is 46 and not 42**, which is the point of the entry shape. A
     // catalogue that omits what it cannot construct reports complete — F313's
-    // contact sheet and F350's corpus, both. So the four are entries naming the
-    // field the published builder does not declare.
+    // contact sheet and F350's corpus, both. Four were entries naming the field
+    // the published builder did not declare, and `b.plot` declares all eight now
+    // (F335, C24 §4b) — so the honest assertion flipped rather than went away.
     expect(FORMS).toHaveLength(46);
-    expect([...refusals()].sort()).toEqual(["gantt", "pairplot", "smallmultiples", "waterfall"]);
+    expect([...refusals()].sort(), "nothing the union declares is unbuildable").toEqual([]);
 
     // **Built, not merely typed.** `b.plot` throws for a document the validator
     // would refuse, and no type reaches those rules — the calendar entry passed
@@ -103,24 +105,47 @@ describe("the plot demo", () => {
       }
     }
     expect(threw).toEqual([]);
-    expect(built).toBe(42);
+    expect(built).toBe(46);
   });
 
-  it("each refusal names a field `b.plot` does not declare (F335, F371, F377)", () => {
-    // The reason must resolve against the builder rather than be prose: the
-    // named field is absent from `b.plot`'s signature and present on `Plot`.
-    const builder = readFileSync(
-      here("../../../src/shell/builders/index.ts"),
-      "utf8",
-    );
+  it("T-eight (C24 I30, F335): the eight `b.plot` omitted are all on it now", () => {
+    // **This row used to assert the opposite, over the four refusals**, and with
+    // the refusals gone it would have iterated an empty set and passed — a claim
+    // that reads as coverage and checks nothing. So it is inverted rather than
+    // deleted: the same source, the same signature slice, the true statement.
+    //
+    // Four of the eight were a form's **only** datum, which is why four forms
+    // could not be built at all: `offsets` for `gantt`, `totals` for `waterfall`,
+    // `facets` for both delegating forms. Two are defaulted choices and two
+    // became readable in both arms this arc.
+    const builder = readFileSync(here("../../../src/shell/builders/index.ts"), "utf8");
     const sig = builder.slice(builder.indexOf("function plot("), builder.indexOf("): Plot {"));
-    for (const form of refusals()) {
-      const entry = CATALOGUE[form].at(0, 8);
-      if (!("refused" in entry)) throw new Error(`${form} did not refuse`);
-      expect(sig, `b.plot must not declare ${entry.needs}`).not.toMatch(
-        new RegExp(`^\\s{4}${entry.needs}\\??:`, "mu"),
-      );
-    }
+    const EIGHT = [
+      "layout", "binning", "offsets", "totals",
+      "facets", "emptyMessage", "xScale", "yScale",
+    ];
+    const absent = EIGHT.filter((m) => !new RegExp(`^\\s{4}${m}\\??:`, "mu").test(sig));
+    expect(absent, "every member F335 measured is declared by the published builder").toEqual([]);
+  });
+
+  it("T-refuse: the refusal shape still works, for the form that lands before its builder", () => {
+    // **A mechanism with no instance, kept and exercised rather than assumed.**
+    // `CATALOGUE` is `Record<PlotForm, Entry>`, so a form added to the union is a
+    // compile error until it has an entry — and the union has grown several times
+    // in this project. The next one may arrive before `b.plot` can build it, and
+    // this is the shape that entry takes: a reason naming the missing field, drawn
+    // as a notice, counted in the total rather than omitted from it.
+    //
+    // Exercised through the same branch `/all` and `/form` take, so it is live
+    // code with a caller rather than an affordance nobody has run.
+    const entry: Entry = {
+      says: "a form with no builder",
+      at: () => ({ refused: "`nothing` is not declared on `b.plot`", needs: "nothing" }),
+    };
+    const drawn = entry.at(0, 8);
+    expect("refused" in drawn, "the branch every composer takes").toBe(true);
+    if (!("refused" in drawn)) throw new Error("unreachable");
+    expect(drawn.needs).toBe("nothing");
   });
 
   it("the animated figure is the static one at a later phase", () => {
@@ -230,8 +255,14 @@ describe("the plot demo", () => {
     expect(checked, "and every declared rung was checked").toBe(everyVariant().length);
     // **The count, by equality** — so a rung appearing or vanishing is a failure
     // that names itself rather than a number nobody reads.
-    expect(everyVariant().length, "rungs beyond the defaults").toBe(53);
-    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(95);
+    // **60, where it was 53** — seven rungs for the five members `b.plot` gained
+    // that the four new *forms* did not exercise: `layout` ×3, `binning` ×2,
+    // `yScale`, `emptyMessage`. A builder taking a member and a consumer naming
+    // one are different claims, and `publicSurfaceUseSignal` counts the second.
+    expect(everyVariant().length, "rungs beyond the defaults").toBe(60);
+    // **46 + 60, where it was 42 + 53** — the four that could not be built now
+    // are, which is the count moving because the surface did (C24 I30).
+    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(106);
   });
 });
 

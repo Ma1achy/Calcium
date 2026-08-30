@@ -474,9 +474,37 @@ function plot(
     axisCross?: Plot["axisCross"];
     calendarUnit?: Plot["calendarUnit"];
     startDate?: Plot["startDate"];
+    /**
+     * **The eight F335 measured, and the argument is per member** (C24 I30, §4b).
+     *
+     * Four are a form's **only** datum, so four forms could not be built at all
+     * and three were reduced to one variant: `offsets` is a start per row and
+     * without it a `gantt` is a bar chart; `totals` says which bars are totals
+     * and a `waterfall`'s running balance is not otherwise drawable; `facets`
+     * is what `pairplot` and `smallmultiples` delegate to, and a delegating
+     * form with no children has nothing to delegate; `layout` is `bar`'s and
+     * `histogram`'s only multi-series reading, so both built `overlap` and
+     * nothing else.
+     *
+     * Two are defaulted **choices** a consumer must still be able to make —
+     * `binning`, which the corpus distinguishes `scott` from `sturges` on, and
+     * `emptyMessage`, whose absence means every app hand-composes an empty
+     * state, which is §8d's defect one kind along.
+     *
+     * And two became readable in **both** arms this arc, so omitting them now
+     * would be omitting something that works: `xScale` and `yScale`.
+     */
+    layout?: Plot["layout"];
+    binning?: Plot["binning"];
+    offsets?: Plot["offsets"];
+    totals?: Plot["totals"];
+    facets?: Plot["facets"];
+    emptyMessage?: Plot["emptyMessage"];
+    xScale?: Plot["xScale"];
+    yScale?: Plot["yScale"];
   },
 ): Plot {
-  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -825,6 +853,14 @@ function plot(
       ...(axisCross === undefined ? {} : { axisCross }),
       ...(calendarUnit === undefined ? {} : { calendarUnit }),
       ...(startDate === undefined ? {} : { startDate }),
+      ...(layout === undefined ? {} : { layout }),
+      ...(binning === undefined ? {} : { binning }),
+      ...(offsets === undefined ? {} : { offsets }),
+      ...(totals === undefined ? {} : { totals }),
+      ...(facets === undefined ? {} : { facets }),
+      ...(emptyMessage === undefined ? {} : { emptyMessage }),
+      ...(xScale === undefined ? {} : { xScale }),
+      ...(yScale === undefined ? {} : { yScale }),
     } as Plot,
     spec,
     true,

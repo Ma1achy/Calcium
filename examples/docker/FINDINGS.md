@@ -13771,6 +13771,58 @@ reason, and the fix for the second is what made the first legible.
 
 ---
 
+## F402 — seven exemptions carrying one sentence, and a plan had owed it since F335 ★★★★☆
+
+`b.plot` declared 48 of `Plot`'s 58 members plus `id`/`kind`. The eight absent were
+`layout · binning · offsets · totals · facets · emptyMessage · xScale · yScale`, and **four of them
+are a form's only datum** — so `gantt`, `waterfall`, `pairplot` and `smallmultiples` could not be
+built at all through the published builder, and `bar`, `histogram` and `line` built one variant
+each where the corpus has several.
+
+**Seven of the eight exemptions carried one sentence**: *step 0 scaffolding — no plot-builder
+shorthand yet, and **no plan owes one***. F335 had owed it. The roadmap cited it. The reason was
+even **reworded once** — when the step it named arrived and took `startDate` and `calendarUnit`,
+the schedule was struck and the replacement asserted, of the rest, that nothing was owed. **A
+deferral whose condition is written where the deferral is and satisfied somewhere else**, which is
+the class CLAUDE.md records, arriving in an enforcement table rather than a comment.
+
+**`emptyMessage`'s was the sharper one**, because it was not a schedule at all: *no surface has an
+empty plot, and `atLeastOne` already floors the height.* That is a claim about the surfaces that
+existed when it was written, offered as a reason a member cannot be **set** — and its effect is
+that every app meeting an empty plot hand-composes the state, which is F401's defect one kind
+along. The renderer has read `block.emptyMessage ?? "No data."` at two sites the whole time.
+
+**Fixed** — all eight declared, destructured and spread, in the file's own three-place idiom.
+`refusals()` is empty, the four forms build, and `/all` reads **46 · 46 drawn · 60 rungs · 106
+figures** where it read 46 · 42 · 53 · 95. The catalogue's `refuse` mechanism is **kept and
+exercised** rather than deleted with its last caller: `CATALOGUE` is `Record<PlotForm, Entry>`, so
+a form added to the union is a compile error until it has an entry, and the union has grown several
+times here. `T-refuse` runs it.
+
+**And `FigureBuilder.setFacets` stops being a capability the published function lacks.** One
+builder holding a member the other did not was two surfaces widened on different days, not a
+design. They set the same field now.
+
+**A row that would have gone quietly vacuous.** *"Each refusal names a field `b.plot` does not
+declare"* iterates `refusals()` — which is empty, so it would have passed over nothing and read as
+coverage. Inverted rather than deleted: `T-eight` slices the same signature from the same file and
+asserts all eight are **present**. Same source, same shape, the true statement.
+
+**The counter that says whether a consumer noticed.** `publicSurfaceUseSignal` reports members
+named by neither example, and it moved `Plot (17) → (14) → (12)`: the four new forms cleared
+`offsets`, `totals` and `facets`, and left `layout`, `binning`, `xScale`, `yScale` and
+`emptyMessage` declared and unused. **A builder taking a member and a consumer naming one are
+different claims**, and only the second is evidence the member works — so seven rungs were added
+for them, `bar` ×3, `histogram` ×2, `line` ×2. All seven build and each draws something its default
+does not, which `T-rungs` checks by comparison rather than by caption. Two of the four members did
+not clear, and the signal's own line says why: 163 of 285 clearings are ambiguous on a shared name.
+
+**Read in colour, because the four had never been drawn through this surface.** The gantt
+staircases its bars by `offsets`, the waterfall's total bar sits at the origin while the rest ride
+the running balance, and both delegating forms lay four facets across the width.
+
+---
+
 ## F401 — the kind the framework returns from three places, and no consumer could build ★★★★★
 
 `/faults` drew every failure as `b.notice("error", …)` — a red line of text, where the framework

@@ -204,6 +204,18 @@ export class FigureBuilder {
     return this;
   }
 
+  /**
+   * **The fluent form of `b.plot`'s `facets`, and for a while the only form**
+   * (C24 I30, §4b).
+   *
+   * One builder holding a member the published function lacked was not a design;
+   * it was two surfaces widened on different days. `pairplot` and
+   * `smallmultiples` are delegating forms, so a `facets` nobody could set made
+   * both unconstructible from `b.plot` while this chain could build them — a
+   * capability reachable only by knowing which of two builders to reach for.
+   * They set the same field now, and this is a convenience over it rather than
+   * the route to it.
+   */
   setFacets(facets: readonly Plot[]): this {
     this.facets_ = facets;
     return this;

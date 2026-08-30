@@ -143,6 +143,9 @@ const plot = (form: PlotForm, height: number, rest: Omit<PlotSpec, "form" | "hei
  */
 export const rungId = (form: PlotForm, name: string): string => `f-${form}-${name}`;
 
+/** The four facets both delegating forms show — one series each, named. */
+const FACET_KEYS = ["cpu", "mem", "io", "net"] as const;
+
 const refuse = (needs: string, what: string): Refusal => ({
   refused: `\`${needs}\` is not declared on \`b.plot\` — ${what}`,
   needs,
@@ -275,15 +278,36 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
       ],
     }, series: [], ...x }) },
 
-  // --- the four the published builder cannot construct (F377) --------------
-  gantt: { says: "bars with a start per row", at: (_p, _h, _x) =>
-    refuse("offsets", "without a start per row a gantt is a bar chart") },
-  waterfall: { says: "a running balance", at: (_p, _h, _x) =>
-    refuse("totals", "without knowing which bars are totals the running balance cannot be drawn") },
-  pairplot: { says: "every variable against every other", at: (_p, _h, _x) =>
-    refuse("facets", "a delegating form with no children has nothing to delegate") },
-  smallmultiples: { says: "the same figure, repeated", at: (_p, _h, _x) =>
-    refuse("facets", "a delegating form with no children has nothing to delegate") },
+  // --- the four that used to refuse, and no longer do (F335, F377, C24 I30) --
+  //
+  // **Each was a form whose *only* datum `b.plot` did not declare**, so the entry
+  // named the missing field rather than being omitted — a catalogue that skips
+  // what it cannot construct reports complete. The published builder takes all
+  // eight now, so `refusals()` is empty and the count on screen is 46 of 46.
+  //
+  // **`refuse` is kept** rather than deleted with its last caller: it is the
+  // shape an entry takes when the surface cannot build a form, and the next form
+  // added to `PlotForm` before its builder is the reason to have it. Exercised by
+  // `T-refuse` so it is not a function nothing calls.
+  gantt: { says: "bars with a start per row", at: (p, h, x) => plot("gantt", h, {
+    axes: true, categories: ["build", "test", "deploy", "monitor"],
+    series: [s([5, 3, 2, 1 + (p % 3)])], offsets: [0, 5, 8, 10], ...x }) },
+  waterfall: { says: "a running balance", at: (p, h, x) => plot("waterfall", h, {
+    axes: true, categories: ["measure", "layout", "paint", "compose", "frame"],
+    series: [s([100, -40 + (p % 5), -25, -10, 25])],
+    totals: [false, false, false, false, true], ...x }) },
+  pairplot: { says: "every variable against every other", at: (p, h, x) => plot("pairplot", h, {
+    axes: true, series: [],
+    facets: FACET_KEYS.map((k, i) => b.plot({
+      id: `pair-${k}`, form: "scatter", height: 4, axes: true,
+      series: [s(wave(30, p, 44 + i, 8, 16))],
+    })), ...x }) },
+  smallmultiples: { says: "the same figure, repeated", at: (p, h, x) => plot("smallmultiples", h, {
+    axes: true, series: [],
+    facets: FACET_KEYS.map((k, i) => b.plot({
+      id: `mult-${k}`, form: "line", height: 4, axes: true,
+      series: [s(wave(30, p, 48 + i, 6, 14), k)],
+    })), ...x }) },
 });
 
 /** Every form, in the catalogue's order. */
@@ -365,6 +389,13 @@ const VARIANTS = {
     // overrode `orientation: "vertical"` onto a spec that sets it, and drew a
     // byte-identical figure under a caption promising a different one.
     "horizontal": { says: "bars rather than columns", spec: { orientation: "horizontal" } },
+    // **`layout` is `bar`'s only multi-series reading**, and for as long as
+    // `b.plot` omitted it the form built `overlap` and nothing else (C24 I30,
+    // F335). A member the builder takes and no consumer names is still counted
+    // by `publicSurfaceUseSignal`, so these are rungs rather than a note.
+    "grouped": { says: "the series side by side within each category", spec: { layout: "grouped" } },
+    "stacked": { says: "the series summed, one column a category", spec: { layout: "stacked" } },
+    "normalised": { says: "stacked to a shared 100%", spec: { layout: "normalised" } },
   },
   line: {
     // **`yAxis: "right"` on all three, and C04 I60 is why**: a callout is written
@@ -395,9 +426,22 @@ const VARIANTS = {
   heatmap: {
     "palette": { says: "a different colormap", spec: { colormap: "magma" as const } },
     "captions-left": { says: "row names down the gutter", spec: { matrixAnchor: "left" } },
+    // **`yScale` and `emptyMessage`, the other two of the eight** (F335). A
+    // percentile spread wants a decade per gridline, and an empty plot is a
+    // state every surface meets — without the member each app hand-composes it,
+    // which is C24 §8d's defect one kind along.
+    "log-y": { says: "a decade per gridline, which a percentile spread wants", spec: { yScale: "log" } },
+    "empty": {
+      says: "no data, and the message the surface chooses for it",
+      spec: { series: [], emptyMessage: "no frames in this window" },
+    },
   },
   histogram: {
     "vertical": { says: "columns", spec: { orientation: "vertical" } },
+    // `binning` — the bin-width rule, defaulted to Sturges and distinguishable
+    // in the corpus, which is the argument for a consumer being able to choose.
+    "scott": { says: "Scott's rule for the bin width", spec: { binning: "scott" } },
+    "freedman-diaconis": { says: "the IQR rule — robust to a long tail", spec: { binning: "freedman-diaconis" } },
   },
   tree: {
     "left-right": { says: "the layout rotated", spec: { treeLayout: "leftRight" } },

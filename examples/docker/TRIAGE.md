@@ -29,7 +29,7 @@ type change.
 
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
-| **1** | [The consumer cannot reach a fact the framework holds](#1) | 12 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
+| **1** | [The consumer cannot reach a fact the framework holds](#1) | 13 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
 | **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 49 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
@@ -51,13 +51,14 @@ than the software.
 ---
 
 <a id="1"></a>
-## 1 · The consumer cannot reach a fact the framework holds — **11 open, 1 closed** ⚠
+## 1 · The consumer cannot reach a fact the framework holds — **11 open, 2 closed** ⚠
 
 **Still the largest open group, and steps 9–13 changed what kind of group it is.** At F55
 every instance was an app *duplicating* a Calcium module. It is now three shapes.
 
 | | the fact | the consumer | the workaround |
 |---|---|---|---|
+| **F402** | **eight `b.plot` members, four of them a form's only datum** | both examples, and every future one | four forms — `gantt`, `waterfall`, `pairplot`, `smallmultiples` — unbuildable through the published builder, and three more reduced to one variant. **Seven of the eight exemptions carried one sentence**: *step 0 scaffolding — no plot-builder shorthand yet, and **no plan owes one***. F335 owed it, the roadmap cited it, and the reason had been **reworded once** without being re-checked. `emptyMessage`'s was worse — *no surface has an empty plot* is a claim about the surfaces that existed, offered as a reason a member cannot be set, while the renderer read `block.emptyMessage ?? "No data."` at two sites throughout. **Fixed** — all eight declared; `refusals()` empty; `/all` reads 46 · 46 · 60 · **106**. `FigureBuilder.setFacets` stops differing. The row that asserted the refusals is **inverted rather than deleted**, since an empty set would have passed over nothing. **Fixed** |
 | **F401** | **the `status` block kind — the thing the framework draws when a part fails** | both examples: plots' `/faults` and docker's `renderError` | a `notice`, independently, in both. `b` had thirty builders and no `status`, and `block()` is not exported, so an override told *rendering is overridable* could only render **worse** — a red line of text against a bordered box with ` ERROR ` in a gap in the rule, a spinner and a countdown. MG27 could not see it: it asks *a field no builder can set* and is keyed `Kind.field`, so a kind with **no** builder has no member rows to be missing, and seven `status.*` reasons described a builder that did not exist. **Fixed** — `b.status(err, retryInMs, attempt)`, the override's own parameters in its own order; `state` and `height` derived, `elapsedMs` and `spinner` still the framework's. The two framework literals now call it, so the default and the override cannot drift. **Fixed** |
 | **F14** | the terminal's width | S1's dashboard | reads `process.stdout.columns` — **stale across a resize**, the duplication C01 I13 exists to prevent |
 | **F43** | what the terminal can draw | S1's banner | sniffs `TERM` and `LANG`, duplicating `terminal/capabilities.ts` |
