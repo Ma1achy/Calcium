@@ -13841,6 +13841,14 @@ backoff is counting down. Not a bug* — so the kind was never scoped to rendere
 `error`'s one-line gloss was: *the definition's renderer threw. A bug.* **A gloss narrower than its
 kind, doing the work of a rule.** Twelve sites were written around it.
 
+**And the box made a stutter conspicuous.** A refused verb reads
+`▲ unknown_verb: unknown verb: /nope` — F165's rule is *a code is the half a reader can search for,
+where a sentence is the half they can read*, which is right in general and produces a repetition
+where the message restates the code. It read the same before, as a red line; a bordered box with a
+painted tag puts it at the centre of the frame. **Recorded, not fixed** — whether a *local parse
+refusal* carries a code at all is a C18 question, and a heuristic that suppresses a prefix when the
+message looks like it is a heuristic that rots.
+
 **Measured before ruling the height**: a realistic spawn message at 72 cells truncates at 4 rows,
 wraps to two rows and fits with one blank at 6, and wastes padding at 8. `statusRowsFor` cannot be
 asked — `errorDoc` has no width and C04 I2 forbids one — so 6 it is, with a long message truncating

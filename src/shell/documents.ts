@@ -250,18 +250,40 @@ export function errorDoc(
 ): ViewDocument {
   const blocks: Block[] = [
     block({
-      kind: "notice",
+      // **A `status`, which is the kind the framework has for this** (F406, C09
+      // §3a). It was a `notice` at all twelve call sites — spawn, handoff,
+      // transport, pipeline, a refused invocation — so a failed command in any
+      // app rendered as a red line of text beside a kind that draws the figure,
+      // and the kind drew it only when a *renderer* threw. §3a's own table has
+      // always read `retrying — the far side failed … not a bug`; only `error`'s
+      // one-line gloss was narrower than the kind, and twelve sites were written
+      // around it.
+      //
+      // **`error`, not `retrying`**: nothing is coming. C23 I51 draws the same
+      // distinction on the live path, and a `retrying` box with no countdown
+      // draws a blank row where the spinner goes.
+      //
+      // **Six rows, read from a frame.** A realistic spawn message at 72 cells
+      // truncates at 4, wraps to two rows and fits with one blank at 6, and
+      // wastes padding at 8. `statusRowsFor` cannot be asked — this function has
+      // no width and C04 I2 forbids one — so the number is a frame read like
+      // C23's, and a very long message truncating is the stated cost.
+      kind: "status",
       id: blockId("error"),
-      tone: "error",
-      glyph: "error",
+      state: "error",
+      height: 6,
       // **The far side's own code, beside its own message** (F165). It was
       // parsed by `mapping.ts`, typed, frozen and rendered nowhere — and a code
       // is the half a reader can search for, where a sentence is the half they
       // can read. Prefixed rather than given a block of its own: it qualifies
-      // the message and a second notice would read as a second failure.
-      text: error.code === undefined ? error.message : `${error.code}: ${error.message}`,
+      // the message and a second block would read as a second failure.
+      message: error.code === undefined ? error.message : `${error.code}: ${error.message}`,
     }),
   ];
+  // **Still a notice, and beneath the box rather than inside it** (F406). A
+  // `status` carries one `message`, and folding the remediation into it would put
+  // the one actionable line in competition with a message that already wraps to
+  // two rows at a typical width. The box says what failed; this says what to do.
   if (error.remediation !== undefined) {
     blocks.push(
       block({
