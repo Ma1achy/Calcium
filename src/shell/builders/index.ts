@@ -51,6 +51,7 @@ import type {
   Code,
   ColumnDef,
   Comparison,
+  ErrorLike,
   Events,
   Glyph,
   Group,
@@ -71,6 +72,7 @@ import type {
   Raw,
   Rule,
   Series,
+  Status,
   Steps,
   Table,
   TableRow,
@@ -1276,6 +1278,91 @@ function spinner(label: string, opts?: BlockOpts): Steps {
   );
 }
 
+/**
+ * `status` — the kind both framework defaults return, and the one no builder made
+ * (C24 I30, §4b, §8d).
+ *
+ * **The parameters are `renderError`'s own, in its own order**, so the null
+ * override is `renderError: b.status` and the useful one wraps it:
+ * `b.group("column", [history, b.status(err, retryInMs, attempt)])`, which keeps
+ * the data the default replaces outright.
+ *
+ * **What is relayed and what is derived, which is the whole of the ruling.** A
+ * consumer is *handed* the error, the countdown and the attempt by the driver, so
+ * passing them back is relaying rather than claiming — the thing MG27 refuses is a
+ * `state` asserted against a fetch that never failed, and `state` is derived here
+ * from whether a countdown is present. `height` is derived too, and it is the one
+ * the scoping does not reach: 1 and 2 are C23's frame read about sitting inside
+ * `b.live`'s panel (F234, F235), so a consumer choosing 3 puts a second border
+ * inside the first and a consumer choosing 2 draws `loading` over `⠋ loading`.
+ * `elapsedMs` and `spinner` are never parameters at all.
+ *
+ * **One implementation, and that is the other half.** This kind was constructed in
+ * three places — here, `execution.ts`'s default `renderError`, and the registry's
+ * containment boundary — and the two that are a *declaration's* default now call
+ * this. Three copies of a shape drift, and the one that drifts is the one with
+ * fewer tests.
+ */
+function statusBlock(
+  err: ErrorLike,
+  retryInMs: number | null,
+  attempt: number,
+  opts?: BlockOpts,
+): Status {
+  // **The decision is named before the block, and SS45 is the reason it reads
+  // better as well as passing.** Written inline, `state: "error",` is a tone
+  // literal *as an object-literal value* — which is SS45's subject exactly, and
+  // the scan is right to look at it: `"error"` is a `Tone` as well as a
+  // `Status.state`, and the two vocabularies overlap. What makes this not
+  // inference is where the value comes from: **an argument the driver supplied**,
+  // not a field name, which is the distinction C24 I5 draws. Hoisting it says so
+  // structurally rather than in a comment, and the literal stops being an
+  // object-literal value because it is not one.
+  //
+  // It also tells MG28 the truth. A bare literal per arm would have that rule
+  // count which arms a builder writes; a derived value makes the field
+  // **parameterised**, which is what it is — all three states are reachable from
+  // the published surface, two through here and `loading` through the door below.
+  const state = retryInMs === null ? "error" : "retrying";
+  const height = retryInMs === null ? 1 : 2;
+  return finish<Status>(
+    block({
+      kind: "status",
+      id: idOf(opts, "status"),
+      message: err.message,
+      state,
+      height,
+      ...(retryInMs === null ? {} : { retryInMs, attempt }),
+    }) as Status,
+    opts,
+    false,
+  );
+}
+
+/**
+ * The third state, which has no error to be handed and so no arity to share.
+ *
+ * `message` is what a taller box would say — the registry can size this one from
+ * a committed measure, and a consumer can read it — while at one row C09 I31
+ * gives `loading` the line that *moves* rather than the label the panel above
+ * already carries.
+ */
+function statusLoading(opts?: BlockOpts): Status {
+  return finish<Status>(
+    block({
+      kind: "status",
+      id: idOf(opts, "status"),
+      state: "loading",
+      message: "loading",
+      height: 1,
+    }) as Status,
+    opts,
+    false,
+  );
+}
+
+const status = Object.assign(statusBlock, { loading: statusLoading });
+
 // --- cells and actions ----------------------------------------------------
 
 const toned =
@@ -1351,6 +1438,11 @@ function live(spec: LiveSpec): Panel {
     // constructed before the driver has run — and it is one of the three states
     // a consumer cannot observe, which is the whole argument for the kind.
     //
+    // **Through `b.status.loading` now** (C24 I30). The literal that stood here
+    // was one of three constructions of this kind, and the argument against three
+    // is the argument against two: the builder and the default cannot drift if
+    // they are the same code.
+    //
     // **This was a `notice` and drew no spinner.** The `pending` glyph was the
     // right answer while the box was static: a builder runs above the renderer,
     // so a character written here cannot be substituted, and `◌` is one C09
@@ -1367,13 +1459,7 @@ function live(spec: LiveSpec): Panel {
     //
     // `message` is still what a taller one would say — the registry can size
     // this box from a committed measure, and a consumer can read it.
-    block({
-      kind: "status",
-      id: `${spec.id}-loading`,
-      state: "loading",
-      message: "loading",
-      height: 1,
-    });
+    statusLoading({ id: `${spec.id}-loading` });
   const panel = finish<Panel>(
     { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
     spec,
@@ -1428,6 +1514,7 @@ export const b = {
   samples,
   raw,
   spinner,
+  status,
 
   // cell shorthands
   id: toned("identifier"),

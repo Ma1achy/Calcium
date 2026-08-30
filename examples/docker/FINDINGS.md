@@ -13771,6 +13771,77 @@ reason, and the fix for the second is what made the first legible.
 
 ---
 
+## F401 — the kind the framework returns from three places, and no consumer could build ★★★★★
+
+`/faults` drew every failure as `b.notice("error", …)` — a red line of text, where the framework
+itself draws a bordered box with ` ERROR ` in a gap in the rule, a spinner, a countdown and an
+attempt count. **The obvious reading is that the demo was hand-rolling a shipped kind, and it is
+wrong.** Measured: `b` had thirty builders and none was `status`; `block()` is not exported. The
+notice was not a shortcut. It was the whole of what the surface allowed.
+
+C24 promises *behaviour is fixed; rendering is overridable, so an app can match its own voice.*
+**The only voice available was a downgrade**, and both example apps had reached for it
+independently — docker's `renderError` composes its history with a notice inside it, plots' four
+write the countdown into a string by hand. Two consumers making the same substitution is what a
+surface gap looks like from outside.
+
+**Why no gate found it.** MG27 asks *a block field no builder can set* and is keyed `Kind.field`,
+so it needs a builder to compare against. A kind with **no** builder has no member rows to be
+missing, and seven `status.*` entries sat in `BUILDER_OMISSIONS` describing a builder that did not
+exist. The rule was answering a question one level below the one that mattered.
+
+**The scoping, and the one member it does not reach.** MG27's reasons are good, and read as *a
+consumer must never hold this* they refuse too much: a `renderError` override **is handed** the
+error, the countdown and the attempt. Relaying them is not claiming, and the member the rule
+protects stays underivable because `state` follows from whether a countdown is present rather than
+being accepted as an argument. **`height` is the exception and it is the one worth naming** — 1 and
+2 are C23's frame read, not arithmetic: both boxes land inside `b.live`'s panel, so three rows
+spend one on a second border inside the first and two rows drew `loading` over `⠋ loading`. A
+consumer picking a height reintroduces exactly that, so the builder derives it.
+
+**Fixed** — `b.status(err, retryInMs, attempt, opts?)`, positionally identical to `renderError`, so
+the null override is `renderError: b.status` and the useful one wraps it. **And the deletion is the
+other half**: the kind was constructed in three places, two of them a declaration's default, and
+both now call the builder. Three copies of one shape drift, and the one that drifts is the one with
+fewer tests. Mutated both ways — collapsing the derived `state`, and moving the height from 1 to 3
+— and `T1.40`/`T1.40b`, which drive the *framework's* default through the real pipeline, fail
+alongside the new rows. The deletion is live, not dead.
+
+**Two rules moved under the pressure**, which is the part worth keeping:
+
+- **SS45 fired on `state: "error"`, correctly and about the wrong thing.** `"error"` is a `Tone`
+  and a `Status.state`, and the vocabularies overlap. What makes it not inference is where the
+  value comes from — an argument the driver supplied, not a field name. Hoisting the decision to a
+  named constant says that structurally rather than in a comment, and the literal stops being an
+  object-literal value because it is not one.
+- **MG28 could not see a shorthand property**, which the hoist then produced. `{ state, height }`
+  is a variable by construction — the case the rule's third stated limit already says is trusted —
+  but the walk read `field:` only, so a field assigned by shorthand looked like a field **no**
+  builder writes, and that is the same verdict as one arm reached. Fixed by anchoring a shorthand
+  match to an object-literal position; the control is a one-arm builder, which still fails.
+
+---
+
+## F401a — a roadmap citation wrong by 190 lines, passing on non-blankness ★★★☆☆
+
+Adding one `import` line to `execution.ts` failed `RS1`: *entry 10: `src/shell/execution.ts:616` is
+blank.* The citation is for `ctx.ask`, which is at **line 806** and has been for some time. It had
+been wrong by 190 lines and passed every run, because the verifier asserts the cited line is
+non-blank and line 616 held *something*.
+
+**This is RS2c's own recorded limit arriving as an instance** — the row is called *a sibling
+citation masks a wrong one — the limit, asserted*, and the same weakness applies within one file:
+**a line number verified only for non-blankness is satisfied by any line.** What exposed it was a
+one-line edit far above, which is the only thing that could: the citation does not resolve against a
+symbol, so nothing but a shift onto whitespace can move it.
+
+Corrected to 806. **Not fixed as a class**, and the reason is the audit's own: matching *"`ctx.ask`
+at line N"* against *the identifier at line N* is the citation-resolves-against-the-wrong-thing
+problem that document argues against automating. The cheap habit is the one already written down —
+when picking up an entry, check what its claims resolve to at HEAD rather than trusting the row.
+
+---
+
 ## F400 — `/all` and `/form` drew nothing for a session, and 53 green assertions were about the pieces ★★★★★
 
 Typed `/all`. Nothing appeared. Typed `/form violin`. Nothing appeared. Both were reported by the

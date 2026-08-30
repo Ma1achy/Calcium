@@ -102,6 +102,7 @@ export type {
   Raw,
   Rule,
   Series,
+  Status,
   Steps,
   Table,
   TableRow,

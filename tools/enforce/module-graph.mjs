@@ -622,19 +622,14 @@ export const BUILDER_OMISSIONS = Object.freeze({
   // `renderLoading` and returns any block at all, which is C24 §5's *behaviour
   // is fixed, rendering is overridable* already working. Both routes exist
   // today, so nothing here is owed a later step (C09 §3a, C04 I66).
-  "status.state": "C09 §3a — the state is observed, never declared; a builder would let it be claimed",
-  "status.message": "C09 §3a — as `state`: the message is what the boundary or the driver caught",
   // **This reason expired halfway and the half that survives is the one that matters.** It
   // read *the box is bound by what `measure` committed and cannot be given its own*, which is
   // true of the containment path and false since C23 I51: the two framework defaults pick 2
   // and 1, chosen from a frame. What has not changed is that no **consumer** picks one — the
   // pickers are the registry and the refresh driver, both inside the framework, and a builder
   // would hand the number to someone with no way to know what will be drawn in it.
-  "status.height": "C09 I31, C23 I51 — the height is the framework's, from a committed measure or from a frame read; never a consumer's",
-  "status.retryInMs": "C09 I32, C23 I51 — the backoff is the source's, and only the driver can compute it",
-  "status.attempt": "C09 I32, C23 I52 — as `retryInMs`: `src.failures`, consecutive, and counted once per source rather than per part",
   "status.elapsedMs": "C09 I32, C23 I52 — supplied by whoever holds the clock, which is the refresh driver and never a builder",
-  "status.spinner": "C09 I32 — reachable when a consumer owns a `status` block, and none does",
+  "status.spinner": "C09 I32 — the frame set is the renderer's, chosen per capability set; a consumer owning a `status` (C24 I30) is handed no frames to name",
 
   "plot.emptyMessage":
     "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
@@ -690,7 +685,11 @@ export const BUILDER_OMISSIONS = Object.freeze({
  *   and `Foo | Bar` is a shape choice the type system already makes.
  * - **A parameter is trusted.** A builder threading `form` through a variable
  *   that can only hold one value would pass; nothing in the tree does that, and
- *   distinguishing it needs flow analysis.
+ *   distinguishing it needs flow analysis. **A shorthand property counts as
+ *   one** — `{ state, height }` is a variable by construction — and it did not
+ *   until `b.status` wrote one: the walk read `field:` only, so a field assigned
+ *   by shorthand looked like a field no builder writes, which is the same
+ *   verdict as one arm reached and the opposite of the truth.
  */
 function checkUnionReach(types, typeNames, fieldsOf, byKind, shared) {
   const violations = [];
@@ -747,6 +746,15 @@ function checkUnionReach(types, typeNames, fieldsOf, byKind, shared) {
       // all — which is the state the fix for F180 put `form` into.
       let parameterised = false;
       const written = new Set();
+      // **A shorthand property is an assignment and the walk could not see one.**
+      // `{ state, height }` names a variable, which the third limit below already
+      // says is trusted — but `field:` never matches it, so the field read as
+      // written by *nothing*, and that is the same verdict as one arm reached.
+      // Found by `b.status`, which hoists its decision so a tone literal is not
+      // an object-literal value (SS45): the fix for one rule made the field
+      // invisible to another. Anchored to an object-literal position — after `{`
+      // or `,` — so a destructure or a type member is not read as a write.
+      if (new RegExp(`[{,]\\s*${field}\\s*[,}]`, "u").test(body)) parameterised = true;
       for (const m of body.matchAll(new RegExp(`\\b${field}:\\s*([^,\\n]+)`, "gu"))) {
         const value = m[1].trim();
         const literal = /^"([^"]+)"/u.exec(value);

@@ -36,6 +36,7 @@ import { DOCUMENT_VIEW_ID } from "./document-view.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { isViewInvocation } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
+import { b } from "./builders/index.js";
 import { liveDeclarations } from "./builders/live.js";
 import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
@@ -1743,26 +1744,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      */
     renderError:
       spec.renderError ??
-      ((err, retryInMs, attempt) =>
-        block(
-          retryInMs === null
-            ? {
-                kind: "status",
-                id: `${spec.id}-error`,
-                state: "error",
-                message: err.message,
-                height: 1,
-              }
-            : {
-                kind: "status",
-                id: `${spec.id}-error`,
-                state: "retrying",
-                message: err.message,
-                height: 2,
-                retryInMs,
-                attempt,
-              },
-        )),
+      // **`b.status`, which is this literal's own shape given a name** (C24 I30,
+      // §4b). It stood here as one of three constructions of one kind, and the
+      // consumer had none — so an override told *rendering is overridable* could
+      // only reach for a `notice` and render worse. The builder derives `state`
+      // and `height` exactly as the two arms below did, so the default and the
+      // consumer's override are the same code and cannot drift.
+      ((err, retryInMs, attempt) => b.status(err, retryInMs, attempt, { id: `${spec.id}-error` })),
   });
 
   /**
