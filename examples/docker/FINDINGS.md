@@ -13849,6 +13849,16 @@ painted tag puts it at the centre of the frame. **Recorded, not fixed** — whet
 refusal* carries a code at all is a C18 question, and a heuristic that suppresses a prefix when the
 message looks like it is a heuristic that rots.
 
+### Three · the reference app had written the countdown by hand
+
+docker's `cpuErrorBlock` composed `b.notice.error(\`${message} — retrying in ${n}s\`)` under its
+ring, because until `b.status` existed an override's whole vocabulary was a red line of text. So
+**one frame showed the same failure two ways**: the parts taking the default drew the box, and the
+part that kept its history drew a hand-formatted sentence — and the two disagreed about the words,
+`— retrying in 16s` against `⠋ retrying in 6s (attempt 2)`. It now composes `b.status`, relaying the
+countdown and the attempt rather than formatting them, which is what an override should have been
+able to do all along: keep the data, and let the framework say the failure.
+
 **Measured before ruling the height**: a realistic spawn message at 72 cells truncates at 4 rows,
 wraps to two rows and fits with one blank at 6, and wastes padding at 8. `statusRowsFor` cannot be
 asked — `errorDoc` has no width and C04 I2 forbids one — so 6 it is, with a long message truncating

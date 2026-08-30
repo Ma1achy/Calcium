@@ -44,7 +44,7 @@ Then, at the prompt:
 /form  <f>    one form full size, with its rungs beneath it   e.g. /form violin
 /live  <f>    one form, advancing
 /compare <f>  the terminal beside the SVG, as pixels
-/faults       a failing source, and the way back
+/faults       a failing source, and the way back — the framework's box, six ways
 /monitor      this machine, live — cores, memory, load, heap
 /rungs        the failure box at every height and width rung it has
 /mosaic       layouts named as a picture — `b.mosaic`'s area grammar

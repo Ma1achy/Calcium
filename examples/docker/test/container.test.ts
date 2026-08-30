@@ -221,15 +221,29 @@ describe("S3's blocks", () => {
     ring.began();
     ring.took(null);
 
-    const body = cpuErrorBlock(ring, "No such container", 16_000) as Group;
+    const body = cpuErrorBlock(ring, { message: "No such container" }, 16_000, 2) as Group;
     const kinds = body.children.map((c) => c.kind);
-    expect(kinds).toEqual(["plot", "notice", "notice"]);
+    // **A `status`, where it was a `notice`** (F406). Before `b.status` existed
+    // an override's only vocabulary was a red line of text, so this app wrote the
+    // countdown into a string by hand — `— retrying in 16s` — while the framework
+    // drew a bordered box with a painted tag on the parts that took the default.
+    // The same failure read two ways in one frame, decided by which panel it was
+    // in.
+    expect(kinds).toEqual(["plot", "notice", "status"]);
     // The history survives the failure that made it worth looking at.
     expect((body.children[0] as Plot).series[0]?.values).toEqual([10, 20, null]);
     // And the caption now has something to report.
     expect((body.children[1] as Notice).text).toContain("1 returned nothing");
-    expect((body.children[2] as Notice).text).toContain("No such container");
-    expect((body.children[2] as Notice).text).toContain("retrying in 16s");
+    // **The countdown is the framework's, not this file's.** `retryInMs` and
+    // `attempt` are relayed rather than formatted here, so the box says what
+    // every other failing part says.
+    expect(body.children[2]).toMatchObject({
+      kind: "status",
+      state: "retrying",
+      message: "No such container",
+      retryInMs: 16_000,
+      attempt: 2,
+    });
   });
 
   it("B2: the plot draws every sample the ring holds and no more", () => {

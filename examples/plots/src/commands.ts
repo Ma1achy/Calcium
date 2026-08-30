@@ -495,7 +495,8 @@ export function faults(): Block {
   return b.group("column", [
     b.notice(
       "info",
-      "six live parts — the framework's own failure box on five of them, and one override that keeps its history",
+      "six live parts — the framework's box on five of them, and one override that keeps its history. " +
+        "` ERROR ` in a gap in the rule, the message, the countdown and the attempt",
     ),
 
     b.live({
@@ -510,12 +511,13 @@ export function faults(): Block {
       render: (v) => walk(Array.isArray(v) ? (v as number[]) : [], 6),
     }),
 
-    // **No `renderError`, which is the change** (F401). This drew the failure as
-    // `b.notice("error", …)` — a red line of text — and the reading that the demo
-    // was hand-rolling a shipped kind was wrong: `b` had no `status`, so a notice
-    // was the whole of what an override could reach for. The default draws the
-    // real box: ` ERROR ` in a gap in the rule, the message wrapped to it, a
-    // spinner, the countdown and `(attempt N)`.
+    // **No `renderError`, and now that means something** (F401, F406). This drew
+    // the failure as `b.notice("error", …)`, and removing the override was only
+    // half the fix: the default was a `status` at the two rungs *below* C09's
+    // first border, so it still read as a red line of text inside the panel and a
+    // reader with two screenshots said so. `framed` is the rung that was missing
+    // — no second border, because the panel has one, and the rows spent on the
+    // tag and the content instead.
     b.live({
       id: "fault-always",
       title: "always failing · the framework's box",
