@@ -245,7 +245,8 @@ export const b: {
   events(events: EventLine[], opts?: BlockOpts): Events;
   plot(spec: BlockOpts & { series: Series[]; height: number;
                            axes?: boolean;
-                           yMin?: number; yMax?: number }): Plot;
+                           yMin?: number; yMax?: number;
+                           /* …and every other member `Plot` declares — §4b */ }): Plot;
   spark(values: number[], opts?: BlockOpts): Plot; // the sparkline path; height 1
   progress(spec: BlockOpts & { label: string; current: number;
                                total: number }): Progress;
@@ -262,6 +263,11 @@ export const b: {
         opts?: BlockOpts): Group;
   raw(text: string, opts?: BlockOpts): Raw;
   spinner(label: string, opts?: BlockOpts): Steps;
+  status: {                                             // §4b
+    (err: ErrorLike, retryInMs: number | null, attempt: number,
+     opts?: BlockOpts): Status;
+    loading(opts?: BlockOpts): Status;
+  };
 
   // cell shorthands
   id(text: string): Cell;   ok(text: string): Cell;   warn(text: string): Cell;
@@ -473,6 +479,70 @@ field private would trade a hand-authored gap for an unreachable one.
 
 ---
 
+### 4b. What a builder may not construct, and the test that decides it
+
+**A published builder constructs every kind and every member the published type
+declares, except where the value is one only the framework can compute.** That is
+the whole rule, and it is I29's dual: I29 asks whether a consumer can build what a
+function makes it *pass in*, and this asks whether it can build what a type says
+*exists*. Both fail the same silent way — the export is there, the signature
+resolves, and the gap shows only when somebody tries.
+
+**The test is who computes the value, not who holds it.** MG27 already refuses a
+builder for seven `status` members, and the reasons are good; read as *a consumer
+must never hold this* they refuse too much. A `renderError` override **is handed**
+the error, the countdown and the attempt by the driver. A consumer passing them
+back is **relaying**, not claiming, and the member MG27 protects — a `state` a
+consumer could assert against a fetch that never failed — stays underivable
+because it is derived from the arguments rather than accepted as one.
+
+| member | who computes it | on `b.status` |
+|---|---|---|
+| `state` | derived: a countdown means `retrying`, `null` means `error` | **no** — derived |
+| `message` | the driver or the containment boundary caught it | **relayed** from `err` |
+| `retryInMs` | the source's backoff | **relayed** |
+| `attempt` | `src.failures`, once per source | **relayed** |
+| `height` | a committed measure, or C23's frame read | **no** — derived |
+| `elapsedMs` | whoever holds the clock | **no** |
+| `spinner` | the renderer, per capability set | **no** |
+
+**`height` is the one the scoping does not reach, and it is the one worth naming.**
+The framework's own defaults choose 1 for `error` and 2 for `retrying`, and those
+two numbers are a frame read rather than an arithmetic: both boxes land inside
+`b.live`'s panel, so three rows spend one on a second border inside the first, and
+two rows drew `loading` over `⠋ loading` — the same word twice. A consumer picking
+a height reintroduces exactly that, so `b.status` derives it the way the default
+does. **The builder and the default are one implementation**, which is the other
+half of the ruling: the same kind constructed in three places drifts, and the
+place that drifts is the one with fewer tests.
+
+**`b.plot` gains all eight members it omitted**, and the argument is per member
+rather than one decision — four are a form's only datum, two are defaulted choices,
+and two became readable in both arms and so would now be omitting something that
+works:
+
+| member | why it lands |
+|---|---|
+| `layout` | `bar`'s and `histogram`'s **only** multi-series reading; without it both build `overlap` and nothing else |
+| `offsets` | a start per row; without it a `gantt` is a bar chart |
+| `totals` | which bars are totals; a `waterfall`'s running balance is not otherwise drawable |
+| `facets` | `pairplot` and `smallmultiples` are delegating forms with nothing to delegate |
+| `binning` | a defaulted choice, and the corpus distinguishes `scott` from `sturges` |
+| `emptyMessage` | otherwise every app hand-composes an empty state, which is this section's defect one kind along |
+| `xScale` · `yScale` | read by both arms; omitting them now omits something that works |
+
+**Four forms were unconstructible and three were reduced**, which is the split that
+says how much was owed: `gantt`, `waterfall`, `pairplot` and `smallmultiples` could
+not be built at all, while `bar`, `histogram` and `line` built without the member
+that distinguishes their variants.
+
+**And `FigureBuilder.setFacets` stops being a capability the published function
+lacks.** One builder having a member the other does not is not a design; it is two
+surfaces that were widened on different days. They set the same field now, and the
+fluent form is a convenience over it rather than the only route to it.
+
+---
+
 ## 5. `b.live` — failure isolation as a primitive
 
 > **This section was *specified, not shipped* for the whole of C22 and C23**, and
@@ -601,6 +671,16 @@ both survived every reading this project gave them because reading is what they
 were consistent with.
 
 **Behaviour is fixed; rendering is overridable.** `renderError` and `renderLoading` are replaceable so an app can match its own voice. Backoff, isolation and teardown are not — a guarantee you can switch off is not one.
+
+**For as long as that sentence existed the only voice available was a downgrade**, and
+that is what §4b fixes. `status` is the kind both framework defaults return and no
+builder constructed, so an override could reach for a `notice` and nothing else —
+a red line of text where the framework draws a bordered box with a tag, a spinner
+and a countdown. Both example apps did exactly that, independently, which is the
+signal: **an override is not a request to render worse.** `b.status` takes
+`renderError`'s own three parameters in its own order, so the null override is
+`renderError: b.status` and the useful one wraps it — `b.group("column", [history,
+b.status(err, retryInMs, attempt)])`, which keeps the data the default replaces.
 
 **`renderError`'s third parameter is a deliberate widening, and the alternative is recorded
 because it is invisible from the result.** `attempt` is the source's consecutive failure count
@@ -886,6 +966,38 @@ does not load; that is the same contract `parseManifest` already publishes and n
 
 ---
 
+## 8d. What the third consumer needed twice — the kind its own failure path uses
+
+`examples/plots` came back with a second finding by the same means, and it is the one §8c's rule
+could not reach. `/faults` exists to show what a failing source looks like, and it drew every
+state as `b.notice("error", …)` — a red line of text, where the framework itself draws a bordered
+box with ` ERROR ` in a gap in the rule, a spinner, a countdown and an attempt count.
+
+**The obvious reading is that the demo was hand-rolling a kind it should have used, and the
+obvious reading is wrong.** Measured: `b` had thirty builders and none of them was `status`, and
+`block()` — C04's constructor — is not exported. **The kind that exists specifically for failure
+had no published constructor at all**, so the notice was not a shortcut; it was the whole of what
+the surface allowed.
+
+**Both example apps had made the same substitution, independently**, which is the signal that it
+is a surface defect rather than a habit: docker's `renderError` composes its history with a
+`notice` inside it, and plots' four write the countdown into a string by hand. Two consumers
+reaching for the same wrong thing is §3's own argument for what a gap looks like.
+
+**Why MG27 did not report it.** MG27 asks *a block field no builder can set* and is keyed
+`Kind.field` — so it needs a builder to compare against. A kind with **no** builder has no member
+rows to be missing, and seven `status.*` entries sat in `BUILDER_OMISSIONS` describing a builder
+that did not exist. The rule was not wrong; it was answering a question one level below the one
+that mattered. That is I30's stated blind spot, and it is why this was found by writing a
+consumer rather than by a gate.
+
+**The residue, stated.** A consumer can now own a `status`, so `BUILDER_OMISSIONS`'s
+`status.spinner` reason — *reachable when a consumer owns a `status` block, and none does* —
+describes a world that no longer exists. It is reworded rather than removed: the field is still
+the renderer's, and the reason has to say so on its own rather than by counting consumers.
+
+---
+
 ## 9. Invariants
 
 - **I1** — Every export is used by **the union of** `prism-tui` and the reference app. Neither alone exercises the whole surface — docker touches no `spectrum`, no `WorldDriver` and only part of the manifest schema. An export used by neither is removed.
@@ -919,6 +1031,7 @@ does not load; that is the same contract `parseManifest` already publishes and n
 - **I28** — **A live part does not poll while nothing is looking at it, and this is not configurable** (I6, C23 I46). It reaches every part rather than only those declaring a `source`, because a part accumulating inside `fetch` is already broken by I27's rule and pausing surfaces that rather than causing it; the alternative would make off-screen behaviour depend on an unrelated declaration. **Nothing is released** — the part stays declared and C23 I33's five triggers remain the only teardown — and a pushed view is visible while its layer exists, so the pause reaches transcript-hosted parts and not a drill-in. It is a stated behaviour change for declarations that predate it, which is why it is an invariant here and not only in C23.
 
 - **I29** — **A published function's arguments are constructible from the published surface.** A parameter whose type is interior makes the function itself interior, whatever the export list says — and the failure is silent in exactly the direction that matters, because the export *is* there and the signature *does* resolve until a consumer tries to supply the argument. **Three instances and the third is why this is a rule** (§8a, §8b, §8c): `CompletionContext` shipped with `completionContext`, `ProducerContext` with `producerContext`, and `plotToSvg` was published for a year with `ResolvedTheme` and `loadTheme` both interior. **`RenderContext.theme` is why it survived** — one published route to the type existed, inside a synchronous `render`, which is the one place an SVG cannot be used. A route that exists and does not reach the callers is indistinguishable from a route that works, from the export list. **Checked rather than promised**: MG29 reads every exported function's parameter types and asks whether each is exported or reachable from an exported type, which is the same question §3's refusal list already answers by hand for the exports it removes. **Its stated blind spot is the one that hid this**: a type reachable through *some* published route counts as constructible, and `ResolvedTheme` was — through `RenderContext`, into a synchronous `render`. The rule reports reachability and cannot ask whether the route reaches the caller who needs it, so it would have found this only once `RenderContext` did not exist.
+- **I30** — **A published builder constructs every block kind, and every member of a kind, that the published types declare — except a value only the framework can compute.** I29's dual, and it fails in the same silent direction: the type is exported, the member resolves, and the gap appears only when a consumer tries to set it. **The exception is `who computes`, not `who holds`** — a value the framework *hands* a consumer, as `renderError` hands `err`, `retryInMs` and `attempt`, is relayed rather than claimed, and relaying it is not the thing MG27 refuses. Derived members stay underivable: `state` follows from whether a countdown is present, and `height` is C23's frame read, so neither is a parameter. **Three instances, and each had been recorded as owed its own commit**, which is how a queue nobody drains gets made: `status` had no builder at all, `b.plot` omitted eight of `Plot`'s 58 — four of them a form's only datum, so four forms were unconstructible and three reduced — and `FigureBuilder.setFacets` set a field the published function could not. **Checked by MG27 in both directions**, which is why the rule can be widened safely: an omission needs a reason keyed `Kind.field`, and an entry whose builder now sets the field is itself a violation, so the reasons cannot outlive their subject. **Stated blind spot**: MG27 is per *member* and this rule is also about *kinds*, and a kind with no builder has no member row to be missing — `status` was invisible to it for that reason, and what found it was writing a consumer that needed one.
 ---
 
 ## 10. Commitments
@@ -951,6 +1064,7 @@ does not load; that is the same contract `parseManifest` already publishes and n
 26. Parts sharing a declared key share one poll and one fold, so two views of one source cannot disagree; a conflicting cadence is refused **where the author can see it** and conflicting fetches are taken on the key's word (I27).
 27. A live part does not poll while nothing is looking at it, for every part and not only the sharing ones — a stated behaviour change, unconditional, and releasing nothing (I28).
 28. A published function's arguments are constructible from the published surface, checked mechanically rather than found by a consumer for the third time (I29, §8c, MG29).
+29. A published builder constructs every kind and member the published types declare, except a value only the framework can compute — and the test is who computes it, not who holds it (I30, §4b, §8d, MG27).
 
 ---
 

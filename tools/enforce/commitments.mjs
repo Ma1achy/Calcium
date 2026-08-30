@@ -925,6 +925,14 @@ export function scanSections(file, src, options = {}) {
  * unsound matcher reported as covered, and they are cited from the rows that
  * cover them rather than listed — a rule's first run should clear something.
  *
+ * **One entry is added deliberately and struck by the next commit**, which is the
+ * only shape this list may grow in. `C24 I30` is ruled in a spec commit that
+ * carries no code — the rule this repository holds for specs — and its row cannot
+ * exist until `b.status` and `b.plot`'s eight do. Listing it says the true thing
+ * about the tree at this commit: *no row names it yet*. The equality compare is
+ * what makes the strike mandatory rather than optional, which is why the entry is
+ * safe to make and why a subset check would not have been.
+ *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
  * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
@@ -942,7 +950,7 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
   "C22 I53", "C22 I57", "C22 I60a", "C23 I10", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
   "C23 I41", "C24 I1", "C24 I10", "C24 I11", "C24 I13", "C24 I14", "C24 I16", "C24 I19",
-  "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
+  "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I30", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
 ]);

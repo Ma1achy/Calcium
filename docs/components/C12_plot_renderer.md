@@ -6623,6 +6623,22 @@ resolution-free: `ecdfSeries` is a function of `values.length`, `densitySeries` 
 argument, `binValues` bins. This one is not. `G1c` states it as a signature, by arity, so the day
 `violinRows` stops taking a width the row fails and the refusal is re-read.
 
+**Re-read, and the refusal is gone — by a route the guard could not see.** `SVG_FAMILY` reads
+`violin: "density", ridgeline: "density"` and `densityFigure` computes the outline from
+`densitySeries` at its fixed resolution, above both arms, which is exactly the escape this section
+ruled out (F383, §3l). **`violinRows` still takes its width**, because the *terminal* arm still
+evaluates per cell — so `G1c` still passes, still asserts a true fact, and stands for nothing.
+**A deferral whose condition is written where the deferral is and satisfied somewhere else**, which
+is the class CLAUDE.md records, and the first instance where the thing watching it is a green test
+rather than a comment. An arity cannot expire here: the shared curve did not change the terminal
+arm's sampling, it stopped the *figure* depending on it. The row is rewritten to watch what is
+actually load-bearing — that the density crossing the seam takes its resolution as an argument.
+
+**And `plotFill` is unblocked with it.** I80's stated blind spot reads *it has nowhere to be read
+until `violin` draws*; `violin` draws, and `svg.ts` still names `plotFill` nowhere. That is a
+member read by one arm on a form both arms now render, which is I75's subject rather than a
+dependency, and the remainder moves from *blocked* to *owed*.
+
 ---
 
 ### 3ak.38 — A key that names its bounds and not its readings, and the invariant it was already under
