@@ -13771,6 +13771,68 @@ reason, and the fix for the second is what made the first legible.
 
 ---
 
+## F406 — the failure box the framework draws, and the two places it never reached ★★★★★
+
+Reported by a reader looking at two screenshots side by side: the containment box with ` ERROR `
+painted in a gap in the rule, and a live part's failure — *`▲ ECONNREFUSED 127.0.0.1:9999` /
+`⠋ retrying in 6s (attempt 2)`* — a red line of text with a glyph, indistinguishable from the
+`notice` it had replaced an arc earlier. **"Those still aren't using the correct error system. Why
+do these old ones still exist."**
+
+**And the commit message said otherwise.** It claimed `/faults` now draws *` ERROR ` painted in a
+gap in the rule, the spinner, the countdown*. The first two of those are the box in the other
+screenshot; the part draws neither. **A description written from the mechanism rather than from the
+frame** — the parts *are* `status` blocks and the sentence about what a `status` draws was copied
+from the kind's own figure, which is exactly the class the frame-read exists to catch and exactly
+the artefact I had.
+
+### One · the ladder had no rung for a box inside a border
+
+Measured at 72 cells, every height a live part's box can take:
+
+| child rows | what it draws |
+|---|---|
+| 1 | message only — a red line |
+| **2, today** | message and activity line — a red line and a spinner |
+| 3 | a **second border inside the panel's**, and no tag |
+| 4 | the tag, at two nested borders |
+| 6 | the tag, two nested borders, and a blank row |
+
+C23 I51 chose 2 with the reason written down — *at 3 the box spends a row on a second border inside
+the first and at 4 it buys the ERROR tag at two nested borders* (F234) — and **the reason is right
+about both options**. What it could not choose is the figure, because C09's height ladder **couples
+the tag to the border**: the tag first appears at the rung where the border already has, so *tag
+without border* was not expressible. A box inside `b.live`'s panel is framed already.
+
+**The missing rung is a second ladder on the same axis.** A framed box draws no border at any
+height and spends the rows on the tag and the content: two rows are *tag and message*, three buy
+`retrying` its activity line. `loading` is unchanged — it has no tag to gain, and its whole content
+is the line that moves.
+
+**A choice between two wrong answers is evidence that a third is missing**, and the shape that hides
+it is a ladder whose rungs are ordered but whose *dimensions* are coupled. Nothing in either
+artefact reaches it: a rule-interaction table indexes rules that both apply, and here one rule
+(*the tag needs a border*) was silently deciding for another (*the container already has one*).
+
+### Two · every framework-level failure was a `notice`
+
+`errorDoc` builds `kind: "notice", tone: "error"`, and it has **twelve call sites** — spawn,
+handoff, transport, pipeline, a refused invocation. So a failed command in **any** app rendered as a
+red line while the framework carried a whole kind for this and drew it only when a *renderer* threw.
+
+**C09 §3a's own table already covered the case** — `retrying` reads *the far side failed and a
+backoff is counting down. Not a bug* — so the kind was never scoped to renderer faults. Only
+`error`'s one-line gloss was: *the definition's renderer threw. A bug.* **A gloss narrower than its
+kind, doing the work of a rule.** Twelve sites were written around it.
+
+**Measured before ruling the height**: a realistic spawn message at 72 cells truncates at 4 rows,
+wraps to two rows and fits with one blank at 6, and wastes padding at 8. `statusRowsFor` cannot be
+asked — `errorDoc` has no width and C04 I2 forbids one — so 6 it is, with a long message truncating
+as the stated cost and `remediation` staying the `info` notice beneath, because the box says what
+failed and the notice says what to do.
+
+---
+
 ## F405 — the block union is open at runtime and closed in the types ★★★★☆
 
 `validateDocument` says it in its own words:

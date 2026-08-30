@@ -672,6 +672,13 @@ were consistent with.
 
 **Behaviour is fixed; rendering is overridable.** `renderError` and `renderLoading` are replaceable so an app can match its own voice. Backoff, isolation and teardown are not — a guarantee you can switch off is not one.
 
+**And an app that declines to override now gets the figure rather than a line** (F406). The
+framework's defaults are a `status` and were sized at 1 and 2 rows inside `b.live`'s own panel,
+where C09's ladder gave a tag only to a box that drew its own border — so a failing part read as a
+red line of text and looked exactly like the `notice` it replaced. C09 §3a's `framed` ladder is
+what fixed it: no second border, the rows spent on the tag and the content. **Declining to override
+is the way to be told**, which is what *behaviour is fixed* was always supposed to mean.
+
 **For as long as that sentence existed the only voice available was a downgrade**, and
 that is what §4b fixes. `status` is the kind both framework defaults return and no
 builder constructed, so an override could reach for a `notice` and nothing else —
