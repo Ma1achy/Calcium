@@ -92,3 +92,58 @@ import { readFileSync } from "node:fs";
   writeFileSync(join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
   console.log("corrupt.png      control written, " + String(out.length) + "B");
 }
+
+// --- the replace case, because six documents assert it and none measured it --
+//
+// **`a=T` at a stable id replaces the image at that id** is written in
+// `kitty.ts:12`, `transmit-image.ts:62`, C09 §4c:834, `c09-image.mjs:114` and
+// FINDINGS twice — six statements across four files, every one of them ours,
+// none citing kitty's documentation and none citing a reading. *Repetition
+// across documents is not corroboration*: six restatements of an unmeasured
+// claim are one unmeasured claim.
+//
+// **F421 rests on it and cannot.** That finding's other half — our path derives
+// the id rather than passing it — is measured, at four call sites. This half
+// never has been, and the two fail differently: a protocol refusal would close
+// the question, and a derivation we wrote would not.
+//
+// **The probe could not have answered it before now.** Every case above gets
+// `imageId(imageKey(block))`, a digest, so no two transmissions in this file
+// have ever shared an id; the only fixed one is the control's hand-rolled 909.
+//
+// **What this measures and what it does not.** The manifest loop transmits and
+// reads the reply, so it answers *does the terminal refuse a second transmission
+// at a live id* — an error here is the protocol saying no. It does not answer
+// *which picture is displayed*, which needs a placement in front of a human;
+// `replace.place` is written for exactly that and the driver's case reads it.
+//
+// Two pictures nobody could confuse — a sixteen-colour swatch and a photograph —
+// so the reading is which one appears rather than whether anything changed.
+{
+  const ID = 911;
+  for (const [name, file] of [["replace-a.png", "palette.png"], ["replace-b.png", "photo.png"]]) {
+    const block = b.image({ id: `x-${file}`, path: join(ASSETS, file), height: 8, alt: file });
+    const box = imageCells(block, WIDTH);
+    const real = transmitImage([block], KITTY, new Set(), WIDTH);
+    // The id is substituted the way `q=2 → q=0` is, and asserted the same way.
+    // `,i=N,` cannot occur in the payload: base64 carries no commas.
+    const derived = `,i=${String(imageId(imageKey(block)))},`;
+    const hits = real.split(derived).length - 1;
+    if (hits !== 1) throw new Error(`${name}: expected exactly one ${derived}, found ${String(hits)}`);
+    const held = real.split("q=2").join("q=0").split(derived).join(`,i=${String(ID)},`);
+    if (held === real) throw new Error(`${name}: the id substitution changed nothing`);
+    if (held.includes(derived)) throw new Error(`${name}: a derived id survived the substitution`);
+    writeFileSync(join(OUT, `${name}.transmit`), held);
+    manifest.push({
+      file: name, cols: box.cols, rows: box.rows, bytes: held.length, placement: "ok",
+      why: `THE REPLACE PAIR — both at i=${String(ID)}; an error here is the protocol refusing`,
+    });
+    // The second one's geometry is what a working replace should display.
+    if (name === "replace-b.png") {
+      const placed = placementRows(ID, box.cols, box.rows);
+      writeFileSync(join(OUT, "replace.place"), "rows" in placed ? placed.rows.join("\n") : "");
+      console.log(`replace pair      both at i=${String(ID)}, place ${String(box.cols)}x${String(box.rows)}`);
+    }
+  }
+  writeFileSync(join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
+}

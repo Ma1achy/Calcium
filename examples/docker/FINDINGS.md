@@ -13902,14 +13902,48 @@ a heredoc, reporting *5 cases, 0 failure descriptions* against a driver where al
 
 ---
 
-## F421 — kitty's same-id replace is real and Calcium cannot reach it, because identity is the picture ★★★★☆
+## F421 — kitty's same-id replace is asserted five times and measured never, and Calcium does not reach it because identity is the picture ★★★★☆
 
 **The question, asked before building an animated image arm**: `a=T` at a stable id replaces the
 image with one escape and no placeholder rewrite — if that holds, an animated image plot is nearly
 free at kitty and expensive everywhere else.
 
-**The protocol half holds.** `transmit-image.ts` already says so in its own words —
-*re-transmitting is correct and idempotent, since `a=T` replaces at that id.*
+**Which of the two it is, because the answer decides what the finding blocks.** *Unreachable
+because the protocol refuses it* and *unreachable because our path does not offer it* are different
+findings — the first closes the question and the second is a seam. It is the second. And the two
+halves are not merely different: they are **held to different standards of evidence**, which is the
+part that was invisible until someone went looking for the record.
+
+**The protocol half is asserted five times and measured never.** *`a=T` at a stable id replaces* is
+written in `kitty.ts:12`, `transmit-image.ts:62`, C09 §4c:834, `tools/mutate/runs/c09-image.mjs:114`
+and this file at 12532 — four files, every statement ours, none citing kitty's documentation and none
+citing a reading. That is F58's shape exactly: **repetition across documents is not corroboration**,
+and five restatements of an unmeasured claim are one unmeasured claim.
+
+**Two of the five go further and call the chain true**, which is the strongest form and the one that
+reads least like a guess: C09 §4c's *every step of that is true and the conclusion is false* and
+F413's *every step holds and the conclusion is false*. Both are about the **conclusion** falling —
+Ink strips APC escapes — and both leave the replace premise standing as verified. It never was.
+
+**And the count was six until this paragraph was written.** The first draft of this finding said *the
+protocol half holds* and cited `transmit-image.ts`'s comment for it, which is the claim quoting
+itself; deleting it is why the number above is five. The instinct to write *six* and then go and
+count is the whole of the instrument.
+
+**And the instrument that could have answered it was in the repository, not answering it.**
+`tools/terminal-probe` transmits five images to a real Ghostty and reads the reply. Every case gets
+`imageId(imageKey(block))` — a digest — and the only fixed id in the file is the control's
+hand-rolled `909`, so **no two transmissions the probe has ever sent shared an id.** `result.txt`'s
+five verdicts say nothing whatever about replacement. Reading the record is what showed that; no
+assertion about a source would have.
+
+**Now instrumented, and bounded honestly.** A pair at `i=911` — the sixteen-colour swatch, then the
+photograph — appended to the manifest, so `probe.py` picks it up without being edited: it iterates
+the manifest, and appending rather than prepending is load-bearing because `manifest[0]` is what
+checks 2b and 9 read. An error on the second transmission is the protocol refusing. It does **not**
+answer which picture is displayed — that needs a human in front of the terminal, and `replace.place`
+is written for exactly that step. Two pictures nobody could confuse, so the reading is *which one
+appears* rather than *did anything change*.
 
 **The Calcium half does not, and the reason is a ruling rather than an oversight.** The id is
 `imageId(imageKey(block))`, and `imageKey` is the block's **digest** — the picture's identity, not
@@ -13935,6 +13969,26 @@ placement per frame                  12 400 B   400 cells at 31 B
 per-frame total at kitty             13 996 B
 per-frame if the id were stable       1 596 B   the placement is byte-identical and the row diff skips it
 ```
+
+**The seam is open at the encoder and closed one layer above.** `kitty.ts`'s
+`transmit(id, payload, cols, rows)` takes the id **as a parameter** — it has always been able to
+hold one still. The id is derived, and never passed, at four lines:
+
+```
+src/shell/transmit-image.ts:110               transmit(imageId(key), …)        key = imageKey(image), :91
+src/shell/transmit-image.ts:123               transmitRgba(imageId(key), …)
+src/shell/transmit-image.ts:124               transmit(imageId(key), …)
+src/presentation/blocks/kinds/image.ts:155    placementRows(imageId(imageKey(block)), …)
+```
+
+**Three transmissions in L4 and one placement in L1, deriving the same id independently** — they
+agree only because both compute the same pure function of the same block, which is why nothing has
+ever had to pass it. That is also what makes the fix cheaper than it looks: `Image.id` is on the
+block, so L1 can address `imageId(block.id)` with no session state and C09 §4c's purity survives.
+What it costs is C04 I74's dedup — two blocks of one picture would transmit twice, once per
+placement id, which is one extra transmission per duplicate block rather than per frame — and the
+overlay collision the digest was chosen to avoid has to be re-derived against block ids. **None of
+that is protocol work.**
 
 **8.8×, and 89% of it is placeholders.** For comparison, the same subject as a braille dither is
 **8 974 B** whole and **8 839 B** diffed (F-anim measurements) — so an animating plot at kitty is

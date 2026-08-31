@@ -68,6 +68,31 @@ describe("tools/terminal-probe/build.mjs — the bytes it captures", () => {
     expect(BUILD).toContain("we refuse: bit depth 16");
     expect(BUILD).toContain("we refuse: Adam7");
   });
+
+  it("TP5: the replace pair goes to one id, and the substitution is asserted both ways", () => {
+    // **F421's protocol half, instrumented.** `a=T` at a stable id replaces is
+    // written six times across four files, all of them ours, none citing kitty's
+    // documentation or a reading — and every case above gets a digest-derived
+    // id, so no two transmissions here had ever shared one. The pair fixes that:
+    // two transmissions at `i=911`, and an error from the second is the protocol
+    // refusing. What it does not answer is *which picture is displayed*, which
+    // needs a human in front of a terminal; `replace.place` is written for that.
+    expect(BUILD).toContain("const ID = 911;");
+    expect(BUILD).toContain('[["replace-a.png", "palette.png"], ["replace-b.png", "photo.png"]]');
+    // **The two must be different pictures or the case measures nothing** — a
+    // replace that did not happen and one that did would look identical.
+    const pair = /\[\["replace-a\.png", "([a-z0-9.]+)"\], \["replace-b\.png", "([a-z0-9.]+)"\]\]/u.exec(BUILD);
+    expect(pair, "the pair's two assets are named").not.toBeNull();
+    expect(pair?.[1], "a swatch and a photograph, not one asset twice").not.toBe(pair?.[2]);
+    // The same discipline as `q=2 → q=0`: the token has to be *there* before its
+    // absence can mean the substitution ran, and a survivor has to be refused.
+    expect(BUILD).toContain("if (hits !== 1)");
+    expect(BUILD).toContain("the id substitution changed nothing");
+    expect(BUILD).toContain("a derived id survived the substitution");
+    // Appended, never prepended: `probe.py` reads `manifest[0]` for checks 2b
+    // and 9, so a pair at the front would silently retarget both.
+    expect(BUILD.indexOf("const ID = 911;")).toBeGreaterThan(BUILD.indexOf("THE CONTROL"));
+  });
 });
 
 describe("tools/terminal-read.sh — the driver's own claims", () => {
