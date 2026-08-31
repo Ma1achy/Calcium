@@ -29,7 +29,7 @@ type change.
 
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
-| **1** | [The consumer cannot reach a fact the framework holds](#1) | 17 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
+| **1** | [The consumer cannot reach a fact the framework holds](#1) | 18 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
 | **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 50 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
@@ -37,9 +37,9 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 43 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 23 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 54 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 25 | **10** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 154 | **15** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **9** | [**The instrument was wrong**](#9) | 55 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **10** | [**A claim carried without a record**](#10) | 27 | **10** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
+| **11** | [A gate that passes without checking](#11) | 157 | **15** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 21 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
@@ -51,7 +51,9 @@ than the software.
 ---
 
 <a id="1"></a>
-## 1 · The consumer cannot reach a fact the framework holds — **12 open, 5 closed** ⚠
+## 1 · The consumer cannot reach a fact the framework holds — **13 open, 5 closed** ⚠
+
+**F421** — kitty's `a=T` replaces at an id, and Calcium's id is `imageId(imageKey(block))` where `imageKey` is the **picture's** digest (C04 I74). Two frames of one animated plot are one block at one position and two ids, so the whole placeholder grid is rewritten with them — the id travels in each cell's foreground colour. Measured at 40×10: **13 996 B a frame, 89% of it placeholders**, against **1 596 B** if the id were stable, and dearer than the braille dither at 8 974 B. `#sentImages` is never cleared, so a hundred frames leave a hundred images resident. **Not a patch** — the digest identity is right for its own reason, and what an animation wants is a *placement* identity that is the block's with the digest kept as the transmission's cache key, which is F413's split one field over. **Open, and it decides the question it was asked**: no live image arm until C09 §4c rules the placement identity.
 
 **Still the largest open group, and steps 9–13 changed what kind of group it is.** At F55
 every instance was an app *duplicating* a Calcium module. It is now three shapes.
@@ -451,6 +453,8 @@ and the claim has to be one the producer can support.*
 
 ## 9 · The instrument was wrong · new at F80
 
+**F419** — `gifFrom` declared `channels: 3` against a raster that has four, so **every GIF this repository ever produced** was sheared, tripled horizontally and green — including F227's two proof GIFs. Every automated check agreed: `metadata()` reported the right pages and delays, the fixture asserted the *frames* were distinct (true of corrupt frames), and no golden or baseline corpus holds a GIF. **Found by looking at a picture** — an `inferno` heatmap that came out flat green — on the first subject with real colour; the four status GIFs are dark text on a dark ground, where a channel rotation still reads as a box with words in it. **The file sizes were saying so**: one-frame-repeated and ten-distinct came out 21 710 and 21 712 bytes, and 2 778 and 3 080 once fixed. **Fixed** — `flatten` onto the page background, the count read back through `resolveWithObject`, a throw comparing the buffer length, and AP9 reading the encoded bytes back out.
+
 **F412** — the half-block pass came back 2 of 8 survived and the two indicted different artefacts. `SWAP-HALVES` was the **fixture**: a red-over-blue split at four cell rows gives every cell two pixel rows of one colour, so a transposition is a no-op — and the comment above the assertions named that property as the reason the row was unambiguous. `NO-CLAMP` was the **ruling**: 1.24 billion coordinates swept and none of `sampleRgb`'s four bounds ever binds, so C09 §8b G9 credited a guard doing no work while being right about the cell. **Fixed** — a stepped fixture, a corrected G9, and the uncatchable mutation replaced by one over the midline, which is what actually carries the claim. 8 of 8 after.
 
 **F411** — three rows each held `/[⠀-⣿]/u` meaning *is a picture drawn*, and a rung above braille made all three report **no picture** for a frame full of it. The class is named in one of the three files already, about SGR rather than glyphs: *a matcher that sees one encoding cannot tell the rung is absent from the rung is a different escape*. The fix stayed where it was found. **Fixed** — one matcher built from the ladder's own constants; and its first draft was vacuous, because membership in `.:-=+*#@` is satisfied by any caption with a hyphen, so a picture is a **run** of the alphabet rather than a character of it.
@@ -575,6 +579,10 @@ here about whether the reading happened at all.
 
 ## 10 · A claim carried without a record — **16: five findings disproved, ten claims caught before anything was built on them, one rule that governed thirty forms** · new at F80
 
+**F416** — fixing F415 did not change the frame: `docker exec` does not propagate `TERM` or `TERM_PROGRAM`, so the container reports `xterm-256color` and C02 answers `none` **correctly**. Two right rules in tension — *run everything in the devcontainer* and *detect the terminal from the environment* — with a boundary the second cannot see across. **Fixed in the harness**, and it is why F415 hid: every reading of this demo has been through a container, so the protocol arm could not have run even with the detection right.
+
+**F417** — the half-block frame is 48681 B against braille's 8141 and kitty's 19048, 82% of it escapes, re-emitted on every scroll frame. Reported by a reader scrolling rather than by any gate. The saving that is unexploited is emitting a colour only when it changes; **not taken**, because F416 moved the reader onto a different arm and tuning against a frame nobody is looking at is the wrong measurement.
+
 **This group is the disposition.** The first five entries are findings that were filed,
 believed, and then turned out to be wrong — and a log that quietly dropped them would read as
 *eighty-four found* rather than **seventy-nine found and five disproved.**
@@ -652,7 +660,13 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F318** | **a `drops` member on `Figure`, named in the design and absent from the tree** | **The tree is right and the design was wrong**, which is the reverse of how a declared-but-missing member reads. `dropped = Math.max(0, longest - layout.areaWidth)` — `longest` is a sample count and **`areaWidth` is cells**. §3aj hazard 3 is *anything measured in cells stays in cells*, and `G1`/`G1b` assert the shared layer's side **by arity**: `niceAxis(range, maxTicks, pin)` and `seriesRange(series, pin, bars)`, neither with a width. `notice` carries the count in its string, so both halves fail for one reason. **And the difference it was reaching for is legitimate** — the terminal drops leading columns because a cell is a quantum; the second arm scales 640 px and has nothing to drop, which is not *has not implemented dropping*. The row belongs in §2's closed list as *they differ and always will*, and fails the day the SVG grows a drop rule. **The ramp half stands and is open.** C23 §8a A4's shape in a type sketch: nine of ten members are properties of the block, so the tenth read as one |
 
 
-## 11 · A gate that passes without checking — **103: 60 closed, 43 open**
+## 11 · A gate that passes without checking — **106: 62 closed, 44 open**
+
+**F422** — `make instruments` compares by equality and failed on the day three instruments landed without fixtures; `make all` includes it, and **has been red for three commits**. **The second instance in the same target**, with the first recorded in that target's own comment four lines from where the fixtures were owed — *a gate is covered by where it sits in the default path*, and being in `make all`'s list is not the same as the list being run. **Fixed two of three**; `probe.py` runs at import and opens `/dev/tty` at module scope, so its parsers cannot be imported, and the expiry is named as a symbol rather than taken — the restructure needs a real terminal to verify.
+
+**F420** — `heatmap.ts`'s `layoutFor` sizes its row-label column from `series[].label`, and `/monitor` declared `categories`, which no matrix form reads. Eight rows of correct colour with **no ordinate**, at every width, with the labels declared and discarded. C12 I18 already forbids the frame — *a heatmap's row labels **are** its ordinate*, and A2's drop order ends *an unlabelled matrix is never rendered* — but the ladder never fires, because there were no labels to drop. **docker's `cpu-history` has always used `label`**: two consumers, one right, and nothing between them. **Fixed in both surfaces**, with the C04 refusal owed as a ruling — `categories` on a matrix form should be refused at construction the way an unknown colormap is.
+
+**F418** — F415's shape one column over. `detectColourDepth` matches the substrings `256color` and `truecolor` and knows no terminal by name, so **`TERM=xterm-kitty` is detected as a 16-colour terminal** by the same table that answers `kitty` for its graphics protocol four lines up and names ghostty for `synchronisedUpdate`. Three capabilities, three vocabularies about one terminal. Masked because both terminals set `COLORTERM`; it surfaced the moment F416's harness fix propagated `TERM` without it, dropping the container to 4-bit and taking every continuous colormap with it. **Open** — the fix is a shared terminal table, which is a C02 ruling.
 
 **F415** — `detectImageProtocol` returns `kitty` for `TERM=xterm-kitty` and nothing else, so the entire protocol arm was unreachable on Ghostty, WezTerm and Konsole — three of the four terminals the plan named. T1.7 asserts exactly the three cases the function implements, so rule and test agree and neither knows about a fourth terminal; and every other test injects capabilities directly, which is correct and leaves the detection as the one thing nothing exercises. **The knowledge was four lines up in the same table** — `synchronisedUpdate` has named ghostty since v1. **Fixed for ghostty on a measurement**; WezTerm and Konsole owed, with the probe named as their expiry.
 

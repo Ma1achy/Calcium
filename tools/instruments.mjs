@@ -55,6 +55,15 @@ const COVERED = [
   // belongs in the raw input options. The rows assert the frames rather than the
   // encoded file, because that is the property an encoder cannot repair.
   ["tools/status-proof.mjs", ["npx", "vitest", "run", "test/unit/status-proof.test.ts"]],
+  // **The animations, split out of `status-proof.mjs` and given the fixture it
+  // could not have.** SP1 and SP2 rebuild the frames from the generator's intent
+  // and check those are distinct, which is a property of `renderSequenceToLines`
+  // — so the two status GIFs it covered held `elapsedMs` and `retryInMs` frozen
+  // across every frame, the spinner turned, the numbers stood still, and sixteen
+  // assertions agreed. AP3 and AP4 ask *these* frames whether the counter moves,
+  // and AP9 reads the bytes back out of the encoded GIF, which is the one
+  // question no frame assertion can ask (F419).
+  ["tools/animation-proof.mjs", ["npx", "vitest", "run", "test/unit/animation-proof.test.ts"]],
   // The Order column's verifier. **It caught this target's own claim a second
   // time**: `make instruments` went 19 found / 18 with a fixture and named the
   // file, which is the equality comparison paying out on the day the instrument
@@ -72,6 +81,14 @@ const COVERED = [
   // source that moves. Eighteen had rotted when the sweep was first run, one of
   // them a **control**, which makes its whole run unstartable.
   ["tools/mutate/anchors.mjs", ["npx", "vitest", "run", "test/unit/mutate-anchors.test.ts"]],
+  // **The terminal read's two halves that a container can check.** Neither's
+  // *verdict* is reachable from here — that is the whole reason the probe exists
+  // — but the properties that make a verdict readable are: that the bytes are
+  // the shipped encoder's, that the `q=2 → q=0` substitution fired, that the
+  // control is a real PNG broken on purpose, and that every case in the driver
+  // tells the reader what its failure looks like.
+  ["tools/terminal-probe/build.mjs", ["npx", "vitest", "run", "test/unit/terminal-probe.test.ts"]],
+  ["tools/terminal-read.sh", null], // same fixture — the driver's own claims
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
   // **Both landed without a fixture and this target was not run**, so the gate
   // that exists to catch exactly that sat red for three commits. `catalogue-png`
@@ -137,6 +154,20 @@ const NOT_INSTRUMENTS = {
   "examples/docker/tools/_fixture.py": "the fixtures' own four-line harness",
   "examples/docker/tools/registry.mjs": "the shared registry, covered by probes_test.mjs",
   "examples/docker/tools/__pycache__": "not a file",
+  // **An instrument, and untestable as written — the reason is the debt rather
+  // than an exclusion.** Its body runs at import and it opens `/dev/tty` at
+  // module scope, so nothing can import `kitty_reply` — the one pure function
+  // that decides whether the terminal said OK or named an error, and therefore
+  // the one whose wrong answer would make every reading meaningless. *An entry
+  // that starts on import is untestable*, and the suite retargeting at the
+  // pieces would read as coverage.
+  //
+  // **The expiry is a symbol**: `if __name__ == "__main__"` around the body with
+  // `TTY`/`FD` opened inside it. Not taken here, because the restructure has to
+  // be verified against a real terminal in a real Ghostty window and this
+  // repository cannot do that — a probe rewritten blind is a probe whose next
+  // reading nobody can trust. Whoever next runs the read owns the change.
+  "tools/terminal-probe/probe.py": "runs at import and opens /dev/tty at module scope, so its parsers cannot be imported; the expiry is a `__main__` guard, and it must be verified in a real terminal",
 };
 
 // **`.ts` was missing, and the omission has a history worth keeping.**

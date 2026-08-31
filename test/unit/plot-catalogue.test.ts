@@ -17,8 +17,10 @@ import { cells as width } from "../../src/presentation/text.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { CAPS, FORMS, clearGenerated, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
+// **This carried a `@ts-expect-error` and no longer needs one**: `catalogue-png`
+// gained a `.d.mts` when `animation-proof.test.ts` came to consume `gifFrom`,
+// and `tsc` reported the directive as unused — which is the declaration file
+// doing exactly what it is for. `plot-catalogue.mjs` above still has none.
 import { ansiToSvg, colour256, parseLine, sheetBg, unparsedSgr } from "../../tools/catalogue-png.mjs";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 

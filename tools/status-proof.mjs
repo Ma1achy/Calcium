@@ -3,15 +3,18 @@
  *
  *     npx tsx tools/status-proof.mjs
  *
- * **A spinner is the one thing a static frame cannot prove**, which is why the
- * GIFs are here rather than a note saying the counter advances. `steps` is the
- * regression proof: the same block that drew one glyph across ten real frames
- * before F227 was fixed, and the whole set after.
+ * **The still frames only — the animations moved to `animation-proof.mjs`.**
+ * Four GIFs were assembled here, and two of them were wrong in a way this file
+ * could not see: `status-loading` held `elapsedMs: 4000` and `status-retrying`
+ * held `retryInMs: 8000` for **every** frame, so the spinner turned and the
+ * numbers beside it stood still — F227's own failure mode, in the artefact built
+ * to prove F227 fixed. The fixture asserts distinctness over `steps`, which
+ * carries no numbers, so it agreed.
  *
- * **Deterministic, so the output can be committed.** Every frame is a pure
- * function of `(block, width, ctx)` with `tick` in `ctx`, so the images are
- * generated without a session and the same input gives the same bytes. A GIF
- * that changed between runs would be the `Math.random()` finding in a new file.
+ * What is left here is the ladder: three states at four capability sets, six
+ * heights and six widths, all at `tick: 0`. Those are frames where nothing is
+ * supposed to move, which is why they belong apart from the ones where
+ * everything is.
  *
  * **The frames go through `ansiToSvg`**, which is the catalogue's own renderer,
  * so an SGR arm missing there is missing here too — and the 1-bit frames are the
@@ -25,7 +28,7 @@ import { join } from "node:path";
 import sharp from "sharp";
 
 import { ansiToSvg } from "./catalogue-png.mjs";
-import { createBlockRegistry, spinnerFrames, spinnerIntervalMs } from "../src/presentation/blocks/index.js";
+import { createBlockRegistry } from "../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../src/presentation/render-lines.js";
 import { defaultTheme, loadTheme } from "../src/presentation/theme/index.js";
 
@@ -76,44 +79,6 @@ async function png(name, ansi) {
   return svg;
 }
 
-/**
- * N frames at successive ticks, assembled at the set's own cadence.
- *
- * **The delay is `spinnerIntervalMs`, not a number chosen here**, so the GIF
- * plays at the rate a reader would see — modulo C03's 100 ms window, which
- * floors it in a live session and is recorded in C22 I60a.
- */
-async function gif(name, frames, delayMs) {
-  const pages = await Promise.all(
-    frames.map((ansi) => sharp(Buffer.from(ansiToSvg(ansi)), { density: 144 }).png().toBuffer()),
-  );
-  const metas = await Promise.all(pages.map((buf) => sharp(buf).metadata()));
-  const w = Math.max(...metas.map((m) => m.width ?? 0));
-  const h = Math.max(...metas.map((m) => m.height ?? 0));
-  const raw = await Promise.all(
-    pages.map((buf) =>
-      sharp(buf)
-        .resize({ width: w, height: h, fit: "contain", position: "left top", background: "#1e1e1e" })
-        .raw()
-        .toBuffer(),
-    ),
-  );
-  // **A raw buffer carries no page metadata**, so the strip is joined and the
-  // page height declared here rather than inferred — `n-pages` is a libvips
-  // field only a decoded animated image has, and asking a raw one for it is the
-  // error this first produced.
-  // **`pageHeight` belongs to the raw *input* options, not to `.gif()`.** Given
-  // to the encoder it is accepted and ignored, and the file writes as a single
-  // tall frame — a GIF that looks like a GIF and does not move. `metadata()` is
-  // what said so, and only when read with `{ animated: true }`: a plain read
-  // reports `pages 1` for an animated file too, so the first check agreed with
-  // the defect either way. **An instrument answering the same for both cases.**
-  await sharp(Buffer.concat(raw), {
-    raw: { width: w, height: h * frames.length, channels: 3, pageHeight: h },
-  })
-    .gif({ delay: frames.map(() => delayMs), loop: 0 })
-    .toFile(join(OUT, `${name}.gif`));
-}
 
 const WIDTH = 52;
 
@@ -160,51 +125,9 @@ for (const w of [30, 13, 11, 9, 8, 3]) {
 // twenty-row frame below is a real render and stands on its own.
 await png("status-error-h20", ansiFor(block({ height: 20 }), WIDTH, CAPS["24bit"], 0));
 
-// --- the animation ----------------------------------------------------------
-const setFrames = spinnerFrames(CAPS["24bit"]).length;
-const delay = spinnerIntervalMs();
-
-await gif(
-  "status-retrying",
-  Array.from({ length: setFrames }, (_, tick) =>
-    ansiFor(
-      block({ state: "retrying", height: 7, message: "connection refused", retryInMs: 8000, attempt: 2 }),
-      WIDTH,
-      CAPS["24bit"],
-      tick,
-    ),
-  ),
-  delay,
-);
-
-await gif(
-  "status-loading",
-  Array.from({ length: setFrames }, (_, tick) =>
-    ansiFor(
-      block({ state: "loading", height: 7, message: "fetching", elapsedMs: 4000 }),
-      WIDTH,
-      CAPS["24bit"],
-      tick,
-    ),
-  ),
-  delay,
-);
-
-// **`steps.gif`, and it is the one that matters.** F227's whole subject is that
-// `tick` never advanced, so the *before* GIF is every frame at tick 0 — which is
-// exactly what a session drew, measured — and the *after* is the counter moving.
-{
-  const steps = { kind: "steps", id: "s", steps: [{ label: "building", state: "active" }] };
-  await gif(
-    "steps-before",
-    Array.from({ length: setFrames }, () => ansiFor(steps, 30, CAPS["24bit"], 0)),
-    delay,
-  );
-  await gif(
-    "steps-after",
-    Array.from({ length: setFrames }, (_, tick) => ansiFor(steps, 30, CAPS["24bit"], tick)),
-    delay,
-  );
-}
+// **The animations are `tools/animation-proof.mjs`'s**, and the split is by
+// what moves rather than by subject. A still ladder and a spinner want opposite
+// things from a fixture: one is asserted frame by frame against a committed
+// picture, the other is worthless unless successive frames *differ*.
 
 console.log(`status proof — ${OUT}`);

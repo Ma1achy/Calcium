@@ -350,8 +350,17 @@ function monitorFrame(h: History): Block {
         b.plot({
           id: "mon-cores", form: "heatmap", height: Math.min(cores, 8), axes: true,
           colormap: "inferno", yMin: 0, yMax: 1,
-          categories: h.cores.map((_c, i) => `core ${String(i)}`),
-          series: h.cores.map((row) => ({ values: [...row] })),
+          // **`label` on the series, not `categories` on the block** (F420).
+          // C12 I18 is explicit — *a heatmap's row labels **are** its ordinate* —
+          // and `layoutFor` sizes the column from `series[].label`. This declared
+          // eight `categories`, which no matrix form reads, so the demo shipped
+          // eight unlabelled rows and a reader could not tell which core was
+          // which. Nothing refused it: `categories` is legal on a `Plot` and
+          // silently ignored here, and the frame that results is a perfectly
+          // good heatmap of anonymous rows. **docker's `cpu-history` has always
+          // done it this way** — one consumer right, one wrong, and no gate
+          // between them.
+          series: h.cores.map((row, i) => ({ values: [...row], label: `core ${String(i)}` })),
         }),
       ], { id: "mon-left" }),
       b.group("column", [
@@ -511,6 +520,21 @@ export async function compare(form: PlotForm, phase: number, caps: TerminalCapab
  */
 let attempts = 0;
 
+/**
+ * **Failures, counted separately from fetches** (F417).
+ *
+ * The label read `attempts - 1` and `attempts` counts *every* fetch, so once the
+ * source recovered the number kept climbing: a reader watching for a minute saw
+ * *recovered after 11 failures* where there had been two. An off-by-one in a
+ * label is invisible to every assertion — the document validates, the frame
+ * paints, and only a person reading the sentence can see it is counting the
+ * wrong thing.
+ *
+ * Grepped for copies: this is the only `attempts - 1` in either example, and the
+ * two `length - 1` hits in docker are indices rather than counts.
+ */
+let failures = 0;
+
 /** The accumulating part's readings — what the override keeps and the default drops. */
 let kept: readonly number[] = [];
 
@@ -555,12 +579,14 @@ export function faults(): Block {
       every: 1200,
       fetch: () => {
         attempts += 1;
-        return attempts <= 2
-          ? Promise.reject(new Error(`the far side is starting up (${String(attempts)}/2)`))
-          : Promise.resolve(attempts);
+        if (attempts <= 2) {
+          failures += 1;
+          return Promise.reject(new Error(`the far side is starting up (${String(attempts)}/2)`));
+        }
+        return Promise.resolve(attempts);
       },
       render: (v) =>
-        b.notice("ok", `recovered after ${String(attempts - 1)} failures — tick ${String(Number(v))}`),
+        b.notice("ok", `recovered after ${String(failures)} failures — tick ${String(Number(v))}`),
     }),
 
     // **A one-shot, and the arm the two above cannot reach** (C23 I51, F234).

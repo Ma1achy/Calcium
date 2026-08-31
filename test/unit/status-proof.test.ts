@@ -8,6 +8,16 @@
 // single tall page. `metadata()` said `pages 1`, and only when read with
 // `{ animated: true }`: a plain read reports `pages 1` for an animated file too,
 // so the first check agreed with the defect either way.
+//
+// **The animations have moved to `tools/animation-proof.mjs`, and the reason is
+// what these rows could not see.** They rebuild the frames here rather than
+// importing the generator's, so they assert a property of
+// `renderSequenceToLines` — and the two status GIFs this file used to write held
+// `elapsedMs: 4000` and `retryInMs: 8000` for **every** frame, so the spinner
+// turned and the numbers stood still. Sixteen assertions agreed, because the
+// subject they range over is `steps`, which carries no numbers. SP1 and SP2 are
+// still right about what they say; `test/unit/animation-proof.test.ts` asks the
+// generator's own frames.
 import { describe, expect, it } from "vitest";
 
 import { createBlockRegistry, spinnerFrames } from "../../src/presentation/blocks/index.js";
@@ -41,15 +51,16 @@ describe("tools/status-proof.mjs — the frames it assembles", () => {
   it("SP1: the animated source is one distinct frame per tick, over the whole set", () => {
     // **The property the GIFs rest on**, asserted on the frames rather than on
     // the encoded file: if these are not distinct, no encoder can make an
-    // animation out of them and the `steps-after.gif` in the catalogue is a
-    // still picture with a caption claiming otherwise.
+    // animation out of them and `docs/media/steps-after.gif` is a still picture
+    // with a caption claiming otherwise.
     const n = spinnerFrames(FULL_CAPS).length;
     const frames = Array.from({ length: n }, (_, tick) => ansi(steps, 30, tick));
     expect(new Set(frames).size, `${String(n)} ticks, ${String(n)} frames`).toBe(n);
   });
 
   it("SP2: the frozen source is one frame repeated, which is what `before` claims", () => {
-    // The other half, and it is the claim `steps-before.gif` makes about F227:
+    // The other half, and it is the claim `docs/media/steps-before.gif` makes
+    // about F227:
     // every frame at tick 0 is what a session drew for the life of the project.
     const n = spinnerFrames(FULL_CAPS).length;
     const frames = Array.from({ length: n }, () => ansi(steps, 30, 0));

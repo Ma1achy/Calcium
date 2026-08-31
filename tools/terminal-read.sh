@@ -39,7 +39,20 @@ mkdir -p "$OUT"
 pause() { printf '\n%s[ %s ]%s ' "$D" "${1:-screenshot, then Enter}" "$O"; read -r _; }
 head2() { printf '\n%s%s%s\n%s%s%s\n' "$B" "$1" "$O" "$D" "$2" "$O"; }
 looks() { printf '\n  %sTHE FAILURE LOOKS LIKE%s\n' "$YE" "$O"; while IFS= read -r l; do printf '    %s\n' "$l"; done; }
-demo()  { docker exec -it "$C" bash -lc "cd /workspace/examples/plots && $1"; }
+# **`COLORTERM` too, and leaving it out cost the colour to buy the pixels** (F418).
+# The first fix passed `TERM` and `TERM_PROGRAM` only: the container went from
+# `xterm-256color` (depth 8) to `xterm-ghostty` (depth **4**, because the string
+# carries neither `256color` nor `truecolor`), so the images arrived and every
+# continuous colormap vanished — C10 I31 gives nothing below 8-bit. Three
+# variables, because capability detection reads three.
+#
+# **`-e TERM -e COLORTERM -e TERM_PROGRAM`, and without them the read measures the container**
+# (F416). `docker exec` does not propagate the terminal's identity: the container
+# reports `TERM=xterm-256color` and no `TERM_PROGRAM`, so C02 answers
+# `imageProtocol: "none"` — correctly, from the only evidence it has — and the
+# demo draws the dither on a terminal that speaks the protocol. The first run of
+# this script measured exactly that and the caption said so on screen.
+demo()  { docker exec -e TERM -e COLORTERM -e TERM_PROGRAM -it "$C" bash -lc "cd /workspace/examples/plots && $1"; }
 
 # --- the record, because a placeholder's width is a font question ------------
 record() {

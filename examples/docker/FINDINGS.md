@@ -11166,13 +11166,21 @@ The two repeats in the *after* row are the wrap, not a stall: ten samples at 250
 cadence near 100 ms traverses the set and starts again. **T4.35 asserts all ten** by sampling
 thirty times rather than by tuning the interval.
 
-**And as images**, because a spinner is the one subject a string of glyphs argues about badly —
-`tools/status-proof.mjs` writes both to `docs/catalogue/status/`:
+**And as images**, because a spinner is the one subject a string of glyphs argues about badly.
+`tools/animation-proof.mjs` writes them, and they are **committed rather than generated** —
+`docs/media/steps-before.gif` and `docs/media/steps-after.gif`, 2.8 and 3.1 KiB:
 
-```
-steps-before.gif    every frame at tick 0 — what a session drew, measured
-steps-after.gif     the counter moving
-```
+![Three steps — resolving done, building active, publishing pending — with the active step's spinner glyph identical in every frame](../../docs/media/steps-before.gif)
+
+![The same three steps, with the active step's spinner turning through all ten glyphs of its set](../../docs/media/steps-after.gif)
+
+**The path was wrong for as long as this finding has existed** (F419). It read
+`docs/catalogue/status/`, which is inside a directory `.gitignore` excludes in its entirety —
+`git ls-files docs/catalogue` returns **zero** — so a finding cited two pictures that have never
+been in the repository, and a reader following the citation found nothing. What determinism buys
+an artefact is *reproducibility*, and the two are not the same thing: **what a command reproduces
+is generated, what is cited as evidence is committed.** These two are the exception the rule
+names.
 
 **The *before* is not a reconstruction**, which is the trap this file has fallen into once
 already: it is the real renderer at the real value a real session supplied, so the honest image
@@ -11492,7 +11500,9 @@ would make it worth building on a third instance.
 
 **Fixed** — the six statements rewritten against HEAD **lead sentence first**, `animation.ts`
 given its C09 text, and F227's two proof GIFs cited from the finding that measured them rather
-than sitting unreferenced in `docs/catalogue/status/`.
+than sitting unreferenced elsewhere. *Unreferenced* turned out to be the smaller half: the path
+they were cited at is inside a gitignored tree, so they were unreferenced **and absent** (F419).
+They are in `docs/media/` now, and rendered inline above rather than named in a code block.
 
 **The habit this leaves is one line: when closing a finding, rewrite the claim, then append the
 history.** Doing it in the other order is what produced I60, and the other order is the one that
@@ -13847,6 +13857,295 @@ the counter reaches it; it failed before the fix with `expected undefined to be 
 
 **Found by measuring the frame after a fix that should have worked.** The row for F407 passed, the
 terminal did not change, and the gap between those two is the whole finding.
+
+---
+
+## F422 — the gate that catches an instrument landing without a fixture caught it, twice, and nobody ran it ★★★☆☆
+
+`make instruments` compares its registry against the tree **by equality**, so an instrument added
+without a fixture fails on the day it lands. It did:
+
+```
+NO FIXTURE   tools/terminal-probe/build.mjs
+NO FIXTURE   tools/terminal-probe/probe.py
+NO FIXTURE   tools/terminal-read.sh
+instruments=2
+```
+
+`make all` is `check enforce audit instruments test golden e2e`, so **the default gate has been
+red for three commits** and every green reading taken in between was taken without it.
+
+**The second instance, and the first is written four lines from where these fixtures were owed.**
+`tools/instruments.mjs` already carries: *both landed without a fixture and this target was not
+run, so the gate that exists to catch exactly that sat red for three commits.* Identical target,
+identical count, identical cause. **A gate is covered by where it sits in the default path, and
+that is not the same as being in `make all`'s list** — it is in the list, and the list was not
+run.
+
+**Fixed, two of three, and the third is a stated debt rather than an exclusion.** `build.mjs` and
+`terminal-read.sh` take `test/unit/terminal-probe.test.ts` — seven rows over what a container can
+check: that the bytes are the shipped encoder's rather than a reimplementation, that the
+`q=2 → q=0` substitution both *could* fire and *did*, that the control is a real PNG broken on
+purpose, and that all five of the driver's cases print what their failure looks like.
+
+**`probe.py` cannot be fixtured as written and the entry says so with its expiry.** Its body runs
+at import and it opens `/dev/tty` at module scope, so nothing can import `kitty_reply` — the one
+pure function deciding whether the terminal said `OK` or named an error, and therefore the one
+whose wrong answer makes every reading meaningless. The expiry is a `__main__` guard, and it is
+**not taken here**: the restructure has to be verified in a real Ghostty window, and a probe
+rewritten blind is a probe whose next reading nobody can trust.
+
+**Two of the fixture's own rows were wrong on the first run**, which is the fixture responding
+before it is asserted against: `TP4` counted two controls where there are three (the corrupt PNG
+is the control for the *probe*, not for a case), and `TR1` matched `| looks` where the driver uses
+a heredoc, reporting *5 cases, 0 failure descriptions* against a driver where all five have one.
+
+---
+
+## F421 — kitty's same-id replace is real and Calcium cannot reach it, because identity is the picture ★★★★☆
+
+**The question, asked before building an animated image arm**: `a=T` at a stable id replaces the
+image with one escape and no placeholder rewrite — if that holds, an animated image plot is nearly
+free at kitty and expensive everywhere else.
+
+**The protocol half holds.** `transmit-image.ts` already says so in its own words —
+*re-transmitting is correct and idempotent, since `a=T` replaces at that id.*
+
+**The Calcium half does not, and the reason is a ruling rather than an oversight.** The id is
+`imageId(imageKey(block))`, and `imageKey` is the block's **digest** — the picture's identity, not
+the block's (C04 I74). Two consecutive frames of one animated plot are one block at one position
+with one `id`, and they get two digests. Measured on 320×160 frames differing by one in the red
+channel:
+
+```
+block id      plot-anim == plot-anim          same
+digest        06d871be… vs 93e26479…          DIFFERENT
+imageKey                                      DIFFERENT
+imageId       10252568  vs 3420252            DIFFERENT
+placeholders identical across frames?         no
+```
+
+**So the placement is rewritten too**, and it is the expensive half: the id travels in each
+placeholder cell's 24-bit foreground colour (`placeholderCell`), so a new id changes every cell of
+the grid. At 40×10:
+
+```
+transmission per frame                1 596 B   (the PNG is 1 157 B)
+placement per frame                  12 400 B   400 cells at 31 B
+per-frame total at kitty             13 996 B
+per-frame if the id were stable       1 596 B   the placement is byte-identical and the row diff skips it
+```
+
+**8.8×, and 89% of it is placeholders.** For comparison, the same subject as a braille dither is
+**8 974 B** whole and **8 839 B** diffed (F-anim measurements) — so an animating plot at kitty is
+*dearer than the arm it is supposed to beat*, exactly inverting the question's premise.
+
+**And the ids leak.** `#sentImages` is a `readonly Set` created once per session and never
+cleared, keyed by picture. A hundred-frame animation leaves a hundred images resident in the
+terminal, none of them ever referenced again.
+
+**Not a patch, because the two identities are both right.** `imageKey` is the digest for a stated
+and measured reason — two blocks of one image must transmit once, and an overlay must not collide
+with the picture it overlays. What an animation wants is a *placement* identity that is the
+block's, with the digest kept as the transmission's cache key: the same split C09 already made
+between `extentOf` and `pixelsOf` (F413), one field over. That is a C09 §4c ruling and it is
+**owed, not taken**.
+
+**What it decides, which is what it was asked to decide**: an animated image plot is not nearly
+free at kitty today, so the SVG arm's animation stays what it is — N documents rasterised and
+assembled by a generator — and no live image arm is worth building until the placement identity
+question is ruled.
+
+---
+
+## F420 — a heatmap's row labels are its ordinate, and the demo declared them in a field no matrix reads ★★★★☆
+
+Found by looking at the first frame of the animation catalogue's heatmap: eight rows of correct
+`inferno` colour and **no ordinate at all**. `/monitor` declares
+
+```
+categories: h.cores.map((_c, i) => `core ${i}`),
+series:     h.cores.map((row) => ({ values: [...row] })),
+```
+
+and `heatmap.ts`'s `layoutFor` sizes its label column from `block.series.map((s) => s.label ?? "")`.
+`categories` is legal on a `Plot`, read by no matrix form, and **silently ignored**. Measured at
+120, 76 and 40 columns: `core` appears zero times. Given both, the series label wins 8–0.
+
+**C12 I18 already rules it** — *a heatmap's row labels **are** its ordinate*, with A2's drop order
+built around it: *columns go first, then labels are truncated, and an unlabelled matrix is never
+rendered.* The spec forbids exactly the frame the demo ships, and the ladder never fires because
+there were no labels to drop.
+
+**Two consumers, one right.** docker's `cpu-history` builds `series` with `label: labelFor(id)`
+and has always drawn its rows named. Nothing between them says which is correct.
+
+**The class is a field accepted and ignored**, and C04 names the remedy for its sibling four lines
+away: *an unknown colormap name is refused at construction, because a name that resolves to nothing
+renders uncoloured and green — the shape this type will not reproduce.* A `categories` that
+resolves to nothing renders **a correct picture of anonymous rows**, which is worse: green is a
+symptom and an unlabelled matrix is a chart.
+
+**Fixed in both surfaces; the framework refusal is owed.** `/monitor` and the catalogue's ring now
+label their series, and `AP8` asserts the eight labels with `CATEGORIES-BACK` as its mutation. What
+is not built is the validator arm — `categories` on a matrix form should be refused at
+construction, the way an unknown colormap is — because that is a C04 ruling and rulings land as
+spec edits first.
+
+---
+
+## F419 — every GIF this repository ever produced was sheared, tripled and green ★★★★★
+
+`gifFrom` — until this arc, `status-proof.mjs`'s local `gif()` — declared its raster's channel
+count instead of reading it:
+
+```js
+raw: { width: w, height: h * pages.length, channels: 3, pageHeight: h }
+```
+
+`pngFromSvg` renders an SVG, SVG rendering carries alpha, and `.raw()` hands back **four**
+channels. Measured: a 640×320 page is 819 200 B, and `w · h · 3` is 614 400. Reading a 4-byte
+pixel stream as 3-byte pixels makes every row four thirds as long as declared, so each row wraps
+into the next and the shear accumulates down the page.
+
+**The output is not subtly wrong.** An `inferno` heatmap came out flat green; the retrying status
+box came out with its text repeated three times across the frame and illegible. Both play
+perfectly smoothly.
+
+**Nothing in the tree could have said so.**
+
+| the check | what it reported |
+|---|---|
+| `metadata()` | 10 pages, 80 ms delays, right dimensions — all correct |
+| `status-proof.test.ts` SP1/SP2 | the **frames** are distinct, which is true of corrupt frames |
+| the still catalogue | unaffected — a PNG is written by `sharp` with no raw round trip |
+| `make golden`, the SVG baseline, the terminal baseline | GIFs are in none of them |
+
+**It was found by looking at a picture**, which is the instrument the findings table already
+ranks first and the one no assertion replaces. The subject that exposed it is the first with real
+colour: the four status GIFs are dark text on a dark ground, where a channel rotation still reads
+as *a box with words in it*.
+
+**And the file size was saying so the whole time.** `steps-before.gif` holds one frame repeated
+ten times and `steps-after.gif` ten distinct frames; corrupt, they were **21 710 and 21 712
+bytes** — two apart, because a sheared dither is incompressible either way. Fixed, they are 2 778
+and 3 080. The whole directory fell from 19 MiB to 6, and `retrying.gif` from 359 KiB to 8.3 —
+**43×**. A GIF of one repeated frame that does not compress better than one of ten different
+frames is a readable signal, and it was in the listing.
+
+**Fixed** — the alpha is composited onto the page background with `flatten` and the count comes
+back from the buffer through `resolveWithObject`, with a throw beside it comparing
+`data.length` against `w · h · channels`. `flatten` rather than `removeAlpha`, because dropping
+the channel leaves every antialiased edge blended against nothing.
+
+**The mutation nearly shipped as an expected survivor.** *The kill for this one is a person
+looking at a picture* is true of how it was found and false as a reason not to test it: the
+question a frame assertion cannot ask is whether the bytes coming **out** of the encoder carry
+the colours that went in, and nothing stopped a test from asking. AP9 encodes two flat pages and
+reads them back page by page. A run with a standing expected survivor teaches its reader to skim
+the survivors column.
+
+**And then the pass found that the fix has two halves and only one is load-bearing.** Written as
+the single edit `const channels = 3`, `CHANNELS-THREE` **survived** — correctly. With `flatten`
+in place the raster genuinely *is* three channels, so hard-coding 3 is a no-op and the mutation
+no longer constructs the defect it names. `flatten` is the repair; reading the count back through
+`resolveWithObject` is the **guard that keeps the repair true**, and a mutation over the guard
+alone tests nothing while reading as though it tests everything. The row removes both, which is
+the code exactly as it shipped, and is caught. **A survivor whose subject has been repaired by a
+different line is the third disposition** — the test is right, the mutation is the artefact
+indicted, and only running the pass separates that from a weak assertion.
+
+---
+
+## F418 — the same table knows a terminal for one capability and not for the one beside it ★★★☆☆
+
+F415's shape, one column over, found by a reader asking why a `/monitor` heatmap had gone
+monochrome. Measured:
+
+```
+TERM=xterm-ghostty                       depth  4    image kitty
+TERM=xterm-ghostty COLORTERM=truecolor   depth 24    image kitty
+TERM=xterm-256color                      depth  8    image none
+TERM=xterm-kitty                         depth  4    image kitty
+```
+
+**`detectColourDepth` matches the substrings `256color` and `truecolor` and knows no terminal by
+name.** `xterm-kitty` carries neither, so **kitty itself is detected as a 16-colour terminal** —
+by the same table that, four lines up, correctly answers `kitty` for its graphics protocol and
+names ghostty for `synchronisedUpdate`. Three capabilities, three different vocabularies about
+the same terminal.
+
+**Masked in practice and latent in principle.** Both terminals set `COLORTERM=truecolor`, so a
+real session gets 24-bit and nobody sees it. It surfaces the moment something propagates `TERM`
+without `COLORTERM` — which is exactly what F416's harness fix did, dropping the container from
+8-bit to **4-bit** and taking every continuous colormap with it (C10 I31 gives nothing below 8).
+Bought the pixels and paid in colour.
+
+**Third instance of one mechanism**, so it is the class rather than the entry: F415 was
+`detectImageProtocol` knowing one terminal, this is `detectColourDepth` knowing none, and
+`synchronisedUpdate` — which knows ghostty by `TERM_PROGRAM` — is the one that already had the
+knowledge each of the others was missing. **Open**: the fix is a terminal table the three
+detectors share, and that is a C02 ruling rather than a patch.
+
+---
+
+## F416 — the container cannot see the terminal, and the detection was right all along ★★★★☆
+
+Fixing F415 did not change the frame. The demo still captioned itself *this terminal reports no
+graphics protocol (none)* on a Ghostty whose detection now works. Measured:
+
+```
+$ docker exec calcium-dev printenv TERM TERM_PROGRAM
+xterm-256color
+TERM_PROGRAM unset
+```
+
+**`docker exec` does not propagate the terminal's identity.** The demo runs in `calcium-dev` —
+CLAUDE.md's rule, and the right rule — so C02 answers `none` from the only evidence it has, which
+is *correct* and produces a wrong picture.
+
+**Two correct things in tension, and neither is at fault.** *Run everything in the devcontainer*
+and *detect the terminal from the environment* are both right, and a container is a boundary the
+second cannot see across. Any consumer running Calcium inside a container gets silently degraded
+capabilities, and the degradation is invisible because every rung below is a working rendering.
+
+**Fixed in the harness rather than in the framework**: `docker exec -e TERM -e TERM_PROGRAM`.
+It is not a framework defect — C02 is answering the question it was asked — but it is a fact a
+consumer needs, because the failure is a *quality* loss with no error attached to it.
+
+**And it is why F415 hid for so long.** Every reading of this project's own demo has been through
+a container, so the protocol arm could not have run even with the detection right. Two independent
+reasons for the same symptom, and fixing the first left the second standing — which is exactly
+why the frame had to be read again rather than assumed fixed.
+
+---
+
+## F417 — the richest rung is six times the cheapest, per frame ★★★☆☆
+
+Reported by a reader scrolling: *the images lag slightly and drift, like they lose their
+anchoring for a second*. Measured over the `/image` document at 110 columns:
+
+```
+half block    89 rows    48681 B   escapes 39672 B   12.3 B/cell
+braille       89 rows     8141 B   escapes   444 B    2.1 B/cell
+kitty         89 rows    19048 B   escapes  2044 B    2.8 B/cell
+```
+
+**82% of the half-block frame is escape bytes**, and a scroll re-emits the whole visible region
+every frame. Six times the dither and four times the protocol arm, for the rung the ladder
+*prefers* on any terminal without graphics.
+
+**The cost is inherent to the rung and the saving is not.** Two full colours a cell is what the
+arm is for, so a photograph cannot be cheap — but `paint` emits an opening sequence and a reset
+**per span**, and `halfBlockRows` produces one span per cell. Adjacent cells sharing both colours
+already coalesce; what is unexploited is emitting a colour only when it *changes*, which is the
+standard run-length a terminal painter does and would cost nothing on a gradient while collapsing
+flat regions to almost nothing.
+
+**Not taken here, and the reason is measurement rather than effort**: the reader was on the
+half-block arm because of F416, and is now on the protocol arm at 2.8 B/cell — a different
+mechanism. Whether the lag survives that is the question, and optimising before it is asked would
+be tuning against a frame nobody is looking at any more.
 
 ---
 

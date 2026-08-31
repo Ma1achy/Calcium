@@ -352,6 +352,106 @@ export function ansiToSvg(ansi) {
   return parts.join("\n");
 }
 
+/**
+ * An SVG string to PNG bytes, at the catalogue's density.
+ *
+ * **One rasteriser for both arms.** The terminal arm reaches it through
+ * `ansiToSvg` and the SVG arm hands it `plotToSvg`'s output directly — two
+ * pipelines, one `sharp` call, so a background changing here cannot move one
+ * arm's images and not the other's.
+ *
+ * **The density is a parameter and the still catalogue's 144 is the default.**
+ * One frame's cost is a still's whole cost; an animation multiplies it by the
+ * frame count, and a GIF is a palletised format whose size scales with pixels
+ * rather than with content. The two callers want different answers to one
+ * question, which is what a parameter is for.
+ */
+export async function pngFromSvg(svg, density = 144) {
+  return await sharp(Buffer.from(svg), { density }).png().toBuffer();
+}
+
+/**
+ * PNG pages to an animated GIF, at a delay per frame.
+ *
+ * **Here rather than in the generator that first needed it**, and the reason is
+ * that there were about to be two. `status-proof.mjs` owned this and
+ * `animation-proof.mjs` wanted the same seven lines — including the two
+ * comments below, each naming a defect that has already shipped once. A second
+ * copy inherits the comments without the bug and then drifts, which is the
+ * shape `screenRows` carries three times and names as such.
+ *
+ * **A raw buffer carries no page metadata**, so the strip is joined and the page
+ * height declared here rather than inferred — `n-pages` is a libvips field only
+ * a decoded animated image has, and asking a raw one for it is the error this
+ * first produced.
+ *
+ * **`pageHeight` belongs to the raw *input* options, not to `.gif()`.** Given to
+ * the encoder it is accepted and ignored, and the file writes as a single tall
+ * frame — a GIF that looks like a GIF and does not move. `metadata()` is what
+ * said so, and only when read with `{ animated: true }`: a plain read reports
+ * `pages 1` for an animated file too, so the first check agreed with the defect
+ * either way.
+ *
+ * **The pages are padded to a common box rather than assumed equal.** A frame
+ * whose widest row is one cell shorter than its neighbour's rasterises one cell
+ * narrower, and a strip of unequal pages is a GIF sheared diagonally — which is
+ * the failure that looks like a rendering defect in the frames themselves.
+ *
+ * **The channel count is measured, and declaring it is what broke every GIF this
+ * repository ever produced** (F419). This read `channels: 3` against a raster
+ * that has four: `pngFromSvg` renders an SVG, SVG rendering carries alpha, and
+ * `.raw()` hands back RGBA. Reading a 4-byte pixel stream as 3-byte pixels makes
+ * every row four thirds as long as declared, so each row wraps into the next and
+ * the shear accumulates down the page — the frames came out **green, tripled
+ * horizontally and illegible**, with the colour channels rotated as a side
+ * effect.
+ *
+ * Nothing caught it. `metadata()` reported the right page count and the right
+ * delays; the fixture asserted the *frames* were distinct, which is true of
+ * corrupt frames; the still catalogue was never affected, because a PNG is
+ * written by `sharp` from the same raster without a raw round trip. **It was
+ * found by looking at a picture** — an `inferno` heatmap that came out green —
+ * and no assertion in the tree could have said so.
+ *
+ * So the alpha is composited onto the page background and then removed, and the
+ * count comes back **from the buffer** through `resolveWithObject` rather than
+ * from this file's belief about it. `flatten` is the right operation rather than
+ * `removeAlpha`: dropping the channel would leave every antialiased edge
+ * blended against nothing.
+ */
+export async function gifFrom(pages, delays, file) {
+  const metas = await Promise.all(pages.map((buf) => sharp(buf).metadata()));
+  const w = Math.max(...metas.map((m) => m.width ?? 0));
+  const h = Math.max(...metas.map((m) => m.height ?? 0));
+  const raws = await Promise.all(
+    pages.map((buf) =>
+      sharp(buf)
+        .resize({ width: w, height: h, fit: "contain", position: "left top", background: BG })
+        .flatten({ background: BG })
+        .raw()
+        .toBuffer({ resolveWithObject: true }),
+    ),
+  );
+  const channels = raws[0].info.channels;
+  // **Asserted rather than trusted, because the failure is silent and pretty.**
+  // A wrong count does not throw — it produces a plausible-looking animation of
+  // the wrong picture, which is the one outcome no reader questions.
+  for (const { data, info } of raws) {
+    if (info.channels !== channels || data.length !== w * h * channels) {
+      throw new Error(
+        `page raster is ${String(data.length)} B at ${String(info.channels)} channels, ` +
+          `expected ${String(w * h * channels)} B at ${String(channels)}`,
+      );
+    }
+  }
+  await sharp(Buffer.concat(raws.map((r) => r.data)), {
+    raw: { width: w, height: h * pages.length, channels, pageHeight: h },
+  })
+    .gif({ delay: [...delays], loop: 0 })
+    .toFile(file);
+  return { width: w, height: h, pages: pages.length, channels };
+}
+
 // --- main ---
 //
 // Guarded so the pure parts above can be imported by a fixture. The colour
