@@ -258,7 +258,10 @@ if [ $# -gt 0 ]; then run "$1"; else
   printf '%sthe terminal read — what no gate here can do%s\n' "$B" "$O"
   printf '%severy case prints what the FAILURE looks like, not only what to look for%s\n' "$D" "$O"
   record
-  pause "Enter to begin — case 4 first"
+  printf '\n%sthe machine half is already run%s — %sdocs/catalogue/images/real/README.md%s\n' "$D" "$O" "$B" "$O"
+  printf '  G7 answered, checks 2 and 9 hold, and the control failed as it must.\n'
+  printf '  %sre-run it on this terminal with:%s python3 tools/terminal-probe/probe.py out.txt\n' "$D" "$O"
+  pause "Enter to begin the human half — case 4 first"
   for c in 4 10 d g7 dither; do run "$c"; done
   printf '\n%sdone%s — screenshots as %sNN-slug.png%s in %s\n' "$CY" "$O" "$B" "$O" "$OUT"
   printf '%sthe README is written; the "What was seen" section is yours%s\n\n' "$D" "$O"

@@ -975,13 +975,22 @@ indexed as a density ramp. They look interchangeable and are not: a density ramp
 magnitude at a position, a dither ramp encodes a **threshold against a position-varying offset**.
 **The type is what tells them apart, because the eye does not.**
 
-### The blind spot, stated rather than assumed
+### The blind spot, and it has now been measured
 
 **Three width implementations matter and two are reachable here** — `cells()`, which every
 `measure` uses, and Ink's, which lays out the box. F247 measured both agreeing at n = 1, 2, 4, 8.
 **The third is the terminal's own guarantee about a plane-16 private-use character**, and it is not
 measurable in this repository. **The first real-terminal test is where it is checked**, and until
 then two of three is not three.
+
+**It was checked on 2026-08-31, in Ghostty 1.3.1, and it holds.** Twenty placeholder cells
+advanced the cursor twenty columns; sixteen cells of a placement row for an image the terminal had
+actually received advanced it sixteen. **Both forms, because the first alone is the weaker claim** —
+an untransmitted id measures a bare private-use glyph, and only the second measures an image *cell*,
+which is what the geometry is about. `docs/catalogue/images/real/README.md` holds the run.
+
+**Three of three, on one terminal and one font.** The font is part of the measurement rather than a
+note about the machine, so a repeat elsewhere is a new reading and not a confirmation of this one.
 
 ## 4a. Syntax tokenisation
 
@@ -1298,6 +1307,21 @@ field, with its reason written where it happens. That is unchanged.
 whether a given terminal's decoder does read Adam7 and 16-bit. If one does not, the failure is a
 placement addressing an image that failed to load — *nothing drawn*, §4c's loud one — and the
 remedy would be a capability, not a re-gate on our own decoder's opinion.
+
+**Measured in Ghostty 1.3.1 on 2026-08-31: it reads both.** A 16-bit PNG and an Adam7 PNG both
+answer `OK` to a real transmission, so the two files this repository refuses by name draw on a
+terminal that decodes them — which is the whole of what moving the refusal off the block buys.
+
+**And the reading is only evidence because a control failed.** A probe that answers `OK` to
+everything measures nothing: `palette.png` with 64 bytes of its IDAT inverted — *IDAT does not
+inflate*, by our own decoder — came back `EINVAL: invalid data`. The path reports failure when
+there is one.
+
+**One thing the measurement needed that the framework does not do**, and it is F414: the shipped
+transmission sets `q=2`, which suppresses **every** reply including errors. That is right today,
+because `decode.ts` has no APC arm and a reply would arrive in the editor as a lone `ESC` and
+literal text — but it means a failed transmission is silent at the protocol level as well as on
+screen, and the terminal *will* say what went wrong if asked.
 
 ## 8a. The fitted height — a table and a trace
 

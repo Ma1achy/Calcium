@@ -13850,6 +13850,40 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F414 — a transmission that fails is silent, and the terminal was willing to say why ★★★☆☆
+
+Found while building the probe that answers G7, and it is about the probe's own obstacle.
+
+`transmit` emits `q=2`:
+
+```ts
+const opts = `a=T,f=100,t=d,i=${String(id)},U=1,c=${String(cols)},r=${String(rows)},q=2`;
+```
+
+**`q=2` suppresses every reply, including errors.** So a transmission that the terminal rejects
+produces nothing drawn *and* no diagnostic — the failure C09 §4c calls *at least the loud one* is
+loud only in the sense that a reader sees a gap.
+
+**The terminal is willing.** Flipping that one token to `q=0` and sending the same bytes, Ghostty
+answers `EINVAL: invalid data` for a corrupted PNG and `OK` for four good ones. The information
+exists and is one character away.
+
+**And `q=2` is nevertheless right today, which is why this is a finding rather than a fix.** The
+reply arrives on **stdin**. `src/interaction/router/decode.ts` handles `ESC [` and has no APC arm
+at all — so `ESC _ G i=3;EINVAL… ESC \` would reach the line editor as a lone `ESC` followed by
+literal text typed into the prompt. Changing `q` without an APC arm trades a silent failure for a
+corrupted input buffer.
+
+**The deferral states its blocker as a symbol, which is what makes it findable:** an APC arm in
+`decode.ts`. `q=1` is the middle rung the protocol already defines — errors reported, successes
+suppressed — and it becomes available the day that arm exists.
+
+**Where this sits.** It is not the transmission's own defect; it is a consequence nobody had
+written down, and the measurement that needed it is the first thing in this repository ever to ask
+the terminal a question and read the answer.
+
+---
+
 ## F413 — the refusal gated the block, and only one arm of three needed it ★★★★★
 
 F410 put a `status` box in front of every PNG `decodePng` refuses. Right that the reason must
