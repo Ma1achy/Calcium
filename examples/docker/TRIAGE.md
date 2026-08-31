@@ -29,7 +29,7 @@ type change.
 
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
-| **1** | [The consumer cannot reach a fact the framework holds](#1) | 16 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
+| **1** | [The consumer cannot reach a fact the framework holds](#1) | 17 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
 | **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 50 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
@@ -51,13 +51,14 @@ than the software.
 ---
 
 <a id="1"></a>
-## 1 · The consumer cannot reach a fact the framework holds — **12 open, 4 closed** ⚠
+## 1 · The consumer cannot reach a fact the framework holds — **12 open, 5 closed** ⚠
 
 **Still the largest open group, and steps 9–13 changed what kind of group it is.** At F55
 every instance was an app *duplicating* a Calcium module. It is now three shapes.
 
 | | the fact | the consumer | the workaround |
 |---|---|---|---|
+| **F413** | **a picture the terminal can decode and we cannot** | any reader on a kitty terminal | F410's box gated the **block**, and only one arm of three needs pixels: `imageCells` wants the aspect, the rasterisers want RGBA, and the transmission wants neither — the identity is a byte digest and the payload is the bytes unchanged. `decodePng` reads the IHDR **before** it refuses, so the extent survives Adam7 and 16-bit intact. **Fixed** — `extentOf` for geometry, `pixelsOf` for rasterising, and the refusal on the arms that cannot run |
 | **F410** | **why a PNG did not decode** | any reader of an image block | `decodePng` names each refusal — *interlaced PNG (Adam7)*, *bit depth 16*, *IDAT does not inflate* — and `pixelsOf` collapses all of them to `null`, so a corrupt file and a deliberately-unbuilt format draw the same `alt`. **Fixed** — the fault goes through the `status` box whose `error` gloss was widened this arc to cover exactly it, with `alt` kept beneath as the caption |
 | **F406** | **the failure box — a ladder with no rung for a framed box, and twelve sites that never used the kind** | every app: `errorDoc`'s twelve call sites, and every live part that declines to override | a `notice`, and a `status` at a rung that looks like one. **Reported by a reader with two screenshots** — the containment box beside a live part's failure, which is a red line of text and indistinguishable from what it replaced. C09's height ladder **couples the tag to the border**, so a box inside `b.live`'s panel could read as a line (h2), draw a second border with no tag (h3), or draw the tag at two nested borders (h4). C23 I51 picked the first with the reason recorded, and the reason is right about both alternatives — **a choice between two wrong answers is evidence a third is missing**. `framed` is a second ladder on the same axis: no border, the rows spent on tag and content. And `errorDoc` built `notice` for spawn, handoff, transport, pipeline and refusals, because `error`'s **gloss** — *the definition's renderer threw. A bug.* — was narrower than the kind its own table describes. **Fixed** |
 | **F405** | **the block union — open at runtime, closed in the types** | any app registering its own kind; the demo's `/rungs` | two `as unknown as` casts, one each side of the seam. `validateDocument` says *an unknown kind is not an error: the union is open and an app registers kinds through C09*, `TuiConfig.blocks` takes the definitions, and `BlockDefinition<B extends Block>` bounds a definition by the closed union — so the block cannot enter a document and the definition cannot be parameterised by it. **And `expectDocument` holds `fullRegistry()` with no way to add one**, so a consumer's kind cannot be tested with the published helper: every height rendered as one row because the registry fell back to `raw`. **Recorded, not fixed** — widening `Block` decides how `childBlocksOf` walks an app's kind and whether measurement conformance binds it, which is a ruling across three components. The casts stay visible in the tree as the fabricated violation. **OPEN** |

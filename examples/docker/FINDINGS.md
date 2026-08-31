@@ -13850,6 +13850,54 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F413 — the refusal gated the block, and only one arm of three needed it ★★★★★
+
+F410 put a `status` box in front of every PNG `decodePng` refuses. Right that the reason must
+reach a reader, and **wrong about where the gate goes** — which a reader asked in one sentence:
+*check whether the kitty path needs the decoder at all.*
+
+**Measured. There are three pixel reads in the tree.**
+
+| site | what it reads | what it needs it for |
+|---|---|---|
+| `imageCells` | `pixelsOf` | `px.width / px.height` — **the aspect, and nothing else** |
+| `image.ts` `render` | `pixelsOf` | real RGBA, to rasterise a glyph per cell |
+| `transmitImage` | `decodePng` | real RGBA, **and only for a composited overlay** |
+
+**The identity needs nothing**: `imageKey` is the byte digest, `imageId` hashes that string,
+`payload` is the bytes unchanged. So a transmission is fully expressible for a picture we cannot
+read.
+
+**And the aspect survives every refusal, by the decoder's own order.** `decodePng` fills `header`
+in the chunk walk at line 58 and refuses at 79–80 — interlace and depth are checked with `w` and
+`h` already in hand:
+
+```
+58:  header = { w: …, h: …, depth, colour, interlace }
+79:  if (interlace !== 0) return { ok: false, fault: "interlaced PNG (Adam7) …" }
+80:  if (depth !== 8)     return { ok: false, fault: `bit depth ${depth} …` }
+```
+
+The only failures that take the extent are *not a PNG* and *no IHDR chunk*, which are failures to
+find a picture at all rather than failures to rasterise one.
+
+**So the refusal belongs on the arms that rasterise.** A 16-bit or interlaced PNG places and draws
+at `kitty`, and refuses — with its reason, in the box — at the half block and the dither, which
+genuinely cannot read it. `Decoded`'s failure arm carries `size`, so geometry and rasterising can
+want different things from one walk.
+
+**This closes G7's architecture half in the container.** What is left for a terminal is a
+conformance question — whether a given decoder reads Adam7 — and if one does not, the remedy is a
+capability rather than a re-gate on our own decoder's opinion.
+
+**The shape is worth naming, because F410 was not careless.** The old code called `pixelsOf` and
+branched on `null`, so *has pixels* and *can be drawn* were one question in one expression. They
+are two, and the refusal reads as belonging to the block because the **call** does. Splitting
+`extentOf` from `pixelsOf` is what makes the difference sayable: the block always has an extent
+it can be laid out at, and only some arms need what is inside it.
+
+---
+
 ## F412 — two survivors, and each indicted a different artefact ★★★★★
 
 The half-block arm's first mutation pass came back **2 of 8 survived**, and both were
