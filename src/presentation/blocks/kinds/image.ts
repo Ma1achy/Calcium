@@ -58,9 +58,28 @@ function decodedOf(block: Image): Decoded {
   return decoded;
 }
 
+/** What an arm that **rasterises** needs: a glyph per cell wants real samples. */
 function pixelsOf(block: Image): Pixels | null {
   const decoded = decodedOf(block);
   return decoded.ok ? decoded.pixels : null;
+}
+
+/**
+ * What **geometry** needs, which is less (§8b G7, F413).
+ *
+ * **`pixelsOf` answered both questions and they are two.** *Can this be drawn as
+ * glyphs* and *how big is it* were one call and one `null` branch, so the
+ * refusal read as belonging to the block — and the protocol arm, which needs
+ * only the second, was refused along with the arms that need the first.
+ *
+ * `decodePng` fills the IHDR in its chunk walk and refuses after, so a 16-bit or
+ * interlaced PNG arrives here with its extent intact. Absent exactly when the
+ * failure is a failure to *find* a picture — no signature, no IHDR, a zero
+ * dimension — and then the 20-column placeholder is still the honest answer.
+ */
+function extentOf(block: Image): Readonly<{ width: number; height: number }> | null {
+  const decoded = decodedOf(block);
+  return decoded.ok ? decoded.pixels : (decoded.size ?? null);
 }
 
 /**
@@ -76,7 +95,9 @@ function pixelsOf(block: Image): Pixels | null {
  * there, so over-drawing here is worse than wrong.
  */
 export function imageCells(block: Image, width: number): { cols: number; rows: number } {
-  const px = pixelsOf(block);
+  // **The extent and not the pixels** (F413) — this is the whole of what the
+  // geometry wants, and it survives a refusal the rasterisers cannot.
+  const px = extentOf(block);
   const w = Math.max(1, Math.floor(width)); // cells-ok — a cell count
   const declared = Math.max(1, block.height); // cells-ok — a row count
   if (px === null) return { cols: Math.min(w, 20), rows: declared }; // cells-ok — a cell count
@@ -112,6 +133,40 @@ export const imageDefinition: BlockDefinition<Image> = {
 
   render(block: Image, ctx: RenderContext): ReactElement {
     const { cols, rows } = imageCells(block, ctx.width);
+
+    // **The protocol arm comes first, and that is the F413 ordering.** It used
+    // to sit below the decode gate, so a PNG this repository cannot rasterise
+    // was described rather than drawn on a terminal that decodes it itself. The
+    // placement needs the *extent* — which `imageCells` has through a refusal —
+    // and the transmission needs neither: `imageKey` is the byte digest and
+    // `payload` is the bytes unchanged.
+    //
+    // **The protocol arm, restored now that `transmitImage` exists** (C09 §4c).
+    // Only the *placeholders* travel through Ink — they are ordinary text. The
+    // transmission is the shell's, prefixed to the frame's bytes, because Ink
+    // strips APC escapes and a placement without one draws nothing.
+    //
+    // **A placement past the encoding falls back to the dither** rather than
+    // wrapping a diacritic: a wrapped one addresses the wrong part of the image,
+    // which is a plausible wrong picture — the failure this arm is built to
+    // avoid, and the one a reader cannot diagnose.
+    const placed =
+      ctx.capabilities.imageProtocol === "kitty"
+        ? placementRows(imageId(imageKey(block)), cols, rows)
+        : null;
+    if (placed !== null && "rows" in placed) {
+      // **The overlay is not here at `kitty` and that is the whole ruling**
+      // (C04 §3h.2): the cell's rendering is the terminal's, so it is composited
+      // into the pixels by `transmitImage` before the bytes ever leave L4.
+      return createElement(
+        Box,
+        { flexDirection: "column", width: cols },
+        placed.rows.map((line, i) => createElement(Text, { key: String(i) }, line)),
+      );
+    }
+
+    // **Below here every arm rasterises, so this is where the refusal goes**
+    // (C09 I38, F410, F413).
     const px = pixelsOf(block);
 
     // **A block whose bytes do not decode draws the refusal, with the reason**
@@ -142,30 +197,6 @@ export const imageDefinition: BlockDefinition<Image> = {
         { flexDirection: "column", width: ctx.width },
         createElement(Box, { key: "box" }, box),
         createElement(Text, { key: "alt", dimColor: true }, alt),
-      );
-    }
-
-    // **The protocol arm, restored now that `transmitImage` exists** (C09 §4c).
-    // Only the *placeholders* travel through Ink — they are ordinary text. The
-    // transmission is the shell's, prefixed to the frame's bytes, because Ink
-    // strips APC escapes and a placement without one draws nothing.
-    //
-    // **A placement past the encoding falls back to the dither** rather than
-    // wrapping a diacritic: a wrapped one addresses the wrong part of the image,
-    // which is a plausible wrong picture — the failure this arm is built to
-    // avoid, and the one a reader cannot diagnose.
-    const placed =
-      ctx.capabilities.imageProtocol === "kitty"
-        ? placementRows(imageId(imageKey(block)), cols, rows)
-        : null;
-    if (placed !== null && "rows" in placed) {
-      // **The overlay is not here at `kitty` and that is the whole ruling**
-      // (C04 §3h.2): the cell's rendering is the terminal's, so it is composited
-      // into the pixels by `transmitImage` before the bytes ever leave L4.
-      return createElement(
-        Box,
-        { flexDirection: "column", width: cols },
-        placed.rows.map((line, i) => createElement(Text, { key: String(i) }, line)),
       );
     }
 

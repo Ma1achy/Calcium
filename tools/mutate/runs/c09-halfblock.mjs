@@ -117,6 +117,25 @@ const results = runPass({
       expect: "HB7",
     },
     {
+      // **F413's ordering, undone.** The protocol arm gated on pixels again, so a
+      // PNG the terminal decodes and we cannot is described rather than drawn.
+      // This is F410's effective behaviour restored — the gate on the block.
+      name: "PROTOCOL-NEEDS-PIXELS: the placement waits on a decode it does not use",
+      file: KIND,
+      from: '    if (placed !== null && "rows" in placed) {',
+      to: '    if (placed !== null && "rows" in placed && pixelsOf(block) !== null) {',
+      expect: "HB11",
+    },
+    {
+      // The extent dropped on refusal, so geometry falls back to the 20-column
+      // placeholder for a picture whose IHDR we read perfectly well.
+      name: "NO-EXTENT: a refusal forgets the size it already knew",
+      file: KIND,
+      from: "  return decoded.ok ? decoded.pixels : (decoded.size ?? null);",
+      to: "  return decoded.ok ? decoded.pixels : null;",
+      expect: "HB10",
+    },
+    {
       // **F410, restored.** The decoder's reason dropped and `alt` drawn for
       // every refusal, so a corrupt file and a deliberately-unbuilt format are
       // the same picture to a reader.

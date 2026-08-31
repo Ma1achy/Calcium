@@ -227,8 +227,8 @@ describe("C09 §8b · the glyph axis", () => {
 
 describe("C09 I38 · a refusal draws the refusal", () => {
   /** A PNG header with the fields the decoder refuses on, and real IDAT bytes. */
-  const mutated = (field: "interlace" | "depth"): string => {
-    const bytes = Buffer.from(rgbPng64(4, 4, () => [10, 20, 30]), "base64");
+  const mutated = (field: "interlace" | "depth", w = 4, h = 4): string => {
+    const bytes = Buffer.from(rgbPng64(w, h, () => [10, 20, 30]), "base64");
     // IHDR body starts at byte 16; depth is +8, interlace is +12 from there.
     bytes[field === "depth" ? 24 : 28] = field === "depth" ? 16 : 1;
     return bytes.toString("base64");
@@ -261,6 +261,38 @@ describe("C09 I38 · a refusal draws the refusal", () => {
     expect(short.join(" ")).not.toMatch(/ERROR/u);
     expect(tall.join(" ")).toMatch(/ERROR/u);
     expect(tall).toHaveLength(7);
+  });
+
+  it("HB10 (C09 I38, C09 §8b G7, F413): the extent survives a refusal, so the geometry does", () => {
+    // **The claim, without predicting the arithmetic.** A PNG this repository
+    // cannot rasterise lays out identically to one it can, at the same pixel
+    // size — because `imageCells` wants `width / height` and `decodePng` fills
+    // the IHDR before it refuses. Comparing against a readable twin is what
+    // makes this an assertion about the *extent* rather than about
+    // `columnsForAspect`'s formula.
+    const refused = raw(mutated("depth", 20, 5), 3);
+    const readable = raw(rgbPng64(20, 5, () => [10, 20, 30]), 3);
+    expect(imageCells(refused, 60)).toEqual(imageCells(readable, 60));
+    // And the control: it really is refused, or the row compares a picture with
+    // itself. `size` is present, `pixels` is not.
+    const d = decodePng(Uint8Array.from(Buffer.from(mutated("depth", 20, 5), "base64")));
+    expect(d.ok).toBe(false);
+    if (!d.ok) expect(d.size).toEqual({ width: 20, height: 5 });
+  });
+
+  it("HB11 (C09 §8b G7, F413): it places at kitty and refuses at the arms that rasterise", () => {
+    // F410 gated the **block**; only the rasterisers need pixels. At `kitty` the
+    // terminal decodes, the payload is the bytes unchanged and the identity is a
+    // hash of them — so the picture is drawn rather than described.
+    const blk = raw(mutated("interlace", 20, 5), 3);
+    const kitty = stripped(draw(blk, { ...FULL_CAPS, imageProtocol: "kitty" }, 60));
+    expect(kitty.join(""), "the placement is emitted").toContain(PLACEHOLDER);
+    expect(kitty.join(" "), "and no box").not.toMatch(/Adam7|ERROR/u);
+
+    // The same block one rung down: the half block genuinely cannot read it.
+    const dither = stripped(draw(blk, FULL_CAPS, 60));
+    expect(dither.join(" ")).toMatch(/Adam7/u);
+    expect(dither.join("")).not.toContain(HALF_BLOCK);
   });
 
   it("HB9 (C09 I38): the `alt` is the caption beneath the box, and yields the row at height 1", () => {

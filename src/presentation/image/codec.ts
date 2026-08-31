@@ -25,7 +25,18 @@ export type Pixels = Readonly<{
   data: Uint8Array;
 }>;
 
-export type Decoded = Readonly<{ ok: true; pixels: Pixels }> | Readonly<{ ok: false; fault: string }>;
+/**
+ * **A refusal carries the extent when it has one** (C09 I38, §8b G7, F413).
+ *
+ * The IHDR is filled in the chunk walk and every refusal below it happens with
+ * `w` and `h` already in hand — so *this cannot be rasterised* and *how big is
+ * it* are separable, and the protocol arm needs only the second. `size` is
+ * absent exactly when the failure is a failure to find a picture at all: no
+ * signature, no IHDR, a zero dimension.
+ */
+export type Decoded =
+  | Readonly<{ ok: true; pixels: Pixels }>
+  | Readonly<{ ok: false; fault: string; size?: Readonly<{ width: number; height: number }> }>;
 
 const SIGNATURE = Object.freeze([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -76,24 +87,30 @@ export function decodePng(bytes: Uint8Array): Decoded {
   // real PNG this cannot read, and a decoder that guessed would produce a wrong
   // picture rather than an error — the failure mode this phase is most careful
   // about (C09 I36).
-  if (interlace !== 0) return { ok: false, fault: "interlaced PNG (Adam7) — phase 1 reads progressive only" };
-  if (depth !== 8) return { ok: false, fault: `bit depth ${String(depth)} — phase 1 reads 8-bit only` };
+  // **From here the extent is known and travels with the refusal** (F413).
+  const size = { width: w, height: h };
+  if (interlace !== 0) {
+    return { ok: false, fault: "interlaced PNG (Adam7) — phase 1 reads progressive only", size };
+  }
+  if (depth !== 8) return { ok: false, fault: `bit depth ${String(depth)} — phase 1 reads 8-bit only`, size };
   const channels = CHANNELS[colour];
-  if (channels === undefined) return { ok: false, fault: `colour type ${String(colour)} is not a PNG colour type` };
-  if (idat.length === 0) return { ok: false, fault: "no IDAT chunk — nothing to decode" }; // cells-ok — a chunk count
+  if (channels === undefined) {
+    return { ok: false, fault: `colour type ${String(colour)} is not a PNG colour type`, size };
+  }
+  if (idat.length === 0) return { ok: false, fault: "no IDAT chunk — nothing to decode", size }; // cells-ok — a chunk count
 
   let raw: Uint8Array;
   try {
     raw = new Uint8Array(inflateSync(Buffer.concat(idat.map((c) => Buffer.from(c)))));
   } catch {
-    return { ok: false, fault: "IDAT does not inflate — the image data is corrupt" };
+    return { ok: false, fault: "IDAT does not inflate — the image data is corrupt", size };
   }
 
   const stride = w * channels; // cells-ok — a byte count
   const got = raw.length; // cells-ok — a byte count
   const need = (stride + 1) * h; // cells-ok — a byte count
   if (got < need) {
-    return { ok: false, fault: `inflated to ${String(got)} bytes where ${String(need)} were needed` };
+    return { ok: false, fault: `inflated to ${String(got)} bytes where ${String(need)} were needed`, size };
   }
 
   // **Unfiltered in place, row by row**, because every filter but `None` reads
