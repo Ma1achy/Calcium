@@ -14,6 +14,7 @@ import { defaultTheme, loadTheme, type ResolvedTheme } from "../../src/presentat
 import { renderToLines, type RenderOptions } from "../../src/presentation/render-lines.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { DITHER_ASCII, HALF_BLOCK } from "../../src/presentation/image/index.js";
 
 export function themeFor(variant: "dark" | "light"): ResolvedTheme {
   const loaded = loadTheme(defaultTheme, variant);
@@ -191,4 +192,52 @@ export function visible(line: string): string {
     .split(`${esc}[`)
     .map((part, index) => (index === 0 ? part : part.slice(part.indexOf("m") + 1)))
     .join("");
+}
+
+/**
+ * A terminal on the **dither** rung of C09's glyph axis (C09 I37, §8b).
+ *
+ * `FULL_CAPS` used to mean *the dither*, because the dither was the only arm
+ * below `kitty`. It now means the **half block**, so a row that wants braille
+ * has to say so — and `ambiguousWidth` is the gate to say it with. The other two
+ * change something else: `colourDepth: 4` drops below C10 I31's overlay floor,
+ * which is a different test's subject, and `unicode: "ascii"` takes the ramp
+ * rather than braille.
+ */
+export const DITHER_CAPS: TerminalCapabilities = Object.freeze({
+  ...FULL_CAPS,
+  ambiguousWidth: "wide",
+});
+
+/**
+ * Whether a row carries **any** of the glyph axis's alphabets (C09 §8b, F411).
+ *
+ * **Built from the ladder's own constants rather than a literal range**, and the
+ * reason is that three sibling rows each held their own `/[⠀-⣿]/`: the day a rung
+ * landed above braille they reported *the picture is not drawn* for a frame full
+ * of picture. `image-overlay.test.ts`'s header already records this class about
+ * SGR — *a matcher that sees one encoding cannot tell the rung is absent from
+ * the rung is a different escape* — and the glyph half repeated it three times.
+ *
+ * **A fourth alphabet must be added here**, and the cost of forgetting is the
+ * failure this replaces: an absence reported where there is a picture. There is
+ * no equality arm to gate that, so it is written down instead — braille is a
+ * range and cannot be an exported string, which is what stops this being
+ * derived outright.
+ *
+ * **A picture is a *run* of the alphabet and not one character of it**, which
+ * the first draft got wrong: the ASCII ramp is `.:-=+*#@`, so any caption
+ * carrying a hyphen satisfied a membership test and the matcher was vacuous on
+ * exactly the rung it was widened to cover. Four consecutive is the threshold —
+ * a box rule is `─` and not `-`, so furniture does not reach it.
+ */
+export function drawsPicture(line: string, run = 4): boolean {
+  const alphabet = new Set([HALF_BLOCK, ...[...DITHER_ASCII].filter((c) => c.trim() !== "")]);
+  let streak = 0;
+  for (const ch of line) {
+    const cp = ch.codePointAt(0) ?? 0;
+    streak = alphabet.has(ch) || (cp >= 0x2800 && cp <= 0x28ff) ? streak + 1 : 0;
+    if (streak >= run) return true;
+  }
+  return false;
 }

@@ -949,6 +949,8 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
   "src/presentation/plot/linedraw.ts":
     "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`",
+  "src/presentation/image/halfblock.ts":
+    "`HALF_BLOCK` is `linedraw.ts`'s premise one module over — a rendering primitive rather than framework text, and gated by ambiguousWidth in `halfBlockEligible` in the same file rather than one away. The premise to re-check: it is the *only* mark here, so a second one is a second decision and this reason would not cover it",
   "src/shell/config.ts":
     "`PROMPT_SUBSTITUTION` is the pair, and `frame.ts` asserts both forms are `PROMPT_GUTTER.first` cells (C22 I52)",
   "src/shell/paint.ts":

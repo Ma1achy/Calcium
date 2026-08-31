@@ -20,7 +20,7 @@ import { decodePng } from "../../src/presentation/image/index.js";
 import { overlayFault, overlayRange, sharedRange } from "../../src/data/viewmodel/index.js";
 import { validateBlock } from "../../src/data/viewmodel/index.js";
 import { COLORMAPS } from "../../src/data/colormaps/index.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { DARK_THEME, DITHER_CAPS, FULL_CAPS } from "../support/render.js";
 import { rgbPng64, rgbPng } from "../support/png.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
@@ -61,13 +61,29 @@ const plain = b.image({ id: "p", data: PIC, height: 6, alt: "stripes" });
 const over = b.image({ id: "o", data: PIC, height: 6, alt: "stripes", overlay: { values: BLOB } });
 
 describe("IO — the overlay, per arm", () => {
-  it("IO1 (C04 I74): at the dither the glyph is the picture and the colour is the field", () => {
+  it("IO1 (C04 I74, C09 I37): at the dither the glyph is the picture and the colour is the field", () => {
     // **The whole ruling in one assertion.** If the overlay changed a glyph it
     // would be competing with the picture for the cell's one shape channel, and
     // the reader would have no way to tell which datum a dot belonged to.
-    expect(glyphs(over), "the picture is untouched").toEqual(glyphs(plain));
-    expect(runs(plain), "and a plain image carries no colour").toHaveLength(0);
-    expect(runs(over).length, "an overlaid one does").toBeGreaterThan(8);
+    //
+    // **Pinned to the dither rung, and it did not used to need pinning.** Both
+    // blocks were on this arm because it was the only arm below `kitty`; C09
+    // I37's half block is now above it, and the overlay gate sends `over` down
+    // while `plain` stays up — so the comparison was between two arms and the
+    // row failed on a distinction it exists to be blind to.
+    expect(glyphs(over, DITHER_CAPS), "the picture is untouched").toEqual(glyphs(plain, DITHER_CAPS));
+    expect(runs(plain, DITHER_CAPS), "and a plain image carries no colour").toHaveLength(0);
+    expect(runs(over, DITHER_CAPS).length, "an overlaid one does").toBeGreaterThan(8);
+  });
+
+  it("IO1b (C09 I37, §8b G5): and at the top rung the overlay is what sends it down", () => {
+    // The gate the pin above hides, asserted where it is visible: one terminal,
+    // two blocks, and the *block* decides the arm. `plain` spends both colour
+    // channels on the picture; `over` cannot, so it takes the rung that still
+    // has a foreground to give the field.
+    expect(glyphs(plain).join("")).toContain("▀");
+    expect(glyphs(over).join("")).not.toContain("▀");
+    expect(glyphs(over).join("")).toMatch(/[⠀-⣿]/u);
   });
 
   it("IO2 (C04 I74): the field is registered to the picture, not to the row", () => {

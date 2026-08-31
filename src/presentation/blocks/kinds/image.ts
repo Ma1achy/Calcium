@@ -7,11 +7,21 @@
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { columnsForAspect } from "../../plot/aspect.js";
-import { decodePng, ditherAscii, ditherBraille, type Pixels } from "../../image/index.js";
+import {
+  decodePng,
+  ditherAscii,
+  ditherBraille,
+  HALF_BLOCK,
+  halfBlockEligible,
+  halfBlockRows,
+  type Decoded,
+  type Pixels,
+} from "../../image/index.js";
 import { imageId, imageKey, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
 import { paint, type Span } from "../paint.js";
-import type { Image } from "../../../data/viewmodel/index.js";
+import { statusDefinition } from "./status.js";
+import type { Image, Status } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -23,20 +33,34 @@ import type { BlockDefinition, RenderContext } from "../types.js";
  * do the expensive half twice per frame. `lowlight`'s memoisation on
  * `(text, language)` is the precedent.
  */
-const DECODED = new Map<string, Pixels | null>();
+const DECODED = new Map<string, Decoded>();
 
-function pixelsOf(block: Image): Pixels | null {
+/**
+ * The decode, **kept whole** (I38, F410).
+ *
+ * This memoised `Pixels | null` and dropped the `fault` on the floor, so a
+ * corrupt file and a format `decodePng` names as deliberately unbuilt reached
+ * the reader as the same `alt`. The reason is computed for every refusal; it
+ * cost nothing to keep and a reader could never see one.
+ */
+function decodedOf(block: Image): Decoded {
   const held = DECODED.get(block.digest);
   if (held !== undefined) return held;
-  let decoded: Pixels | null = null;
+  let decoded: Decoded;
   try {
-    const r = decodePng(Uint8Array.from(Buffer.from(block.data, "base64")));
-    decoded = r.ok ? r.pixels : null;
+    decoded = decodePng(Uint8Array.from(Buffer.from(block.data, "base64")));
   } catch {
-    decoded = null;
+    // **The one refusal `decodePng` cannot phrase**, because it never received
+    // bytes: `Buffer.from(…, "base64")` is lenient and `Uint8Array.from` is not.
+    decoded = { ok: false, fault: "the block's data is not base64" };
   }
   DECODED.set(block.digest, decoded);
   return decoded;
+}
+
+function pixelsOf(block: Image): Pixels | null {
+  const decoded = decodedOf(block);
+  return decoded.ok ? decoded.pixels : null;
 }
 
 /**
@@ -64,6 +88,20 @@ export function imageCells(block: Image, width: number): { cols: number; rows: n
   return { cols: w, rows: Math.min(declared, scaled) }; // cells-ok — a row count
 }
 
+/**
+ * The refusal, as the block the rest of the framework draws for one (I38).
+ *
+ * **`error` and never `retrying`**: no attempt is coming, and the two states
+ * differ by exactly that. The height is the caller's, so the box cannot argue
+ * with what `measure` already returned (C09 I31).
+ *
+ * **The id is derived from the block's**, because C04 I14 addresses by id and two
+ * images failing in one document would otherwise refuse the whole thing.
+ */
+function faultStatus(block: Image, fault: string, height: number): Status {
+  return { kind: "status", id: `${block.id}-fault`, state: "error", message: fault, height } as Status;
+}
+
 export const imageDefinition: BlockDefinition<Image> = {
   kind: "image",
 
@@ -76,24 +114,34 @@ export const imageDefinition: BlockDefinition<Image> = {
     const { cols, rows } = imageCells(block, ctx.width);
     const px = pixelsOf(block);
 
-    // **A block whose bytes do not decode falls back to its `alt`** rather than
-    // throwing. The registry's containment would draw an error box of the
-    // committed height, which is right for a renderer that gave way and wrong
-    // for an image that simply is not one — and `alt` is the field that exists
-    // for a reader with no pixels (C04 I73).
+    // **A block whose bytes do not decode draws the refusal, with the reason**
+    // (I38, F410). It drew `alt` for every one of them, and the ruling that put
+    // it there was right about what it rejected — *the registry's containment
+    // would draw an error box of the committed height, which is right for a
+    // renderer that gave way and wrong for an image that simply is not one*. The
+    // third option is the one that did not exist when it was written: the
+    // `status` box, whose `error` state means *an operation failed and nothing
+    // more is coming* (§3a), which is exactly what a refused decode is.
+    //
+    // **`alt` is not displaced, it is placed under the box** — it was always the
+    // caption for a reader with no pixels (C04 I73), and a caption is what it
+    // still is. Where the block committed one row there is no caption, because
+    // the box says which refusal and `alt` says what the picture was, and the
+    // first is the one a reader cannot recover any other way.
     if (px === null) {
-      // **Truncated by C09's own function and padded with a space**, and both
-      // halves were defects in the first draft. Ink's `wrap: "truncate"` emits
-      // `…` at every capability, where I22 substitutes `~` under `ascii`; and an
-      // empty `Text` occupies **no row**, so a three-row block drew one and I1
-      // came apart on the corpus at every width.
-      const alt = truncate(block.alt, cols, ctx.capabilities);
+      const decoded = decodedOf(block);
+      const fault = decoded.ok ? "" : decoded.fault;
+      const boxRows = rows >= 2 ? rows - 1 : rows; // cells-ok — a row count
+      const box = statusDefinition.render(faultStatus(block, fault, boxRows), ctx);
+      if (rows < 2) return box;
+      // **Truncated by C09's own function**, not by Ink's `wrap`, which emits
+      // `…` at every capability where I22 substitutes `~` under `ascii`.
+      const alt = truncate(block.alt, ctx.width, ctx.capabilities);
       return createElement(
         Box,
-        { flexDirection: "column", width: cols },
-        Array.from({ length: rows }, (_, i) =>
-          createElement(Text, { key: String(i) }, i === 0 ? alt : " "),
-        ),
+        { flexDirection: "column", width: ctx.width },
+        createElement(Box, { key: "box" }, box),
+        createElement(Text, { key: "alt", dimColor: true }, alt),
       );
     }
 
@@ -118,6 +166,30 @@ export const imageDefinition: BlockDefinition<Image> = {
         Box,
         { flexDirection: "column", width: cols },
         placed.rows.map((line, i) => createElement(Text, { key: String(i) }, line)),
+      );
+    }
+
+    // **The half-block rung, and the refused placement re-enters here** (I37,
+    // §8b G3, F409). This read `unicode === "ascii" ? ascii : braille` and was
+    // correct while the glyph ladder had two rungs; the third is what made the
+    // kitty fallback a defect. `placementRows` refuses a placement past the
+    // diacritic encoding's span, and **a kitty terminal is non-`ascii` and at
+    // least 8-bit by construction** — so the one terminal reaching that branch
+    // is the one qualifying for every rung of the ladder, and it was landing on
+    // the bottom of it. Neither frame shows that: both draw a picture, and both
+    // are the right size.
+    if (halfBlockEligible(ctx.capabilities, block.overlay !== undefined)) {
+      const cellRows = halfBlockRows(px, cols, rows, ctx.capabilities.colourDepth);
+      return createElement(
+        Box,
+        { flexDirection: "column", width: cols },
+        cellRows.map((line, i) =>
+          createElement(
+            Text,
+            { key: String(i) },
+            paint(line.map((cell) => ({ text: HALF_BLOCK, style: { colour: cell.top, background: cell.bottom } }))),
+          ),
+        ),
       );
     }
 

@@ -13850,6 +13850,44 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F411 — three rows matched one rung's alphabet, and a new rung read as no picture ★★★★☆
+
+Adding the half block turned three green rows red, all saying the same thing:
+
+```
+C1  the picture is drawn: expected false to be true
+C3  expected 0 to be greater than 0
+IO1 the picture is untouched: braille !== ▀
+```
+
+Every one held its own `/[⠀-⣿]/u` and meant *is a picture drawn*. **A frame full of
+picture reported as no picture** — and the failure is loud only because the rung landed
+in the same commit. A rung landing later, in a different arc, reads as *the composition
+broke*.
+
+**The class was already written down in one of the three files.** `image-overlay.test.ts`'s
+own header says it about SGR: *`\[38;2;` alone was the first draft and it made IO3 report
+nothing drawn at 8-bit, where `continuousColour` emits `38;5;N`. **A matcher that sees one
+encoding cannot tell the rung is absent from the rung is a different escape.*** That is
+this finding exactly, one axis over — escapes there, glyphs here — and the fix stayed in
+the file it was found in while three sibling rows kept the literal range.
+
+**Fixed** — `drawsPicture` in `test/support/render.ts`, built from `HALF_BLOCK` and
+`DITHER_ASCII` rather than a literal, so a fourth alphabet is one edit in one place.
+
+**And the first draft of the fix was vacuous, which is the part worth keeping.** Membership
+in the union alphabet is satisfied by any caption containing `-`, because the ASCII ramp is
+`.:-=+*#@` — so widening the matcher to cover the ramp made it true of prose. **A picture is
+a *run* of the alphabet, not one character of it**: four consecutive, and a box rule is `─`
+rather than `-`, so furniture does not reach it. Widening a matcher is where vacuity gets in.
+
+**IO1 is the odd member and did not want the matcher.** It compares two blocks glyph for
+glyph and the half block's *overlay gate* sends one of them down a rung — so the two arms
+really did differ and the row was right to notice. It pins `DITHER_CAPS` and a new IO1b
+asserts the gate where it is visible: one terminal, two blocks, and the block decides.
+
+---
+
 ## F409 — the kitty fallback lands two rungs down, and only a table could see it ★★★☆☆
 
 Found by C09 §8b's classification table before any half-block code existed — the cell where
