@@ -347,6 +347,20 @@ export type { ArtSpec, ArtTier } from "./presentation/art.js";
  * `RenderContext` and could not be spelled.
  */
 export type { TerminalCapabilities } from "./terminal/capabilities.js";
+
+/**
+ * **Which glyph rung an image will take on this terminal** (C09 I37, §8b).
+ *
+ * Published because a consumer captioning its own figure cannot otherwise say
+ * which arm drew it, and F394 is what that costs: the demo labelled a braille
+ * dither `pixels` and a working ladder read as a broken renderer. F415 is the
+ * same shape one rung along — the caption said *braille dither* while the half
+ * block was drawing, because the ladder grew a rung and the label named two.
+ *
+ * The protocol arm is `capabilities.imageProtocol === "kitty"`, which a consumer
+ * already has; this answers the question below it.
+ */
+export { halfBlockEligible } from "./presentation/image/index.js";
 export type { Measure, MeasureFn } from "./data/viewmodel/index.js";
 export type { BlockKeymap } from "./interaction/router/types.js";
 

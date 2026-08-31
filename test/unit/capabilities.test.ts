@@ -61,10 +61,38 @@ describe("C02 detection", () => {
     expect(caps({ TERM: "xterm", TMUX: "/tmp/x" }).mouse).toBe(false);
   });
 
-  it("T1.7: image protocol", () => {
+  it("T1.7 (C02 I9, F415): image protocol, and the terminals it does not claim", () => {
     expect(caps({ TERM: "xterm", TERM_PROGRAM: "iTerm.app" }).imageProtocol).toBe("iterm2");
     expect(caps({ TERM: "xterm-kitty" }).imageProtocol).toBe("kitty");
     expect(caps({ TERM: "xterm" }).imageProtocol).toBe("none");
+
+    // **Ghostty, on a measurement** — `tools/terminal-probe` sent the shipped
+    // encoder's own transmission to Ghostty 1.3.1 and read `OK`, against
+    // `EINVAL: invalid data` for a corrupted control. Before this the whole
+    // protocol arm was unreachable there, and the demo said so on screen.
+    expect(caps({ TERM: "xterm-ghostty" }).imageProtocol).toBe("kitty");
+    // The tmux case: `TERM` is rewritten and `TERM_PROGRAM` survives.
+    expect(caps({ TERM: "screen-256color", TERM_PROGRAM: "ghostty" }).imageProtocol).toBe("kitty");
+    expect(caps({ TERM: "xterm", TERM_PROGRAM: "Ghostty" }).imageProtocol).toBe("kitty");
+
+    // **The unmeasured arms, asserted as they stand rather than as assumed.**
+    // Both are widely said to implement the protocol and neither has been
+    // measured here, and the asymmetry decides it: a wrong `kitty` draws
+    // *nothing*, a wrong `none` draws a dither. This row is what fails on the day
+    // someone runs the probe in one of them and widens the rule — which is the
+    // expiry being a test rather than a hope.
+    expect(caps({ TERM: "xterm-256color", TERM_PROGRAM: "WezTerm" }).imageProtocol).toBe("none");
+    expect(caps({ TERM: "xterm-256color", KONSOLE_VERSION: "220400" }).imageProtocol).toBe("none");
+
+    // **The record this rule is drawn from, and writing it down corrected it.**
+    // `synchronisedUpdate` has known about ghostty since v1 — but by
+    // `TERM_PROGRAM`, not by `TERM`. Both rules carry an `xterm-kitty` special
+    // case *and* a program list, and `imageProtocol`'s list held only iTerm: the
+    // gap was ghostty missing from **both** keys, not from one. Asserted rather
+    // than narrated, because the first version of this row claimed
+    // `TERM=xterm-ghostty` implied a synchronised update and it does not.
+    expect(caps({ TERM_PROGRAM: "ghostty" }).synchronisedUpdate).toBe(true);
+    expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(false);
   });
 
   it("T1.8: alt screen needs TERM present and not dumb", () => {

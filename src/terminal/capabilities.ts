@@ -248,12 +248,37 @@ function detectSynchronisedUpdate(
   return SYNCHRONISED_UPDATE_PROGRAMS.includes(termProgram.toLowerCase());
 }
 
+/**
+ * **Ghostty was missing and the whole protocol arm was unreachable** (F415).
+ *
+ * This answered `kitty` for `TERM=xterm-kitty` and nothing else, so
+ * `transmitImage`, `placementRows`, the placeholder encoding and C09 §4c entire
+ * were dead code on three of the four terminals that speak the protocol. The
+ * knowledge was **four lines up in C02's own table**: `synchronisedUpdate` has
+ * named ghostty since v1. Two lists over one question — *which emulator is
+ * this* — and only one kept up.
+ *
+ * **Added on a measurement.** `tools/terminal-probe` sends the shipped encoder's
+ * own transmission and reads the reply: Ghostty 1.3.1 answers `OK` for four PNGs
+ * and `EINVAL: invalid data` for a corrupted control, so the protocol is present
+ * and success is distinguishable from failure.
+ *
+ * **Both `TERM` and `TERM_PROGRAM`**, because a ghostty inside `tmux` reports
+ * `TERM=screen-256color` and only the second survives.
+ *
+ * **WezTerm and Konsole are owed and not claimed.** Neither has been measured
+ * here, and a false positive is worse than a false negative: placeholders
+ * addressing an image the terminal never received draw *nothing*, where a wrong
+ * `none` draws a dither. The expiry is an instrument rather than a hope — run
+ * `tools/terminal-probe/probe.py` in the terminal and read the verdict.
+ */
 function detectImageProtocol(
   term: string | undefined,
   termProgram: string | undefined,
 ): TerminalCapabilities["imageProtocol"] {
-  if (termProgram !== undefined && termProgram.toLowerCase() === "iterm.app") return "iterm2";
-  if (term === "xterm-kitty") return "kitty";
+  const program = termProgram?.toLowerCase();
+  if (program === "iterm.app") return "iterm2";
+  if (term === "xterm-kitty" || term === "xterm-ghostty" || program === "ghostty") return "kitty";
   return "none";
 }
 

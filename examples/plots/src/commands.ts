@@ -13,7 +13,7 @@
  * returns blocks and touches no clock, no session and no terminal, which is
  * what makes `everyDocument()` in the suite able to validate all of them.
  */
-import { b } from "@fmx/calcium";
+import { b, halfBlockEligible } from "@fmx/calcium";
 import type { AdapterDocument, Block, TerminalCapabilities, ViewDocument } from "@fmx/calcium";
 import os from "node:os";
 import { dirname, join } from "node:path";
@@ -38,21 +38,39 @@ const caption = (text: string): Block => b.notice("muted", text);
 /**
  * **What the right-hand pane actually is**, which is not always pixels (F394).
  *
- * `b.image` descends a ladder — kitty's graphics protocol, then an ordered
- * braille dither, then `alt` — and only the first is pixels. Captioned `svg ·
- * pixels` unconditionally, a terminal with no graphics protocol shows a field of
- * braille dots under a label claiming otherwise, and the honest reading of that
- * is *the SVG renderer is broken*. It is not: **VS Code, Cursor, Terminal.app
- * and every `TERM=xterm-256color` shell take the dither**, because
- * `detectImageProtocol` answers `kitty` only for `TERM=xterm-kitty` and
- * `iterm2` for iTerm.
+ * Captioned `svg · pixels` unconditionally, a terminal with no graphics protocol
+ * shows a field of braille dots under a label claiming otherwise, and the honest
+ * reading of that is *the SVG renderer is broken*. It is not — but the label has
+ * to say which arm, or the ladder reads as a fault.
  *
- * The dither being the **first** arm rather than the last is C09 I36's ruling
- * and the reason this is worth looking at anywhere — but the label has to say
- * which arm, or the ladder reads as a fault.
+ * **It named two arms and there are four, which is F415's second half.** The
+ * original said *kitty's graphics protocol, then an ordered braille dither, then
+ * `alt`* and captioned everything below kitty as braille. C09 I37 put the half
+ * block between them, so a frame in colour was described as a dither — a correct
+ * rendering described wrongly by the demo built to describe it. It is F394
+ * exactly, one rung along, and it arrived the same way: the ladder grew and the
+ * label did not.
+ *
+ * **And the sentence this comment used to carry was F415's first half, written
+ * down as an excuse.** It read *VS Code, Cursor, Terminal.app and every
+ * `TERM=xterm-256color` shell take the dither, because `detectImageProtocol`
+ * answers `kitty` only for `TERM=xterm-kitty`* — true, and used to explain why
+ * the dither is legitimate rather than to ask whether the detection was right.
+ * It was not: Ghostty speaks the protocol and was answered `none`.
+ *
+ * **Asked of the framework rather than re-derived**, which is why
+ * `halfBlockEligible` is published: a consumer that guesses its own arm is the
+ * duplication this caption exists to stop.
  */
-const rungSays = (protocol: ImageProtocol): string =>
-  protocol === "kitty" ? "pixels" : `braille dither — this terminal has no graphics protocol (${protocol})`;
+const rungSays = (caps: TerminalCapabilities): string => {
+  if (caps.imageProtocol === "kitty") return "pixels — the terminal's own decoder";
+  const rung = halfBlockEligible(caps, false)
+    ? "half blocks — two colours a cell"
+    : caps.unicode === "ascii"
+      ? "an ASCII ramp"
+      : "a braille dither — one bit a dot";
+  return `${rung}, because this terminal reports no graphics protocol (${caps.imageProtocol})`;
+};
 
 /**
  * The SVG image's cell box, **tuned against a measurement rather than reasoned**.
@@ -409,7 +427,7 @@ export function monitor(): Block {
  * The SVG arm refuses six families outright, and a refusal is said rather than
  * left as an empty column.
  */
-export async function compare(form: PlotForm, phase: number, protocol: ImageProtocol): Promise<readonly Block[]> {
+export async function compare(form: PlotForm, phase: number, caps: TerminalCapabilities): Promise<readonly Block[]> {
   const entry = CATALOGUE[form];
   const drawn = entry.at(phase, COMPARE_PLOT_ROWS);
   if ("refused" in drawn) {
@@ -458,16 +476,19 @@ export async function compare(form: PlotForm, phase: number, protocol: ImageProt
     caption(`${form} · ${entry.says}`),
     b.group("row", [
       b.group("column", [caption("terminal · cells"), drawn], { id: "left" }),
-      b.group("column", [caption(`svg · ${rungSays(protocol)}`), right], { id: "right" }),
+      b.group("column", [caption(`svg · ${rungSays(caps)}`), right], { id: "right" }),
     ], { flex: [1, 1], id: "compare" }),
     b.notice(
       "muted",
       svgOf(drawn, COMPARE_COLS, COMPARE_ROWS) === null
         ? "the second renderer has no arm for this family"
-        : protocol === "kitty"
+        : caps.imageProtocol === "kitty"
           ? "the same block, two renderers — one measured in cells, one in pixels"
-          : "the same block, two renderers — and this terminal cannot show the pixels, "
-            + "so the right pane is an ordered braille dither of them (C09 I36)",
+          // **Not *an ordered braille dither* any more, and that was F415's other
+          // half.** Below the protocol the ladder has three rungs, so the sentence
+          // names what `rungSays` decided rather than assuming the bottom one.
+          : "the same block, two renderers — this terminal reports no graphics protocol, "
+            + "so the right pane is the picture spent on glyphs instead (C09 I36, I37)",
     ),
   ];
 }

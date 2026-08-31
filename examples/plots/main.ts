@@ -83,7 +83,7 @@ const tui = createTui({
     compare: (async (argv, ctx) => {
       const form = formIn(argv);
       if (form === null) return doc(ctx.command, [unknown(argv[0] ?? "")]);
-      return doc(ctx.command, await compare(form, 0, ctx.capabilities.imageProtocol));
+      return doc(ctx.command, await compare(form, 0, ctx.capabilities));
     }) satisfies LocalHandler,
 
     faults: ((_argv, ctx) => doc(ctx.command, [faults()])) satisfies LocalHandler,

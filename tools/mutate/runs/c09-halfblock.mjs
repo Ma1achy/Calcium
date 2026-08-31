@@ -15,8 +15,9 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/image-halfblock.test.ts test/unit/image-overlay.test.ts";
+const CMD = "npx vitest run test/unit/image-halfblock.test.ts test/unit/image-overlay.test.ts test/unit/capabilities.test.ts";
 const HALF = "src/presentation/image/halfblock.ts";
+const CAPS = "src/terminal/capabilities.ts";
 const KIND = "src/presentation/blocks/kinds/image.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -134,6 +135,18 @@ const results = runPass({
       from: "  return decoded.ok ? decoded.pixels : (decoded.size ?? null);",
       to: "  return decoded.ok ? decoded.pixels : null;",
       expect: "HB10",
+    },
+    {
+      // **F415, restored.** `xterm-kitty` only, which is what shipped — and the
+      // whole protocol arm becomes unreachable on three of the four terminals
+      // that speak it. Nothing in the renderer's own suite can see this: every
+      // test injects capabilities, which is correct, and leaves the detection as
+      // the one door nothing opens.
+      name: "KITTY-ONLY: the detection forgets every terminal but kitty itself",
+      file: CAPS,
+      from: 'if (term === "xterm-kitty" || term === "xterm-ghostty" || program === "ghostty") return "kitty";',
+      to: 'if (term === "xterm-kitty") return "kitty";',
+      expect: "T1.7",
     },
     {
       // **F410, restored.** The decoder's reason dropped and `alt` drawn for

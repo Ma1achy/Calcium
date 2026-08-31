@@ -21,7 +21,7 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { b, completeLocal } from "@fmx/calcium";
 import { expectDocument, liveParts, producerContext } from "@fmx/calcium/testing";
-import type { Block, ViewDocument } from "@fmx/calcium";
+import type { Block, ViewDocument, TerminalCapabilities } from "@fmx/calcium";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
@@ -447,16 +447,65 @@ describe("every command composes a document the transcript would accept", () => 
     expect(bad).toEqual([]);
   }, 120_000);
 
-  it("T-doc5: /compare validates for every form, on both arms", async () => {
+  /**
+   * A full-capability record, written here because the demo's suite has none.
+   *
+   * `expectDocument` and the framework's own `FULL_CAPS` are `src/testing`'s and
+   * `test/support`'s; an example is a consumer and reaches neither, which is the
+   * same gap `TuiConfig.capabilities` fills for `--ambiguous-wide`.
+   */
+  const FULL = {
+    colourDepth: 24, unicode: "full", ambiguousWidth: "narrow",
+    backgroundPolarity: "dark", synchronisedUpdate: true, bracketedPaste: true,
+    mouse: true, imageProtocol: "none", altScreen: true,
+  } as const satisfies TerminalCapabilities;
+
+  // **The row was named for coverage it did not have** (F415). It said *on both
+  // arms* and passed `"kitty"` — one arm, and the name is what a reader checks.
+  // There are now four rungs below the caption's decision, so the set is named
+  // rather than counted, and each is a capability record `rungSays` must answer
+  // differently.
+  const ARMS = [
+    ["protocol", { ...FULL, imageProtocol: "kitty" as const }],
+    ["half block", { ...FULL, imageProtocol: "none" as const }],
+    ["braille", { ...FULL, imageProtocol: "none" as const, ambiguousWidth: "wide" as const }],
+    ["ascii ramp", { ...FULL, imageProtocol: "none" as const, unicode: "ascii" as const }],
+  ] as const;
+
+  it("T-doc5: /compare validates for every form, on every arm of the ladder", async () => {
     const bad: string[] = [];
-    for (const form of FORMS) {
-      const blocks = await compare(form, 0, "kitty");
-      try {
-        expectDocument(as(`compare ${form}`, blocks)).isValid();
-      } catch (err) {
-        bad.push(`${form}: ${err instanceof Error ? err.message.split("\n")[1] ?? err.message : String(err)}`);
+    for (const [name, caps] of ARMS) {
+      for (const form of FORMS) {
+        const blocks = await compare(form, 0, caps);
+        try {
+          expectDocument(as(`compare ${form}`, blocks)).isValid();
+        } catch (err) {
+          bad.push(`${name}/${form}: ${err instanceof Error ? err.message.split("\n")[1] ?? err.message : String(err)}`);
+        }
       }
     }
     expect(bad).toEqual([]);
+  }, 240_000);
+
+  it("T-doc7 (C09 I37, F415): the caption names the arm that actually drew", async () => {
+    // **F394 and F415 are one defect twice**: a caption that names an arm the
+    // renderer did not take reads as a broken renderer. The ladder grew a rung
+    // and the label kept its two, so a frame in colour was captioned *braille*.
+    const said = new Map<string, string>();
+    for (const [name, caps] of ARMS) {
+      const blocks = await compare("bar", 0, caps);
+      const text = JSON.stringify(blocks);
+      said.set(name, text);
+    }
+    expect(said.get("protocol")).toContain("pixels");
+    expect(said.get("half block")).toContain("half blocks");
+    expect(said.get("braille")).toContain("braille");
+    expect(said.get("ascii ramp")).toContain("ASCII ramp");
+    // **Four captions, four strings.** A ladder whose label collapses two rungs
+    // is exactly what shipped, and a set compared by size is what notices.
+    const captions = new Set(
+      [...said.values()].map((t) => /svg · ([^"]+)/u.exec(t)?.[1] ?? ""),
+    );
+    expect(captions.size, "each arm must caption itself differently").toBe(ARMS.length);
   }, 120_000);
 });
