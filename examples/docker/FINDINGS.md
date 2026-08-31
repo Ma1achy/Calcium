@@ -13860,6 +13860,89 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F423 — a plan's falsification condition aimed at the wrong artefact, and it would have closed a 544 ms defect ★★★★★
+
+**Roadmap 19 diagnoses a resize drag and names the cost.** *"Each one forces an immediate frame
+**and** a full Fenwick rebuild: `viewport.ts:202` calls `#rebuild()` on a width change, which is
+correct (heights change with width) and is the one operation the incremental index cannot do
+incrementally… So a resize drag is: N full index rebuilds, N full re-renders, N full frame
+writes."*
+
+**Every sentence of that is true and the emphasis is on the free part.** Measured against `dist/`,
+real registry, real transcript, monotonic width sweep — a drag never revisits a width, so nothing
+can be reused even in principle:
+
+```
+                     per drag event      a 30-event drag     Fenwick rebuild     tree's share
+N =   200 entries     3.8 – 5.8 ms            115 ms            0.001 ms            0.03%
+N = 1 000 entries    18.1 – 20.0 ms           544 ms       0.007 – 0.013 ms         0.07%
+```
+
+**The defect is real and large. Its named cause is 0.07% of it.** `#rebuild()` is called, it is
+correct, and it genuinely cannot be incremental — and the Fenwick tree over N integers is free. The
+cost is the line above it: `#cache.clear()`, which makes the width path re-measure **every entry**.
+
+### The part that makes this a finding rather than a correction
+
+**The entry states its own falsification condition, and the condition tests the wrong thing.**
+
+> *"Measure a real drag first. If a rebuild at a realistic transcript size is sub-millisecond the
+> whole thing is moot, and the honest answer is a recorded negative."*
+
+**The rebuild is sub-millisecond by three orders of magnitude**, and the thing is not moot. A reader
+following that instruction literally measures `#rebuild()`, reads 0.008 ms, records the honest
+negative, and closes a defect costing half a second per drag. **The instruction is rigorous, the
+measurement it names is the right kind, and its subject is the 0.07%.**
+
+This is *a correct sentence justifying the wrong decision* with the sentence promoted to a gate. A
+reader checks whether a falsification condition is well-formed, and this one is: specific, numeric,
+falsifiable, and pointed at the wrong artefact. **Nothing in the entry is wrong; the emphasis is,
+and emphasis is what a check inherits.**
+
+### And it redirects the work, which is why it had to be caught first
+
+The entry frames the fix as **a C03 I2 amendment**. `construct.ts:914` is the resize handler:
+
+```
+stores.viewport.resize(...)   ← the remeasure. 20 ms at N=1000
+refreshAnchors()
+scheduler.commit("resize")    ← the frame
+```
+
+**The expensive work runs before the scheduler is told.** A coalescing window in C03 defers the
+third line and leaves the first running per `SIGWINCH` — so it saves the N writes and the N renders
+and **none of the N remeasures**, which is ~100% of the cost. The window has to sit in C22's
+handler, above `viewport.resize`, and the entry points one layer below it.
+
+**The asymmetry underneath, which is the reusable part.** C14 virtualises, so a resize's *render* is
+`O(visible)` — the roadmap records that as checked-and-clear, correctly. But the Fenwick index needs
+a height for **every** entry, so the *measure* stays `O(transcript)`. **A width change is the one
+event whose cost scales with the whole transcript rather than with the screen**, and virtualisation
+is what makes the two diverge. Nothing about the render path suggests it; the entry that records
+render as clear is the same one that misplaces measure.
+
+### The C03 citation is also wrong, and three sites carry it
+
+**C02 I2 does not mention `resize`.** Its text is *"`input` and `completion` commits are never
+delayed by any amount, and their windows are not configurable"* — two reasons. Three places cite it
+for three: §3's prose (*"supplying a window for `input`, `completion` or `resize` is rejected…
+(I2)"*), rule 1 (*"`input`, `completion` and `resize` are immediate (I2, I7)"*) and **T3.13**
+(*"`windows: { input: 50 }` → throws. Same for `completion` and `resize`"*). Roadmap 19 quotes I2 as
+*"input, completion and resize are never delayed"* — a quotation of a sentence that does not exist.
+
+**`make enforce` resolves 12 742 invariant references and cannot see it**: it checks that a citation
+names an invariant that exists, never that the invariant says the cited thing. That is SP9's stated
+blind spot arriving in a component spec rather than in a test row.
+
+**And *never delayed* is already false for `resize` today** — T3.17: `commit("resize")` during a
+write → **deferred**, contamination flag set. So the amendment the entry proposes is smaller than it
+thinks in one direction and lands in the wrong component in the other.
+
+**Caught before anything was built on it**, which is the only reason the redirection cost twenty
+minutes rather than a rewrite.
+
+---
+
 ## F422 — the gate that catches an instrument landing without a fixture caught it, twice, and nobody ran it ★★★☆☆
 
 `make instruments` compares its registry against the tree **by equality**, so an instrument added

@@ -1512,25 +1512,55 @@ is rare, and the equality check costs more than the render it would save.
 
 ### Resize is never delayed, and it rebuilds the index every time
 
-**C03 I2 makes `resize` immediate** — *"input, completion and resize are never delayed"* —
-alongside the two reasons that genuinely cannot wait.
+**MEASURED 2026-09-01, and this entry named the free part. F423.** The defect is real and
+larger than the entry claimed; its stated cause is **0.07%** of it. Against `dist/`, real
+registry, real transcript, monotonic width sweep — a drag never revisits a width, so nothing
+is reusable even in principle:
 
-**But dragging a window emits dozens of SIGWINCHes**, and each one forces an immediate frame
-*and* a **full Fenwick rebuild**: `viewport.ts:202` calls `#rebuild()` on a width change,
-which is correct (heights change with width) and is the one operation the incremental index
-cannot do incrementally.
+```
+                     per drag event      a 30-event drag     Fenwick rebuild     tree's share
+N =   200 entries     3.8 – 5.8 ms            115 ms            0.001 ms            0.03%
+N = 1 000 entries    18.1 – 20.0 ms           544 ms       0.007 – 0.013 ms         0.07%
+```
 
-**So a resize drag is: N full index rebuilds, N full re-renders, N full frame writes.** The
-[render cache](#render-caching) and [output diffing](#output-diffing) do not help — every row genuinely changed.
+**The cost is `#cache.clear()`, one line above the rebuild** — a width change invalidates every
+cached height (C14 I8), so the path re-measures **every entry**. `#rebuild()` is called, it is
+correct, and the Fenwick tree over N integers is free.
 
-**A short coalescing window is the fix, and it is a C03 I2 amendment rather than a bug fix.**
-I2's reasoning is that a delayed resize means a visibly wrong frame; **the counter is that a
-delayed resize by 16 ms means one correct frame instead of thirty wrong ones**, and the final
-size is the only one anyone sees. Immediate for the *first* resize, coalesced for a run of
-them, is the shape — which is what a terminal emulator does with its own repaints.
+**The falsification condition this entry stated would have closed it.** It read *"if a rebuild
+at a realistic transcript size is sub-millisecond the whole thing is moot, and the honest
+answer is a recorded negative"* — and the rebuild **is** sub-millisecond, by three orders of
+magnitude. Rigorous, numeric, falsifiable, and pointed at the 0.07%. Kept here rather than
+deleted, because a check aimed at the wrong artefact reads exactly like a good one and this is
+the measured instance.
 
-**Measure a real drag first.** If a rebuild at a realistic transcript size is sub-millisecond
-the whole thing is moot, and the honest answer is a recorded negative.
+**And the fix is not where this entry put it.** `construct.ts:914` is the handler:
+
+```
+stores.viewport.resize(...)   ← the remeasure. 20 ms at N=1000
+refreshAnchors()
+scheduler.commit("resize")    ← the frame
+```
+
+The expensive work runs **before the scheduler is told**, so a C03 window defers the third line
+and leaves the first running per SIGWINCH: it saves the N writes and the N renders and none of
+the N measures. **The coalescing belongs in C22's handler, above `viewport.resize`.**
+
+**The asymmetry to carry**: C14 virtualises, so a resize's render is `O(visible)` — recorded
+below as checked-and-clear, correctly — but the index needs a height for every entry, so the
+measure stays `O(transcript)`. **A width change is the one event whose cost scales with the
+whole transcript rather than the screen.**
+
+**The C03 citation is also wrong.** I2's text is *"`input` and `completion` commits are never
+delayed by any amount"* — it does not mention `resize`, and this entry quoted it as though it
+did. Three places in C03 cite I2 for `resize` (§3's prose, rule 1, T3.13); `make enforce`
+resolves the citation and cannot check what the invariant says. And *never delayed* is already
+false for `resize` — T3.17 defers one arriving during a write.
+
+**Still worth doing, for the reason the entry gave**: a delayed resize by 16 ms means one
+correct frame instead of thirty wrong ones, and the final size is the only one anyone sees.
+Immediate for the first, coalesced for a run — what a terminal emulator does with its own
+repaints. The acceptance is a drag, not a benchmark.
 
 ### Checked and clear — recorded so nobody re-derives them
 
