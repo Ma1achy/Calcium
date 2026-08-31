@@ -13850,6 +13850,63 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F415 — the protocol arm has never run, and the demo said so on screen ★★★★★
+
+**Found by a reader looking at four frames on a real terminal**, and the demo reported it in its
+own words:
+
+```
+svg · braille dither — this terminal has no graphics protocol (none)
+```
+
+on Ghostty 1.3.1 — a terminal measured ten minutes earlier answering `OK` to the shipped
+encoder's own kitty transmission.
+
+```ts
+function detectImageProtocol(term, termProgram) {
+  if (termProgram?.toLowerCase() === "iterm.app") return "iterm2";
+  if (term === "xterm-kitty") return "kitty";
+  return "none";
+}
+```
+
+**`xterm-kitty` only.** Ghostty sets `TERM=xterm-ghostty`, so it falls to `none` — and with it
+`transmitImage`, `placementRows`, the placeholder encoding, C09 §4c entire, and F413's whole
+reordering. **All of it dead on every terminal but kitty itself**, which is three of the four the
+plan named.
+
+**The knowledge was already in the file, four lines up.** C02's own table:
+
+```
+synchronisedUpdate | TERM_PROGRAM in {iTerm.app, WezTerm, ghostty, WindowsTerminal} || TERM = xterm-kitty
+imageProtocol      | TERM_PROGRAM = iTerm.app -> iterm2; TERM = xterm-kitty -> kitty; otherwise none
+```
+
+Two lists over one question — *which emulator is this* — and only one kept up. **A reimplemented
+rule keeps its birthday clauses**, and here both copies are in one table with four lines between
+them.
+
+**Why nothing caught it.** T1.7 asserts exactly the three cases the function implements, so the
+rule and its test agree perfectly and neither knows about a fourth terminal. `imageProtocol` is a
+*detection*, so no fixture, no golden and no mutation over the renderer can reach it: every test
+in the tree injects capabilities directly, which is correct and is what makes the detection itself
+the one thing the suite never exercises. **It is the vacuity class arriving in a lookup table** —
+the arm below it was tested exhaustively and the door to it was shut.
+
+**And the second finding rides on the first.** `/compare`'s caption reads *braille dither* for
+everything that is not kitty. That was true when the ladder had two rungs below the protocol; it
+now has three, and the pane in the frame is plainly the **half block** — colour, not shape.
+F394's fix made the demo label its arm honestly and named two arms where there are now three, so
+a correct rendering is described wrongly by the demo built to describe it.
+
+**Fixed** — `xterm-ghostty` and `TERM_PROGRAM=ghostty` both, because a `ghostty` inside `tmux`
+reports `TERM=screen-256color` and only the second survives. **WezTerm and Konsole are owed and
+not claimed**: unmeasured, and a false positive draws *nothing* where a false negative draws a
+dither. The expiry is an instrument rather than a hope — run `tools/terminal-probe/probe.py` in
+the terminal and read the verdict.
+
+---
+
 ## F414 — a transmission that fails is silent, and the terminal was willing to say why ★★★☆☆
 
 Found while building the probe that answers G7, and it is about the probe's own obstacle.

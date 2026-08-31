@@ -65,9 +65,33 @@ Environment-based. **C02 never queries the terminal and never awaits a reply.** 
 | `synchronisedUpdate` | `TERM_PROGRAM` ∈ {iTerm.app, WezTerm, ghostty, WindowsTerminal} ∥ `TERM` = `xterm-kitty` → true |
 | `bracketedPaste` | `TERM` present and ≠ `dumb` |
 | `mouse` | `TERM` present and ≠ `dumb`, **and** `TMUX` unset. Disabled inside tmux by default — sequence passthrough is unreliable and keyboard parity means nothing is lost (D34) |
-| `imageProtocol` | `TERM_PROGRAM` = iTerm.app → `iterm2`; `TERM` = `xterm-kitty` → `kitty`; otherwise `none`. Detected in v1, unused until Phase 1B |
+| `imageProtocol` | `TERM_PROGRAM` = iTerm.app → `iterm2`; `TERM` = `xterm-kitty` ∥ `TERM` = `xterm-ghostty` ∥ `TERM_PROGRAM` = ghostty → `kitty`; otherwise `none`. Ghostty added on a **measurement**, not a claim — see below |
 | `backgroundPolarity` | `COLORFGBG`'s **last** `;`-separated field: 0–6 or 8 → `dark`; 7 or 9–15 → `light`; absent, non-numeric or outside 0–15 → `unknown`. Not gated by `dumb` — the rule is derived from `COLORFGBG` and not from `TERM` |
 | `altScreen` | `TERM` present and ≠ `dumb` |
+
+### Ghostty, and the two lists in this table that disagree about it
+
+**`synchronisedUpdate` has named ghostty since v1 and `imageProtocol` never did.** They are
+two lists over one subject — *which emulator is this* — and only one was kept up. The
+consequence is not a missing nicety: `TERM=xterm-ghostty` fell through to `none`, so **the whole
+protocol arm was unreachable on Ghostty** — `transmitImage`, `placementRows`, the placeholder
+encoding, every ruling in C09 §4c — and the first terminal it was ever run against drew the
+dither instead. That is *a reimplemented rule keeping its birthday clauses*, in a table where
+both copies are four lines apart.
+
+**Added on a measurement rather than on a claim.** `tools/terminal-probe/probe.py` sends the
+shipped encoder's own transmission to the terminal and reads the reply: Ghostty 1.3.1 answers
+`OK` for four PNGs and `EINVAL: invalid data` for a corrupted control, so the protocol is present
+and the failure path is distinguishable from the success path. Both `TERM` and `TERM_PROGRAM`
+are matched because a `ghostty` inside `tmux` reports `TERM=screen-256color` while
+`TERM_PROGRAM` survives.
+
+**WezTerm and Konsole are owed and deliberately not claimed.** Both are widely said to implement
+the protocol and **neither has been measured here**, and a false positive is worse than a false
+negative: placeholders addressing an image the terminal never received draw *nothing*, which is
+C09 §4c's loud failure arriving through a detection table. The expiry is cheap and named — run
+`tools/terminal-probe/probe.py` in the terminal and read the verdict — so this is a deferral with
+an instrument rather than a deferral with a hope.
 
 **Which rules the `dumb` gate applies to.** `TERM = dumb` gates every rule derived from `TERM` — `colourDepth`, `bracketedPaste`, `mouse`, `altScreen`. It does **not** gate rules derived from `TERM_PROGRAM` — `synchronisedUpdate` and `imageProtocol` — or from `COLORFGBG` — `backgroundPolarity` — because those describe the emulator, and `TERM=dumb` is a statement about terminfo. The case that makes this matter is an override of `altScreen: true` under `TERM=dumb` (T1.9): the user has said detection is wrong about their terminal, and iTerm2 supports synchronised update whatever `TERM` claims. Gating it would give them an alt screen that tears.
 
@@ -219,7 +243,7 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T1.4**: unicode detection is case-insensitive — `utf-8`, `UTF8`, `UTF-8` all → `full`.
 - **T1.5**: synchronised update — each of the four `TERM_PROGRAM` values → true; `TERM=xterm-kitty` → true; `TERM_PROGRAM=Apple_Terminal` → false.
 - **T1.6**: mouse — `TERM=xterm` → true; `TERM=dumb` → false; `TERM=xterm` with `TMUX=/tmp/x` → false.
-- **T1.7**: image protocol — `TERM_PROGRAM=iTerm.app` → `iterm2`; `TERM=xterm-kitty` → `kitty`; plain xterm → `none`.
+- **T1.7**: image protocol — `TERM_PROGRAM=iTerm.app` → `iterm2`; `TERM=xterm-kitty` → `kitty`; `TERM=xterm-ghostty` → `kitty`; `TERM_PROGRAM=ghostty` with a `tmux` `TERM` → `kitty`; plain xterm → `none`; and `TERM_PROGRAM=WezTerm` → `none`, which is the **unmeasured** arm asserted as it stands rather than as it is assumed (FINDINGS F415).
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.

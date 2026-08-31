@@ -23,8 +23,17 @@ C=calcium-dev
 OUT="docs/catalogue/images/real"
 B=$'\033[1m'; D=$'\033[2m'; CY=$'\033[36m'; YE=$'\033[33m'; RE=$'\033[31m'; O=$'\033[0m'
 
-docker ps --format '{{.Names}}' | grep -qx "$C" || {
-  printf 'the devcontainer %s is not running\n' "$C" >&2; exit 1; }
+# **Two failures that look the same from one message.** A fresh terminal may not
+# have Docker on PATH at all, and "the devcontainer is not running" sends the
+# reader to the wrong place — so they are separated.
+command -v docker >/dev/null 2>&1 || {
+  printf 'docker is not on PATH in this shell.\n' >&2
+  printf 'try: /Applications/Docker.app/Contents/Resources/bin/docker\n' >&2
+  exit 1; }
+docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$C" || {
+  printf 'docker is on PATH but the container %s is not running.\n' "$C" >&2
+  printf 'start it and re-run.\n' >&2
+  exit 1; }
 mkdir -p "$OUT"
 
 pause() { printf '\n%s[ %s ]%s ' "$D" "${1:-screenshot, then Enter}" "$O"; read -r _; }

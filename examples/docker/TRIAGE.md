@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 23 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 54 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 25 | **10** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 153 | **15** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 154 | **15** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 21 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
@@ -653,6 +653,8 @@ through a menu in as many words — as the reason the implementation writes ever
 
 
 ## 11 · A gate that passes without checking — **103: 60 closed, 43 open**
+
+**F415** — `detectImageProtocol` returns `kitty` for `TERM=xterm-kitty` and nothing else, so the entire protocol arm was unreachable on Ghostty, WezTerm and Konsole — three of the four terminals the plan named. T1.7 asserts exactly the three cases the function implements, so rule and test agree and neither knows about a fourth terminal; and every other test injects capabilities directly, which is correct and leaves the detection as the one thing nothing exercises. **The knowledge was four lines up in the same table** — `synchronisedUpdate` has named ghostty since v1. **Fixed for ghostty on a measurement**; WezTerm and Konsole owed, with the probe named as their expiry.
 
 | | the gate | what it was not checking |
 |---|---|---|
