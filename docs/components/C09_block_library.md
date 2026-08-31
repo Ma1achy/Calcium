@@ -1260,7 +1260,7 @@ rules could both claim the answer (CLAUDE.md, *rule interactions come in two kin
 | G6 | `overlay` × `unicode: "ascii"` | **ASCII ramp**, field in the foreground | unchanged, and it is the row that shows G5 is about channels rather than about rungs: a ramp glyph has a free foreground exactly as braille does |
 | G7 | **bytes do not decode** × protocol arm | **the fault, through `status`** — and the bytes still transmit | *`alt`, silently*, which is what shipped: the decoder computes a **reason** for every refusal and no consumer could ever see it. FINDINGS **F410**. The transmission is deliberately **not** guarded on our decoder's opinion — see below |
 | G8 | `ambiguousWidth: "wide"` × 24-bit, no overlay | **braille** | nothing better is available, and the loss is worth naming: colour is present and unusable, which is the only rung where the terminal has more than the ladder can take |
-| G9 | a **1-pixel-tall** image × half block eligible | **half block**, the lower sample clamped to the last row | *index `y*2+1`*, which is off the end of the image — a cell is two pixels and an image need not be an even number of them |
+| G9 | a **1-pixel-tall** image × half block eligible | **half block**, both halves resolving to row 0 **by the arithmetic** | *index `y*2+1`*, off the end of the image — and that is a **point-sampling** implementation's hazard, which this is not. The ruling first said *clamped to the last row* and credited a guard: measured over 1.24 billion coordinates, **not one of `sampleRgb`'s four clamps ever binds**, because the coordinates are fractions of the image's own extent. Right about the cell, wrong about the mechanism — FINDINGS **F412** |
 
 ### G7's other half, which is a claim this repository cannot settle
 

@@ -83,11 +83,21 @@ export function halfBlockEligible(
  * there — this layer does not know the theme's background and asking would put
  * a colour where C10 owns one.
  *
- * **The clamps are `dither.ts`'s and they carry C09 §8b's G9.** A cell is two pixels
- * tall and an image need not be an even number of them: at one pixel `y0`
- * resolves to row 0 for both halves, because `Math.min(px.height - 1, …)` caps
- * the top and `Math.max(top + 1, …)` guarantees the rectangle is non-empty. The
- * naive `y * 2 + 1` indexes off the end of a one-row image.
+ * **The clamps are `dither.ts`'s and they are defensive rather than load-
+ * bearing — measured, not assumed** (F412). The mutation pass asked: removing
+ * the `Math.min(px.height - 1, …)` cap fails nothing, because it never fires.
+ * Swept over every `(W, H, cols, rows)` in `1..60 x 1..60 x 1..40 x 1..20` —
+ * **1.24 billion samples, and not one of the four clamps binds.** The
+ * coordinates are fractions of the image's own extent, so they cannot leave it.
+ *
+ * **C09 §8b's G9 named the wrong mechanism** and its outcome is still right. The
+ * `y * 2 + 1` that indexes off the end of a one-row image is a **point-sampling**
+ * implementation's hazard; this one averages over `[(2r)·sy, (2r+1)·sy)` with
+ * `sy = height / (2·rows)`, and at one pixel both halves resolve to row 0 by the
+ * arithmetic rather than by a guard. The clamps stay because they are this
+ * *function's* contract — it takes four numbers and must be total — but nothing
+ * here depends on them, and a comment claiming otherwise is a guard that reads
+ * as load-bearing and would survive being deleted.
  */
 function sampleRgb(px: Pixels, x0: number, y0: number, x1: number, y1: number): string {
   const lo = Math.max(0, Math.min(px.width - 1, Math.floor(x0))); // cells-ok — a pixel index

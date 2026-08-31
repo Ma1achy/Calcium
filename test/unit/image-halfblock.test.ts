@@ -48,9 +48,18 @@ const draw = (
 
 const stripped = (rows: readonly string[]): readonly string[] => rows.map((l) => l.replace(SGR, ""));
 
-/** Half red over half blue — so a top/bottom mix-up is a different frame. */
+/**
+ * Half red over half blue — a coarse fixture, and **it cannot see a swap** (F412).
+ *
+ * Kept because HB4, HB5 and HB7 want a picture rather than a gradient, and
+ * renamed in its own comment rather than deleted: at four cell rows every cell
+ * covers two pixel rows of one colour, so `top` and `bottom` agree everywhere.
+ */
 const SPLIT = (h: number): string =>
   rgbPng64(8, h, (_x, y) => (y < h / 2 ? [255, 0, 0] : [0, 0, 255]));
+
+/** One colour per **pixel row**, so the two halves of every cell disagree. */
+const STEP = (h: number): string => rgbPng64(8, h, (_x, y) => [y * 32, 0, 255 - y * 32]);
 
 const image = (data: string, height: number, extra: Partial<Image> = {}): Image =>
   ({ ...b.image({ id: "img", data, height, alt: "a caption" }), ...extra }) as Image;
@@ -94,18 +103,33 @@ describe("C09 §8b · the glyph axis", () => {
   });
 
   it("HB2 (C09 I37): the colours are the picture, top over bottom and not the reverse", () => {
-    // Eight pixel rows into four cell rows: cell row 0 covers pixel rows 0-1,
-    // both red; cell row 3 covers 6-7, both blue.
-    const rows = draw(image(SPLIT(8), 4));
-    expect(rows[0]).toContain("38;2;255;0;0");
-    expect(rows[0]).toContain("48;2;255;0;0");
-    expect(rows[3]).toContain("38;2;0;0;255");
-    expect(rows[3]).toContain("48;2;0;0;255");
-    // Row 1 is the seam: pixel rows 2-3, still red; row 2 is 4-5, blue. The
-    // boundary lands between cells here, which is what makes the two extremes
-    // above unambiguous.
-    expect(rows[1]).toContain("38;2;255;0;0");
-    expect(rows[2]).toContain("38;2;0;0;255");
+    // **This row was blind and the mutation pass is what said so** (F412).
+    // `SPLIT(8)` is red for `y < 4` and blue after, drawn at four cell rows — so
+    // every cell covers two pixel rows of **one** colour, `top` equals `bottom`
+    // in all four, and exchanging them is a no-op. The comment that stood here
+    // said *the boundary lands between cells, which is what makes the two
+    // extremes unambiguous*: true, and it is the property that made the row
+    // unable to see a transposition. A convenient fixture is the one where both
+    // readings agree.
+    //
+    // `STEP` gives every pixel row its own colour, so the two halves of every
+    // cell differ and a swap moves the frame.
+    const rows = draw(image(STEP(8), 4));
+    // Cell row 0 is pixel rows 0 and 1: (0,0,255) over (32,0,223).
+    expect(rows[0], "the foreground is the UPPER pixel").toContain("38;2;0;0;255");
+    expect(rows[0], "the background is the LOWER pixel").toContain("48;2;32;0;223");
+    // Cell row 3 is pixel rows 6 and 7 — the far end, so a reversed *row* order
+    // fails here even where a per-cell swap would not.
+    expect(rows[3]).toContain("38;2;192;0;63");
+    expect(rows[3]).toContain("48;2;224;0;31");
+    // And the two channels are never equal in any row, which is the property
+    // that makes every assertion above able to fail.
+    for (const [i, row] of rows.entries()) {
+      const fg = /38;2;(\d+;\d+;\d+)/u.exec(row)?.[1];
+      const bg = /48;2;(\d+;\d+;\d+)/u.exec(row)?.[1];
+      expect(fg, `row ${String(i)} carries both channels`).toBeDefined();
+      expect(fg, `row ${String(i)}: the halves must differ or a swap is invisible`).not.toBe(bg);
+    }
   });
 
   it("HB3 (C09 I37): each of the three gates demotes on its own, and only its own", () => {
@@ -170,9 +194,12 @@ describe("C09 §8b · the glyph axis", () => {
   });
 
   it("HB6 (C09 I37): a one-pixel-tall image samples row 0 twice rather than off the end", () => {
-    // §8b G9. `y * 2 + 1` is past the last row of a one-pixel image, and the
-    // naive read of `data[i] ?? 0` turns that into black — a picture with a
-    // dark band that looks like a picture.
+    // C09 §8b G9, **and what it guards is not what the ruling first said**
+    // (F412). `y * 2 + 1` past the last row is a point-sampling implementation's
+    // hazard; this one averages over fractional coordinates and both halves
+    // resolve to row 0 by arithmetic — no clamp fires, measured. The row stays
+    // as the regression guard for exactly that: a future rewrite to point
+    // sampling reintroduces the hazard, and this is what would notice.
     const px = decodePng(Uint8Array.from(Buffer.from(rgbPng64(4, 1, () => [255, 255, 255]), "base64")));
     expect(px.ok).toBe(true);
     if (!px.ok) return;

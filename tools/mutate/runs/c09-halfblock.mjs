@@ -90,14 +90,21 @@ const results = runPass({
       expect: "HB2",
     },
     {
-      // §8b G9 — a cell is two pixels and an image need not be an even number of
-      // them. Without the clamp the lower sample of a one-row image is off the
-      // end, and `?? 0` turns that into a dark band that looks like a picture.
-      name: "NO-CLAMP: the lower sample may index past the last row",
+      // **This slot held `NO-CLAMP` and it could not be killed** (F412). Removing
+      // `Math.min(px.height - 1, …)` fails nothing because the clamp never fires:
+      // 1.24 billion coordinates swept, and none of `sampleRgb`'s four bounds
+      // binds. An uncatchable mutation left in a run is a row that reports the
+      // suite is thorough about a guard doing no work.
+      //
+      // **The midline is what actually carries the two-pixels-a-cell claim.**
+      // Collapsing it onto the upper edge makes both halves sample one pixel row,
+      // so every cell's foreground equals its background — the picture halves its
+      // vertical resolution and still looks like a picture.
+      name: "MID-COLLAPSES: both halves sample the same pixel row",
       file: HALF,
-      from: "  const top = Math.max(0, Math.min(px.height - 1, Math.floor(y0))); // cells-ok — a pixel index",
-      to: "  const top = Math.max(0, Math.floor(y0)); // cells-ok — a pixel index",
-      expect: "HB6",
+      from: "      const mid = (r * 2 + 1) * sy; // cells-ok — a pixel coordinate",
+      to: "      const mid = (r * 2) * sy; // cells-ok — a pixel coordinate",
+      expect: "HB2",
     },
     {
       // The 8-bit funnel bypassed, so the quantised arm emits truecolour. The

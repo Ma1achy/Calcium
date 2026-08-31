@@ -13850,6 +13850,72 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F412 — two survivors, and each indicted a different artefact ★★★★★
+
+The half-block arm's first mutation pass came back **2 of 8 survived**, and both were
+rows I had written a sentence claiming were load-bearing.
+
+### `SWAP-HALVES` — the fixture never constructed the state the row claimed
+
+Exchanging `top` and `bottom` in `halfBlockRows` changed nothing HB2 could see. The
+fixture is `SPLIT(8)` — red for `y < 4`, blue after — drawn at four cell rows:
+
+```
+cell row 0: top=pixels[0,1) red    bottom=pixels[1,2) red    IDENTICAL
+cell row 1: top=pixels[2,3) red    bottom=pixels[3,4) red    IDENTICAL
+cell row 2: top=pixels[4,5) blue   bottom=pixels[5,6) blue   IDENTICAL
+cell row 3: top=pixels[6,7) blue   bottom=pixels[7,8) blue   IDENTICAL
+```
+
+**Every cell's two halves are the same colour**, so a transposition is a no-op. And the
+comment above the assertions said so, as a *justification*:
+
+> *the boundary lands between cells here, which is what makes the two extremes above
+> unambiguous.*
+
+True, and it is precisely the property that made the row blind. **The convenient fixture
+is the one where both readings agree** — a boundary between cells is easy to reason about
+and impossible to test with. **Fixed** — `STEP`, one colour per pixel row, so the halves
+of every cell disagree; plus a loop asserting foreground never equals background, which is
+what makes every other assertion in the row able to fail.
+
+**No golden frame could have caught it either.** `ONE_PER_KIND.image` is a flat red square,
+so a swapped half is byte-identical in all sixteen variants.
+
+### `NO-CLAMP` — the mutation could not be killed, because the code is unreachable
+
+Removing `Math.min(px.height - 1, …)` failed nothing. Measured rather than argued: swept
+over every `(W, H, cols, rows)` in `1..60 × 1..60 × 1..40 × 1..20`,
+
+```
+samples: 1239840000
+clamps that ever bind: {"xLo":0,"xHi":0,"yTop":0,"yBot":0}
+```
+
+**Not one of `sampleRgb`'s four bounds ever binds.** The coordinates are fractions of the
+image's own extent, so they cannot leave it.
+
+**So the indictment is the ruling, not the test.** C09 §8b's G9 said *the lower sample
+clamped to the last row*, and named the hazard as `y * 2 + 1` indexing off the end of a
+one-row image. That is a **point-sampling** implementation's hazard. This one averages over
+`[(2r)·sy, (2r+1)·sy)`, and at one pixel both halves resolve to row 0 **by the arithmetic**.
+G9's row is right — a 1-pixel image is a real structural interaction — and its mechanism was
+assumed rather than checked. *An artefact can be correct about the interaction it found and
+wrong about a mechanism it assumed existed*, which is CLAUDE.md's own class arriving in a
+table rather than in prose.
+
+**Fixed in three places, because one would have been the wrong one.** The clamps stay —
+`sampleRgb` takes four numbers and must be total — but their comment now says defensive and
+carries the measurement, so the next reader does not delete a guard the prose called
+load-bearing. G9's ruling names the arithmetic. And the run's slot holds `MID-COLLAPSES`
+instead: the midline **is** the two-pixels-a-cell claim, and collapsing it onto the upper
+edge halves the vertical resolution while still looking like a picture. **An uncatchable
+mutation left in a run reports thoroughness about a guard doing no work.**
+
+**8 of 8 caught after.**
+
+---
+
 ## F411 — three rows matched one rung's alphabet, and a new rung read as no picture ★★★★☆
 
 Adding the half block turned three green rows red, all saying the same thing:
