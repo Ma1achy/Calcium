@@ -60,16 +60,85 @@ Environment-based. **C02 never queries the terminal and never awaits a reply.** 
 
 | Capability | Rule |
 |---|---|
-| `colourDepth` | Checked in order. `TERM` = `dumb` or absent → 1 — a dumb terminal renders no colour whatever `COLORTERM` claims; `COLORTERM` ∈ {`truecolor`, `24bit`} → 24; `TERM` contains `256color` → 8; otherwise → 4 |
+| `colourDepth` | Checked in order. `TERM` = `dumb` or absent → 1 — a dumb terminal renders no colour whatever `COLORTERM` claims; `COLORTERM` ∈ {`truecolor`, `24bit`} → 24; **the terminal is identified (below) and `TMUX` is unset → 24**; `TERM` contains `256color` → 8; otherwise → 4 |
 | `unicode` | POSIX precedence: take the **first** of `LC_ALL`, `LC_CTYPE`, `LANG` that is set and read only that one — a set `LC_ALL` suppresses the others even when they name a UTF-8 locale. It contains `UTF-8` (case-insensitive, hyphen optional) → `full`; otherwise, and when none is set → `ascii`. `bmp` is reserved and never produced in v1 |
-| `synchronisedUpdate` | `TERM_PROGRAM` ∈ {iTerm.app, WezTerm, ghostty, WindowsTerminal} ∥ `TERM` = `xterm-kitty` → true |
+| `synchronisedUpdate` | The terminal is identified (below) → true. Every emulator this file can name implements it |
 | `bracketedPaste` | `TERM` present and ≠ `dumb` |
 | `mouse` | `TERM` present and ≠ `dumb`, **and** `TMUX` unset. Disabled inside tmux by default — sequence passthrough is unreliable and keyboard parity means nothing is lost (D34) |
-| `imageProtocol` | `TERM_PROGRAM` = iTerm.app → `iterm2`; `TERM` = `xterm-kitty` ∥ `TERM` = `xterm-ghostty` ∥ `TERM_PROGRAM` = ghostty → `kitty`; otherwise `none`. Ghostty added on a **measurement**, not a claim — see below |
+| `imageProtocol` | The identification's own column (below): iTerm2 → `iterm2`; kitty and Ghostty → `kitty`; WezTerm and Windows Terminal → `none`, **unmeasured rather than absent**; unidentified → `none` |
 | `backgroundPolarity` | `COLORFGBG`'s **last** `;`-separated field: 0–6 or 8 → `dark`; 7 or 9–15 → `light`; absent, non-numeric or outside 0–15 → `unknown`. Not gated by `dumb` — the rule is derived from `COLORFGBG` and not from `TERM` |
 | `altScreen` | `TERM` present and ≠ `dumb` |
 
-### Ghostty, and the two lists in this table that disagree about it
+### One identification, consulted by every capability
+
+**Three capabilities in this file identified the same terminal three different ways.**
+`synchronisedUpdate` knew Ghostty by `TERM_PROGRAM`, `imageProtocol` by `TERM` *or* `TERM_PROGRAM`,
+and `colourDepth` by neither — and the section below diagnosed exactly that class while fixing one
+member of it, which is *a citation reading as coverage*. The remedy is not a third list kept up to
+date with the other two. It is that **the question is asked once**:
+
+| terminal | identified by | `imageProtocol` |
+|---|---|---|
+| kitty | `TERM` = `xterm-kitty` | `kitty` |
+| Ghostty | `TERM` = `xterm-ghostty` ∥ `TERM_PROGRAM` = ghostty | `kitty` |
+| iTerm2 | `TERM_PROGRAM` = iTerm.app | `iterm2` |
+| WezTerm | `TERM_PROGRAM` = WezTerm | `none` — unmeasured, see below |
+| Windows Terminal | `TERM_PROGRAM` = WindowsTerminal | `none` |
+
+**`synchronisedUpdate` is true for every row**, and there is no column for it because the table's
+membership criterion *is* being an emulator modern enough to name. **`colourDepth` has no column for
+the same reason**: every terminal here is 24-bit. A terminal added for which either is false needs
+the column before it needs the row, and that is the expiry on both sentences — a column whose value
+never varies carries no information and is the first thing to distrust.
+
+**It was not a tidiness problem, and here is the frame it cost.** With `TERM=xterm-ghostty` alone —
+which is exactly what `docker exec -e TERM` forwards, and what `ssh` forwards — the three answers
+were:
+
+```
+                                             imageProtocol   synchronisedUpdate   colourDepth
+TERM=xterm-ghostty                           kitty           false                4
+TERM=xterm-ghostty  COLORTERM=truecolor      kitty           false                24
+TERM=screen-256color  TERM_PROGRAM=ghostty   kitty           true                 8
+TERM=xterm-kitty                             kitty           true                 4
+```
+
+**One terminal, two detectors, opposite answers**, in the environment this project runs its own demo
+in. The image arm worked and the frame tore, every frame, because the two lists were consulted for
+one question and only one of them had heard of `xterm-ghostty`.
+
+**Why `colourDepth` consults the identification, which is the row that looks least necessary.** A
+real Ghostty sets `COLORTERM=truecolor`, so the third column looks like an artefact of our own
+harness stripping it — and it is not. **`ssh` allocates a pty and forwards `TERM`; it does not
+forward `COLORTERM`.** A kitty or Ghostty user connecting to a machine that runs a Calcium app gets
+24-bit images and 4-bit colour, from one terminal, on the strength of which variable happened to
+survive. That is the case that earns the row.
+
+**And identity is gated by `TMUX` where it outranks a direct statement.** `COLORTERM` is the
+terminal speaking for itself; a name is us inferring. Inside a multiplexer we are not talking to the
+emulator we identified, so the identification does not raise the depth there and the answer stays
+what it is today. This is `mouse`'s rule (D34) reaching a second capability, and it is deliberately
+**conservative**: outside tmux it fixes the measured defect, and inside it changes nothing.
+
+### The axis none of the three states, which is the fourth instance
+
+**Identification is not capability.** *Which emulator is this* and *does a sequence reach it* are
+different questions, and only `mouse` has ever asked the second. `imageProtocol` and
+`synchronisedUpdate` are claimed from a name inside `tmux` exactly as they are outside it, and the
+image case is the one that matters: **nothing in `src/` wraps an escape in tmux's passthrough form**
+— greppable, and the reason this is a real question rather than a stylistic one — so an APC
+transmission is emitted raw and C09 §4c's failure is a placement addressing an image that never
+arrived, which draws *nothing*.
+
+**It is named here and not ruled, because ruling it needs a measurement this repository cannot
+take.** What unwrapped APC does inside a given tmux is not a fact about our code, and F421 is the
+standing lesson about carrying that kind of claim on repetition. **The instrument is one run**:
+`tools/terminal-probe/probe.py` inside `tmux` on the same Ghostty that produced `result.txt`. The
+manifest loop reads the terminal's reply, so a swallowed transmission is visible as an absent or
+error verdict rather than as a blank rectangle nobody can diagnose. Whoever next runs the read owns
+the answer, and T1.7's tmux row is asserted *as it stands* until then.
+
+### Ghostty, and how the second list came to be kept up
 
 **`synchronisedUpdate` has named ghostty since v1 and `imageProtocol` never did.** They are
 two lists over one subject — *which emulator is this* — and only one was kept up. The
@@ -209,6 +278,8 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 
 - **I10** — **`backgroundPolarity` is read from `COLORFGBG` alone, answers `unknown` wherever it is not certain, and chooses nothing.** The background is the field after the **last** `;`, which is right for `fg;bg` and for rxvt's `fg;default;bg` alike; 0–6 and 8 are `dark`, 7 and 9–15 are `light`, and everything else — absent, empty, non-numeric, or an index above 15 — is `unknown`. **The third value is the invariant's load-bearing half**: *nothing stated* and *stated light* are different facts, and a two-valued field makes them one, which is exactly the distinction its only consumer branches on. **C02 does not choose a theme**, on commitment 9's shape — a depth is reported and never interpreted, and a polarity is the same kind of fact: what it *means* for which theme opens is C22's, decided against a set C02 cannot see (→ C22 I68).
 
+- **I11** — **The emulator is identified once, and no capability matches an emulator name itself.** One function takes `TERM` and `TERM_PROGRAM` and answers with a terminal or nothing; every rule that depends on *which emulator this is* reads that answer and never re-derives it. **Three rules derived it separately and two of them disagreed** — `TERM=xterm-ghostty` alone gave `imageProtocol: kitty` with `synchronisedUpdate: false`, one terminal answering opposite ways in the environment this project demos in. The invariant is not that the lists agree; it is that **there is one list**, because agreement between three copies is a property nothing checks and single-sourcing is a property a scan can (→ T1.12, T6.11).
+
 ---
 
 ## 6. Commitments
@@ -226,6 +297,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 11. Warnings about rejected overrides are returned to the caller, never printed (I8).
 12. **`ambiguousWidth` is detected from the locale, overridden by declaration, and constant for the session** — and `cells()` takes it as a parameter rather than reading it, because only L1 measures and L0's data half must not learn about terminals (I9). `cells()` is C09's and takes it as an argument.
 13. **`backgroundPolarity` is detected from `COLORFGBG`, is three-valued, and is never acted on here** — the certain range is 0–15 because the range beyond it is C10's table and C10 is a layer up, and *not stated* keeps its own value because the consumer branches on it (I10). What a polarity *means* for which theme opens is decided against a set C02 cannot see (→ C22 I68).
+14. **The emulator is identified once and every capability consults that identification** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM` and gated by `TMUX`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**: whether a sequence *reaches* the emulator is a second question, and `mouse` is still the only rule that asks it (§3).
 
 ---
 
@@ -237,13 +309,14 @@ Six tiers. No state machine, so no transition table (A02 §7).
 
 A table of `env` fixtures. No mocks, no terminal.
 
-- **T1.1**: colour depth — `COLORTERM=truecolor` → 24; `TERM=xterm-256color` → 8; `TERM=xterm` → 4; `TERM=dumb` → 1; empty env → 1.
+- **T1.1**: colour depth — `COLORTERM=truecolor` → 24; `TERM=xterm-256color` → 8; `TERM=xterm` → 4; `TERM=dumb` → 1; empty env → 1; **`TERM=xterm-kitty` with no `COLORTERM` → 24**, which is the `ssh` case — a pty is allocated and `TERM` is forwarded where `COLORTERM` is not; **and `TERM=xterm-kitty` with `TMUX=/tmp/x` → 4**, because inside a multiplexer a name is not the terminal speaking for itself.
 - **T1.2**: `COLORTERM=24bit` → 24 (the less common spelling).
 - **T1.3**: unicode — `LANG=en_GB.UTF-8` → `full`; `LANG=C` → `ascii`; `LC_ALL` overrides `LANG`; `LC_CTYPE` overrides `LANG` but not `LC_ALL`.
 - **T1.4**: unicode detection is case-insensitive — `utf-8`, `UTF8`, `UTF-8` all → `full`.
-- **T1.5**: synchronised update — each of the four `TERM_PROGRAM` values → true; `TERM=xterm-kitty` → true; `TERM_PROGRAM=Apple_Terminal` → false.
+- **T1.5**: synchronised update — each of the four `TERM_PROGRAM` values → true; `TERM=xterm-kitty` → true; **`TERM=xterm-ghostty` alone → true**, which was `false` before the identification was single-sourced and is the row the defect lived in; `TERM_PROGRAM=Apple_Terminal` → false.
 - **T1.6**: mouse — `TERM=xterm` → true; `TERM=dumb` → false; `TERM=xterm` with `TMUX=/tmp/x` → false.
 - **T1.7**: image protocol — `TERM_PROGRAM=iTerm.app` → `iterm2`; `TERM=xterm-kitty` → `kitty`; `TERM=xterm-ghostty` → `kitty`; `TERM_PROGRAM=ghostty` with a `tmux` `TERM` → `kitty`; plain xterm → `none`; and `TERM_PROGRAM=WezTerm` → `none`, which is the **unmeasured** arm asserted as it stands rather than as it is assumed (FINDINGS F415).
+- **T1.12** (I11): **the identification is one function and the capabilities are its readers.** A source scan over `terminal/capabilities.ts` finds every emulator name — `xterm-kitty`, `xterm-ghostty`, `iterm.app`, `ghostty`, `wezterm`, `windowsterminal` — inside the identifying function alone, and none in any `detect*` that answers a capability. **Asserted structurally rather than by comparing the three answers**, because three lists that happen to agree pass an agreement test and still are three lists (F84's shape: the property worth holding is the one a scan can see).
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.
@@ -307,6 +380,7 @@ PTY harness with a controlled environment.
 - **T6.7** (I3): caching detection in module scope so a second call returns a shared reference → T2.3 fails.
 - **T6.8** (I10): taking `COLORFGBG`'s **second** field rather than its last → T1.11 fails on the rxvt row alone. Every other row in the suite has two fields, where the two rules agree — so this is the row that exists to disagree with them.
 - **T6.9** (I10): collapsing `unknown` into `dark` → T1.11 fails on the absent row, and **C22's T1.20c passes unchanged**. That asymmetry is the row's whole content: the two-valued field is wrong only where nothing is stated, and it is the reader's behaviour there that the third value exists to protect.
+- **T6.11** (I11): re-deriving a capability from its own emulator list — `synchronisedUpdate: term === "xterm-kitty" || term === "xterm-ghostty" || […].includes(termProgram)` inline in `detect`, which answers **identically on every fixture in this file** — → **T1.12 fails alone; T1.1, T1.5 and T1.7 all pass.** Measured, and the first mutation written for this row did not have that property: hard-coding `xterm-kitty` into `detectColourDepth` also broke T1.1's tmux row, so it was a *disagreeing* second list and proved nothing about the invariant. **A second list that agrees is invisible to every assertion about answers**, which is the state this file shipped in for the life of the project and the whole content of the row.
 - **T6.10** (I1): adding a field to the record without declaring it in §2 → **T2.8 fails and T2.6 does not**, which is the state `ambiguousWidth` shipped in.
 
 ---

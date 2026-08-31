@@ -14138,8 +14138,68 @@ Bought the pixels and paid in colour.
 **Third instance of one mechanism**, so it is the class rather than the entry: F415 was
 `detectImageProtocol` knowing one terminal, this is `detectColourDepth` knowing none, and
 `synchronisedUpdate` — which knows ghostty by `TERM_PROGRAM` — is the one that already had the
-knowledge each of the others was missing. **Open**: the fix is a terminal table the three
-detectors share, and that is a C02 ruling rather than a patch.
+knowledge each of the others was missing.
+
+### Ruled — one identification, and three things the ruling found
+
+**C02 I11 and commitment 14**: one `identifyTerminal(term, termProgram)`, one table, and every
+capability reads its answer. Not *the lists agree* — three copies that happen to agree pass an
+agreement test and are still three copies — but **there is one list**, which is a property a scan
+can see (T1.12) where agreement is not.
+
+**1 · *Latent* was wrong, and the finding above says so in its own words.** It reads *masked in
+practice… it surfaces the moment something propagates `TERM` without `COLORTERM` — which is exactly
+what F416's harness fix did*, which names our own harness as the trigger and makes the defect ours
+to have caused. **`ssh` allocates a pty and forwards `TERM`; it does not forward `COLORTERM`.** Any
+kitty or Ghostty user connecting to a machine that runs a Calcium app got 24-bit images and 4-bit
+colour from one terminal, decided by which variable survived the hop. The finding was written from
+the case that produced it and generalised to the case that did not exist.
+
+**2 · The colour column was not the worst of it, and the finding never mentions the other one.**
+With `TERM=xterm-ghostty` alone the record answered `imageProtocol: "kitty"` and
+`synchronisedUpdate: false` — **one terminal, two detectors, opposite answers.** The images arrived
+and the frame tore, every frame, in the environment this project demos in. The measurement above has
+four rows and an `image` column, and the capability that actually contradicted it is not among them.
+
+```
+                                             imageProtocol   synchronisedUpdate   colourDepth
+TERM=xterm-ghostty                           kitty           false                4
+TERM=xterm-ghostty  COLORTERM=truecolor      kitty           false                24
+TERM=screen-256color  TERM_PROGRAM=ghostty   kitty           true                 8
+TERM=xterm-kitty                             kitty           true                 4
+```
+
+**3 · A test asserted the disagreement as correct, and its comment is why that survives a careful
+reader.** T1.7 carried `expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(false)`
+under: *asserted rather than narrated, because the first version of this row claimed
+`TERM=xterm-ghostty` implied a synchronised update **and it does not***. Every word of that is true.
+A reader hunting their own assumptions went to the code, found `false`, and wrote it down as a
+correction — **true about the code and false about Ghostty**, which implements synchronised update
+and is in the program list for that reason. *A correct sentence justifying the wrong decision
+survives being read carefully*: the row recorded which variable happened to be consulted, and a row
+that does that is indistinguishable from a row that records a decision.
+
+### The fourth instance was already written, one level up
+
+**Identification is not capability.** *Which emulator is this* and *does a sequence reach it* are
+two questions, and `mouse` is the only rule in the file that has ever asked the second — disabled
+inside `tmux` because *sequence passthrough is unreliable* (D34). `imageProtocol` and
+`synchronisedUpdate` are claimed from a name inside tmux exactly as outside it, and the image case is
+the one that matters: **nothing in `src/` wraps an escape in tmux's passthrough form** — greppable,
+which is what makes this a question about our code rather than a belief about tmux — so an APC
+transmission goes out raw and C09 §4c's failure is a placement addressing an image that never
+arrived, which draws *nothing*.
+
+**Named and not ruled**, because ruling it needs a measurement this repository cannot take, and F421
+is the standing lesson about carrying that kind of claim on repetition instead. **The instrument is
+one run**: `tools/terminal-probe/probe.py` inside `tmux` on the same Ghostty that produced
+`result.txt`. The manifest loop reads the terminal's reply, so a swallowed transmission shows as an
+absent or error verdict rather than as a blank rectangle nobody can diagnose.
+
+`colourDepth` **is** gated on `TMUX`, because there the gate is conservative — outside tmux it fixes
+the measured defect and inside it answers exactly what it answered before — so it costs no unmeasured
+claim. The other two would change a shipped answer and are left alone. **Closed** for the
+identification; the passthrough axis is open and instrumented.
 
 ---
 

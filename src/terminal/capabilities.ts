@@ -146,12 +146,27 @@ function read(env: Readonly<NodeJS.ProcessEnv>, key: string): string | undefined
 function detectColourDepth(
   term: string | undefined,
   colorterm: string | undefined,
+  terminal: TerminalName | null,
+  inTmux: boolean,
 ): TerminalCapabilities["colourDepth"] {
   // Order matters, and the dumb gate comes first: a dumb terminal renders no
   // colour whatever COLORTERM claims about the emulator (T3.3). Absent TERM is
   // dumb — see §3.
   if (term === undefined || term === "dumb") return 1;
   if (colorterm === "truecolor" || colorterm === "24bit") return 24;
+  // **The identification, below `COLORTERM` and gated by `TMUX`** (I11). A real
+  // Ghostty sets `COLORTERM`, so this row looks like an artefact of our own
+  // harness stripping it — and it is not: **`ssh` allocates a pty and forwards
+  // `TERM`, never `COLORTERM`**. A kitty user connecting to a machine running a
+  // Calcium app got 24-bit images and 4-bit colour from one terminal, decided by
+  // which variable survived.
+  //
+  // Below `COLORTERM` because that is the terminal speaking for itself and a name
+  // is us inferring. Gated by `TMUX` because inside a multiplexer we are not
+  // talking to the emulator we identified — `mouse`'s rule (D34) reaching a
+  // second capability — and the gate is deliberately conservative: outside tmux
+  // it fixes the measured defect, inside it changes nothing.
+  if (terminal !== null && !inTmux) return 24;
   if (term.includes("256color")) return 8;
   return 4;
 }
@@ -232,55 +247,82 @@ function detectBackgroundPolarity(
   return index === 7 || index > 8 ? "light" : "dark";
 }
 
-const SYNCHRONISED_UPDATE_PROGRAMS: readonly string[] = [
-  "iterm.app",
-  "wezterm",
-  "ghostty",
-  "windowsterminal",
-];
+/**
+ * **The emulators this file can name, and the only place it names them** (I11).
+ *
+ * Three rules used to identify a terminal separately — `synchronisedUpdate` by
+ * `TERM_PROGRAM`, `imageProtocol` by `TERM` *or* `TERM_PROGRAM`, `colourDepth` by
+ * neither — and **two of them disagreed**. With `TERM=xterm-ghostty` alone, which
+ * is what `docker exec -e TERM` forwards and what `ssh` forwards, the record said
+ * `imageProtocol: "kitty"` and `synchronisedUpdate: false`: one terminal, two
+ * lists, opposite answers, and the demo tore on every frame while its images
+ * worked (F418).
+ *
+ * **The disagreement was seen and written down as correct.** T1.7 carried
+ * `expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(false)` under a
+ * comment saying the first draft of the row had assumed otherwise *and it does
+ * not* — a reader hunting their own assumptions went to the code, found `false`
+ * and recorded it. **The sentence is true about the code and false about
+ * Ghostty**, which implements synchronised update and is in the program list for
+ * that reason. A row that records which variable happened to be consulted reads
+ * exactly like a row that records a decision.
+ *
+ * So the invariant is not *the lists agree* — three copies that happen to agree
+ * pass an agreement test and are still three copies. It is that **there is one
+ * list**, which is a property a scan can see (T1.12, T6.11).
+ */
+type TerminalName = "kitty" | "ghostty" | "iterm2" | "wezterm" | "windowsterminal";
 
-function detectSynchronisedUpdate(
+/** `TERM` is rewritten by a multiplexer; `TERM_PROGRAM` survives one. Both, therefore. */
+const BY_TERM: Readonly<Record<string, TerminalName>> = {
+  "xterm-kitty": "kitty",
+  "xterm-ghostty": "ghostty",
+};
+const BY_PROGRAM: Readonly<Record<string, TerminalName>> = {
+  "iterm.app": "iterm2",
+  ghostty: "ghostty",
+  wezterm: "wezterm",
+  windowsterminal: "windowsterminal",
+};
+
+function identifyTerminal(
   term: string | undefined,
   termProgram: string | undefined,
-): boolean {
-  if (term === "xterm-kitty") return true;
-  if (termProgram === undefined) return false;
-  return SYNCHRONISED_UPDATE_PROGRAMS.includes(termProgram.toLowerCase());
+): TerminalName | null {
+  const byTerm = term === undefined ? undefined : BY_TERM[term];
+  if (byTerm !== undefined) return byTerm;
+  const program = termProgram?.toLowerCase();
+  const byProgram = program === undefined ? undefined : BY_PROGRAM[program];
+  return byProgram ?? null;
 }
 
 /**
- * **Ghostty was missing and the whole protocol arm was unreachable** (F415).
+ * **Ghostty is here on a measurement rather than on a claim.**
+ * `tools/terminal-probe` sends the shipped encoder's own transmission and reads
+ * the reply: Ghostty 1.3.1 answers `OK` for four PNGs and `EINVAL: invalid data`
+ * for a corrupted control, so the protocol is present and success is
+ * distinguishable from failure (F415).
  *
- * This answered `kitty` for `TERM=xterm-kitty` and nothing else, so
- * `transmitImage`, `placementRows`, the placeholder encoding and C09 §4c entire
- * were dead code on three of the four terminals that speak the protocol. The
- * knowledge was **four lines up in C02's own table**: `synchronisedUpdate` has
- * named ghostty since v1. Two lists over one question — *which emulator is
- * this* — and only one kept up.
+ * **WezTerm and Windows Terminal are `none`, owed and not claimed.** Neither has
+ * been measured here and the asymmetry decides it: placeholders addressing an
+ * image the terminal never received draw *nothing*, where a wrong `none` draws a
+ * dither. The expiry is an instrument rather than a hope — run the probe there
+ * and read the verdict.
  *
- * **Added on a measurement.** `tools/terminal-probe` sends the shipped encoder's
- * own transmission and reads the reply: Ghostty 1.3.1 answers `OK` for four PNGs
- * and `EINVAL: invalid data` for a corrupted control, so the protocol is present
- * and success is distinguishable from failure.
- *
- * **Both `TERM` and `TERM_PROGRAM`**, because a ghostty inside `tmux` reports
- * `TERM=screen-256color` and only the second survives.
- *
- * **WezTerm and Konsole are owed and not claimed.** Neither has been measured
- * here, and a false positive is worse than a false negative: placeholders
- * addressing an image the terminal never received draw *nothing*, where a wrong
- * `none` draws a dither. The expiry is an instrument rather than a hope — run
- * `tools/terminal-probe/probe.py` in the terminal and read the verdict.
+ * **`synchronisedUpdate` and `colourDepth` have no table of their own**, because
+ * the membership criterion for the map above *is* being an emulator modern enough
+ * to name, and there is no member for which either is false. A terminal added for
+ * which one is false needs a column before it needs a row — and a column whose
+ * value never varies is the first thing to distrust, which is why that expiry is
+ * written here rather than assumed.
  */
-function detectImageProtocol(
-  term: string | undefined,
-  termProgram: string | undefined,
-): TerminalCapabilities["imageProtocol"] {
-  const program = termProgram?.toLowerCase();
-  if (program === "iterm.app") return "iterm2";
-  if (term === "xterm-kitty" || term === "xterm-ghostty" || program === "ghostty") return "kitty";
-  return "none";
-}
+const IMAGE_PROTOCOL: Readonly<Record<TerminalName, TerminalCapabilities["imageProtocol"]>> = {
+  kitty: "kitty",
+  ghostty: "kitty",
+  iterm2: "iterm2",
+  wezterm: "none",
+  windowsterminal: "none",
+};
 
 function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
   const term = read(env, "TERM");
@@ -289,9 +331,14 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
   // Absent TERM is treated as dumb throughout (§3). A record that has already
   // concluded the shell cannot open has no business claiming bracketed paste.
   const usable = term !== undefined && term !== "dumb";
+  // **Asked once, read three times** (I11). Not gated by `usable`, on §3's
+  // boundary: `TERM=dumb` is a statement about terminfo and iTerm2 supports
+  // synchronised update whatever it claims.
+  const terminal = identifyTerminal(term, termProgram);
+  const inTmux = read(env, "TMUX") !== undefined;
 
   return {
-    colourDepth: detectColourDepth(term, read(env, "COLORTERM")),
+    colourDepth: detectColourDepth(term, read(env, "COLORTERM"), terminal, inTmux),
     unicode: detectUnicode(read(env, "LC_ALL"), read(env, "LC_CTYPE"), read(env, "LANG")),
     ambiguousWidth: detectAmbiguousWidth(
       read(env, "LC_ALL"),
@@ -303,10 +350,10 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
     // `TERM=dumb` — depth 1 colours nothing — which is a separate fact and the
     // reason the combination is asserted rather than assumed (T3.12).
     backgroundPolarity: detectBackgroundPolarity(read(env, "COLORFGBG")),
-    synchronisedUpdate: detectSynchronisedUpdate(term, termProgram),
+    synchronisedUpdate: terminal !== null,
     bracketedPaste: usable,
-    mouse: usable && read(env, "TMUX") === undefined,
-    imageProtocol: detectImageProtocol(term, termProgram),
+    mouse: usable && !inTmux,
+    imageProtocol: terminal === null ? "none" : IMAGE_PROTOCOL[terminal],
     altScreen: usable,
   };
 }

@@ -1,4 +1,6 @@
 // C02 tier 1 — unit. A table of env fixtures. No mocks, no terminal.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   detectCapabilities,
@@ -19,6 +21,23 @@ describe("C02 detection", () => {
     expect(caps({ TERM: "xterm" }).colourDepth).toBe(4);
     expect(caps({ TERM: "dumb" }).colourDepth).toBe(1);
     expect(caps({}).colourDepth).toBe(1);
+
+    // **The identification's row, and the case that earns it** (C02 I11, F418).
+    // A real Ghostty or kitty sets `COLORTERM`, so this looks like an artefact of
+    // our own harness stripping it — and it is not. `ssh` allocates a pty and
+    // forwards `TERM`; it does not forward `COLORTERM`. The user got 24-bit
+    // images and 4-bit colour from one terminal, decided by which variable
+    // survived the hop.
+    expect(caps({ TERM: "xterm-kitty" }).colourDepth).toBe(24);
+    expect(caps({ TERM: "xterm-ghostty" }).colourDepth).toBe(24);
+    // **And gated by `TMUX`**, because inside a multiplexer we are not talking to
+    // the emulator we identified — `mouse`'s rule (D34) reaching a second
+    // capability. Conservative by construction: this is what the rule answered
+    // before the identification existed, so inside tmux nothing moved.
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" }).colourDepth).toBe(4);
+    // `COLORTERM` still outranks the name — the terminal speaking for itself
+    // beats us inferring, which is why the identification sits below it.
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x", COLORTERM: "truecolor" }).colourDepth).toBe(24);
   });
 
   it("T1.2: COLORTERM=24bit, the less common spelling, is also 24", () => {
@@ -53,6 +72,12 @@ describe("C02 detection", () => {
     }
     expect(caps({ TERM: "xterm-kitty" }).synchronisedUpdate).toBe(true);
     expect(caps({ TERM: "xterm", TERM_PROGRAM: "Apple_Terminal" }).synchronisedUpdate).toBe(false);
+    // **`false` here until the identification was single-sourced** (F418). This
+    // is what `docker exec -e TERM` forwards and what `ssh` forwards, so it is
+    // the common case rather than a corner: the images arrived and the frame
+    // tore, every frame, because two lists answered one question and only one had
+    // heard of `xterm-ghostty`.
+    expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(true);
   });
 
   it("T1.6: mouse needs a real terminal and no tmux (D34)", () => {
@@ -84,15 +109,61 @@ describe("C02 detection", () => {
     expect(caps({ TERM: "xterm-256color", TERM_PROGRAM: "WezTerm" }).imageProtocol).toBe("none");
     expect(caps({ TERM: "xterm-256color", KONSOLE_VERSION: "220400" }).imageProtocol).toBe("none");
 
-    // **The record this rule is drawn from, and writing it down corrected it.**
-    // `synchronisedUpdate` has known about ghostty since v1 — but by
-    // `TERM_PROGRAM`, not by `TERM`. Both rules carry an `xterm-kitty` special
-    // case *and* a program list, and `imageProtocol`'s list held only iTerm: the
-    // gap was ghostty missing from **both** keys, not from one. Asserted rather
-    // than narrated, because the first version of this row claimed
-    // `TERM=xterm-ghostty` implied a synchronised update and it does not.
+    // **This row asserted the defect as correct, and its comment is why that is
+    // hard to catch** (F418). It read: *asserted rather than narrated, because
+    // the first version of this row claimed `TERM=xterm-ghostty` implied a
+    // synchronised update and it does not.* Every word true — a reader hunting
+    // their own assumptions went to the code, found `false`, and wrote it down.
+    //
+    // **True about the code and false about Ghostty**, which implements
+    // synchronised update and is in the program list for exactly that reason. The
+    // row recorded which variable happened to be consulted, and a row that does
+    // that reads exactly like a row that records a decision. It then held the
+    // disagreement in place for the life of the project.
     expect(caps({ TERM_PROGRAM: "ghostty" }).synchronisedUpdate).toBe(true);
-    expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(false);
+    expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(true);
+  });
+
+  it("T1.12 (C02 I11): the identification is one function and the capabilities read it", () => {
+    // **Structural rather than by comparing answers** (F84's shape). Three lists
+    // that happen to agree pass every agreement test and are still three lists —
+    // and this file shipped for the life of the project with two that did not.
+    // The property worth holding is the one a scan can see.
+    //
+    // **Comments stripped first**: the doc comments here name every emulator
+    // repeatedly, and a source assertion that counts prose measures the prose
+    // rather than the code.
+    const src = readFileSync(join(import.meta.dirname, "../../src/terminal/capabilities.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/\/\/[^\n]*/gu, "");
+    const NAMES = ["xterm-kitty", "xterm-ghostty", "iterm.app", "ghostty", "wezterm", "windowsterminal"];
+
+    // Brace-matched bodies, so a name in a later function is not attributed to an
+    // earlier one — the failure that makes a source scan agree with itself.
+    const bodies = new Map<string, string>();
+    for (const m of src.matchAll(/function\s+([A-Za-z0-9_]+)\s*\(/gu)) {
+      let i = src.indexOf("{", m.index + m[0].length);
+      if (i === -1) continue;
+      let depth = 0;
+      const from = i;
+      for (; i < src.length; i += 1) {
+        if (src[i] === "{") depth += 1;
+        else if (src[i] === "}") { depth -= 1; if (depth === 0) break; }
+      }
+      bodies.set(m[1] ?? "", src.slice(from, i + 1));
+    }
+
+    expect(bodies.has("identifyTerminal"), "the identification exists as one function").toBe(true);
+    for (const [name, body] of bodies) {
+      if (!name.startsWith("detect")) continue;
+      for (const emulator of NAMES) {
+        expect(body.includes(emulator), `${name} names ${emulator} itself`).toBe(false);
+      }
+    }
+    // And the control: the scan can see a name where one legitimately is, so a
+    // green run above is not the corpus being empty (a fabricated violation can
+    // be vacuous).
+    expect(NAMES.some((n) => src.includes(n)), "the names are in the file at all").toBe(true);
   });
 
   it("T1.8: alt screen needs TERM present and not dumb", () => {

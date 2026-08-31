@@ -137,15 +137,24 @@ const results = runPass({
       expect: "HB10",
     },
     {
-      // **F415, restored.** `xterm-kitty` only, which is what shipped — and the
-      // whole protocol arm becomes unreachable on three of the four terminals
-      // that speak it. Nothing in the renderer's own suite can see this: every
-      // test injects capabilities, which is correct, and leaves the detection as
-      // the one door nothing opens.
-      name: "KITTY-ONLY: the detection forgets every terminal but kitty itself",
+      // **F415, restored.** Ghostty forgotten, and the whole protocol arm becomes
+      // unreachable on it. Nothing in the renderer's own suite can see this:
+      // every test injects capabilities, which is correct, and leaves the
+      // detection as the one door nothing opens.
+      //
+      // **Compound since F418 single-sourced the identification**, and the shape
+      // change is the point rather than an inconvenience. The old anchor was one
+      // line of `detectImageProtocol` — `xterm-kitty || xterm-ghostty ||
+      // program === "ghostty"` — which was itself the second of three lists over
+      // *which emulator is this*. There is one list now, so forgetting a terminal
+      // takes an edit in both of its keys: `TERM`, which a multiplexer rewrites,
+      // and `TERM_PROGRAM`, which survives one. A single-anchor version would
+      // leave ghostty identified by the other key and mutate nothing observable.
+      name: "GHOSTTY-FORGOTTEN: the one identification loses a terminal by both keys",
       file: CAPS,
-      from: 'if (term === "xterm-kitty" || term === "xterm-ghostty" || program === "ghostty") return "kitty";',
-      to: 'if (term === "xterm-kitty") return "kitty";',
+      from: '  "xterm-ghostty": "ghostty",\n',
+      to: "",
+      also: [{ file: CAPS, from: "  ghostty: \"ghostty\",\n", to: "" }],
       expect: "T1.7",
     },
     {
